@@ -28,4 +28,7 @@ function _optionalChain(ops) {
   return value;
 }
 
-export { _nullishCoalesce, _optionalChain };
+const uid = () => Math.random().toString(36).slice(2,9);
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+export { _nullishCoalesce, _optionalChain, uid, todayStr };
