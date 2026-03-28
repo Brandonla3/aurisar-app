@@ -15,6 +15,7 @@ import { ExerciseVideo } from './components/ExerciseVideo';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
 import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
+import loginBg from './assets/login-bg.png';
 
 
 function App() {
@@ -1523,6 +1524,49 @@ function App() {
     else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
   }
 
+  // Instantly log a scheduled solo exercise with default values and remove it from schedule
+  function quickLogSoloEx(sw) {
+    const ex = allExById[sw.exId];
+    if (!ex) return;
+    const noSetsEx = NO_SETS_EX_IDS.has(ex.id);
+    const sv = noSetsEx ? 1 : (ex.defaultSets != null ? ex.defaultSets : 3);
+    const rv = ex.defaultReps != null ? ex.defaultReps : 10;
+    const mult = getMult(ex);
+    const earned = Math.round(ex.baseXP * mult * (1 + (rv * sv - 1) * 0.05));
+    const weekStart = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
+    const travelActive = profile.travelBoost && profile.travelBoost.weekStart === weekStart();
+    const myRegionIdx = getRegionIdx(xpToLevel(profile.xp));
+    const myRegion = MAP_REGIONS[myRegionIdx];
+    const regionBoost = myRegion && (myRegion.boost.muscle==="all" || myRegion.boost.muscle===ex.muscleGroup) ? 1.07 : 1;
+    const finalEarned = Math.round(earned * (travelActive ? 1.1 : 1) * regionBoost);
+    const entry = {
+      exercise: ex.name, icon: ex.icon, xp: finalEarned, mult, reps: rv, sets: sv,
+      weightLbs: null, weightPct: 100, hrZone: null, distanceMi: null,
+      time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+      date: new Date().toLocaleDateString(),
+      dateKey: todayStr(),
+      exId: ex.id,
+    };
+    const newQuests = {...(profile.quests||{})};
+    QUESTS.filter(q => q.auto && !_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q => {
+      if (checkQuestCompletion(q, [entry, ...profile.log], profile.checkInStreak))
+        newQuests[q.id] = {completed:true, completedAt:todayStr(), claimed:false};
+    });
+    const newLog = [entry, ...profile.log];
+    const newExPBs = calcExercisePBs(newLog);
+    setProfile(p => ({
+      ...p,
+      xp: p.xp + finalEarned,
+      log: [entry, ...p.log],
+      quests: newQuests,
+      exercisePBs: newExPBs,
+      scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
+    }));
+    setXpFlash({amount: finalEarned, mult, travel: travelActive});
+    setTimeout(() => setXpFlash(null), 2000);
+    showToast(travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`);
+  }
+
   // Save a set of log entries (from history) as a custom plan template
   // Open "Save To Plan" wizard from history (renamed from Save as Plan)
   function openSavePlanWizard(entries, label) {
@@ -2195,6 +2239,8 @@ function App() {
         doSave(newProfile, _optionalChain([authUser, 'optionalAccess', _67 => _67.id])||null, _optionalChain([authUser, 'optionalAccess', _68 => _68.email])||null);
         showToast(p.icon + " " + p.name + " scheduled for " + formatScheduledDate(spDate) + " \u2726");
       }
+      setActiveTab("workouts");
+      setWorkoutSubTab("oneoff");
     }
     setSchedulePicker(null);
   }
@@ -2438,7 +2484,11 @@ function App() {
   if(screen==="login") return (
     React.createElement('div', { style: {
       minHeight:"100vh",
-      background:"radial-gradient(ellipse 60% 40% at 50% 18%, rgba(160,120,50,.12) 0%, transparent 70%), radial-gradient(ellipse 80% 50% at 55% 10%, rgba(80,60,25,.18) 0%, transparent 65%), radial-gradient(ellipse 50% 45% at 68% 78%, rgba(35,30,20,.10) 0%, transparent 60%), linear-gradient(180deg, rgba(30,24,16,.6) 0%, transparent 35%), #0c0c0a",
+      backgroundImage:`linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
+      backgroundSize:"cover",
+      backgroundPosition:"center",
+      backgroundRepeat:"no-repeat",
+      backgroundColor:"#0c0c0a",
       display:"flex", flexDirection:"column", alignItems:"stretch"
     }}
       , React.createElement('style', null, CSS)
@@ -3000,6 +3050,7 @@ function App() {
                 {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
                 {icon:"💬", label:"Feedback",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
+                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("login");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
                 React.createElement('button', {
                     key: item.label,
@@ -3703,7 +3754,7 @@ function App() {
                             setReps(String(libDetailEx.defaultReps!=null?libDetailEx.defaultReps:10));
                             setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);
                             setLibDetailEx(null);
-                            setActiveTab("log");
+                            setActiveTab("exercises");
                           },
                           style:{width:"100%",marginTop:8,background:"linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",border:"1px solid rgba(41,128,185,.3)",color:"#2980b9",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer",textAlign:"center"}
                         }, "\u26A1 Edit & Complete Now")
@@ -3957,7 +4008,9 @@ function App() {
                           grouped[key].items.push(sw);
                         });
                         const scheduled = Object.values(grouped).sort((a,b)=>a.date.localeCompare(b.date));
-                        if(scheduled.length===0) return React.createElement('div', { className: "empty"}, "No upcoming one-off workouts."   , React.createElement('br', null), "Select exercises and tap ⚡ One-Off Workout to schedule one."         );
+                        const hasSoloExs = (profile.scheduledWorkouts||[]).some(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today);
+                        if(scheduled.length===0 && !hasSoloExs) return React.createElement('div', { className: "empty"}, "No upcoming one-off workouts."   , React.createElement('br', null), "Select exercises and tap ⚡ One-Off Workout to schedule one."         );
+                        if(scheduled.length===0) return null;
                         return scheduled.map(g=>{
                           const days = daysUntil(g.date);
                           const badgeCls = days===0?"badge-today":days<=3?"badge-soon":"badge-future";
@@ -4014,6 +4067,42 @@ function App() {
                             )
                           );
                         });
+                      })()
+                      , (()=>{
+                        const today = todayStr();
+                        const soloExs = (profile.scheduledWorkouts||[]).filter(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today).sort((a,b)=>a.scheduledDate.localeCompare(b.scheduledDate));
+                        if(soloExs.length===0) return null;
+                        return React.createElement(React.Fragment, null
+                          , React.createElement('div', {style:{fontSize:".65rem",color:"#4a4438",textTransform:"uppercase",letterSpacing:".1em",marginTop:14,marginBottom:8}}, "Solo Exercises")
+                          , soloExs.map(sw=>{
+                            const ex = allExById[sw.exId];
+                            if(!ex) return null;
+                            const days = daysUntil(sw.scheduledDate);
+                            const badgeCls = days===0?"badge-today":days<=3?"badge-soon":"badge-future";
+                            const badgeTxt = days===0?"Today":days===1?"Tomorrow":`${days}d away`;
+                            return React.createElement('div', {key:sw.id, className:"workout-card"}
+                              , React.createElement('div', {className:"workout-card-top"}
+                                , React.createElement('div', {className:"workout-icon"}, ex.icon)
+                                , React.createElement('div', {style:{flex:1,minWidth:0}}
+                                  , React.createElement('div', {className:"workout-name"}, ex.name)
+                                  , React.createElement('div', {className:"workout-meta"}
+                                    , React.createElement('span', {className:`upcoming-badge ${badgeCls}`, style:{marginLeft:4}}, badgeTxt)
+                                  )
+                                  , sw.notes && React.createElement('div', {className:"workout-desc", style:{marginTop:3}}, sw.notes)
+                                )
+                                , React.createElement('div', {style:{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}
+                                  , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{color:"#e74c3c"}, onClick:()=>{
+                                    setProfile(p=>({...p,scheduledWorkouts:(p.scheduledWorkouts||[]).filter(s=>s.id!==sw.id)}));
+                                    showToast("Scheduled exercise removed.");
+                                  }}, "\u2715")
+                                )
+                              )
+                              , React.createElement('div', {style:{display:"flex",gap:6,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(180,172,158,.04)"}}
+                                , React.createElement('button', {className:"btn btn-gold btn-sm", onClick:()=>quickLogSoloEx(sw)}, "\u26A1 Log Now")
+                              )
+                            );
+                          })
+                        );
                       })()
                     )
                   )
