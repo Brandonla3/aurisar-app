@@ -29,6 +29,7 @@ function _optionalChain(ops) {
 }
 
 const uid = () => Math.random().toString(36).slice(2,9);
+const clone = obj => JSON.parse(JSON.stringify(obj));
 const todayStr = () => new Date().toISOString().slice(0,10);
 
-export { _nullishCoalesce, _optionalChain, uid, todayStr };
+export { _nullishCoalesce, _optionalChain, uid, clone, todayStr };
