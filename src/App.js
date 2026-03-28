@@ -14,7 +14,7 @@ import { ClassIcon } from './components/ClassIcon';
 import { ExerciseVideo } from './components/ExerciseVideo';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
-import { useYMoveExercises, loadYMoveExercises } from './utils/ymove';
+import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 
 
 function App() {

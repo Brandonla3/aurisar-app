@@ -166,4 +166,4 @@ async function getFreshVideoUrl(exerciseId) {
   return promise;
 }
 
-export { _notifyYMoveLoaded, onYMoveLoaded, loadYMoveExercises, useYMoveExercises, getFreshVideoUrl };
+export { _ymoveLoaded, _notifyYMoveLoaded, onYMoveLoaded, loadYMoveExercises, useYMoveExercises, getFreshVideoUrl };
