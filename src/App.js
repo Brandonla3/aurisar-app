@@ -261,6 +261,11 @@ function App() {
   const [spActiveCal,setSpActiveCal] = useState("");
   const [spTotalCal,setSpTotalCal]   = useState("");
   const [spMakeReusable,setSpMakeReusable] = useState(false);
+  // Workout label filter & builder
+  const [woLabelFilters,setWoLabelFilters] = useState(()=>new Set());
+  const [woLabelDropOpen,setWoLabelDropOpen] = useState(false);
+  const [wbLabels,setWbLabels] = useState([]); // labels for workout being built/edited
+  const [newLabelInput,setNewLabelInput] = useState("");
   // Workout completion modal
   const [completionModal,setCompletionModal] = useState(null); // null | {workout}
   const [retroEditModal,setRetroEditModal]   = useState(null); // {groupId, entries, dateKey, sourceType, sourceName, sourceIcon, sourceId}
@@ -1645,11 +1650,14 @@ function App() {
       const split = base.durationMin ? secToHHMMSplit(Number(base.durationMin)) : {hhmm:"",sec:""};
       setWbDuration(split.hhmm); setWbDurSec(split.sec!==0&&split.sec!==""?String(split.sec):"");
       setWbActiveCal(base.activeCal||""); setWbTotalCal(base.totalCal||"");
+      setWbLabels(base.labels||[]);
     } else {
       setWbName(""); setWbIcon("💪"); setWbDesc(""); setWbExercises([]); setWbEditId(null);
       setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
+      setWbLabels([]);
     }
     setWbIsOneOff(false);
+    setNewLabelInput("");
     setWorkoutView("builder");
   }
   function saveBuiltWorkout() {
@@ -1657,7 +1665,8 @@ function App() {
     if(wbExercises.length===0) { showToast("Add at least one exercise."); return; }
     const w = {id:wbEditId||uid(), name:wbName.trim(), icon:wbIcon, desc:wbDesc.trim(),
       exercises:wbExercises, createdAt:new Date().toLocaleDateString(),
-      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null};
+      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null,
+      labels:wbLabels};
     if(wbEditId) {
       setProfile(pr=>({...pr, workouts:(pr.workouts||[]).map(wo=>wo.id===wbEditId?w:wo)}));
       showToast("Workout updated! 💪");
@@ -1667,6 +1676,7 @@ function App() {
     }
     setWorkoutView("list"); setActiveWorkout(null); setWbEditId(null); setWbCopySource(null);
     setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
+    setWbLabels([]); setNewLabelInput("");
   }
   function copyWorkout(wo) {
     setWbName("Copy of "+wo.name);
@@ -1675,6 +1685,8 @@ function App() {
     setWbExercises(wo.exercises.map(e=>({...e})));
     setWbEditId(null); // new id on save
     setWbCopySource(wo.name);
+    setWbLabels(wo.labels||[]);
+    setNewLabelInput("");
     setWorkoutView("builder");
   }
   function deleteWorkout(id) {
@@ -4097,14 +4109,95 @@ function App() {
                       React.createElement('button', { key: t, className: `log-subtab-btn ${workoutSubTab===t?"on":""}`, onClick: ()=>setWorkoutSubTab(t)}, l)
                     ))
                   )
+                  /* Label filter dropdown */
+                  , (profile.workoutLabels||[]).length>0 && React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,position:"relative"}},
+                    woLabelDropOpen && React.createElement('div', {onClick:()=>setWoLabelDropOpen(false), style:{position:"fixed",inset:0,zIndex:19}}),
+                    React.createElement('div', {style:{position:"relative",zIndex:20}},
+                      React.createElement('button', {
+                        onClick:()=>setWoLabelDropOpen(!woLabelDropOpen),
+                        style:{padding:"7px 28px 7px 10px",borderRadius:9,
+                               border:"1px solid "+(woLabelFilters.size>0?"#C4A044":"rgba(45,42,36,.3)"),
+                               background:"rgba(14,14,12,.95)",
+                               color:woLabelFilters.size>0?"#C4A044":"#8a8478",
+                               fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                      },
+                        woLabelFilters.size>0?"Labels ("+woLabelFilters.size+")":"Labels",
+                        React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
+                          transform:"translateY(-50%) rotate("+(woLabelDropOpen?"180deg":"0deg")+")",
+                          color:woLabelFilters.size>0?"#C4A044":"#6a6050",fontSize:".6rem",
+                          transition:"transform .15s",lineHeight:1}},"▼")
+                      ),
+                      woLabelDropOpen && React.createElement('div', {
+                        style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:180,
+                               background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.07)",
+                               borderRadius:9,padding:"6px 4px",zIndex:21,
+                               boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
+                      },
+                        (profile.workoutLabels||[]).map(l=>{
+                          const sel=woLabelFilters.has(l);
+                          return React.createElement('div', {
+                            key:l,
+                            onClick:()=>setWoLabelFilters(s=>{const n=new Set(s);n.has(l)?n.delete(l):n.add(l);return n;}),
+                            style:{display:"flex",alignItems:"center",gap:8,
+                                   padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                   background:sel?"rgba(196,160,68,.12)":"transparent"}
+                          },
+                            React.createElement('div', {style:{
+                              width:14,height:14,borderRadius:3,flexShrink:0,
+                              border:"1.5px solid "+(sel?"#C4A044":"rgba(180,172,158,.08)"),
+                              background:sel?"rgba(196,160,68,.25)":"transparent",
+                              display:"flex",alignItems:"center",justifyContent:"center"
+                            }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:"#C4A044",lineHeight:1}},"✓")),
+                            React.createElement('span',{style:{fontSize:".72rem",
+                              color:sel?"#C4A044":"#b4ac9e",whiteSpace:"nowrap"}},l)
+                          );
+                        }),
+                        React.createElement('div', {className:"wo-label-new-row"},
+                          React.createElement('input', {className:"wo-label-new-inp", value:newLabelInput,
+                            onChange:e=>setNewLabelInput(e.target.value),
+                            onClick:e=>e.stopPropagation(),
+                            onKeyDown:e=>{
+                              if(e.key==="Enter"&&newLabelInput.trim()){
+                                const lbl=newLabelInput.trim();
+                                if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                                  setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                                }
+                                setNewLabelInput("");
+                              }
+                            },
+                            placeholder:"+ New label…"}),
+                          React.createElement('button', {className:"btn btn-ghost btn-xs", style:{padding:"2px 6px",fontSize:".6rem"},
+                            onClick:e=>{
+                              e.stopPropagation();
+                              const lbl=newLabelInput.trim(); if(!lbl) return;
+                              if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                                setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                              }
+                              setNewLabelInput("");
+                            }},"+")
+                        )
+                      )
+                    ),
+                    woLabelFilters.size>0 && React.createElement('button', {
+                      className:"btn btn-ghost btn-xs",
+                      style:{fontSize:".6rem",color:"#8a8478",alignSelf:"center"},
+                      onClick:()=>setWoLabelFilters(new Set())
+                    },"Clear")
+                  )
                   , workoutSubTab==="reusable"&&(
                     React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:13}}
                         , React.createElement('button', { className: "btn btn-gold btn-sm"  , onClick: ()=>initWorkoutBuilder(null)}, "＋ New Workout"  )
                         , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setWorkoutView("recipes")}, "📋 Recipes" )
                       )
-                      , allW.filter(w=>!w.oneOff).length===0&&React.createElement('div', { className: "empty"}, "No reusable workouts yet."   , React.createElement('br', null), "Create your first custom workout or start from a template."         )
-                  , allW.filter(w=>!w.oneOff).map(wo=>{
+                      , (()=>{
+                        const reusableWo = allW.filter(w=>!w.oneOff);
+                        const filtered = reusableWo.filter(w=>woLabelFilters.size===0||(w.labels||[]).some(l=>woLabelFilters.has(l)));
+                        if(reusableWo.length===0) return React.createElement('div', { className: "empty"}, "No reusable workouts yet.", React.createElement('br', null), "Create your first custom workout or start from a template.");
+                        if(filtered.length===0 && woLabelFilters.size>0) return React.createElement('div', { className: "empty"}, "No workouts match the selected labels.");
+                        return null;
+                      })()
+                  , allW.filter(w=>!w.oneOff).filter(w=>woLabelFilters.size===0||(w.labels||[]).some(l=>woLabelFilters.has(l))).map(wo=>{
                     const exCount = wo.exercises.length;
                     const xp = calcWorkoutXP(wo);
                     return (
@@ -4116,6 +4209,7 @@ function App() {
                             , React.createElement('div', { className: "workout-meta"}
                               , React.createElement('span', { className: "workout-tag"}, exCount, " exercise" , exCount!==1?"s":"")
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
+                              , (wo.labels||[]).map(l=>React.createElement('span', {key:l, className:"wo-label-chip", style:{pointerEvents:"none",marginLeft:2}}, l))
                             )
                             , wo.desc&&React.createElement('div', { className: "workout-desc", style:{marginTop:3}}, wo.desc)
                           )
@@ -4142,9 +4236,14 @@ function App() {
                           if(!grouped[key]) grouped[key]={id:sw.sourceWorkoutId, name:sw.sourceWorkoutName, icon:sw.sourceWorkoutIcon||"⚡", date:sw.scheduledDate, items:[]};
                           grouped[key].items.push(sw);
                         });
-                        const scheduled = Object.values(grouped).sort((a,b)=>a.date.localeCompare(b.date));
+                        const scheduled = Object.values(grouped).filter(g=>{
+                          if(woLabelFilters.size===0) return true;
+                          const wo = (profile.workouts||[]).find(w=>w.id===g.id);
+                          return (wo&&wo.labels||[]).some(l=>woLabelFilters.has(l));
+                        }).sort((a,b)=>a.date.localeCompare(b.date));
                         const hasSoloExs = (profile.scheduledWorkouts||[]).some(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today);
-                        if(scheduled.length===0 && !hasSoloExs) return React.createElement('div', { className: "empty"}, "No upcoming one-off workouts."   , React.createElement('br', null), "Select exercises and tap ⚡ One-Off Workout to schedule one."         );
+                        if(scheduled.length===0 && !hasSoloExs && woLabelFilters.size===0) return React.createElement('div', { className: "empty"}, "No upcoming one-off workouts."   , React.createElement('br', null), "Select exercises and tap ⚡ One-Off Workout to schedule one."         );
+                        if(scheduled.length===0 && !hasSoloExs && woLabelFilters.size>0) return React.createElement('div', { className: "empty"}, "No one-off workouts match the selected labels.");
                         if(scheduled.length===0) return null;
                         return scheduled.map(g=>{
                           const days = daysUntil(g.date);
@@ -4162,6 +4261,7 @@ function App() {
                                     , React.createElement('span', { className: "workout-tag"}, g.items.length, " exercise" , g.items.length!==1?"s":"")
                                     , React.createElement('span', { className: "workout-tag"}, "\u26A1 " , xp.toLocaleString(), " XP" )
                                     , React.createElement('span', { className: `upcoming-badge ${badgeCls}`, style: {marginLeft:4}}, badgeTxt)
+                                    , (wo.labels||[]).map(l=>React.createElement('span', {key:l, className:"wo-label-chip", style:{pointerEvents:"none",marginLeft:2}}, l))
                                   )
                                   , wo.desc&&React.createElement('div', { className: "workout-desc", style:{marginTop:3}}, wo.desc)
                                 )
@@ -4170,6 +4270,7 @@ function App() {
                                     setWbName(wo.name); setWbIcon(wo.icon); setWbDesc(wo.desc||"");
                                     setWbExercises(wo.exercises.map(e=>({...e})));
                                     setWbEditId(wo.id); setWbIsOneOff(true);
+                                    setWbLabels(wo.labels||[]); setNewLabelInput("");
                                     setWorkoutView("builder");
                                   }}, "\u270E")
                                   , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Delete", style:{color:"#e74c3c"}, onClick: ()=>{
@@ -4394,7 +4495,7 @@ function App() {
               if(workoutView==="builder") return (
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { className: "builder-nav-hdr" }
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setWorkoutView("list"); setWbCopySource(null); setWbIsOneOff(false); setWbEditId(null); setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");} }, "← Cancel")
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setWorkoutView("list"); setWbCopySource(null); setWbIsOneOff(false); setWbEditId(null); setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal(""); setWbLabels([]); setNewLabelInput("");} }, "← Cancel")
                     , React.createElement('div', { style: {flex:1,minWidth:0} }
                       , React.createElement('div', { className: "builder-nav-title" }
                         , wbIsOneOff
@@ -4422,6 +4523,41 @@ function App() {
                   , React.createElement('div', { className: "field"}
                     , React.createElement('label', null, "Description " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
                     , React.createElement('input', { className: "inp", value: wbDesc, onChange: e=>setWbDesc(e.target.value), placeholder: "e.g. Upper body strength focus…"    })
+                  )
+                  /* Labels */
+                  , React.createElement('div', { className: "field"}
+                    , React.createElement('label', null, "Labels " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
+                    , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}
+                      , (profile.workoutLabels||[]).map(l=>
+                        React.createElement('span', { key: l, className: "wo-label-chip"+(wbLabels.includes(l)?" sel":""),
+                          onClick: ()=>setWbLabels(prev=>prev.includes(l)?prev.filter(x=>x!==l):[...prev,l])
+                        }, l)
+                      )
+                      , React.createElement('span', { style: {display:"inline-flex",alignItems:"center",gap:4}}
+                        , React.createElement('input', { className: "wo-label-new-inp", value: newLabelInput,
+                          onChange: e=>setNewLabelInput(e.target.value),
+                          onKeyDown: e=>{
+                            if(e.key==="Enter"&&newLabelInput.trim()){
+                              const lbl=newLabelInput.trim();
+                              if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                                setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                              }
+                              if(!wbLabels.includes(lbl)) setWbLabels(prev=>[...prev,lbl]);
+                              setNewLabelInput("");
+                            }
+                          },
+                          placeholder: "+ New label…", style: {width:100} })
+                        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 6px",fontSize:".6rem"},
+                          onClick: ()=>{
+                            const lbl=newLabelInput.trim(); if(!lbl) return;
+                            if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                              setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                            }
+                            if(!wbLabels.includes(lbl)) setWbLabels(prev=>[...prev,lbl]);
+                            setNewLabelInput("");
+                          }}, "+")
+                      )
+                    )
                   )
                   /* Workout-level stats (optional) */
                   , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:4}}
@@ -4745,7 +4881,7 @@ function App() {
                         if(!wbName.trim()){ showToast("Name your workout first!"); return; }
                         if(wbExercises.length===0){ showToast("Add at least one exercise."); return; }
                         const updated = {id:wbEditId, name:wbName.trim(), icon:wbIcon, desc:wbDesc.trim(),
-                          exercises:wbExercises, createdAt:todayStr(), oneOff:true};
+                          exercises:wbExercises, createdAt:todayStr(), oneOff:true, labels:wbLabels};
                         setProfile(p=>({
                           ...p,
                           // Update the saved workout object
@@ -4772,7 +4908,8 @@ function App() {
                           exercises:wbExercises,createdAt:todayStr(),oneOff:true,
                           durationMin:dur||null,
                           activeCal:wbActiveCal||null,
-                          totalCal:wbTotalCal||null};
+                          totalCal:wbTotalCal||null,
+                          labels:wbLabels};
                         openStatsPromptIfNeeded(wo,(woWithStats, _sr)=>{
                           setCompletionModal({workout:woWithStats, fromStats:_sr});
                           setCompletionDate(todayStr());
