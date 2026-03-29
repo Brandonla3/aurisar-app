@@ -3749,7 +3749,7 @@ function App() {
                       React.createElement('button',{
                         onClick:()=>{
                           const exs=[...libSelected].map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
-                          setWbExercises(exs);setWbName("");setWbIcon("💪");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
+                          setWbExercises(exs);setWbName("");setWbIcon("💪");setWbDesc("");setWbEditId(null);setWbIsOneOff(false);
                           setWorkoutView("builder");setActiveTab("workouts");
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
@@ -3941,28 +3941,28 @@ function App() {
                       }, favSelectMode?"✕ Cancel":"☐ Select")
                     )
                     /* Multi-select action bar */
-                    , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.3)",border:"1px solid rgba(180,172,158,.08)",borderRadius:10,padding:"10px 12px",marginBottom:10,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}
-                      , React.createElement('span',{style:{fontSize:".68rem",color:"#b4ac9e",fontWeight:600,marginRight:4}}, favSelected.size+" selected")
+                    , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"center"}}
+                      , React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700",flexShrink:0}}, favSelected.size+" selected")
+                      , React.createElement('div',{style:{flex:1}})
                       , React.createElement('button',{
                         onClick:()=>{
                           const ids=[...favSelected];
-                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};});
+                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
+                          setAddToWorkoutPicker({exercises:exs});
+                          setFavSelectMode(false);setFavSelected(new Set());
+                        },
+                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
+                      },"➕ Existing")
+                      , React.createElement('button',{
+                        onClick:()=>{
+                          const ids=[...favSelected];
+                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
                           setWbExercises(exs);setWbName("");setWbIcon("💪");setWbDesc("");setWbEditId(null);setWbIsOneOff(false);
                           setWorkoutView("builder");setActiveTab("workouts");
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",fontSize:".6rem",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontWeight:600}
-                      },"💪 Workout")
-                      , React.createElement('button',{
-                        onClick:()=>{
-                          const ids=[...favSelected];
-                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};});
-                          setWbExercises(exs);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
-                          setWorkoutView("builder");setActiveTab("workouts");
-                          setFavSelectMode(false);setFavSelected(new Set());
-                        },
-                        style:{background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",fontSize:".6rem",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontWeight:600}
-                      },"⚡ One-Off")
+                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
+                      },"⚡ New Workout")
                       , React.createElement('button',{
                         onClick:()=>{
                           const ids=[...favSelected];
@@ -3970,7 +3970,7 @@ function App() {
                           setSpwName("Selected Favorites");setSpwIcon("📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",fontSize:".6rem",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontWeight:600}
+                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
                       },"📋 Plan")
                     )
                     , (profile.favoriteExercises||[]).length===0
@@ -9338,7 +9338,7 @@ function App() {
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
       , statsPromptModal&&(
-        React.createElement('div', { className: "modal-backdrop", onClick: ()=>setStatsPromptModal(null)}
+        React.createElement('div', { className: "modal-backdrop", style:{zIndex:200}, onClick: ()=>setStatsPromptModal(null)}
           , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
             , React.createElement('div', { className: "modal-body"}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10} }
