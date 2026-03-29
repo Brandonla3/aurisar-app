@@ -367,6 +367,7 @@ const EMPTY_PROFILE = {
   xp:0, log:[], plans:[],
   customExercises:[],
   workouts:[],
+  workoutLabels:[], // user-created labels for organizing workouts
   scheduledWorkouts:[],
   lastCheckIn:null, checkInStreak:0, totalCheckIns:0, checkInHistory:[],
   quests:{},

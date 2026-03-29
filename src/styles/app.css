@@ -724,6 +724,15 @@
     .workout-ex-pill-row{display:flex;gap:4px;flex-wrap:wrap}
     .workout-ex-pill{font-size:.58rem;color:#5a5650;background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);border-radius:4px;padding:2px 6px;white-space:nowrap}
 
+    /* ── Workout label chips ── */
+    .wo-label-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:.56rem;border:1px solid rgba(196,160,68,.25);color:#C4A044;background:rgba(196,160,68,.08);cursor:pointer;transition:background .15s,border-color .15s;font-family:'Inter',sans-serif;letter-spacing:.02em;white-space:nowrap}
+    .wo-label-chip.sel{border-color:#C4A044;background:rgba(196,160,68,.18)}
+    .wo-label-chip:hover{background:rgba(196,160,68,.14)}
+    .wo-label-new-row{display:flex;gap:4px;padding:6px 10px;border-top:1px solid rgba(180,172,158,.07);margin-top:4px}
+    .wo-label-new-inp{flex:1;padding:4px 8px;border-radius:6px;border:1px solid rgba(45,42,36,.3);background:rgba(14,14,12,.6);color:#b4ac9e;font-size:.68rem;outline:none;font-family:'Inter',sans-serif}
+    .wo-label-new-inp:focus{border-color:#C4A044}
+    .wo-label-new-inp::placeholder{color:#5a5650}
+
     /* ── Plan cards (Campaign tab) ── */
     .plan-card{background:linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:14px;margin-bottom:9px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
     .plan-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--pc,#b4ac9e) 60%,transparent),transparent);opacity:.45}
