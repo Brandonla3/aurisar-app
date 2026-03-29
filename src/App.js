@@ -1495,48 +1495,58 @@ function App() {
     const regionBoost = myRegion && (myRegion.boost.muscle==="all" || myRegion.boost.muscle===ex.muscleGroup) ? 1.07 : 1;
     const travelMult = travelActive ? 1.1 : 1;
     const finalEarned = Math.round(earned * travelMult * regionBoost);
-    const entry={
-      exercise:ex.name, icon:ex.icon, xp:finalEarned, mult, reps:rv, sets:sv,
-      weightLbs:effectiveW||null, weightPct,
-      hrZone:(canHaveZone&&hrZone)||null,
-      distanceMi:distMi||null,
-      time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
-      date:new Date().toLocaleDateString(),
-      dateKey:todayStr(),
-      exId:ex.id,
-    };
-    const newLog=[entry,...profile.log];
-    const newQuests={...(profile.quests||{})};
-    QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q=>{
-      if(checkQuestCompletion(q,newLog,profile.checkInStreak))
-        newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false};
+    // Capture current state values before clearing UI
+    const capturedPendingSoloRemoveId = pendingSoloRemoveId;
+    const capturedHrZone = (canHaveZone&&hrZone)||null;
+    // Show stats popup, then log on confirm
+    const synth = {name:ex.name, icon:ex.icon, exercises:[], durationMin:null, activeCal:null, totalCal:null, soloEx:true};
+    openStatsPromptIfNeeded(synth, (woWithStats) => {
+      const entry={
+        exercise:ex.name, icon:ex.icon, xp:finalEarned, mult, reps:rv, sets:sv,
+        weightLbs:effectiveW||null, weightPct,
+        hrZone:capturedHrZone,
+        distanceMi:distMi||null,
+        time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+        date:new Date().toLocaleDateString(),
+        dateKey:todayStr(),
+        exId:ex.id,
+        sourceTotalCal: woWithStats.totalCal || null,
+        sourceActiveCal: woWithStats.activeCal || null,
+        sourceDurationSec: woWithStats.durationMin || null,
+      };
+      const newLog=[entry,...profile.log];
+      const newQuests={...(profile.quests||{})};
+      QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q=>{
+        if(checkQuestCompletion(q,newLog,profile.checkInStreak))
+          newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false};
+      });
+      let newPB = profile.runningPB || null;
+      if(runPace && (!newPB || runPace < newPB)) newPB = runPace;
+      const newExPBs = calcExercisePBs(newLog);
+      const oldPB = (profile.exercisePBs||{})[entry.exId];
+      const curPB = newExPBs[entry.exId];
+      const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
+      setProfile(p=>{
+        const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
+        if(capturedPendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==capturedPendingSoloRemoveId);
+        return base;
+      });
+      if(capturedPendingSoloRemoveId) setPendingSoloRemoveId(null);
+      setXpFlash({amount:finalEarned,mult,travel:travelActive});
+      setTimeout(()=>setXpFlash(null),2000);
+      if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
+        showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
+      else if(isNewPB && curPB.type==="strength")
+        showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
+      else if(isNewPB && curPB.type==="assisted")
+        showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
+      else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
     });
-    let newPB = profile.runningPB || null;
-    if(runPace && (!newPB || runPace < newPB)) newPB = runPace;
-    const newExPBs = calcExercisePBs(newLog);
-    const oldPB = (profile.exercisePBs||{})[entry.exId];
-    const curPB = newExPBs[entry.exId];
-    const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
-    setProfile(p=>{
-      const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
-      if(pendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==pendingSoloRemoveId);
-      return base;
-    });
-    if(pendingSoloRemoveId) setPendingSoloRemoveId(null);
-    setXpFlash({amount:finalEarned,mult,travel:travelActive});
-    setTimeout(()=>setXpFlash(null),2000);
     setSelEx(null);setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
     setExHHMM("");setExSec("");setQuickRows([]);
-    if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
-      showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
-    else if(isNewPB && curPB.type==="strength")
-      showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
-    else if(isNewPB && curPB.type==="assisted")
-      showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
-    else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
   }
 
-  // Instantly log a scheduled solo exercise with default values and remove it from schedule
+  // Log a scheduled solo exercise with default values and remove it from schedule (shows stats popup first)
   function quickLogSoloEx(sw) {
     const ex = allExById[sw.exId];
     if (!ex) return;
@@ -1551,32 +1561,39 @@ function App() {
     const myRegion = MAP_REGIONS[myRegionIdx];
     const regionBoost = myRegion && (myRegion.boost.muscle==="all" || myRegion.boost.muscle===ex.muscleGroup) ? 1.07 : 1;
     const finalEarned = Math.round(earned * (travelActive ? 1.1 : 1) * regionBoost);
-    const entry = {
-      exercise: ex.name, icon: ex.icon, xp: finalEarned, mult, reps: rv, sets: sv,
-      weightLbs: null, weightPct: 100, hrZone: null, distanceMi: null,
-      time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
-      date: new Date().toLocaleDateString(),
-      dateKey: todayStr(),
-      exId: ex.id,
-    };
-    const newQuests = {...(profile.quests||{})};
-    QUESTS.filter(q => q.auto && !_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q => {
-      if (checkQuestCompletion(q, [entry, ...profile.log], profile.checkInStreak))
-        newQuests[q.id] = {completed:true, completedAt:todayStr(), claimed:false};
+    // Show stats popup, then log on confirm
+    const synth = {name:ex.name, icon:ex.icon, exercises:[], durationMin:null, activeCal:null, totalCal:null, soloEx:true};
+    openStatsPromptIfNeeded(synth, (woWithStats) => {
+      const entry = {
+        exercise: ex.name, icon: ex.icon, xp: finalEarned, mult, reps: rv, sets: sv,
+        weightLbs: null, weightPct: 100, hrZone: null, distanceMi: null,
+        time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+        date: new Date().toLocaleDateString(),
+        dateKey: todayStr(),
+        exId: ex.id,
+        sourceTotalCal: woWithStats.totalCal || null,
+        sourceActiveCal: woWithStats.activeCal || null,
+        sourceDurationSec: woWithStats.durationMin || null,
+      };
+      const newQuests = {...(profile.quests||{})};
+      QUESTS.filter(q => q.auto && !_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q => {
+        if (checkQuestCompletion(q, [entry, ...profile.log], profile.checkInStreak))
+          newQuests[q.id] = {completed:true, completedAt:todayStr(), claimed:false};
+      });
+      const newLog = [entry, ...profile.log];
+      const newExPBs = calcExercisePBs(newLog);
+      setProfile(p => ({
+        ...p,
+        xp: p.xp + finalEarned,
+        log: [entry, ...p.log],
+        quests: newQuests,
+        exercisePBs: newExPBs,
+        scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
+      }));
+      setXpFlash({amount: finalEarned, mult, travel: travelActive});
+      setTimeout(() => setXpFlash(null), 2000);
+      showToast(travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`);
     });
-    const newLog = [entry, ...profile.log];
-    const newExPBs = calcExercisePBs(newLog);
-    setProfile(p => ({
-      ...p,
-      xp: p.xp + finalEarned,
-      log: [entry, ...p.log],
-      quests: newQuests,
-      exercisePBs: newExPBs,
-      scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
-    }));
-    setXpFlash({amount: finalEarned, mult, travel: travelActive});
-    setTimeout(() => setXpFlash(null), 2000);
-    showToast(travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`);
   }
 
   // Save a set of log entries (from history) as a custom plan template
@@ -2081,6 +2098,9 @@ function App() {
           sourceWorkoutId:wo.id, sourceWorkoutName:wo.name, sourceWorkoutIcon:wo.icon,
           sourceWorkoutType: wo.oneOff ? "oneoff" : "reusable",
           sourceGroupId:batchId,
+          sourceTotalCal: wo.totalCal || null,
+          sourceActiveCal: wo.activeCal || null,
+          sourceDurationSec: wo.durationMin || null,
         };
       });
     }).filter(Boolean);
@@ -2374,7 +2394,7 @@ function App() {
     }
   }
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
-  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
+  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
 
   const builderXP = bDays.reduce((t,d)=>t+d.exercises.reduce((s,ex)=>{
     const base=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById);
@@ -5966,13 +5986,24 @@ function App() {
                   , (()=>{
                     const mPrefix = `${y}-${String(m+1).padStart(2,"0")}`;
                     const mEntries = profile.log.filter(e=>e.dateKey&&e.dateKey.startsWith(mPrefix));
-                    const mExCount = mEntries.length;
-                    const estMin = mEntries.reduce((s,e)=>s+((e.sets||1)*1.25),0);
-                    const estC = Math.round(mExCount * 8.5);
-                    const estA = Math.round(estC * 0.82);
-                    const dH = Math.floor(estMin/60);
-                    const dM = Math.round(estMin%60);
-                    const dStr = dH>0 ? dH+"h "+dM+"m" : dM+"m";
+                    // Deduplicate grouped entries (workouts/plans share a sourceGroupId)
+                    const grouped = {};
+                    const ungrouped = [];
+                    mEntries.forEach(e => {
+                      if (e.sourceGroupId) {
+                        if (!grouped[e.sourceGroupId]) grouped[e.sourceGroupId] = e;
+                      } else {
+                        ungrouped.push(e);
+                      }
+                    });
+                    const sources = [...Object.values(grouped), ...ungrouped];
+                    const estC = sources.reduce((s, e) => s + (Number(e.sourceTotalCal) || 0), 0);
+                    const estA = sources.reduce((s, e) => s + (Number(e.sourceActiveCal) || 0), 0);
+                    const totalSec = sources.reduce((s, e) => s + (Number(e.sourceDurationSec) || 0), 0);
+                    const dH = Math.floor(totalSec / 3600);
+                    const dM = Math.floor((totalSec % 3600) / 60);
+                    const dS = totalSec % 60;
+                    const dStr = String(dH).padStart(2,"0")+":"+String(dM).padStart(2,"0")+":"+String(dS).padStart(2,"0");
                     return React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
                       React.createElement('div', { className: "eff-weight", style: {flex:1} },
                         React.createElement('span', { className: "eff-weight-val" }, dStr),
@@ -9177,7 +9208,7 @@ function App() {
                 , React.createElement('div', null
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}},
                     React.createElement('button', {className:"btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
-                      onClick:()=>{ setStatsPromptModal(null); setWorkoutView("builder"); setActiveTab("workouts"); }
+                      onClick:()=>{ setStatsPromptModal(null); if(!statsPromptModal.wo.soloEx){ setWorkoutView("builder"); setActiveTab("workouts"); } }
                     }, "← Back"),
                     React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", statsPromptModal.wo.oneOff?"Review Battle Stats":"Record Battle Stats")
                   )
@@ -9201,8 +9232,8 @@ function App() {
                     onBlur: e=>setSpDuration(normalizeHHMM(e.target.value))})
                 )
                 , React.createElement('div', { className: "field", style: {flex:0.8,marginBottom:0}}
-                  , React.createElement('label', null, "Seconds")
-                  , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: "0",
+                  , React.createElement('label', null, "Sec")
+                  , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: ":00",
                     value: spDurSec,
                     onChange: e=>setSpDurSec(e.target.value)})
                 )
