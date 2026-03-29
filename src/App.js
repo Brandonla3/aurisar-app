@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './styles/app.css';
 import { CLASSES, EXERCISES, IMG } from './data/exercises';
-import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS } from './data/constants';
+import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
