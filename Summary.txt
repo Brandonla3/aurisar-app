@@ -1,0 +1,37 @@
+Fix: Missing YMove/Supabase Workouts Not Loading
+=================================================
+
+Problem
+-------
+None of the Supabase-sourced workouts (YMove exercises) were appearing in the
+app. Only the ~400 hardcoded exercises from src/data/exercises.js were displayed.
+The failure was silent — no visible error to the user.
+
+Root Cause
+----------
+File: src/utils/ymove.js
+
+The Supabase client `sb` was used on lines 21 and 141 but was never imported.
+This caused loadYMoveExercises() to throw a ReferenceError: sb is not defined,
+which was silently caught by the try/catch block. The app fell back to only
+showing hardcoded exercises.
+
+Other files (App.js, storage.js) already had the correct import, confirming
+this was simply an oversight in ymove.js.
+
+Fix
+---
+Added the missing import to src/utils/ymove.js:
+
+    import { sb } from './supabase';
+
+This single-line change restores the Supabase exercise library loading so that
+all YMove workouts appear in the app again.
+
+Verification
+------------
+- Vite build passes cleanly with no errors.
+- On app startup, the console should now log:
+  "✅ Exercise library loaded: X from Supabase (Y new, Z patched)"
+  instead of the previous silent fallback warning.
+- Supabase-sourced exercises should appear in the exercise browser/workout screens.

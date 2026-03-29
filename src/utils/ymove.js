@@ -1,6 +1,7 @@
 import React from 'react';
 import { EXERCISES } from '../data/exercises';
 import { EX_BY_ID } from '../data/constants';
+import { sb } from './supabase';
 
 let _ymoveLoaded = false;
 let _ymoveCallbacks = [];
