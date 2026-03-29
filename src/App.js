@@ -16,6 +16,9 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
 import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 import loginBg from './assets/login-bg.png';
+import heroBg from './assets/hero.png';
+
+const PREVIEW_PIN = "1234";
 
 
 function App() {
@@ -42,6 +45,10 @@ function App() {
   const [forgotPwEmail,setForgotPwEmail] = useState("");
   const [forgotPrivateId,setForgotPrivateId] = useState("");
   const [forgotLookupResult,setForgotLookupResult] = useState(null); // null | {found, masked_email, error}
+  const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
+  const [showPreviewPin,setShowPreviewPin] = useState(false);
+  const [previewPinInput,setPreviewPinInput] = useState("");
+  const [previewPinError,setPreviewPinError] = useState(false);
   const [detectedClass,setDetectedClass] = useState(null);
   const [activeTab,setActiveTab] = useState("workout");
   const [xpFlash,setXpFlash] = useState(null);
@@ -339,13 +346,13 @@ function App() {
         ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
         setScreen("main");
       } else {
-        setScreen(user ? "intro" : "login");
+        setScreen(user ? "intro" : "home");
       }
     });
     // Check existing session on mount — handle both cases explicitly
     sb.auth.getSession().then(async ({data:{session}})=>{
       if(!session) {
-        setScreen("login");
+        setScreen("home");
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
@@ -361,12 +368,12 @@ function App() {
           }
         } catch(e) {
           console.error("loadSave error:", e);
-          setScreen("login");
+          setScreen("home");
         }
       }
-    }).catch(()=>setScreen("login"));
-    // Safety fallback — if nothing resolves in 5s, go to login
-    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"login":s), 5000);
+    }).catch(()=>setScreen("home"));
+    // Safety fallback — if nothing resolves in 5s, go to home
+    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"home":s), 5000);
     loadYMoveExercises();
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
@@ -1297,7 +1304,7 @@ function App() {
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
-    setScreen("login");
+    setScreen("home");
   }
 
   // ── Legacy class migration — maps old keys to new equivalents ──
@@ -2385,6 +2392,60 @@ function App() {
   }).length;
   const CSS = "";
 
+  function launchPreviewMode(){
+    const daysAgo = n => new Date(Date.now()-n*86400000).toISOString().slice(0,10);
+    const fmtDate = n => new Date(Date.now()-n*86400000).toLocaleDateString();
+    const fmtTime = () => "07:30 AM";
+    const gid = s => `preview-grp-${s}`;
+    const previewLog = [
+      {exercise:"Bench Press",icon:"\uD83C\uDFCB\uFE0F",exId:"bench",sets:4,reps:8,weightLbs:185,weightPct:100,hrZone:null,distanceMi:null,xp:420,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
+      {exercise:"Overhead Press",icon:"\uD83C\uDFCB\uFE0F",exId:"ohp",sets:3,reps:10,weightLbs:115,weightPct:100,hrZone:null,distanceMi:null,xp:310,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
+      {exercise:"Running",icon:"\uD83C\uDFC3",exId:"run",sets:1,reps:28,weightLbs:null,weightPct:100,hrZone:null,distanceMi:3.1,xp:380,mult:0.94,time:fmtTime(),date:fmtDate(3),dateKey:daysAgo(3),sourceGroupId:gid("b")},
+      {exercise:"Deadlift",icon:"\uD83C\uDFCB\uFE0F",exId:"deadlift",sets:4,reps:6,weightLbs:225,weightPct:100,hrZone:null,distanceMi:null,xp:580,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
+      {exercise:"Pull-Up",icon:"\uD83E\uDE9D",exId:"pullups",sets:3,reps:10,weightLbs:null,weightPct:100,hrZone:null,distanceMi:null,xp:290,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
+      {exercise:"Squat",icon:"\uD83C\uDFCB\uFE0F",exId:"squat",sets:4,reps:8,weightLbs:205,weightPct:100,hrZone:null,distanceMi:null,xp:510,mult:1.12,time:fmtTime(),date:fmtDate(10),dateKey:daysAgo(10),sourceGroupId:gid("e")},
+    ];
+    setProfile({...EMPTY_PROFILE,
+      playerName:"Test Majiq", firstName:"John", lastName:"Majiq",
+      chosenClass:"tempest", xp:320000,
+      weightLbs:205, heightFt:6, heightIn:2, age:36, gender:"Male",
+      gym:"Lifetime Fitness", state:"KS", country:"United States",
+      motto:"I like to test apps", trainingStyle:"mixed", workoutTiming:"evening",
+      disciplineTrait:"Night Owl",
+      hudFields:{weight:true,height:true,bmi:false},
+      fitnessPriorities:["nutrition","endurance","social"],
+      sportsBackground:["football","volleyball","dance"],
+      nameVisibility:{displayName:["app","game"],realName:["hide"]},
+      log:previewLog, workouts:[], plans:[], scheduledWorkouts:[],
+      checkInHistory:[], checkInStreak:3, totalCheckIns:10,
+      lastCheckIn:new Date(Date.now()-86400000).toISOString().slice(0,10),
+      quests:{}, customExercises:[],
+      exercisePBs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},
+    });
+    setMyPublicId("UQHDD2");
+    setMyPrivateId("mPTSbPw8vTnd");
+    setFriends([
+      {id:"f1",playerName:"IronValkyrie",chosenClass:"warrior",xp:420000,log:[]},
+      {id:"f2",playerName:"ZenMaster_X",chosenClass:"druid",xp:155000,log:[]},
+      {id:"f3",playerName:"CrushMode88",chosenClass:"gladiator",xp:58000,log:[]},
+      {id:"f4",playerName:"SwiftArrow",chosenClass:"warden",xp:105000,log:[]},
+    ]);
+    setLbData([
+      {user_id:"f1",public_id:"VK9R3M",player_name:"IronValkyrie",first_name:"Sarah",last_name:"Chen",chosen_class:"warrior",total_xp:420000,level:8,streak:31,state:"NY",country:"United States",gym:"Gold's Gym",exercise_pbs:{bench:{weight:185},squat:{weight:275},deadlift:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f5",public_id:"PH3L9F",player_name:"PhantomLift",first_name:"Jake",last_name:"Morrison",chosen_class:"phantom",total_xp:360000,level:8,streak:45,state:"CO",country:"United States",gym:"24 Hr Fitness",exercise_pbs:{bench:{weight:245},squat:{weight:365},deadlift:{weight:405},pullups:{reps:25}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"preview",public_id:"UQHDD2",player_name:"Test Majiq",first_name:"John",last_name:"Majiq",chosen_class:"tempest",total_xp:320000,level:7,streak:3,state:"KS",country:"United States",gym:"Lifetime Fitness",exercise_pbs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:true},
+      {user_id:"f6",public_id:"TT6B4K",player_name:"TitanBreaker",first_name:"Mike",last_name:"OBrien",chosen_class:"titan",total_xp:210000,level:6,streak:18,state:"OH",country:"United States",gym:"YMCA",exercise_pbs:{bench:{weight:315},squat:{weight:455},deadlift:{weight:500}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f2",public_id:"ZN4K8W",player_name:"ZenMaster_X",first_name:"Marcus",last_name:"Rivera",chosen_class:"druid",total_xp:155000,level:5,streak:14,state:"CA",country:"United States",gym:"Equinox",exercise_pbs:{bench:{weight:135},run:{type:"cardio",value:7.5}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f4",public_id:"SW7A2R",player_name:"SwiftArrow",first_name:"Emily",last_name:"Park",chosen_class:"warden",total_xp:105000,level:4,streak:22,state:"FL",country:"United States",gym:"LA Fitness",exercise_pbs:{run:{type:"cardio",value:7.2},pullups:{reps:12}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f3",public_id:"CR8M5T",player_name:"CrushMode88",first_name:"DeAndre",last_name:"Williams",chosen_class:"gladiator",total_xp:58000,level:3,streak:7,state:"TX",country:"United States",gym:"Planet Fitness",exercise_pbs:{bench:{weight:225},squat:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f7",public_id:"ST2E7X",player_name:"StrikerElite",first_name:"Aisha",last_name:"Thompson",chosen_class:"striker",total_xp:22000,level:2,streak:5,state:"WA",country:"United States",gym:"Home Gym",exercise_pbs:{pushups:{reps:45}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+    ]);
+    setLbWorldRanks({"f1":1,"f5":2,"preview":3,"f6":4,"f2":5,"f4":6,"f3":7,"f7":8});
+    setShowPreviewPin(false);
+    setPreviewPinInput("");
+    setPreviewPinError(false);
+    setScreen("main");
+  }
 
   if(screen==="loading") return (
     React.createElement('div', { style: {minHeight:"100vh",background:"#0c0c0a",display:"flex",alignItems:"center",justifyContent:"center"}}
@@ -2478,10 +2539,97 @@ function App() {
             setMfaRecoveryMode(false);
             setMfaRecoveryInput("");
             setAuthUser(null);
-            setScreen("login");
+            setScreen("home");
           } }, "\u2190 Back to Sign In")
           , React.createElement('div', { style: {fontSize:".56rem", color:"#3a3834", marginTop:8} }, "Lost your authenticator AND recovery codes?")
           , React.createElement('div', { style: {fontSize:".56rem", color:"#5a5650"} }, "Contact support for an admin-assisted reset.")
+        )
+      )
+    )
+  );
+
+  /* ══ HOMEPAGE / LANDING PAGE ══════════════════════════════════ */
+  if(screen==="home") return (
+    React.createElement('div', { style: {minHeight:"100vh",background:"#0c0c0a",color:"#d4cec4",fontFamily:"'Inter',sans-serif",overflowX:"hidden"}}
+      , React.createElement('style', null, CSS)
+
+      /* ── Sticky Nav Bar ── */
+      , React.createElement('nav', { className: "hp-nav" }
+        , React.createElement('div', { className: "hp-nav-logo" }
+          , React.createElement('img', { src: "/male-female-flame logo.png", alt: "Aurisar" })
+          , React.createElement('span', { className: "hp-nav-wordmark" }, "AURISAR")
+        )
+        , React.createElement('div', { className: "hp-nav-btns" }
+          , React.createElement('button', { className: "hp-btn-login", onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Login")
+          , React.createElement('button', { className: "hp-btn-signup", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Sign Up")
+        )
+      )
+
+      /* ── Hero Section ── */
+      , React.createElement('section', { className: "hp-hero", style: {
+          backgroundImage:`linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.65)), url(${heroBg})`,
+          backgroundSize:"cover", backgroundPosition:"center", backgroundRepeat:"no-repeat"
+        }}
+        , React.createElement('h1', { className: "hp-hero-title" }, "Your Fitness. Your Legend.")
+        , React.createElement('p', { className: "hp-hero-sub" }, "The RPG-powered fitness tracker that turns every rep into an adventure.")
+        , React.createElement('div', { className: "hp-orn" }, "\u2014 \u2726 \u2014")
+        , React.createElement('button', { className: "hp-hero-cta", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Begin Your Journey")
+        , React.createElement('p', { className: "hp-hero-signin" }
+          , "Already have an account? "
+          , React.createElement('span', { onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Sign In")
+        )
+      )
+
+      /* ── What Is Aurisar? ── */
+      , React.createElement('section', { className: "hp-section" }
+        , React.createElement('h2', { className: "hp-section-title" }, "Forge Your Body. Level Your Character.")
+        , React.createElement('p', { className: "hp-section-body" },
+          "Whether you\u2019re just getting started, grinding daily, coaching a team, or chasing competition PRs \u2014 Aurisar meets you where you are. It\u2019s a fitness tracker wrapped in an RPG universe: log your workouts, earn XP, unlock character classes, complete quests, and compete on leaderboards. Casual or competitive, solo or social \u2014 every rep counts, and every rep is rewarded."
+        )
+      )
+
+      /* ── Feature Cards ── */
+      , React.createElement('div', { className: "hp-features" }
+        , [
+          { icon:"\u2694\uFE0F", title:"11 Character Classes", desc:"Choose your path \u2014 Warrior, Phantom, Tempest, Druid, and more. Each class amplifies different workout styles." },
+          { icon:"\u2728",       title:"Earn XP & Level Up",    desc:"Every set, rep, and mile earns experience points. Watch your character grow stronger as you do." },
+          { icon:"\uD83C\uDFCB\uFE0F", title:"1,500+ Exercises", desc:"Strength, cardio, flexibility \u2014 log any workout with detailed tracking for sets, reps, weight, and distance." },
+          { icon:"\uD83D\uDDE1\uFE0F", title:"Quests & Achievements", desc:"Complete challenges like \u201CRun 50 miles\u201D or \u201CHit a 225lb bench\u201D to unlock rewards and prove your dedication." },
+          { icon:"\uD83D\uDC65", title:"Social & Leaderboards",  desc:"Add friends, share workouts, climb the global leaderboard, and send messages." },
+          { icon:"\uD83D\uDCC5", title:"Plans & Calendar",       desc:"Build custom workout plans, schedule training days, and track your history on a visual calendar." }
+        ].map((f,i)=> React.createElement('div', { className: "hp-feat-card", key: i }
+          , React.createElement('span', { className: "hp-feat-icon" }, f.icon)
+          , React.createElement('div', { className: "hp-feat-title" }, f.title)
+          , React.createElement('div', { className: "hp-feat-desc" }, f.desc)
+        ))
+      )
+
+      /* ── Class Showcase ── */
+      , React.createElement('section', { className: "hp-section", style: {paddingBottom:12} }
+        , React.createElement('h2', { className: "hp-section-title" }, "Choose Your Class")
+      )
+      , React.createElement('div', { className: "hp-classes" }
+        , Object.entries(CLASSES).filter(([,c])=>!c.locked).map(([key,c])=>
+          React.createElement('div', { className: "hp-class-pill", key: key, style: {"--pill-color":c.color} }
+            , React.createElement('span', { className: "hp-class-emoji" }, c.icon)
+            , React.createElement('div', { className: "hp-class-name" }, c.name)
+            , React.createElement('div', { className: "hp-class-tag" }, c.description.split(".")[0])
+          )
+        )
+      )
+
+      /* ── Bottom CTA ── */
+      , React.createElement('section', { className: "hp-cta" }
+        , React.createElement('h2', { className: "hp-cta-title" }, "Ready to Begin?")
+        , React.createElement('p', { className: "hp-cta-sub" }, "Join the ranks. Your legend starts with one rep.")
+        , React.createElement('button', { className: "hp-hero-cta", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Create Your Free Account")
+      )
+
+      /* ── Footer ── */
+      , React.createElement('footer', { className: "hp-footer" }
+        , React.createElement('div', { className: "hp-footer-text" }
+          , "\u00A9 2026 Aurisar Games \u00A0\u00B7\u00A0 "
+          , React.createElement('a', { href: "mailto:support@aurisargames.com" }, "support@aurisargames.com")
         )
       )
     )
@@ -2498,6 +2646,11 @@ function App() {
       display:"flex", flexDirection:"column", alignItems:"stretch"
     }}
       , React.createElement('style', null, CSS)
+
+      /* ── Back to Home ── */
+      , React.createElement('div', { style: {padding:"14px 20px 0", display:"flex", justifyContent:"flex-start"} }
+        , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer", letterSpacing:".04em"}, onClick: ()=>setScreen("home") }, "\u2190 Back")
+      )
 
       /* ── Logo ── */
       , React.createElement('img', {
@@ -2740,67 +2893,34 @@ function App() {
           )
           ) /* end loginSubScreen===null */
 
-          /* Preview mode — tiny */
+/* Preview mode — PIN-gated dev access */
           , React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.12)", marginTop:6, paddingTop:10, textAlign:"center"} }
-            , React.createElement('span', {
+            , !showPreviewPin && React.createElement('span', {
                 style: {fontSize:".55rem", color:"#3a3630", cursor:"pointer", fontStyle:"italic", letterSpacing:".03em"},
                 onClick: ()=>{
-                  const startDate = new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-                  const endDate   = new Date(Date.now()+(30+56)*24*60*60*1000).toISOString().slice(0,10);
-                  const daysAgo = n => new Date(Date.now()-n*86400000).toISOString().slice(0,10);
-                  const fmtDate = n => new Date(Date.now()-n*86400000).toLocaleDateString();
-                  const fmtTime = () => "07:30 AM";
-                  const gid = s => `preview-grp-${s}`;
-                  const previewLog = [
-                    {exercise:"Bench Press",icon:"🏋️",exId:"bench",sets:4,reps:8,weightLbs:185,weightPct:100,hrZone:null,distanceMi:null,xp:420,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
-                    {exercise:"Overhead Press",icon:"🏋️",exId:"ohp",sets:3,reps:10,weightLbs:115,weightPct:100,hrZone:null,distanceMi:null,xp:310,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
-                    {exercise:"Running",icon:"🏃",exId:"run",sets:1,reps:28,weightLbs:null,weightPct:100,hrZone:null,distanceMi:3.1,xp:380,mult:0.94,time:fmtTime(),date:fmtDate(3),dateKey:daysAgo(3),sourceGroupId:gid("b")},
-                    {exercise:"Deadlift",icon:"🏋️",exId:"deadlift",sets:4,reps:6,weightLbs:225,weightPct:100,hrZone:null,distanceMi:null,xp:580,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
-                    {exercise:"Pull-Up",icon:"🪝",exId:"pullups",sets:3,reps:10,weightLbs:null,weightPct:100,hrZone:null,distanceMi:null,xp:290,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
-                    {exercise:"Squat",icon:"🏋️",exId:"squat",sets:4,reps:8,weightLbs:205,weightPct:100,hrZone:null,distanceMi:null,xp:510,mult:1.12,time:fmtTime(),date:fmtDate(10),dateKey:daysAgo(10),sourceGroupId:gid("e")},
-                  ];
-                  const previewXP = 320000;
-                  setProfile({...EMPTY_PROFILE,
-                    playerName:"Test Majiq", firstName:"John", lastName:"Majiq",
-                    chosenClass:"tempest", xp:previewXP,
-                    weightLbs:205, heightFt:6, heightIn:2, age:36, gender:"Male",
-                    gym:"Lifetime Fitness", state:"KS", country:"United States",
-                    motto:"I like to test apps", trainingStyle:"mixed", workoutTiming:"evening",
-                    disciplineTrait:"Night Owl",
-                    hudFields:{weight:true,height:true,bmi:false},
-                    fitnessPriorities:["nutrition","endurance","social"],
-                    sportsBackground:["football","volleyball","dance"],
-                    nameVisibility:{displayName:["app","game"],realName:["hide"]},
-                    log:previewLog, workouts:[], plans:[], scheduledWorkouts:[],
-                    checkInHistory:[], checkInStreak:3, totalCheckIns:10,
-                    lastCheckIn:new Date(Date.now()-86400000).toISOString().slice(0,10),
-                    quests:{}, customExercises:[],
-                    exercisePBs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},
-                  });
-                  setMyPublicId("UQHDD2");
-                  setMyPrivateId("mPTSbPw8vTnd");
-                  setFriends([
-                    {id:"f1",playerName:"IronValkyrie",chosenClass:"warrior",xp:420000,log:[]},
-                    {id:"f2",playerName:"ZenMaster_X",chosenClass:"druid",xp:155000,log:[]},
-                    {id:"f3",playerName:"CrushMode88",chosenClass:"gladiator",xp:58000,log:[]},
-                    {id:"f4",playerName:"SwiftArrow",chosenClass:"warden",xp:105000,log:[]},
-                  ]);
-                  setLbData([
-                    {user_id:"f1",public_id:"VK9R3M",player_name:"IronValkyrie",first_name:"Sarah",last_name:"Chen",chosen_class:"warrior",total_xp:420000,level:8,streak:31,state:"NY",country:"United States",gym:"Gold's Gym",exercise_pbs:{bench:{weight:185},squat:{weight:275},deadlift:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f5",public_id:"PH3L9F",player_name:"PhantomLift",first_name:"Jake",last_name:"Morrison",chosen_class:"phantom",total_xp:360000,level:8,streak:45,state:"CO",country:"United States",gym:"24 Hr Fitness",exercise_pbs:{bench:{weight:245},squat:{weight:365},deadlift:{weight:405},pullups:{reps:25}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"preview",public_id:"UQHDD2",player_name:"Test Majiq",first_name:"John",last_name:"Majiq",chosen_class:"tempest",total_xp:320000,level:7,streak:3,state:"KS",country:"United States",gym:"Lifetime Fitness",exercise_pbs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:true},
-                    {user_id:"f6",public_id:"TT6B4K",player_name:"TitanBreaker",first_name:"Mike",last_name:"OBrien",chosen_class:"titan",total_xp:210000,level:6,streak:18,state:"OH",country:"United States",gym:"YMCA",exercise_pbs:{bench:{weight:315},squat:{weight:455},deadlift:{weight:500}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f2",public_id:"ZN4K8W",player_name:"ZenMaster_X",first_name:"Marcus",last_name:"Rivera",chosen_class:"druid",total_xp:155000,level:5,streak:14,state:"CA",country:"United States",gym:"Equinox",exercise_pbs:{bench:{weight:135},run:{type:"cardio",value:7.5}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f4",public_id:"SW7A2R",player_name:"SwiftArrow",first_name:"Emily",last_name:"Park",chosen_class:"warden",total_xp:105000,level:4,streak:22,state:"FL",country:"United States",gym:"LA Fitness",exercise_pbs:{run:{type:"cardio",value:7.2},pullups:{reps:12}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f3",public_id:"CR8M5T",player_name:"CrushMode88",first_name:"DeAndre",last_name:"Williams",chosen_class:"gladiator",total_xp:58000,level:3,streak:7,state:"TX",country:"United States",gym:"Planet Fitness",exercise_pbs:{bench:{weight:225},squat:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f7",public_id:"ST2E7X",player_name:"StrikerElite",first_name:"Aisha",last_name:"Thompson",chosen_class:"striker",total_xp:22000,level:2,streak:5,state:"WA",country:"United States",gym:"Home Gym",exercise_pbs:{pushups:{reps:45}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                  ]);
-                  setLbWorldRanks({"f1":1,"f5":2,"preview":3,"f6":4,"f2":5,"f4":6,"f3":7,"f7":8});
-                  setScreen("main");
+                  if(!previewPinEnabled){ launchPreviewMode(); }
+                  else { setShowPreviewPin(true);setPreviewPinInput("");setPreviewPinError(false); }
                 }
-              }, "👁 Preview Mode"
+              }, "\uD83D\uDC41 Preview Mode"
             )
-            , React.createElement('div', { style: {fontSize:".5rem", color:"#2e2c28", marginTop:2} }, "No account needed · Data won't be saved")
+            , showPreviewPin && React.createElement('div', null
+              , React.createElement('div', { style: {fontSize:".55rem", color:"#5a5650", marginBottom:6} }, "Enter dev PIN")
+              , React.createElement('div', { className: "preview-pin-wrap" }
+                , React.createElement('input', {
+                    className: "preview-pin-inp",
+                    type: "password",
+                    maxLength: 8,
+                    value: previewPinInput,
+                    onChange: e=>{setPreviewPinInput(e.target.value);setPreviewPinError(false);},
+                    onKeyDown: e=>{ if(e.key==="Enter"){ if(previewPinInput===PREVIEW_PIN){launchPreviewMode();}else{setPreviewPinError(true);} } },
+                    autoFocus: true
+                  })
+                , React.createElement('button', { className: "preview-pin-go", onClick: ()=>{ if(previewPinInput===PREVIEW_PIN){launchPreviewMode();}else{setPreviewPinError(true);} } }, "Go")
+              )
+              , previewPinError && React.createElement('div', { style: {fontSize:".55rem", color:"#e74c3c", marginTop:4} }, "Wrong PIN")
+              , React.createElement('span', { style: {fontSize:".5rem", color:"#3a3630", cursor:"pointer", display:"inline-block", marginTop:6}, onClick: ()=>{setShowPreviewPin(false);setPreviewPinError(false);} }, "Cancel")
+            )
+            , !showPreviewPin && React.createElement('div', { style: {fontSize:".5rem", color:"#2e2c28", marginTop:2} }, "Dev access only")
           )
 
         )
@@ -3056,7 +3176,7 @@ function App() {
                 {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
                 {icon:"💬", label:"Feedback",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
-                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("login");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
+                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("home");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
                 React.createElement('button', {
                     key: item.label,
