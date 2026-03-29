@@ -4097,7 +4097,7 @@ function App() {
                                   , sw.notes && React.createElement('div', {className:"workout-desc", style:{marginTop:3}}, sw.notes)
                                 )
                                 , React.createElement('div', {style:{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}
-                                  , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".65rem",color:"#b4ac9e",padding:"3px 6px"}, onClick:(e)=>{e.stopPropagation(); openScheduleEx(sw.exId, sw.id);}}, "✎")
+                                  , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".65rem",color:"#b4ac9e",padding:"3px 6px"}, onClick:(e)=>{e.stopPropagation(); setSelEx(sw.exId);setPendingSoloRemoveId(sw.id);}}, "✎")
                                   , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{color:"#e74c3c"}, onClick:()=>{
                                     setProfile(p=>({...p,scheduledWorkouts:(p.scheduledWorkouts||[]).filter(s=>s.id!==sw.id)}));
                                     showToast("Scheduled exercise removed.");
@@ -4106,7 +4106,7 @@ function App() {
                               )
                               , React.createElement('div', {style:{display:"flex",gap:6,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(180,172,158,.04)"}}
                                 , React.createElement('button', {className:"btn btn-gold btn-sm", style:{flex:1}, onClick:()=>quickLogSoloEx(sw)}, "\u26A1 Quick Log")
-                                , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,borderColor:"rgba(180,172,158,.15)",color:"#d4cec4"}, onClick:()=>{setSelEx(sw.exId);setPendingSoloRemoveId(sw.id);}}, "\uD83D\uDCDD Log\u2026")
+                                , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,fontSize:".58rem",borderColor:"rgba(180,172,158,.15)",color:"#b4ac9e"}, onClick:(e)=>{e.stopPropagation(); openScheduleEx(sw.exId, sw.id);}}, "\uD83D\uDCC5 Reschedule")
                                 , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,fontSize:".58rem",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"}, onClick:()=>{
                                     const ex2=allExById[sw.exId]; if(!ex2) return;
                                     const exEntry={exId:ex2.id,sets:ex2.defaultSets||3,reps:ex2.defaultReps||10,weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};
