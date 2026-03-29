@@ -6002,7 +6002,8 @@ function App() {
                     const totalSec = sources.reduce((s, e) => s + (Number(e.sourceDurationSec) || 0), 0);
                     const dH = Math.floor(totalSec / 3600);
                     const dM = Math.floor((totalSec % 3600) / 60);
-                    const dStr = dH > 0 ? dH+"h "+dM+"m" : dM+"m";
+                    const dS = totalSec % 60;
+                    const dStr = String(dH).padStart(2,"0")+":"+String(dM).padStart(2,"0")+":"+String(dS).padStart(2,"0");
                     return React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
                       React.createElement('div', { className: "eff-weight", style: {flex:1} },
                         React.createElement('span', { className: "eff-weight-val" }, dStr),
