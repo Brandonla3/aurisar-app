@@ -902,52 +902,64 @@
     .grim-add-label{font-size:.7rem;color:#5a5650}
 
     /* ══ Homepage / Landing Page ══ */
-    .hp-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(12,12,10,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(180,172,158,.06)}
+    /* Nav — matches login-screen glassmorphism */
+    .hp-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(180,172,158,.07)}
     .hp-nav-logo{display:flex;align-items:center;gap:10px}
     .hp-nav-wordmark{font-family:'Cinzel Decorative',serif;font-size:1.1rem;font-weight:900;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.08em}
     .hp-nav-btns{display:flex;gap:8px}
-    .hp-btn-login{background:transparent;border:1px solid rgba(180,172,158,.15);color:#b4ac9e;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s}
-    .hp-btn-login:hover{border-color:rgba(180,172,158,.3);color:#d4cec4}
+    .hp-btn-login{background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:none;color:#b4ac9e;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .hp-btn-login:hover{background:rgba(45,42,36,.45);color:#d4cec4}
     .hp-btn-signup{background:linear-gradient(135deg,#c49428,#8a6010);color:#0c0c0a;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:none;transition:all .2s}
     .hp-btn-signup:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(196,148,40,.3)}
 
-    .hp-hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px 60px;position:relative}
-    .hp-hero-banner{width:100%;max-width:520px;height:auto;border-radius:16px;margin-bottom:28px;box-shadow:0 12px 48px rgba(0,0,0,.6),0 0 80px rgba(196,148,40,.08);border:1px solid rgba(180,172,158,.06)}
-    .hp-hero-title{font-family:'Cinzel Decorative',serif;font-size:clamp(2rem,6vw,3.2rem);font-weight:900;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.08em;line-height:1.15;margin-bottom:16px}
-    .hp-hero-sub{font-size:clamp(.9rem,2.5vw,1.15rem);color:#8a8478;font-style:italic;letter-spacing:.06em;max-width:480px;line-height:1.6;margin-bottom:12px}
-    .hp-orn{font-size:.9rem;color:rgba(180,172,158,.15);letter-spacing:.3em;margin-bottom:28px}
-    .hp-hero-cta{background:linear-gradient(135deg,#c49428,#8a6010);color:#0c0c0a;padding:14px 36px;border-radius:10px;font-family:'Cinzel',serif;font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border:none;transition:all .25s;box-shadow:0 4px 24px rgba(196,148,40,.25)}
+    /* Glass nav links — borderless, semi-transparent */
+    .hp-glass-links{display:flex;justify-content:center;gap:6px;padding:56px 20px 0;flex-wrap:wrap}
+    .hp-glass-link{background:linear-gradient(145deg,rgba(45,42,36,.3),rgba(32,30,26,.18));border:none;color:#b4ac9e;padding:8px 18px;border-radius:8px;font-family:'Inter',sans-serif;font-size:.65rem;font-weight:500;letter-spacing:.06em;cursor:pointer;transition:all .2s;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .hp-glass-link:hover{background:rgba(45,42,36,.45);color:#d4cec4;transform:translateY(-1px)}
+
+    /* Hero */
+    .hp-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px 24px 60px;position:relative}
+    .hp-hero-banner{width:100%;max-width:520px;height:auto;border-radius:16px;margin-bottom:28px;box-shadow:0 12px 48px rgba(0,0,0,.6),0 0 80px rgba(196,148,40,.08)}
+    .hp-hero-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.6rem,5vw,2.8rem);font-weight:900;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.1em;line-height:1.15;margin-bottom:14px}
+    .hp-hero-sub{font-size:clamp(.82rem,2.2vw,1.05rem);color:#6a645a;font-style:italic;letter-spacing:.06em;max-width:420px;line-height:1.65;margin-bottom:10px}
+    .hp-orn{font-size:.85rem;color:rgba(180,172,158,.12);letter-spacing:.2em;margin-bottom:24px}
+    .hp-hero-cta{background:linear-gradient(135deg,#c49428,#8a6010);color:#0c0c0a;padding:12px 32px;border-radius:9px;font-family:'Cinzel',serif;font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border:none;transition:all .25s;box-shadow:0 4px 24px rgba(196,148,40,.25)}
     .hp-hero-cta:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(196,148,40,.4)}
-    .hp-hero-signin{font-size:.78rem;color:#5a5650;margin-top:16px}
+    .hp-hero-signin{font-size:.72rem;color:#5a5650;margin-top:14px}
     .hp-hero-signin span{color:#b4ac9e;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
     .hp-hero-signin span:hover{color:#d4cec4}
 
-    .hp-section{padding:60px 24px;max-width:640px;margin:0 auto}
-    .hp-section-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.2rem,4vw,1.8rem);font-weight:700;background:linear-gradient(135deg,#c49428 0%,#f0d060 50%,#c49428 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;letter-spacing:.08em;margin-bottom:18px}
-    .hp-section-body{font-size:.88rem;color:#8a8478;line-height:1.7;text-align:center;max-width:520px;margin:0 auto}
+    /* Sections — glass card treatment matching login auth card */
+    .hp-section{padding:48px 24px;max-width:520px;margin:0 auto}
+    .hp-section-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.1rem,3.5vw,1.6rem);font-weight:700;background:linear-gradient(135deg,#c49428 0%,#f0d060 50%,#c49428 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;letter-spacing:.1em;margin-bottom:14px}
+    .hp-section-body{font-size:.78rem;color:#6a645a;line-height:1.7;text-align:center;max-width:440px;margin:0 auto}
 
-    .hp-features{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 24px 60px;max-width:640px;margin:0 auto}
+    /* Feature cards — glass panels */
+    .hp-features{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 24px 48px;max-width:520px;margin:0 auto}
     @media(max-width:420px){.hp-features{grid-template-columns:1fr}}
-    .hp-feat-card{background:linear-gradient(145deg,rgba(45,42,36,.25),rgba(32,30,26,.15));border:1px solid rgba(180,172,158,.06);border-radius:12px;padding:18px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);text-align:center;transition:all .2s}
-    .hp-feat-card:hover{border-color:rgba(180,172,158,.12);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.4)}
-    .hp-feat-icon{font-size:1.6rem;margin-bottom:8px;display:block}
-    .hp-feat-title{font-family:'Cinzel',serif;font-size:.72rem;font-weight:600;color:#d4cec4;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
-    .hp-feat-desc{font-size:.72rem;color:#8a8478;line-height:1.5}
+    .hp-feat-card{background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:1px solid rgba(180,172,158,.07);border-radius:12px;padding:16px 14px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);text-align:center;transition:all .2s;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+    .hp-feat-card:hover{border-color:rgba(180,172,158,.12);transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,0,0,.4)}
+    .hp-feat-icon{font-size:1.4rem;margin-bottom:6px;display:block}
+    .hp-feat-title{font-family:'Cinzel',serif;font-size:.65rem;font-weight:600;color:#d4cec4;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+    .hp-feat-desc{font-size:.66rem;color:#6a645a;line-height:1.5}
 
-    .hp-classes{display:flex;gap:10px;overflow-x:auto;padding:0 24px 60px;max-width:640px;margin:0 auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    /* Class pills — glass style */
+    .hp-classes{display:flex;gap:10px;overflow-x:auto;padding:0 24px 48px;max-width:520px;margin:0 auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
     .hp-classes::-webkit-scrollbar{display:none}
-    .hp-class-pill{flex-shrink:0;background:linear-gradient(145deg,rgba(45,42,36,.3),rgba(32,30,26,.18));border:1.5px solid var(--pill-color,rgba(180,172,158,.1));border-radius:10px;padding:14px 18px;text-align:center;min-width:120px;transition:all .2s;box-shadow:0 0 12px color-mix(in srgb,var(--pill-color,#8a8478) 15%,transparent)}
+    .hp-class-pill{flex-shrink:0;background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:1px solid rgba(180,172,158,.07);border-radius:10px;padding:14px 18px;text-align:center;min-width:120px;transition:all .2s;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
     .hp-class-pill:hover{transform:translateY(-2px);box-shadow:0 0 20px color-mix(in srgb,var(--pill-color,#8a8478) 30%,transparent)}
     .hp-class-emoji{font-size:1.5rem;display:block;margin-bottom:6px}
-    .hp-class-name{font-family:'Cinzel',serif;font-size:.68rem;font-weight:600;color:#d4cec4;letter-spacing:.06em;text-transform:uppercase}
-    .hp-class-tag{font-size:.58rem;color:#8a8478;margin-top:3px}
+    .hp-class-name{font-family:'Cinzel',serif;font-size:.65rem;font-weight:600;color:#d4cec4;letter-spacing:.06em;text-transform:uppercase}
+    .hp-class-tag{font-size:.55rem;color:#6a645a;margin-top:3px}
 
-    .hp-cta{padding:60px 24px;text-align:center;background:linear-gradient(180deg,transparent 0%,rgba(45,42,36,.12) 50%,transparent 100%)}
-    .hp-cta-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.3rem,4vw,2rem);font-weight:700;background:linear-gradient(135deg,#c49428 0%,#f0d060 50%,#c49428 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.08em;margin-bottom:12px}
-    .hp-cta-sub{font-size:.85rem;color:#8a8478;font-style:italic;letter-spacing:.06em;margin-bottom:28px}
+    /* Bottom CTA — glass panel */
+    .hp-cta{padding:48px 24px;text-align:center;margin:0 auto;max-width:520px}
+    .hp-cta-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.1rem,3.5vw,1.6rem);font-weight:700;background:linear-gradient(135deg,#c49428 0%,#f0d060 50%,#c49428 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.1em;margin-bottom:10px}
+    .hp-cta-sub{font-size:.78rem;color:#6a645a;font-style:italic;letter-spacing:.06em;margin-bottom:24px}
 
-    .hp-footer{padding:24px;text-align:center;border-top:1px solid rgba(180,172,158,.04)}
-    .hp-footer-text{font-size:.6rem;color:#3a3834;letter-spacing:.06em}
+    /* Footer */
+    .hp-footer{padding:20px;text-align:center;border-top:1px solid rgba(180,172,158,.04)}
+    .hp-footer-text{font-size:.55rem;color:#3a3834;letter-spacing:.06em}
     .hp-footer-text a{color:#5a5650;text-decoration:none}
     .hp-footer-text a:hover{color:#8a8478}
 

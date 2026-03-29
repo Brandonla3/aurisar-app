@@ -2549,7 +2549,13 @@ function App() {
 
   /* ══ HOMEPAGE / LANDING PAGE ══════════════════════════════════ */
   if(screen==="home") return (
-    React.createElement('div', { style: {minHeight:"100vh",background:"#0c0c0a",color:"#d4cec4",fontFamily:"'Inter',sans-serif",overflowX:"hidden"}}
+    React.createElement('div', { style: {
+      minHeight:"100vh",
+      backgroundImage:`linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
+      backgroundSize:"cover", backgroundPosition:"center", backgroundRepeat:"no-repeat",
+      backgroundColor:"#0c0c0a",
+      color:"#d4cec4", fontFamily:"'Inter',sans-serif", overflowX:"hidden"
+    }}
       , React.createElement('style', null, CSS)
 
       /* ── Sticky Nav Bar ── */
@@ -2563,10 +2569,15 @@ function App() {
         )
       )
 
+      /* ── Glass Nav Links ── */
+      , React.createElement('div', { className: "hp-glass-links" }
+        , ["About Aurisar","Future Roadmap","Leaderboards"].map((label,i)=>
+          React.createElement('button', { className: "hp-glass-link", key: i }, label)
+        )
+      )
+
       /* ── Hero Section — Logo Banner ── */
-      , React.createElement('section', { className: "hp-hero", style: {
-          background:"linear-gradient(180deg, #0c0c0a 0%, #14120e 50%, #0c0c0a 100%)"
-        }}
+      , React.createElement('section', { className: "hp-hero" }
         , React.createElement('img', { src: "/male-female-flame logo.png", alt: "Aurisar", className: "hp-hero-banner" })
         , React.createElement('h1', { className: "hp-hero-title" }, "Your Fitness. Your Legend.")
         , React.createElement('p', { className: "hp-hero-sub" }, "The RPG-powered fitness tracker that turns every rep into an adventure.")
