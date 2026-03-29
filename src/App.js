@@ -16,7 +16,6 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
 import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 import loginBg from './assets/login-bg.png';
-import heroBg from './assets/hero.png';
 
 const PREVIEW_PIN = "1234";
 
@@ -2556,7 +2555,6 @@ function App() {
       /* ── Sticky Nav Bar ── */
       , React.createElement('nav', { className: "hp-nav" }
         , React.createElement('div', { className: "hp-nav-logo" }
-          , React.createElement('img', { src: "/male-female-flame logo.png", alt: "Aurisar" })
           , React.createElement('span', { className: "hp-nav-wordmark" }, "AURISAR")
         )
         , React.createElement('div', { className: "hp-nav-btns" }
@@ -2565,11 +2563,11 @@ function App() {
         )
       )
 
-      /* ── Hero Section ── */
+      /* ── Hero Section — Logo Banner ── */
       , React.createElement('section', { className: "hp-hero", style: {
-          backgroundImage:`linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.65)), url(${heroBg})`,
-          backgroundSize:"cover", backgroundPosition:"center", backgroundRepeat:"no-repeat"
+          background:"linear-gradient(180deg, #0c0c0a 0%, #14120e 50%, #0c0c0a 100%)"
         }}
+        , React.createElement('img', { src: "/male-female-flame logo.png", alt: "Aurisar", className: "hp-hero-banner" })
         , React.createElement('h1', { className: "hp-hero-title" }, "Your Fitness. Your Legend.")
         , React.createElement('p', { className: "hp-hero-sub" }, "The RPG-powered fitness tracker that turns every rep into an adventure.")
         , React.createElement('div', { className: "hp-orn" }, "\u2014 \u2726 \u2014")

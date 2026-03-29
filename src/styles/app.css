@@ -904,7 +904,6 @@
     /* ══ Homepage / Landing Page ══ */
     .hp-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(12,12,10,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(180,172,158,.06)}
     .hp-nav-logo{display:flex;align-items:center;gap:10px}
-    .hp-nav-logo img{height:36px;width:auto;border-radius:6px}
     .hp-nav-wordmark{font-family:'Cinzel Decorative',serif;font-size:1.1rem;font-weight:900;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.08em}
     .hp-nav-btns{display:flex;gap:8px}
     .hp-btn-login{background:transparent;border:1px solid rgba(180,172,158,.15);color:#b4ac9e;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s}
@@ -913,6 +912,7 @@
     .hp-btn-signup:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(196,148,40,.3)}
 
     .hp-hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px 60px;position:relative}
+    .hp-hero-banner{width:100%;max-width:520px;height:auto;border-radius:16px;margin-bottom:28px;box-shadow:0 12px 48px rgba(0,0,0,.6),0 0 80px rgba(196,148,40,.08);border:1px solid rgba(180,172,158,.06)}
     .hp-hero-title{font-family:'Cinzel Decorative',serif;font-size:clamp(2rem,6vw,3.2rem);font-weight:900;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.08em;line-height:1.15;margin-bottom:16px}
     .hp-hero-sub{font-size:clamp(.9rem,2.5vw,1.15rem);color:#8a8478;font-style:italic;letter-spacing:.06em;max-width:480px;line-height:1.6;margin-bottom:12px}
     .hp-orn{font-size:.9rem;color:rgba(180,172,158,.15);letter-spacing:.3em;margin-bottom:28px}
