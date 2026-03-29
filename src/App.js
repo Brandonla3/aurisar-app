@@ -240,6 +240,7 @@ function App() {
   const [wbIsOneOff,setWbIsOneOff] = useState(false); // true when building a one-off workout
   const [addToPlanPicker,setAddToPlanPicker] = useState(null);
   const [addToWorkoutPicker,setAddToWorkoutPicker] = useState(null); // {exercises} — pick existing workout
+  const [pendingSoloRemoveId,setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
   const [workoutSubTab,setWorkoutSubTab] = useState("reusable"); // "reusable"|"oneoff"
   const [collapsedWo,setCollapsedWo] = useState(new Set());
   const [oneOffModal,setOneOffModal] = useState(null); // {exercises, name, icon} — naming step
@@ -1510,7 +1511,12 @@ function App() {
     const oldPB = (profile.exercisePBs||{})[entry.exId];
     const curPB = newExPBs[entry.exId];
     const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
-    setProfile(p=>({...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs}));
+    setProfile(p=>{
+      const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
+      if(pendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==pendingSoloRemoveId);
+      return base;
+    });
+    if(pendingSoloRemoveId) setPendingSoloRemoveId(null);
     setXpFlash({amount:finalEarned,mult,travel:travelActive});
     setTimeout(()=>setXpFlash(null),2000);
     setSelEx(null);setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
@@ -4091,6 +4097,7 @@ function App() {
                                   , sw.notes && React.createElement('div', {className:"workout-desc", style:{marginTop:3}}, sw.notes)
                                 )
                                 , React.createElement('div', {style:{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}
+                                  , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".65rem",color:"#b4ac9e",padding:"3px 6px"}, onClick:(e)=>{e.stopPropagation(); setSelEx(sw.exId);setPendingSoloRemoveId(sw.id);}}, "✎")
                                   , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{color:"#e74c3c"}, onClick:()=>{
                                     setProfile(p=>({...p,scheduledWorkouts:(p.scheduledWorkouts||[]).filter(s=>s.id!==sw.id)}));
                                     showToast("Scheduled exercise removed.");
@@ -4098,7 +4105,13 @@ function App() {
                                 )
                               )
                               , React.createElement('div', {style:{display:"flex",gap:6,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(180,172,158,.04)"}}
-                                , React.createElement('button', {className:"btn btn-gold btn-sm", onClick:()=>quickLogSoloEx(sw)}, "\u26A1 Log Now")
+                                , React.createElement('button', {className:"btn btn-gold btn-sm", style:{flex:1}, onClick:()=>quickLogSoloEx(sw)}, "\u26A1 Quick Log")
+                                , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,fontSize:".58rem",borderColor:"rgba(180,172,158,.15)",color:"#b4ac9e"}, onClick:(e)=>{e.stopPropagation(); openScheduleEx(sw.exId, sw.id);}}, "\uD83D\uDCC5 Reschedule")
+                                , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,fontSize:".58rem",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"}, onClick:()=>{
+                                    const ex2=allExById[sw.exId]; if(!ex2) return;
+                                    const exEntry={exId:ex2.id,sets:ex2.defaultSets||3,reps:ex2.defaultReps||10,weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};
+                                    setAddToWorkoutPicker({exercises:[exEntry]});
+                                  }}, "\u2795 Add to Workout")
                               )
                             );
                           })
@@ -8855,13 +8868,13 @@ function App() {
         })();
         return (
           React.createElement('div', { style: {position:"fixed",inset:0,background:"rgba(0,0,0,.78)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
-            onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);}}
+            onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}
             , React.createElement('div', { style: {width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",background:"linear-gradient(160deg,#0c0c0a,#0c0c0a)",border:"1px solid rgba(180,172,158,.06)",borderRadius:"18px 18px 0 0",padding:"0 0 24px"},
               onClick: e=>e.stopPropagation()}
               /* Header */
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px 4px"}}
                 , React.createElement('div', { style: {fontSize:".95rem",color:"#d4cec4",fontFamily:"'Inter',sans-serif",fontWeight:600}}, ex.icon, " " , ex.name)
-                , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);}}, "✕")
+                , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}, "✕")
               )
               , React.createElement('div', { style: {padding:"0 14px"}}
                 , React.createElement('div', { className: "log-form"}
