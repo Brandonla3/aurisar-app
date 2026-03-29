@@ -3998,7 +3998,7 @@ function App() {
                   , workoutSubTab==="oneoff"&&(
                     React.createElement(React.Fragment, null
                       , (()=>{
-                        const today = todayStr();
+                        const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
                         const grouped = {};
                         (profile.scheduledWorkouts||[]).forEach(sw=>{
                           if(!sw.sourceWorkoutId) return;
@@ -4069,7 +4069,7 @@ function App() {
                         });
                       })()
                       , (()=>{
-                        const today = todayStr();
+                        const _now2 = new Date(); const today = `${_now2.getFullYear()}-${String(_now2.getMonth()+1).padStart(2,'0')}-${String(_now2.getDate()).padStart(2,'0')}`;
                         const soloExs = (profile.scheduledWorkouts||[]).filter(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today).sort((a,b)=>a.scheduledDate.localeCompare(b.scheduledDate));
                         if(soloExs.length===0) return null;
                         return React.createElement(React.Fragment, null
