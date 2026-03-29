@@ -1,6 +1,18 @@
 Homepage Landing Page & Login Screen Improvements
 ==================================================
 
+Latest Update: Homepage Modernization + Font Fix
+-------------------------------------------------
+- Switched all homepage headings from Cinzel Decorative (ornate) to plain
+  Cinzel with wider letter-spacing to match the brand logo image
+- Added a subtle gold glow pulse animation on CTA buttons ("Begin Your
+  Journey", "Create Your Free Account") for a modern-gaming feel
+- Added a dark vignette overlay (radial gradient darkening edges) on the
+  homepage background for cinematic depth
+- Feature cards now glow gold on hover instead of just changing border color
+- Banner image has a stronger ambient gold glow shadow
+- Login page is untouched
+
 Overview
 --------
 Previously, unauthenticated visitors landed directly on a login/signup form
