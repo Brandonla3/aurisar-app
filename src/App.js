@@ -3734,10 +3734,10 @@ function App() {
                     /* Select mode action bar */
                     libSelectMode && libSelected.size>0 && React.createElement('div', {
                       style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,
-                             padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}
+                             padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}
                     },
-                      React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700",flexShrink:0}}, libSelected.size+" selected"),
-                      React.createElement('div',{style:{flex:1}}),
+                      React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, libSelected.size+" selected"),
+                      React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
                       React.createElement('button',{
                         onClick:()=>{
                           const exs=[...libSelected].map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
@@ -3765,7 +3765,7 @@ function App() {
                         },
                         style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
                       }, "📋 Plan")
-                    ),
+                    )),
 
                     /* Exercise list */
                     React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}},
@@ -3941,10 +3941,10 @@ function App() {
                       }, favSelectMode?"✕ Cancel":"☐ Select")
                     )
                     /* Multi-select action bar */
-                    , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"center"}}
-                      , React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700",flexShrink:0}}, favSelected.size+" selected")
-                      , React.createElement('div',{style:{flex:1}})
-                      , React.createElement('button',{
+                    , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}
+                      , React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, favSelected.size+" selected")
+                      , React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
+                      React.createElement('button',{
                         onClick:()=>{
                           const ids=[...favSelected];
                           const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
@@ -3972,7 +3972,7 @@ function App() {
                         },
                         style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
                       },"📋 Plan")
-                    )
+                    ))
                     , (profile.favoriteExercises||[]).length===0
                         ? React.createElement('div',{className:"empty",style:{padding:"16px 0"}},"No favorites yet — tap ⭐ on any exercise.")
                         : React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:6}}
