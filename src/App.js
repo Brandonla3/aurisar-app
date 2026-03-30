@@ -14,7 +14,7 @@ import { ClassIcon } from './components/ClassIcon';
 import { ExerciseVideo } from './components/ExerciseVideo';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
-import { TrendsTab } from './components/TrendsTab';
+import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 import loginBg from './assets/login-bg.png';
 
@@ -6826,7 +6826,7 @@ function App() {
                   , logSubTab==="exercises"&&React.createElement(ExercisesTab,null)
                   , logSubTab==="workouts"&&React.createElement(WorkoutsTab,null)
                   , logSubTab==="plans"&&React.createElement(PlansTab,null)
-                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,clsGlow:cls.glow,units:profile.units})
+                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order}))})
                   , logSubTab==="deleted"&&(()=>{
                     const now = new Date();
                     const active = (profile.deletedItems||[])

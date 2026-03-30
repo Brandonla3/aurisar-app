@@ -989,4 +989,11 @@
     .recharts-tooltip-item{color:#d4cec4!important;font-size:.62rem!important}
     .recharts-tooltip-label{color:#b4ac9e!important;font-size:.64rem!important;font-weight:700!important}
 
-
+    /* ── Trends Reorder Controls ── */
+    .trends-reorder-controls{display:flex;align-items:center;gap:3px;flex-shrink:0}
+    .trends-reorder-btn{background:rgba(45,42,36,.2);border:1px solid rgba(180,172,158,.06);color:#5a5650;width:24px;height:24px;border-radius:6px;font-size:.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;padding:0;line-height:1}
+    .trends-reorder-btn:hover:not(:disabled){color:#b4ac9e;border-color:rgba(180,172,158,.15);background:rgba(45,42,36,.35)}
+    .trends-reorder-btn:disabled{opacity:.25;cursor:default}
+    .trends-drag-handle{color:#3a3830;font-size:.7rem;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-.15em}
+    .trends-drag-handle:active{cursor:grabbing}
+    @media (hover:none){.trends-drag-handle{display:none}}

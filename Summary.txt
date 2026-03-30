@@ -3,9 +3,10 @@
 
 ## Overview
 Added a Trends/Analytics section to the Battle Record tab, giving users interactive
-charts and insights about their workout habits. Users can now visualize which days
-of the week they train best, how different workout types impact calories and duration,
-track their strength volume progression over time, and more.
+charts and insights about their workout habits. Users can visualize which days of the
+week they train best, track muscle group training frequency, monitor volume progression
+per muscle group for hypertrophy, see sets-per-session trends, and more. All chart cards
+are reorderable via drag-and-drop (desktop) and up/down arrow buttons (mobile).
 
 ## What Was Added
 
@@ -14,28 +15,36 @@ track their strength volume progression over time, and more.
   area charts with full dark-theme support
 
 ### New File: src/components/TrendsTab.js
-Self-contained component (~280 lines) containing all analytics logic:
+Self-contained component containing all analytics logic:
 - Time-range filtering (7 Days / 30 Days / 90 Days / 6 Months / All Time)
-- 5 chart cards with memoized data aggregation for performance
+- 6 chart cards with memoized data aggregation for performance
+- Chart reordering system (drag-and-drop + up/down arrows)
 - Empty state handling when no workout data exists
 - Dark glassmorphism styling matching the existing app theme
 - Unit-aware display (imperial/metric) for volume calculations
+- Exports DEFAULT_CHART_ORDER constant for App.js integration
 
 ### Modified Files
 1. **src/App.js** (3 lines changed)
-   - Imported TrendsTab component
+   - Imported TrendsTab component + DEFAULT_CHART_ORDER
    - Added "Trends" to Battle Record sub-tab array
-   - Added conditional rendering for logSubTab==="trends"
+   - Added conditional rendering with chartOrder prop and onChartOrderChange callback
 
-2. **src/styles/app.css** (7 lines added)
+2. **src/styles/app.css** (14 lines added)
    - `.trends-range-bar` — time range filter pill bar styling
    - Recharts tooltip overrides for dark theme consistency
+   - `.trends-reorder-controls` — reorder button container
+   - `.trends-reorder-btn` — up/down arrow buttons (ghost style)
+   - `.trends-drag-handle` — drag grip icon, hidden on touch devices via @media (hover:none)
 
-3. **package.json** — Added `recharts` dependency
+3. **src/data/constants.js** (1 line added)
+   - Added `chartOrder` to EMPTY_PROFILE with default ordering
+
+4. **package.json** — Added `recharts` dependency
 
 ## Chart Details
 
-### 1. Best Training Days (Bar Chart)
+### 1. Best Training Days (Bar Chart) — key: "dow"
 - 7 bars representing Sunday through Saturday
 - Metric toggle: Sessions / Duration / Total Cal / Active Cal
 - Best day highlighted in bright gold (#f0d060), others in standard gold (#c49428)
@@ -43,30 +52,62 @@ Self-contained component (~280 lines) containing all analytics logic:
 - Auto-generated insight: "Your strongest day is [Day] with [X] [metric]"
 - Deduplicates workout sessions by sourceGroupId to avoid double-counting
 
-### 2. Impact by Workout Type (Grouped Bar Chart)
-- Groups completed workouts by exercise category (Strength, Cardio, Flexibility, etc.)
-- Shows 3 bars per category: Avg Duration (blue), Avg Total Cal (orange), Avg Active Cal (green)
-- Deduplicates by sourceGroupId so multi-exercise workouts count once
-- Only appears when workout data with sourceGroupId exists
+### 2. Sets Over Time (Bar Chart) — key: "sets"
+- Visualizes average total sets per session each week
+- Session definition: Solo exercise (no sourceGroupId) = its own session;
+  entries sharing the same dateKey + sourceGroupId = one workout session
+- Sums all sets across exercises in each session, then averages per week
+- Gold bars (#c49428) with week labels on x-axis
+- Insight: "Average total sets per session each week — ensure sufficient training stimulus"
 
-### 3. Strength Trends / Volume Progression (Line Chart)
-- Plots weekly total volume (sets x reps x weight) over time
-- Dropdown filter to view all strength exercises or a specific one
-- Line color matches the user's character class color
+### 3. Muscle Group Frequency (Horizontal Bar Chart) — key: "muscleFreq"
+- Tracks how often specific muscles are trained per week
+- Groups log entries by exercise muscleGroup field
+- Counts distinct weeks each muscle group appears in
+- Computes avgPerWeek = totalWeeksActive / totalDistinctWeeks in range
+- Bars colored by MUSCLE_COLORS (chest=#9E7B6B, back=#7B8D7A, etc.)
+- Auto-generated insight highlighting most trained muscle group
+
+### 4. Volume Over Time (Stacked/Filtered Bar Chart) — key: "volume"
+- Displays total load (sets × reps × weight) per muscle group each week
+- Dropdown filter: "All Muscle Groups" (stacked bars) or specific muscle (single-color bars)
+- Stacked bars colored by MUSCLE_COLORS per muscle group
 - Supports metric/imperial unit conversion (lbs/kg)
-- Shows "No strength data with weight in this range" when no data matches
+- Purpose: Track muscle hypertrophy stimulus over time
 
-### 4. Workout Consistency (Area Chart)
+### 5. Workout Consistency (Area Chart) — key: "consistency"
 - Sessions logged per week as a filled area chart
 - Fill color uses the user's character class color at low opacity
 - Only appears when 2+ weeks of data exist
 - X-axis labels show week start dates (e.g., "Mar 3")
 
-### 5. Most Trained Exercises (Ranked List)
+### 6. Most Trained Exercises (Ranked List) — key: "topEx"
 - Top 10 most-logged exercises sorted by frequency
 - Each row shows: rank number, exercise icon, name, progress bar, count, and XP earned
 - Progress bars colored by exercise category using CAT_ICON_COLORS
 - Bar width proportional to the top exercise's count
+
+## Chart Reordering System
+
+### How It Works
+- Each chart card has a header with the title + reorder controls (top-right)
+- Controls: ↑ button (move up), ↓ button (move down), ⋮⋮ drag handle
+- First chart's ↑ button is disabled; last chart's ↓ button is disabled
+- Drag handle uses native HTML5 drag events (same pattern as existing plan/workout builders)
+- On touch devices (@media hover:none), drag handle is hidden — arrows are the primary method
+
+### Persistence
+- Chart order stored as `profile.chartOrder` array (e.g., ["dow","sets","muscleFreq","volume","consistency","topEx"])
+- Saved via existing doSave() pattern to both localStorage and Supabase
+- Default order defined in DEFAULT_CHART_ORDER constant
+- Falls back to default if saved order is missing or has wrong length
+
+### Implementation
+- Charts defined in CHART_RENDERERS map (key → render function)
+- chartOrder array determines render sequence
+- ChartCard wrapper component handles drag events and arrow button callbacks
+- moveChart(fromIdx, toIdx) function splices the order array and calls onChartOrderChange prop
+- App.js passes chartOrder from profile and onChartOrderChange callback that updates profile state
 
 ## Architecture Decisions
 
@@ -78,9 +119,16 @@ Self-contained component (~280 lines) containing all analytics logic:
 
 ### Why a Separate Component File?
 - App.js is already 10,000+ lines with 252 useState hooks
-- TrendsTab manages its own internal state (range, metric toggles, filters)
+- TrendsTab manages its own internal state (range, metric toggles, filters, drag state)
 - Isolates charting library imports so recharts only loads when needed
-- All data passed via props: log, allExById, clsColor, clsGlow, units
+- All data passed via props: log, allExById, clsColor, units, chartOrder, onChartOrderChange
+
+### Why Native Drag + Arrow Buttons (no library)?
+- App already uses native HTML5 drag in plan/workout builders (App.js lines 4691-4699, 5514-5519)
+- Zero additional dependencies
+- Arrow buttons work universally on mobile and desktop
+- Drag handle hidden on touch devices to avoid UX issues
+- ~30 lines of reorder logic total
 
 ### Why Recharts?
 - React-first: works naturally with the existing React.createElement() pattern
@@ -90,12 +138,13 @@ Self-contained component (~280 lines) containing all analytics logic:
 - ~45KB gzipped — reasonable bundle size addition
 
 ## Data Flow
-1. App.js passes `profile.log`, `allExById`, `cls.color`, `cls.glow`, `profile.units` as props
+1. App.js passes `profile.log`, `allExById`, `cls.color`, `profile.units`, `profile.chartOrder`, and `onChartOrderChange` as props
 2. TrendsTab filters log entries by selected time range (useMemo)
 3. Each chart has its own useMemo hook that aggregates the filtered data
 4. Workout sessions are deduplicated by sourceGroupId where appropriate
-5. No new state is added to App.js — all analytics state is local to TrendsTab
+5. Chart order changes call onChartOrderChange which updates profile state (auto-saved)
+6. No new state is added to App.js — all analytics state is local to TrendsTab
 
 ## Navigation Path
-Main App -> Hamburger Menu -> "Battle Log" -> Sub-tabs -> "Trends"
+Main App -> Hamburger Menu -> "Battle Log" -> Sub-tabs -> "📊 Trends"
 (activeTab === "history" -> logSubTab === "trends")

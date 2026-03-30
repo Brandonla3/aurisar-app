@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   CartesianGrid
 } from 'recharts';
-import { CAT_ICON_COLORS } from '../data/constants';
+import { CAT_ICON_COLORS, MUSCLE_COLORS } from '../data/constants';
 import { isMetric, lbsToKg } from '../utils/units';
 
 const h = React.createElement;
@@ -25,6 +25,8 @@ const HEATMAP_METRICS = [
   ["totalCal", "Total Cal"],
   ["activeCal", "Active Cal"],
 ];
+
+const DEFAULT_CHART_ORDER = ["dow","sets","muscleFreq","volume","consistency","topEx"];
 
 function cutoffDate(range) {
   const now = new Date();
@@ -53,6 +55,8 @@ function weekLabel(wk) {
   return mo + " " + d.getDate();
 }
 
+function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
 const TOOLTIP_STYLE = {
   backgroundColor: "rgba(20,18,15,.92)",
   border: "1px solid rgba(180,172,158,.15)",
@@ -76,9 +80,9 @@ const CARD_TITLE = {
   fontSize: ".82rem",
   fontWeight: 700,
   color: "#b4ac9e",
-  marginBottom: 12,
   fontFamily: "'Cinzel', serif",
   letterSpacing: ".03em",
+  flex: 1,
 };
 
 const INSIGHT_STYLE = {
@@ -89,11 +93,26 @@ const INSIGHT_STYLE = {
   lineHeight: 1.5,
 };
 
-function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
+function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, onChartOrderChange }) {
   const [range, setRange] = useState("30d");
   const [heatMetric, setHeatMetric] = useState("sessions");
-  const [volExFilter, setVolExFilter] = useState("_all");
+  const [volMuscleFilter, setVolMuscleFilter] = useState("_all");
+  const [dragIdx, setDragIdx] = useState(null);
   const metric = isMetric(units);
+
+  // ── Chart order ──
+  const chartOrder = useMemo(() => {
+    if (savedOrder && Array.isArray(savedOrder) && savedOrder.length === DEFAULT_CHART_ORDER.length) return savedOrder;
+    return DEFAULT_CHART_ORDER;
+  }, [savedOrder]);
+
+  function moveChart(fromIdx, toIdx) {
+    if (fromIdx < 0 || toIdx < 0 || fromIdx >= chartOrder.length || toIdx >= chartOrder.length || fromIdx === toIdx) return;
+    const next = [...chartOrder];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    if (onChartOrderChange) onChartOrderChange(next);
+  }
 
   // ── Filtered log ──
   const filtered = useMemo(() => {
@@ -105,14 +124,20 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
     });
   }, [log, range]);
 
+  // ── Distinct weeks in filtered range (for per-week averages) ──
+  const distinctWeeks = useMemo(() => {
+    const wks = new Set();
+    filtered.forEach(e => { if (e.dateKey) wks.add(weekKey(e.dateKey)); });
+    return Math.max(1, wks.size);
+  }, [filtered]);
+
   // ══════════════════════════════════════════════
-  // CHART 1: Best Training Days (day-of-week bar)
+  // CHART: Best Training Days (day-of-week bar)
   // ══════════════════════════════════════════════
   const dowData = useMemo(() => {
     const buckets = DOW_LABELS.map((label, i) => ({
       day: label, dow: i, sessions: 0, duration: 0, totalCal: 0, activeCal: 0, _dates: new Set()
     }));
-    // Deduplicate workouts by sourceGroupId
     const seen = new Set();
     filtered.forEach(e => {
       if (!e.dateKey) return;
@@ -130,84 +155,124 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
       buckets[dow].sessions++;
       buckets[dow]._dates.add(e.dateKey);
     });
-    // Convert duration from seconds to minutes
     buckets.forEach(b => { b.duration = Math.round(b.duration / 60); });
     return buckets;
   }, [filtered]);
 
   const bestDow = useMemo(() => {
-    const m = heatMetric;
     let best = dowData[0];
-    dowData.forEach(b => { if (b[m] > best[m]) best = b; });
+    dowData.forEach(b => { if (b[heatMetric] > best[heatMetric]) best = b; });
     return best;
   }, [dowData, heatMetric]);
 
-  const dowMax = useMemo(() => {
-    return Math.max(1, ...dowData.map(b => b[heatMetric]));
-  }, [dowData, heatMetric]);
+  const dowMax = useMemo(() => Math.max(1, ...dowData.map(b => b[heatMetric])), [dowData, heatMetric]);
 
   // ══════════════════════════════════════════════
-  // CHART 2: Calories & Duration by Workout Type
+  // CHART: Sets Over Time (avg sets per session per week)
   // ══════════════════════════════════════════════
-  const impactData = useMemo(() => {
-    const groups = {};
-    const seen = new Set();
+  const setsData = useMemo(() => {
+    // Build sessions: solo exercise = own session, grouped entries = one session per sourceGroupId+dateKey
+    const sessionMap = {}; // sessionKey -> { week, totalSets }
+    let soloIdx = 0;
     filtered.forEach(e => {
+      if (!e.dateKey) return;
       const gid = e.sourceGroupId;
-      if (!gid) return;
-      const key = e.dateKey + "|" + gid;
-      if (seen.has(key)) return;
-      seen.add(key);
-      const cat = (allExById[e.exId] || {}).category || "other";
-      if (!groups[cat]) groups[cat] = { cat, totalDur: 0, totalCal: 0, activeCal: 0, count: 0 };
-      groups[cat].totalDur += Number(e.sourceDurationSec) || 0;
-      groups[cat].totalCal += Number(e.sourceTotalCal) || 0;
-      groups[cat].activeCal += Number(e.sourceActiveCal) || 0;
-      groups[cat].count++;
+      const sessionKey = gid ? (e.dateKey + "|" + gid) : (e.dateKey + "|solo|" + (e.exId || "") + "|" + (e.time || String(soloIdx++)));
+      if (!sessionMap[sessionKey]) sessionMap[sessionKey] = { week: weekKey(e.dateKey), totalSets: 0 };
+      sessionMap[sessionKey].totalSets += Number(e.sets) || 1;
     });
-    return Object.values(groups)
-      .filter(g => g.count > 0)
-      .map(g => ({
-        name: g.cat.charAt(0).toUpperCase() + g.cat.slice(1),
-        cat: g.cat,
-        avgDuration: Math.round(g.totalDur / g.count / 60),
-        avgTotalCal: Math.round(g.totalCal / g.count),
-        avgActiveCal: Math.round(g.activeCal / g.count),
-      }))
-      .sort((a, b) => b.avgTotalCal - a.avgTotalCal);
-  }, [filtered, allExById]);
+    // Group sessions by week
+    const weeks = {};
+    Object.values(sessionMap).forEach(s => {
+      if (!weeks[s.week]) weeks[s.week] = { week: s.week, totalSets: 0, sessionCount: 0 };
+      weeks[s.week].totalSets += s.totalSets;
+      weeks[s.week].sessionCount++;
+    });
+    return Object.values(weeks)
+      .sort((a, b) => a.week.localeCompare(b.week))
+      .map(w => ({
+        ...w,
+        label: weekLabel(w.week),
+        avgSets: Math.round(w.totalSets / w.sessionCount * 10) / 10,
+      }));
+  }, [filtered]);
 
   // ══════════════════════════════════════════════
-  // CHART 3: Volume Progression (Strength Trends)
+  // CHART: Muscle Group Frequency (avg per week)
   // ══════════════════════════════════════════════
-  const strengthExercises = useMemo(() => {
-    const exSet = new Set();
-    log.forEach(e => {
+  const muscleFreqData = useMemo(() => {
+    // Count distinct weeks each muscle group appears in
+    const mgWeeks = {}; // muscleGroup -> Set of weekKeys
+    filtered.forEach(e => {
+      if (!e.dateKey) return;
       const ex = allExById[e.exId];
-      if (ex && ex.category === "strength" && e.weightLbs) exSet.add(e.exId);
+      const mg = ex ? (ex.muscleGroup || "").toLowerCase() : "";
+      if (!mg) return;
+      const wk = weekKey(e.dateKey);
+      if (!mgWeeks[mg]) mgWeeks[mg] = new Set();
+      mgWeeks[mg].add(wk);
     });
-    return Array.from(exSet).map(id => ({ id, name: (allExById[id] || {}).name || id }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return Object.entries(mgWeeks)
+      .map(([mg, wks]) => ({
+        name: capFirst(mg.replace("_", " ")),
+        muscleGroup: mg,
+        avgPerWeek: Math.round(wks.size / distinctWeeks * 10) / 10,
+        totalWeeks: wks.size,
+      }))
+      .filter(d => d.avgPerWeek > 0)
+      .sort((a, b) => b.avgPerWeek - a.avgPerWeek);
+  }, [filtered, allExById, distinctWeeks]);
+
+  const topMuscle = muscleFreqData.length > 0 ? muscleFreqData[0] : null;
+
+  // ══════════════════════════════════════════════
+  // CHART: Volume Over Time (per muscle group)
+  // ══════════════════════════════════════════════
+  const muscleGroupsInLog = useMemo(() => {
+    const mgs = new Set();
+    log.forEach(e => {
+      if (!e.weightLbs) return;
+      const ex = allExById[e.exId];
+      if (ex && ex.muscleGroup) mgs.add(ex.muscleGroup.toLowerCase());
+    });
+    return Array.from(mgs).sort().map(mg => ({ id: mg, name: capFirst(mg.replace("_", " ")) }));
   }, [log, allExById]);
 
-  const volumeData = useMemo(() => {
+  const volOverTimeData = useMemo(() => {
     const weeks = {};
     filtered.forEach(e => {
       if (!e.dateKey || !e.weightLbs) return;
       const ex = allExById[e.exId];
-      if (!ex || ex.category !== "strength") return;
-      if (volExFilter !== "_all" && e.exId !== volExFilter) return;
+      if (!ex || !ex.muscleGroup) return;
+      const mg = ex.muscleGroup.toLowerCase();
+      if (volMuscleFilter !== "_all" && mg !== volMuscleFilter) return;
       const wk = weekKey(e.dateKey);
-      if (!weeks[wk]) weeks[wk] = { week: wk, volume: 0 };
+      if (!weeks[wk]) weeks[wk] = { week: wk };
       const vol = (Number(e.sets) || 1) * (Number(e.reps) || 1) * (Number(e.weightLbs) || 0);
-      weeks[wk].volume += metric ? Math.round(lbsToKg(vol) * 10) / 10 : Math.round(vol);
+      const converted = metric ? Math.round(lbsToKg(vol)) : Math.round(vol);
+      if (volMuscleFilter !== "_all") {
+        weeks[wk].volume = (weeks[wk].volume || 0) + converted;
+      } else {
+        weeks[wk][mg] = (weeks[wk][mg] || 0) + converted;
+      }
     });
-    return Object.values(weeks).sort((a, b) => a.week.localeCompare(b.week))
+    return Object.values(weeks)
+      .sort((a, b) => a.week.localeCompare(b.week))
       .map(w => ({ ...w, label: weekLabel(w.week) }));
-  }, [filtered, allExById, volExFilter, metric]);
+  }, [filtered, allExById, volMuscleFilter, metric]);
+
+  // Collect muscle groups present in volOverTimeData for stacked bars
+  const volMuscleKeys = useMemo(() => {
+    if (volMuscleFilter !== "_all") return ["volume"];
+    const keys = new Set();
+    volOverTimeData.forEach(w => {
+      Object.keys(w).forEach(k => { if (k !== "week" && k !== "label") keys.add(k); });
+    });
+    return Array.from(keys).sort();
+  }, [volOverTimeData, volMuscleFilter]);
 
   // ══════════════════════════════════════════════
-  // CHART 4: Workout Consistency (Area chart)
+  // CHART: Workout Consistency (Area chart)
   // ══════════════════════════════════════════════
   const consistencyData = useMemo(() => {
     const weeks = {};
@@ -222,7 +287,7 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
   }, [filtered]);
 
   // ══════════════════════════════════════════════
-  // CHART 5: Top Exercises
+  // CHART: Top Exercises
   // ══════════════════════════════════════════════
   const topExData = useMemo(() => {
     const counts = {};
@@ -236,26 +301,20 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
       .slice(0, 10)
       .map(c => {
         const ex = allExById[c.exId] || {};
-        return {
-          name: ex.name || c.exId,
-          icon: ex.icon || "💪",
-          count: c.count,
-          xp: c.xp,
-          cat: ex.category || "strength",
-        };
+        return { name: ex.name || c.exId, icon: ex.icon || "\uD83D\uDCAA", count: c.count, xp: c.xp, cat: ex.category || "strength" };
       });
   }, [filtered, allExById]);
 
   // ── Empty state ──
   if (!log.length) {
     return h('div', { style: { ...CARD_STYLE, textAlign: "center", padding: "40px 20px" } },
-      h('div', { style: { fontSize: "2rem", marginBottom: 10 } }, "📊"),
+      h('div', { style: { fontSize: "2rem", marginBottom: 10 } }, "\uD83D\uDCCA"),
       h('div', { style: { fontSize: ".78rem", color: "#8a8478", fontWeight: 600 } }, "No workout data yet"),
       h('div', { style: { fontSize: ".62rem", color: "#5a5650", marginTop: 6 } }, "Log some exercises to see your trends and analytics here.")
     );
   }
 
-  // ── Metric label helper ──
+  // ── Helpers ──
   function metricLabel(m) {
     switch (m) {
       case "sessions": return "sessions";
@@ -266,7 +325,6 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
     }
   }
 
-  // ── Custom tooltip ──
   function DarkTooltip({ active, payload, label, suffix }) {
     if (!active || !payload || !payload.length) return null;
     return h('div', { style: TOOLTIP_STYLE },
@@ -279,24 +337,47 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
     );
   }
 
-  // ── Render ──
-  return h(React.Fragment, null,
+  // ── Card wrapper with reorder controls ──
+  function ChartCard({ title, icon, idx, children }) {
+    const isFirst = idx === 0;
+    const isLast = idx === chartOrder.length - 1;
+    const isDragging = dragIdx === idx;
+    return h('div', {
+      style: { ...CARD_STYLE, opacity: isDragging ? 0.5 : 1, transition: "opacity .2s" },
+      draggable: true,
+      onDragStart: (ev) => { ev.dataTransfer.effectAllowed = "move"; setDragIdx(idx); },
+      onDragOver: (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; },
+      onDrop: (ev) => { ev.preventDefault(); if (dragIdx !== null) moveChart(dragIdx, idx); setDragIdx(null); },
+      onDragEnd: () => setDragIdx(null),
+    },
+      h('div', { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
+        h('div', { style: CARD_TITLE }, icon, " ", title),
+        h('div', { className: "trends-reorder-controls" },
+          h('button', {
+            className: "trends-reorder-btn",
+            disabled: isFirst,
+            onClick: () => moveChart(idx, idx - 1),
+            title: "Move up",
+          }, "\u2191"),
+          h('button', {
+            className: "trends-reorder-btn",
+            disabled: isLast,
+            onClick: () => moveChart(idx, idx + 1),
+            title: "Move down",
+          }, "\u2193"),
+          h('span', { className: "trends-drag-handle", title: "Drag to reorder" }, "\u22EE\u22EE")
+        )
+      ),
+      children
+    );
+  }
 
-    // ── Time Range Filter ──
-    h('div', { className: "trends-range-bar" },
-      ...RANGE_OPTIONS.map(([val, label]) =>
-        h('button', {
-          key: val,
-          className: "log-subtab-btn" + (range === val ? " on" : ""),
-          onClick: () => setRange(val),
-        }, label)
-      )
-    ),
+  // ══════════════════════════════════════════════
+  // CHART RENDERERS (keyed by chart order ID)
+  // ══════════════════════════════════════════════
 
-    // ═══ CARD 1: Best Training Days ═══
-    h('div', { style: CARD_STYLE },
-      h('div', { style: CARD_TITLE }, "⚔️ Best Training Days"),
-      // Metric toggle
+  function renderDow(idx) {
+    return h(ChartCard, { key: "dow", title: "Best Training Days", icon: "\u2694\uFE0F", idx },
       h('div', { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } },
         ...HEATMAP_METRICS.map(([val, label]) =>
           h('button', {
@@ -317,9 +398,7 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
             ...dowData.map((entry, i) =>
               h(Cell, {
                 key: i,
-                fill: entry.dow === bestDow.dow && bestDow[heatMetric] > 0
-                  ? "#f0d060"
-                  : "#c49428",
+                fill: entry.dow === bestDow.dow && bestDow[heatMetric] > 0 ? "#f0d060" : "#c49428",
                 fillOpacity: Math.max(0.3, entry[heatMetric] / dowMax),
               })
             )
@@ -330,73 +409,96 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
         "Your strongest day is ", h('strong', { style: { color: "#f0d060" } }, bestDow.day),
         " with ", bestDow[heatMetric].toLocaleString(), " ", metricLabel(heatMetric)
       )
-    ),
+    );
+  }
 
-    // ═══ CARD 2: Calories & Duration by Type ═══
-    impactData.length > 0 && h('div', { style: CARD_STYLE },
-      h('div', { style: CARD_TITLE }, "🔥 Impact by Workout Type"),
-      h(ResponsiveContainer, { width: "100%", height: 220 },
-        h(BarChart, { data: impactData, margin: { top: 5, right: 5, bottom: 5, left: -10 } },
-          h(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(180,172,158,.06)" }),
-          h(XAxis, { dataKey: "name", tick: { fill: "#8a8478", fontSize: 11 }, axisLine: false, tickLine: false }),
-          h(YAxis, { tick: { fill: "#5a5650", fontSize: 10 }, axisLine: false, tickLine: false }),
-          h(Tooltip, { contentStyle: TOOLTIP_STYLE }),
-          h(Bar, { dataKey: "avgDuration", name: "Avg Duration (min)", fill: "#3498db", radius: [3, 3, 0, 0] }),
-          h(Bar, { dataKey: "avgTotalCal", name: "Avg Total Cal", fill: "#e67e22", radius: [3, 3, 0, 0] }),
-          h(Bar, { dataKey: "avgActiveCal", name: "Avg Active Cal", fill: "#2ecc71", radius: [3, 3, 0, 0] }),
-        )
-      ),
-      h('div', { style: INSIGHT_STYLE },
-        "Comparing average duration, total calories, and active calories across workout categories."
-      )
-    ),
-
-    // ═══ CARD 3: Strength/Volume Trends ═══
-    h('div', { style: CARD_STYLE },
-      h('div', { style: CARD_TITLE }, "💪 Strength Trends"),
-      // Exercise filter
-      h('div', { style: { marginBottom: 10 } },
-        h('select', {
-          className: "inp",
-          style: { fontSize: ".6rem", padding: "5px 8px", maxWidth: 220 },
-          value: volExFilter,
-          onChange: (ev) => setVolExFilter(ev.target.value),
-        },
-          h('option', { value: "_all" }, "All Strength Exercises"),
-          ...strengthExercises.map(ex =>
-            h('option', { key: ex.id, value: ex.id }, ex.name)
-          )
-        )
-      ),
-      volumeData.length > 0
+  function renderSets(idx) {
+    return h(ChartCard, { key: "sets", title: "Sets Over Time", icon: "\uD83C\uDFCB\uFE0F", idx },
+      setsData.length > 0
         ? h(ResponsiveContainer, { width: "100%", height: 200 },
-            h(LineChart, { data: volumeData, margin: { top: 5, right: 5, bottom: 5, left: -10 } },
+            h(BarChart, { data: setsData, margin: { top: 5, right: 5, bottom: 5, left: -10 } },
               h(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(180,172,158,.06)" }),
               h(XAxis, { dataKey: "label", tick: { fill: "#8a8478", fontSize: 10 }, axisLine: false, tickLine: false }),
               h(YAxis, { tick: { fill: "#5a5650", fontSize: 10 }, axisLine: false, tickLine: false }),
               h(Tooltip, { contentStyle: TOOLTIP_STYLE }),
-              h(Line, {
-                type: "monotone",
-                dataKey: "volume",
-                name: "Volume (" + (metric ? "kg" : "lbs") + ")",
-                stroke: clsColor || "#c49428",
-                strokeWidth: 2,
-                dot: { r: 3, fill: clsColor || "#c49428" },
-                activeDot: { r: 5, fill: clsGlow || "#f0d060" },
-              })
+              h(Bar, { dataKey: "avgSets", name: "Avg Sets/Session", fill: "#c49428", radius: [4, 4, 0, 0] })
+            )
+          )
+        : h('div', { style: { fontSize: ".62rem", color: "#5a5650", padding: "20px 0", textAlign: "center" } }, "No session data in this range."),
+      h('div', { style: INSIGHT_STYLE },
+        "Average total sets per session each week \u2014 ensure sufficient training stimulus."
+      )
+    );
+  }
+
+  function renderMuscleFreq(idx) {
+    return h(ChartCard, { key: "muscleFreq", title: "Muscle Group Frequency", icon: "\uD83E\uDDBE", idx },
+      muscleFreqData.length > 0
+        ? h(ResponsiveContainer, { width: "100%", height: Math.max(160, muscleFreqData.length * 32) },
+            h(BarChart, { data: muscleFreqData, layout: "vertical", margin: { top: 5, right: 15, bottom: 5, left: 60 } },
+              h(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(180,172,158,.06)" }),
+              h(XAxis, { type: "number", tick: { fill: "#5a5650", fontSize: 10 }, axisLine: false, tickLine: false }),
+              h(YAxis, { type: "category", dataKey: "name", tick: { fill: "#8a8478", fontSize: 11 }, axisLine: false, tickLine: false, width: 70 }),
+              h(Tooltip, { contentStyle: TOOLTIP_STYLE }),
+              h(Bar, { dataKey: "avgPerWeek", name: "Avg/Week", radius: [0, 4, 4, 0] },
+                ...muscleFreqData.map((entry, i) =>
+                  h(Cell, { key: i, fill: MUSCLE_COLORS[entry.muscleGroup] || "#c49428" })
+                )
+              )
+            )
+          )
+        : h('div', { style: { fontSize: ".62rem", color: "#5a5650", padding: "20px 0", textAlign: "center" } }, "No muscle group data in this range."),
+      topMuscle && h('div', { style: INSIGHT_STYLE },
+        h('strong', { style: { color: MUSCLE_COLORS[topMuscle.muscleGroup] || "#f0d060" } }, topMuscle.name),
+        " is your most trained muscle at ", topMuscle.avgPerWeek, " times/week"
+      )
+    );
+  }
+
+  function renderVolume(idx) {
+    return h(ChartCard, { key: "volume", title: "Volume Over Time", icon: "\uD83D\uDCC8", idx },
+      h('div', { style: { marginBottom: 10 } },
+        h('select', {
+          className: "inp",
+          style: { fontSize: ".6rem", padding: "5px 8px", maxWidth: 220 },
+          value: volMuscleFilter,
+          onChange: (ev) => setVolMuscleFilter(ev.target.value),
+        },
+          h('option', { value: "_all" }, "All Muscle Groups"),
+          ...muscleGroupsInLog.map(mg => h('option', { key: mg.id, value: mg.id }, mg.name))
+        )
+      ),
+      volOverTimeData.length > 0
+        ? h(ResponsiveContainer, { width: "100%", height: 200 },
+            h(BarChart, { data: volOverTimeData, margin: { top: 5, right: 5, bottom: 5, left: -10 } },
+              h(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(180,172,158,.06)" }),
+              h(XAxis, { dataKey: "label", tick: { fill: "#8a8478", fontSize: 10 }, axisLine: false, tickLine: false }),
+              h(YAxis, { tick: { fill: "#5a5650", fontSize: 10 }, axisLine: false, tickLine: false }),
+              h(Tooltip, { contentStyle: TOOLTIP_STYLE }),
+              ...volMuscleKeys.map(mk =>
+                h(Bar, {
+                  key: mk,
+                  dataKey: mk,
+                  name: mk === "volume" ? "Volume" : capFirst(mk.replace("_", " ")),
+                  stackId: volMuscleFilter === "_all" ? "vol" : undefined,
+                  fill: mk === "volume" ? (MUSCLE_COLORS[volMuscleFilter] || clsColor || "#c49428") : (MUSCLE_COLORS[mk] || "#c49428"),
+                  radius: volMuscleFilter !== "_all" ? [4, 4, 0, 0] : undefined,
+                })
+              )
             )
           )
         : h('div', { style: { fontSize: ".62rem", color: "#5a5650", padding: "20px 0", textAlign: "center" } },
-            "No strength data with weight in this range."
+            "No weighted exercise data in this range."
           ),
       h('div', { style: INSIGHT_STYLE },
-        "Weekly total volume (sets \u00d7 reps \u00d7 weight) over time."
+        "Total load (sets \u00d7 reps \u00d7 weight) per muscle group each week \u2014 track hypertrophy stimulus."
       )
-    ),
+    );
+  }
 
-    // ═══ CARD 4: Workout Consistency ═══
-    consistencyData.length > 1 && h('div', { style: CARD_STYLE },
-      h('div', { style: CARD_TITLE }, "📅 Workout Consistency"),
+  function renderConsistency(idx) {
+    if (consistencyData.length <= 1) return null;
+    return h(ChartCard, { key: "consistency", title: "Workout Consistency", icon: "\uD83D\uDCC5", idx },
       h(ResponsiveContainer, { width: "100%", height: 180 },
         h(AreaChart, { data: consistencyData, margin: { top: 5, right: 5, bottom: 5, left: -10 } },
           h(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(180,172,158,.06)" }),
@@ -404,32 +506,26 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
           h(YAxis, { tick: { fill: "#5a5650", fontSize: 10 }, axisLine: false, tickLine: false }),
           h(Tooltip, { contentStyle: TOOLTIP_STYLE }),
           h(Area, {
-            type: "monotone",
-            dataKey: "sessions",
-            name: "Sessions",
-            stroke: clsColor || "#c49428",
-            fill: clsColor || "#c49428",
-            fillOpacity: 0.15,
-            strokeWidth: 2,
+            type: "monotone", dataKey: "sessions", name: "Sessions",
+            stroke: clsColor || "#c49428", fill: clsColor || "#c49428",
+            fillOpacity: 0.15, strokeWidth: 2,
           })
         )
       ),
-      h('div', { style: INSIGHT_STYLE },
-        "Sessions logged per week across your selected time range."
-      )
-    ),
+      h('div', { style: INSIGHT_STYLE }, "Sessions logged per week across your selected time range.")
+    );
+  }
 
-    // ═══ CARD 5: Top Exercises ═══
-    topExData.length > 0 && h('div', { style: CARD_STYLE },
-      h('div', { style: CARD_TITLE }, "🏆 Most Trained Exercises"),
+  function renderTopEx(idx) {
+    if (topExData.length === 0) return null;
+    const maxCount = topExData[0].count;
+    return h(ChartCard, { key: "topEx", title: "Most Trained Exercises", icon: "\uD83C\uDFC6", idx },
       ...topExData.map((ex, i) => {
-        const maxCount = topExData[0].count;
         const catColor = CAT_ICON_COLORS[ex.cat] || "#c49428";
         return h('div', {
           key: i,
           style: {
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 0",
+            display: "flex", alignItems: "center", gap: 8, padding: "6px 0",
             borderBottom: i < topExData.length - 1 ? "1px solid rgba(180,172,158,.04)" : "none",
           }
         },
@@ -442,13 +538,34 @@ function TrendsTab({ log, allExById, clsColor, clsGlow, units }) {
             )
           ),
           h('div', { style: { textAlign: "right", flexShrink: 0 } },
-            h('div', { style: { fontSize: ".62rem", color: "#b4ac9e", fontWeight: 700 } }, ex.count + "×"),
+            h('div', { style: { fontSize: ".62rem", color: "#b4ac9e", fontWeight: 700 } }, ex.count + "\u00d7"),
             h('div', { style: { fontSize: ".48rem", color: "#5a5650" } }, "+" + ex.xp + " XP")
           )
         );
       })
+    );
+  }
+
+  const CHART_RENDERERS = { dow: renderDow, sets: renderSets, muscleFreq: renderMuscleFreq, volume: renderVolume, consistency: renderConsistency, topEx: renderTopEx };
+
+  // ── Render ──
+  return h(React.Fragment, null,
+    // ── Time Range Filter ──
+    h('div', { className: "trends-range-bar" },
+      ...RANGE_OPTIONS.map(([val, label]) =>
+        h('button', {
+          key: val,
+          className: "log-subtab-btn" + (range === val ? " on" : ""),
+          onClick: () => setRange(val),
+        }, label)
+      )
     ),
+    // ── Charts in user-defined order ──
+    ...chartOrder.map((key, idx) => {
+      const render = CHART_RENDERERS[key];
+      return render ? render(idx) : null;
+    })
   );
 }
 
-export { TrendsTab };
+export { TrendsTab, DEFAULT_CHART_ORDER };
