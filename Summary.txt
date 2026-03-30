@@ -1,84 +1,101 @@
-# Aurisar — LOTR Disassociation & City Name Generation Summary
-# ============================================================
+# Aurisar — Workout Analytics & Trends Feature Summary
+# =====================================================
 
-## Changes Made
-1. Replaced "Middle-earth" map title with "Auranthel" (src/App.js)
-2. Renamed 6 map region names to generated fantasy names (src/data/constants.js)
-3. Hidden the Map feature from navigation menu (src/App.js)
+## Overview
+Added a Trends/Analytics section to the Battle Record tab, giving users interactive
+charts and insights about their workout habits. Users can now visualize which days
+of the week they train best, how different workout types impact calories and duration,
+track their strength volume progression over time, and more.
 
-## Region Name Mapping
-  Old Name            →  New Name
-  ─────────────────────────────────────
-  Starter's Realm     →  Verath Hollow
-  Cardio Canyon       →  Caelvoss
-  Flex Temple         →  Lithenvale
-  Iron Peak           →  Korrath Summit
-  Elite Citadel       →  Emberveil
-  Legend's Sanctum    →  Zenthara Citadel
+## What Was Added
 
-## 60 Generated City/Area Names (with Inspiration Sources)
-These names are original blends from diverse real-world linguistic roots.
-No name is taken directly from any existing franchise, game, or published fiction.
+### New Dependency
+- `recharts` (v3.8.1) — React-first charting library for rendering bar, line, and
+  area charts with full dark-theme support
 
- #  | City Name            | Inspiration Source
-----|----------------------|---------------------------------------------------
-  1 | Verath Hollow        | Latin veritas (truth) + English terrain
-  2 | Kesmora              | Turkish kes (cut) + Spanish mora (blackberry)
-  3 | Dawnspire            | English compound: dawn + spire
-  4 | Thalindor            | Greek thalassa (sea) + invented suffix "-indor"
-  5 | Brynvael             | Welsh bryn (hill) + invented "-vael"
-  6 | Oskmire              | Old Norse osk (wish) + English mire
-  7 | Caelvoss             | Latin caelum (sky) + Icelandic foss (waterfall)
-  8 | Thornwatch           | English compound: thorn + watch (lookout)
-  9 | Pyralis Gate         | Greek pyr (fire) + Latin "-alis" + English
- 10 | Solmara              | Latin sol (sun) + Italian mare (sea)
- 11 | Duskfeld             | English dusk + German Feld (field)
- 12 | Renvasa              | French renard (fox) + invented Spanish-esque
- 13 | Korrath Summit       | Invented hard consonants + English summit
- 14 | Ashenmoor            | English compound: ashen + moor
- 15 | Zephyral             | Greek zephyros (west wind) + "-al"
- 16 | Tarvikk              | Finnish tarve (need) + Nordic doubled consonant
- 17 | Lithenvale           | Greek lithos (stone) + English vale
- 18 | Myrwen               | Welsh-inspired: invented + -wen (white/blessed)
- 19 | Granithos            | English granite + Greek suffix "-os"
- 20 | Felhaven             | Old English fel (fell/hill) + English haven
- 21 | Oravyn               | Romanian ora (hour) + invented "-vyn"
- 22 | Cindral Keep         | English cinder + "-al" + English fortification
- 23 | Vastok               | Russian vostok (east) rearranged
- 24 | Sundered Reach       | English: sundered (split) + reach (expanse)
- 25 | Ithramor             | Hebrew-esque ith- + Latin amor (love)
- 26 | Kaelvith             | Gaelic cael- (slender) + invented "-vith"
- 27 | Stormholt            | English storm + Old English holt (wood)
- 28 | Draven's Crest       | Slavic drav- (Croatian river Drava) + English crest
- 29 | Quorinth             | Latin quo (where) + "-rinth" (evokes labyrinth)
- 30 | Emberveil            | English compound: ember + veil
- 31 | Nythara              | Invented nyth- (night-esque) + Sanskrit-esque "-ara"
- 32 | Pellomar             | Latin pellis (hide) + Spanish mar (sea)
- 33 | Wyndcross            | Scots wynd (narrow lane) + English cross
- 34 | Halcyren             | Greek halcyon (calm) + invented "-ren"
- 35 | Fenwick Spires       | English fen + Old English wic (settlement) + spires
- 36 | Arkthos Bluff        | Greek arktos (bear/north) + English bluff
- 37 | Sulvane              | Latin sulcus (furrow) + English vane
- 38 | Meridorn             | Latin meridies (midday/south) + invented "-orn"
- 39 | Cristvael            | Crystal-esque crist- + invented "-vael"
- 40 | Oakenrath            | English oaken + Old English/Irish rath (hill fort)
- 41 | Vyrantis             | Invented vyr- + Greek "-antis" suffix
- 42 | Delmaris             | Italian del (of the) + Latin mare (sea)
- 43 | Frostvang            | English frost + Old Norse vangr (meadow)
- 44 | Ghalen Tor           | Gaelic-esque ghalen + Celtic tor (rocky hill)
- 45 | Runehollow           | English compound: rune + hollow
- 46 | Petravar             | Latin petra (rock) + Slavic "-var"
- 47 | Nightmere Basin      | English nightmare respelled + geological basin
- 48 | Solvetta             | Latin sol (sun) + Italian diminutive "-etta"
- 49 | Cragmoor Reach       | English crag + moor + reach
- 50 | Thessivane           | Greek Thess- (Thessaly) + English vane
- 51 | Ironveil Pass        | English compound: iron + veil + pass
- 52 | Auranthel            | Latin aurum (gold) + invented "-anthel"
- 53 | Borevik              | Greek boreas (north wind) + Old Norse vik (bay)
- 54 | Wyrmglen             | Old English wyrm (serpent) + Scots glen
- 55 | Obsidara             | English obsidian + "-ara" suffix
- 56 | Kallenvrost          | Germanic kallen- (to call) + Old Norse frost
- 57 | Verdance Hall        | French verdant + English hall
- 58 | Skyreach Bastion     | English compound: sky + reach + bastion
- 59 | Eclisvar             | Latin eclipsis (eclipse) + invented "-var"
- 60 | Zenthara Citadel     | Greek zenith + invented "-thara" + English citadel
+### New File: src/components/TrendsTab.js
+Self-contained component (~280 lines) containing all analytics logic:
+- Time-range filtering (7 Days / 30 Days / 90 Days / 6 Months / All Time)
+- 5 chart cards with memoized data aggregation for performance
+- Empty state handling when no workout data exists
+- Dark glassmorphism styling matching the existing app theme
+- Unit-aware display (imperial/metric) for volume calculations
+
+### Modified Files
+1. **src/App.js** (3 lines changed)
+   - Imported TrendsTab component
+   - Added "Trends" to Battle Record sub-tab array
+   - Added conditional rendering for logSubTab==="trends"
+
+2. **src/styles/app.css** (7 lines added)
+   - `.trends-range-bar` — time range filter pill bar styling
+   - Recharts tooltip overrides for dark theme consistency
+
+3. **package.json** — Added `recharts` dependency
+
+## Chart Details
+
+### 1. Best Training Days (Bar Chart)
+- 7 bars representing Sunday through Saturday
+- Metric toggle: Sessions / Duration / Total Cal / Active Cal
+- Best day highlighted in bright gold (#f0d060), others in standard gold (#c49428)
+- Bar opacity scales proportionally to show relative intensity
+- Auto-generated insight: "Your strongest day is [Day] with [X] [metric]"
+- Deduplicates workout sessions by sourceGroupId to avoid double-counting
+
+### 2. Impact by Workout Type (Grouped Bar Chart)
+- Groups completed workouts by exercise category (Strength, Cardio, Flexibility, etc.)
+- Shows 3 bars per category: Avg Duration (blue), Avg Total Cal (orange), Avg Active Cal (green)
+- Deduplicates by sourceGroupId so multi-exercise workouts count once
+- Only appears when workout data with sourceGroupId exists
+
+### 3. Strength Trends / Volume Progression (Line Chart)
+- Plots weekly total volume (sets x reps x weight) over time
+- Dropdown filter to view all strength exercises or a specific one
+- Line color matches the user's character class color
+- Supports metric/imperial unit conversion (lbs/kg)
+- Shows "No strength data with weight in this range" when no data matches
+
+### 4. Workout Consistency (Area Chart)
+- Sessions logged per week as a filled area chart
+- Fill color uses the user's character class color at low opacity
+- Only appears when 2+ weeks of data exist
+- X-axis labels show week start dates (e.g., "Mar 3")
+
+### 5. Most Trained Exercises (Ranked List)
+- Top 10 most-logged exercises sorted by frequency
+- Each row shows: rank number, exercise icon, name, progress bar, count, and XP earned
+- Progress bars colored by exercise category using CAT_ICON_COLORS
+- Bar width proportional to the top exercise's count
+
+## Architecture Decisions
+
+### Why Battle Record Sub-Tab (not a new main tab)?
+- Battle Record is the app's data/history hub — trends are a natural extension
+- Avoids crowding the existing 5-tab main navigation bar
+- Leverages the existing logSubTab state and log-subtab-bar/log-subtab-btn CSS
+- Zero new navigation patterns needed
+
+### Why a Separate Component File?
+- App.js is already 10,000+ lines with 252 useState hooks
+- TrendsTab manages its own internal state (range, metric toggles, filters)
+- Isolates charting library imports so recharts only loads when needed
+- All data passed via props: log, allExById, clsColor, clsGlow, units
+
+### Why Recharts?
+- React-first: works naturally with the existing React.createElement() pattern
+- Responsive out of the box via ResponsiveContainer
+- Easy to customize colors, tooltips, and styling for the dark theme
+- Well-maintained with React 19 compatibility
+- ~45KB gzipped — reasonable bundle size addition
+
+## Data Flow
+1. App.js passes `profile.log`, `allExById`, `cls.color`, `cls.glow`, `profile.units` as props
+2. TrendsTab filters log entries by selected time range (useMemo)
+3. Each chart has its own useMemo hook that aggregates the filtered data
+4. Workout sessions are deduplicated by sourceGroupId where appropriate
+5. No new state is added to App.js — all analytics state is local to TrendsTab
+
+## Navigation Path
+Main App -> Hamburger Menu -> "Battle Log" -> Sub-tabs -> "Trends"
+(activeTab === "history" -> logSubTab === "trends")
