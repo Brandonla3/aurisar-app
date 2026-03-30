@@ -1524,52 +1524,69 @@ function App() {
     // Capture current state values before clearing UI
     const capturedPendingSoloRemoveId = pendingSoloRemoveId;
     const capturedHrZone = (canHaveZone&&hrZone)||null;
-    // Show stats popup, then log on confirm
-    const synth = {name:ex.name, icon:ex.icon, exercises:[], durationMin:null, activeCal:null, totalCal:null, soloEx:true};
-    openStatsPromptIfNeeded(synth, (woWithStats) => {
-      const entry={
-        exercise:ex.name, icon:ex.icon, xp:finalEarned, mult, reps:rv, sets:sv,
-        weightLbs:effectiveW||null, weightPct,
-        hrZone:capturedHrZone,
-        distanceMi:distMi||null,
-        time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
-        date:new Date().toLocaleDateString(),
-        dateKey:todayStr(),
-        exId:ex.id,
-        sourceTotalCal: woWithStats.totalCal || null,
-        sourceActiveCal: woWithStats.activeCal || null,
-        sourceDurationSec: woWithStats.durationMin || null,
+    // Show stats popup, then completion modal for Complete/Schedule
+    const synth = {name:ex.name, icon:ex.icon, exercises:[], durationMin:null, activeCal:null, totalCal:null, soloEx:true, _soloExId:ex.id};
+    openStatsPromptIfNeeded(synth, (woWithStats, _sr) => {
+      const soloExCallback = (dateStr) => {
+        const dateObj = new Date(dateStr+"T12:00:00");
+        const displayDate = dateObj.toLocaleDateString();
+        const entry={
+          exercise:ex.name, icon:ex.icon, xp:finalEarned, mult, reps:rv, sets:sv,
+          weightLbs:effectiveW||null, weightPct,
+          hrZone:capturedHrZone,
+          distanceMi:distMi||null,
+          time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+          date:displayDate,
+          dateKey:dateStr,
+          exId:ex.id,
+          sourceTotalCal: woWithStats.totalCal || null,
+          sourceActiveCal: woWithStats.activeCal || null,
+          sourceDurationSec: woWithStats.durationMin || null,
+        };
+        const newLog=[entry,...profile.log];
+        const newQuests={...(profile.quests||{})};
+        QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q=>{
+          if(checkQuestCompletion(q,newLog,profile.checkInStreak))
+            newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false};
+        });
+        let newPB = profile.runningPB || null;
+        if(runPace && (!newPB || runPace < newPB)) newPB = runPace;
+        const newExPBs = calcExercisePBs(newLog);
+        const oldPB = (profile.exercisePBs||{})[entry.exId];
+        const curPB = newExPBs[entry.exId];
+        const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
+        setProfile(p=>{
+          const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
+          if(capturedPendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==capturedPendingSoloRemoveId);
+          return base;
+        });
+        if(capturedPendingSoloRemoveId) setPendingSoloRemoveId(null);
+        setXpFlash({amount:finalEarned,mult,travel:travelActive});
+        setTimeout(()=>setXpFlash(null),2000);
+        if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
+          showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
+        else if(isNewPB && curPB.type==="strength")
+          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
+        else if(isNewPB && curPB.type==="assisted")
+          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
+        else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
+        // Clean up form state after successful completion
+        setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
+        setExHHMM("");setExSec("");setQuickRows([]);
       };
-      const newLog=[entry,...profile.log];
-      const newQuests={...(profile.quests||{})};
-      QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q=>{
-        if(checkQuestCompletion(q,newLog,profile.checkInStreak))
-          newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false};
-      });
-      let newPB = profile.runningPB || null;
-      if(runPace && (!newPB || runPace < newPB)) newPB = runPace;
-      const newExPBs = calcExercisePBs(newLog);
-      const oldPB = (profile.exercisePBs||{})[entry.exId];
-      const curPB = newExPBs[entry.exId];
-      const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
-      setProfile(p=>{
-        const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
-        if(capturedPendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==capturedPendingSoloRemoveId);
-        return base;
-      });
-      if(capturedPendingSoloRemoveId) setPendingSoloRemoveId(null);
-      setXpFlash({amount:finalEarned,mult,travel:travelActive});
-      setTimeout(()=>setXpFlash(null),2000);
-      if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
-        showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
-      else if(isNewPB && curPB.type==="strength")
-        showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
-      else if(isNewPB && curPB.type==="assisted")
-        showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
-      else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
+      const soloExScheduleCallback = (schedDate) => {
+        const sw = {id:uid(), exId:ex.id, scheduledDate:schedDate, notes:ex.name, createdAt:todayStr()};
+        setProfile(p=>({...p, scheduledWorkouts:[...(p.scheduledWorkouts||[]), sw]}));
+        setCompletionModal(null); setCompletionDate(""); setCompletionAction("today"); setScheduleWoDate("");
+        showToast(`📅 ${ex.name} scheduled for ${formatScheduledDate(schedDate)}!`);
+        // Clean up form state
+        setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
+        setExHHMM("");setExSec("");setQuickRows([]);
+      };
+      setCompletionModal({workout:woWithStats, fromStats:_sr, soloExCallback, soloExScheduleCallback});
+      setCompletionDate(todayStr()); setCompletionAction("today");
     });
-    setSelEx(null);setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
-    setExHHMM("");setExSec("");setQuickRows([]);
+    setSelEx(null);
   }
 
   // Log a scheduled solo exercise with default values and remove it from schedule (shows stats popup first)
@@ -3946,7 +3963,7 @@ function App() {
                             setActiveTab("exercises");
                           },
                           style:{width:"100%",marginTop:8,background:"linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",border:"1px solid rgba(41,128,185,.3)",color:"#2980b9",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer",textAlign:"center"}
-                        }, "\u26A1 Edit & Complete Now")
+                        }, "\u2699 Configure")
                       )
                     )
                   );
@@ -9236,7 +9253,11 @@ function App() {
               onClick: e=>e.stopPropagation()}
               /* Header */
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px 4px"}}
-                , React.createElement('div', { style: {fontSize:".95rem",color:"#d4cec4",fontFamily:"'Inter',sans-serif",fontWeight:600}}, ex.icon, " " , ex.name)
+                , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8}}
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
+                      onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);setLibDetailEx(ex);}}, "← Back")
+                  , React.createElement('div', { style: {fontSize:".95rem",color:"#d4cec4",fontFamily:"'Inter',sans-serif",fontWeight:600}}, ex.icon, " " , ex.name)
+                )
                 , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}, "✕")
               )
               , React.createElement('div', { style: {padding:"0 14px"}}
@@ -9368,7 +9389,7 @@ function App() {
                   )
                   /* Primary action row */
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
-                    , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "Complete ⚡" )
+                    , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{openScheduleEx(ex.id);setSelEx(null);}}, "📅 Schedule" )
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
@@ -9411,7 +9432,7 @@ function App() {
                 , React.createElement('div', null
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}},
                     React.createElement('button', {className:"btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
-                      onClick:()=>{ setStatsPromptModal(null); if(!statsPromptModal.wo.soloEx){ setWorkoutView("builder"); setActiveTab("workouts"); } }
+                      onClick:()=>{ setStatsPromptModal(null); if(statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId){ setSelEx(statsPromptModal.wo._soloExId); } else if(!statsPromptModal.wo.soloEx){ setWorkoutView("builder"); setActiveTab("workouts"); } }
                     }, "← Back"),
                     React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", "Review Battle Stats ", React.createElement('span',{style:{color:"#5a5650",fontWeight:"normal",fontSize:".72rem"}},"(Optional)"))
                   )
@@ -9887,13 +9908,23 @@ function App() {
                 , !inScheduleMode ? (
                   React.createElement('button', { className: "btn btn-cls" , style: {flex:2},
                     disabled: inPickMode&&!pickerValue,
-                    onClick: confirmWorkoutComplete}, "✓ Confirm & Claim XP"
+                    onClick: ()=>{
+                      if(completionModal.soloExCallback){
+                        const dateStr=(completionAction==="past"&&completionDate&&completionDate!=="pick")?completionDate:todayStr();
+                        completionModal.soloExCallback(dateStr);
+                        setCompletionModal(null);setCompletionDate("");setCompletionAction("today");setScheduleWoDate("");
+                      } else { confirmWorkoutComplete(); }
+                    }}, "✓ Confirm & Claim XP"
 
                   )
                 ) : (
                   React.createElement('button', { className: "btn btn-gold" , style: {flex:2},
                     disabled: !scheduleWoDate,
-                    onClick: scheduleWorkoutForDate}, "📅 Schedule Workout"
+                    onClick: ()=>{
+                      if(completionModal.soloExScheduleCallback){
+                        completionModal.soloExScheduleCallback(scheduleWoDate);
+                      } else { scheduleWorkoutForDate(); }
+                    }}, "📅 Schedule Workout"
 
                   )
                 )
