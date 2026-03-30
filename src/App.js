@@ -3737,7 +3737,7 @@ function App() {
                              padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}
                     },
                       React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, libSelected.size+" selected"),
-                      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%"}},
+                      React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
                       React.createElement('button',{
                         onClick:()=>{
                           const exs=[...libSelected].map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
@@ -3764,19 +3764,7 @@ function App() {
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
                         style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
-                      }, "📋 Plan"),
-                      React.createElement('button',{
-                        onClick:()=>{
-                          const exs=[...libSelected].map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
-                          const wo={id:uid(),name:"Quick Workout",icon:"⚡",desc:"",exercises:exs,createdAt:todayStr(),oneOff:true,durationMin:null,activeCal:null,totalCal:null};
-                          openStatsPromptIfNeeded(wo,(woWithStats,_sr)=>{
-                            setCompletionModal({workout:woWithStats,fromStats:_sr});
-                            setCompletionDate(todayStr());setCompletionAction("today");
-                          });
-                          setLibSelectMode(false);setLibSelected(new Set());
-                        },
-                        style:{background:"linear-gradient(135deg,#8B7425,#A89030)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
-                      }, "✓ Complete / Schedule")
+                      }, "📋 Plan")
                     )),
 
                     /* Exercise list */
@@ -3955,7 +3943,7 @@ function App() {
                     /* Multi-select action bar */
                     , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}
                       , React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, favSelected.size+" selected")
-                      , React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%"}},
+                      , React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
                       React.createElement('button',{
                         onClick:()=>{
                           const ids=[...favSelected];
@@ -3984,19 +3972,6 @@ function App() {
                         },
                         style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       },"📋 Plan")
-                      , React.createElement('button',{
-                        onClick:()=>{
-                          const ids=[...favSelected];
-                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
-                          const wo={id:uid(),name:"Quick Workout",icon:"⚡",desc:"",exercises:exs,createdAt:todayStr(),oneOff:true,durationMin:null,activeCal:null,totalCal:null};
-                          openStatsPromptIfNeeded(wo,(woWithStats,_sr)=>{
-                            setCompletionModal({workout:woWithStats,fromStats:_sr});
-                            setCompletionDate(todayStr());setCompletionAction("today");
-                          });
-                          setFavSelectMode(false);setFavSelected(new Set());
-                        },
-                        style:{background:"linear-gradient(135deg,#8B7425,#A89030)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
-                      },"✓ Complete / Schedule")
                     ))
                     , (profile.favoriteExercises||[]).length===0
                         ? React.createElement('div',{className:"empty",style:{padding:"16px 0"}},"No favorites yet — tap ⭐ on any exercise.")
@@ -4964,8 +4939,25 @@ function App() {
                       }}, "Next: Log or Schedule →")
                     )
                   ) : (
-                    React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltWorkout}, "💾 "
-                       , wbEditId?"Update Workout":"Save Workout"
+                    wbEditId ? (
+                      React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltWorkout}, "💾 Update Workout")
+                    ) : (
+                      React.createElement('div', {style:{display:"flex",gap:8,width:"100%"}},
+                        React.createElement('button', { className: "btn btn-gold" , style: {flex:1}, onClick: saveBuiltWorkout}, "💾 Save Workout"),
+                        React.createElement('button', { className: "btn btn-gold" , style: {flex:1,background:"linear-gradient(135deg,#8B7425,#A89030)"}, onClick: ()=>{
+                          if(!wbName.trim()){ showToast("Name your workout first!"); return; }
+                          if(wbExercises.length===0){ showToast("Add at least one exercise."); return; }
+                          const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
+                          const wo={id:uid(),name:wbName.trim(),icon:wbIcon,desc:wbDesc.trim(),
+                            exercises:wbExercises,createdAt:todayStr(),oneOff:true,
+                            durationMin:dur||null,activeCal:wbActiveCal||null,totalCal:wbTotalCal||null,labels:wbLabels};
+                          openStatsPromptIfNeeded(wo,(woWithStats, _sr)=>{
+                            setCompletionModal({workout:woWithStats, fromStats:_sr});
+                            setCompletionDate(todayStr());setCompletionAction("today");
+                          });
+                          setWorkoutView("list");
+                        }}, "✓ Complete / Schedule")
+                      )
                     )
                   )
                 )
@@ -9372,7 +9364,7 @@ function App() {
                     React.createElement('button', {className:"btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
                       onClick:()=>{ setStatsPromptModal(null); if(!statsPromptModal.wo.soloEx){ setWorkoutView("builder"); setActiveTab("workouts"); } }
                     }, "← Back"),
-                    React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", "Review Battle Stats")
+                    React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", "Review Battle Stats ", React.createElement('span',{style:{color:"#5a5650",fontWeight:"normal",fontSize:".72rem"}},"(Optional)"))
                   )
                 )
                 , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setStatsPromptModal(null) }, "✕")
