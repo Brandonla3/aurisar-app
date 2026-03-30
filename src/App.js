@@ -3214,7 +3214,8 @@ function App() {
                 {icon:"🏆", label:"Leaderboard", action:()=>guardAll(()=>{setActiveTab("leaderboard");setNavMenuOpen(false);})},
                 {icon:"💬", label:"Messages", action:()=>guardAll(()=>{setActiveTab("messages");setMsgView("list");loadConversations();setNavMenuOpen(false);}), badge:msgUnreadTotal||null, badgeDanger:true},
                 {icon:"🎯", label:"Quests",      action:()=>guardAll(()=>{setActiveTab("quests");setNavMenuOpen(false);}), badge:pendingQuestCount},
-                {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
+                // Map feature hidden — re-enable when ready
+                // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
                 {icon:"💬", label:"Feedback",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
                 !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("home");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
@@ -9941,7 +9942,7 @@ function App() {
             /* Header */
             , React.createElement('div', { style: {width:"100%",maxWidth:420,display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexShrink:0}}
               , React.createElement('div', null
-                , React.createElement('div', { style: {fontFamily:"'Cinzel Decorative',serif,Arial",fontSize:".95rem",color:"#b4ac9e",letterSpacing:".08em"}}, "⚔️ Middle-earth" )
+                , React.createElement('div', { style: {fontFamily:"'Cinzel Decorative',serif,Arial",fontSize:".95rem",color:"#b4ac9e",letterSpacing:".08em"}}, "⚔️ Auranthel" )
                 , React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",marginTop:2,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}
                   , React.createElement('span', null, myRegion.icon, " " , myRegion.name, " · Level "   , level)
                   , React.createElement('span', { style: {color:"#b4ac9e"}}, myRegion.boost.emoji, " +7% "  , myRegion.boost.label)
