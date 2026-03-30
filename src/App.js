@@ -14,6 +14,7 @@ import { ClassIcon } from './components/ClassIcon';
 import { ExerciseVideo } from './components/ExerciseVideo';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
+import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 import loginBg from './assets/login-bg.png';
 
@@ -6815,7 +6816,7 @@ function App() {
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { className: "sec"}, "Battle Record — "   , profile.log.length, " sessions · "   , profile.xp.toLocaleString(), " total XP"  )
                   , React.createElement('div', { className: "log-subtab-bar"}
-                    , [["exercises","⚔️ Exercises"],["workouts","💪 Workouts"],["plans","📋 Plans"],["deleted","🗑 Deleted"]].map(([t,l])=>(
+                    , [["exercises","⚔️ Exercises"],["workouts","💪 Workouts"],["plans","📋 Plans"],["trends","📊 Trends"],["deleted","🗑 Deleted"]].map(([t,l])=>(
                       React.createElement('button', { key: t, className: `log-subtab-btn ${logSubTab===t?"on":""}`,
                         onClick: ()=>setLogSubTab(t)}, l
                         , t==="deleted"&&(profile.deletedItems||[]).filter(d=>((new Date()-new Date(d.deletedAt))/(1000*60*60*24))<7).length>0&&React.createElement('span', { style: {marginLeft:4,background:"#6a645a",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:".45rem",display:"inline-flex",alignItems:"center",justifyContent:"center"}}, (profile.deletedItems||[]).filter(d=>((new Date()-new Date(d.deletedAt))/(1000*60*60*24))<7).length)
@@ -6825,6 +6826,7 @@ function App() {
                   , logSubTab==="exercises"&&React.createElement(ExercisesTab,null)
                   , logSubTab==="workouts"&&React.createElement(WorkoutsTab,null)
                   , logSubTab==="plans"&&React.createElement(PlansTab,null)
+                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order}))})
                   , logSubTab==="deleted"&&(()=>{
                     const now = new Date();
                     const active = (profile.deletedItems||[])

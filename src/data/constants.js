@@ -375,6 +375,7 @@ const EMPTY_PROFILE = {
   exercisePBs:{},
   travelBoost:null,
   favoriteExercises:[],
+  chartOrder:["dow","sets","muscleFreq","volume","consistency","topEx"],
   deletedItems:[], // [{id, type:"workout"|"plan", item, deletedAt (ISO)}]
   notificationPrefs:{
     sharedWorkout:true,

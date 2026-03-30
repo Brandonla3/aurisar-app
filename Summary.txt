@@ -1,84 +1,150 @@
-# Aurisar — LOTR Disassociation & City Name Generation Summary
-# ============================================================
+# Aurisar — Workout Analytics & Trends Feature Summary
+# =====================================================
 
-## Changes Made
-1. Replaced "Middle-earth" map title with "Auranthel" (src/App.js)
-2. Renamed 6 map region names to generated fantasy names (src/data/constants.js)
-3. Hidden the Map feature from navigation menu (src/App.js)
+## Overview
+Added a Trends/Analytics section to the Battle Record tab, giving users interactive
+charts and insights about their workout habits. Users can visualize which days of the
+week they train best, track muscle group training frequency, monitor volume progression
+per muscle group for hypertrophy, see sets-per-session trends, and more. All chart cards
+are reorderable via drag-and-drop (desktop) and up/down arrow buttons (mobile).
 
-## Region Name Mapping
-  Old Name            →  New Name
-  ─────────────────────────────────────
-  Starter's Realm     →  Verath Hollow
-  Cardio Canyon       →  Caelvoss
-  Flex Temple         →  Lithenvale
-  Iron Peak           →  Korrath Summit
-  Elite Citadel       →  Emberveil
-  Legend's Sanctum    →  Zenthara Citadel
+## What Was Added
 
-## 60 Generated City/Area Names (with Inspiration Sources)
-These names are original blends from diverse real-world linguistic roots.
-No name is taken directly from any existing franchise, game, or published fiction.
+### New Dependency
+- `recharts` (v3.8.1) — React-first charting library for rendering bar, line, and
+  area charts with full dark-theme support
 
- #  | City Name            | Inspiration Source
-----|----------------------|---------------------------------------------------
-  1 | Verath Hollow        | Latin veritas (truth) + English terrain
-  2 | Kesmora              | Turkish kes (cut) + Spanish mora (blackberry)
-  3 | Dawnspire            | English compound: dawn + spire
-  4 | Thalindor            | Greek thalassa (sea) + invented suffix "-indor"
-  5 | Brynvael             | Welsh bryn (hill) + invented "-vael"
-  6 | Oskmire              | Old Norse osk (wish) + English mire
-  7 | Caelvoss             | Latin caelum (sky) + Icelandic foss (waterfall)
-  8 | Thornwatch           | English compound: thorn + watch (lookout)
-  9 | Pyralis Gate         | Greek pyr (fire) + Latin "-alis" + English
- 10 | Solmara              | Latin sol (sun) + Italian mare (sea)
- 11 | Duskfeld             | English dusk + German Feld (field)
- 12 | Renvasa              | French renard (fox) + invented Spanish-esque
- 13 | Korrath Summit       | Invented hard consonants + English summit
- 14 | Ashenmoor            | English compound: ashen + moor
- 15 | Zephyral             | Greek zephyros (west wind) + "-al"
- 16 | Tarvikk              | Finnish tarve (need) + Nordic doubled consonant
- 17 | Lithenvale           | Greek lithos (stone) + English vale
- 18 | Myrwen               | Welsh-inspired: invented + -wen (white/blessed)
- 19 | Granithos            | English granite + Greek suffix "-os"
- 20 | Felhaven             | Old English fel (fell/hill) + English haven
- 21 | Oravyn               | Romanian ora (hour) + invented "-vyn"
- 22 | Cindral Keep         | English cinder + "-al" + English fortification
- 23 | Vastok               | Russian vostok (east) rearranged
- 24 | Sundered Reach       | English: sundered (split) + reach (expanse)
- 25 | Ithramor             | Hebrew-esque ith- + Latin amor (love)
- 26 | Kaelvith             | Gaelic cael- (slender) + invented "-vith"
- 27 | Stormholt            | English storm + Old English holt (wood)
- 28 | Draven's Crest       | Slavic drav- (Croatian river Drava) + English crest
- 29 | Quorinth             | Latin quo (where) + "-rinth" (evokes labyrinth)
- 30 | Emberveil            | English compound: ember + veil
- 31 | Nythara              | Invented nyth- (night-esque) + Sanskrit-esque "-ara"
- 32 | Pellomar             | Latin pellis (hide) + Spanish mar (sea)
- 33 | Wyndcross            | Scots wynd (narrow lane) + English cross
- 34 | Halcyren             | Greek halcyon (calm) + invented "-ren"
- 35 | Fenwick Spires       | English fen + Old English wic (settlement) + spires
- 36 | Arkthos Bluff        | Greek arktos (bear/north) + English bluff
- 37 | Sulvane              | Latin sulcus (furrow) + English vane
- 38 | Meridorn             | Latin meridies (midday/south) + invented "-orn"
- 39 | Cristvael            | Crystal-esque crist- + invented "-vael"
- 40 | Oakenrath            | English oaken + Old English/Irish rath (hill fort)
- 41 | Vyrantis             | Invented vyr- + Greek "-antis" suffix
- 42 | Delmaris             | Italian del (of the) + Latin mare (sea)
- 43 | Frostvang            | English frost + Old Norse vangr (meadow)
- 44 | Ghalen Tor           | Gaelic-esque ghalen + Celtic tor (rocky hill)
- 45 | Runehollow           | English compound: rune + hollow
- 46 | Petravar             | Latin petra (rock) + Slavic "-var"
- 47 | Nightmere Basin      | English nightmare respelled + geological basin
- 48 | Solvetta             | Latin sol (sun) + Italian diminutive "-etta"
- 49 | Cragmoor Reach       | English crag + moor + reach
- 50 | Thessivane           | Greek Thess- (Thessaly) + English vane
- 51 | Ironveil Pass        | English compound: iron + veil + pass
- 52 | Auranthel            | Latin aurum (gold) + invented "-anthel"
- 53 | Borevik              | Greek boreas (north wind) + Old Norse vik (bay)
- 54 | Wyrmglen             | Old English wyrm (serpent) + Scots glen
- 55 | Obsidara             | English obsidian + "-ara" suffix
- 56 | Kallenvrost          | Germanic kallen- (to call) + Old Norse frost
- 57 | Verdance Hall        | French verdant + English hall
- 58 | Skyreach Bastion     | English compound: sky + reach + bastion
- 59 | Eclisvar             | Latin eclipsis (eclipse) + invented "-var"
- 60 | Zenthara Citadel     | Greek zenith + invented "-thara" + English citadel
+### New File: src/components/TrendsTab.js
+Self-contained component containing all analytics logic:
+- Time-range filtering (7 Days / 30 Days / 90 Days / 6 Months / All Time)
+- 6 chart cards with memoized data aggregation for performance
+- Chart reordering system (drag-and-drop + up/down arrows)
+- Empty state handling when no workout data exists
+- Dark glassmorphism styling matching the existing app theme
+- Unit-aware display (imperial/metric) for volume calculations
+- Exports DEFAULT_CHART_ORDER constant for App.js integration
+
+### Modified Files
+1. **src/App.js** (3 lines changed)
+   - Imported TrendsTab component + DEFAULT_CHART_ORDER
+   - Added "Trends" to Battle Record sub-tab array
+   - Added conditional rendering with chartOrder prop and onChartOrderChange callback
+
+2. **src/styles/app.css** (14 lines added)
+   - `.trends-range-bar` — time range filter pill bar styling
+   - Recharts tooltip overrides for dark theme consistency
+   - `.trends-reorder-controls` — reorder button container
+   - `.trends-reorder-btn` — up/down arrow buttons (ghost style)
+   - `.trends-drag-handle` — drag grip icon, hidden on touch devices via @media (hover:none)
+
+3. **src/data/constants.js** (1 line added)
+   - Added `chartOrder` to EMPTY_PROFILE with default ordering
+
+4. **package.json** — Added `recharts` dependency
+
+## Chart Details
+
+### 1. Best Training Days (Bar Chart) — key: "dow"
+- 7 bars representing Sunday through Saturday
+- Metric toggle: Sessions / Duration / Total Cal / Active Cal
+- Best day highlighted in bright gold (#f0d060), others in standard gold (#c49428)
+- Bar opacity scales proportionally to show relative intensity
+- Auto-generated insight: "Your strongest day is [Day] with [X] [metric]"
+- Deduplicates workout sessions by sourceGroupId to avoid double-counting
+
+### 2. Sets Over Time (Bar Chart) — key: "sets"
+- Visualizes average total sets per session each week
+- Session definition: Solo exercise (no sourceGroupId) = its own session;
+  entries sharing the same dateKey + sourceGroupId = one workout session
+- Sums all sets across exercises in each session, then averages per week
+- Gold bars (#c49428) with week labels on x-axis
+- Insight: "Average total sets per session each week — ensure sufficient training stimulus"
+
+### 3. Muscle Group Frequency (Horizontal Bar Chart) — key: "muscleFreq"
+- Tracks how often specific muscles are trained per week
+- Groups log entries by exercise muscleGroup field
+- Counts distinct weeks each muscle group appears in
+- Computes avgPerWeek = totalWeeksActive / totalDistinctWeeks in range
+- Bars colored by MUSCLE_COLORS (chest=#9E7B6B, back=#7B8D7A, etc.)
+- Auto-generated insight highlighting most trained muscle group
+
+### 4. Volume Over Time (Stacked/Filtered Bar Chart) — key: "volume"
+- Displays total load (sets × reps × weight) per muscle group each week
+- Dropdown filter: "All Muscle Groups" (stacked bars) or specific muscle (single-color bars)
+- Stacked bars colored by MUSCLE_COLORS per muscle group
+- Supports metric/imperial unit conversion (lbs/kg)
+- Purpose: Track muscle hypertrophy stimulus over time
+
+### 5. Workout Consistency (Area Chart) — key: "consistency"
+- Sessions logged per week as a filled area chart
+- Fill color uses the user's character class color at low opacity
+- Only appears when 2+ weeks of data exist
+- X-axis labels show week start dates (e.g., "Mar 3")
+
+### 6. Most Trained Exercises (Ranked List) — key: "topEx"
+- Top 10 most-logged exercises sorted by frequency
+- Each row shows: rank number, exercise icon, name, progress bar, count, and XP earned
+- Progress bars colored by exercise category using CAT_ICON_COLORS
+- Bar width proportional to the top exercise's count
+
+## Chart Reordering System
+
+### How It Works
+- Each chart card has a header with the title + reorder controls (top-right)
+- Controls: ↑ button (move up), ↓ button (move down), ⋮⋮ drag handle
+- First chart's ↑ button is disabled; last chart's ↓ button is disabled
+- Drag handle uses native HTML5 drag events (same pattern as existing plan/workout builders)
+- On touch devices (@media hover:none), drag handle is hidden — arrows are the primary method
+
+### Persistence
+- Chart order stored as `profile.chartOrder` array (e.g., ["dow","sets","muscleFreq","volume","consistency","topEx"])
+- Saved via existing doSave() pattern to both localStorage and Supabase
+- Default order defined in DEFAULT_CHART_ORDER constant
+- Falls back to default if saved order is missing or has wrong length
+
+### Implementation
+- Charts defined in CHART_RENDERERS map (key → render function)
+- chartOrder array determines render sequence
+- ChartCard wrapper component handles drag events and arrow button callbacks
+- moveChart(fromIdx, toIdx) function splices the order array and calls onChartOrderChange prop
+- App.js passes chartOrder from profile and onChartOrderChange callback that updates profile state
+
+## Architecture Decisions
+
+### Why Battle Record Sub-Tab (not a new main tab)?
+- Battle Record is the app's data/history hub — trends are a natural extension
+- Avoids crowding the existing 5-tab main navigation bar
+- Leverages the existing logSubTab state and log-subtab-bar/log-subtab-btn CSS
+- Zero new navigation patterns needed
+
+### Why a Separate Component File?
+- App.js is already 10,000+ lines with 252 useState hooks
+- TrendsTab manages its own internal state (range, metric toggles, filters, drag state)
+- Isolates charting library imports so recharts only loads when needed
+- All data passed via props: log, allExById, clsColor, units, chartOrder, onChartOrderChange
+
+### Why Native Drag + Arrow Buttons (no library)?
+- App already uses native HTML5 drag in plan/workout builders (App.js lines 4691-4699, 5514-5519)
+- Zero additional dependencies
+- Arrow buttons work universally on mobile and desktop
+- Drag handle hidden on touch devices to avoid UX issues
+- ~30 lines of reorder logic total
+
+### Why Recharts?
+- React-first: works naturally with the existing React.createElement() pattern
+- Responsive out of the box via ResponsiveContainer
+- Easy to customize colors, tooltips, and styling for the dark theme
+- Well-maintained with React 19 compatibility
+- ~45KB gzipped — reasonable bundle size addition
+
+## Data Flow
+1. App.js passes `profile.log`, `allExById`, `cls.color`, `profile.units`, `profile.chartOrder`, and `onChartOrderChange` as props
+2. TrendsTab filters log entries by selected time range (useMemo)
+3. Each chart has its own useMemo hook that aggregates the filtered data
+4. Workout sessions are deduplicated by sourceGroupId where appropriate
+5. Chart order changes call onChartOrderChange which updates profile state (auto-saved)
+6. No new state is added to App.js — all analytics state is local to TrendsTab
+
+## Navigation Path
+Main App -> Hamburger Menu -> "Battle Log" -> Sub-tabs -> "📊 Trends"
+(activeTab === "history" -> logSubTab === "trends")
