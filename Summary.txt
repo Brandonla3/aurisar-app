@@ -1,37 +1,84 @@
-Fix: Missing YMove/Supabase Workouts Not Loading
-=================================================
+# Aurisar — LOTR Disassociation & City Name Generation Summary
+# ============================================================
 
-Problem
--------
-None of the Supabase-sourced workouts (YMove exercises) were appearing in the
-app. Only the ~400 hardcoded exercises from src/data/exercises.js were displayed.
-The failure was silent — no visible error to the user.
+## Changes Made
+1. Replaced "Middle-earth" map title with "Auranthel" (src/App.js)
+2. Renamed 6 map region names to generated fantasy names (src/data/constants.js)
+3. Hidden the Map feature from navigation menu (src/App.js)
 
-Root Cause
-----------
-File: src/utils/ymove.js
+## Region Name Mapping
+  Old Name            →  New Name
+  ─────────────────────────────────────
+  Starter's Realm     →  Verath Hollow
+  Cardio Canyon       →  Caelvoss
+  Flex Temple         →  Lithenvale
+  Iron Peak           →  Korrath Summit
+  Elite Citadel       →  Emberveil
+  Legend's Sanctum    →  Zenthara Citadel
 
-The Supabase client `sb` was used on lines 21 and 141 but was never imported.
-This caused loadYMoveExercises() to throw a ReferenceError: sb is not defined,
-which was silently caught by the try/catch block. The app fell back to only
-showing hardcoded exercises.
+## 60 Generated City/Area Names (with Inspiration Sources)
+These names are original blends from diverse real-world linguistic roots.
+No name is taken directly from any existing franchise, game, or published fiction.
 
-Other files (App.js, storage.js) already had the correct import, confirming
-this was simply an oversight in ymove.js.
-
-Fix
----
-Added the missing import to src/utils/ymove.js:
-
-    import { sb } from './supabase';
-
-This single-line change restores the Supabase exercise library loading so that
-all YMove workouts appear in the app again.
-
-Verification
-------------
-- Vite build passes cleanly with no errors.
-- On app startup, the console should now log:
-  "✅ Exercise library loaded: X from Supabase (Y new, Z patched)"
-  instead of the previous silent fallback warning.
-- Supabase-sourced exercises should appear in the exercise browser/workout screens.
+ #  | City Name            | Inspiration Source
+----|----------------------|---------------------------------------------------
+  1 | Verath Hollow        | Latin veritas (truth) + English terrain
+  2 | Kesmora              | Turkish kes (cut) + Spanish mora (blackberry)
+  3 | Dawnspire            | English compound: dawn + spire
+  4 | Thalindor            | Greek thalassa (sea) + invented suffix "-indor"
+  5 | Brynvael             | Welsh bryn (hill) + invented "-vael"
+  6 | Oskmire              | Old Norse osk (wish) + English mire
+  7 | Caelvoss             | Latin caelum (sky) + Icelandic foss (waterfall)
+  8 | Thornwatch           | English compound: thorn + watch (lookout)
+  9 | Pyralis Gate         | Greek pyr (fire) + Latin "-alis" + English
+ 10 | Solmara              | Latin sol (sun) + Italian mare (sea)
+ 11 | Duskfeld             | English dusk + German Feld (field)
+ 12 | Renvasa              | French renard (fox) + invented Spanish-esque
+ 13 | Korrath Summit       | Invented hard consonants + English summit
+ 14 | Ashenmoor            | English compound: ashen + moor
+ 15 | Zephyral             | Greek zephyros (west wind) + "-al"
+ 16 | Tarvikk              | Finnish tarve (need) + Nordic doubled consonant
+ 17 | Lithenvale           | Greek lithos (stone) + English vale
+ 18 | Myrwen               | Welsh-inspired: invented + -wen (white/blessed)
+ 19 | Granithos            | English granite + Greek suffix "-os"
+ 20 | Felhaven             | Old English fel (fell/hill) + English haven
+ 21 | Oravyn               | Romanian ora (hour) + invented "-vyn"
+ 22 | Cindral Keep         | English cinder + "-al" + English fortification
+ 23 | Vastok               | Russian vostok (east) rearranged
+ 24 | Sundered Reach       | English: sundered (split) + reach (expanse)
+ 25 | Ithramor             | Hebrew-esque ith- + Latin amor (love)
+ 26 | Kaelvith             | Gaelic cael- (slender) + invented "-vith"
+ 27 | Stormholt            | English storm + Old English holt (wood)
+ 28 | Draven's Crest       | Slavic drav- (Croatian river Drava) + English crest
+ 29 | Quorinth             | Latin quo (where) + "-rinth" (evokes labyrinth)
+ 30 | Emberveil            | English compound: ember + veil
+ 31 | Nythara              | Invented nyth- (night-esque) + Sanskrit-esque "-ara"
+ 32 | Pellomar             | Latin pellis (hide) + Spanish mar (sea)
+ 33 | Wyndcross            | Scots wynd (narrow lane) + English cross
+ 34 | Halcyren             | Greek halcyon (calm) + invented "-ren"
+ 35 | Fenwick Spires       | English fen + Old English wic (settlement) + spires
+ 36 | Arkthos Bluff        | Greek arktos (bear/north) + English bluff
+ 37 | Sulvane              | Latin sulcus (furrow) + English vane
+ 38 | Meridorn             | Latin meridies (midday/south) + invented "-orn"
+ 39 | Cristvael            | Crystal-esque crist- + invented "-vael"
+ 40 | Oakenrath            | English oaken + Old English/Irish rath (hill fort)
+ 41 | Vyrantis             | Invented vyr- + Greek "-antis" suffix
+ 42 | Delmaris             | Italian del (of the) + Latin mare (sea)
+ 43 | Frostvang            | English frost + Old Norse vangr (meadow)
+ 44 | Ghalen Tor           | Gaelic-esque ghalen + Celtic tor (rocky hill)
+ 45 | Runehollow           | English compound: rune + hollow
+ 46 | Petravar             | Latin petra (rock) + Slavic "-var"
+ 47 | Nightmere Basin      | English nightmare respelled + geological basin
+ 48 | Solvetta             | Latin sol (sun) + Italian diminutive "-etta"
+ 49 | Cragmoor Reach       | English crag + moor + reach
+ 50 | Thessivane           | Greek Thess- (Thessaly) + English vane
+ 51 | Ironveil Pass        | English compound: iron + veil + pass
+ 52 | Auranthel            | Latin aurum (gold) + invented "-anthel"
+ 53 | Borevik              | Greek boreas (north wind) + Old Norse vik (bay)
+ 54 | Wyrmglen             | Old English wyrm (serpent) + Scots glen
+ 55 | Obsidara             | English obsidian + "-ara" suffix
+ 56 | Kallenvrost          | Germanic kallen- (to call) + Old Norse frost
+ 57 | Verdance Hall        | French verdant + English hall
+ 58 | Skyreach Bastion     | English compound: sky + reach + bastion
+ 59 | Eclisvar             | Latin eclipsis (eclipse) + invented "-var"
+ 60 | Zenthara Citadel     | Greek zenith + invented "-thara" + English citadel
