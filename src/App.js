@@ -57,8 +57,11 @@ function App() {
   const [toast,setToast]     = useState(null);
   const [feedbackOpen,setFeedbackOpen] = useState(false);
   const [feedbackText,setFeedbackText] = useState("");
-  const [feedbackType,setFeedbackType] = useState("idea"); // "idea"|"bug"|"other"
+  const [feedbackType,setFeedbackType] = useState("idea"); // "idea"|"bug"|"help"
   const [feedbackSent,setFeedbackSent] = useState(false);
+  const [feedbackEmail,setFeedbackEmail] = useState("");
+  const [feedbackAccountId,setFeedbackAccountId] = useState("");
+  const [helpConfirmShown,setHelpConfirmShown] = useState(false);
   // Quick log
   const [selEx,setSelEx]   = useState(null);
   const [sets,setSets]     = useState("");
@@ -3216,7 +3219,7 @@ function App() {
                 {icon:"🎯", label:"Quests",      action:()=>guardAll(()=>{setActiveTab("quests");setNavMenuOpen(false);}), badge:pendingQuestCount},
                 // Map feature hidden — re-enable when ready
                 // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
-                {icon:"💬", label:"Feedback",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setNavMenuOpen(false);}},
+                {icon:"🛟", label:"Support",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setFeedbackEmail(_optionalChain([authUser, 'optionalAccess', _a => _a.email])||"");setFeedbackAccountId(myPublicId||"");setHelpConfirmShown(false);setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
                 !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("home");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
@@ -10121,20 +10124,30 @@ function App() {
           , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
             , React.createElement('div', { className: "modal-body"}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}
-                , React.createElement('div', { className: "feedback-title" }, "💬 Share Your Scroll")
+                , React.createElement('div', { className: "feedback-title" }, "🛟 Support")
                 , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setFeedbackOpen(false)}, "✕")
               )
               , feedbackSent ? (
-                React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
-                  , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "⚡")
-                  , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Feedback received!" )
-                  , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478"}}, "Thanks for helping forge Aurisar into something legendary."        )
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
+                helpConfirmShown ? (
+                  React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
+                    , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "📬")
+                    , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Help request received!")
+                    , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",lineHeight:1.6,maxWidth:280,margin:"0 auto"}},
+                      "You\u2019ll receive an email from Support@aurisargames.com upon review that will ask for your 12-character Private User ID to verify your identity.")
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
+                  )
+                ) : (
+                  React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
+                    , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "⚡")
+                    , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Feedback received!" )
+                    , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478"}}, "Thanks for helping forge Aurisar into something legendary.")
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
+                  )
                 )
               ) : (
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:12}}
-                    , [["idea","💡 Idea"],["bug","🐛 Bug"],["other","💬 Other"]].map(([v,l])=>(
+                    , [["idea","💡 Idea"],["bug","🐛 Bug"],["help","❓ Help"]].map(([v,l])=>(
                       React.createElement('button', { key: v, className: "btn btn-ghost btn-xs"  ,
                         style: {flex:1,fontSize:".65rem",
                           border:feedbackType===v?"1px solid rgba(180,172,158,.12)":"",
@@ -10143,38 +10156,65 @@ function App() {
                         onClick: ()=>setFeedbackType(v)}, l)
                     ))
                   )
+                  , React.createElement('div', { className: "field", style: {marginBottom:8}}
+                    , React.createElement('label', null, "Email Address")
+                    , React.createElement('input', { className: "inp", type: "email",
+                      placeholder: "your@email.com",
+                      value: feedbackEmail,
+                      onChange: e=>setFeedbackEmail(e.target.value)})
+                  )
+                  , React.createElement('div', { className: "field", style: {marginBottom:8}}
+                    , React.createElement('label', null, "Account ID")
+                    , React.createElement('input', { className: "inp", type: "text",
+                      placeholder: "e.g. A7XK9M",
+                      value: feedbackAccountId,
+                      onChange: e=>setFeedbackAccountId(e.target.value)})
+                  )
                   , React.createElement('div', { className: "field", style: {marginBottom:12}}
-                    , React.createElement('label', null, feedbackType==="bug"?"Describe the bug":"What's on your mind?")
+                    , React.createElement('label', null, feedbackType==="bug"?"Describe the bug":feedbackType==="help"?"How can we help?":"What's on your mind?")
                     , React.createElement('textarea', { className: "inp", rows: 5,
                       style: {resize:"vertical",minHeight:100,lineHeight:1.5},
-                      placeholder: feedbackType==="idea"?"I'd love to see…":feedbackType==="bug"?"When I tap… it does…":"Type here…",
+                      placeholder: feedbackType==="idea"?"I'd love to see…":feedbackType==="bug"?"When I tap… it does…":"Describe your issue…",
                       value: feedbackText,
                       onChange: e=>setFeedbackText(e.target.value)})
                   )
-                  , authUser&&React.createElement('div', { style: {fontSize:".62rem",color:"#6a645a",marginBottom:10}}, "Submitting as: "  , authUser.email)
                   , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"},
                     disabled: !feedbackText.trim(),
                     onClick: async()=>{
                       const msg = feedbackText.trim();
                       const type = feedbackType;
-                      // Always show success immediately — don't wait on network
+                      const email = feedbackEmail.trim();
+                      const acctId = feedbackAccountId.trim();
+                      // Show success immediately (optimistic UI)
                       setFeedbackSent(true);
+                      if (type === "help") setHelpConfirmShown(true);
                       setFeedbackText("");
-                      // Try Supabase first, silently fall back to mailto
+                      // Store in Supabase
                       try {
                         await sb.from("feedback").insert({
                           user_id:_optionalChain([authUser, 'optionalAccess', _193 => _193.id])||null,
-                          email:_optionalChain([authUser, 'optionalAccess', _194 => _194.email])||"anonymous",
+                          email: email||"anonymous",
                           type,
                           message:msg,
+                          account_id: acctId||null,
                           created_at:new Date().toISOString(),
                         });
                       } catch(e) {
-                        // Supabase table may not exist yet — silently ignore
-                        // Could also do: window.location.href = `mailto:feedback@aurisargames.com?subject=...`
-                        console.log("Feedback stored locally only:", type, msg);
+                        console.log("Supabase feedback insert failed:", e);
                       }
-                    }}, "Send Feedback ⚡"
+                      // For Idea/Bug, also create a GitHub issue
+                      if (type === "idea" || type === "bug") {
+                        try {
+                          await fetch("/api/create-github-issue", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({ type, message: msg, email, accountId: acctId }),
+                          });
+                        } catch(e) {
+                          console.log("GitHub issue creation failed:", e);
+                        }
+                      }
+                    }}, "Submit"
 
                   )
                 )
