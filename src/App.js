@@ -309,9 +309,29 @@ function App() {
   function toggleLogGroup(gid) {
     setOpenLogGroups(prev=>({...prev,[gid]:!prev[gid]}));
   }
+  // Retroactive stats lookup: get Duration/ActiveCal/TotalCal from log entry or source workout/plan
+  function getEntryStats(entry) {
+    let dur = Number(entry.sourceDurationSec)||0;
+    let act = Number(entry.sourceActiveCal)||0;
+    let tot = Number(entry.sourceTotalCal)||0;
+    if(!dur && !act && !tot) {
+      if(entry.sourceWorkoutId) {
+        const wo = (profile.workouts||[]).find(w=>w.id===entry.sourceWorkoutId);
+        if(wo) { dur=Number(wo.durationMin)||0; act=Number(wo.activeCal)||0; tot=Number(wo.totalCal)||0; }
+      } else if(entry.sourcePlanId) {
+        const pl = (profile.plans||[]).find(p=>p.id===entry.sourcePlanId);
+        if(pl && pl.days) {
+          pl.days.forEach(d=>{ dur+=Number(d.durationMin)||0; act+=Number(d.activeCal)||0; tot+=Number(d.totalCal)||0; });
+        }
+      }
+    }
+    return {durationSec:dur, activeCal:act, totalCal:tot};
+  }
   // Log entry editor
   const [logEditModal,setLogEditModal] = useState(null); // null | {idx}
   const [logEditDraft,setLogEditDraft] = useState(null); // copy of the entry being edited
+  // Calendar exercise read-only detail modal
+  const [calExDetailModal,setCalExDetailModal] = useState(null);
   // Retro check-in modal
   const [retroCheckInModal,setRetroCheckInModal] = useState(false);
   const [retroDate,setRetroDate] = useState("");
@@ -6053,41 +6073,61 @@ function App() {
                             const collapsed = !openLogGroups[cKey];
                             const label = first.sourcePlanName || first.sourceWorkoutName || "Workout";
                             const icon = first.sourcePlanIcon || first.sourceWorkoutIcon || "💪";
+                            const uniqueExCount = new Set(entries.map(e=>e.exId)).size;
+                            const gStats = getEntryStats(first);
+                            const hasStats = gStats.durationSec || gStats.activeCal || gStats.totalCal;
                             return React.createElement('div', { key: gi, className: "log-group-card", style:{marginBottom:8} }
                               , React.createElement('div', { className: "log-group-hdr "+(collapsed?"collapsed":""), onClick:()=>toggleLogGroup(cKey), style:{cursor:"pointer"} }
                                 , React.createElement('span', { className: "log-group-icon" }, icon)
                                 , React.createElement('div', { style:{flex:1,minWidth:0} }
                                   , React.createElement('div', { className: "log-group-name" }, label)
-                                  , React.createElement('div', { className: "log-group-meta" }, entries.length, " exercise", entries.length!==1?"s":"", " · ", first.time)
+                                  , React.createElement('div', { className: "log-group-meta" }, uniqueExCount, " exercise", uniqueExCount!==1?"s":"", " · ", first.time)
+                                  , hasStats && React.createElement('div', { style:{fontSize:".5rem",color:"#6a645a",marginTop:2,display:"flex",gap:8} }
+                                    , gStats.durationSec>0 && React.createElement('span', null, "⏱ ", secToHMS(gStats.durationSec))
+                                    , gStats.totalCal>0 && React.createElement('span', null, "🔥 ", gStats.totalCal, " cal")
+                                    , gStats.activeCal>0 && React.createElement('span', null, "⚡ ", gStats.activeCal, " active")
+                                  )
                                 )
                                 , React.createElement('div', { className: "log-group-xp" }, "⚡ ", groupXP.toLocaleString(), " XP")
                                 , React.createElement('span', { style:{fontSize:".6rem",color:"#5a5650",flexShrink:0,transition:"transform .2s",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",marginLeft:6} }, "▾")
                               )
-                              , !collapsed && React.createElement('div', { className: "log-group-body" }
-                                , entries.map((e,i)=>{
-                                  const isSuperset = entries.some((o,oi)=>oi!==i && o.sourceGroupId===e.sourceGroupId && Math.abs(oi-i)===1 && ((o.supersetWith!=null && o.supersetWith===i)||(e.supersetWith!=null && e.supersetWith===oi)));
-                                  return React.createElement('div', { key:i, className:"h-entry", style:{marginBottom:4} }
-                                    , React.createElement('span', {style:{fontSize:"1rem",flexShrink:0,width:26,textAlign:"center"}}, e.icon)
-                                    , React.createElement('div', {style:{flex:1,minWidth:0}}
-                                      , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4}}
-                                        , React.createElement('span', {style:{fontSize:".72rem",fontWeight:600,color:"#d4cec4"}}, e.exercise)
-                                        , isSuperset && React.createElement('span', {style:{fontSize:".48rem",color:"#b4ac9e",background:"rgba(180,172,158,.1)",padding:"1px 5px",borderRadius:3,fontWeight:600}}, "SS")
+                              , !collapsed && (()=>{
+                                // Consolidate entries by exId
+                                const byExId = {};
+                                entries.forEach(e=>{ if(!byExId[e.exId]) byExId[e.exId]=[]; byExId[e.exId].push(e); });
+                                const consolidated = Object.values(byExId);
+                                return React.createElement('div', { className: "log-group-body" }
+                                  , consolidated.map((exEntries,ci)=>{
+                                    const ef = exEntries[0];
+                                    const exXP = exEntries.reduce((s,e)=>s+e.xp,0);
+                                    const isSuperset = exEntries.some(e=>entries.some((o,oi)=>o.exId!==e.exId && o.sourceGroupId===e.sourceGroupId && ((o.supersetWith!=null)||(e.supersetWith!=null))));
+                                    return React.createElement('div', { key:ci, className:"h-entry", style:{marginBottom:4,cursor:"pointer"},
+                                      onClick:()=>setCalExDetailModal({ entries:exEntries, exerciseName:ef.exercise, exerciseIcon:ef.icon,
+                                        sourceName:first.sourcePlanName||first.sourceWorkoutName||null, sourceIcon:icon,
+                                        totalCal:gStats.totalCal, activeCal:gStats.activeCal, durationSec:gStats.durationSec }) }
+                                      , React.createElement('span', {style:{fontSize:"1rem",flexShrink:0,width:26,textAlign:"center"}}, ef.icon)
+                                      , React.createElement('div', {style:{flex:1,minWidth:0}}
+                                        , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4}}
+                                          , React.createElement('span', {style:{fontSize:".72rem",fontWeight:600,color:"#d4cec4"}}, ef.exercise)
+                                          , isSuperset && React.createElement('span', {style:{fontSize:".48rem",color:"#b4ac9e",background:"rgba(180,172,158,.1)",padding:"1px 5px",borderRadius:3,fontWeight:600}}, "SS")
+                                          , exEntries.length>1 && React.createElement('span', {style:{fontSize:".48rem",color:"#8a8478",background:"rgba(180,172,158,.08)",padding:"1px 5px",borderRadius:3}}, exEntries.length, " sets")
+                                        )
                                       )
-                                      , React.createElement('div', {style:{fontSize:".58rem",color:"#8a8478"}}
-                                        , e.sets, "×", e.reps
-                                        , e.weightLbs ? " · "+(isMetric(profile.units)?lbsToKg(e.weightLbs)+" kg":e.weightLbs+" lbs") : ""
-                                        , e.distanceMi ? " · "+(isMetric(profile.units)?miToKm(e.distanceMi)+" km":e.distanceMi+" mi") : ""
-                                      )
-                                    )
-                                    , React.createElement('div', {style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e",flexShrink:0}}, "+", e.xp, " XP")
-                                  );
-                                })
-                              )
+                                      , React.createElement('div', {style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e",flexShrink:0}}, "+", exXP, " XP")
+                                    );
+                                  })
+                                );
+                              })()
                             );
                           })
                           /* Ungrouped standalone exercises */
-                          , ungrouped.map((e,i)=>
-                            React.createElement('div', { key: "u"+i, className: "cal-event-row log-entry" }
+                          , ungrouped.map((e,i)=>{
+                            const uStats = getEntryStats(e);
+                            const uHasStats = uStats.durationSec || uStats.activeCal || uStats.totalCal;
+                            return React.createElement('div', { key: "u"+i, className: "cal-event-row log-entry", style:{cursor:"pointer"},
+                              onClick:()=>setCalExDetailModal({ entries:[e], exerciseName:e.exercise, exerciseIcon:e.icon,
+                                sourceName:null, sourceIcon:null,
+                                totalCal:uStats.totalCal, activeCal:uStats.activeCal, durationSec:uStats.durationSec }) }
                               , React.createElement('span', { className: "cal-event-icon" }, e.icon)
                               , React.createElement('div', { style: {flex:1,minWidth:0} }
                                 , React.createElement('div', { className: "cal-event-name" }, e.exercise)
@@ -6097,10 +6137,15 @@ function App() {
                                   , e.distanceMi?React.createElement('span', { style: {marginLeft:5} }, isMetric(profile.units)?miToKm(e.distanceMi)+" km":e.distanceMi+" mi"):""
                                   , React.createElement('span', { style: {marginLeft:5,color:"#6a645a"} }, e.time)
                                 )
+                                , uHasStats && React.createElement('div', { style:{fontSize:".5rem",color:"#6a645a",marginTop:2,display:"flex",gap:8} }
+                                  , uStats.durationSec>0 && React.createElement('span', null, "⏱ ", secToHMS(uStats.durationSec))
+                                  , uStats.totalCal>0 && React.createElement('span', null, "🔥 ", uStats.totalCal, " cal")
+                                  , uStats.activeCal>0 && React.createElement('span', null, "⚡ ", uStats.activeCal, " active")
+                                )
                               )
                               , React.createElement('div', { className: "cal-event-xp" }, "+", e.xp, " XP")
-                            )
-                          )
+                            );
+                          })
                         );
                       })()
 
@@ -6153,9 +6198,10 @@ function App() {
                       }
                     });
                     const sources = [...Object.values(grouped), ...ungrouped];
-                    const estC = sources.reduce((s, e) => s + (Number(e.sourceTotalCal) || 0), 0);
-                    const estA = sources.reduce((s, e) => s + (Number(e.sourceActiveCal) || 0), 0);
-                    const totalSec = sources.reduce((s, e) => s + (Number(e.sourceDurationSec) || 0), 0);
+                    const statsArr = sources.map(e => getEntryStats(e));
+                    const estC = statsArr.reduce((s, st) => s + st.totalCal, 0);
+                    const estA = statsArr.reduce((s, st) => s + st.activeCal, 0);
+                    const totalSec = statsArr.reduce((s, st) => s + st.durationSec, 0);
                     const dH = Math.floor(totalSec / 3600);
                     const dM = Math.floor((totalSec % 3600) / 60);
                     const dS = totalSec % 60;
@@ -9429,6 +9475,84 @@ function App() {
                   statsPromptModal.onConfirm(wo, _statsRef);
                   setStatsPromptModal(null); setSpMakeReusable(false); setSpDurSec("");
                 }}, "✓ Save & Complete"   )
+              )
+            )
+          )
+        )
+      )
+
+      /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */
+      , calExDetailModal && (
+        React.createElement('div', { className: "modal-backdrop", onClick: ()=>setCalExDetailModal(null)}
+          , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
+            , React.createElement('div', { className: "modal-body"}
+              /* Header */
+              , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10} }
+                , React.createElement('div', { style:{display:"flex",alignItems:"center",gap:8} }
+                  , React.createElement('span', { style:{fontSize:"1.2rem"} }, calExDetailModal.exerciseIcon)
+                  , React.createElement('div', { className: "stats-modal-title" }, calExDetailModal.exerciseName)
+                )
+                , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setCalExDetailModal(null) }, "✕")
+              )
+              /* Source info */
+              , calExDetailModal.sourceName && React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",padding:"6px 10px",background:"rgba(45,42,36,.12)",borderRadius:7,border:"1px solid rgba(45,42,36,.2)",marginBottom:10} }
+                , React.createElement('span', null, calExDetailModal.sourceIcon||"💪", " From: ", React.createElement('b', { style:{color:"#b4ac9e"} }, calExDetailModal.sourceName))
+              )
+              , !calExDetailModal.sourceName && React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",padding:"6px 10px",background:"rgba(45,42,36,.12)",borderRadius:7,border:"1px solid rgba(45,42,36,.2)",marginBottom:10} }
+                , "Solo Exercise"
+              )
+              /* Stats row */
+              , (calExDetailModal.durationSec>0 || calExDetailModal.activeCal>0 || calExDetailModal.totalCal>0) && React.createElement('div', { style:{display:"flex",gap:8,marginBottom:12} }
+                , calExDetailModal.durationSec>0 && React.createElement('div', { className: "eff-weight", style: {flex:1} }
+                  , React.createElement('span', { className: "eff-weight-val" }, secToHMS(calExDetailModal.durationSec))
+                  , React.createElement('span', { className: "eff-weight-lbl" }, "Duration")
+                )
+                , calExDetailModal.totalCal>0 && React.createElement('div', { className: "eff-weight", style: {flex:1} }
+                  , React.createElement('span', { className: "eff-weight-val" }, calExDetailModal.totalCal)
+                  , React.createElement('span', { className: "eff-weight-lbl" }, "Total Cal")
+                )
+                , calExDetailModal.activeCal>0 && React.createElement('div', { className: "eff-weight", style: {flex:1} }
+                  , React.createElement('span', { className: "eff-weight-val" }, calExDetailModal.activeCal)
+                  , React.createElement('span', { className: "eff-weight-lbl" }, "Active Cal")
+                )
+              )
+              /* Entry rows */
+              , React.createElement('div', { style:{marginBottom:8} }
+                , calExDetailModal.entries.length>1 && React.createElement('div', { style:{fontSize:".58rem",color:"#5a5650",textTransform:"uppercase",letterSpacing:".08em",marginBottom:6} }, calExDetailModal.entries.length, " Sets / Rows")
+                , calExDetailModal.entries.map((e,i)=>
+                  React.createElement('div', { key:i, style:{background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:8,padding:"10px 12px",marginBottom:6} }
+                    , React.createElement('div', { style:{display:"flex",justifyContent:"space-between",alignItems:"center"} }
+                      , React.createElement('div', { style:{fontSize:".72rem",color:"#d4cec4",fontWeight:600} }
+                        , calExDetailModal.entries.length>1 ? "Set "+(i+1) : "Details"
+                      )
+                      , React.createElement('div', { style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e"} }, "+", e.xp, " XP")
+                    )
+                    , React.createElement('div', { style:{display:"flex",gap:12,marginTop:6,flexWrap:"wrap"} }
+                      , React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Sets: "), e.sets
+                      )
+                      , React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Reps: "), e.reps
+                      )
+                      , e.weightLbs && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Weight: "), isMetric(profile.units)?lbsToKg(e.weightLbs)+" kg":e.weightLbs+" lbs"
+                      )
+                      , e.distanceMi && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Distance: "), isMetric(profile.units)?miToKm(e.distanceMi)+" km":e.distanceMi+" mi"
+                      )
+                      , e.hrZone && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "HR Zone: "), e.hrZone
+                      )
+                      , e.seconds && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Seconds: "), e.seconds
+                      )
+                    )
+                  )
+                )
+              )
+              /* Total XP */
+              , React.createElement('div', { style:{display:"flex",justifyContent:"flex-end",padding:"8px 0",borderTop:"1px solid rgba(180,172,158,.08)"} }
+                , React.createElement('div', { style:{fontSize:".75rem",fontWeight:700,color:"#b4ac9e"} }, "Total: +", calExDetailModal.entries.reduce((s,e)=>s+e.xp,0), " XP")
               )
             )
           )
