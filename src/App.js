@@ -6872,7 +6872,7 @@ function App() {
                   , logSubTab==="exercises"&&React.createElement(ExercisesTab,null)
                   , logSubTab==="workouts"&&React.createElement(WorkoutsTab,null)
                   , logSubTab==="plans"&&React.createElement(PlansTab,null)
-                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order}))})
+                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order})),workouts:profile.workouts,plans:profile.plans})
                   , logSubTab==="deleted"&&(()=>{
                     const now = new Date();
                     const active = (profile.deletedItems||[])

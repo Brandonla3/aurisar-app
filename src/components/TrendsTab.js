@@ -93,12 +93,31 @@ const INSIGHT_STYLE = {
   lineHeight: 1.5,
 };
 
-function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, onChartOrderChange }) {
+function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, onChartOrderChange, workouts, plans }) {
   const [range, setRange] = useState("30d");
   const [heatMetric, setHeatMetric] = useState("sessions");
   const [volMuscleFilter, setVolMuscleFilter] = useState("_all");
   const [dragIdx, setDragIdx] = useState(null);
   const metric = isMetric(units);
+
+  // ── Retroactive stats lookup (mirrors getEntryStats in App.js) ──
+  function getEntryStats(entry) {
+    let dur = Number(entry.sourceDurationSec) || 0;
+    let act = Number(entry.sourceActiveCal) || 0;
+    let tot = Number(entry.sourceTotalCal) || 0;
+    if (!dur && !act && !tot) {
+      if (entry.sourceWorkoutId) {
+        const wo = (workouts || []).find(w => w.id === entry.sourceWorkoutId);
+        if (wo) { dur = Number(wo.durationMin) || 0; act = Number(wo.activeCal) || 0; tot = Number(wo.totalCal) || 0; }
+      } else if (entry.sourcePlanId) {
+        const pl = (plans || []).find(p => p.id === entry.sourcePlanId);
+        if (pl && pl.days) {
+          pl.days.forEach(d => { dur += Number(d.durationMin) || 0; act += Number(d.activeCal) || 0; tot += Number(d.totalCal) || 0; });
+        }
+      }
+    }
+    return { durationSec: dur, activeCal: act, totalCal: tot };
+  }
 
   // ── Chart order ──
   const chartOrder = useMemo(() => {
@@ -148,16 +167,18 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
         const key = e.dateKey + "|" + gid;
         if (seen.has(key)) return;
         seen.add(key);
-        buckets[dow].duration += Number(e.sourceDurationSec) || 0;
-        buckets[dow].totalCal += Number(e.sourceTotalCal) || 0;
-        buckets[dow].activeCal += Number(e.sourceActiveCal) || 0;
       }
+      // Use retroactive stats lookup for all entries (grouped first-seen and solo)
+      const stats = getEntryStats(e);
+      buckets[dow].duration += stats.durationSec;
+      buckets[dow].totalCal += stats.totalCal;
+      buckets[dow].activeCal += stats.activeCal;
       buckets[dow].sessions++;
       buckets[dow]._dates.add(e.dateKey);
     });
     buckets.forEach(b => { b.duration = Math.round(b.duration / 60); });
     return buckets;
-  }, [filtered]);
+  }, [filtered, workouts, plans]);
 
   const bestDow = useMemo(() => {
     let best = dowData[0];
@@ -276,8 +297,15 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
   // ══════════════════════════════════════════════
   const consistencyData = useMemo(() => {
     const weeks = {};
+    const seen = new Set();
+    let soloIdx = 0;
     filtered.forEach(e => {
       if (!e.dateKey) return;
+      // Deduplicate grouped entries so a multi-exercise workout counts as one session
+      const gid = e.sourceGroupId;
+      const sessionKey = gid ? (e.dateKey + "|" + gid) : (e.dateKey + "|solo|" + (e.exId || "") + "|" + (e.time || String(soloIdx++)));
+      if (seen.has(sessionKey)) return;
+      seen.add(sessionKey);
       const wk = weekKey(e.dateKey);
       if (!weeks[wk]) weeks[wk] = { week: wk, sessions: 0 };
       weeks[wk].sessions++;
