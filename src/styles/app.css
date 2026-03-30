@@ -982,4 +982,11 @@
     .preview-pin-go{background:rgba(45,42,36,.3);border:1px solid rgba(180,172,158,.08);color:#8a8478;padding:5px 10px;border-radius:6px;font-size:.55rem;cursor:pointer;font-family:'Inter',sans-serif;text-transform:uppercase;letter-spacing:.06em}
     .preview-pin-go:hover{color:#b4ac9e;border-color:rgba(180,172,158,.15)}
 
+    /* ── Trends / Analytics ── */
+    .trends-range-bar{display:flex;gap:0;border:1px solid rgba(180,172,158,.05);border-radius:9px;overflow:hidden;margin-bottom:14px;flex-shrink:0;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .trends-range-bar .log-subtab-btn{flex:0 1 auto;padding:7px 12px;font-size:.52rem}
+    .recharts-default-tooltip{background:rgba(20,18,15,.92)!important;border:1px solid rgba(180,172,158,.15)!important;border-radius:8px!important;backdrop-filter:blur(8px)}
+    .recharts-tooltip-item{color:#d4cec4!important;font-size:.62rem!important}
+    .recharts-tooltip-label{color:#b4ac9e!important;font-size:.64rem!important;font-weight:700!important}
+
 
