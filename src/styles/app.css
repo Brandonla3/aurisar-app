@@ -997,3 +997,22 @@
     .trends-drag-handle{color:#3a3830;font-size:.7rem;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-.15em}
     .trends-drag-handle:active{cursor:grabbing}
     @media (hover:none){.trends-drag-handle{display:none}}
+
+    /* ── Boot / Intro Screen ── */
+    @keyframes bootLineIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes bootBarFill{from{opacity:.6}to{opacity:1}}
+    @keyframes bootBtnPulse{0%,100%{box-shadow:0 4px 24px rgba(196,148,40,.25),0 0 0 0 rgba(196,148,40,0)}50%{box-shadow:0 4px 32px rgba(196,148,40,.55),0 0 28px rgba(196,148,40,.2)}}
+    .boot-screen{gap:18px}
+    .boot-logo{width:min(260px,78vw);height:auto;display:block;margin:0 auto;filter:drop-shadow(0 0 28px rgba(196,148,40,.4)) drop-shadow(0 4px 18px rgba(0,0,0,.8))}
+    .boot-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.1rem,5vw,1.6rem);font-weight:900;letter-spacing:.18em;text-align:center;background:linear-gradient(135deg,#f0d060,#c49428,#8a6010);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1}
+    .boot-title-sub{display:block;font-family:'Cinzel',serif;font-size:.5em;font-weight:600;letter-spacing:.35em;margin-top:3px;background:linear-gradient(135deg,#b4ac9e,#8a8478);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .boot-log{width:min(300px,88vw);display:flex;flex-direction:column;gap:10px}
+    .boot-bar-wrap{width:100%;height:4px;background:rgba(180,172,158,.08);border-radius:4px;overflow:hidden}
+    .boot-bar{height:100%;background:linear-gradient(90deg,#8a6010,#c49428,#f0d060);border-radius:4px;transition:width .55s cubic-bezier(.4,0,.2,1);animation:bootBarFill .6s ease}
+    .boot-log-lines{display:flex;flex-direction:column;gap:4px;min-height:52px}
+    .boot-line{font-family:'Inter',sans-serif;font-size:.68rem;color:#8a8478;letter-spacing:.04em}
+    .boot-line-in{animation:bootLineIn .3s ease forwards}
+    .boot-prompt{color:#c49428;font-weight:700}
+    .boot-check{color:#4caf6e;font-weight:700}
+    .boot-ellipsis{color:#8a8478}
+    .boot-btn-ready{animation:bootBtnPulse 2s ease-in-out infinite!important;border-color:rgba(196,148,40,.22)!important;color:#d4cec4!important}
