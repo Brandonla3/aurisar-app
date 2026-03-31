@@ -2017,8 +2017,7 @@ function App() {
     const _isC = exData.category==="cardio"; const _isF = exData.category==="flexibility";
     const _hasDur = _isC||_isF; const _hasW = !_isC&&!_isF;
     const _m = isMetric(profile.units); const _wU = weightLabel(profile.units); const _dU = distLabel(profile.units);
-    const _distMi = ex.distanceMi?parseFloat(ex.distanceMi):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMi||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
+    const xpVal = wizardExXPs[exIdx]||0;
     const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_m?lbsToKg(ex.weightLbs):ex.weightLbs}${_wU}`:"");
     return React.createElement('div', {className:"ss-section"},
       React.createElement('div', {className:"ss-section-hdr",onClick:()=>setSsAccordion(p=>({...p,[sectionKey]:!p[sectionKey]}))},
@@ -2042,7 +2041,7 @@ function App() {
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"numeric",
                 value:ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
                 onChange:e=>updateExInDay(dayIdx,exIdx,"_durHHMM",e.target.value),
-                onBlur:e=>{const n=normalizeHHMM(e.target.value);updateExInDay(dayIdx,exIdx,"_durHHMM",n||undefined);const s=combineHHMMSec(n,ex._durSec||"");updateExInDay(dayIdx,exIdx,"durationSec",s);if(s)updateExInDay(dayIdx,exIdx,"reps",Math.max(1,Math.floor(s/60)));},
+                onBlur:e=>{const n=normalizeHHMM(e.target.value);const s=combineHHMMSec(n,ex._durSec||"");const batch={_durHHMM:n||undefined,durationSec:s};if(s){batch.reps=Math.max(1,Math.floor(s/60));batch.durationMin=s/60;}updateExInDayBatch(dayIdx,exIdx,batch);},
                 placeholder:"00:00"})
             ),
             React.createElement('div', {style:{flex:1,minWidth:0}},
@@ -5636,7 +5635,6 @@ function App() {
                               , hasExercises
                                 ? React.createElement('span', { className: "day-xp-mini" }, "⚡", dayXP)
                                 : React.createElement('span', { className: "day-rest-badge" }, "REST")
-                              , bDays.length>1 && React.createElement('div', { className: "wizard-day-tab-del", onClick: e=>{e.stopPropagation();removeDayFromBuilder(globalIdx);}}, "✕")
                             );
                           })
                           , React.createElement('div', { className: "wizard-day-tab", style: {color:"#b4ac9e",borderStyle:"dashed",borderColor:"rgba(180,172,158,.12)",minWidth:52},
@@ -5659,6 +5657,7 @@ function App() {
                         , React.createElement('div', { className: "wizard-day-hdr" }
                           , React.createElement('input', { className: "inp", value: _optionalChain([bDays, 'access', _97 => _97[bDayIdx], 'optionalAccess', _98 => _98.label])||"", onChange: e=>updateDayLabel(bDayIdx,e.target.value), placeholder: "Day label…" , style: {flex:1,padding:"8px 12px",fontSize:".82rem"}})
                           , React.createElement('span', { style: {fontSize:".72rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "⚡ " , wizardDayXPs[bDayIdx]||0)
+                          , bDays.length>1 && React.createElement('button', { className: "btn btn-danger btn-xs", style: {marginLeft:6,padding:"4px 8px",fontSize:".6rem"}, onClick: ()=>removeDayFromBuilder(bDayIdx)}, "🗑 Delete Day")
                         )
                         /* Optional day-level stats */
                         , React.createElement('div', { className: "wizard-day-stats" }
@@ -5680,6 +5679,10 @@ function App() {
                             style: {flex:1,fontSize:".68rem",padding:"6px 10px"},
                             value: _optionalChain([bDays, 'access', _111 => _111[bDayIdx], 'optionalAccess', _112 => _112.totalCal])||"",
                             onChange: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}))})
+                        )
+                        , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
+                          , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "＋ Add Exercise"  )
+                          , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "💪 Add Workout"  )
                         )
                         , (()=>{const minSsCheckedPlan = ssCheckedPlan.size>0 ? Math.min(...ssCheckedPlan) : -1; return (_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises])||[]).map((ex,i)=>{
                           const exData=allExById[ex.exId]; if(!exData) return null;
@@ -5931,10 +5934,6 @@ function App() {
                             )
                           ));
                         });})()
-                        , React.createElement('div', { style: {display:"flex",gap:6,marginTop:8}}
-                          , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "＋ Add Exercise"  )
-                          , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "💪 Add Workout"  )
-                        )
                         , bEditId && React.createElement('button', { className:"btn btn-glass-yellow", style:{width:"100%",marginTop:8},
                           onClick:()=>{
                             const plan=(profile.plans||[]).find(p=>p.id===bEditId); if(!plan) return;
@@ -8158,7 +8157,7 @@ function App() {
       )
 
       /* ══ PLAN BUILDER WORKOUT PICKER ════════════ */
-      , bWoPickerOpen && (
+      , bWoPickerOpen && createPortal(
         React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();setBWoPickerOpen(false);}}
           , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation()}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
@@ -8191,10 +8190,10 @@ function App() {
             )
           )
         )
-      )
+      , document.body)
 
       /* ══ EXERCISE PICKER ════════════════════════ */
-      , exPickerOpen && (
+      , exPickerOpen && createPortal(
         React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();if(!pickerConfigOpen)closePicker();}}
           , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation(), style: {maxHeight:"85vh"}}
             , !pickerConfigOpen ? React.createElement(React.Fragment, null
@@ -8387,10 +8386,10 @@ function App() {
             )
           )
         )
-      )
+      , document.body)
 
       /* ══ EXERCISE EDITOR MODAL ══════════════════ */
-      , exEditorOpen && exEditorDraft && (()=>{
+      , exEditorOpen && exEditorDraft && createPortal((()=>{
         const ed = exEditorDraft;
         const setEd = patch => setExEditorDraft(d=>({...d,...patch}));
         const isCardioED = ed.category==="cardio";
@@ -9458,11 +9457,11 @@ function App() {
             )
           )
         );
-      })()
+      })(), document.body)
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
-      , statsPromptModal&&(
-        React.createElement('div', { className: "modal-backdrop", style:{zIndex:200}, onClick: ()=>setStatsPromptModal(null)}
+      , statsPromptModal&&createPortal(
+        React.createElement('div', { className: "modal-backdrop", onClick: ()=>setStatsPromptModal(null)}
           , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
             , React.createElement('div', { className: "modal-body"}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10} }
@@ -9537,7 +9536,7 @@ function App() {
             )
           )
         )
-      )
+      , document.body)
 
       /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */
       , calExDetailModal && (
