@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { createPortal } from 'react-dom';
 import './styles/app.css';
 import { CLASSES, EXERCISES, IMG } from './data/exercises';
@@ -196,6 +196,7 @@ function App() {
   const [collapsedWeeks,setCollapsedWeeks] = useState({}); // {weekIdx: bool}
   const [planWizardOpen,setPlanWizardOpen] = useState(false);
   const [wizardWeekIdx,setWizardWeekIdx] = useState(0);
+  const [, startTransition] = useTransition();
   function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
   const [dragPlanExIdx,setDragPlanExIdx] = useState(null);
   const [dragDetailExIdx,setDragDetailExIdx] = useState(null);
@@ -2033,35 +2034,34 @@ function App() {
           !_noSets&&!_hasDur&&React.createElement('div', {style:{flex:1,minWidth:0}},
             React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets"),
             React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-              value:ex.sets===0||ex.sets===""?"":ex.sets, onChange:e=>updateExInDay(dayIdx,exIdx,"sets",e.target.value)})
+              defaultValue:ex.sets===0||ex.sets===""?"":ex.sets, onBlur:e=>updateExInDay(dayIdx,exIdx,"sets",e.target.value)})
           ),
           _hasDur ? (React.createElement(React.Fragment, null,
             React.createElement('div', {style:{flex:1.6,minWidth:0}},
               React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"numeric",
-                value:ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
-                onChange:e=>updateExInDay(dayIdx,exIdx,"_durHHMM",e.target.value),
+                defaultValue:ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
                 onBlur:e=>{const n=normalizeHHMM(e.target.value);const s=combineHHMMSec(n,ex._durSec||"");const batch={_durHHMM:n||undefined,durationSec:s};if(s){batch.reps=Math.max(1,Math.floor(s/60));batch.durationMin=s/60;}updateExInDayBatch(dayIdx,exIdx,batch);},
                 placeholder:"00:00"})
             ),
             React.createElement('div', {style:{flex:1,minWidth:0}},
               React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (",_dU,")"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-                value:ex.distanceMi?(_m?String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)):String(ex.distanceMi)):"",
-                onChange:e=>{const v=e.target.value;const mi=v&&_m?kmToMi(v):v;updateExInDay(dayIdx,exIdx,"distanceMi",mi||null);},
+                defaultValue:ex.distanceMi?(_m?String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)):String(ex.distanceMi)):"",
+                onBlur:e=>{const v=e.target.value;const mi=v&&_m?kmToMi(v):v;updateExInDay(dayIdx,exIdx,"distanceMi",mi||null);},
                 placeholder:"0"})
             )
           )) : (React.createElement(React.Fragment, null,
             React.createElement('div', {style:{flex:1,minWidth:0}},
               React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-                value:ex.reps===0||ex.reps===""?"":ex.reps, onChange:e=>updateExInDay(dayIdx,exIdx,"reps",e.target.value)})
+                defaultValue:ex.reps===0||ex.reps===""?"":ex.reps, onBlur:e=>updateExInDay(dayIdx,exIdx,"reps",e.target.value)})
             ),
             _hasW&&React.createElement('div', {style:{flex:1.2,minWidth:0}},
               React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Weight (",_wU,")"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-                value:ex.weightLbs!=null&&ex.weightLbs!==""?(_m?lbsToKg(ex.weightLbs):String(ex.weightLbs)):"",
-                onChange:e=>{const v=e.target.value;const lbs=v&&_m?kgToLbs(v):v;updateExInDay(dayIdx,exIdx,"weightLbs",lbs||null);},
+                defaultValue:ex.weightLbs!=null&&ex.weightLbs!==""?(_m?lbsToKg(ex.weightLbs):String(ex.weightLbs)):"",
+                onBlur:e=>{const v=e.target.value;const lbs=v&&_m?kgToLbs(v):v;updateExInDay(dayIdx,exIdx,"weightLbs",lbs||null);},
                 placeholder:"—"})
             )
           ))
@@ -2410,15 +2410,15 @@ function App() {
     setBType(tpl.type||"week"); setBDurCount(tpl.durCount||1); setBStartDate(tpl.startDate||""); setBEndDate(tpl.endDate||""); setBIcon(tpl.icon); setBDays(clone(tpl.days)); setBDayIdx(0);
     setPlanWizardOpen(false); setWizardWeekIdx(0); setPlanView(customize?"builder":"detail"); if(!customize) setActivePlan(tpl);
   }
-  function addDayToBuilder(){ setBDays(d=>[...d,{label:`Day ${d.length+1}`,exercises:[]}]); setBDayIdx(bDays.length); }
-  function removeDayFromBuilder(idx){ const nd=bDays.filter((_,i)=>i!==idx); setBDays(nd); setBDayIdx(Math.min(bDayIdx,nd.length-1)); }
-  function reorderDay(fromIdx,toIdx){ if(fromIdx===toIdx) return; const nd=[...bDays]; const [moved]=nd.splice(fromIdx,1); nd.splice(toIdx,0,moved); setBDays(nd); setBDayIdx(toIdx); }
+  function addDayToBuilder(){ startTransition(()=>{ setBDays(d=>[...d,{label:`Day ${d.length+1}`,exercises:[]}]); setBDayIdx(bDays.length); }); }
+  function removeDayFromBuilder(idx){ startTransition(()=>{ const nd=bDays.filter((_,i)=>i!==idx); setBDays(nd); setBDayIdx(Math.min(bDayIdx,nd.length-1)); }); }
+  function reorderDay(fromIdx,toIdx){ if(fromIdx===toIdx) return; startTransition(()=>{ const nd=[...bDays]; const [moved]=nd.splice(fromIdx,1); nd.splice(toIdx,0,moved); setBDays(nd); setBDayIdx(toIdx); }); }
   function duplicateWeek(weekIdx){
     const start=weekIdx*7; const end=Math.min(start+7,bDays.length);
     const weekDays=bDays.slice(start,end);
     const base=bDays.length;
     const copies=weekDays.map((d,i)=>({...d,label:`Day ${base+i+1}`,exercises:d.exercises.map(e=>({...e}))}));
-    setBDays(d=>[...d,...copies]);
+    startTransition(()=>{setBDays(d=>[...d,...copies]);});
     showToast(`Week ${weekIdx+1} duplicated!`);
   }
   function reorderWeek(fromWeek,toWeek){
@@ -2427,11 +2427,11 @@ function App() {
     for(let i=0;i<days.length;i+=7) weeks.push(days.slice(i,i+7));
     const [moved]=weeks.splice(fromWeek,1); weeks.splice(toWeek,0,moved);
     const reordered=weeks.flat().map((d,i)=>({...d,label:`Day ${i+1}`}));
-    setBDays(reordered); setBDayIdx(toWeek*7);
+    startTransition(()=>{ setBDays(reordered); setBDayIdx(toWeek*7); });
   }
-  function reorderPlanEx(dayIdx,fromIdx,toIdx){ if(fromIdx===toIdx) return; setBDays(days=>days.map((d,i)=>{ if(i!==dayIdx) return d; const exs=[...d.exercises]; const [m]=exs.splice(fromIdx,1); exs.splice(toIdx,0,m); return {...d,exercises:exs}; })); }
-  function addExToDay(exId){ const exd=allExById[exId]||{}; setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,{exId,sets:(exd.defaultSets!=null?exd.defaultSets:3),reps:(exd.defaultReps!=null?exd.defaultReps:10),weightLbs:exd.defaultWeightLbs||null,durationMin:exd.defaultDurationMin||null,distanceMi:exd.defaultDistanceMi||null,hrZone:exd.defaultHrZone||null,weightPct:exd.defaultWeightPct||100}]})); setExPickerOpen(false); }
-  function removeExFromDay(di,ei){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)})); }
+  function reorderPlanEx(dayIdx,fromIdx,toIdx){ if(fromIdx===toIdx) return; startTransition(()=>{setBDays(days=>days.map((d,i)=>{ if(i!==dayIdx) return d; const exs=[...d.exercises]; const [m]=exs.splice(fromIdx,1); exs.splice(toIdx,0,m); return {...d,exercises:exs}; }));}); }
+  function addExToDay(exId){ const exd=allExById[exId]||{}; startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,{exId,sets:(exd.defaultSets!=null?exd.defaultSets:3),reps:(exd.defaultReps!=null?exd.defaultReps:10),weightLbs:exd.defaultWeightLbs||null,durationMin:exd.defaultDurationMin||null,distanceMi:exd.defaultDistanceMi||null,hrZone:exd.defaultHrZone||null,weightPct:exd.defaultWeightPct||100}]}));}); setExPickerOpen(false); }
+  function removeExFromDay(di,ei){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)}));}); }
   function updateExInDay(di,ei,field,val){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})})); }
   function updateExInDayBatch(di,ei,fields){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,...fields})})); }
   function updateDayLabel(idx,val){ setBDays(days=>days.map((d,i)=>i!==idx?d:{...d,label:val})); }
@@ -2466,6 +2466,18 @@ function App() {
       return ex.intervals ? Math.round((base+rowsXP)*1.25) : (base+rowsXP);
     });
   },[bDays,bDayIdx,profile.chosenClass,allExById]);
+  const wizardActionsRef = React.useRef({});
+  wizardActionsRef.current = {
+    updateExInDay, updateExInDayBatch, updateDayLabel,
+    removeDayFromBuilder, saveBuiltPlan, reorderPlanEx, reorderDay,
+    duplicateWeek, planGroupSuperset, planUngroupSuperset,
+    renderPlanSsSection, openStatsPromptIfNeeded, startPlanWorkout,
+    showToast, togglePlanEx, removeExFromDay, addDayToBuilder,
+    openExEditor, setExPickerOpen, setBWoPickerOpen, openSchedulePlan,
+    deletePlan, setPlanWizardOpen, setPlanView, setSsCheckedPlan,
+    setWizardWeekIdx, setBDayIdx, setDragDayIdx, setDragPlanExIdx,
+    setSsAccordion, reorderWeek, addExToDay
+  };
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
   const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
 
@@ -5752,7 +5764,7 @@ function App() {
                           const runBoostPct=runPace?(runPace<=8?20:5):0;
                           const catColorPlan=getTypeColor(exData.category);
                           return (
-                            React.createElement(React.Fragment, {key:i},
+                            React.createElement(React.Fragment, {key:bDayIdx+'_'+i+'_'+ex.exId},
                             i===minSsCheckedPlan && ssCheckedPlan.size>0 && React.createElement('div',{className:"ss-action-bar",style:{marginBottom:8}},
                               React.createElement('span',{className:"ss-action-text"}, ssCheckedPlan.size+" selected"),
                               ssCheckedPlan.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
@@ -5802,14 +5814,13 @@ function App() {
                                         , !noSetsEx&&!hasDur&&React.createElement('div', { style: {flex:1,minWidth:0}}
                                           , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
                                           , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
-                                            value: ex.sets===0||ex.sets===""?"":ex.sets, onChange: e=>updateExInDay(bDayIdx,i,"sets",e.target.value)})
+                                            defaultValue: ex.sets===0||ex.sets===""?"":ex.sets, onBlur: e=>updateExInDay(bDayIdx,i,"sets",e.target.value)})
                                         )
                                         , hasDur ? (React.createElement(React.Fragment, null
                                           , React.createElement('div', { style: {flex:1.6,minWidth:0}}
                                             , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration")
                                             , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "numeric",
-                                              value: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
-                                              onChange: e=>updateExInDay(bDayIdx,i,"_durHHMM",e.target.value),
+                                              defaultValue: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
                                               onBlur: e=>{
                                                 const norm=normalizeHHMM(e.target.value);
                                                 const sec=combineHHMMSec(norm,ex._durSec||"");
@@ -5823,8 +5834,8 @@ function App() {
                                           , React.createElement('div', { style: {flex:0.8,minWidth:0}}
                                             , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
                                             , React.createElement('input', { className: "builder-ex-input", style: {width:"100%",textAlign:"center"}, type: "number", min: "0", max: "59",
-                                              value: ex._durSec!==undefined ? String(ex._durSec).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
-                                              onChange: e=>{
+                                              defaultValue: ex._durSec!==undefined ? String(ex._durSec).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
+                                              onBlur: e=>{
                                                 const v=e.target.value;
                                                 const sec=combineHHMMSec(ex._durHHMM||"",v);
                                                 const batch={_durSec:v,durationSec:sec};
@@ -5836,22 +5847,22 @@ function App() {
                                           , React.createElement('div', { style: {flex:1.2,minWidth:0}}
                                             , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , bMetric?"km":"mi", ")")
                                             , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
-                                              value: dispDist, placeholder: "0",
-                                              onChange: e=>{const v=e.target.value;const mi=v&&bMetric?kmToMi(v):v;updateExInDay(bDayIdx,i,"distanceMi",mi||null);}})
+                                              defaultValue: dispDist, placeholder: "0",
+                                              onBlur: e=>{const v=e.target.value;const mi=v&&bMetric?kmToMi(v):v;updateExInDay(bDayIdx,i,"distanceMi",mi||null);}})
                                           )
                                         )) : (
                                           React.createElement(React.Fragment, null
                                             , React.createElement('div', { style: {flex:1,minWidth:0}}
                                               , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
                                               , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
-                                                value: dispReps===0||dispReps===""?"":dispReps, onChange: e=>updateExInDay(bDayIdx,i,"reps",e.target.value)})
+                                                defaultValue: dispReps===0||dispReps===""?"":dispReps, onBlur: e=>updateExInDay(bDayIdx,i,"reps",e.target.value)})
                                             )
                                             , hasWeight&&(
                                               React.createElement('div', { style: {flex:1.2,minWidth:0}}
                                                 , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, bWUnit)
                                                 , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal", step: bMetric?"0.5":"2.5",
-                                                  value: dispW, placeholder: "—",
-                                                  onChange: e=>{const v=e.target.value;const lbs=v&&bMetric?kgToLbs(v):v;updateExInDay(bDayIdx,i,"weightLbs",lbs||null);}})
+                                                  defaultValue: dispW, placeholder: "—",
+                                                  onBlur: e=>{const v=e.target.value;const lbs=v&&bMetric?kgToLbs(v):v;updateExInDay(bDayIdx,i,"weightLbs",lbs||null);}})
                                               )
                                             )
                                           )
@@ -5866,11 +5877,11 @@ function App() {
                                           , React.createElement('div', { style: {display:"flex",gap:8}}
                                             , React.createElement('div', { style: {flex:1}}
                                               , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
-                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: ex.incline||"", onChange: e=>updateExInDay(bDayIdx,i,"incline",e.target.value?parseFloat(e.target.value):null)})
+                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", defaultValue: ex.incline||"", onBlur: e=>updateExInDay(bDayIdx,i,"incline",e.target.value?parseFloat(e.target.value):null)})
                                             )
                                             , React.createElement('div', { style: {flex:1}}
                                               , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
-                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: ex.speed||"", onChange: e=>updateExInDay(bDayIdx,i,"speed",e.target.value?parseFloat(e.target.value):null)})
+                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", defaultValue: ex.speed||"", onBlur: e=>updateExInDay(bDayIdx,i,"speed",e.target.value?parseFloat(e.target.value):null)})
                                             )
                                           )
                                         )
