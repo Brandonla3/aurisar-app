@@ -409,6 +409,11 @@ function App() {
   },[]);
   useEffect(()=>{ if(screen==="main") doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen]);
   useEffect(()=>{
+    if(planWizardOpen){document.body.style.overflow='hidden';}
+    else{document.body.style.overflow='';}
+    return ()=>{document.body.style.overflow='';};
+  },[planWizardOpen]);
+  useEffect(()=>{
     // Auto-load social data on login so badge shows immediately
     if(screen==="main" && authUser) {
       loadSocialData();
@@ -2451,6 +2456,15 @@ function App() {
     return s+base+rowsXP;
   },0),0),[bDays,profile.chosenClass,allExById]);
   const wizardDayXPs = useMemo(()=>bDays.map(d=>calcDayXP(d,profile.chosenClass,allExById)),[bDays,profile.chosenClass,allExById]);
+  const wizardExXPs = useMemo(()=>{
+    const day = bDays[bDayIdx]; if(!day) return [];
+    return day.exercises.map(ex=>{
+      const noSets = NO_SETS_EX_IDS.has(ex.exId);
+      const base = calcExXP(ex.exId,noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,ex.distanceMi||null);
+      const rowsXP = (ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
+      return ex.intervals ? Math.round((base+rowsXP)*1.25) : (base+rowsXP);
+    });
+  },[bDays,bDayIdx,profile.chosenClass,allExById]);
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
   const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
 
@@ -5537,19 +5551,9 @@ function App() {
                       , bEditId && (()=>{
                         const plan = (profile.plans||[]).find(p=>p.id===bEditId);
                         if(!plan) return null;
-                        const currentDay = bDays[bDayIdx] || bDays[0] || {exercises:[]};
                         return React.createElement(React.Fragment, null
                           , React.createElement('div', { className: "div", style: {margin:"8px 0"}})
-                          , React.createElement('div', { className: "plan-actions"}
-                            , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:1}, onClick: ()=>{
-                              const synth={name:currentDay.label||"Day",icon:bIcon||"\uD83D\uDCCB",exercises:currentDay.exercises,
-                                durationMin:currentDay.durationMin||null,activeCal:currentDay.activeCal||null,totalCal:currentDay.totalCal||null};
-                              openStatsPromptIfNeeded(synth,(woWithStats, _sr)=>{
-                                startPlanWorkout({...plan,days:[{...currentDay,durationMin:woWithStats.durationMin,activeCal:woWithStats.activeCal,totalCal:woWithStats.totalCal}]});
-                              });
-                            }}, "\u2713 Complete Day"  )
-                          )
-                          , React.createElement('div', { style: {display:"flex",gap:7,marginTop:7}}
+                          , React.createElement('div', { style: {display:"flex",gap:7}}
                             , React.createElement('button', { className: `plan-sched-btn ${plan.scheduledDate?"plan-sched-active":""}`,
                               style: {flex:1,padding:"8px 12px",textAlign:"center"},
                               onClick: ()=>openSchedulePlan(plan)}
@@ -5566,7 +5570,7 @@ function App() {
 
                 /* ── PLAN WIZARD FULL-SCREEN OVERLAY ── */
                 , planWizardOpen && planView==="builder" && (
-                  React.createElement('div', { className: "plan-wizard-backdrop", onClick: e=>e.stopPropagation() }
+                  React.createElement('div', { className: "plan-wizard-backdrop", onClick: e=>e.stopPropagation(), onTouchStart: e=>e.stopPropagation(), onTouchMove: e=>e.stopPropagation(), onTouchEnd: e=>e.stopPropagation() }
                     , React.createElement('div', { className: "plan-wizard-inner" }
                       /* Wizard Header */
                       , React.createElement('div', { className: "plan-wizard-hdr" }
@@ -5686,8 +5690,8 @@ function App() {
                           const planPartnerExD = planPartnerEx ? (allExById[planPartnerEx.exId]||null) : null;
                           /* Render accordion card for superset pairs */
                           if (planPartnerIdx != null && planPartnerExD) {
-                            const xpA = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
-                            const xpB = calcExXP(planPartnerEx.exId,planPartnerEx.sets||3,planPartnerEx.reps||10,profile.chosenClass,allExById);
+                            const xpA = wizardExXPs[i]||0;
+                            const xpB = wizardExXPs[planPartnerIdx]||0;
                             return React.createElement('div', {key:i, className:"ss-accordion"},
                               React.createElement('div', {className:"ss-accordion-hdr"},
                                 React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:2,flexShrink:0}},
@@ -5783,7 +5787,7 @@ function App() {
                                       , React.createElement('span', { className: "builder-ex-name-styled", style: {flex:1} }, exData.name)
                                       , (isRunningEx&&pbDisp||exPBDisp3)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp3)
                                       , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:"")
-                                      , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",minWidth:36,textAlign:"right"}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})())
+                                      , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",minWidth:36,textAlign:"right"}}, "+"+(wizardExXPs[i]||0).toLocaleString())
                                       , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
                                       , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:2}, onClick: e=>{e.stopPropagation();removeExFromDay(bDayIdx,i);}}, "✕")
                                     )
@@ -5928,6 +5932,16 @@ function App() {
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "＋ Add Exercise"  )
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "💪 Add Workout"  )
                         )
+                        , bEditId && React.createElement('button', { className:"btn btn-glass-yellow", style:{width:"100%",marginTop:8},
+                          onClick:()=>{
+                            const plan=(profile.plans||[]).find(p=>p.id===bEditId); if(!plan) return;
+                            const currentDay=bDays[bDayIdx]; if(!currentDay) return;
+                            const synth={name:currentDay.label||"Day",icon:bIcon||"\uD83D\uDCCB",exercises:currentDay.exercises,
+                              durationMin:currentDay.durationMin||null,activeCal:currentDay.activeCal||null,totalCal:currentDay.totalCal||null};
+                            openStatsPromptIfNeeded(synth,(woWithStats,_sr)=>{
+                              startPlanWorkout({...plan,days:[{...currentDay,durationMin:woWithStats.durationMin,activeCal:woWithStats.activeCal,totalCal:woWithStats.totalCal}]});
+                            });
+                          }}, "\u2713 Complete Day")
                         , React.createElement('div', { className: "div", style: {margin:"3px 0"}})
                         , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltPlan}, "\uD83D\uDCBE Save Plan"  )
                       ) /* close wizard-day-editor */
