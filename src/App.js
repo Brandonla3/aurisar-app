@@ -193,6 +193,8 @@ function App() {
   const [dragDayIdx,setDragDayIdx] = useState(null);
   const [dragWeekIdx,setDragWeekIdx] = useState(null); // drag whole week
   const [collapsedWeeks,setCollapsedWeeks] = useState({}); // {weekIdx: bool}
+  const [planWizardOpen,setPlanWizardOpen] = useState(false);
+  const [wizardWeekIdx,setWizardWeekIdx] = useState(0);
   function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
   const [dragPlanExIdx,setDragPlanExIdx] = useState(null);
   const [dragDetailExIdx,setDragDetailExIdx] = useState(null);
@@ -2395,13 +2397,13 @@ function App() {
     showToast("Plan moved to Deleted — recoverable for 7 days.");
   }
   // Plan builder helpers
-  function initBuilderScratch(){ setBEditId(null); setBName(""); setBLevel(""); setBType("week"); setBDurCount(1); setBStartDate(""); setBEndDate(""); setBIcon("⚔️"); setBDays(Array.from({length:7},(_,i)=>({label:`Day ${i+1}`,exercises:[]}))); setBDayIdx(0); setPlanView("builder"); }
+  function initBuilderScratch(){ setBEditId(null); setBName(""); setBLevel(""); setBType("week"); setBDurCount(1); setBStartDate(""); setBEndDate(""); setBIcon("⚔️"); setBDays(Array.from({length:7},(_,i)=>({label:`Day ${i+1}`,exercises:[]}))); setBDayIdx(0); setPlanWizardOpen(false); setWizardWeekIdx(0); setPlanView("builder"); }
   function initBuilderFromTemplate(tpl,customize=false){
     setBEditId(customize && tpl.custom ? tpl.id : null);
     setBName(customize && !tpl.custom ? `${tpl.name} (Custom)` : tpl.name);
     setBLevel(tpl.level||"");
     setBType(tpl.type||"week"); setBDurCount(tpl.durCount||1); setBStartDate(tpl.startDate||""); setBEndDate(tpl.endDate||""); setBIcon(tpl.icon); setBDays(clone(tpl.days)); setBDayIdx(0);
-    setPlanView(customize?"builder":"detail"); if(!customize) setActivePlan(tpl);
+    setPlanWizardOpen(false); setWizardWeekIdx(0); setPlanView(customize?"builder":"detail"); if(!customize) setActivePlan(tpl);
   }
   function addDayToBuilder(){ setBDays(d=>[...d,{label:`Day ${d.length+1}`,exercises:[]}]); setBDayIdx(bDays.length); }
   function removeDayFromBuilder(idx){ const nd=bDays.filter((_,i)=>i!==idx); setBDays(nd); setBDayIdx(Math.min(bDayIdx,nd.length-1)); }
@@ -2434,10 +2436,10 @@ function App() {
       const updated = {name:bName,level:bLevel||null,icon:bIcon,type:bType,durCount:bDurCount,startDate:bStartDate||null,endDate:bEndDate||null,scheduledDate:bStartDate||null,description:`Custom ${durLabel} plan`,days:clone(bDays)};
       setProfile(pr=>({...pr,plans:pr.plans.map(pl=>pl.id===bEditId?{...pl,...updated}:pl)}));
       setActivePlan(p=>({...p,...updated}));
-      setPlanView("detail"); showToast("Plan updated! ⚡");
+      setPlanWizardOpen(false); setPlanView("detail"); showToast("Plan updated! ⚡");
     } else {
       const p={id:uid(),name:bName,level:bLevel||null,icon:bIcon,type:bType,durCount:bDurCount,startDate:bStartDate||null,endDate:bEndDate||null,scheduledDate:bStartDate||null,description:`Custom ${durLabel} plan`,bestFor:[],days:clone(bDays),createdAt:new Date().toLocaleDateString(),custom:true};
-      setProfile(pr=>({...pr,plans:[p,...pr.plans]})); setPlanView("list"); showToast("Plan saved! ⚡");
+      setProfile(pr=>({...pr,plans:[p,...pr.plans]})); setPlanWizardOpen(false); setPlanView("list"); showToast("Plan saved! ⚡");
     }
   }
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
@@ -5404,7 +5406,7 @@ function App() {
                 , planView==="builder" && (
                   React.createElement(React.Fragment, null
                     , React.createElement('div', { className: "builder-nav-hdr" }
-                      , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setPlanView(bEditId?"detail":"list") }, "← Cancel")
+                      , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setPlanWizardOpen(false);setPlanView(bEditId?"detail":"list");} }, "← Cancel")
                       , React.createElement('div', { className: "builder-nav-title" }, bEditId ? "✎ Edit Plan" : "📜 New Plan")
                     )
                     , React.createElement('div', { className: "builder-wrap"}
@@ -5520,124 +5522,127 @@ function App() {
                         , React.createElement('div', { className: "icon-row"}, ICONS.map(ic=>React.createElement('div', { key: ic, className: `icon-opt ${bIcon===ic?"sel":""}`, onClick: ()=>setBIcon(ic)}, ic)))
                       )
                       , React.createElement('div', { className: "xp-projection"}
-                        , React.createElement('div', null, React.createElement('div', { className: "xp-proj-label"}, "Projected Total XP"  ), React.createElement('div', { className: "xp-proj-detail"}, bDays.filter(d=>d.exercises.length>0).length, " active days"  ))
+                        , React.createElement('div', null, React.createElement('div', { className: "xp-proj-label"}, "Projected Total XP"  ), React.createElement('div', { className: "xp-proj-detail"}, bDays.filter(d=>d.exercises.length>0).length, " active days · "    , bDays.reduce((t,d)=>t+d.exercises.length,0), " exercises"  ))
                         , React.createElement('div', { className: "xp-proj-value"}, "⚡ " , builderXP.toLocaleString())
                       )
-                      , React.createElement('div', { className: "div", style: {margin:"3px 0"}})
-                      , React.createElement('div', null, React.createElement('label', { style: {marginBottom:6}}, "Days " , React.createElement('span', { style: {fontSize:".58rem",color:"#8a8478",fontStyle:"italic"}}, "drag to reorder"  ))
-                        , (()=>{
-                          // Group days into weeks of 7
-                          const totalDays = bDays.length;
-                          const multiWeek = totalDays > 7;
-                          if(!multiWeek) {
-                            // Single week — flat day tabs as before
-                            return (
-                              React.createElement('div', { className: "builder-day-tabs"}
-                                , bDays.map((d,i)=>(
-                                  React.createElement('div', { key: i,
-                                    className: `bday-tab ${bDayIdx===i?"on":""} ${dragDayIdx===i?"dragging":""}`,
-                                    draggable: true,
-                                    onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragDayIdx(i);},
-                                    onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                                    onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,i);setDragDayIdx(null);},
-                                    onDragEnd: ()=>setDragDayIdx(null),
-                                    onClick: ()=>setBDayIdx(i)}
-                                    , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",marginRight:3,fontSize:".7rem"}}, "⠿")
-                                    , d.label||`Day ${i+1}`
-                                    , bDays.length>1&&React.createElement('div', { className: "bday-tab-del", onClick: e=>{e.stopPropagation();removeDayFromBuilder(i);}}, "✕")
-                                  )
-                                ))
-                                , React.createElement('div', { className: "bday-tab", style: {color:"#b4ac9e",borderColor:"rgba(45,42,36,.3)"}, onClick: addDayToBuilder}, "＋")
-                              )
-                            );
-                          }
-                          // Multi-week — grouped with collapse/expand and week drag
-                          const weeks = [];
-                          for(let w=0;w<Math.ceil(totalDays/7);w++) {
-                            weeks.push(bDays.slice(w*7, w*7+7));
-                          }
-                          return (
-                            React.createElement('div', null
-                              , weeks.map((weekDays, wk)=>{
-                                const collapsed = !!collapsedWeeks[wk];
-                                const weekStart = wk*7;
-                                const weekXP = weekDays.reduce((t,d)=>t+calcDayXP(d,profile.chosenClass,allExById),0);
-                                return (
-                                  React.createElement('div', { key: wk,
-                                    className: `week-group ${dragWeekIdx===wk?"dragging-week":""}`,
-                                    draggable: true,
-                                    onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragWeekIdx(wk);e.stopPropagation();},
-                                    onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                                    onDrop: e=>{e.preventDefault();if(dragWeekIdx!==null&&dragWeekIdx!==wk){reorderWeek(dragWeekIdx,wk);}setDragWeekIdx(null);},
-                                    onDragEnd: ()=>setDragWeekIdx(null)}
-                                    /* Week header */
-                                    , React.createElement('div', { className: "week-group-hdr", onClick: ()=>toggleWeek(wk)}
-                                      , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".8rem"}, onClick: e=>e.stopPropagation()}, "⠿")
-                                      , React.createElement('span', { style: {fontSize:".72rem",color:"#b4ac9e",fontWeight:700,flex:1}}, "Week " , wk+1)
-                                      , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478"}}, weekDays.filter(d=>d.exercises.length>0).length, "/", weekDays.length, " days active"  )
-                                      , React.createElement('span', { style: {fontSize:".6rem",color:"#b4ac9e",marginLeft:6}}, "⚡", weekXP.toLocaleString())
-                                      , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".55rem",marginLeft:6,padding:"2px 6px"},
-                                        onClick: e=>{e.stopPropagation();duplicateWeek(wk);}}, "⎘ Dup" )
-                                      , React.createElement('svg', { width: "14", height: "14", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {marginLeft:4,flexShrink:0,transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
-                                        , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg4", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
-                                        , React.createElement('polyline', { points: "3,5 7,9 11,5"  , stroke: "url(#cg4)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"})
-                                      )
-                                    )
-                                    , !collapsed&&(
-                                      React.createElement('div', { className: "week-group-body"}
-                                        , React.createElement('div', { className: "builder-day-tabs", style: {marginBottom:4}}
-                                          , weekDays.map((d,wi)=>{
-                                            const globalIdx=weekStart+wi;
-                                            return (
-                                              React.createElement('div', { key: globalIdx,
-                                                className: `bday-tab ${bDayIdx===globalIdx?"on":""} ${dragDayIdx===globalIdx?"dragging":""}`,
-                                                draggable: true,
-                                                onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragDayIdx(globalIdx);e.stopPropagation();},
-                                                onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                                                onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,globalIdx);setDragDayIdx(null);},
-                                                onDragEnd: ()=>setDragDayIdx(null),
-                                                onClick: ()=>setBDayIdx(globalIdx)}
-                                                , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",marginRight:3,fontSize:".7rem"}}, "⠿")
-                                                , d.label||`Day ${globalIdx+1}`
-                                                , bDays.length>1&&React.createElement('div', { className: "bday-tab-del", onClick: e=>{e.stopPropagation();removeDayFromBuilder(globalIdx);}}, "✕")
-                                              )
-                                            );
-                                          })
-                                        )
-                                      )
-                                    )
-                                  )
-                                );
-                              })
-                              , React.createElement('div', { className: "bday-tab", style: {color:"#b4ac9e",borderColor:"rgba(45,42,36,.3)",marginTop:4}, onClick: addDayToBuilder}, "＋ Add Day"  )
-                            )
-                          );
-                        })()
-                        , bDays.length<=7&&React.createElement('div', { className: "bday-tab", style: {color:"#b4ac9e",borderColor:"rgba(45,42,36,.3)"}, onClick: addDayToBuilder}, "＋")
+                      , React.createElement('button', { className: "btn btn-gold btn-plan-action" ,
+                          onClick: ()=>{setPlanWizardOpen(true);setWizardWeekIdx(0);}},
+                          bEditId ? "✎ Edit Plan" : "⚔ Create Plan"
                       )
-                      , React.createElement('div', null
-                        , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,marginBottom:8}}
-                          , React.createElement('input', { className: "inp", value: _optionalChain([bDays, 'access', _97 => _97[bDayIdx], 'optionalAccess', _98 => _98.label])||"", onChange: e=>updateDayLabel(bDayIdx,e.target.value), placeholder: "Day label…" , style: {flex:1,padding:"6px 10px",fontSize:".8rem"}})
-                          , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "⚡ " , calcDayXP(bDays[bDayIdx]||{exercises:[]},profile.chosenClass,allExById))
+                      , React.createElement('div', { style: {fontSize:".58rem",color:"#5a5650",textAlign:"center",marginTop:6,fontStyle:"italic"}},
+                          bEditId ? "Open the plan wizard to edit days and exercises" : "Open the plan wizard to add days and exercises"
+                      )
+                    )
+                  )
+                )
+
+                /* ── PLAN WIZARD FULL-SCREEN OVERLAY ── */
+                , planWizardOpen && planView==="builder" && (
+                  React.createElement('div', { className: "plan-wizard-backdrop" }
+                    , React.createElement('div', { className: "plan-wizard-inner" }
+                      /* Wizard Header */
+                      , React.createElement('div', { className: "plan-wizard-hdr" }
+                        , React.createElement('button', { className: "btn btn-ghost btn-sm" , onClick: ()=>setPlanWizardOpen(false)}, "← Back")
+                        , React.createElement('div', { className: "plan-wizard-hdr-title" }
+                          , React.createElement('span', { className: "plan-wizard-hdr-icon" }, bIcon)
+                          , " " , bName||"Untitled Plan"
+                        )
+                        , React.createElement('button', { className: "btn btn-gold btn-sm" , onClick: ()=>{saveBuiltPlan();setPlanWizardOpen(false);}}, "💾 Save")
+                      )
+
+                      /* Week tabs (only for multi-week plans) */
+                      , bDays.length > 7 && (()=>{
+                        const weekCount = Math.ceil(bDays.length / 7);
+                        return React.createElement('div', { className: "wizard-week-tabs" }
+                          , Array.from({length:weekCount},(_,wk)=>{
+                            const weekDays = bDays.slice(wk*7, wk*7+7);
+                            const weekXP = weekDays.reduce((t,d)=>t+calcDayXP(d,profile.chosenClass,allExById),0);
+                            const activeDays = weekDays.filter(d=>d.exercises.length>0).length;
+                            return React.createElement('div', { key: wk,
+                              className: `wizard-week-tab ${wizardWeekIdx===wk?"on":""}`,
+                              onClick: ()=>{setWizardWeekIdx(wk);setBDayIdx(wk*7);}
+                            }
+                              , React.createElement('span', null, "Week " , wk+1)
+                              , React.createElement('span', { className: "wk-days" }, activeDays, "/", weekDays.length, " active" )
+                              , React.createElement('span', { className: "wk-xp" }, "⚡", weekXP.toLocaleString())
+                            );
+                          })
+                          , React.createElement('div', { className: "wizard-week-tab", style: {color:"#b4ac9e",borderStyle:"dashed",borderColor:"rgba(180,172,158,.12)"},
+                            onClick: ()=>{
+                              /* Add 7 more days (a new week) */
+                              const newDays = Array.from({length:7},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
+                              setBDays(d=>[...d,...newDays]);
+                              setWizardWeekIdx(Math.ceil((bDays.length+7)/7)-1);
+                            }}, "＋ Week")
+                        );
+                      })()
+
+                      /* Day tabs for the current week (or all days if single-week) */
+                      , (()=>{
+                        const multiWeek = bDays.length > 7;
+                        const weekStart = multiWeek ? wizardWeekIdx * 7 : 0;
+                        const weekDays = multiWeek ? bDays.slice(weekStart, weekStart+7) : bDays;
+                        return React.createElement('div', { className: "wizard-day-tabs" }
+                          , weekDays.map((d,wi)=>{
+                            const globalIdx = weekStart + wi;
+                            const dayXP = calcDayXP(d,profile.chosenClass,allExById);
+                            const hasExercises = d.exercises.length > 0;
+                            return React.createElement('div', { key: globalIdx,
+                              className: `wizard-day-tab ${bDayIdx===globalIdx?"on":""}`,
+                              draggable: true,
+                              onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragDayIdx(globalIdx);},
+                              onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
+                              onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,globalIdx);setDragDayIdx(null);},
+                              onDragEnd: ()=>setDragDayIdx(null),
+                              onClick: ()=>setBDayIdx(globalIdx)
+                            }
+                              , React.createElement('span', { className: "drag-handle" }, "⠿")
+                              , React.createElement('span', null, d.label||`Day ${globalIdx+1}`)
+                              , hasExercises
+                                ? React.createElement('span', { className: "day-xp-mini" }, "⚡", dayXP)
+                                : React.createElement('span', { className: "day-rest-badge" }, "REST")
+                              , bDays.length>1 && React.createElement('div', { className: "wizard-day-tab-del", onClick: e=>{e.stopPropagation();removeDayFromBuilder(globalIdx);}}, "✕")
+                            );
+                          })
+                          , React.createElement('div', { className: "wizard-day-tab", style: {color:"#b4ac9e",borderStyle:"dashed",borderColor:"rgba(180,172,158,.12)",minWidth:52},
+                            onClick: addDayToBuilder}, "＋")
+                        );
+                      })()
+
+                      /* Multi-week: duplicate week + week XP info */
+                      , bDays.length > 7 && React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
+                        , React.createElement('span', { style: {fontSize:".62rem",color:"#8a8478"}}
+                          , "Week ", wizardWeekIdx+1, " · "
+                          , (()=>{const wDays=bDays.slice(wizardWeekIdx*7,wizardWeekIdx*7+7);return wDays.filter(d=>d.exercises.length>0).length;})(), " active days"
+                        )
+                        , React.createElement('button', { className: "btn btn-ghost btn-xs" , style: {fontSize:".58rem"},
+                          onClick: ()=>duplicateWeek(wizardWeekIdx)}, "⎘ Duplicate Week" )
+                      )
+
+                      /* Selected day editor */
+                      , React.createElement('div', { className: "wizard-day-editor" }
+                        , React.createElement('div', { className: "wizard-day-hdr" }
+                          , React.createElement('input', { className: "inp", value: _optionalChain([bDays, 'access', _97 => _97[bDayIdx], 'optionalAccess', _98 => _98.label])||"", onChange: e=>updateDayLabel(bDayIdx,e.target.value), placeholder: "Day label…" , style: {flex:1,padding:"8px 12px",fontSize:".82rem"}})
+                          , React.createElement('span', { style: {fontSize:".72rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "⚡ " , calcDayXP(bDays[bDayIdx]||{exercises:[]},profile.chosenClass,allExById))
                         )
                         /* Optional day-level stats */
-                        , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
+                        , React.createElement('div', { className: "wizard-day-stats" }
                           , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric", placeholder: "Duration HH:MM" ,
-                            style: {flex:1.5,fontSize:".65rem",padding:"5px 8px"},
+                            style: {flex:1.5,fontSize:".68rem",padding:"6px 10px"},
                             value: _optionalChain([bDays, 'access', _99 => _99[bDayIdx], 'optionalAccess', _100 => _100._durHHMM])!==undefined ? bDays[bDayIdx]._durHHMM : (_optionalChain([bDays, 'access', _101 => _101[bDayIdx], 'optionalAccess', _102 => _102.durationSec]) ? secToHHMMSplit(bDays[bDayIdx].durationSec).hhmm : ""),
                             onChange: e=>{const v=e.target.value;setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,_durHHMM:v}));},
                             onBlur: e=>{const norm=normalizeHHMM(e.target.value);const sec=combineHHMMSec(norm,_optionalChain([bDays, 'access', _103 => _103[bDayIdx], 'optionalAccess', _104 => _104._durSec])||"");setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durHHMM:sec?norm:undefined,durationMin:sec?sec/60:null}));}})
                           , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: "Sec (0-59)" ,
-                            style: {flex:0.8,fontSize:".65rem",padding:"5px 8px"},
+                            style: {flex:0.8,fontSize:".68rem",padding:"6px 10px"},
                             value: _optionalChain([bDays, 'access', _105 => _105[bDayIdx], 'optionalAccess', _106 => _106._durSec])||"",
                             onChange: e=>{const v=e.target.value;setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,_durSec:v}));},
                             onBlur: e=>{const sec=combineHHMMSec(_optionalChain([bDays, 'access', _107 => _107[bDayIdx], 'optionalAccess', _108 => _108._durHHMM])||"",e.target.value);setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durSec:undefined,durationMin:sec?sec/60:null}));}})
                           , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", placeholder: "Active Cal" ,
-                            style: {flex:1,fontSize:".65rem",padding:"5px 8px"},
+                            style: {flex:1,fontSize:".68rem",padding:"6px 10px"},
                             value: _optionalChain([bDays, 'access', _109 => _109[bDayIdx], 'optionalAccess', _110 => _110.activeCal])||"",
                             onChange: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,activeCal:e.target.value||null}))})
                           , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", placeholder: "Total Cal" ,
-                            style: {flex:1,fontSize:".65rem",padding:"5px 8px"},
+                            style: {flex:1,fontSize:".68rem",padding:"6px 10px"},
                             value: _optionalChain([bDays, 'access', _111 => _111[bDayIdx], 'optionalAccess', _112 => _112.totalCal])||"",
                             onChange: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}))})
                         )
@@ -5890,16 +5895,16 @@ function App() {
                             )
                           ));
                         });})()
-                        , React.createElement('div', { style: {display:"flex",gap:6,marginTop:5}}
+                        , React.createElement('div', { style: {display:"flex",gap:6,marginTop:8}}
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "＋ Add Exercise"  )
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "💪 Add Workout"  )
                         )
-                      )
-                      , React.createElement('div', { className: "div", style: {margin:"3px 0"}})
-                      , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltPlan}, "💾 Save Plan"  )
-                    )
-                  )
-                )
+                        , React.createElement('div', { className: "div", style: {margin:"3px 0"}})
+                        , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltPlan}, "\uD83D\uDCBE Save Plan"  )
+                      ) /* close wizard-day-editor */
+                    ) /* close plan-wizard-inner */
+                  ) /* close plan-wizard-backdrop */
+                ) /* close planWizardOpen conditional */
               )
             )
 
