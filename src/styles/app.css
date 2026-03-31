@@ -919,6 +919,7 @@
     .hp-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(180,172,158,.07)}
     .hp-nav-logo{display:flex;align-items:center;gap:10px}
     .hp-nav-wordmark{font-family:'Cinzel',serif;font-size:1.1rem;font-weight:400;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.25em}
+    .hp-nav-fitness{font-family:'Cinzel',serif;font-size:.55rem;font-weight:600;letter-spacing:.35em;background:linear-gradient(135deg,#b4ac9e,#8a8478);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;align-self:flex-end;padding-bottom:1px}
     .hp-nav-btns{display:flex;gap:8px}
     .hp-btn-login{background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:none;color:#b4ac9e;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
     .hp-btn-login:hover{background:rgba(45,42,36,.45);color:#d4cec4}
@@ -998,3 +999,26 @@
     .trends-drag-handle{color:#3a3830;font-size:.7rem;cursor:grab;padding:0 4px;user-select:none;letter-spacing:-.15em}
     .trends-drag-handle:active{cursor:grabbing}
     @media (hover:none){.trends-drag-handle{display:none}}
+
+    /* ── Boot / Intro Screen ── */
+    @keyframes bootLineIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes bootBarFill{from{opacity:.6}to{opacity:1}}
+    @keyframes bootBtnPulse{0%,100%{box-shadow:0 4px 24px rgba(196,148,40,.25),0 0 0 0 rgba(196,148,40,0)}50%{box-shadow:0 4px 32px rgba(196,148,40,.55),0 0 28px rgba(196,148,40,.2)}}
+    .boot-screen{gap:18px}
+    .boot-title{font-family:'Cinzel Decorative',serif;font-size:clamp(1.4rem,6vw,2rem);font-weight:900;letter-spacing:.18em;text-align:center;background:linear-gradient(135deg,#f0d060,#c49428,#8a6010);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;filter:drop-shadow(0 0 18px rgba(196,148,40,.55)) drop-shadow(0 0 40px rgba(196,148,40,.25))}
+    .boot-title-sub{display:block;font-family:'Cinzel',serif;font-size:.5em;font-weight:600;letter-spacing:.35em;margin-top:3px;background:linear-gradient(135deg,#b4ac9e,#8a8478);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .boot-log{width:min(300px,88vw);display:flex;flex-direction:column;gap:10px}
+    .boot-bar-wrap{width:100%;height:4px;background:rgba(180,172,158,.08);border-radius:4px;overflow:hidden}
+    .boot-bar{height:100%;background:linear-gradient(90deg,#8a6010,#c49428,#f0d060);border-radius:4px;transition:width .55s cubic-bezier(.4,0,.2,1);animation:bootBarFill .6s ease}
+    .boot-log-lines{display:flex;flex-direction:column;gap:4px;min-height:52px}
+    .boot-line{font-family:'Inter',sans-serif;font-size:.68rem;color:#8a8478;letter-spacing:.04em}
+    .boot-line-in{animation:bootLineIn .3s ease forwards}
+    .boot-prompt{color:#c49428;font-weight:700}
+    .boot-check{color:#4caf6e;font-weight:700}
+    .boot-ellipsis{color:#8a8478}
+    .boot-btn-ready{animation:bootBtnPulse 2s ease-in-out infinite!important;border-color:rgba(196,148,40,.22)!important;color:#d4cec4!important}
+    .boot-cancel-btn{font-size:.58rem;color:#3a3834;border-color:transparent;padding:5px 14px;margin-top:-8px}
+    .boot-cancel-btn:hover{color:#6a645a;background:transparent;border-color:rgba(180,172,158,.06)}
+    .boot-resume-card{width:min(300px,88vw);background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.07);border-radius:10px;padding:13px 16px;text-align:center;backdrop-filter:blur(8px)}
+    .boot-resume-label{font-size:.7rem;color:#8a8478;letter-spacing:.05em;margin-bottom:3px}
+    .boot-resume-step{font-size:.62rem;color:#5a5650;letter-spacing:.04em}
