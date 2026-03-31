@@ -168,6 +168,7 @@ function App() {
   const [obStyle,setObStyle] = useState("");
   const [obState,setObState] = useState("");
   const [obCountry,setObCountry] = useState("United States");
+  const [obDraft,setObDraft] = useState(null); // null | saved onboarding draft from localStorage
   // Plans
   const [charSubTab, setCharSubTab] = useState("avatar");
   const [bodyTypeLocked, setBodyTypeLocked] = useState(false);
@@ -417,6 +418,19 @@ function App() {
     return ()=>{ clearTimeout(t1);clearTimeout(t2);clearTimeout(t3);clearTimeout(t4); };
   },[screen]);
   useEffect(()=>{
+    if(!authUser || screen!=="onboard") return;
+    const draft={obStep,obName,obFirstName,obLastName,obBio,obAge,obGender,obSports,obFreq,obTiming,obPriorities,obStyle,obState,obCountry};
+    try { localStorage.setItem("aurisar_ob_draft_"+authUser.id, JSON.stringify(draft)); } catch(e) {}
+  },[authUser,screen,obStep,obName,obFirstName,obLastName,obBio,obAge,obGender,obSports,obFreq,obTiming,obPriorities,obStyle,obState,obCountry]);
+  useEffect(()=>{
+    if(screen!=="intro"||!authUser||authIsNew){ setObDraft(null); return; }
+    try {
+      const raw=localStorage.getItem("aurisar_ob_draft_"+authUser.id);
+      const parsed=raw?JSON.parse(raw):null;
+      setObDraft(parsed?.obStep>=2?parsed:null);
+    } catch(e){ setObDraft(null); }
+  },[screen,authUser?.id,authIsNew]);
+  useEffect(()=>{
     // Auto-load social data on login so badge shows immediately
     if(screen==="main" && authUser) {
       loadSocialData();
@@ -448,6 +462,7 @@ function App() {
         const saved = await loadSave(signUpData.session.user.id);
         setAuthUser(signUpData.session.user);
         setAuthLoading(false);
+        fetch("/api/send-welcome-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:signUpData.session.user.email})}).catch(()=>{});
         if(_optionalChain([saved, 'optionalAccess', _33 => _33.chosenClass])){
           ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
           setScreen("main");
@@ -1469,6 +1484,7 @@ function App() {
     setScreen("classReveal");
   }
   function confirmClass(c) {
+    try { if(authUser) localStorage.removeItem("aurisar_ob_draft_"+authUser.id); } catch(e) {}
     const p={...profile,chosenClass:c}; setProfile(p); doSave(p, _optionalChain([authUser, 'optionalAccess', _60 => _60.id])||null, _optionalChain([authUser, 'optionalAccess', _61 => _61.email])||null); setScreen("main");
   }
 
@@ -3031,18 +3047,13 @@ function App() {
       /* ══ INTRO ══════════════════════════════════ */
       , screen==="intro" && (
         React.createElement('div', { className: "screen boot-screen"}
-          , React.createElement('img', {
-              src: "/male-female-flame logo.png",
-              alt: "Aurisar Fitness",
-              className: "boot-logo"
-            })
           , React.createElement('div', { className: "boot-title"}
             , "AURISAR"
             , React.createElement('span', { className: "boot-title-sub"}, "FITNESS")
           )
           , React.createElement('div', { className: "boot-log"}
             , React.createElement('div', { className: "boot-bar-wrap"}
-              , React.createElement('div', { className: "boot-bar", style: {width: bootStep>=4?"82%": bootStep>=3?"58%": bootStep>=2?"34%": bootStep>=1?"12%":"2%"}})
+              , React.createElement('div', { className: "boot-bar", style: {width: bootStep>=4?"100%": bootStep>=3?"58%": bootStep>=2?"34%": bootStep>=1?"12%":"2%"}})
             )
             , React.createElement('div', { className: "boot-log-lines"}
               , bootStep>=1 && React.createElement('div', { className: "boot-line boot-line-in"}, React.createElement('span', { className: "boot-prompt"}, ">"), " Loading combat modules...", React.createElement('span', { className: "boot-check"}, " ✓"))
@@ -3054,6 +3065,41 @@ function App() {
               className: `btn btn-gold${bootStep>=4?" boot-btn-ready":""}`,
               onClick: ()=>setScreen("onboard")
             }, bootStep>=4 ? "BEGIN" : "BOOT UP")
+          , React.createElement('button', {
+              className: "btn btn-ghost boot-cancel-btn",
+              onClick: async ()=>{
+                await sb.auth.signOut();
+                setAuthUser(null); setAuthIsNew(false); setAuthEmail(""); setAuthPassword("");
+                setScreen("home");
+              }
+            }, "← Cancel")
+          , obDraft && React.createElement('div', { className: "boot-resume-card boot-line-in" }
+            , React.createElement('div', {className:"boot-resume-label"}, "⟳ Resume where you left off?")
+            , React.createElement('div', {className:"boot-resume-step"}, `Step ${obDraft.obStep} of 6${obDraft.obFirstName ? " · "+obDraft.obFirstName : ""}`)
+            , React.createElement('div', {style:{display:"flex",gap:8,justifyContent:"center",marginTop:8}}
+              , React.createElement('button', {
+                  className:"btn btn-ghost", style:{fontSize:".65rem",padding:"5px 14px"},
+                  onClick:()=>{
+                    setObStep(obDraft.obStep); setObName(obDraft.obName); setObFirstName(obDraft.obFirstName);
+                    setObLastName(obDraft.obLastName); setObBio(obDraft.obBio); setObAge(obDraft.obAge);
+                    setObGender(obDraft.obGender); setObSports(obDraft.obSports); setObFreq(obDraft.obFreq);
+                    setObTiming(obDraft.obTiming); setObPriorities(obDraft.obPriorities); setObStyle(obDraft.obStyle);
+                    setObState(obDraft.obState); setObCountry(obDraft.obCountry);
+                    setObDraft(null); setScreen("onboard");
+                  }
+                }, "Resume")
+              , React.createElement('span', {
+                  style:{fontSize:".58rem",color:"#3a3834",cursor:"pointer",alignSelf:"center",padding:"4px 6px"},
+                  onClick:()=>{
+                    try { localStorage.removeItem("aurisar_ob_draft_"+authUser.id); } catch(e) {}
+                    setObDraft(null); setObStep(1); setObName(""); setObFirstName(""); setObLastName("");
+                    setObBio(""); setObAge(""); setObGender(""); setObSports([]); setObFreq("");
+                    setObTiming(""); setObPriorities([]); setObStyle(""); setObState(""); setObCountry("United States");
+                    setScreen("onboard");
+                  }
+                }, "Start fresh")
+            )
+          )
         )
       )
 
