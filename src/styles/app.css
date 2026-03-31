@@ -209,9 +209,10 @@
     .week-group-hdr:hover{background:rgba(45,42,36,.2)}
     .week-group-hdr.dragging-week{border:1.5px solid rgba(180,172,158,.1);background:rgba(45,42,36,.22)}
     .week-group-body{padding:6px 8px 4px}
+    .wb-ex-hdr{border-radius:4px;transition:background .15s}
+    .wb-ex-hdr:hover{background:rgba(180,172,158,.04)}
     .ex-collapse-btn{cursor:pointer;color:#3a3834;font-size:.75rem;padding:2px 4px;border-radius:4px;transition:color .15s,transform .2s;flex-shrink:0;line-height:1;user-select:none}
     .ex-collapse-btn:hover{color:#8a8478}
-    .ex-collapse-btn.open{transform:rotate(180deg)}
     .builder-ex-name{font-size:.78rem;color:#b4ac9e;flex:1;min-width:0}
     .builder-ex-input{width:58px;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.06);border-radius:5px;padding:4px 6px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;text-align:center;outline:none}
     .builder-ex-input:focus{border-color:rgba(180,172,158,.12)}
