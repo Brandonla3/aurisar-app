@@ -2661,6 +2661,7 @@ function App() {
       , React.createElement('nav', { className: "hp-nav" }
         , React.createElement('div', { className: "hp-nav-logo" }
           , React.createElement('span', { className: "hp-nav-wordmark" }, "AURISAR")
+          , React.createElement('span', { className: "hp-nav-fitness" }, "FITNESS")
         )
         , React.createElement('div', { className: "hp-nav-btns" }
           , React.createElement('button', { className: "hp-btn-login", onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Login")

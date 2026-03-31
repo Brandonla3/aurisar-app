@@ -918,6 +918,7 @@
     .hp-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(180,172,158,.07)}
     .hp-nav-logo{display:flex;align-items:center;gap:10px}
     .hp-nav-wordmark{font-family:'Cinzel',serif;font-size:1.1rem;font-weight:400;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.25em}
+    .hp-nav-fitness{font-family:'Cinzel',serif;font-size:.55rem;font-weight:600;letter-spacing:.35em;background:linear-gradient(135deg,#b4ac9e,#8a8478);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;align-self:flex-end;padding-bottom:1px}
     .hp-nav-btns{display:flex;gap:8px}
     .hp-btn-login{background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:none;color:#b4ac9e;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
     .hp-btn-login:hover{background:rgba(45,42,36,.45);color:#d4cec4}
