@@ -243,7 +243,7 @@ function App() {
   const [wbIcon,setWbIcon]   = useState("💪");
   const [wbDesc,setWbDesc]   = useState("");
   const [wbExercises,setWbExercises] = useState([]); // [{exId,sets,reps,weightLbs,durationMin,...}]
-  const [wbExCompleted,setWbExCompleted] = useState({}); // {i:true} — persists per session
+  // wbExCompleted removed — Mark Complete feature removed from builder UX
   const [wbExPickerOpen,setWbExPickerOpen] = useState(false);
   const [wbEditId,setWbEditId] = useState(null); // id of workout being edited
   const [wbCopySource,setWbCopySource] = useState(null);
@@ -1907,7 +1907,6 @@ function App() {
   /* ── Render one accordion section (A or B) inside a superset card ── */
   function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
     const collapsed = !!ssAccordion[sectionKey];
-    const isDone = !!wbExCompleted[idx];
     const _noSets = NO_SETS_EX_IDS.has(exD.id);
     const _isC = exD.category==="cardio";
     const _isF = exD.category==="flexibility";
@@ -1925,14 +1924,9 @@ function App() {
         onClick:()=>setSsAccordion(prev=>({...prev,[sectionKey]:!prev[sectionKey]}))},
         React.createElement('div', {className:"ab-badge"}, label),
         React.createElement('div', {style:{width:28,height:28,borderRadius:6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem"}}, exD.icon),
-        React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:isDone?"#5a8f6a":"#d8caba",letterSpacing:".02em",flex:1,minWidth:0,textDecoration:isDone?"line-through":"none"}}, exD.name),
+        React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}, exD.name),
         collapsed && React.createElement('span', {style:{fontSize:".55rem",color:"#5a5650"}}, summaryText),
         React.createElement('span', {style:{fontSize:".6rem",fontWeight:700,color:"#b4ac9e",flexShrink:0}}, "+"+xpVal),
-        React.createElement('button', {
-          style:{width:20,height:20,borderRadius:"50%",border:`2px solid ${isDone?"#2ecc71":"rgba(180,172,158,.08)"}`,background:isDone?"rgba(46,204,113,.2)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:".65rem",transition:"all .2s"},
-          onClick:e=>{e.stopPropagation();setWbExCompleted(prev=>({...prev,[idx]:!prev[idx]}));}},
-          isDone&&React.createElement('span',{style:{color:"#2ecc71"}},"✓")
-        ),
         React.createElement('span', {style:{fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "▼")
       ),
       !collapsed && React.createElement('div', {className:"ss-section-body"},
@@ -4665,17 +4659,7 @@ function App() {
                     )
                   )
                   , wbExercises.length===0&&React.createElement('div', { className: "empty", style: {padding:"16px 0"}}, "No techniques yet. Add from the arsenal or forge a custom one."           )
-                  /* Superset checkbox action bar */
-                  , ssChecked.size>0 && React.createElement('div',{className:"ss-action-bar"},
-                    React.createElement('span',{className:"ss-action-text"}, ssChecked.size+" exercise"+(ssChecked.size!==1?"s":"")+" selected"),
-                    ssChecked.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
-                      const [a,b]=[...ssChecked];
-                      setWbExercises(exs=>exs.map((x,xi)=>xi===a?{...x,supersetWith:b}:xi===b?{...x,supersetWith:a}:x));
-                      setSsChecked(new Set());
-                    }},"🔗 Group as Superset"),
-                    React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsChecked(new Set())},"✕")
-                  )
-                  , wbExercises.map((ex,i)=>{
+                  , (()=>{const minSsChecked = ssChecked.size>0 ? Math.min(...ssChecked) : -1; return wbExercises.map((ex,i)=>{
                     const exD=allExById[ex.exId]; if(!exD) return null;
                     const isC=exD.category==="cardio";
                     const isF=exD.category==="flexibility";
@@ -4727,6 +4711,15 @@ function App() {
                       );
                     }
                     return React.createElement(React.Fragment, {key:i},
+                      i===minSsChecked && ssChecked.size>0 && React.createElement('div',{className:"ss-action-bar"},
+                        React.createElement('span',{className:"ss-action-text"}, ssChecked.size+" exercise"+(ssChecked.size!==1?"s":"")+" selected"),
+                        ssChecked.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
+                          const [a,b]=[...ssChecked];
+                          setWbExercises(exs=>exs.map((x,xi)=>xi===a?{...x,supersetWith:b}:xi===b?{...x,supersetWith:a}:x));
+                          setSsChecked(new Set());
+                        }},"🔗 Group as Superset"),
+                        React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsChecked(new Set())},"✕")
+                      ),
                       React.createElement('div', {
                         className: `wb-ex-row ${dragWbExIdx===i?"dragging":""}`,
                         style: {
@@ -4740,48 +4733,39 @@ function App() {
                         onDragEnd: ()=>setDragWbExIdx(null)}
                         , (()=>{
                           const collapsed=!!collapsedWbEx[i];
-                          const isDone=!!wbExCompleted[i];
                           return (
                             React.createElement(React.Fragment, null
                               /* Header */
-                              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:8,
-                                background:isDone?"rgba(46,204,113,.07)":"transparent",
-                                borderRadius:isDone?6:0,padding:isDone?"4px 6px":"0",transition:"all .2s",marginLeft:-4,marginRight:-4}}
+                              , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:8,
+                                background:"transparent",cursor:"pointer",
+                                borderRadius:0,padding:"0",transition:"all .2s",marginLeft:-4,marginRight:-4},
+                                onClick:()=>toggleWbEx(i)}
                                 /* Order: ▲▼ arrows (leftmost) + SS checkbox + drag handle */
                                 , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
                                   , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();reorderWbEx(i,i-1);}}, "▲")
                                   , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===wbExercises.length-1?.3:1}, disabled: i===wbExercises.length-1, onClick: e=>{e.stopPropagation();reorderWbEx(i,i+1);}}, "▼")
                                 )
                                 , ex.supersetWith==null && wbExercises.filter(e=>!e.supersetWith).length>=2 && React.createElement('div', {
-                                    className:`ss-cb ${ssChecked.has(i)?"on":""}`,
+                                    style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
                                     title:"Select for superset",
                                     onClick:e=>{e.stopPropagation();setSsChecked(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
-                                  })
+                                  },
+                                    React.createElement('div', {className:`ss-cb ${ssChecked.has(i)?"on":""}`}),
+                                    React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
+                                  )
                                 , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
                                 , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColor} }, exD.icon)
-                                , React.createElement('div', { className: "builder-ex-name-styled", style: {textDecoration:isDone?"line-through":"none",color:isDone?"#5a8f6a":undefined}}
+                                , React.createElement('div', { className: "builder-ex-name-styled"}
                                   , exD.name
                                   , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:4}}, "custom")
-                                  , exD.custom&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {marginLeft:6,fontSize:".55rem",padding:"1px 5px"}, onClick: ()=>openExEditor("edit",exD)}, "✎ edit" )
+                                  , exD.custom&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {marginLeft:6,fontSize:".55rem",padding:"1px 5px"}, onClick: e=>{e.stopPropagation();openExEditor("edit",exD);}}, "✎ edit" )
                                 )
                                 , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
                                 , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
                                 , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
                                 , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
-                                /* Completion checkmark */
-                                , React.createElement('button', {
-                                  style: {width:22,height:22,borderRadius:"50%",border:`2px solid ${isDone?"#2ecc71":"rgba(180,172,158,.08)"}`,background:isDone?"rgba(46,204,113,.2)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:".75rem",transition:"all .2s"},
-                                  onClick: e=>{e.stopPropagation();setWbExCompleted(prev=>({...prev,[i]:!prev[i]}));},
-                                  title: isDone?"Mark incomplete":"Mark complete"}
-                                  , isDone&&React.createElement('span', { style: {color:"#2ecc71"}}, "✓")
-                                )
-                                , React.createElement('span', { className: "ex-collapse-btn", onClick: e=>{e.stopPropagation();toggleWbEx(i);}}
-                                        , React.createElement('svg', { width: "14", height: "14", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
-                                          , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg1", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
-                                          , React.createElement('polyline', { points: "3,5 7,9 11,5"  , stroke: "url(#cg1)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"})
-                                        )
-                                      )
-                                , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: ()=>removeWbEx(i)}, "✕")
+                                , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
+                                , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: e=>{e.stopPropagation();removeWbEx(i);}}, "✕")
                               )
                               , !collapsed&&React.createElement(React.Fragment, null
                                 /* Sets + Reps/Duration + Weight row */
@@ -4934,7 +4918,7 @@ function App() {
                       )
 
                     );
-                  })
+                  });})()
                   , React.createElement('div', { className: "div"})
                   , wbIsOneOff ? (
                     wbEditId ? (
@@ -5657,15 +5641,7 @@ function App() {
                             value: _optionalChain([bDays, 'access', _111 => _111[bDayIdx], 'optionalAccess', _112 => _112.totalCal])||"",
                             onChange: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}))})
                         )
-                        /* Plan builder superset action bar */
-                        , ssCheckedPlan.size>0 && React.createElement('div',{className:"ss-action-bar",style:{marginBottom:8}},
-                          React.createElement('span',{className:"ss-action-text"}, ssCheckedPlan.size+" selected"),
-                          ssCheckedPlan.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
-                            const [a,b]=[...ssCheckedPlan]; planGroupSuperset(bDayIdx,a,b);
-                          }},"🔗 Group as Superset"),
-                          React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsCheckedPlan(new Set())},"✕")
-                        )
-                        , (_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises])||[]).map((ex,i)=>{
+                        , (()=>{const minSsCheckedPlan = ssCheckedPlan.size>0 ? Math.min(...ssCheckedPlan) : -1; return (_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises])||[]).map((ex,i)=>{
                           const exData=allExById[ex.exId]; if(!exData) return null;
                           /* Plan superset: skip second in pair */
                           const planExs = (_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises])||[]);
@@ -5733,7 +5709,15 @@ function App() {
                           const runBoostPct=runPace?(runPace<=8?20:5):0;
                           const catColorPlan=getTypeColor(exData.category);
                           return (
-                            React.createElement('div', { key: i, className: `builder-ex-row ${dragPlanExIdx===i?"dragging":""}`,
+                            React.createElement(React.Fragment, {key:i},
+                            i===minSsCheckedPlan && ssCheckedPlan.size>0 && React.createElement('div',{className:"ss-action-bar",style:{marginBottom:8}},
+                              React.createElement('span',{className:"ss-action-text"}, ssCheckedPlan.size+" selected"),
+                              ssCheckedPlan.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
+                                const [a,b]=[...ssCheckedPlan]; planGroupSuperset(bDayIdx,a,b);
+                              }},"🔗 Group as Superset"),
+                              React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsCheckedPlan(new Set())},"✕")
+                            ),
+                            React.createElement('div', { className: `builder-ex-row ${dragPlanExIdx===i?"dragging":""}`,
                               style: {flexDirection:"column",alignItems:"stretch",gap:0,opacity:dragPlanExIdx===i?0.5:1,"--cat-color":catColorPlan},
                               draggable: true,
                               onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragPlanExIdx(i);},
@@ -5745,30 +5729,29 @@ function App() {
                                 const collapsed=!!collapsedPlanEx[`${bDayIdx}_${i}`];
                                 return (
                                   React.createElement(React.Fragment, null
-                                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:4,marginBottom:collapsed?0:8}}
+                                    , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:4,marginBottom:collapsed?0:8,cursor:"pointer"},
+                                        onClick:()=>togglePlanEx(bDayIdx,i)}
                                       , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
                                         , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();const nd=bDays.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i-1,0,m);return{...d,exercises:exs};});setBDays(nd);}}, "▲")
                                         , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===_optionalChain([bDays, 'access', _118 => _118[bDayIdx], 'optionalAccess', _119 => _119.exercises, 'access', _120 => _120.length])-1?.3:1}, disabled: i===_optionalChain([bDays, 'access', _121 => _121[bDayIdx], 'optionalAccess', _122 => _122.exercises, 'access', _123 => _123.length])-1, onClick: e=>{e.stopPropagation();const nd=bDays.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i+1,0,m);return{...d,exercises:exs};});setBDays(nd);}}, "▼")
                                       )
                                       , ex.supersetWith==null && planExs.filter(e=>!e.supersetWith).length>=2 && React.createElement('div', {
-                                          className:`ss-cb ${ssCheckedPlan.has(i)?"on":""}`,
+                                          style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
                                           title:"Select for superset",
                                           onClick:e=>{e.stopPropagation();setSsCheckedPlan(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
-                                        })
+                                        },
+                                          React.createElement('div', {className:`ss-cb ${ssCheckedPlan.has(i)?"on":""}`}),
+                                          React.createElement('span', {style:{fontSize:".55rem",color:ssCheckedPlan.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
+                                        )
                                       , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",marginRight:2}}, "⠿")
-                                      , exData.custom&&React.createElement('div', { className: "ex-edit-btn", style: {position:"static",marginRight:2}, onClick: ()=>openExEditor("edit",exData)}, "✎")
+                                      , exData.custom&&React.createElement('div', { className: "ex-edit-btn", style: {position:"static",marginRight:2}, onClick: e=>{e.stopPropagation();openExEditor("edit",exData);}}, "✎")
                                       , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColorPlan} }, exData.icon)
                                       , React.createElement('span', { className: "builder-ex-name-styled", style: {flex:1} }, exData.name)
                                       , (isRunningEx&&pbDisp||exPBDisp3)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp3)
                                       , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:"")
                                       , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",minWidth:36,textAlign:"right"}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})())
-                                      , React.createElement('span', { className: "ex-collapse-btn", onClick: e=>{e.stopPropagation();togglePlanEx(bDayIdx,i);}}
-                                        , React.createElement('svg', { width: "14", height: "14", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
-                                          , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg3", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
-                                          , React.createElement('polyline', { points: "3,5 7,9 11,5"  , stroke: "url(#cg3)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"})
-                                        )
-                                      )
-                                      , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:2}, onClick: ()=>removeExFromDay(bDayIdx,i)}, "✕")
+                                      , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
+                                      , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:2}, onClick: e=>{e.stopPropagation();removeExFromDay(bDayIdx,i);}}, "✕")
                                     )
                                     , !collapsed&&React.createElement(React.Fragment, null
                                       /* Top row: Sets+Reps+Weight or Duration+Sec+Dist */
@@ -5905,8 +5888,8 @@ function App() {
                                 );
                               })()
                             )
-                          );
-                        })
+                          ));
+                        });})()
                         , React.createElement('div', { style: {display:"flex",gap:6,marginTop:5}}
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "＋ Add Exercise"  )
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "💪 Add Workout"  )
