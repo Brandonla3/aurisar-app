@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import './styles/app.css';
 import { CLASSES, EXERCISES, IMG } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS, MAP_REGIONS } from './data/constants';
@@ -2433,6 +2434,7 @@ function App() {
   function addExToDay(exId){ const exd=allExById[exId]||{}; setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,{exId,sets:(exd.defaultSets!=null?exd.defaultSets:3),reps:(exd.defaultReps!=null?exd.defaultReps:10),weightLbs:exd.defaultWeightLbs||null,durationMin:exd.defaultDurationMin||null,distanceMi:exd.defaultDistanceMi||null,hrZone:exd.defaultHrZone||null,weightPct:exd.defaultWeightPct||100}]})); setExPickerOpen(false); }
   function removeExFromDay(di,ei){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)})); }
   function updateExInDay(di,ei,field,val){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})})); }
+  function updateExInDayBatch(di,ei,fields){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,...fields})})); }
   function updateDayLabel(idx,val){ setBDays(days=>days.map((d,i)=>i!==idx?d:{...d,label:val})); }
   function saveBuiltPlan(){
     if(!bName.trim()){showToast("Give your plan a name!");return;}
@@ -5569,7 +5571,7 @@ function App() {
                 )
 
                 /* ── PLAN WIZARD FULL-SCREEN OVERLAY ── */
-                , planWizardOpen && planView==="builder" && (
+                , planWizardOpen && planView==="builder" && createPortal(
                   React.createElement('div', { className: "plan-wizard-backdrop", onClick: e=>e.stopPropagation(), onTouchStart: e=>e.stopPropagation(), onTouchMove: e=>e.stopPropagation(), onTouchEnd: e=>e.stopPropagation() }
                     , React.createElement('div', { className: "plan-wizard-inner" }
                       /* Wizard Header */
@@ -5807,10 +5809,11 @@ function App() {
                                               onChange: e=>updateExInDay(bDayIdx,i,"_durHHMM",e.target.value),
                                               onBlur: e=>{
                                                 const norm=normalizeHHMM(e.target.value);
-                                                updateExInDay(bDayIdx,i,"_durHHMM",norm||undefined);
                                                 const sec=combineHHMMSec(norm,ex._durSec||"");
-                                                updateExInDay(bDayIdx,i,"durationSec",sec);
-                                                if(sec) updateExInDay(bDayIdx,i,"reps",Math.max(1,Math.floor(sec/60)));
+                                                const batch={_durHHMM:norm||undefined,durationSec:sec};
+                                                if(sec) batch.reps=Math.max(1,Math.floor(sec/60));
+                                                if(sec) batch.durationMin=sec/60;
+                                                updateExInDayBatch(bDayIdx,i,batch);
                                               },
                                               placeholder: "00:00"})
                                           )
@@ -5820,10 +5823,10 @@ function App() {
                                               value: ex._durSec!==undefined ? String(ex._durSec).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
                                               onChange: e=>{
                                                 const v=e.target.value;
-                                                updateExInDay(bDayIdx,i,"_durSec",v);
                                                 const sec=combineHHMMSec(ex._durHHMM||"",v);
-                                                updateExInDay(bDayIdx,i,"durationSec",sec);
-                                                if(sec) updateExInDay(bDayIdx,i,"reps",Math.max(1,Math.floor(sec/60)));
+                                                const batch={_durSec:v,durationSec:sec};
+                                                if(sec) batch.reps=Math.max(1,Math.floor(sec/60));
+                                                updateExInDayBatch(bDayIdx,i,batch);
                                               },
                                               placeholder: "00"})
                                           )
@@ -5947,7 +5950,7 @@ function App() {
                       ) /* close wizard-day-editor */
                     ) /* close plan-wizard-inner */
                   ) /* close plan-wizard-backdrop */
-                ) /* close planWizardOpen conditional */
+                , document.body) /* close planWizardOpen portal */
               )
             )
 
