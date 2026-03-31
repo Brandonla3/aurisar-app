@@ -697,6 +697,10 @@
     .wizard-day-tab .day-rest-badge{font-size:.48rem;color:#5a5650;font-style:italic;font-family:'Inter',sans-serif;letter-spacing:0;text-transform:none}
     .wizard-day-tab-del{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#e74c3c;color:#fff;font-size:.55rem;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .2s;z-index:2}
     .wizard-day-tab:hover .wizard-day-tab-del{opacity:1}
+    @media (hover: none) {
+      .wizard-day-tab .wizard-day-tab-del{opacity:.35}
+      .wizard-day-tab .wizard-day-tab-del:active{opacity:1}
+    }
     .wizard-day-tab .drag-handle{cursor:grab;color:#5a5650;font-size:.75rem;position:absolute;top:3px;left:3px;opacity:0;transition:opacity .15s}
     .wizard-day-tab:hover .drag-handle{opacity:.6}
 

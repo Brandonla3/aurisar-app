@@ -2436,7 +2436,7 @@ function App() {
       const updated = {name:bName,level:bLevel||null,icon:bIcon,type:bType,durCount:bDurCount,startDate:bStartDate||null,endDate:bEndDate||null,scheduledDate:bStartDate||null,description:`Custom ${durLabel} plan`,days:clone(bDays)};
       setProfile(pr=>({...pr,plans:pr.plans.map(pl=>pl.id===bEditId?{...pl,...updated}:pl)}));
       setActivePlan(p=>({...p,...updated}));
-      setPlanWizardOpen(false); setPlanView("detail"); showToast("Plan updated! ⚡");
+      setPlanWizardOpen(false); setPlanView("list"); showToast("Plan updated! ⚡");
     } else {
       const p={id:uid(),name:bName,level:bLevel||null,icon:bIcon,type:bType,durCount:bDurCount,startDate:bStartDate||null,endDate:bEndDate||null,scheduledDate:bStartDate||null,description:`Custom ${durLabel} plan`,bestFor:[],days:clone(bDays),createdAt:new Date().toLocaleDateString(),custom:true};
       setProfile(pr=>({...pr,plans:[p,...pr.plans]})); setPlanWizardOpen(false); setPlanView("list"); showToast("Plan saved! ⚡");
@@ -2445,11 +2445,12 @@ function App() {
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
   function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
 
-  const builderXP = bDays.reduce((t,d)=>t+d.exercises.reduce((s,ex)=>{
+  const builderXP = useMemo(()=>bDays.reduce((t,d)=>t+d.exercises.reduce((s,ex)=>{
     const base=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById);
     const rowsXP=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
     return s+base+rowsXP;
-  },0),0);
+  },0),0),[bDays,profile.chosenClass,allExById]);
+  const wizardDayXPs = useMemo(()=>bDays.map(d=>calcDayXP(d,profile.chosenClass,allExById)),[bDays,profile.chosenClass,allExById]);
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
   const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
 
@@ -5054,7 +5055,7 @@ function App() {
                       const daysN = hasSched ? daysUntil(plan.scheduledDate) : null;
                       return (
                         React.createElement('div', { key: plan.id, className: "plan-card", style: {"--pc":cls&&cls.color||"#b4ac9e"}}
-                          , React.createElement('div', { className: "plan-card-top", onClick: ()=>{setActivePlan(plan);setBDayIdx(0);setPlanView("detail");}}
+                          , React.createElement('div', { className: "plan-card-top", onClick: ()=>{initBuilderFromTemplate(plan,true);}}
                             , React.createElement('div', { className: "plan-icon"}, plan.icon)
                             , React.createElement('div', { style: {flex:1,minWidth:0}}
                               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:2}}
@@ -5072,14 +5073,14 @@ function App() {
                             )
                             , React.createElement('div', { className: "plan-xp-badge"}, "⚡ " , planXP.toLocaleString())
                           )
-                          , plan.description&&React.createElement('div', { className: "plan-desc", onClick: ()=>{setActivePlan(plan);setBDayIdx(0);setPlanView("detail");}}, plan.description)
+                          , plan.description&&React.createElement('div', { className: "plan-desc", onClick: ()=>{initBuilderFromTemplate(plan,true);}}, plan.description)
                           , React.createElement('div', { style: {display:"flex",gap:7,marginTop:7,paddingTop:7,borderTop:"1px solid rgba(45,42,36,.18)"}}
                             , React.createElement('button', { className: `plan-sched-btn ${hasSched?"plan-sched-active":""}`,
                               onClick: e=>{e.stopPropagation();openSchedulePlan(plan);}}
                               , hasSched?("📅 "+formatScheduledDate(plan.scheduledDate)):"📅 Schedule"
                             )
                             , React.createElement('div', { style: {flex:1}})
-                            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , onClick: e=>{e.stopPropagation();setActivePlan(plan);setBDayIdx(0);setPlanView("detail");}}, "View →" )
+                            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , onClick: e=>{e.stopPropagation();initBuilderFromTemplate(plan,true);}}, "View →" )
                           )
                         )
                       );
@@ -5406,8 +5407,8 @@ function App() {
                 , planView==="builder" && (
                   React.createElement(React.Fragment, null
                     , React.createElement('div', { className: "builder-nav-hdr" }
-                      , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setPlanWizardOpen(false);setPlanView(bEditId?"detail":"list");} }, "← Cancel")
-                      , React.createElement('div', { className: "builder-nav-title" }, bEditId ? "✎ Edit Plan" : "📜 New Plan")
+                      , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setPlanWizardOpen(false);setPlanView("list");} }, "← Back")
+                      , React.createElement('div', { className: "builder-nav-title" }, bEditId ? "✎ Overview" : "📜 New Plan")
                     )
                     , React.createElement('div', { className: "builder-wrap"}
                       , React.createElement('div', { className: "field"}, React.createElement('label', null, "Plan Name" ), React.createElement('input', { className: "inp", value: bName, onChange: e=>setBName(e.target.value), placeholder: "Name your plan…"  }))
@@ -5532,13 +5533,40 @@ function App() {
                       , React.createElement('div', { style: {fontSize:".58rem",color:"#5a5650",textAlign:"center",marginTop:6,fontStyle:"italic"}},
                           bEditId ? "Open the plan wizard to edit days and exercises" : "Open the plan wizard to add days and exercises"
                       )
+                      /* Action buttons — only for existing plans in user's collection */
+                      , bEditId && (()=>{
+                        const plan = (profile.plans||[]).find(p=>p.id===bEditId);
+                        if(!plan) return null;
+                        const currentDay = bDays[bDayIdx] || bDays[0] || {exercises:[]};
+                        return React.createElement(React.Fragment, null
+                          , React.createElement('div', { className: "div", style: {margin:"8px 0"}})
+                          , React.createElement('div', { className: "plan-actions"}
+                            , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:1}, onClick: ()=>{
+                              const synth={name:currentDay.label||"Day",icon:bIcon||"\uD83D\uDCCB",exercises:currentDay.exercises,
+                                durationMin:currentDay.durationMin||null,activeCal:currentDay.activeCal||null,totalCal:currentDay.totalCal||null};
+                              openStatsPromptIfNeeded(synth,(woWithStats, _sr)=>{
+                                startPlanWorkout({...plan,days:[{...currentDay,durationMin:woWithStats.durationMin,activeCal:woWithStats.activeCal,totalCal:woWithStats.totalCal}]});
+                              });
+                            }}, "\u2713 Complete Day"  )
+                          )
+                          , React.createElement('div', { style: {display:"flex",gap:7,marginTop:7}}
+                            , React.createElement('button', { className: `plan-sched-btn ${plan.scheduledDate?"plan-sched-active":""}`,
+                              style: {flex:1,padding:"8px 12px",textAlign:"center"},
+                              onClick: ()=>openSchedulePlan(plan)}
+                              , plan.scheduledDate?"\uD83D\uDCC5 "+formatScheduledDate(plan.scheduledDate):"\uD83D\uDCC5 Schedule"
+                            )
+                            , plan.custom&&React.createElement('button', { className: "btn btn-danger btn-sm"  , style: {flex:1}, onClick: ()=>{deletePlan(plan.id);setPlanView("list");}}, "\uD83D\uDDD1 Delete" )
+                          )
+                          , plan.custom&&React.createElement('button', { className: "btn btn-glass" , style: {width:"100%",marginTop:7}, onClick: ()=>startPlanWorkout(plan)}, "\uD83D\uDCCB Mark Plan Complete"   )
+                        );
+                      })()
                     )
                   )
                 )
 
                 /* ── PLAN WIZARD FULL-SCREEN OVERLAY ── */
                 , planWizardOpen && planView==="builder" && (
-                  React.createElement('div', { className: "plan-wizard-backdrop" }
+                  React.createElement('div', { className: "plan-wizard-backdrop", onClick: e=>e.stopPropagation() }
                     , React.createElement('div', { className: "plan-wizard-inner" }
                       /* Wizard Header */
                       , React.createElement('div', { className: "plan-wizard-hdr" }
@@ -5556,7 +5584,7 @@ function App() {
                         return React.createElement('div', { className: "wizard-week-tabs" }
                           , Array.from({length:weekCount},(_,wk)=>{
                             const weekDays = bDays.slice(wk*7, wk*7+7);
-                            const weekXP = weekDays.reduce((t,d)=>t+calcDayXP(d,profile.chosenClass,allExById),0);
+                            const weekXP = weekDays.reduce((t,d,di)=>t+(wizardDayXPs[wk*7+di]||0),0);
                             const activeDays = weekDays.filter(d=>d.exercises.length>0).length;
                             return React.createElement('div', { key: wk,
                               className: `wizard-week-tab ${wizardWeekIdx===wk?"on":""}`,
@@ -5585,7 +5613,7 @@ function App() {
                         return React.createElement('div', { className: "wizard-day-tabs" }
                           , weekDays.map((d,wi)=>{
                             const globalIdx = weekStart + wi;
-                            const dayXP = calcDayXP(d,profile.chosenClass,allExById);
+                            const dayXP = wizardDayXPs[globalIdx]||0;
                             const hasExercises = d.exercises.length > 0;
                             return React.createElement('div', { key: globalIdx,
                               className: `wizard-day-tab ${bDayIdx===globalIdx?"on":""}`,
@@ -5594,7 +5622,8 @@ function App() {
                               onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
                               onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,globalIdx);setDragDayIdx(null);},
                               onDragEnd: ()=>setDragDayIdx(null),
-                              onClick: ()=>setBDayIdx(globalIdx)
+                              onClick: ()=>setBDayIdx(globalIdx),
+                              onTouchEnd: e=>{e.preventDefault();setBDayIdx(globalIdx);}
                             }
                               , React.createElement('span', { className: "drag-handle" }, "⠿")
                               , React.createElement('span', null, d.label||`Day ${globalIdx+1}`)
@@ -5623,7 +5652,7 @@ function App() {
                       , React.createElement('div', { className: "wizard-day-editor" }
                         , React.createElement('div', { className: "wizard-day-hdr" }
                           , React.createElement('input', { className: "inp", value: _optionalChain([bDays, 'access', _97 => _97[bDayIdx], 'optionalAccess', _98 => _98.label])||"", onChange: e=>updateDayLabel(bDayIdx,e.target.value), placeholder: "Day label…" , style: {flex:1,padding:"8px 12px",fontSize:".82rem"}})
-                          , React.createElement('span', { style: {fontSize:".72rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "⚡ " , calcDayXP(bDays[bDayIdx]||{exercises:[]},profile.chosenClass,allExById))
+                          , React.createElement('span', { style: {fontSize:".72rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "⚡ " , wizardDayXPs[bDayIdx]||0)
                         )
                         /* Optional day-level stats */
                         , React.createElement('div', { className: "wizard-day-stats" }
@@ -6048,7 +6077,7 @@ function App() {
                               , ev.kind==="plan" && (
                                 React.createElement('button', { className: "cal-sched-btn", onClick: ()=>{
                                   const pl=profile.plans.find(p=>p.id===ev.planId);
-                                  if(pl){setActivePlan(pl);setBDayIdx(0);setPlanView("detail");setActiveTab("plans");}
+                                  if(pl){initBuilderFromTemplate(pl,true);setActiveTab("plans");}
                                 }}, "View →" )
                               )
                               , React.createElement('div', { className: "upcoming-del", onClick: ()=>{
@@ -8113,7 +8142,7 @@ function App() {
 
       /* ══ PLAN BUILDER WORKOUT PICKER ════════════ */
       , bWoPickerOpen && (
-        React.createElement('div', { className: "ex-picker-backdrop", onClick: ()=>setBWoPickerOpen(false)}
+        React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();setBWoPickerOpen(false);}}
           , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation()}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
               , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Add Workout to Day"   )
@@ -8149,7 +8178,7 @@ function App() {
 
       /* ══ EXERCISE PICKER ════════════════════════ */
       , exPickerOpen && (
-        React.createElement('div', { className: "ex-picker-backdrop", onClick: ()=>pickerConfigOpen?null:closePicker()}
+        React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();if(!pickerConfigOpen)closePicker();}}
           , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation(), style: {maxHeight:"85vh"}}
             , !pickerConfigOpen ? React.createElement(React.Fragment, null
                             /* ── BROWSE VIEW — Charcoal Inset style ── */
@@ -8867,7 +8896,7 @@ function App() {
 
       /* ══ WORKOUT EXERCISE PICKER ═════════════════ */
       , wbExPickerOpen && (
-        React.createElement('div', { className: "ex-picker-backdrop", onClick: ()=>pickerConfigOpen?null:closePicker()}
+        React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();if(!pickerConfigOpen)closePicker();}}
           , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation(), style: {maxHeight:"85vh"}}
             , !pickerConfigOpen ? React.createElement(React.Fragment, null
               /* ── BROWSE VIEW — Charcoal Inset style ── */
