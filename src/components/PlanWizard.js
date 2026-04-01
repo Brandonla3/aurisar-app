@@ -321,7 +321,15 @@ function PlanWizard(props) {
         , React.createElement('label', null, "Duration")
         , React.createElement('div', { className: "dur-row"}
           , React.createElement('select', { className: "dur-count-sel", value: bDurCount,
-            onChange: e=>setBDurCount(parseInt(e.target.value))}
+            onChange: e=>{
+              const newCount=parseInt(e.target.value);
+              setBDurCount(newCount);
+              const totalDays=bType==="day"?newCount:bType==="week"?newCount*7:bType==="month"?newCount*28:newCount*52*7;
+              if(totalDays>7&&totalDays>bDays.length){
+                const extra=Array.from({length:totalDays-bDays.length},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
+                startTransition(()=>{setBDays(d=>[...d,...extra]);});
+              }
+            }}
             , (()=>{
               const max = bType==="day"?31:bType==="week"?52:bType==="month"?12:3;
               return Array.from({length:max},(_,i)=>i+1).map(n=>(
@@ -334,7 +342,13 @@ function PlanWizard(props) {
               const t=e.target.value;
               setBType(t);
               const max=t==="day"?31:t==="week"?52:t==="month"?12:3;
-              setBDurCount(c=>Math.min(c,max));
+              const newCount=Math.min(bDurCount,max);
+              setBDurCount(newCount);
+              const totalDays=t==="day"?newCount:t==="week"?newCount*7:t==="month"?newCount*28:newCount*52*7;
+              if(totalDays>7&&totalDays>bDays.length){
+                const extra=Array.from({length:totalDays-bDays.length},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
+                startTransition(()=>{setBDays(d=>[...d,...extra]);});
+              }
             }}
             , React.createElement('option', { value: "day"}, "Day", bDurCount>1?"s":"")
             , React.createElement('option', { value: "week"}, "Week", bDurCount>1?"s":"")
