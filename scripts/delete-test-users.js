@@ -4,7 +4,12 @@
  * Deletes dependent rows from application tables first to avoid FK constraint
  * violations, then removes the user from auth.users.
  *
+ * NOTE: If you have run scripts/add-cascade-delete.sql in the Supabase SQL
+ * Editor, FK constraints are set to ON DELETE CASCADE and you can delete users
+ * directly from the Supabase dashboard without this script.
+ *
  * Usage:
+ *   export SUPABASE_SERVICE_ROLE_KEY='your-service-role-key'
  *   node scripts/delete-test-users.js
  */
 
