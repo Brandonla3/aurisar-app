@@ -336,6 +336,9 @@ function App() {
     const {data:{subscription}} = sb.auth.onAuthStateChange(async (_event, session)=>{
       const user = _optionalChain([session, 'optionalAccess', _22 => _22.user]) || null;
 
+      // Skip INITIAL_SESSION — getSession() below handles the initial page load
+      if(_event === "INITIAL_SESSION") return;
+
       // When user clicks a password reset link, direct them to Security tab
       if(_event === "PASSWORD_RECOVERY") {
         setAuthUser(user);
