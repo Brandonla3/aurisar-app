@@ -1063,4 +1063,11 @@ function PlanWizard(props) {
   ); // end return
 }
 
-export default PlanWizard;
+export default React.memo(PlanWizard, (prev, next) => {
+  // Only re-render when data props change; skip callback props (stable by identity)
+  return prev.editPlan === next.editPlan
+    && prev.templatePlan === next.templatePlan
+    && prev.profile === next.profile
+    && prev.allExercises === next.allExercises
+    && prev.allExById === next.allExById;
+});
