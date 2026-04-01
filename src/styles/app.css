@@ -680,8 +680,9 @@
 
     /* Wizard week tabs (horizontal row) */
     .wizard-week-tabs{display:flex;gap:5px;margin-bottom:10px;overflow-x:auto;padding:2px 0 6px;flex-shrink:0;-webkit-overflow-scrolling:touch}
-    .wizard-week-tabs::-webkit-scrollbar{height:3px}
-    .wizard-week-tabs::-webkit-scrollbar-thumb{background:rgba(180,172,158,.12);border-radius:3px}
+    .wizard-week-tabs::-webkit-scrollbar{height:8px}
+    .wizard-week-tabs::-webkit-scrollbar-thumb{background:rgba(180,172,158,.22);border-radius:8px}
+    .wizard-week-tabs{scrollbar-width:auto;scrollbar-color:rgba(180,172,158,.22) transparent}
     .wizard-week-tab{padding:8px 14px;border-radius:8px;font-family:'Inter',sans-serif;font-size:.68rem;color:#8a8478;background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px}
     .wizard-week-tab.on{background:rgba(45,42,36,.28);color:#b4ac9e;border-color:rgba(180,172,158,.12);box-shadow:0 0 10px rgba(0,0,0,.15)}
     .wizard-week-tab .wk-xp{font-size:.52rem;color:#b4ac9e;opacity:.7}
@@ -689,8 +690,9 @@
 
     /* Wizard day tabs (larger, readable) */
     .wizard-day-tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;margin-bottom:8px;flex-shrink:0;-webkit-overflow-scrolling:touch}
-    .wizard-day-tabs::-webkit-scrollbar{height:3px}
-    .wizard-day-tabs::-webkit-scrollbar-thumb{background:rgba(180,172,158,.12);border-radius:3px}
+    .wizard-day-tabs::-webkit-scrollbar{height:8px}
+    .wizard-day-tabs::-webkit-scrollbar-thumb{background:rgba(180,172,158,.22);border-radius:8px}
+    .wizard-day-tabs{scrollbar-width:auto;scrollbar-color:rgba(180,172,158,.22) transparent}
     .wizard-day-tab{padding:10px 16px;border-radius:9px;font-family:'Cinzel',serif;font-size:.74rem;letter-spacing:.04em;cursor:pointer;border:1px solid rgba(180,172,158,.08);background:rgba(45,42,36,.15);color:#8a8478;white-space:nowrap;transition:all .2s;position:relative;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:72px;flex-shrink:0}
     .wizard-day-tab.on{background:rgba(45,42,36,.32);color:#d4cec4;border-color:rgba(180,172,158,.18);box-shadow:0 0 14px rgba(0,0,0,.22)}
     .wizard-day-tab .day-xp-mini{font-size:.52rem;color:#b4ac9e;font-family:'Inter',sans-serif;letter-spacing:0}

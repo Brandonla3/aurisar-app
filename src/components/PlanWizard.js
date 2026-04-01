@@ -329,6 +329,14 @@ function PlanWizard(props) {
                 const extra=Array.from({length:totalDays-bDays.length},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
                 startTransition(()=>{setBDays(d=>[...d,...extra]);});
               }
+              if(bStartDate){
+                const d=new Date(bStartDate+"T12:00:00");
+                if(bType==="day") d.setDate(d.getDate()+newCount-1);
+                else if(bType==="week") d.setDate(d.getDate()+newCount*7-1);
+                else if(bType==="month") d.setMonth(d.getMonth()+newCount);
+                else d.setFullYear(d.getFullYear()+newCount);
+                setBEndDate(d.toISOString().slice(0,10));
+              }
             }}
             , (()=>{
               const max = bType==="day"?31:bType==="week"?52:bType==="month"?12:3;
@@ -348,6 +356,14 @@ function PlanWizard(props) {
               if(totalDays>7&&totalDays>bDays.length){
                 const extra=Array.from({length:totalDays-bDays.length},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
                 startTransition(()=>{setBDays(d=>[...d,...extra]);});
+              }
+              if(bStartDate){
+                const d=new Date(bStartDate+"T12:00:00");
+                if(t==="day") d.setDate(d.getDate()+newCount-1);
+                else if(t==="week") d.setDate(d.getDate()+newCount*7-1);
+                else if(t==="month") d.setMonth(d.getMonth()+newCount);
+                else d.setFullYear(d.getFullYear()+newCount);
+                setBEndDate(d.toISOString().slice(0,10));
               }
             }}
             , React.createElement('option', { value: "day"}, "Day", bDurCount>1?"s":"")
