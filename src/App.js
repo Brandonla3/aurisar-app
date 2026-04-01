@@ -376,7 +376,7 @@ function App() {
         ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
         setScreen("main");
       } else {
-        setScreen(user ? "intro" : "home");
+        if(_event==="SIGNED_IN"){ setScreen(user?"intro":"home"); } else { setScreen("home"); }
       }
     });
     // Check existing session on mount — handle both cases explicitly
@@ -394,7 +394,7 @@ function App() {
             ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
             setScreen("main");
           } else {
-            setScreen("intro");
+            setScreen("home");
           }
         } catch(e) {
           console.error("loadSave error:", e);
