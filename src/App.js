@@ -3316,7 +3316,7 @@ function App() {
                               , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478",textTransform:"uppercase",letterSpacing:".08em"} }, "Muscle Group")
                               , React.createElement('span', { style: {fontSize:".65rem",color:"#b4ac9e",cursor:"pointer"}, onClick: ()=>{setExMuscleFilter("All");setMusclePickerOpen(false);} }, "Clear")
                             )
-                            , ["chest","shoulder","bicep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
+                            , ["chest","shoulder","bicep","tricep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
                               React.createElement('div', {
                                   key: mg,
                                   style: {display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid rgba(45,42,36,.15)"},
@@ -3453,7 +3453,7 @@ function App() {
                 , exSubTab==="library" && (()=>{
                   const TYPE_OPTS  = ["strength","cardio","flexibility","yoga","stretching","plyometric","calisthenics","functional","isometric","warmup","cooldown"];
                   const TYPE_LABELS = {strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flexibility",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali",functional:"🔧 Functional",isometric:"🧱 Isometric",warmup:"🌅 Warmup",cooldown:"🌙 Cooldown"};
-                  const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","full_body","cardio"];
+                  const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","full_body","cardio"];
                   const ALL_EQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
 
                   const toggleSet = (setter, val) => setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; });
@@ -7659,7 +7659,7 @@ function App() {
                 , React.createElement('div', { className: "field"}
                   , React.createElement('label', {}, "Muscle Group")
                   , React.createElement('div', { style: {display:"flex",gap:4,flexWrap:"wrap"}}
-                    , ["chest","back","shoulder","bicep","forearm","legs","glutes","calves","abs"].map(mg=>(
+                    , ["chest","back","shoulder","bicep","tricep","forearm","legs","glutes","calves","abs"].map(mg=>(
                       React.createElement('button', { key: mg,
                         className: `btn btn-sm ${ed.muscleGroup===mg?"btn-gold":"btn-ghost"}`,
                         style: {textTransform:"capitalize",fontSize:".54rem",padding:"4px 8px"},
@@ -8112,7 +8112,7 @@ function App() {
                 const PTYPE_LABELS = {strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flex",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali"};
                 const PTYPE_OPTS   = Object.keys(PTYPE_LABELS);
                 const PEQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
-                const PMUSCLE_OPTS = ["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","cardio"];
+                const PMUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","cardio"];
                 const closeDrops   = () => setPickerOpenDrop(null);
                 return React.createElement('div', {style:{position:"relative",marginBottom:10}},
                   pickerOpenDrop && React.createElement('div',{onClick:closeDrops,style:{position:"fixed",inset:0,zIndex:19}}),
