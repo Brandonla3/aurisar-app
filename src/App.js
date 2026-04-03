@@ -7801,7 +7801,7 @@ function App() {
             )
           )
         );
-      } catch(e) { console.error("Exercise editor render error:", e); return null; } })()
+      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
 
       /* ══ EXERCISE DETAIL MODAL ══════════════════ */
       , detailEx && (
@@ -8398,7 +8398,7 @@ function App() {
       /* ══ WORKOUT COMPLETION MODAL ════════════════ */
       /* ══ ONE-OFF NAMING MODAL ════════════════════ */
       /* ══ SINGLE EXERCISE QUICK-LOG MODAL ════════ */
-      , selEx&&(()=>{ try {
+      , selEx&&(()=>{
         const ex = allExById[selEx];
         if(!ex) return null;
         const metric=isMetric(profile.units);
@@ -8617,7 +8617,7 @@ function App() {
             )
           )
         );
-      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
+      })()
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
       , statsPromptModal&&createPortal(
