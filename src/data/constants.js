@@ -367,6 +367,7 @@ const EMPTY_PROFILE = {
   xp:0, log:[], plans:[],
   customExercises:[],
   workouts:[],
+  workoutLabels:[], // user-created labels for organizing workouts
   scheduledWorkouts:[],
   lastCheckIn:null, checkInStreak:0, totalCheckIns:0, checkInHistory:[],
   quests:{},
@@ -374,6 +375,7 @@ const EMPTY_PROFILE = {
   exercisePBs:{},
   travelBoost:null,
   favoriteExercises:[],
+  chartOrder:["dow","sets","muscleFreq","volume","consistency","topEx"],
   deletedItems:[], // [{id, type:"workout"|"plan", item, deletedAt (ISO)}]
   notificationPrefs:{
     sharedWorkout:true,
@@ -440,12 +442,12 @@ function scaleDur(baseDur, pct) {
 // Map Regions & Points — Progressive journey through fitness zones
 // ════════════════════════════════════════════════════════════════════
 const MAP_REGIONS = [
-  { id: "zone_1", name: "Starter's Realm", icon: "⚔️", color: "#8B7355", glow: "#A89070", desc: "Foundation strength building", boost: { emoji: "💪", label: "Strength", muscle: "all" } },
-  { id: "zone_2", name: "Cardio Canyon", icon: "🏃", color: "#5B8D6B", glow: "#7BA68C", desc: "Endurance and stamina zone", boost: { emoji: "❤️", label: "Cardio", muscle: "all" } },
-  { id: "zone_3", name: "Flex Temple", icon: "🧘", color: "#7B6B8B", glow: "#9B8BAB", desc: "Flexibility and mobility focus", boost: { emoji: "🤸", label: "Flexibility", muscle: "all" } },
-  { id: "zone_4", name: "Iron Peak", icon: "🏔️", color: "#8B7B5B", glow: "#A89B7B", desc: "Advanced strength territory", boost: { emoji: "⚡", label: "Strength", muscle: "all" } },
-  { id: "zone_5", name: "Elite Citadel", icon: "👑", color: "#7B8B6B", glow: "#9BAB8B", desc: "Master's domain", boost: { emoji: "🏆", label: "All-Around", muscle: "all" } },
-  { id: "zone_6", name: "Legend's Sanctum", icon: "🌟", color: "#8B7B6B", glow: "#A89B8B", desc: "The ultimate fitness sanctuary", boost: { emoji: "✨", label: "All-Around", muscle: "all" } },
+  { id: "zone_1", name: "Verath Hollow", icon: "⚔️", color: "#8B7355", glow: "#A89070", desc: "Foundation strength building", boost: { emoji: "💪", label: "Strength", muscle: "all" } },
+  { id: "zone_2", name: "Caelvoss", icon: "🏃", color: "#5B8D6B", glow: "#7BA68C", desc: "Endurance and stamina zone", boost: { emoji: "❤️", label: "Cardio", muscle: "all" } },
+  { id: "zone_3", name: "Lithenvale", icon: "🧘", color: "#7B6B8B", glow: "#9B8BAB", desc: "Flexibility and mobility focus", boost: { emoji: "🤸", label: "Flexibility", muscle: "all" } },
+  { id: "zone_4", name: "Korrath Summit", icon: "🏔️", color: "#8B7B5B", glow: "#A89B7B", desc: "Advanced strength territory", boost: { emoji: "⚡", label: "Strength", muscle: "all" } },
+  { id: "zone_5", name: "Emberveil", icon: "👑", color: "#7B8B6B", glow: "#9BAB8B", desc: "Master's domain", boost: { emoji: "🏆", label: "All-Around", muscle: "all" } },
+  { id: "zone_6", name: "Zenthara Citadel", icon: "🌟", color: "#8B7B6B", glow: "#A89B8B", desc: "The ultimate fitness sanctuary", boost: { emoji: "✨", label: "All-Around", muscle: "all" } },
 ];
 
 const MAP_POINTS = [
