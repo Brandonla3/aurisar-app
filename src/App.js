@@ -1369,7 +1369,7 @@ function App() {
   // Merged exercise list (built-in + custom) — memoized to avoid rebuilding on every render
   const _ymReady = useYMoveExercises(); // re-renders when Supabase exercises load
   const _customExRef = profile.customExercises;
-  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])], [_customExRef, _ymReady]);
+  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef, _ymReady]);
   const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
 
   // Auto-update quest completion state when log or streak changes
@@ -1477,7 +1477,7 @@ function App() {
   function getMult(ex){ return clsKey?(CLASSES[clsKey]?.bonuses[ex.category]||1):1; }
 
   // ── Exercise editor ─────────────────────────────────────────
-  const EX_ICON_LIST = ["🏋️","💪","⚡","🦾","🪃","🏃","🚴","🔥","⭕","🧘","🤸","🧱","🪝","🏊","🔻","🦵","🚶","🧗","🎯","🏌️","⛹️","🤼","🤸","🏇","🥊","🤺","🏋","🦶","🫀","🧠","🛌","💤","🌙","☕","🧊","🏖️"];
+  const EX_ICON_LIST = ["🏋️","💪","⚡","🦾","🪃","🏃","🚴","🔥","⭕","🧘","🤸","🧱","🪝","🏊","🔻","🦵","🚶","🧗","🎯","🏌️","⛹️","🤼","🏇","🥊","🤺","🏋","🦶","🫀","🧠","🛌","💤","🌙","☕","🧊","🏖️"];
   function newExDraft(base){ return { id:uid(), name:base?base.name+" (Copy)":(""), icon:base?base.icon:"💪", category:base?base.category:"strength", muscleGroup:base?base.muscleGroup:"chest", baseXP:base?base.baseXP:40, muscles:base?base.muscles:"", desc:base?base.desc:"", tips:base?[...base.tips]:["","",""], custom:true, defaultSets:base?(base.defaultSets!=null?base.defaultSets:null):3, defaultReps:base?(base.defaultReps!=null?base.defaultReps:null):10, defaultWeightLbs:base?base.defaultWeightLbs||"":"", defaultWeightPct:base?base.defaultWeightPct||100:100, defaultHrZone:base?base.defaultHrZone||null:null }; }
   function openExEditor(mode, baseEx){ setExEditorMode(mode); setExEditorDraft(newExDraft(mode==="create"?null:baseEx)); setExEditorOpen(true); }
   function saveExEditor(){
@@ -7559,7 +7559,7 @@ function App() {
 
 
       /* ══ EXERCISE EDITOR MODAL ══════════════════ */
-      , exEditorOpen && exEditorDraft && createPortal((()=>{
+      , exEditorOpen && exEditorDraft && createPortal((()=>{ try {
         const ed = exEditorDraft;
         const setEd = patch => setExEditorDraft(d=>({...d,...patch}));
         const isCardioED = ed.category==="cardio";
@@ -7811,7 +7811,7 @@ function App() {
             )
           )
         );
-      })()
+      } catch(e) { console.error("Exercise editor render error:", e); return null; } })()
 
       /* ══ EXERCISE DETAIL MODAL ══════════════════ */
       , detailEx && (
@@ -8627,7 +8627,7 @@ function App() {
             )
           )
         );
-      })(), document.body)
+      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
       , statsPromptModal&&createPortal(
