@@ -6558,7 +6558,7 @@ function App() {
             })()
 
             , activeTab==="social"&&(()=>{
-                    const levelFor = xp => { const t=buildXPTable(70); let lv=1; for(let i=1;i<t.length;i++){if(xp>=t[i])lv=i+1;else break;} return lv; };
+                    const levelFor = xp => { const t=buildXPTable(100); let lv=1; for(let i=1;i<t.length;i++){if(xp>=t[i])lv=i+1;else break;} return lv; };
                     const recentWorkout = log => {
                       if(!log||!log.length) return null;
                       const entry = log[0];

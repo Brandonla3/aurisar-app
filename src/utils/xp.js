@@ -38,16 +38,28 @@ function scaleDur(baseDur, pct) {
   return Math.max(1, Math.round(parseFloat(baseDur||0) * pct / 100));
 }
 
-function buildXPTable(max=70) {
-  const t=[0,0]; let inc=20000;
-  for(let lv=2;lv<=max;lv++){
-    t[lv]=t[lv-1]+Math.round(inc);
-    if(lv<10) inc*=1.30; else if(lv<30) inc*=1.50; else if(lv<40) inc*=2.25;
+const _XP_PER_LEVEL = [
+  1200,1288,1376,1472,1568,1672,1776,1888,2000,2120,
+  2240,2368,2496,2632,2768,2912,3056,3208,3360,3520,
+  3680,3848,4016,4192,4368,4552,4736,4928,5120,5320,
+  5520,5728,5936,6152,6368,6592,6816,7048,7280,7520,
+  7760,8008,8256,8512,8768,9032,9296,9568,9840,10120,
+  10400,10688,10976,11272,11568,11872,12176,12488,12800,13120,
+  13440,13768,14096,14432,14768,15112,15456,15808,16160,16520,
+  16880,17248,17616,17992,18368,18752,19136,19528,19920,20320,
+  20720,21128,21536,21952,22368,22792,23216,23648,24080,24520,
+  24960,25408,25856,26312,26768,27232,27696,28168,28640
+];
+
+function buildXPTable(max=100) {
+  const t=[0,0];
+  for(let lv=2;lv<=Math.min(max,100);lv++){
+    t[lv]=t[lv-1]+_XP_PER_LEVEL[lv-2];
   }
   return t;
 }
 
-const XP_TABLE = buildXPTable(70);
+const XP_TABLE = buildXPTable(100);
 
 const xpToLevel = xp => { let lv=1; while(lv<XP_TABLE.length-1&&xp>=XP_TABLE[lv+1]) lv++; return lv; };
 const xpForLevel = l  => XP_TABLE[Math.min(l,XP_TABLE.length-1)]||0;
