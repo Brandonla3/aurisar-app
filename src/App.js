@@ -355,13 +355,29 @@ function App() {
         return;
       }
 
+      // Silent background events — never touch the screen
+      if(_event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
+        setAuthUser(user);
+        return;
+      }
+
+      // Explicit sign-out — always go to login
+      if(_event === "SIGNED_OUT") {
+        setAuthUser(null);
+        setScreen("login");
+        return;
+      }
+
       setAuthUser(user);
       const saved = await loadSave(_optionalChain([user, 'optionalAccess', _25 => _25.id]) || null);
       if(_optionalChain([saved, 'optionalAccess', _26 => _26.chosenClass])){
         ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
         setScreen("main");
       } else {
-        if(_event==="SIGNED_IN"){ setScreen(user?"intro":"home"); } else { setScreen("home"); }
+        // Safety net: never navigate an active user away from "main" due to a
+        // failed/slow loadSave. Functional updater reads live screen state, not
+        // the stale closure value captured at mount.
+        setScreen(s => s === "main" ? s : (user ? "intro" : "login"));
       }
     });
     // Check existing session on mount — handle both cases explicitly
@@ -8452,7 +8468,7 @@ function App() {
           },0);
           return (Math.round(baseXP*zb*wb*pb*intBoost)+rowsXP).toLocaleString();
         })();
-        return (
+        try { return (
           React.createElement('div', { style: {position:"fixed",inset:0,background:"rgba(0,0,0,.78)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
             onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}
             , React.createElement('div', { style: {width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",background:"linear-gradient(160deg,#0c0c0a,#0c0c0a)",border:"1px solid rgba(180,172,158,.06)",borderRadius:"18px 18px 0 0",padding:"0 0 24px"},
@@ -8626,8 +8642,7 @@ function App() {
               )
             )
           )
-        );
-      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
+        ); } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
       , statsPromptModal&&createPortal(
