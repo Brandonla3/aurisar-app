@@ -109,7 +109,10 @@ const detectClass = bio => {
 
 function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi) {
   const ex=(exLookup||EX_BY_ID)[exId]||EX_BY_ID[exId]; if(!ex) return 0;
-  const mult=classKey?(_optionalChain([CLASSES, 'access', _2 => _2[classKey], 'optionalAccess', _3 => _3.bonuses, 'access', _4 => _4[ex.category]])||1):1;
+  // Prefer per-exercise class multiplier from xpClassMap, fall back to category bonus
+  const mult = (ex.xpClassMap && classKey && ex.xpClassMap[classKey])
+    ? ex.xpClassMap[classKey]
+    : (classKey ? (_optionalChain([CLASSES, 'access', _2 => _2[classKey], 'optionalAccess', _3 => _3.bonuses, 'access', _4 => _4[ex.category]])||1) : 1);
   const s=parseInt(sets)||0,r=parseInt(reps)||0;
   const distBonus = distanceMi ? 1+Math.min(distanceMi*0.05,0.5) : 1;
   const runPace = (exId===RUNNING_EX_ID && distanceMi && r) ? r/distanceMi : null;
@@ -126,10 +129,16 @@ function calcDayXP(day,classKey,exLookup) {
 }
 
 // ── PERSONAL BEST CALCULATOR ─────────────────────────────────────
-// Returns { exId: { type:"strength"|"assisted"|"cardio", value, display } }
-// Strength 1RM: highest weight at exactly 1 set × 1 rep
-// Assisted 1RM: lowest weight at exactly 1 set × 1 rep (lower = better)
-// Cardio PB: best (lowest) pace in min/mi from distanceMi + reps(duration)
+// Returns { exId: { type, value, display } }
+// Supports 7 PB types from the master exercise list:
+//   "Heaviest Weight"    — highest weightLbs across ALL entries
+//   "Max Reps Per 1 Set" — highest reps in any single entry
+//   "Assisted Weight"    — lowest weightLbs at 1 set × 1 rep (lower = better)
+//   "Strength 1RM"       — highest weightLbs at exactly 1 set × 1 rep
+//   "Cardio Pace"        — best (lowest) pace in min/mi
+//   "Longest Hold"       — highest duration
+//   "Fastest Time"       — lowest duration (shorter = better)
+// Falls back to legacy heuristic if ex.pbType is not set (custom exercises)
 function calcExercisePBs(log, exLookup) {
   const pbs = {};
   const lookup = exLookup || EX_BY_ID;
@@ -138,32 +147,66 @@ function calcExercisePBs(log, exLookup) {
     if(!exId) return;
     const ex = lookup[exId];
     if(!ex) return;
-    const isCardio = ex.category === "cardio";
-    const isAssisted = ex.name && ex.name.toLowerCase().includes("assisted");
-    if(isCardio) {
-      // Cardio PB: best pace = lowest min/mi
-      if(entry.distanceMi && entry.distanceMi > 0 && entry.reps && entry.reps > 0) {
-        const pace = entry.reps / entry.distanceMi; // min/mi
-        if(!pbs[exId] || pace < pbs[exId].value) {
-          pbs[exId] = { type:"cardio", value:pace };
+
+    const pbType = ex.pbType;
+    const sets = parseInt(entry.sets)||0;
+    const reps = parseInt(entry.reps)||0;
+    const weight = parseFloat(entry.weightLbs)||0;
+    const duration = parseFloat(entry.durationMin)||0;
+    const distance = parseFloat(entry.distanceMi)||0;
+
+    if (pbType === "Heaviest Weight") {
+      if (weight > 0 && (!pbs[exId] || weight > pbs[exId].value)) {
+        pbs[exId] = { type:"Heaviest Weight", value:weight };
+      }
+    } else if (pbType === "Max Reps Per 1 Set") {
+      if (reps > 0 && (!pbs[exId] || reps > pbs[exId].value)) {
+        pbs[exId] = { type:"Max Reps Per 1 Set", value:reps };
+      }
+    } else if (pbType === "Assisted Weight") {
+      if (sets === 1 && reps === 1 && weight > 0 && (!pbs[exId] || weight < pbs[exId].value)) {
+        pbs[exId] = { type:"Assisted Weight", value:weight };
+      }
+    } else if (pbType === "Strength 1RM") {
+      if (sets === 1 && reps === 1 && weight > 0 && (!pbs[exId] || weight > pbs[exId].value)) {
+        pbs[exId] = { type:"Strength 1RM", value:weight };
+      }
+    } else if (pbType === "Cardio Pace") {
+      if (distance > 0 && reps > 0) {
+        const pace = reps / distance; // min/mi
+        if (!pbs[exId] || pace < pbs[exId].value) {
+          pbs[exId] = { type:"Cardio Pace", value:pace };
         }
       }
+    } else if (pbType === "Longest Hold") {
+      const dur = duration || reps; // duration in minutes or reps as seconds
+      if (dur > 0 && (!pbs[exId] || dur > pbs[exId].value)) {
+        pbs[exId] = { type:"Longest Hold", value:dur };
+      }
+    } else if (pbType === "Fastest Time") {
+      const dur = duration || reps;
+      if (dur > 0 && (!pbs[exId] || dur < pbs[exId].value)) {
+        pbs[exId] = { type:"Fastest Time", value:dur };
+      }
     } else {
-      // Strength 1RM: exactly 1 set × 1 rep
-      const sets = parseInt(entry.sets)||0;
-      const reps = parseInt(entry.reps)||0;
-      const weight = parseFloat(entry.weightLbs)||0;
-      if(sets === 1 && reps === 1 && weight > 0) {
-        const existing = pbs[exId];
-        if(isAssisted) {
-          // Assisted: lower weight = better
-          if(!existing || weight < existing.value) {
-            pbs[exId] = { type:"assisted", value:weight };
+      // Legacy fallback for custom exercises or exercises without pbType
+      const isCardio = ex.category === "cardio";
+      const isAssisted = ex.name && ex.name.toLowerCase().includes("assisted");
+      if (isCardio) {
+        if (distance > 0 && reps > 0) {
+          const pace = reps / distance;
+          if (!pbs[exId] || pace < pbs[exId].value) {
+            pbs[exId] = { type:"Cardio Pace", value:pace };
+          }
+        }
+      } else if (sets === 1 && reps === 1 && weight > 0) {
+        if (isAssisted) {
+          if (!pbs[exId] || weight < pbs[exId].value) {
+            pbs[exId] = { type:"Assisted Weight", value:weight };
           }
         } else {
-          // Standard: higher weight = better
-          if(!existing || weight > existing.value) {
-            pbs[exId] = { type:"strength", value:weight };
+          if (!pbs[exId] || weight > pbs[exId].value) {
+            pbs[exId] = { type:"Strength 1RM", value:weight };
           }
         }
       }

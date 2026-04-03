@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import './styles/app.css';
-import { CLASSES, EXERCISES, IMG } from './data/exercises';
+import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave } from './utils/storage';
@@ -12,12 +12,10 @@ import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
-import { ExerciseVideo } from './components/ExerciseVideo';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
 import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import PlanWizard from './components/PlanWizard';
-import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 import loginBg from './assets/login-bg.png';
 
 const PREVIEW_PIN = "1234";
@@ -402,10 +400,9 @@ function App() {
           setScreen("home");
         }
       }
-    }).catch(()=>setScreen("home"));
-    // Safety fallback — if nothing resolves in 5s, go to home
-    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"home":s), 5000);
-    loadYMoveExercises();
+    }).catch(()=>setScreen("login"));
+    // Safety fallback — if nothing resolves in 5s, go to login
+    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"login":s), 5000);
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
   useEffect(()=>{ if(screen==="main") doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen]);
@@ -1383,9 +1380,8 @@ function App() {
   const bmi      = calcBMI(profile.weightLbs,totalH);
 
   // Merged exercise list (built-in + custom) — memoized to avoid rebuilding on every render
-  const _ymReady = useYMoveExercises(); // re-renders when Supabase exercises load
   const _customExRef = profile.customExercises;
-  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef, _ymReady]);
+  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef]);
   const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
 
   // Auto-update quest completion state when log or streak changes
@@ -3709,8 +3705,7 @@ function App() {
                     /* Count + clear row */
                     React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}},
                       React.createElement('div', {style:{fontSize:".68rem",color:"#4a4438"}},
-                        libFiltered.length+" exercises",
-                        !_ymoveLoaded && React.createElement('span',{style:{color:"#6a6050",marginLeft:6}},"(loading more…)")
+                        libFiltered.length+" exercises"
                       ),
                       hasFilters && React.createElement('button', {
                         onClick:clearAll,
@@ -3805,7 +3800,6 @@ function App() {
                                 letterSpacing:".01em",
                               }}, ex.name),
                               hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆"),
-                              ex.hasVideo && React.createElement('span',{style:{fontSize:".58rem",color:"#2ecc71",background:"rgba(46,204,113,.1)",padding:"1px 5px",borderRadius:3,fontWeight:700}}, "▶")
                             ),
                             React.createElement('div', {style:{
                               fontSize:".62rem", fontStyle:"italic", lineHeight:1.4,
@@ -3855,13 +3849,10 @@ function App() {
                         style:{background:"linear-gradient(160deg,rgba(18,16,12,.92),rgba(12,12,10,.95))",border:"1px solid rgba(180,172,158,.06)",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:"20px 18px 32px"}
                       },
                         React.createElement('div',{style:{width:36,height:4,background:"rgba(45,42,36,.3)",borderRadius:2,margin:"0 auto 16px"}}),
-                        libDetailEx.hasVideo
-                          ? React.createElement(ExerciseVideo, {exerciseId:libDetailEx.id, height:220})
-                          : React.createElement('div',{style:{height:90,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}, React.createElement(ExIcon,{ex:libDetailEx,size:"3.5rem",color:getTypeColor(libDetailEx.category)})),
+                        React.createElement('div',{style:{height:90,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}, React.createElement(ExIcon,{ex:libDetailEx,size:"3.5rem",color:getTypeColor(libDetailEx.category)})),
                         React.createElement('div',{style:{marginBottom:10}},
                           React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}},
                             React.createElement('span',{style:{fontSize:"1rem",fontWeight:"700",color:"#e8e0d0"}}, libDetailEx.name),
-                            libDetailEx.hasVideo && React.createElement('span',{style:{background:"rgba(46,204,113,.15)",color:"#2ecc71",fontSize:".6rem",padding:"2px 7px",borderRadius:4,fontWeight:"700"}}, "▶ VIDEO"),
                             (profile.exercisePBs||{})[libDetailEx.id] && React.createElement('span',{style:{background:"rgba(180,172,158,.1)",color:"#b4ac9e",fontSize:".6rem",padding:"2px 7px",borderRadius:4,fontWeight:"700"}}, "🏆 PB")
                           ),
                           React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}},
@@ -4048,7 +4039,6 @@ function App() {
                                     React.createElement('span',{style:{fontSize:".83rem",fontWeight:600,color:"#d4cec4",letterSpacing:".01em"}}, ex.name),
                                     React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:2}}, "custom"),
                                     hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆"),
-                                    ex.hasVideo && React.createElement('span',{style:{fontSize:".58rem",color:"#2ecc71",background:"rgba(46,204,113,.1)",padding:"1px 5px",borderRadius:3,fontWeight:700}}, "▶")
                                   ),
                                   React.createElement('div',{style:{fontSize:".62rem",fontStyle:"italic",lineHeight:1.4}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))
                                 ),
@@ -7827,7 +7817,7 @@ function App() {
             )
           )
         );
-      } catch(e) { console.error("Exercise editor render error:", e); return null; } })()
+      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
 
       /* ══ EXERCISE DETAIL MODAL ══════════════════ */
       , detailEx && (
@@ -8642,7 +8632,9 @@ function App() {
               )
             )
           )
-        ); } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
+        );
+      } catch(e) { console.error("Quick-log render error:", e); return null; }
+      })()
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
       , statsPromptModal&&createPortal(
