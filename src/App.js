@@ -8468,7 +8468,7 @@ function App() {
           },0);
           return (Math.round(baseXP*zb*wb*pb*intBoost)+rowsXP).toLocaleString();
         })();
-        return (
+        try { return (
           React.createElement('div', { style: {position:"fixed",inset:0,background:"rgba(0,0,0,.78)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
             onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}
             , React.createElement('div', { style: {width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",background:"linear-gradient(160deg,#0c0c0a,#0c0c0a)",border:"1px solid rgba(180,172,158,.06)",borderRadius:"18px 18px 0 0",padding:"0 0 24px"},
@@ -8642,8 +8642,7 @@ function App() {
               )
             )
           )
-        );
-      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
+        ); } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
       , statsPromptModal&&createPortal(
