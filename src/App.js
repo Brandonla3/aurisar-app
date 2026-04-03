@@ -1935,7 +1935,7 @@ function App() {
     const _isRunning = exD.id===RUNNING_EX_ID;
     const _runPace = (_isRunning&&_distMiVal>0&&_durMin>0)?_durMin/_distMiVal:null;
     const _runBoost = _runPace?(_runPace<=8?20:5):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
+    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
     const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_metric?lbsToKg(ex.weightLbs):ex.weightLbs}${_wUnit}`:"");
     return React.createElement('div', {className:"ss-section"},
       React.createElement('div', {className:"ss-section-hdr",
@@ -2356,7 +2356,7 @@ function App() {
     }
   }
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
-  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
+  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
 
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
 
@@ -3316,7 +3316,7 @@ function App() {
                               , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478",textTransform:"uppercase",letterSpacing:".08em"} }, "Muscle Group")
                               , React.createElement('span', { style: {fontSize:".65rem",color:"#b4ac9e",cursor:"pointer"}, onClick: ()=>{setExMuscleFilter("All");setMusclePickerOpen(false);} }, "Clear")
                             )
-                            , ["chest","shoulder","bicep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
+                            , ["chest","shoulder","bicep","tricep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
                               React.createElement('div', {
                                   key: mg,
                                   style: {display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid rgba(45,42,36,.15)"},
@@ -3453,7 +3453,7 @@ function App() {
                 , exSubTab==="library" && (()=>{
                   const TYPE_OPTS  = ["strength","cardio","flexibility","yoga","stretching","plyometric","calisthenics","functional","isometric","warmup","cooldown"];
                   const TYPE_LABELS = {strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flexibility",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali",functional:"🔧 Functional",isometric:"🧱 Isometric",warmup:"🌅 Warmup",cooldown:"🌙 Cooldown"};
-                  const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","full_body","cardio"];
+                  const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","full_body","cardio"];
                   const ALL_EQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
 
                   const toggleSet = (setter, val) => setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; });
@@ -5177,7 +5177,7 @@ function App() {
                           const noSetsEx=NO_SETS_EX_IDS.has(exData.id);
                           const isRunningEx=exData.id===RUNNING_EX_ID;
                           const distMiVal=ex.distanceMi?parseFloat(ex.distanceMi):0;
-                          const exXP=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);
+                          const exXP=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null,ex.weightLbs||null,null);
                           const clsD=profile.chosenClass?CLASSES[profile.chosenClass]:null; const mult=clsD&&clsD.bonuses&&exData.category?(clsD.bonuses[exData.category]||1):1;
                           const isCardioEx=exData.category==="cardio"||exData.category==="endurance";
                           const hasWeightEx = !isCardioEx && exData.category!=="flexibility";
@@ -7659,7 +7659,7 @@ function App() {
                 , React.createElement('div', { className: "field"}
                   , React.createElement('label', {}, "Muscle Group")
                   , React.createElement('div', { style: {display:"flex",gap:4,flexWrap:"wrap"}}
-                    , ["chest","back","shoulder","bicep","forearm","legs","glutes","calves","abs"].map(mg=>(
+                    , ["chest","back","shoulder","bicep","tricep","forearm","legs","glutes","calves","abs"].map(mg=>(
                       React.createElement('button', { key: mg,
                         className: `btn btn-sm ${ed.muscleGroup===mg?"btn-gold":"btn-ghost"}`,
                         style: {textTransform:"capitalize",fontSize:".54rem",padding:"4px 8px"},
@@ -8112,7 +8112,7 @@ function App() {
                 const PTYPE_LABELS = {strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flex",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali"};
                 const PTYPE_OPTS   = Object.keys(PTYPE_LABELS);
                 const PEQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
-                const PMUSCLE_OPTS = ["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","cardio"];
+                const PMUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","cardio"];
                 const closeDrops   = () => setPickerOpenDrop(null);
                 return React.createElement('div', {style:{position:"relative",marginBottom:10}},
                   pickerOpenDrop && React.createElement('div',{onClick:closeDrops,style:{position:"fixed",inset:0,zIndex:19}}),

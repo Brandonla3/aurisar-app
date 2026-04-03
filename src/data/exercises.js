@@ -19373,6 +19373,14 @@ const EXERCISES = [
     xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1},
     tips:[], images:[],
   },
+  {
+    id:"yoga_session", name:"Yoga", category:"flexibility", muscleGroup:"full_body", icon:"🧘", baseXP:40,
+    muscles:"Full Body", desc:"Mind-body yoga practice. Builds flexibility, balance, and body awareness through controlled poses and breath.", tips:[], images:[],
+  },
+  {
+    id:"deep_stretch", name:"Deep Stretch", category:"flexibility", muscleGroup:"full_body", icon:"🤸", baseXP:30,
+    muscles:"Full Body", desc:"Full-body flexibility and mobility session. Focus on breathing, holding stretches, and releasing tension.", tips:[], images:[],
+  },
 ];
 
 export { CLASSES, EXERCISES };

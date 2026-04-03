@@ -107,7 +107,7 @@ const detectClass = bio => {
   return detectClassFromAnswers(sports, priorities, style);
 };
 
-function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi) {
+function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi,weightLbs,hrZone) {
   const ex=(exLookup||EX_BY_ID)[exId]||EX_BY_ID[exId]; if(!ex) return 0;
   // Prefer per-exercise class multiplier from xpClassMap, fall back to category bonus
   const mult = (ex.xpClassMap && classKey && ex.xpClassMap[classKey])
@@ -117,7 +117,9 @@ function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi) {
   const distBonus = distanceMi ? 1+Math.min(distanceMi*0.05,0.5) : 1;
   const runPace = (exId===RUNNING_EX_ID && distanceMi && r) ? r/distanceMi : null;
   const paceBonus = runPace ? (runPace<=8 ? 1.20 : 1.05) : 1;
-  return Math.round(ex.baseXP*mult*(1+(s*r-1)*0.05)*distBonus*paceBonus);
+  const weightBonus = ex.tracksWeight && weightLbs ? 1+Math.min(weightLbs/500,0.3) : 1;
+  const zoneBonus = hrZone ? 1+(hrZone-1)*0.04 : 1;
+  return Math.round(ex.baseXP*mult*(1+(s*r-1)*0.05)*distBonus*paceBonus*weightBonus*zoneBonus);
 }
 
 function calcPlanXP(plan,classKey,exLookup) {
@@ -338,7 +340,7 @@ function checkQuestCompletion(quest, log, streak) {
   if(quest.streak) return streak >= quest.streak;
   if(_optionalChain([quest, 'access', _5 => _5.auto, 'optionalAccess', _6 => _6.total])) return log.length >= quest.auto.total;
   if(_optionalChain([quest, 'access', _7 => _7.auto, 'optionalAccess', _8 => _8.exId])) {
-    const count = log.filter(e=>_optionalChain([EXERCISES, 'access', _9 => _9.find, 'call', _10 => _10(ex=>ex.name===e.exercise), 'optionalAccess', _11 => _11.id])===quest.auto.exId).length;
+    const count = log.filter(e=>(e.exId||_optionalChain([EXERCISES, 'access', _9 => _9.find, 'call', _10 => _10(ex=>ex.name===e.exercise), 'optionalAccess', _11 => _11.id]))===quest.auto.exId).length;
     return count >= quest.auto.count;
   }
   return false;
