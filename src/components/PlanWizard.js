@@ -77,9 +77,6 @@ function PlanWizard(props) {
   const [wizardWeekIdx, setWizardWeekIdx] = useState(0);
   const [collapsedWeeks, setCollapsedWeeks] = useState({});
   const [planWizardOpen, setPlanWizardOpen] = useState(false);
-  const [dragDayIdx, setDragDayIdx] = useState(null);
-  const [dragWeekIdx, setDragWeekIdx] = useState(null);
-  const [dragPlanExIdx, setDragPlanExIdx] = useState(null);
   const [collapsedPlanEx, setCollapsedPlanEx] = useState({});
   const [ssAccordion, setSsAccordion] = useState({});
   const [ssCheckedPlan, setSsCheckedPlan] = useState(()=>new Set());
@@ -309,11 +306,11 @@ function PlanWizard(props) {
   return React.createElement(React.Fragment, null
 
     // ── 1. BUILDER OVERVIEW FORM ──
-    , React.createElement('div', { className: "builder-nav-hdr" }
+    , !planWizardOpen && React.createElement('div', { className: "builder-nav-hdr" }
       , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: onClose }, "\u2190 Back")
       , React.createElement('div', { className: "builder-nav-title" }, bEditId ? "\u270E Overview" : "\uD83D\uDCDC New Plan")
     )
-    , React.createElement('div', { className: "builder-wrap"}
+    , !planWizardOpen && React.createElement('div', { className: "builder-wrap"}
       , React.createElement('div', { className: "field"}, React.createElement('label', null, "Plan Name" ), React.createElement('input', { className: "inp", value: bName, onChange: e=>setBName(e.target.value), placeholder: "Name your plan\u2026"  }))
       , React.createElement('div', { className: "field"}
         , React.createElement('label', null, "Level " , React.createElement('span', { style: {fontSize:".55rem",opacity:.6}}, "(optional)"))
@@ -533,15 +530,12 @@ function PlanWizard(props) {
                 const hasExercises = d.exercises.length > 0;
                 return React.createElement('div', { key: globalIdx,
                   className: `wizard-day-tab ${bDayIdx===globalIdx?"on":""}`,
-                  draggable: true,
-                  onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragDayIdx(globalIdx);},
-                  onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                  onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,globalIdx);setDragDayIdx(null);},
-                  onDragEnd: ()=>setDragDayIdx(null),
-                  onClick: ()=>setBDayIdx(globalIdx),
-                  onTouchEnd: e=>{e.preventDefault();setBDayIdx(globalIdx);}
+                  onClick: ()=>setBDayIdx(globalIdx)
                 }
-                  , React.createElement('span', { className: "drag-handle" }, "\u2807")
+                  , weekDays.length>1 && React.createElement('span', { style: {display:"flex",flexDirection:"column",gap:0,flexShrink:0}},
+                    React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"1px 4px",fontSize:".5rem",lineHeight:1,minWidth:0,opacity:wi===0?.3:1}, disabled: wi===0, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx-1);}}, "\u25C0"),
+                    React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"1px 4px",fontSize:".5rem",lineHeight:1,minWidth:0,opacity:wi===weekDays.length-1?.3:1}, disabled: wi===weekDays.length-1, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx+1);}}, "\u25B6")
+                  )
                   , React.createElement('span', null, d.label||`Day ${globalIdx+1}`)
                   , hasExercises
                     ? React.createElement('span', { className: "day-xp-mini" }, "\u26A1", dayXP)
@@ -575,19 +569,19 @@ function PlanWizard(props) {
               , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric", placeholder: "Duration HH:MM" ,
                 style: {flex:1.5,fontSize:".68rem",padding:"6px 10px"},
                 defaultValue: _optionalChain([bDays, 'access', _6 => _6[bDayIdx], 'optionalAccess', _7 => _7._durHHMM])!==undefined ? bDays[bDayIdx]._durHHMM : (_optionalChain([bDays, 'access', _8 => _8[bDayIdx], 'optionalAccess', _9 => _9.durationSec]) ? secToHHMMSplit(bDays[bDayIdx].durationSec).hhmm : ""),
-                onBlur: e=>{const norm=normalizeHHMM(e.target.value);const sec=combineHHMMSec(norm,_optionalChain([bDays, 'access', _10 => _10[bDayIdx], 'optionalAccess', _11 => _11._durSec])||"");setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durHHMM:sec?norm:undefined,durationMin:sec?sec/60:null}));}})
+                onBlur: e=>{const norm=normalizeHHMM(e.target.value);const sec=combineHHMMSec(norm,_optionalChain([bDays, 'access', _10 => _10[bDayIdx], 'optionalAccess', _11 => _11._durSec])||"");startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durHHMM:sec?norm:undefined,durationMin:sec?sec/60:null}));});}})
               , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: "Sec (0-59)" ,
                 style: {flex:0.8,fontSize:".68rem",padding:"6px 10px"},
                 defaultValue: _optionalChain([bDays, 'access', _12 => _12[bDayIdx], 'optionalAccess', _13 => _13._durSec])||"",
-                onBlur: e=>{const sec=combineHHMMSec(_optionalChain([bDays, 'access', _14 => _14[bDayIdx], 'optionalAccess', _15 => _15._durHHMM])||"",e.target.value);setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durSec:undefined,durationMin:sec?sec/60:null}));}})
+                onBlur: e=>{const sec=combineHHMMSec(_optionalChain([bDays, 'access', _14 => _14[bDayIdx], 'optionalAccess', _15 => _15._durHHMM])||"",e.target.value);startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durSec:undefined,durationMin:sec?sec/60:null}));});}})
               , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", placeholder: "Active Cal" ,
                 style: {flex:1,fontSize:".68rem",padding:"6px 10px"},
                 defaultValue: _optionalChain([bDays, 'access', _16 => _16[bDayIdx], 'optionalAccess', _17 => _17.activeCal])||"",
-                onBlur: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,activeCal:e.target.value||null}))})
+                onBlur: e=>startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,activeCal:e.target.value||null}));})})
               , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", placeholder: "Total Cal" ,
                 style: {flex:1,fontSize:".68rem",padding:"6px 10px"},
                 defaultValue: _optionalChain([bDays, 'access', _18 => _18[bDayIdx], 'optionalAccess', _19 => _19.totalCal])||"",
-                onBlur: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}))})
+                onBlur: e=>startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}));})})
             )
             , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
               , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "\uFF0B Add Exercise"  )
@@ -669,13 +663,8 @@ function PlanWizard(props) {
                   }},"\uD83D\uDD17 Group as Superset"),
                   React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsCheckedPlan(new Set())},"\u2715")
                 ),
-                React.createElement('div', { className: `builder-ex-row ${dragPlanExIdx===i?"dragging":""}`,
-                  style: {flexDirection:"column",alignItems:"stretch",gap:0,opacity:dragPlanExIdx===i?0.5:1,"--cat-color":catColorPlan},
-                  draggable: true,
-                  onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragPlanExIdx(i);},
-                  onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                  onDrop: e=>{e.preventDefault();reorderPlanEx(bDayIdx,dragPlanExIdx,i);setDragPlanExIdx(null);},
-                  onDragEnd: ()=>setDragPlanExIdx(null)}
+                React.createElement('div', { className: "builder-ex-row",
+                  style: {flexDirection:"column",alignItems:"stretch",gap:0,"--cat-color":catColorPlan}}
                   /* Header row */
                   , (()=>{
                     const collapsed=!!collapsedPlanEx[`${bDayIdx}_${i}`];
@@ -695,7 +684,6 @@ function PlanWizard(props) {
                               React.createElement('div', {className:`ss-cb ${ssCheckedPlan.has(i)?"on":""}`}),
                               React.createElement('span', {style:{fontSize:".55rem",color:ssCheckedPlan.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
                             )
-                          , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",marginRight:2}}, "\u2807")
                           , exData.custom&&React.createElement('div', { className: "ex-edit-btn", style: {position:"static",marginRight:2}, onClick: e=>{e.stopPropagation();onOpenExEditor("edit",exData);}}, "\u270E")
                           , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColorPlan} }, exData.icon)
                           , React.createElement('span', { className: "builder-ex-name-styled", style: {flex:1} }, exData.name)
