@@ -16,6 +16,7 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
 import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import PlanWizard from './components/PlanWizard';
+import WorkoutNotificationMockup from './components/WorkoutNotificationMockup';
 import loginBg from './assets/login-bg.png';
 
 const PREVIEW_PIN = "1234";
@@ -56,6 +57,7 @@ function App() {
   const [navMenuOpen,setNavMenuOpen] = useState(false);
   const [mapTooltip,setMapTooltip] = useState(null); // {name, x, y, info}
   const [toast,setToast]     = useState(null);
+  const [showWNMockup,setShowWNMockup] = useState(false);
   const [feedbackOpen,setFeedbackOpen] = useState(false);
   const [feedbackText,setFeedbackText] = useState("");
   const [feedbackType,setFeedbackType] = useState("idea"); // "idea"|"bug"|"help"
@@ -2921,6 +2923,7 @@ function App() {
       , PARTICLES.map(p=>React.createElement('div', { key: p.id, className: "pt", style: {left:`${p.x}%`,bottom:`${Math.random()*100}%`,width:p.size,height:p.size,"--dur":`${p.duration}s`,"--dly":`${p.delay}s`}}))
       , xpFlash && React.createElement('div', { className: "xp-flash"}, "+", xpFlash.amount.toLocaleString(), " XP" , xpFlash.mult>1.02?" ⚡":"")
       , toast    && React.createElement('div', { className: "toast"}, toast)
+      , showWNMockup && React.createElement(WorkoutNotificationMockup, { onClose: ()=>setShowWNMockup(false) })
 
       /* ══ INTRO ══════════════════════════════════ */
       , screen==="intro" && (
@@ -3235,6 +3238,10 @@ function App() {
                   style: {fontSize:".5rem",color:"#5a5650",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"},
                   onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
                 }, "↺ Retro")
+              , React.createElement('button', {
+                  style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
+                  onClick: ()=>setShowWNMockup(true)
+                }, "📲 Notification")
               , React.createElement('button', {
                   style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
                   disabled: profile.lastCheckIn===todayStr(),
