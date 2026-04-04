@@ -1076,7 +1076,20 @@
     .wn-banner-title{font-family:'Cinzel',serif;font-size:.62rem;color:#b4ac9e;letter-spacing:.12em;flex:1}
     .wn-banner-time{font-family:'Inter',sans-serif;font-size:.58rem;color:#6a645a}
     .wn-banner-workout{font-family:'Cinzel',serif;font-size:.95rem;color:#d4cec4;margin-bottom:4px;letter-spacing:.03em}
-    .wn-banner-sub{font-family:'Inter',sans-serif;font-size:.62rem;color:#8a8478;letter-spacing:.04em}
+    .wn-banner-sub{font-family:'Inter',sans-serif;font-size:.62rem;color:#8a8478;letter-spacing:.04em;margin-top:6px}
+    .wn-banner.in-progress{border-left-color:rgba(240,208,96,.7)}
+    .wn-banner.in-progress .wn-banner-time{color:#c49428;font-weight:600}
+
+    /* Mini Pizza Tracker (inside banner) */
+    .wn-mini-pizza{margin:8px 0 2px;position:relative}
+    .wn-mini-pizza-track{height:2px;background:rgba(45,42,36,.5);border-radius:1px;margin:0 4px}
+    .wn-mini-pizza-fill{height:100%;background:linear-gradient(90deg,#c49428,#f0d060);border-radius:1px;transition:width .6s ease}
+    .wn-mini-pizza-nodes{display:flex;justify-content:space-between;margin-top:-6px;padding:0 0}
+    .wn-mini-node{width:10px;height:10px;border-radius:50%;background:rgba(45,42,36,.6);border:1.5px solid rgba(180,172,158,.15);display:flex;align-items:center;justify-content:center;font-size:.35rem;color:transparent;transition:all .3s ease}
+    .wn-mini-node.done{background:linear-gradient(135deg,#c49428,#f0d060);border-color:rgba(240,208,96,.4);color:#1a1608;font-weight:700;box-shadow:0 0 6px rgba(196,148,40,.3)}
+    .wn-mini-pizza-labels{display:flex;justify-content:space-between;margin-top:2px}
+    .wn-mini-label{font-family:'Inter',sans-serif;font-size:.42rem;color:#5a5650;letter-spacing:.04em;text-align:center;flex:1;transition:color .3s}
+    .wn-mini-label.done{color:#c49428}
 
     .wn-lock-hint{font-family:'Inter',sans-serif;font-size:.56rem;color:#4a4640;letter-spacing:.1em;text-transform:uppercase;margin-top:24px;animation:wnPulse 2.5s ease-in-out infinite}
     .wn-lock-close{position:absolute;bottom:32px;font-family:'Inter',sans-serif;font-size:.6rem;color:#4a4640;letter-spacing:.06em;cursor:pointer;padding:8px 16px;border:1px solid rgba(180,172,158,.06);border-radius:8px;transition:color .2s,border-color .2s}

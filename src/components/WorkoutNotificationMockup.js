@@ -68,7 +68,34 @@ function WorkoutNotificationMockup({ onClose }) {
       .filter(ex => ex.group === group)
   }));
 
+  const hasStarted = completed.size > 0;
   const h = React.createElement;
+
+  // Mini pizza tracker (shared between lock screen banner and tracker header)
+  const miniPizzaTracker = h('div', { className: "wn-mini-pizza" },
+    h('div', { className: "wn-mini-pizza-track" },
+      h('div', { className: "wn-mini-pizza-fill", style: { width: linePct + "%" } })
+    ),
+    h('div', { className: "wn-mini-pizza-nodes" },
+      MILESTONES.map((group, i) => {
+        const done = isMilestoneDone(group);
+        return h('div', {
+          key: group,
+          className: "wn-mini-node" + (done ? " done" : "")
+        },
+          done ? "✓" : ""
+        );
+      })
+    ),
+    h('div', { className: "wn-mini-pizza-labels" },
+      MILESTONES.map(group =>
+        h('div', {
+          key: group,
+          className: "wn-mini-label" + (isMilestoneDone(group) ? " done" : "")
+        }, group)
+      )
+    )
+  );
 
   // ── Lock Screen View ──
   if (view === "lock") {
@@ -81,23 +108,30 @@ function WorkoutNotificationMockup({ onClose }) {
 
         // Notification banner
         h('div', {
-          className: "wn-banner",
+          className: "wn-banner" + (hasStarted ? " in-progress" : ""),
           onClick: () => setView("tracker")
         },
           h('div', { className: "wn-banner-row" },
             h('div', { className: "wn-banner-icon" }, "⚔️"),
             h('div', { className: "wn-banner-title" }, "AURISAR"),
-            h('div', { className: "wn-banner-time" }, "now")
+            h('div', { className: "wn-banner-time" }, hasStarted ? "In Progress" : "now")
           ),
           h('div', { className: "wn-banner-workout" }, DEMO_WORKOUT.name),
+
+          // Show mini pizza tracker in the banner
+          miniPizzaTracker,
+
           h('div', { className: "wn-banner-sub" },
-            MILESTONES.length + " muscle groups · " +
-            DEMO_WORKOUT.exercises.length + " exercises · Tap to begin"
+            hasStarted
+              ? completed.size + "/" + DEMO_WORKOUT.exercises.length + " exercises · " + pct + "% complete · Tap to continue"
+              : MILESTONES.length + " muscle groups · " + DEMO_WORKOUT.exercises.length + " exercises · Tap to begin"
           )
         ),
 
         // Subtle hint
-        h('div', { className: "wn-lock-hint" }, "tap notification to start workout"),
+        h('div', { className: "wn-lock-hint" },
+          hasStarted ? "tap to continue your workout" : "tap notification to start workout"
+        ),
 
         // Close button at bottom
         h('div', {
@@ -120,7 +154,8 @@ function WorkoutNotificationMockup({ onClose }) {
         ),
         h('div', {
           className: "wn-tracker-close",
-          onClick: onClose
+          onClick: () => setView("lock"),
+          title: "Back to lock screen"
         }, "✕")
       ),
 
