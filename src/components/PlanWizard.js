@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useTransition, useEffect } from 'react';
+import React, { useState, useMemo, useTransition, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { calcExXP, calcDayXP, getMuscleColor, getTypeColor, hrRange } from '../utils/xp';
 import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } from '../utils/units';
@@ -17,6 +17,8 @@ function formatScheduledDate(dateStr) {
     return d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
   } catch(e) { return dateStr; }
 }
+
+function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); }; }
 
 function PlanWizard(props) {
   const { editPlan, templatePlan, profile, allExercises, allExById, onSave, onClose, onCompleteDayStart, onStartPlanWorkout, onDeletePlan, onSchedulePlan, onOpenExEditor, showToast } = props;
@@ -85,7 +87,9 @@ function PlanWizard(props) {
   // ── Picker state ──
   const [exPickerOpen, setExPickerOpen] = useState(false);
   const [bWoPickerOpen, setBWoPickerOpen] = useState(false);
+  const [pickerSearchDisplay, setPickerSearchDisplay] = useState("");
   const [pickerSearch, setPickerSearch] = useState("");
+  const debouncedSetSearch = useRef(debounce(v => setPickerSearch(v), 200)).current;
   const [pickerMuscle, setPickerMuscle] = useState("All");
   const [pickerMuscleOpen, setPickerMuscleOpen] = useState(false);
   const [pickerTypeFilter, setPickerTypeFilter] = useState("all");
@@ -124,6 +128,17 @@ function PlanWizard(props) {
     });
   },[bDays,bDayIdx,profile.chosenClass,allExById]);
 
+  const filteredExercises = useMemo(()=>{
+    const q=pickerSearch.toLowerCase().trim();
+    return allExercises.filter(e=>{
+      if(pickerMuscle!=="All"&&e.muscleGroup!==pickerMuscle) return false;
+      if(pickerTypeFilter!=="all"){const ty=(e.exerciseType||"").toLowerCase(),ca=(e.category||"").toLowerCase();if(!ty.includes(pickerTypeFilter)&&ca!==pickerTypeFilter) return false;}
+      if(pickerEquipFilter!=="all"&&(e.equipment||"bodyweight").toLowerCase()!==pickerEquipFilter) return false;
+      if(q&&!e.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  },[pickerSearch,pickerMuscle,pickerTypeFilter,pickerEquipFilter,allExercises]);
+
   // ── Functions ──
   function togglePlanEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedPlanEx(s=>({...s,[k]:!s[k]})); }
   function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
@@ -156,11 +171,11 @@ function PlanWizard(props) {
 
   function removeExFromDay(di,ei){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)}));}); }
 
-  function updateExInDay(di,ei,field,val){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})})); }
+  function updateExInDay(di,ei,field,val){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})}));}); }
 
-  function updateExInDayBatch(di,ei,fields){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,...fields})})); }
+  function updateExInDayBatch(di,ei,fields){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,...fields})}));}); }
 
-  function updateDayLabel(idx,val){ setBDays(days=>days.map((d,i)=>i!==idx?d:{...d,label:val})); }
+  function updateDayLabel(idx,val){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==idx?d:{...d,label:val}));}); }
 
   function planGroupSuperset(dayIdx, idxA, idxB) {
     startTransition(()=>{setBDays(days => days.map((d,di) => {
@@ -266,7 +281,7 @@ function PlanWizard(props) {
 
   function closePicker() {
     setExPickerOpen(false);
-    setPickerSearch(""); setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
+    setPickerSearchDisplay(""); setPickerSearch(""); setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
     setPickerSelected([]); setPickerConfigOpen(false);
   }
 
@@ -898,8 +913,8 @@ function PlanWizard(props) {
             )
             , React.createElement('div', {style:{marginBottom:8}},
               React.createElement('input', {className:"inp",style:{width:"100%",padding:"7px 11px",fontSize:".82rem"},
-                placeholder:"Search exercises\u2026", value:pickerSearch,
-                onChange:e=>setPickerSearch(e.target.value), autoFocus:true})
+                placeholder:"Search exercises\u2026", value:pickerSearchDisplay,
+                onChange:e=>{setPickerSearchDisplay(e.target.value);debouncedSetSearch(e.target.value);}, autoFocus:true})
             )
             , (()=>{
               const PTYPE_LABELS2={strength:"\u2694\uFE0F Strength",cardio:"\uD83C\uDFC3 Cardio",flexibility:"\uD83E\uDDD8 Flex",yoga:"\uD83E\uDDD8 Yoga",stretching:"\uD83C\uDF3F Stretch",plyometric:"\u26A1 Plyo",calisthenics:"\uD83E\uDD38 Cali"};
@@ -938,15 +953,9 @@ function PlanWizard(props) {
               );
             })()
             , (()=>{
-              const q=pickerSearch.toLowerCase().trim();
-              const filtered=allExercises.filter(e=>{
-                if(pickerMuscle!=="All"&&e.muscleGroup!==pickerMuscle) return false;
-                if(pickerTypeFilter!=="all"){const ty=(e.exerciseType||"").toLowerCase(),ca=(e.category||"").toLowerCase();if(!ty.includes(pickerTypeFilter)&&ca!==pickerTypeFilter) return false;}
-                if(pickerEquipFilter!=="all"&&(e.equipment||"bodyweight").toLowerCase()!==pickerEquipFilter) return false;
-                if(q&&!e.name.toLowerCase().includes(q)) return false;
-                return true;
-              });
+              const filtered=filteredExercises;
               if(filtered.length===0) return React.createElement('div',{className:"empty",style:{padding:"20px 0"}},"No exercises found.");
+              const q=pickerSearch.trim();
               const selIds=new Set(pickerSelected.map(e=>e.exId));
               const visible=filtered.slice(0,80);
               return React.createElement(React.Fragment,null,
