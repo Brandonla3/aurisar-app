@@ -77,6 +77,7 @@ function PlanWizard(props) {
   const [wizardWeekIdx, setWizardWeekIdx] = useState(0);
   const [collapsedWeeks, setCollapsedWeeks] = useState({});
   const [planWizardOpen, setPlanWizardOpen] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
   const [collapsedPlanEx, setCollapsedPlanEx] = useState({});
   const [ssAccordion, setSsAccordion] = useState({});
   const [ssCheckedPlan, setSsCheckedPlan] = useState(()=>new Set());
@@ -84,9 +85,9 @@ function PlanWizard(props) {
   // ── Picker state ──
   const [exPickerOpen, setExPickerOpen] = useState(false);
   const [bWoPickerOpen, setBWoPickerOpen] = useState(false);
-  const [pickerSearchDisplay, setPickerSearchDisplay] = useState("");
   const [pickerSearch, setPickerSearch] = useState("");
   const debouncedSetSearch = useRef(debounce(v => setPickerSearch(v), 200)).current;
+  const pickerSearchRef = useRef(null);
   const [pickerMuscle, setPickerMuscle] = useState("All");
   const [pickerMuscleOpen, setPickerMuscleOpen] = useState(false);
   const [pickerTypeFilter, setPickerTypeFilter] = useState("all");
@@ -278,7 +279,7 @@ function PlanWizard(props) {
 
   function closePicker() {
     setExPickerOpen(false);
-    setPickerSearchDisplay(""); setPickerSearch(""); setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
+    setPickerSearch(""); if(pickerSearchRef.current) pickerSearchRef.current.value=""; setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
     setPickerSelected([]); setPickerConfigOpen(false);
   }
 
@@ -532,7 +533,7 @@ function PlanWizard(props) {
                   className: `wizard-day-tab ${bDayIdx===globalIdx?"on":""}`,
                   onClick: ()=>setBDayIdx(globalIdx)
                 }
-                  , weekDays.length>1 && React.createElement('span', { style: {display:"flex",flexDirection:"column",gap:0,flexShrink:0}},
+                  , reorderMode && weekDays.length>1 && React.createElement('span', { style: {display:"flex",flexDirection:"column",gap:0,flexShrink:0}},
                     React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"1px 4px",fontSize:".5rem",lineHeight:1,minWidth:0,opacity:wi===0?.3:1}, disabled: wi===0, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx-1);}}, "\u25C0"),
                     React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"1px 4px",fontSize:".5rem",lineHeight:1,minWidth:0,opacity:wi===weekDays.length-1?.3:1}, disabled: wi===weekDays.length-1, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx+1);}}, "\u25B6")
                   )
@@ -544,6 +545,8 @@ function PlanWizard(props) {
               })
               , React.createElement('div', { className: "wizard-day-tab", style: {color:"#b4ac9e",borderStyle:"dashed",borderColor:"rgba(180,172,158,.12)",minWidth:52},
                 onClick: addDayToBuilder}, "\uFF0B")
+              , weekDays.length>1 && React.createElement('div', { className: `wizard-day-tab ${reorderMode?"on":""}`, style: {minWidth:52,fontSize:".52rem",cursor:"pointer",borderColor:reorderMode?"rgba(180,172,158,.15)":"rgba(180,172,158,.06)"},
+                onClick: ()=>setReorderMode(r=>!r)}, reorderMode?"\u2713 Done":"\u21C4 Reorder")
             );
           })()
 
@@ -900,8 +903,8 @@ function PlanWizard(props) {
             )
             , React.createElement('div', {style:{marginBottom:8}},
               React.createElement('input', {className:"inp",style:{width:"100%",padding:"7px 11px",fontSize:".82rem"},
-                placeholder:"Search exercises\u2026", value:pickerSearchDisplay,
-                onChange:e=>{setPickerSearchDisplay(e.target.value);debouncedSetSearch(e.target.value);}, autoFocus:true})
+                placeholder:"Search exercises\u2026", ref:pickerSearchRef,
+                onChange:e=>debouncedSetSearch(e.target.value), autoFocus:true})
             )
             , (()=>{
               const PTYPE_LABELS2={strength:"\u2694\uFE0F Strength",cardio:"\uD83C\uDFC3 Cardio",flexibility:"\uD83E\uDDD8 Flex",yoga:"\uD83E\uDDD8 Yoga",stretching:"\uD83C\uDF3F Stretch",plyometric:"\u26A1 Plyo",calisthenics:"\uD83E\uDD38 Cali"};
