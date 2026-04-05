@@ -30,6 +30,6 @@ function _optionalChain(ops) {
 
 const uid = () => Math.random().toString(36).slice(2,9);
 const clone = obj => JSON.parse(JSON.stringify(obj));
-const todayStr = () => new Date().toISOString().slice(0,10);
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 export { _nullishCoalesce, _optionalChain, uid, clone, todayStr };
