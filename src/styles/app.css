@@ -203,7 +203,6 @@
     .bday-tab:hover .bday-tab-del{opacity:1}
     .builder-ex-row{display:flex;align-items:center;gap:7px;padding:7px 9px;background:rgba(45,42,36,.12);border:1px solid rgba(45,42,36,.15);border-radius:8px;margin-bottom:5px}
     .builder-ex-row:focus{outline:none}
-    .dragging{border-color:rgba(180,172,158,.1) !important;background:rgba(45,42,36,.16) !important}
     .week-group{border:1px solid rgba(180,172,158,.05);border-radius:10px;margin-bottom:8px;overflow:hidden}
     .week-group-hdr{display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(45,42,36,.16);cursor:pointer;user-select:none}
     .week-group-hdr:hover{background:rgba(45,42,36,.2)}
@@ -595,12 +594,11 @@
     .ss-section-hdr:hover{background:rgba(138,143,150,.04)}
     .ss-section-body{padding:4px 12px 10px}
     .ab-badge{width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(138,143,150,.3);display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700;color:#8a8f96;flex-shrink:0}
-    .builder-ex-row{display:flex;align-items:center;gap:7px;padding:9px 11px;background:linear-gradient(145deg,rgba(45,42,36,.15),rgba(45,42,36,.08));border:1px solid rgba(180,172,158,.05);border-radius:10px;margin-bottom:5px;transition:all .18s;position:relative;overflow:hidden}
+    .builder-ex-row{display:flex;align-items:center;gap:7px;padding:9px 11px;background:linear-gradient(145deg,rgba(45,42,36,.15),rgba(45,42,36,.08));border:1px solid rgba(180,172,158,.05);border-radius:10px;margin-bottom:5px;transition:border-color .18s,background .18s;position:relative}
     .builder-ex-row::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:var(--cat-color,rgba(180,172,158,.12));opacity:.35;transition:opacity .22s}
     .builder-ex-row::after{content:'';position:absolute;top:0;left:0;bottom:0;width:2px;background:var(--cat-color,rgba(180,172,158,.12));opacity:.5}
     .builder-ex-row:hover{border-color:color-mix(in srgb,var(--cat-color,#b4ac9e) 28%,transparent)}
     .builder-ex-row:hover::before{opacity:.75}
-    .builder-ex-row.dragging{border-color:var(--cat-color,rgba(180,172,158,.15));background:color-mix(in srgb,var(--cat-color,#b4ac9e) 6%,transparent)}
     /* Grimoire-style icon orb for builder rows */
     .builder-ex-orb{width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 40% 35%,color-mix(in srgb,var(--cat-color,#b4ac9e) 22%,rgba(32,30,26,.7)),rgba(32,30,26,.25));border:1px solid color-mix(in srgb,var(--cat-color,#b4ac9e) 30%,transparent);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem;box-shadow:0 2px 8px rgba(0,0,0,.4),inset 0 0 6px rgba(0,0,0,.35)}
     .builder-ex-name-styled{font-family:'Cinzel',serif;font-size:.68rem;color:color-mix(in srgb,var(--cat-color,#b4ac9e) 25%,#d8caba);letter-spacing:.02em;flex:1;min-width:0}
