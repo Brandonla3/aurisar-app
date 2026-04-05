@@ -119,6 +119,10 @@ function App() {
   const [editMode,setEditMode] = useState(false);
   const [securityMode,setSecurityMode] = useState(false);
   const [notifMode,setNotifMode] = useState(false);
+  // Personal Bests filter
+  const LEADERBOARD_PB_IDS = new Set(["bench","bench_press","squat","barbell_back_squat","deadlift","barbell_deadlift","overhead_press","ohp","pull_up","pullups","push_up","pushups","running","treadmill_run","run"]);
+  const [pbFilterOpen,setPbFilterOpen] = useState(false);
+  const [pbSelectedFilters,setPbSelectedFilters] = useState(null);
   // Email change
   const [emailPanelOpen,setEmailPanelOpen] = useState(false);
   const [newEmail,setNewEmail] = useState("");
@@ -6864,6 +6868,13 @@ function App() {
                   , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".58rem",flexShrink:0}, onClick:()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "Edit")
                 )
 
+                /* Action buttons */
+                , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:11}}
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "✎ Edit"  )
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setNotifMode(false);setSecurityMode(true);}}, "🔒 Security" )
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setSecurityMode(false);setNotifMode(true);}}, "🔔 Alerts" )
+                )
+
                 /* ── IDENTITY SECTION — Name visibility with App/Game/Hide toggles ── */
                 , (()=>{
                   const nv = profile.nameVisibility || { displayName:["app","game"], realName:["hide"] };
@@ -6948,28 +6959,84 @@ function App() {
                   const pbEntries = Object.entries(allPBs);
                   if(pbEntries.length === 0) return null;
                   const metric = isMetric(profile.units);
+
+                  // Compute effective selection: leaderboard PBs pre-selected by default
+                  const effectiveSelected = pbSelectedFilters === null
+                    ? pbEntries.filter(([id]) => LEADERBOARD_PB_IDS.has(id)).map(([id]) => id)
+                    : pbSelectedFilters;
+
+                  // Build options for the filter dropdown
+                  const pbOptions = pbEntries.map(([exId]) => {
+                    const ex = EX_BY_ID[exId];
+                    return { id: exId, label: ex ? ex.name : exId, icon: ex ? ex.icon : "💪" };
+                  });
+
+                  // Filter visible entries
+                  const visibleEntries = pbEntries.filter(([exId]) => effectiveSelected.includes(exId));
+
+                  // PB Filter Dropdown
+                  const chipLabel = effectiveSelected.length === pbOptions.length ? "All PBs"
+                    : effectiveSelected.length === 0 ? "Filter PBs"
+                    : effectiveSelected.length <= 2 ? effectiveSelected.map(id=>{const ex=EX_BY_ID[id]; return ex?ex.name:id;}).join(", ")
+                    : effectiveSelected.length+" selected";
+
+                  const filterDrop = React.createElement('div', {style:{position:"relative",marginBottom:8}},
+                    React.createElement('div', {
+                      style:{background:pbFilterOpen?"rgba(45,42,36,.45)":"rgba(45,42,36,.2)",border:"1px solid "+(pbFilterOpen?"rgba(180,172,158,.12)":"rgba(180,172,158,.06)"),borderRadius:8,padding:"7px 10px",fontSize:".6rem",fontWeight:600,color:effectiveSelected.length===0?"#5a5650":"#b4ac9e",cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all .15s",userSelect:"none"},
+                      onClick:()=>setPbFilterOpen(!pbFilterOpen)
+                    },
+                      React.createElement('span',{style:{fontSize:".7rem"}}, "🏆"),
+                      React.createElement('span',{style:{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, chipLabel),
+                      React.createElement('span',{style:{fontSize:".46rem",color:"#5a5650",flexShrink:0}}, pbFilterOpen?"▲":"▼")
+                    ),
+                    pbFilterOpen && React.createElement('div', {style:{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:60,background:"#16160f",border:"1px solid rgba(180,172,158,.1)",borderRadius:10,boxShadow:"0 8px 32px rgba(0,0,0,.6)",overflow:"hidden"}},
+                      React.createElement('div',{style:{display:"flex",justifyContent:"space-between",padding:"8px 10px",borderBottom:"1px solid rgba(180,172,158,.06)",background:"rgba(45,42,36,.15)"}},
+                        React.createElement('span',{style:{fontSize:".56rem",color:"#b4ac9e",cursor:"pointer",fontWeight:600},onClick:()=>setPbSelectedFilters(pbOptions.map(o=>o.id))}, "Select All"),
+                        React.createElement('span',{style:{fontSize:".56rem",color:"#e05555",cursor:"pointer",fontWeight:600},onClick:()=>setPbSelectedFilters([])}, "Clear All")
+                      ),
+                      React.createElement('div',{style:{maxHeight:200,overflowY:"auto",padding:"4px 4px",scrollbarWidth:"thin",scrollbarColor:"rgba(180,172,158,.15) transparent"}},
+                        pbOptions.map(opt => {
+                          const on = effectiveSelected.includes(opt.id);
+                          return React.createElement('div', {key:opt.id, style:{display:"flex",alignItems:"center",gap:7,padding:"6px 8px",cursor:"pointer",borderRadius:5,background:on?"rgba(180,172,158,.07)":"transparent",transition:"background .1s",fontSize:".62rem",color:on?"#d4cec4":"#6a645a"},
+                            onClick:()=>{const newSel = on ? effectiveSelected.filter(s=>s!==opt.id) : [...effectiveSelected, opt.id]; setPbSelectedFilters(newSel);}
+                          },
+                            React.createElement('span',{style:{width:15,height:15,borderRadius:3,border:"1.5px solid "+(on?"#b4ac9e":"rgba(180,172,158,.12)"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:".52rem",color:"#b4ac9e",flexShrink:0,background:on?"rgba(180,172,158,.08)":"transparent"}}, on?"✓":""),
+                            React.createElement('span',{style:{fontSize:".7rem",marginRight:4}}, opt.icon),
+                            opt.label
+                          );
+                        })
+                      ),
+                      React.createElement('div',{style:{padding:"6px 10px",borderTop:"1px solid rgba(180,172,158,.06)",background:"rgba(45,42,36,.1)"}},
+                        React.createElement('div',{style:{textAlign:"center",fontSize:".58rem",color:"#b4ac9e",cursor:"pointer",fontWeight:600,padding:"4px 0"},onClick:()=>setPbFilterOpen(false)}, "✓ Done ("+effectiveSelected.length+")")
+                      )
+                    )
+                  );
+
                   return React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11} }
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ Personal Bests ⠿"))
-                    , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6} }
-                      , pbEntries.map(([exId, pb]) => {
-                        const ex = EX_BY_ID[exId];
-                        const name = ex ? ex.name : exId;
-                        const icon = ex ? ex.icon : "💪";
-                        let valDisp = "";
-                        if(pb.type === "cardio") {
-                          valDisp = metric ? parseFloat((pb.value*1.60934).toFixed(2))+" min/km" : parseFloat(pb.value.toFixed(2))+" min/mi";
-                        } else if(pb.type === "assisted") {
-                          valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " (Assisted)";
-                        } else {
-                          valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " 1RM";
-                        }
-                        return React.createElement('div', { key: exId, style: {display:"flex",alignItems:"center",gap:8,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)"} }
-                          , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0} }, icon)
-                          , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"} }, name)
-                          , React.createElement('span', { style: {fontSize:".68rem",color:"#b4ac9e",fontWeight:600,flexShrink:0,fontFamily:"'Inter',sans-serif"} }, "🏆 ", valDisp)
-                        );
-                      })
-                    )
+                    , filterDrop
+                    , visibleEntries.length === 0
+                      ? React.createElement('div', {style:{textAlign:"center",fontSize:".62rem",color:"#5a5650",padding:"10px 0"}}, "Use the filter above to select which Personal Bests to display.")
+                      : React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6} }
+                        , visibleEntries.map(([exId, pb]) => {
+                          const ex = EX_BY_ID[exId];
+                          const name = ex ? ex.name : exId;
+                          const icon = ex ? ex.icon : "💪";
+                          let valDisp = "";
+                          if(pb.type === "cardio") {
+                            valDisp = metric ? parseFloat((pb.value*1.60934).toFixed(2))+" min/km" : parseFloat(pb.value.toFixed(2))+" min/mi";
+                          } else if(pb.type === "assisted") {
+                            valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " (Assisted)";
+                          } else {
+                            valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " 1RM";
+                          }
+                          return React.createElement('div', { key: exId, style: {display:"flex",alignItems:"center",gap:8,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)"} }
+                            , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0} }, icon)
+                            , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"} }, name)
+                            , React.createElement('span', { style: {fontSize:".68rem",color:"#b4ac9e",fontWeight:600,flexShrink:0,fontFamily:"'Inter',sans-serif"} }, "🏆 ", valDisp)
+                          );
+                        })
+                      )
                   );
                 })()
 
@@ -7019,12 +7086,6 @@ function App() {
                   )
                 ) : null
 
-                /* Action buttons */
-                , React.createElement('div', { style: {display:"flex",gap:8}}
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "✎ Edit"  )
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setNotifMode(false);setSecurityMode(true);}}, "🔒 Security" )
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setSecurityMode(false);setNotifMode(true);}}, "🔔 Alerts" )
-                )
               )
             )
 
