@@ -2,28 +2,28 @@ import React from 'react';
 import { EXERCISES } from '../data/exercises';
 import { EX_BY_ID } from '../data/constants';
 
-let _ymoveLoaded = false;
-let _ymoveCallbacks = [];
+let _exercisesLoaded = false;
+let _exerciseCallbacks = [];
 
-function _notifyYMoveLoaded() {
-  _ymoveLoaded = true;
-  _ymoveCallbacks.forEach(fn => fn());
-  _ymoveCallbacks = [];
+function _notifyExercisesLoaded() {
+  _exercisesLoaded = true;
+  _exerciseCallbacks.forEach(fn => fn());
+  _exerciseCallbacks = [];
 }
-function onYMoveLoaded(fn) {
-  if (_ymoveLoaded) { fn(); return; }
-  _ymoveCallbacks.push(fn);
+function onExercisesLoaded(fn) {
+  if (_exercisesLoaded) { fn(); return; }
+  _exerciseCallbacks.push(fn);
 }
 
-async function loadYMoveExercises() {
-  if (_ymoveLoaded) return;
+async function loadExercises() {
+  if (_exercisesLoaded) return;
   try {
     const { data, error } = await sb
       .from('exercise_library')
       .select('*')
       .order('name');
     if (error) throw error;
-    if (!data || data.length === 0) { _notifyYMoveLoaded(); return; }
+    if (!data || data.length === 0) { _notifyExercisesLoaded(); return; }
 
     const existingIds = new Set(EXERCISES.map(e => e.id));
     let added = 0, patched = 0;
@@ -66,8 +66,8 @@ async function loadYMoveExercises() {
         hasElliptical:   ex.id === 'elliptical',
         videoUrl:        ex.video_url || null,
         thumbnailUrl:    ex.thumbnail_url || null,
-        ymoveUuid:       ex.ymove_uuid || null,
-        ymoveSlug:       ex.ymove_slug || null,
+        videoUuid:       ex.video_uuid || null,
+        videoSlug:       ex.video_slug || null,
         hasVideo:        ex.has_video || false,
         urlExpiresAt:    ex.url_expires_at || null,
         xpClassMap:      ex.xp_class_map || {},
@@ -103,26 +103,26 @@ async function loadYMoveExercises() {
   } catch (err) {
     console.warn('Exercise library load failed (using hardcoded set):', err.message);
   }
-  _notifyYMoveLoaded();
+  _notifyExercisesLoaded();
 }
 
-// Re-render hook — triggers when YMove exercises finish loading
-function useYMoveExercises() {
-  const [ready, setReady] = React.useState(_ymoveLoaded);
+// Re-render hook — triggers when exercises finish loading
+function useExercises() {
+  const [ready, setReady] = React.useState(_exercisesLoaded);
   React.useEffect(() => {
-    if (!_ymoveLoaded) onYMoveLoaded(() => setReady(true));
+    if (!_exercisesLoaded) onExercisesLoaded(() => setReady(true));
   }, []);
   return ready;
 }
 
 // -- Video URL fetcher via Supabase RPC (server-side, no CORS) --
-const _ymoveFetchCache = {}; // prevents duplicate in-flight requests
+const _videoUrlCache = {}; // prevents duplicate in-flight requests
 
 async function getFreshVideoUrl(exerciseId) {
   const ex = EX_BY_ID[exerciseId];
   if (!ex) return null;
 
-  // If exercise has no YMove mapping and no existing URL, nothing to do
+  // If exercise has no video mapping and no existing URL, nothing to do
   if (!ex.hasVideo && !ex.videoUrl) return null;
 
   // Check if we have a valid in-memory cached URL (30+ min remaining)
@@ -133,15 +133,15 @@ async function getFreshVideoUrl(exerciseId) {
   }
 
   // Deduplicate concurrent requests for same exercise
-  if (_ymoveFetchCache[exerciseId]) return _ymoveFetchCache[exerciseId];
+  if (_videoUrlCache[exerciseId]) return _videoUrlCache[exerciseId];
 
   const promise = (async () => {
     try {
-      // Call server-side RPC — this handles YMove API call + Supabase caching
-      const { data, error } = await sb.rpc('get_ymove_video_url', { p_exercise_id: exerciseId });
+      // Call server-side RPC — handles video API call + Supabase caching
+      const { data, error } = await sb.rpc('get_exercise_video_url', { p_exercise_id: exerciseId });
       if (error) { console.warn('Video RPC error:', error.message); return null; }
       if (!data || data.error || !data.video_url) {
-        if (data?.error) console.warn('YMove:', data.error);
+        if (data?.error) console.warn('Video URL fetch:', data.error);
         return null;
       }
 
@@ -158,12 +158,12 @@ async function getFreshVideoUrl(exerciseId) {
       console.warn('Video fetch error:', e.message);
       return null;
     } finally {
-      delete _ymoveFetchCache[exerciseId];
+      delete _videoUrlCache[exerciseId];
     }
   })();
 
-  _ymoveFetchCache[exerciseId] = promise;
+  _videoUrlCache[exerciseId] = promise;
   return promise;
 }
 
-export { _ymoveLoaded, _notifyYMoveLoaded, onYMoveLoaded, loadYMoveExercises, useYMoveExercises, getFreshVideoUrl };
+export { _exercisesLoaded, _notifyExercisesLoaded, onExercisesLoaded, loadExercises, useExercises, getFreshVideoUrl };

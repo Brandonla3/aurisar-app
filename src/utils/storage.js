@@ -4,16 +4,18 @@ import { STORAGE_KEY } from '../data/constants';
 async function loadSave(userId) {
   if(userId) {
     try {
-      // Race Supabase against a 4s timeout — fall back to localStorage if slow
+      // Race Supabase against a 4s timeout
       const supabaseLoad = sb.from("profiles").select("data").eq("id",userId).single();
       const timeout = new Promise((_,reject) => setTimeout(()=>reject(new Error("timeout")), 4000));
       const {data,error} = await Promise.race([supabaseLoad, timeout]);
-      if(!error && data) return data.data;
+      // PGRST116 = no row found (new user with no saved profile yet) — return null cleanly
+      if(!error || error.code === "PGRST116") return data?.data ?? null;
     } catch(e) {
-      // Timeout or network error — fall through to localStorage
+      // Timeout or network error — return null rather than leaking another user's localStorage data
     }
+    return null;
   }
-  // Fallback to localStorage
+  // No userId — unauthenticated/offline fallback only
   try { const r=localStorage.getItem(STORAGE_KEY); return r?JSON.parse(r):null; } catch(e) { return null; }
 }
 
