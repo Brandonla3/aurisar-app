@@ -2048,6 +2048,8 @@ function App() {
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
   function openStatsPromptIfNeeded(wo, onConfirm) {
+    const _bsPrefs = profile.notificationPrefs || {};
+    if (_bsPrefs.reviewBattleStats !== true) { onConfirm(wo); return; }
     const hasDur = wo.durationMin!==null && wo.durationMin!==undefined && wo.durationMin!=="";
     const hasAct = wo.activeCal!==null && wo.activeCal!==undefined && wo.activeCal!=="";
     const hasTot = wo.totalCal!==null && wo.totalCal!==undefined && wo.totalCal!=="";
@@ -7541,6 +7543,7 @@ function App() {
                     {key:"friendRequest", icon:"🤝", label:"Friend Requests", desc:"When someone sends you a friend request"},
                     {key:"friendAccepted", icon:"✅", label:"Request Accepted", desc:"When someone accepts your friend request"},
                     {key:"messageReceived", icon:"💬", label:"New Messages", desc:"Email me when I receive a new direct message", defaultOff:true},
+                    {key:"reviewBattleStats", icon:"📊", label:"Review Battle Stats", desc:"Remind me to input Duration, Total Calories & Active Calories for each completed Workout or Exercise", defaultOff:true},
                   ];
                   return React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:8} }
                     , items.map(item => {
@@ -8648,6 +8651,22 @@ function App() {
         React.createElement('div', { className: "modal-backdrop", onClick: ()=>setStatsPromptModal(null)}
           , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
             , React.createElement('div', { className: "modal-body"}
+              /* ── Glass dismiss banner ── */
+              , React.createElement('div', {
+                  style: {background:"rgba(45,42,36,.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1px solid rgba(180,172,158,.10)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10,cursor:"pointer"},
+                  onClick: ()=>{
+                    setProfile(p=>({...p,notificationPrefs:{...(p.notificationPrefs||{}),reviewBattleStats:false}}));
+                    statsPromptModal.onConfirm(statsPromptModal.wo);
+                    setStatsPromptModal(null); setSpMakeReusable(false); setSpDurSec("");
+                  }
+                }
+                , React.createElement('div', { style: {width:16,height:16,borderRadius:3,border:"1.5px solid rgba(180,172,158,.25)",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0} })
+                , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",lineHeight:1.35} }
+                  , "Want this reminder off? Check here. To re-enable, you can do so in "
+                  , React.createElement('span', { style: {color:"#b4ac9e",fontWeight:600} }, "Alerts settings")
+                  , "."
+                )
+              )
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10} }
                 , React.createElement('div', null
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}},
