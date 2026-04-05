@@ -3884,7 +3884,7 @@ function App() {
                           style:{width:"100%",background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer"}
                         }, (profile.favoriteExercises||[]).includes(libDetailEx.id)?"⭐ Saved to Favorites":"☆ Save to Favorites"),
                         React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
-                          React.createElement('button', {
+                          libDetailEx.id!=="rest_day"&&React.createElement('button', {
                             onClick:()=>{
                               const exEntry = {exId:libDetailEx.id,sets:(libDetailEx.defaultSets!=null?libDetailEx.defaultSets:3),reps:(libDetailEx.defaultReps!=null?libDetailEx.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};
                               setAddToWorkoutPicker({exercises:[exEntry]});
@@ -8616,7 +8616,7 @@ function App() {
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{openScheduleEx(ex.id);setSelEx(null);}}, "📅 Schedule" )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
                   /* Secondary actions — add to existing workout / plan */
                   , React.createElement('div', { style: {display:"flex",gap:6}}
