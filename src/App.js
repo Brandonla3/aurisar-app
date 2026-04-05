@@ -2048,6 +2048,10 @@ function App() {
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
   function openStatsPromptIfNeeded(wo, onConfirm) {
+    // Skip stats modal entirely for rest-day-only workouts
+    const isRestDayOnly = (wo.soloEx && wo._soloExId === "rest_day") ||
+      (wo.exercises && wo.exercises.length > 0 && wo.exercises.every(e => e.exId === "rest_day"));
+    if (isRestDayOnly) { onConfirm(wo); return; }
     const _bsPrefs = profile.notificationPrefs || {};
     if (_bsPrefs.reviewBattleStats === false) { onConfirm(wo); return; }
     const hasDur = wo.durationMin!==null && wo.durationMin!==undefined && wo.durationMin!=="";
@@ -3882,7 +3886,7 @@ function App() {
                           style:{width:"100%",background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer"}
                         }, (profile.favoriteExercises||[]).includes(libDetailEx.id)?"⭐ Saved to Favorites":"☆ Save to Favorites"),
                         React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
-                          React.createElement('button', {
+                          libDetailEx.id!=="rest_day"&&React.createElement('button', {
                             onClick:()=>{
                               const exEntry = {exId:libDetailEx.id,sets:(libDetailEx.defaultSets!=null?libDetailEx.defaultSets:3),reps:(libDetailEx.defaultReps!=null?libDetailEx.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};
                               setAddToWorkoutPicker({exercises:[exEntry]});
@@ -4468,7 +4472,7 @@ function App() {
                               , exD.name
                               , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:5}}, "custom")
                             )
-                            , React.createElement('div', { className: "workout-detail-ex-meta"}
+                            , ex.exId!=="rest_day"&&React.createElement('div', { className: "workout-detail-ex-meta"}
                               , ex.sets, "×", ex.reps, isC||isF?" min":""
                               , showW&&ex.weightLbs?React.createElement('span', { style: {color:"#8a8478",marginLeft:6}}, metric?lbsToKg(ex.weightLbs)+" kg":ex.weightLbs+" lbs"):""
                             )
@@ -4712,12 +4716,12 @@ function App() {
                                 )
                                 , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
                                 , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
-                                , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
+                                , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
                                 , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
                                 , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
                                 , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: e=>{e.stopPropagation();removeWbEx(i);}}, "✕")
                               )
-                              , !collapsed&&React.createElement(React.Fragment, null
+                              , !collapsed&&exD.id!=="rest_day"&&React.createElement(React.Fragment, null
                                 /* Sets + Reps/Duration + Weight row */
                                 , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
                                   , !noSetsEx&&React.createElement('div', { style: {flex:1}}
@@ -5048,11 +5052,10 @@ function App() {
                         React.createElement('div', { key: type}
                           , React.createElement('div', { className: "sec", style: {textTransform:"capitalize",marginBottom:8}}, type, " Plans" )
                           , typePlans.map(tpl=>{
-                            const isRec = tpl.bestFor.includes(profile.chosenClass);
-                            const tplXP = calcPlanXP(tpl,profile.chosenClass,allExById);
-                            const activeDays = tpl.days.filter(d=>d.exercises.length>0);
-                            const allTplExIds = [...new Set(tpl.days.flatMap(d=>d.exercises.map(e=>e.exId)))];
                             const isCollapsed = !!collapsedTpls[tpl.id];
+                            const isRec = tpl.bestFor.includes(profile.chosenClass);
+                            const activeDays = tpl.days.filter(d=>d.exercises.length>0);
+                            const tplXP = calcPlanXP(tpl,profile.chosenClass,allExById);
                             return (
                               React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:10}}
                                 /* Header — always visible, click to collapse */
@@ -5085,8 +5088,9 @@ function App() {
                                   )
                                 )
                                 /* Expanded content */
-                                , !isCollapsed&&(
-                                  React.createElement('div', { style: {marginTop:10}}
+                                , !isCollapsed&&(()=>{
+                                  const allTplExIds = [...new Set(tpl.days.flatMap(d=>d.exercises.map(e=>e.exId)))];
+                                  return React.createElement('div', { style: {marginTop:10}}
                                     , React.createElement('div', { className: "workout-ex-pill-row", style: {marginBottom:10}}
                                       , allTplExIds.slice(0,6).map((exId,i)=>{
                                         const exD=allExById[exId];
@@ -5118,8 +5122,8 @@ function App() {
 
                                       )
                                     )
-                                  )
-                                )
+                                  );
+                                })()
                               )
                             );
                           })
@@ -5223,7 +5227,7 @@ function App() {
                                       , React.createElement('span', { className: "plan-ex-icon"}, exData.icon)
                                       , React.createElement('div', { style: {flex:1,minWidth:0}}
                                         , React.createElement('div', { className: "plan-ex-name"}, exData.name)
-                                        , React.createElement('div', { className: "plan-ex-sets"}
+                                        , exData.id!=="rest_day"&&React.createElement('div', { className: "plan-ex-sets"}
                                           , noSetsEx?"":ex.sets+"×", ex.reps
                                           , ex.weightLbs&&React.createElement('span', { style: {color:"#8a8478",marginLeft:5}}, metric?lbsToKg(ex.weightLbs)+" kg":ex.weightLbs+" lbs")
                                           , ex.durationMin&&React.createElement('span', { style: {color:"#8a8478",marginLeft:5}}, ex.durationMin, " min" )
@@ -5242,7 +5246,7 @@ function App() {
                                         )
                                       )
                                     )
-                                    , !collapsed&&React.createElement(React.Fragment, null
+                                    , !collapsed&&exData.id!=="rest_day"&&React.createElement(React.Fragment, null
                                       /* Sets + Reps/Duration + Weight */
                                       , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
                                         , !noSetsEx&&React.createElement('div', { style: {flex:1}}
@@ -8176,6 +8180,7 @@ function App() {
               , (()=>{
                 const q   = pickerSearch.toLowerCase().trim();
                 const filtered = allExercises.filter(e=>{
+                  if(e.id==="rest_day") return false; // Rest Day is plan-only
                   if(pickerMuscle!=="All" && e.muscleGroup!==pickerMuscle) return false;
                   if(pickerTypeFilter!=="all"){
                     const ty=(e.exerciseType||"").toLowerCase(), ca=(e.category||"").toLowerCase();
@@ -8484,8 +8489,9 @@ function App() {
               )
               , React.createElement('div', { style: {padding:"0 14px"}}
                 , React.createElement('div', { className: "log-form"}
+                  , ex.id==="rest_day" ? React.createElement('div', { style: {textAlign:"center",padding:"18px 0",color:"#8a8478",fontSize:".78rem",fontStyle:"italic"}}, "🛌 Rest day — no stats to track. Recover well!") : null
                   /* Top row: Sets/Reps or Duration+Sec+Dist, then Weight */
-                  , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
                     , !noSets&&!(isCardio||isFlex)&&React.createElement('div', { style: {flex:1}}
                       , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
                       , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: "3"})
@@ -8515,7 +8521,7 @@ function App() {
                     ))
                   )
                   /* Extra rows */
-                  , React.createElement('div', { style: {marginBottom:9}}
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9}}
                     , quickRows.map((row,ri)=>(
                       React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
                         , React.createElement('span', { style: {fontSize:".6rem",color:"#a09080",flexShrink:0,minWidth:18}}, isCardio||isFlex?`I${ri+2}`:`S${ri+2}`)
@@ -8538,34 +8544,34 @@ function App() {
                     ))
                   )
                   /* Distance bonus info (field is now in top row) */
-                  , showDist&&rawDist>0&&(
+                  , ex.id!=="rest_day"&&showDist&&rawDist>0&&(
                     React.createElement('div', { style: {fontSize:".62rem",color:"#6a645a",marginBottom:6,marginTop:-4}}
                       , metric?`${rawDist} km = ${parseFloat(kmToMi(rawDist)).toFixed(2)} mi`:`${rawDist} mi = ${parseFloat(miToKm(rawDist)).toFixed(2)} km`
                       , React.createElement('span', { style: {color:"#e67e22",marginLeft:6}}, "+", Math.round(Math.min(distMi*0.05,0.5)*100), "% dist bonus"  )
                     )
                   )
                   /* Treadmill: Incline + Speed */
-                  , isTreadmill&&(
+                  , ex.id!=="rest_day"&&isTreadmill&&(
                     React.createElement('div', { style: {display:"flex",gap:8,marginBottom:10}}
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Incline (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exIncline||"", onChange: e=>setExIncline(e.target.value?parseFloat(e.target.value):null)}))
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Speed (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exSpeed||"", onChange: e=>setExSpeed(e.target.value?parseFloat(e.target.value):null)}))
                     )
                   )
                   /* Intervals toggle — all cardio */
-                  , showHR&&(
+                  , ex.id!=="rest_day"&&showHR&&(
                     React.createElement('button', { style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",background:exIntervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",border:`1.5px solid ${exIntervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,color:exIntervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer"}, onClick: ()=>setExIntervals(v=>!v)}, "⚡ Intervals "
                         , exIntervals?"ON · +25% XP":"OFF"
                     )
                   )
                   /* Add Row button */
-                  , (isCardio||isFlex||showWeight)&&(
+                  , ex.id!=="rest_day"&&(isCardio||isFlex||showWeight)&&(
                     React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
                       onClick: ()=>setQuickRows([...quickRows,(isCardio||isFlex)?{hhmm:"",sec:"",dist:"",incline:"",speed:""}:{sets:sets||"",reps:reps||"",weightLbs:exWeight||""}])}, "＋ Add Row ("
                          , isCardio||isFlex?"e.g. interval":"progressive weight/sets", ")"
                     )
                   )
                   /* Weight Intensity slider (weight field is now in top row) */
-                  , showWeight&&(
+                  , ex.id!=="rest_day"&&showWeight&&(
                     React.createElement('div', { style: {marginBottom:11}}
                       , React.createElement('div', { className: "intensity-row"}
                         , React.createElement('label', { style: {marginBottom:0,flex:1}}, "Weight Intensity" )
@@ -8578,7 +8584,7 @@ function App() {
                     )
                   )
                   /* Avg HR Zone — last */
-                  , showHR&&(
+                  , ex.id!=="rest_day"&&showHR&&(
                     React.createElement('div', { style: {marginBottom:11}}
                       , React.createElement('label', null, "Avg Heart Rate Zone "    , profile.age?`(Age ${profile.age})`:"")
                       , React.createElement('div', { className: "hr-zone-row"}
@@ -8598,12 +8604,12 @@ function App() {
                     )
                   )
                   /* Personal Best display */
-                  , (isRunning&&pbDisp||exPBDisp4) && React.createElement('div', { style: {fontSize:".68rem",color:"#b4ac9e",marginBottom:7,display:"flex",alignItems:"center",gap:5} }
+                  , ex.id!=="rest_day"&&(isRunning&&pbDisp||exPBDisp4) && React.createElement('div', { style: {fontSize:".68rem",color:"#b4ac9e",marginBottom:7,display:"flex",alignItems:"center",gap:5} }
                     , React.createElement('span', null, "🏆")
                     , React.createElement('span', null, "Current PB: ", isRunning&&pbDisp?pbDisp:exPBDisp4)
                   )
                   /* XP estimate */
-                  , React.createElement('div', { style: {marginBottom:9,fontSize:".7rem",color:"#8a8478",fontStyle:"italic"}}, "Est. XP: "
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9,fontSize:".7rem",color:"#8a8478",fontStyle:"italic"}}, "Est. XP: "
                       , React.createElement('span', { style: {color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, estXP)
                     , showHR&&hrZone&&React.createElement('span', { style: {color:"#e67e22",marginLeft:6}}, "Z", hrZone, " +" , ((hrZone-1)*4), "% XP" )
                     , showWeight&&effW>0&&React.createElement('span', { style: {color:"#2ecc71",marginLeft:6}}, "+", Math.round(Math.min(effW/500,0.3)*100), "% wt bonus"  )
@@ -8613,11 +8619,11 @@ function App() {
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{openScheduleEx(ex.id);setSelEx(null);}}, "📅 Schedule" )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
                   /* Secondary actions — add to existing workout / plan */
                   , React.createElement('div', { style: {display:"flex",gap:6}}
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
                       onClick: ()=>{
                         const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
                         setAddToWorkoutPicker({exercises:[exEntry]});
@@ -8631,7 +8637,7 @@ function App() {
                         setSpwName(ex.name);setSpwIcon(ex.icon||"📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                         setSelEx(null);
                       }}, "📋 Add to Plan"   )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
                       onClick: ()=>{
                         const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
                         setWbExercises([exEntry]);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
