@@ -1765,6 +1765,19 @@ function App() {
     setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
     setWbLabels([]); setNewLabelInput("");
   }
+  function saveAsNewWorkout() {
+    if(!wbName.trim()) { showToast("Name your workout first!"); return; }
+    if(wbExercises.length===0) { showToast("Add at least one exercise."); return; }
+    const w = {id:uid(), name:wbName.trim(), icon:wbIcon, desc:wbDesc.trim(),
+      exercises:wbExercises, createdAt:new Date().toLocaleDateString(),
+      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null,
+      labels:wbLabels};
+    setProfile(pr=>({...pr, workouts:[w,...(pr.workouts||[])]}));
+    showToast("Saved as new workout! 💪");
+    setWorkoutView("list"); setActiveWorkout(null); setWbEditId(null); setWbCopySource(null);
+    setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
+    setWbLabels([]); setNewLabelInput("");
+  }
   function copyWorkout(wo) {
     setWbName("Copy of "+wo.name);
     setWbIcon(wo.icon);
@@ -4923,7 +4936,10 @@ function App() {
                     )
                   ) : (
                     wbEditId ? (
-                      React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltWorkout}, "💾 Update Workout")
+                      React.createElement('div', {style:{display:"flex",gap:8}},
+                        React.createElement('button', {className:"btn btn-gold", style:{flex:1}, onClick:saveBuiltWorkout}, "💾 Update Workout"),
+                        React.createElement('button', {className:"btn btn-ghost", style:{flex:1}, onClick:saveAsNewWorkout}, "📋 Save As New")
+                      )
                     ) : (
                       React.createElement('div', {style:{display:"flex",gap:8,width:"100%"}},
                         React.createElement('button', { className: "btn btn-gold" , style: {flex:1}, onClick: saveBuiltWorkout}, "💾 Save Workout"),
