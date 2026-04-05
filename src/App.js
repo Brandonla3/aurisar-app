@@ -5046,11 +5046,10 @@ function App() {
                         React.createElement('div', { key: type}
                           , React.createElement('div', { className: "sec", style: {textTransform:"capitalize",marginBottom:8}}, type, " Plans" )
                           , typePlans.map(tpl=>{
-                            const isRec = tpl.bestFor.includes(profile.chosenClass);
-                            const tplXP = calcPlanXP(tpl,profile.chosenClass,allExById);
-                            const activeDays = tpl.days.filter(d=>d.exercises.length>0);
-                            const allTplExIds = [...new Set(tpl.days.flatMap(d=>d.exercises.map(e=>e.exId)))];
                             const isCollapsed = !!collapsedTpls[tpl.id];
+                            const isRec = tpl.bestFor.includes(profile.chosenClass);
+                            const activeDays = tpl.days.filter(d=>d.exercises.length>0);
+                            const tplXP = calcPlanXP(tpl,profile.chosenClass,allExById);
                             return (
                               React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:10}}
                                 /* Header — always visible, click to collapse */
@@ -5083,8 +5082,9 @@ function App() {
                                   )
                                 )
                                 /* Expanded content */
-                                , !isCollapsed&&(
-                                  React.createElement('div', { style: {marginTop:10}}
+                                , !isCollapsed&&(()=>{
+                                  const allTplExIds = [...new Set(tpl.days.flatMap(d=>d.exercises.map(e=>e.exId)))];
+                                  return React.createElement('div', { style: {marginTop:10}}
                                     , React.createElement('div', { className: "workout-ex-pill-row", style: {marginBottom:10}}
                                       , allTplExIds.slice(0,6).map((exId,i)=>{
                                         const exD=allExById[exId];
@@ -5116,8 +5116,8 @@ function App() {
 
                                       )
                                     )
-                                  )
-                                )
+                                  );
+                                })()
                               )
                             );
                           })
