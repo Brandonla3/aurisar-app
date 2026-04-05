@@ -194,11 +194,11 @@ function PlanWizard(props) {
         React.createElement('div', {className:"ab-badge"}, label),
         React.createElement('div', {style:{width:28,height:28,borderRadius:6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem"}}, exData.icon),
         React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}, exData.name),
-        collapsed && React.createElement('span', {style:{fontSize:".55rem",color:"#5a5650"}}, summaryText),
+        collapsed && exData.id!=="rest_day" && React.createElement('span', {style:{fontSize:".55rem",color:"#5a5650"}}, summaryText),
         React.createElement('span', {style:{fontSize:".6rem",fontWeight:700,color:"#b4ac9e",flexShrink:0}}, "+"+xpVal),
         React.createElement('span', {style:{fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "\u25BC")
       ),
-      !collapsed && React.createElement('div', {className:"ss-section-body"},
+      !collapsed && exData.id!=="rest_day" && React.createElement('div', {className:"ss-section-body"},
         React.createElement('div', {style:{display:"flex",gap:6,marginBottom:6}},
           !_noSets&&!_hasDur&&React.createElement('div', {style:{flex:1,minWidth:0}},
             React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets"),
@@ -685,12 +685,12 @@ function PlanWizard(props) {
                           , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColorPlan} }, exData.icon)
                           , React.createElement('span', { className: "builder-ex-name-styled", style: {flex:1} }, exData.name)
                           , (isRunningEx&&pbDisp||exPBDisp3)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "\uD83C\uDFC6 ", isRunningEx&&pbDisp?pbDisp:exPBDisp3)
-                          , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"\u00D7", ex.reps, ex.weightLbs?` \u00B7 ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:"")
+                          , collapsed&&exData.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"\u00D7", ex.reps, ex.weightLbs?` \u00B7 ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:"")
                           , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",minWidth:36,textAlign:"right"}}, "+"+(wizardExXPs[i]||0).toLocaleString())
                           , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "\u25BC")
                           , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:2}, onClick: e=>{e.stopPropagation();removeExFromDay(bDayIdx,i);}}, "\u2715")
                         )
-                        , !collapsed&&React.createElement(React.Fragment, null
+                        , !collapsed&&exData.id!=="rest_day"&&React.createElement(React.Fragment, null
                           /* Top row: Sets+Reps+Weight or Duration+Sec+Dist */
                           , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:6}}
                             , !noSetsEx&&!hasDur&&React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -995,7 +995,8 @@ function PlanWizard(props) {
                     , React.createElement('span', { style: {fontSize:".65rem",cursor:"pointer",color:"#e74c3c"}, onClick: ()=>setPickerSelected(p=>p.filter(e=>e.exId!==entry.exId))}, "\u2715")
                   )
                   /* Top row -- category-specific */
-                  , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}
+                  , ex.id==="rest_day" ? React.createElement('div', {style:{fontSize:".72rem",color:"#8a8478",fontStyle:"italic",padding:"6px 0"}}, "🛌 No configuration needed") : null
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}
                     , !noSets&&!isCardio&&React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
                       , React.createElement('label', null, "Sets")
                       , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric", value: entry.sets||"", onChange: e=>pickerUpdateEx(entry.exId,"sets",e.target.value), placeholder: "3"})
@@ -1032,7 +1033,7 @@ function PlanWizard(props) {
                     ))
                   )
                   /* Treadmill: Incline + Speed */
-                  , isTreadEx&&(
+                  , ex.id!=="rest_day"&&isTreadEx&&(
                     React.createElement('div', { style: {display:"flex",gap:6,marginBottom:6}}
                       , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
                         , React.createElement('label', null, "Incline (0.5\u201315)" )
@@ -1045,7 +1046,7 @@ function PlanWizard(props) {
                     )
                   )
                   /* +Add Row */
-                  , (entry.extraRows||[]).map((row,ri)=>(
+                  , ex.id!=="rest_day"&&(entry.extraRows||[]).map((row,ri)=>(
                     React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"5px 7px",background:"rgba(45,42,36,.18)",borderRadius:5,alignItems:"center",flexWrap:"wrap"}}
                       , React.createElement('span', { style: {fontSize:".55rem",color:"#9a8a78",flexShrink:0,minWidth:16}}, isCardio?`I${ri+2}`:`S${ri+2}`)
                       , isCardio ? (React.createElement(React.Fragment, null
@@ -1065,7 +1066,7 @@ function PlanWizard(props) {
                       , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 4px",flexShrink:0}, onClick: ()=>{const rr=(entry.extraRows||[]).filter((_,j)=>j!==ri);pickerUpdateEx(entry.exId,"extraRows",rr);}}, "\u2715")
                     )
                   ))
-                  , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
+                  , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
                     onClick: ()=>{const rr=[...(entry.extraRows||[]),isCardio?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:"",reps:"",weightLbs:""}];pickerUpdateEx(entry.exId,"extraRows",rr);}}, "\uFF0B Add Row (e.g. "
                         , isCardio?"interval":"progressive set", ")"
                   )
