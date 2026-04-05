@@ -2636,7 +2636,7 @@ function App() {
   if(screen==="login") return (
     React.createElement('div', { style: {
       minHeight:"100vh",
-      backgroundImage:`linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
+      backgroundImage:`radial-gradient(ellipse 50% 65% at center, transparent 10%, #0c0c0a 65%), linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
       backgroundSize:"cover", backgroundPosition:"center", backgroundRepeat:"no-repeat",
       backgroundColor:"#0c0c0a",
       color:"#d4cec4", fontFamily:"'Inter',sans-serif", overflowX:"hidden",
