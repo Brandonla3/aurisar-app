@@ -383,7 +383,7 @@ const EMPTY_PROFILE = {
     friendRequest:true,
     friendAccepted:true,
     messageReceived:false,
-    reviewBattleStats:false,
+    reviewBattleStats:true,
   },
 };
 

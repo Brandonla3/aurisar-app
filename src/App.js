@@ -2049,7 +2049,7 @@ function App() {
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
   function openStatsPromptIfNeeded(wo, onConfirm) {
     const _bsPrefs = profile.notificationPrefs || {};
-    if (_bsPrefs.reviewBattleStats !== true) { onConfirm(wo); return; }
+    if (_bsPrefs.reviewBattleStats === false) { onConfirm(wo); return; }
     const hasDur = wo.durationMin!==null && wo.durationMin!==undefined && wo.durationMin!=="";
     const hasAct = wo.activeCal!==null && wo.activeCal!==undefined && wo.activeCal!=="";
     const hasTot = wo.totalCal!==null && wo.totalCal!==undefined && wo.totalCal!=="";
@@ -7543,7 +7543,7 @@ function App() {
                     {key:"friendRequest", icon:"🤝", label:"Friend Requests", desc:"When someone sends you a friend request"},
                     {key:"friendAccepted", icon:"✅", label:"Request Accepted", desc:"When someone accepts your friend request"},
                     {key:"messageReceived", icon:"💬", label:"New Messages", desc:"Email me when I receive a new direct message", defaultOff:true},
-                    {key:"reviewBattleStats", icon:"📊", label:"Review Battle Stats", desc:"Remind me to input Duration, Total Calories & Active Calories for each completed Workout or Exercise", defaultOff:true},
+                    {key:"reviewBattleStats", icon:"📊", label:"Review Battle Stats", desc:"Remind me to input Duration, Total Calories & Active Calories for each completed Workout or Exercise"},
                   ];
                   return React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:8} }
                     , items.map(item => {
