@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import './styles/app.css';
-import { CLASSES, EXERCISES, IMG } from './data/exercises';
+import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave } from './utils/storage';
@@ -11,11 +12,14 @@ import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
-import { ExerciseVideo } from './components/ExerciseVideo';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
-import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
+import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
+import PlanWizard from './components/PlanWizard';
+import WorkoutNotificationMockup from './components/WorkoutNotificationMockup';
 import loginBg from './assets/login-bg.png';
+
+const PREVIEW_PIN = "1234";
 
 
 function App() {
@@ -42,6 +46,10 @@ function App() {
   const [forgotPwEmail,setForgotPwEmail] = useState("");
   const [forgotPrivateId,setForgotPrivateId] = useState("");
   const [forgotLookupResult,setForgotLookupResult] = useState(null); // null | {found, masked_email, error}
+  const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
+  const [showPreviewPin,setShowPreviewPin] = useState(false);
+  const [previewPinInput,setPreviewPinInput] = useState("");
+  const [previewPinError,setPreviewPinError] = useState(false);
   const [detectedClass,setDetectedClass] = useState(null);
   const [activeTab,setActiveTab] = useState("workout");
   const [xpFlash,setXpFlash] = useState(null);
@@ -49,10 +57,14 @@ function App() {
   const [navMenuOpen,setNavMenuOpen] = useState(false);
   const [mapTooltip,setMapTooltip] = useState(null); // {name, x, y, info}
   const [toast,setToast]     = useState(null);
+  const [showWNMockup,setShowWNMockup] = useState(false);
   const [feedbackOpen,setFeedbackOpen] = useState(false);
   const [feedbackText,setFeedbackText] = useState("");
-  const [feedbackType,setFeedbackType] = useState("idea"); // "idea"|"bug"|"other"
+  const [feedbackType,setFeedbackType] = useState("idea"); // "idea"|"bug"|"help"
   const [feedbackSent,setFeedbackSent] = useState(false);
+  const [feedbackEmail,setFeedbackEmail] = useState("");
+  const [feedbackAccountId,setFeedbackAccountId] = useState("");
+  const [helpConfirmShown,setHelpConfirmShown] = useState(false);
   // Quick log
   const [selEx,setSelEx]   = useState(null);
   const [sets,setSets]     = useState("");
@@ -107,6 +119,10 @@ function App() {
   const [editMode,setEditMode] = useState(false);
   const [securityMode,setSecurityMode] = useState(false);
   const [notifMode,setNotifMode] = useState(false);
+  // Personal Bests filter
+  const LEADERBOARD_PB_IDS = new Set(["bench","bench_press","squat","barbell_back_squat","deadlift","barbell_deadlift","overhead_press","ohp","pull_up","pullups","push_up","pushups","running","treadmill_run","run"]);
+  const [pbFilterOpen,setPbFilterOpen] = useState(false);
+  const [pbSelectedFilters,setPbSelectedFilters] = useState(null);
   // Email change
   const [emailPanelOpen,setEmailPanelOpen] = useState(false);
   const [newEmail,setNewEmail] = useState("");
@@ -158,6 +174,7 @@ function App() {
   const [obStyle,setObStyle] = useState("");
   const [obState,setObState] = useState("");
   const [obCountry,setObCountry] = useState("United States");
+  const [obDraft,setObDraft] = useState(null); // null | saved onboarding draft from localStorage
   // Plans
   const [charSubTab, setCharSubTab] = useState("avatar");
   const [bodyTypeLocked, setBodyTypeLocked] = useState(false);
@@ -168,36 +185,17 @@ function App() {
     return defaults;
   });
   const [activePlan,setActivePlan] = useState(null);
-  const [builderMode,setBuilderMode] = useState("scratch");
-  const [bEditId,setBEditId] = useState(null); // non-null when editing an existing custom plan
-  const [bName,setBName]   = useState("");
-  const [bLevel,setBLevel] = useState("");
-  const [bType,setBType]   = useState("week");
-  const [bDurCount,setBDurCount] = useState(1);
-  const [bStartDate,setBStartDate] = useState("");
-  const [bEndDate,setBEndDate]   = useState("");
-  const [bIcon,setBIcon]   = useState("⚔️");
-  const [bDays,setBDays]   = useState([{label:"Day 1",exercises:[]}]);
-  const [bDayIdx,setBDayIdx] = useState(0);
-  // Drag state
-  const [dragDayIdx,setDragDayIdx] = useState(null);
-  const [dragWeekIdx,setDragWeekIdx] = useState(null); // drag whole week
-  const [collapsedWeeks,setCollapsedWeeks] = useState({}); // {weekIdx: bool}
-  function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
-  const [dragPlanExIdx,setDragPlanExIdx] = useState(null);
+  const [detailDayIdx,setDetailDayIdx] = useState(0);
+  const [wizardEditPlan,setWizardEditPlan] = useState(null); // plan object for editing, or null for new
+  const [wizardTemplatePlan,setWizardTemplatePlan] = useState(null); // template plan, or null
   const [dragDetailExIdx,setDragDetailExIdx] = useState(null);
   const [dragWbExIdx,setDragWbExIdx] = useState(null);
   const [ssChecked,setSsChecked] = useState(()=>new Set()); // indices checked for superset grouping
   const [ssAccordion,setSsAccordion] = useState({}); // collapse state for accordion sections like "0_a", "0_b"
-  const [ssCheckedPlan,setSsCheckedPlan] = useState(()=>new Set()); // indices checked in plan builder for superset
-  // Collapsed exercise rows: Set of indices (reset when day changes)
-  const [collapsedPlanEx,setCollapsedPlanEx] = useState({}); // {dayIdx_exIdx: bool}
   const [collapsedDetailEx,setCollapsedDetailEx] = useState({}); // {dayIdx_exIdx: bool}
   const [collapsedWbEx,setCollapsedWbEx] = useState({}); // {i: bool}
-  function togglePlanEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedPlanEx(s=>({...s,[k]:!s[k]})); }
   function toggleDetailEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedDetailEx(s=>({...s,[k]:!s[k]})); }
   function toggleWbEx(i){ setCollapsedWbEx(s=>({...s,[i]:!s[i]})); }
-  const [exPickerOpen,setExPickerOpen] = useState(false);
   const [pickerMuscle,setPickerMuscle] = useState("All");
   const [pickerSearch,setPickerSearch] = useState("");
   const [pickerMuscleOpen,setPickerMuscleOpen] = useState(false);
@@ -206,7 +204,6 @@ function App() {
   const [pickerOpenDrop,setPickerOpenDrop]       = useState(null); // "muscle"|"type"|"equip"|null
   const [pickerSelected,setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
   const [pickerConfigOpen,setPickerConfigOpen] = useState(false); // show config panel in picker
-  const [bWoPickerOpen,setBWoPickerOpen] = useState(false); // plan builder workout picker
   // Quests
   const [questCat,setQuestCat] = useState("All");
   // Calendar
@@ -233,13 +230,14 @@ function App() {
   const [wbIcon,setWbIcon]   = useState("💪");
   const [wbDesc,setWbDesc]   = useState("");
   const [wbExercises,setWbExercises] = useState([]); // [{exId,sets,reps,weightLbs,durationMin,...}]
-  const [wbExCompleted,setWbExCompleted] = useState({}); // {i:true} — persists per session
+  // wbExCompleted removed — Mark Complete feature removed from builder UX
   const [wbExPickerOpen,setWbExPickerOpen] = useState(false);
   const [wbEditId,setWbEditId] = useState(null); // id of workout being edited
   const [wbCopySource,setWbCopySource] = useState(null);
   const [wbIsOneOff,setWbIsOneOff] = useState(false); // true when building a one-off workout
   const [addToPlanPicker,setAddToPlanPicker] = useState(null);
   const [addToWorkoutPicker,setAddToWorkoutPicker] = useState(null); // {exercises} — pick existing workout
+  const [pendingSoloRemoveId,setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
   const [workoutSubTab,setWorkoutSubTab] = useState("reusable"); // "reusable"|"oneoff"
   const [collapsedWo,setCollapsedWo] = useState(new Set());
   const [oneOffModal,setOneOffModal] = useState(null); // {exercises, name, icon} — naming step
@@ -254,6 +252,12 @@ function App() {
   const [spActiveCal,setSpActiveCal] = useState("");
   const [spTotalCal,setSpTotalCal]   = useState("");
   const [spMakeReusable,setSpMakeReusable] = useState(false);
+  const [bootStep,setBootStep] = useState(0);
+  // Workout label filter & builder
+  const [woLabelFilters,setWoLabelFilters] = useState(()=>new Set());
+  const [woLabelDropOpen,setWoLabelDropOpen] = useState(false);
+  const [wbLabels,setWbLabels] = useState([]); // labels for workout being built/edited
+  const [newLabelInput,setNewLabelInput] = useState("");
   // Workout completion modal
   const [completionModal,setCompletionModal] = useState(null); // null | {workout}
   const [retroEditModal,setRetroEditModal]   = useState(null); // {groupId, entries, dateKey, sourceType, sourceName, sourceIcon, sourceId}
@@ -296,9 +300,29 @@ function App() {
   function toggleLogGroup(gid) {
     setOpenLogGroups(prev=>({...prev,[gid]:!prev[gid]}));
   }
+  // Retroactive stats lookup: get Duration/ActiveCal/TotalCal from log entry or source workout/plan
+  function getEntryStats(entry) {
+    let dur = Number(entry.sourceDurationSec)||0;
+    let act = Number(entry.sourceActiveCal)||0;
+    let tot = Number(entry.sourceTotalCal)||0;
+    if(!dur && !act && !tot) {
+      if(entry.sourceWorkoutId) {
+        const wo = (profile.workouts||[]).find(w=>w.id===entry.sourceWorkoutId);
+        if(wo) { dur=Number(wo.durationMin)||0; act=Number(wo.activeCal)||0; tot=Number(wo.totalCal)||0; }
+      } else if(entry.sourcePlanId) {
+        const pl = (profile.plans||[]).find(p=>p.id===entry.sourcePlanId);
+        if(pl && pl.days) {
+          pl.days.forEach(d=>{ dur+=Number(d.durationMin)||0; act+=Number(d.activeCal)||0; tot+=Number(d.totalCal)||0; });
+        }
+      }
+    }
+    return {durationSec:dur, activeCal:act, totalCal:tot};
+  }
   // Log entry editor
   const [logEditModal,setLogEditModal] = useState(null); // null | {idx}
   const [logEditDraft,setLogEditDraft] = useState(null); // copy of the entry being edited
+  // Calendar exercise read-only detail modal
+  const [calExDetailModal,setCalExDetailModal] = useState(null);
   // Retro check-in modal
   const [retroCheckInModal,setRetroCheckInModal] = useState(false);
   const [retroDate,setRetroDate] = useState("");
@@ -316,6 +340,9 @@ function App() {
     const {data:{subscription}} = sb.auth.onAuthStateChange(async (_event, session)=>{
       const user = _optionalChain([session, 'optionalAccess', _22 => _22.user]) || null;
 
+      // Skip INITIAL_SESSION — getSession() below handles the initial page load
+      if(_event === "INITIAL_SESSION") return;
+
       // When user clicks a password reset link, direct them to Security tab
       if(_event === "PASSWORD_RECOVERY") {
         setAuthUser(user);
@@ -332,19 +359,35 @@ function App() {
         return;
       }
 
+      // Silent background events — never touch the screen
+      if(_event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
+        setAuthUser(user);
+        return;
+      }
+
+      // Explicit sign-out — always go to login
+      if(_event === "SIGNED_OUT") {
+        setAuthUser(null);
+        setScreen("login");
+        return;
+      }
+
       setAuthUser(user);
       const saved = await loadSave(_optionalChain([user, 'optionalAccess', _25 => _25.id]) || null);
       if(_optionalChain([saved, 'optionalAccess', _26 => _26.chosenClass])){
         ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
         setScreen("main");
       } else {
-        setScreen(user ? "intro" : "login");
+        // Safety net: never navigate an active user away from "main" due to a
+        // failed/slow loadSave. Functional updater reads live screen state, not
+        // the stale closure value captured at mount.
+        setScreen(s => s === "main" ? s : (user ? "intro" : "login"));
       }
     });
     // Check existing session on mount — handle both cases explicitly
     sb.auth.getSession().then(async ({data:{session}})=>{
       if(!session) {
-        setScreen("login");
+        setScreen("home");
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
@@ -356,20 +399,41 @@ function App() {
             ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
             setScreen("main");
           } else {
-            setScreen("intro");
+            setScreen("home");
           }
         } catch(e) {
           console.error("loadSave error:", e);
-          setScreen("login");
+          setScreen("home");
         }
       }
     }).catch(()=>setScreen("login"));
     // Safety fallback — if nothing resolves in 5s, go to login
     const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"login":s), 5000);
-    loadYMoveExercises();
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
   useEffect(()=>{ if(screen==="main") doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen]);
+  useEffect(()=>{
+    if(screen!=="intro"){ setBootStep(0); return; }
+    setBootStep(0);
+    const t1=setTimeout(()=>setBootStep(1),700);
+    const t2=setTimeout(()=>setBootStep(2),1400);
+    const t3=setTimeout(()=>setBootStep(3),2100);
+    const t4=setTimeout(()=>setBootStep(4),2800);
+    return ()=>{ clearTimeout(t1);clearTimeout(t2);clearTimeout(t3);clearTimeout(t4); };
+  },[screen]);
+  useEffect(()=>{
+    if(!authUser || screen!=="onboard") return;
+    const draft={obStep,obName,obFirstName,obLastName,obBio,obAge,obGender,obSports,obFreq,obTiming,obPriorities,obStyle,obState,obCountry};
+    try { localStorage.setItem("aurisar_ob_draft_"+authUser.id, JSON.stringify(draft)); } catch(e) {}
+  },[authUser,screen,obStep,obName,obFirstName,obLastName,obBio,obAge,obGender,obSports,obFreq,obTiming,obPriorities,obStyle,obState,obCountry]);
+  useEffect(()=>{
+    if(screen!=="intro"||!authUser||authIsNew){ setObDraft(null); return; }
+    try {
+      const raw=localStorage.getItem("aurisar_ob_draft_"+authUser.id);
+      const parsed=raw?JSON.parse(raw):null;
+      setObDraft(parsed?.obStep>=2?parsed:null);
+    } catch(e){ setObDraft(null); }
+  },[screen,authUser?.id,authIsNew]);
   useEffect(()=>{
     // Auto-load social data on login so badge shows immediately
     if(screen==="main" && authUser) {
@@ -402,6 +466,7 @@ function App() {
         const saved = await loadSave(signUpData.session.user.id);
         setAuthUser(signUpData.session.user);
         setAuthLoading(false);
+        fetch("/api/send-welcome-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:signUpData.session.user.email})}).catch(()=>{});
         if(_optionalChain([saved, 'optionalAccess', _33 => _33.chosenClass])){
           ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
           setScreen("main");
@@ -1296,7 +1361,7 @@ function App() {
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
-    setScreen("login");
+    setScreen("home");
   }
 
   // ── Legacy class migration — maps old keys to new equivalents ──
@@ -1321,9 +1386,8 @@ function App() {
   const bmi      = calcBMI(profile.weightLbs,totalH);
 
   // Merged exercise list (built-in + custom) — memoized to avoid rebuilding on every render
-  const _ymReady = useYMoveExercises(); // re-renders when Supabase exercises load
   const _customExRef = profile.customExercises;
-  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])], [_customExRef, _ymReady]);
+  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef]);
   const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
 
   // Auto-update quest completion state when log or streak changes
@@ -1423,6 +1487,7 @@ function App() {
     setScreen("classReveal");
   }
   function confirmClass(c) {
+    try { if(authUser) localStorage.removeItem("aurisar_ob_draft_"+authUser.id); } catch(e) {}
     const p={...profile,chosenClass:c}; setProfile(p); doSave(p, _optionalChain([authUser, 'optionalAccess', _60 => _60.id])||null, _optionalChain([authUser, 'optionalAccess', _61 => _61.email])||null); setScreen("main");
   }
 
@@ -1430,7 +1495,7 @@ function App() {
   function getMult(ex){ return clsKey?(CLASSES[clsKey]?.bonuses[ex.category]||1):1; }
 
   // ── Exercise editor ─────────────────────────────────────────
-  const EX_ICON_LIST = ["🏋️","💪","⚡","🦾","🪃","🏃","🚴","🔥","⭕","🧘","🤸","🧱","🪝","🏊","🔻","🦵","🚶","🧗","🎯","🏌️","⛹️","🤼","🤸","🏇","🥊","🤺","🏋","🦶","🫀","🧠","🛌","💤","🌙","☕","🧊","🏖️"];
+  const EX_ICON_LIST = ["🏋️","💪","⚡","🦾","🪃","🏃","🚴","🔥","⭕","🧘","🤸","🧱","🪝","🏊","🔻","🦵","🚶","🧗","🎯","🏌️","⛹️","🤼","🏇","🥊","🤺","🏋","🦶","🫀","🧠","🛌","💤","🌙","☕","🧊","🏖️"];
   function newExDraft(base){ return { id:uid(), name:base?base.name+" (Copy)":(""), icon:base?base.icon:"💪", category:base?base.category:"strength", muscleGroup:base?base.muscleGroup:"chest", baseXP:base?base.baseXP:40, muscles:base?base.muscles:"", desc:base?base.desc:"", tips:base?[...base.tips]:["","",""], custom:true, defaultSets:base?(base.defaultSets!=null?base.defaultSets:null):3, defaultReps:base?(base.defaultReps!=null?base.defaultReps:null):10, defaultWeightLbs:base?base.defaultWeightLbs||"":"", defaultWeightPct:base?base.defaultWeightPct||100:100, defaultHrZone:base?base.defaultHrZone||null:null }; }
   function openExEditor(mode, baseEx){ setExEditorMode(mode); setExEditorDraft(newExDraft(mode==="create"?null:baseEx)); setExEditorOpen(true); }
   function saveExEditor(){
@@ -1488,43 +1553,75 @@ function App() {
     const regionBoost = myRegion && (myRegion.boost.muscle==="all" || myRegion.boost.muscle===ex.muscleGroup) ? 1.07 : 1;
     const travelMult = travelActive ? 1.1 : 1;
     const finalEarned = Math.round(earned * travelMult * regionBoost);
-    const entry={
-      exercise:ex.name, icon:ex.icon, xp:finalEarned, mult, reps:rv, sets:sv,
-      weightLbs:effectiveW||null, weightPct,
-      hrZone:(canHaveZone&&hrZone)||null,
-      distanceMi:distMi||null,
-      time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
-      date:new Date().toLocaleDateString(),
-      dateKey:todayStr(),
-      exId:ex.id,
-    };
-    const newLog=[entry,...profile.log];
-    const newQuests={...(profile.quests||{})};
-    QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q=>{
-      if(checkQuestCompletion(q,newLog,profile.checkInStreak))
-        newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false};
+    // Capture current state values before clearing UI
+    const capturedPendingSoloRemoveId = pendingSoloRemoveId;
+    const capturedHrZone = (canHaveZone&&hrZone)||null;
+    // Show stats popup, then completion modal for Complete/Schedule
+    const synth = {name:ex.name, icon:ex.icon, exercises:[], durationMin:null, activeCal:null, totalCal:null, soloEx:true, _soloExId:ex.id};
+    openStatsPromptIfNeeded(synth, (woWithStats, _sr) => {
+      const soloExCallback = (dateStr) => {
+        const dateObj = new Date(dateStr+"T12:00:00");
+        const displayDate = dateObj.toLocaleDateString();
+        const entry={
+          exercise:ex.name, icon:ex.icon, xp:finalEarned, mult, reps:rv, sets:sv,
+          weightLbs:effectiveW||null, weightPct,
+          hrZone:capturedHrZone,
+          distanceMi:distMi||null,
+          time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+          date:displayDate,
+          dateKey:dateStr,
+          exId:ex.id,
+          sourceTotalCal: woWithStats.totalCal || null,
+          sourceActiveCal: woWithStats.activeCal || null,
+          sourceDurationSec: woWithStats.durationMin || null,
+        };
+        const newLog=[entry,...profile.log];
+        const newQuests={...(profile.quests||{})};
+        QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q=>{
+          if(checkQuestCompletion(q,newLog,profile.checkInStreak))
+            newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false};
+        });
+        let newPB = profile.runningPB || null;
+        if(runPace && (!newPB || runPace < newPB)) newPB = runPace;
+        const newExPBs = calcExercisePBs(newLog);
+        const oldPB = (profile.exercisePBs||{})[entry.exId];
+        const curPB = newExPBs[entry.exId];
+        const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
+        setProfile(p=>{
+          const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
+          if(capturedPendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==capturedPendingSoloRemoveId);
+          return base;
+        });
+        if(capturedPendingSoloRemoveId) setPendingSoloRemoveId(null);
+        setXpFlash({amount:finalEarned,mult,travel:travelActive});
+        setTimeout(()=>setXpFlash(null),2000);
+        if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
+          showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
+        else if(isNewPB && curPB.type==="strength")
+          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
+        else if(isNewPB && curPB.type==="assisted")
+          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
+        else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
+        // Clean up form state after successful completion
+        setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
+        setExHHMM("");setExSec("");setQuickRows([]);
+      };
+      const soloExScheduleCallback = (schedDate) => {
+        const sw = {id:uid(), exId:ex.id, scheduledDate:schedDate, notes:ex.name, createdAt:todayStr()};
+        setProfile(p=>({...p, scheduledWorkouts:[...(p.scheduledWorkouts||[]), sw]}));
+        setCompletionModal(null); setCompletionDate(""); setCompletionAction("today"); setScheduleWoDate("");
+        showToast(`📅 ${ex.name} scheduled for ${formatScheduledDate(schedDate)}!`);
+        // Clean up form state
+        setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
+        setExHHMM("");setExSec("");setQuickRows([]);
+      };
+      setCompletionModal({workout:woWithStats, fromStats:_sr, soloExCallback, soloExScheduleCallback});
+      setCompletionDate(todayStr()); setCompletionAction("today");
     });
-    let newPB = profile.runningPB || null;
-    if(runPace && (!newPB || runPace < newPB)) newPB = runPace;
-    const newExPBs = calcExercisePBs(newLog);
-    const oldPB = (profile.exercisePBs||{})[entry.exId];
-    const curPB = newExPBs[entry.exId];
-    const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
-    setProfile(p=>({...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs}));
-    setXpFlash({amount:finalEarned,mult,travel:travelActive});
-    setTimeout(()=>setXpFlash(null),2000);
-    setSelEx(null);setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
-    setExHHMM("");setExSec("");setQuickRows([]);
-    if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
-      showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
-    else if(isNewPB && curPB.type==="strength")
-      showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
-    else if(isNewPB && curPB.type==="assisted")
-      showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
-    else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
+    setSelEx(null);
   }
 
-  // Instantly log a scheduled solo exercise with default values and remove it from schedule
+  // Log a scheduled solo exercise with default values and remove it from schedule (shows stats popup first)
   function quickLogSoloEx(sw) {
     const ex = allExById[sw.exId];
     if (!ex) return;
@@ -1539,32 +1636,39 @@ function App() {
     const myRegion = MAP_REGIONS[myRegionIdx];
     const regionBoost = myRegion && (myRegion.boost.muscle==="all" || myRegion.boost.muscle===ex.muscleGroup) ? 1.07 : 1;
     const finalEarned = Math.round(earned * (travelActive ? 1.1 : 1) * regionBoost);
-    const entry = {
-      exercise: ex.name, icon: ex.icon, xp: finalEarned, mult, reps: rv, sets: sv,
-      weightLbs: null, weightPct: 100, hrZone: null, distanceMi: null,
-      time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
-      date: new Date().toLocaleDateString(),
-      dateKey: todayStr(),
-      exId: ex.id,
-    };
-    const newQuests = {...(profile.quests||{})};
-    QUESTS.filter(q => q.auto && !_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q => {
-      if (checkQuestCompletion(q, [entry, ...profile.log], profile.checkInStreak))
-        newQuests[q.id] = {completed:true, completedAt:todayStr(), claimed:false};
+    // Show stats popup, then log on confirm
+    const synth = {name:ex.name, icon:ex.icon, exercises:[], durationMin:null, activeCal:null, totalCal:null, soloEx:true};
+    openStatsPromptIfNeeded(synth, (woWithStats) => {
+      const entry = {
+        exercise: ex.name, icon: ex.icon, xp: finalEarned, mult, reps: rv, sets: sv,
+        weightLbs: null, weightPct: 100, hrZone: null, distanceMi: null,
+        time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+        date: new Date().toLocaleDateString(),
+        dateKey: todayStr(),
+        exId: ex.id,
+        sourceTotalCal: woWithStats.totalCal || null,
+        sourceActiveCal: woWithStats.activeCal || null,
+        sourceDurationSec: woWithStats.durationMin || null,
+      };
+      const newQuests = {...(profile.quests||{})};
+      QUESTS.filter(q => q.auto && !_optionalChain([newQuests, 'access', _62 => _62[q.id], 'optionalAccess', _63 => _63.completed])).forEach(q => {
+        if (checkQuestCompletion(q, [entry, ...profile.log], profile.checkInStreak))
+          newQuests[q.id] = {completed:true, completedAt:todayStr(), claimed:false};
+      });
+      const newLog = [entry, ...profile.log];
+      const newExPBs = calcExercisePBs(newLog);
+      setProfile(p => ({
+        ...p,
+        xp: p.xp + finalEarned,
+        log: [entry, ...p.log],
+        quests: newQuests,
+        exercisePBs: newExPBs,
+        scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
+      }));
+      setXpFlash({amount: finalEarned, mult, travel: travelActive});
+      setTimeout(() => setXpFlash(null), 2000);
+      showToast(travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`);
     });
-    const newLog = [entry, ...profile.log];
-    const newExPBs = calcExercisePBs(newLog);
-    setProfile(p => ({
-      ...p,
-      xp: p.xp + finalEarned,
-      log: [entry, ...p.log],
-      quests: newQuests,
-      exercisePBs: newExPBs,
-      scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
-    }));
-    setXpFlash({amount: finalEarned, mult, travel: travelActive});
-    setTimeout(() => setXpFlash(null), 2000);
-    showToast(travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`);
   }
 
   // Save a set of log entries (from history) as a custom plan template
@@ -1633,11 +1737,14 @@ function App() {
       const split = base.durationMin ? secToHHMMSplit(Number(base.durationMin)) : {hhmm:"",sec:""};
       setWbDuration(split.hhmm); setWbDurSec(split.sec!==0&&split.sec!==""?String(split.sec):"");
       setWbActiveCal(base.activeCal||""); setWbTotalCal(base.totalCal||"");
+      setWbLabels(base.labels||[]);
     } else {
       setWbName(""); setWbIcon("💪"); setWbDesc(""); setWbExercises([]); setWbEditId(null);
       setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
+      setWbLabels([]);
     }
     setWbIsOneOff(false);
+    setNewLabelInput("");
     setWorkoutView("builder");
   }
   function saveBuiltWorkout() {
@@ -1645,7 +1752,8 @@ function App() {
     if(wbExercises.length===0) { showToast("Add at least one exercise."); return; }
     const w = {id:wbEditId||uid(), name:wbName.trim(), icon:wbIcon, desc:wbDesc.trim(),
       exercises:wbExercises, createdAt:new Date().toLocaleDateString(),
-      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null};
+      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null,
+      labels:wbLabels};
     if(wbEditId) {
       setProfile(pr=>({...pr, workouts:(pr.workouts||[]).map(wo=>wo.id===wbEditId?w:wo)}));
       showToast("Workout updated! 💪");
@@ -1655,17 +1763,20 @@ function App() {
     }
     setWorkoutView("list"); setActiveWorkout(null); setWbEditId(null); setWbCopySource(null);
     setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
+    setWbLabels([]); setNewLabelInput("");
   }
   function saveAsNewWorkout() {
     if(!wbName.trim()) { showToast("Name your workout first!"); return; }
     if(wbExercises.length===0) { showToast("Add at least one exercise."); return; }
     const w = {id:uid(), name:wbName.trim(), icon:wbIcon, desc:wbDesc.trim(),
       exercises:wbExercises, createdAt:new Date().toLocaleDateString(),
-      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null};
+      durationMin:combineHHMMSec(wbDuration,wbDurSec)||null, activeCal:wbActiveCal||null, totalCal:wbTotalCal||null,
+      labels:wbLabels};
     setProfile(pr=>({...pr, workouts:[w,...(pr.workouts||[])]}));
     showToast("Saved as new workout! 💪");
     setWorkoutView("list"); setActiveWorkout(null); setWbEditId(null); setWbCopySource(null);
     setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");
+    setWbLabels([]); setNewLabelInput("");
   }
   function copyWorkout(wo) {
     setWbName("Copy of "+wo.name);
@@ -1674,6 +1785,8 @@ function App() {
     setWbExercises(wo.exercises.map(e=>({...e})));
     setWbEditId(null); // new id on save
     setWbCopySource(wo.name);
+    setWbLabels(wo.labels||[]);
+    setNewLabelInput("");
     setWorkoutView("builder");
   }
   function deleteWorkout(id) {
@@ -1694,7 +1807,7 @@ function App() {
     setWbExPickerOpen(false);
   }
   function closePicker() {
-    setExPickerOpen(false); setWbExPickerOpen(false);
+    setWbExPickerOpen(false);
     setPickerSearch(""); setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
     setPickerSelected([]); setPickerConfigOpen(false);
   }
@@ -1712,11 +1825,6 @@ function App() {
   function commitPickerToWorkout() {
     if(pickerSelected.length===0) return;
     setWbExercises(ex=>[...ex,...pickerSelected.map(e=>({...e,sets:e.sets||"",reps:e.reps||"",weightLbs:e.weightLbs||null,durationMin:e.durationMin||null,distanceMi:e.distanceMi||null}))]);
-    closePicker();
-  }
-  function commitPickerToPlan() {
-    if(pickerSelected.length===0) return;
-    setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,...pickerSelected.map(e=>({exId:e.exId,sets:e.sets||"",reps:e.reps||"",weightLbs:e.weightLbs||null,durationMin:e.durationMin||null,distanceMi:e.distanceMi||null,hrZone:e.hrZone||null,weightPct:e.weightPct||100}))]}));
     closePicker();
   }
   function updateWbEx(idx, field, val) {
@@ -1836,7 +1944,6 @@ function App() {
   /* ── Render one accordion section (A or B) inside a superset card ── */
   function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
     const collapsed = !!ssAccordion[sectionKey];
-    const isDone = !!wbExCompleted[idx];
     const _noSets = NO_SETS_EX_IDS.has(exD.id);
     const _isC = exD.category==="cardio";
     const _isF = exD.category==="flexibility";
@@ -1847,21 +1954,16 @@ function App() {
     const _isRunning = exD.id===RUNNING_EX_ID;
     const _runPace = (_isRunning&&_distMiVal>0&&_durMin>0)?_durMin/_distMiVal:null;
     const _runBoost = _runPace?(_runPace<=8?20:5):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
+    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
     const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_metric?lbsToKg(ex.weightLbs):ex.weightLbs}${_wUnit}`:"");
     return React.createElement('div', {className:"ss-section"},
       React.createElement('div', {className:"ss-section-hdr",
         onClick:()=>setSsAccordion(prev=>({...prev,[sectionKey]:!prev[sectionKey]}))},
         React.createElement('div', {className:"ab-badge"}, label),
         React.createElement('div', {style:{width:28,height:28,borderRadius:6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem"}}, exD.icon),
-        React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:isDone?"#5a8f6a":"#d8caba",letterSpacing:".02em",flex:1,minWidth:0,textDecoration:isDone?"line-through":"none"}}, exD.name),
+        React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}, exD.name),
         collapsed && React.createElement('span', {style:{fontSize:".55rem",color:"#5a5650"}}, summaryText),
         React.createElement('span', {style:{fontSize:".6rem",fontWeight:700,color:"#b4ac9e",flexShrink:0}}, "+"+xpVal),
-        React.createElement('button', {
-          style:{width:20,height:20,borderRadius:"50%",border:`2px solid ${isDone?"#2ecc71":"rgba(180,172,158,.08)"}`,background:isDone?"rgba(46,204,113,.2)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:".65rem",transition:"all .2s"},
-          onClick:e=>{e.stopPropagation();setWbExCompleted(prev=>({...prev,[idx]:!prev[idx]}));}},
-          isDone&&React.createElement('span',{style:{color:"#2ecc71"}},"✓")
-        ),
         React.createElement('span', {style:{fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "▼")
       ),
       !collapsed && React.createElement('div', {className:"ss-section-body"},
@@ -1919,85 +2021,6 @@ function App() {
     });
   }
 
-  /* ── Plan builder superset helpers ── */
-  function planGroupSuperset(dayIdx, idxA, idxB) {
-    setBDays(days => days.map((d,di) => {
-      if(di!==dayIdx) return d;
-      return {...d, exercises: d.exercises.map((e,ei) =>
-        ei===idxA ? {...e, supersetWith:idxB} : ei===idxB ? {...e, supersetWith:idxA} : e
-      )};
-    }));
-    setSsCheckedPlan(new Set());
-  }
-  function planUngroupSuperset(dayIdx, idxA, idxB) {
-    setBDays(days => days.map((d,di) => {
-      if(di!==dayIdx) return d;
-      return {...d, exercises: d.exercises.map((e,ei) =>
-        ei===idxA ? {...e, supersetWith:null} : ei===idxB ? {...e, supersetWith:null} : e
-      )};
-    }));
-  }
-  /* ── Render plan exercise fields inside accordion section ── */
-  function renderPlanSsSection(ex, dayIdx, exIdx, exData, label, sectionKey) {
-    const collapsed = !!ssAccordion[sectionKey];
-    const _noSets = NO_SETS_EX_IDS.has(exData.id);
-    const _isC = exData.category==="cardio"; const _isF = exData.category==="flexibility";
-    const _hasDur = _isC||_isF; const _hasW = !_isC&&!_isF;
-    const _m = isMetric(profile.units); const _wU = weightLabel(profile.units); const _dU = distLabel(profile.units);
-    const _distMi = ex.distanceMi?parseFloat(ex.distanceMi):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMi||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
-    const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_m?lbsToKg(ex.weightLbs):ex.weightLbs}${_wU}`:"");
-    return React.createElement('div', {className:"ss-section"},
-      React.createElement('div', {className:"ss-section-hdr",onClick:()=>setSsAccordion(p=>({...p,[sectionKey]:!p[sectionKey]}))},
-        React.createElement('div', {className:"ab-badge"}, label),
-        React.createElement('div', {style:{width:28,height:28,borderRadius:6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem"}}, exData.icon),
-        React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}, exData.name),
-        collapsed && React.createElement('span', {style:{fontSize:".55rem",color:"#5a5650"}}, summaryText),
-        React.createElement('span', {style:{fontSize:".6rem",fontWeight:700,color:"#b4ac9e",flexShrink:0}}, "+"+xpVal),
-        React.createElement('span', {style:{fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "▼")
-      ),
-      !collapsed && React.createElement('div', {className:"ss-section-body"},
-        React.createElement('div', {style:{display:"flex",gap:6,marginBottom:6}},
-          !_noSets&&!_hasDur&&React.createElement('div', {style:{flex:1,minWidth:0}},
-            React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets"),
-            React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-              value:ex.sets===0||ex.sets===""?"":ex.sets, onChange:e=>updateExInDay(dayIdx,exIdx,"sets",e.target.value)})
-          ),
-          _hasDur ? (React.createElement(React.Fragment, null,
-            React.createElement('div', {style:{flex:1.6,minWidth:0}},
-              React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration"),
-              React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"numeric",
-                value:ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
-                onChange:e=>updateExInDay(dayIdx,exIdx,"_durHHMM",e.target.value),
-                onBlur:e=>{const n=normalizeHHMM(e.target.value);updateExInDay(dayIdx,exIdx,"_durHHMM",n||undefined);const s=combineHHMMSec(n,ex._durSec||"");updateExInDay(dayIdx,exIdx,"durationSec",s);if(s)updateExInDay(dayIdx,exIdx,"reps",Math.max(1,Math.floor(s/60)));},
-                placeholder:"00:00"})
-            ),
-            React.createElement('div', {style:{flex:1,minWidth:0}},
-              React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (",_dU,")"),
-              React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-                value:ex.distanceMi?(_m?String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)):String(ex.distanceMi)):"",
-                onChange:e=>{const v=e.target.value;const mi=v&&_m?kmToMi(v):v;updateExInDay(dayIdx,exIdx,"distanceMi",mi||null);},
-                placeholder:"0"})
-            )
-          )) : (React.createElement(React.Fragment, null,
-            React.createElement('div', {style:{flex:1,minWidth:0}},
-              React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps"),
-              React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-                value:ex.reps===0||ex.reps===""?"":ex.reps, onChange:e=>updateExInDay(dayIdx,exIdx,"reps",e.target.value)})
-            ),
-            _hasW&&React.createElement('div', {style:{flex:1.2,minWidth:0}},
-              React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Weight (",_wU,")"),
-              React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
-                value:ex.weightLbs!=null&&ex.weightLbs!==""?(_m?lbsToKg(ex.weightLbs):String(ex.weightLbs)):"",
-                onChange:e=>{const v=e.target.value;const lbs=v&&_m?kgToLbs(v):v;updateExInDay(dayIdx,exIdx,"weightLbs",lbs||null);},
-                placeholder:"—"})
-            )
-          ))
-        )
-      )
-    );
-  }
-
   function removeWbEx(idx) {
     setWbExercises(exs => {
       const updated = exs.map((e, i) => {
@@ -2042,6 +2065,12 @@ function App() {
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
   function openStatsPromptIfNeeded(wo, onConfirm) {
+    // Skip stats modal entirely for rest-day-only workouts
+    const isRestDayOnly = (wo.soloEx && wo._soloExId === "rest_day") ||
+      (wo.exercises && wo.exercises.length > 0 && wo.exercises.every(e => e.exId === "rest_day"));
+    if (isRestDayOnly) { onConfirm(wo); return; }
+    const _bsPrefs = profile.notificationPrefs || {};
+    if (_bsPrefs.reviewBattleStats === false) { onConfirm(wo); return; }
     const hasDur = wo.durationMin!==null && wo.durationMin!==undefined && wo.durationMin!=="";
     const hasAct = wo.activeCal!==null && wo.activeCal!==undefined && wo.activeCal!=="";
     const hasTot = wo.totalCal!==null && wo.totalCal!==undefined && wo.totalCal!=="";
@@ -2080,6 +2109,9 @@ function App() {
           sourceWorkoutId:wo.id, sourceWorkoutName:wo.name, sourceWorkoutIcon:wo.icon,
           sourceWorkoutType: wo.oneOff ? "oneoff" : "reusable",
           sourceGroupId:batchId,
+          sourceTotalCal: wo.totalCal || null,
+          sourceActiveCal: wo.activeCal || null,
+          sourceDurationSec: wo.durationMin || null,
         };
       });
     }).filter(Boolean);
@@ -2327,61 +2359,31 @@ function App() {
     showToast("Plan moved to Deleted — recoverable for 7 days.");
   }
   // Plan builder helpers
-  function initBuilderScratch(){ setBEditId(null); setBName(""); setBLevel(""); setBType("week"); setBDurCount(1); setBStartDate(""); setBEndDate(""); setBIcon("⚔️"); setBDays(Array.from({length:7},(_,i)=>({label:`Day ${i+1}`,exercises:[]}))); setBDayIdx(0); setPlanView("builder"); }
+  function initBuilderScratch(){ setWizardEditPlan(null); setWizardTemplatePlan(null); setPlanView("builder"); }
   function initBuilderFromTemplate(tpl,customize=false){
-    setBEditId(customize && tpl.custom ? tpl.id : null);
-    setBName(customize && !tpl.custom ? `${tpl.name} (Custom)` : tpl.name);
-    setBLevel(tpl.level||"");
-    setBType(tpl.type||"week"); setBDurCount(tpl.durCount||1); setBStartDate(tpl.startDate||""); setBEndDate(tpl.endDate||""); setBIcon(tpl.icon); setBDays(clone(tpl.days)); setBDayIdx(0);
-    setPlanView(customize?"builder":"detail"); if(!customize) setActivePlan(tpl);
-  }
-  function addDayToBuilder(){ setBDays(d=>[...d,{label:`Day ${d.length+1}`,exercises:[]}]); setBDayIdx(bDays.length); }
-  function removeDayFromBuilder(idx){ const nd=bDays.filter((_,i)=>i!==idx); setBDays(nd); setBDayIdx(Math.min(bDayIdx,nd.length-1)); }
-  function reorderDay(fromIdx,toIdx){ if(fromIdx===toIdx) return; const nd=[...bDays]; const [moved]=nd.splice(fromIdx,1); nd.splice(toIdx,0,moved); setBDays(nd); setBDayIdx(toIdx); }
-  function duplicateWeek(weekIdx){
-    const start=weekIdx*7; const end=Math.min(start+7,bDays.length);
-    const weekDays=bDays.slice(start,end);
-    const base=bDays.length;
-    const copies=weekDays.map((d,i)=>({...d,label:`Day ${base+i+1}`,exercises:d.exercises.map(e=>({...e}))}));
-    setBDays(d=>[...d,...copies]);
-    showToast(`Week ${weekIdx+1} duplicated!`);
-  }
-  function reorderWeek(fromWeek,toWeek){
-    if(fromWeek===toWeek) return;
-    const weeks=[]; const days=[...bDays];
-    for(let i=0;i<days.length;i+=7) weeks.push(days.slice(i,i+7));
-    const [moved]=weeks.splice(fromWeek,1); weeks.splice(toWeek,0,moved);
-    const reordered=weeks.flat().map((d,i)=>({...d,label:`Day ${i+1}`}));
-    setBDays(reordered); setBDayIdx(toWeek*7);
-  }
-  function reorderPlanEx(dayIdx,fromIdx,toIdx){ if(fromIdx===toIdx) return; setBDays(days=>days.map((d,i)=>{ if(i!==dayIdx) return d; const exs=[...d.exercises]; const [m]=exs.splice(fromIdx,1); exs.splice(toIdx,0,m); return {...d,exercises:exs}; })); }
-  function addExToDay(exId){ const exd=allExById[exId]||{}; setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,{exId,sets:(exd.defaultSets!=null?exd.defaultSets:3),reps:(exd.defaultReps!=null?exd.defaultReps:10),weightLbs:exd.defaultWeightLbs||null,durationMin:exd.defaultDurationMin||null,distanceMi:exd.defaultDistanceMi||null,hrZone:exd.defaultHrZone||null,weightPct:exd.defaultWeightPct||100}]})); setExPickerOpen(false); }
-  function removeExFromDay(di,ei){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)})); }
-  function updateExInDay(di,ei,field,val){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})})); }
-  function updateDayLabel(idx,val){ setBDays(days=>days.map((d,i)=>i!==idx?d:{...d,label:val})); }
-  function saveBuiltPlan(){
-    if(!bName.trim()){showToast("Give your plan a name!");return;}
-    const durLabel = bDurCount===1 ? bType : `${bDurCount} ${bType}s`;
-    if(bEditId) {
-      const updated = {name:bName,level:bLevel||null,icon:bIcon,type:bType,durCount:bDurCount,startDate:bStartDate||null,endDate:bEndDate||null,scheduledDate:bStartDate||null,description:`Custom ${durLabel} plan`,days:clone(bDays)};
-      setProfile(pr=>({...pr,plans:pr.plans.map(pl=>pl.id===bEditId?{...pl,...updated}:pl)}));
-      setActivePlan(p=>({...p,...updated}));
-      setPlanView("detail"); showToast("Plan updated! ⚡");
+    if(customize) {
+      setWizardEditPlan(tpl.custom ? tpl : null);
+      setWizardTemplatePlan(tpl.custom ? null : {...tpl, customize:true});
+      setPlanView("builder");
     } else {
-      const p={id:uid(),name:bName,level:bLevel||null,icon:bIcon,type:bType,durCount:bDurCount,startDate:bStartDate||null,endDate:bEndDate||null,scheduledDate:bStartDate||null,description:`Custom ${durLabel} plan`,bestFor:[],days:clone(bDays),createdAt:new Date().toLocaleDateString(),custom:true};
-      setProfile(pr=>({...pr,plans:[p,...pr.plans]})); setPlanView("list"); showToast("Plan saved! ⚡");
+      setPlanView("detail"); setActivePlan(tpl);
+    }
+  }
+  function handlePlanWizardSave(planData){
+    if(planData.isEdit) {
+      const {isEdit, ...rest} = planData;
+      setProfile(pr=>({...pr,plans:pr.plans.map(pl=>pl.id===planData.id?{...pl,...rest}:pl)}));
+      setActivePlan(p=>({...p,...rest}));
+      setPlanView("list"); showToast("Plan updated! ⚡");
+    } else {
+      const {isEdit, ...rest} = planData;
+      setProfile(pr=>({...pr,plans:[rest,...pr.plans]})); setPlanView("list"); showToast("Plan saved! ⚡");
     }
   }
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
-  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
+  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
 
-  const builderXP = bDays.reduce((t,d)=>t+d.exercises.reduce((s,ex)=>{
-    const base=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById);
-    const rowsXP=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
-    return s+base+rowsXP;
-  },0),0);
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
-  const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
 
   // Pending quest claims
   const pendingQuestCount = QUESTS.filter(q=>{
@@ -2390,6 +2392,60 @@ function App() {
   }).length;
   const CSS = "";
 
+  function launchPreviewMode(){
+    const daysAgo = n => new Date(Date.now()-n*86400000).toISOString().slice(0,10);
+    const fmtDate = n => new Date(Date.now()-n*86400000).toLocaleDateString();
+    const fmtTime = () => "07:30 AM";
+    const gid = s => `preview-grp-${s}`;
+    const previewLog = [
+      {exercise:"Bench Press",icon:"\uD83C\uDFCB\uFE0F",exId:"bench",sets:4,reps:8,weightLbs:185,weightPct:100,hrZone:null,distanceMi:null,xp:420,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
+      {exercise:"Overhead Press",icon:"\uD83C\uDFCB\uFE0F",exId:"ohp",sets:3,reps:10,weightLbs:115,weightPct:100,hrZone:null,distanceMi:null,xp:310,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
+      {exercise:"Running",icon:"\uD83C\uDFC3",exId:"run",sets:1,reps:28,weightLbs:null,weightPct:100,hrZone:null,distanceMi:3.1,xp:380,mult:0.94,time:fmtTime(),date:fmtDate(3),dateKey:daysAgo(3),sourceGroupId:gid("b")},
+      {exercise:"Deadlift",icon:"\uD83C\uDFCB\uFE0F",exId:"deadlift",sets:4,reps:6,weightLbs:225,weightPct:100,hrZone:null,distanceMi:null,xp:580,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
+      {exercise:"Pull-Up",icon:"\uD83E\uDE9D",exId:"pullups",sets:3,reps:10,weightLbs:null,weightPct:100,hrZone:null,distanceMi:null,xp:290,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
+      {exercise:"Squat",icon:"\uD83C\uDFCB\uFE0F",exId:"squat",sets:4,reps:8,weightLbs:205,weightPct:100,hrZone:null,distanceMi:null,xp:510,mult:1.12,time:fmtTime(),date:fmtDate(10),dateKey:daysAgo(10),sourceGroupId:gid("e")},
+    ];
+    setProfile({...EMPTY_PROFILE,
+      playerName:"Test Majiq", firstName:"John", lastName:"Majiq",
+      chosenClass:"tempest", xp:320000,
+      weightLbs:205, heightFt:6, heightIn:2, age:36, gender:"Male",
+      gym:"Lifetime Fitness", state:"KS", country:"United States",
+      motto:"I like to test apps", trainingStyle:"mixed", workoutTiming:"evening",
+      disciplineTrait:"Night Owl",
+      hudFields:{weight:true,height:true,bmi:false},
+      fitnessPriorities:["nutrition","endurance","social"],
+      sportsBackground:["football","volleyball","dance"],
+      nameVisibility:{displayName:["app","game"],realName:["hide"]},
+      log:previewLog, workouts:[], plans:[], scheduledWorkouts:[],
+      checkInHistory:[], checkInStreak:3, totalCheckIns:10,
+      lastCheckIn:new Date(Date.now()-86400000).toISOString().slice(0,10),
+      quests:{}, customExercises:[],
+      exercisePBs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},
+    });
+    setMyPublicId("UQHDD2");
+    setMyPrivateId("mPTSbPw8vTnd");
+    setFriends([
+      {id:"f1",playerName:"IronValkyrie",chosenClass:"warrior",xp:420000,log:[]},
+      {id:"f2",playerName:"ZenMaster_X",chosenClass:"druid",xp:155000,log:[]},
+      {id:"f3",playerName:"CrushMode88",chosenClass:"gladiator",xp:58000,log:[]},
+      {id:"f4",playerName:"SwiftArrow",chosenClass:"warden",xp:105000,log:[]},
+    ]);
+    setLbData([
+      {user_id:"f1",public_id:"VK9R3M",player_name:"IronValkyrie",first_name:"Sarah",last_name:"Chen",chosen_class:"warrior",total_xp:420000,level:8,streak:31,state:"NY",country:"United States",gym:"Gold's Gym",exercise_pbs:{bench:{weight:185},squat:{weight:275},deadlift:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f5",public_id:"PH3L9F",player_name:"PhantomLift",first_name:"Jake",last_name:"Morrison",chosen_class:"phantom",total_xp:360000,level:8,streak:45,state:"CO",country:"United States",gym:"24 Hr Fitness",exercise_pbs:{bench:{weight:245},squat:{weight:365},deadlift:{weight:405},pullups:{reps:25}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"preview",public_id:"UQHDD2",player_name:"Test Majiq",first_name:"John",last_name:"Majiq",chosen_class:"tempest",total_xp:320000,level:7,streak:3,state:"KS",country:"United States",gym:"Lifetime Fitness",exercise_pbs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:true},
+      {user_id:"f6",public_id:"TT6B4K",player_name:"TitanBreaker",first_name:"Mike",last_name:"OBrien",chosen_class:"titan",total_xp:210000,level:6,streak:18,state:"OH",country:"United States",gym:"YMCA",exercise_pbs:{bench:{weight:315},squat:{weight:455},deadlift:{weight:500}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f2",public_id:"ZN4K8W",player_name:"ZenMaster_X",first_name:"Marcus",last_name:"Rivera",chosen_class:"druid",total_xp:155000,level:5,streak:14,state:"CA",country:"United States",gym:"Equinox",exercise_pbs:{bench:{weight:135},run:{type:"cardio",value:7.5}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f4",public_id:"SW7A2R",player_name:"SwiftArrow",first_name:"Emily",last_name:"Park",chosen_class:"warden",total_xp:105000,level:4,streak:22,state:"FL",country:"United States",gym:"LA Fitness",exercise_pbs:{run:{type:"cardio",value:7.2},pullups:{reps:12}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f3",public_id:"CR8M5T",player_name:"CrushMode88",first_name:"DeAndre",last_name:"Williams",chosen_class:"gladiator",total_xp:58000,level:3,streak:7,state:"TX",country:"United States",gym:"Planet Fitness",exercise_pbs:{bench:{weight:225},squat:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+      {user_id:"f7",public_id:"ST2E7X",player_name:"StrikerElite",first_name:"Aisha",last_name:"Thompson",chosen_class:"striker",total_xp:22000,level:2,streak:5,state:"WA",country:"United States",gym:"Home Gym",exercise_pbs:{pushups:{reps:45}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
+    ]);
+    setLbWorldRanks({"f1":1,"f5":2,"preview":3,"f6":4,"f2":5,"f4":6,"f3":7,"f7":8});
+    setShowPreviewPin(false);
+    setPreviewPinInput("");
+    setPreviewPinError(false);
+    setScreen("main");
+  }
 
   if(screen==="loading") return (
     React.createElement('div', { style: {minHeight:"100vh",background:"#0c0c0a",display:"flex",alignItems:"center",justifyContent:"center"}}
@@ -2483,7 +2539,7 @@ function App() {
             setMfaRecoveryMode(false);
             setMfaRecoveryInput("");
             setAuthUser(null);
-            setScreen("login");
+            setScreen("home");
           } }, "\u2190 Back to Sign In")
           , React.createElement('div', { style: {fontSize:".56rem", color:"#3a3834", marginTop:8} }, "Lost your authenticator AND recovery codes?")
           , React.createElement('div', { style: {fontSize:".56rem", color:"#5a5650"} }, "Contact support for an admin-assisted reset.")
@@ -2492,17 +2548,119 @@ function App() {
     )
   );
 
+  /* ══ HOMEPAGE / LANDING PAGE ══════════════════════════════════ */
+  if(screen==="home") return (
+    React.createElement('div', { style: {
+      minHeight:"100vh",
+      backgroundImage:`radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.4) 100%), linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
+      backgroundSize:"cover", backgroundPosition:"center", backgroundRepeat:"no-repeat",
+      backgroundColor:"#0c0c0a",
+      color:"#d4cec4", fontFamily:"'Inter',sans-serif", overflowX:"hidden"
+    }}
+      , React.createElement('style', null, CSS)
+
+      /* ── Sticky Nav Bar ── */
+      , React.createElement('nav', { className: "hp-nav" }
+        , React.createElement('div', { className: "hp-nav-logo" }
+          , React.createElement('span', { className: "hp-nav-wordmark" }, "AURISAR")
+          , React.createElement('span', { className: "hp-nav-fitness" }, "FITNESS")
+        )
+        , React.createElement('div', { className: "hp-nav-btns" }
+          , React.createElement('button', { className: "hp-btn-login", onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Login")
+          , React.createElement('button', { className: "hp-btn-signup", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Sign Up")
+        )
+      )
+
+      /* ── Glass Nav Links ── */
+      , React.createElement('div', { className: "hp-glass-links" }
+        , ["About Aurisar","Future Roadmap","Leaderboards"].map((label,i)=>
+          React.createElement('button', { className: "hp-glass-link", key: i }, label)
+        )
+      )
+
+      /* ── Hero Section — Logo Banner ── */
+      , React.createElement('section', { className: "hp-hero" }
+        , React.createElement('img', { src: "/male-female-flame logo.png", alt: "Aurisar", className: "hp-hero-banner" })
+        , React.createElement('h1', { className: "hp-hero-title" }, "Your Fitness. Your Legend.")
+        , React.createElement('p', { className: "hp-hero-sub" }, "The RPG-powered fitness tracker that turns every rep into an adventure.")
+        , React.createElement('div', { className: "hp-orn" }, "\u2014 \u2726 \u2014")
+        , React.createElement('button', { className: "hp-hero-cta", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Begin Your Journey")
+        , React.createElement('p', { className: "hp-hero-signin" }
+          , "Already have an account? "
+          , React.createElement('span', { onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Sign In")
+        )
+      )
+
+      /* ── What Is Aurisar? ── */
+      , React.createElement('section', { className: "hp-section" }
+        , React.createElement('h2', { className: "hp-section-title" }, "Forge Your Body. Level Your Character.")
+        , React.createElement('p', { className: "hp-section-body" },
+          "Whether you\u2019re just getting started, grinding daily, coaching a team, or chasing competition PRs \u2014 Aurisar meets you where you are. It\u2019s a fitness tracker wrapped in an RPG universe: log your workouts, earn XP, unlock character classes, complete quests, and compete on leaderboards. Casual or competitive, solo or social \u2014 every rep counts, and every rep is rewarded."
+        )
+      )
+
+      /* ── Feature Cards ── */
+      , React.createElement('div', { className: "hp-features" }
+        , [
+          { icon:"\u2694\uFE0F", title:"11 Character Classes", desc:"Choose your path \u2014 Warrior, Phantom, Tempest, Druid, and more. Each class amplifies different workout styles." },
+          { icon:"\u2728",       title:"Earn XP & Level Up",    desc:"Every set, rep, and mile earns experience points. Watch your character grow stronger as you do." },
+          { icon:"\uD83C\uDFCB\uFE0F", title:"1,500+ Exercises", desc:"Strength, cardio, flexibility \u2014 log any workout with detailed tracking for sets, reps, weight, and distance." },
+          { icon:"\uD83D\uDDE1\uFE0F", title:"Quests & Achievements", desc:"Complete challenges like \u201CRun 50 miles\u201D or \u201CHit a 225lb bench\u201D to unlock rewards and prove your dedication." },
+          { icon:"\uD83D\uDC65", title:"Social & Leaderboards",  desc:"Add friends, share workouts, climb the global leaderboard, and send messages." },
+          { icon:"\uD83D\uDCC5", title:"Plans & Calendar",       desc:"Build custom workout plans, schedule training days, and track your history on a visual calendar." }
+        ].map((f,i)=> React.createElement('div', { className: "hp-feat-card", key: i }
+          , React.createElement('span', { className: "hp-feat-icon" }, f.icon)
+          , React.createElement('div', { className: "hp-feat-title" }, f.title)
+          , React.createElement('div', { className: "hp-feat-desc" }, f.desc)
+        ))
+      )
+
+      /* ── Class Showcase ── */
+      , React.createElement('section', { className: "hp-section", style: {paddingBottom:12} }
+        , React.createElement('h2', { className: "hp-section-title" }, "Choose Your Class")
+      )
+      , React.createElement('div', { className: "hp-classes" }
+        , Object.entries(CLASSES).filter(([,c])=>!c.locked).map(([key,c])=>
+          React.createElement('div', { className: "hp-class-pill", key: key, style: {"--pill-color":c.color} }
+            , React.createElement('span', { className: "hp-class-emoji" }, c.icon)
+            , React.createElement('div', { className: "hp-class-name" }, c.name)
+            , React.createElement('div', { className: "hp-class-tag" }, c.description.split(".")[0])
+          )
+        )
+      )
+
+      /* ── Bottom CTA ── */
+      , React.createElement('section', { className: "hp-cta" }
+        , React.createElement('h2', { className: "hp-cta-title" }, "Ready to Begin?")
+        , React.createElement('p', { className: "hp-cta-sub" }, "Join the ranks. Your legend starts with one rep.")
+        , React.createElement('button', { className: "hp-hero-cta", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Create Your Free Account")
+      )
+
+      /* ── Footer ── */
+      , React.createElement('footer', { className: "hp-footer" }
+        , React.createElement('div', { className: "hp-footer-text" }
+          , "\u00A9 2026 Aurisar Games \u00A0\u00B7\u00A0 "
+          , React.createElement('a', { href: "mailto:support@aurisargames.com" }, "support@aurisargames.com")
+        )
+      )
+    )
+  );
+
   if(screen==="login") return (
     React.createElement('div', { style: {
       minHeight:"100vh",
-      backgroundImage:`linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
-      backgroundSize:"cover",
-      backgroundPosition:"center",
-      backgroundRepeat:"no-repeat",
+      backgroundImage:`radial-gradient(ellipse at center, transparent 55%, rgba(12,12,10,.5) 85%, #0c0c0a 100%), linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${loginBg})`,
+      backgroundSize:"cover, cover, 200% auto", backgroundPosition:"center, center, center", backgroundRepeat:"no-repeat, no-repeat, no-repeat",
       backgroundColor:"#0c0c0a",
+      color:"#d4cec4", fontFamily:"'Inter',sans-serif", overflowX:"hidden",
       display:"flex", flexDirection:"column", alignItems:"stretch"
     }}
       , React.createElement('style', null, CSS)
+
+      /* ── Back to Home ── */
+      , React.createElement('div', { style: {padding:"14px 20px 0", display:"flex", justifyContent:"flex-start"} }
+        , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer", letterSpacing:".04em"}, onClick: ()=>setScreen("home") }, "\u2190 Back")
+      )
 
       /* ── Logo ── */
       , React.createElement('img', {
@@ -2745,67 +2903,34 @@ function App() {
           )
           ) /* end loginSubScreen===null */
 
-          /* Preview mode — tiny */
+/* Preview mode — PIN-gated dev access */
           , React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.12)", marginTop:6, paddingTop:10, textAlign:"center"} }
-            , React.createElement('span', {
+            , !showPreviewPin && React.createElement('span', {
                 style: {fontSize:".55rem", color:"#3a3630", cursor:"pointer", fontStyle:"italic", letterSpacing:".03em"},
                 onClick: ()=>{
-                  const startDate = new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-                  const endDate   = new Date(Date.now()+(30+56)*24*60*60*1000).toISOString().slice(0,10);
-                  const daysAgo = n => new Date(Date.now()-n*86400000).toISOString().slice(0,10);
-                  const fmtDate = n => new Date(Date.now()-n*86400000).toLocaleDateString();
-                  const fmtTime = () => "07:30 AM";
-                  const gid = s => `preview-grp-${s}`;
-                  const previewLog = [
-                    {exercise:"Bench Press",icon:"🏋️",exId:"bench",sets:4,reps:8,weightLbs:185,weightPct:100,hrZone:null,distanceMi:null,xp:420,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
-                    {exercise:"Overhead Press",icon:"🏋️",exId:"ohp",sets:3,reps:10,weightLbs:115,weightPct:100,hrZone:null,distanceMi:null,xp:310,mult:1.12,time:fmtTime(),date:fmtDate(1),dateKey:daysAgo(1),sourceGroupId:gid("a")},
-                    {exercise:"Running",icon:"🏃",exId:"run",sets:1,reps:28,weightLbs:null,weightPct:100,hrZone:null,distanceMi:3.1,xp:380,mult:0.94,time:fmtTime(),date:fmtDate(3),dateKey:daysAgo(3),sourceGroupId:gid("b")},
-                    {exercise:"Deadlift",icon:"🏋️",exId:"deadlift",sets:4,reps:6,weightLbs:225,weightPct:100,hrZone:null,distanceMi:null,xp:580,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
-                    {exercise:"Pull-Up",icon:"🪝",exId:"pullups",sets:3,reps:10,weightLbs:null,weightPct:100,hrZone:null,distanceMi:null,xp:290,mult:1.12,time:fmtTime(),date:fmtDate(5),dateKey:daysAgo(5),sourceGroupId:gid("c")},
-                    {exercise:"Squat",icon:"🏋️",exId:"squat",sets:4,reps:8,weightLbs:205,weightPct:100,hrZone:null,distanceMi:null,xp:510,mult:1.12,time:fmtTime(),date:fmtDate(10),dateKey:daysAgo(10),sourceGroupId:gid("e")},
-                  ];
-                  const previewXP = 320000;
-                  setProfile({...EMPTY_PROFILE,
-                    playerName:"Test Majiq", firstName:"John", lastName:"Majiq",
-                    chosenClass:"tempest", xp:previewXP,
-                    weightLbs:205, heightFt:6, heightIn:2, age:36, gender:"Male",
-                    gym:"Lifetime Fitness", state:"KS", country:"United States",
-                    motto:"I like to test apps", trainingStyle:"mixed", workoutTiming:"evening",
-                    disciplineTrait:"Night Owl",
-                    hudFields:{weight:true,height:true,bmi:false},
-                    fitnessPriorities:["nutrition","endurance","social"],
-                    sportsBackground:["football","volleyball","dance"],
-                    nameVisibility:{displayName:["app","game"],realName:["hide"]},
-                    log:previewLog, workouts:[], plans:[], scheduledWorkouts:[],
-                    checkInHistory:[], checkInStreak:3, totalCheckIns:10,
-                    lastCheckIn:new Date(Date.now()-86400000).toISOString().slice(0,10),
-                    quests:{}, customExercises:[],
-                    exercisePBs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},
-                  });
-                  setMyPublicId("UQHDD2");
-                  setMyPrivateId("mPTSbPw8vTnd");
-                  setFriends([
-                    {id:"f1",playerName:"IronValkyrie",chosenClass:"warrior",xp:420000,log:[]},
-                    {id:"f2",playerName:"ZenMaster_X",chosenClass:"druid",xp:155000,log:[]},
-                    {id:"f3",playerName:"CrushMode88",chosenClass:"gladiator",xp:58000,log:[]},
-                    {id:"f4",playerName:"SwiftArrow",chosenClass:"warden",xp:105000,log:[]},
-                  ]);
-                  setLbData([
-                    {user_id:"f1",public_id:"VK9R3M",player_name:"IronValkyrie",first_name:"Sarah",last_name:"Chen",chosen_class:"warrior",total_xp:420000,level:8,streak:31,state:"NY",country:"United States",gym:"Gold's Gym",exercise_pbs:{bench:{weight:185},squat:{weight:275},deadlift:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f5",public_id:"PH3L9F",player_name:"PhantomLift",first_name:"Jake",last_name:"Morrison",chosen_class:"phantom",total_xp:360000,level:8,streak:45,state:"CO",country:"United States",gym:"24 Hr Fitness",exercise_pbs:{bench:{weight:245},squat:{weight:365},deadlift:{weight:405},pullups:{reps:25}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"preview",public_id:"UQHDD2",player_name:"Test Majiq",first_name:"John",last_name:"Majiq",chosen_class:"tempest",total_xp:320000,level:7,streak:3,state:"KS",country:"United States",gym:"Lifetime Fitness",exercise_pbs:{bench:{weight:185},squat:{weight:205},deadlift:{weight:225},run:{type:"cardio",value:9.03}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:true},
-                    {user_id:"f6",public_id:"TT6B4K",player_name:"TitanBreaker",first_name:"Mike",last_name:"OBrien",chosen_class:"titan",total_xp:210000,level:6,streak:18,state:"OH",country:"United States",gym:"YMCA",exercise_pbs:{bench:{weight:315},squat:{weight:455},deadlift:{weight:500}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f2",public_id:"ZN4K8W",player_name:"ZenMaster_X",first_name:"Marcus",last_name:"Rivera",chosen_class:"druid",total_xp:155000,level:5,streak:14,state:"CA",country:"United States",gym:"Equinox",exercise_pbs:{bench:{weight:135},run:{type:"cardio",value:7.5}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f4",public_id:"SW7A2R",player_name:"SwiftArrow",first_name:"Emily",last_name:"Park",chosen_class:"warden",total_xp:105000,level:4,streak:22,state:"FL",country:"United States",gym:"LA Fitness",exercise_pbs:{run:{type:"cardio",value:7.2},pullups:{reps:12}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f3",public_id:"CR8M5T",player_name:"CrushMode88",first_name:"DeAndre",last_name:"Williams",chosen_class:"gladiator",total_xp:58000,level:3,streak:7,state:"TX",country:"United States",gym:"Planet Fitness",exercise_pbs:{bench:{weight:225},squat:{weight:315}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                    {user_id:"f7",public_id:"ST2E7X",player_name:"StrikerElite",first_name:"Aisha",last_name:"Thompson",chosen_class:"striker",total_xp:22000,level:2,streak:5,state:"WA",country:"United States",gym:"Home Gym",exercise_pbs:{pushups:{reps:45}},name_visibility:{displayName:["app","game"],realName:["hide"]},is_me:false},
-                  ]);
-                  setLbWorldRanks({"f1":1,"f5":2,"preview":3,"f6":4,"f2":5,"f4":6,"f3":7,"f7":8});
-                  setScreen("main");
+                  if(!previewPinEnabled){ launchPreviewMode(); }
+                  else { setShowPreviewPin(true);setPreviewPinInput("");setPreviewPinError(false); }
                 }
-              }, "👁 Preview Mode"
+              }, "\uD83D\uDC41 Preview Mode"
             )
-            , React.createElement('div', { style: {fontSize:".5rem", color:"#2e2c28", marginTop:2} }, "No account needed · Data won't be saved")
+            , showPreviewPin && React.createElement('div', null
+              , React.createElement('div', { style: {fontSize:".55rem", color:"#5a5650", marginBottom:6} }, "Enter dev PIN")
+              , React.createElement('div', { className: "preview-pin-wrap" }
+                , React.createElement('input', {
+                    className: "preview-pin-inp",
+                    type: "password",
+                    maxLength: 8,
+                    value: previewPinInput,
+                    onChange: e=>{setPreviewPinInput(e.target.value);setPreviewPinError(false);},
+                    onKeyDown: e=>{ if(e.key==="Enter"){ if(previewPinInput===PREVIEW_PIN){launchPreviewMode();}else{setPreviewPinError(true);} } },
+                    autoFocus: true
+                  })
+                , React.createElement('button', { className: "preview-pin-go", onClick: ()=>{ if(previewPinInput===PREVIEW_PIN){launchPreviewMode();}else{setPreviewPinError(true);} } }, "Go")
+              )
+              , previewPinError && React.createElement('div', { style: {fontSize:".55rem", color:"#e74c3c", marginTop:4} }, "Wrong PIN")
+              , React.createElement('span', { style: {fontSize:".5rem", color:"#3a3630", cursor:"pointer", display:"inline-block", marginTop:6}, onClick: ()=>{setShowPreviewPin(false);setPreviewPinError(false);} }, "Cancel")
+            )
+            , !showPreviewPin && React.createElement('div', { style: {fontSize:".5rem", color:"#2e2c28", marginTop:2} }, "Dev access only")
           )
 
         )
@@ -2820,26 +2945,64 @@ function App() {
       , PARTICLES.map(p=>React.createElement('div', { key: p.id, className: "pt", style: {left:`${p.x}%`,bottom:`${Math.random()*100}%`,width:p.size,height:p.size,"--dur":`${p.duration}s`,"--dly":`${p.delay}s`}}))
       , xpFlash && React.createElement('div', { className: "xp-flash"}, "+", xpFlash.amount.toLocaleString(), " XP" , xpFlash.mult>1.02?" ⚡":"")
       , toast    && React.createElement('div', { className: "toast"}, toast)
+      , showWNMockup && React.createElement(WorkoutNotificationMockup, { onClose: ()=>setShowWNMockup(false) })
 
       /* ══ INTRO ══════════════════════════════════ */
       , screen==="intro" && (
-        React.createElement('div', { className: "screen"}
-          , React.createElement('div', { style: {textAlign:"center", padding:"8px 0 4px"} }
-            , React.createElement('img', {
-                src: "data:image/png;base64,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",
-                alt: "Aurisar Fitness",
-                style: {
-                  width: "min(280px, 82vw)",
-                  height: "auto",
-                  display: "block",
-                  margin: "0 auto",
-                  filter: "drop-shadow(0 0 24px rgba(196,148,40,0.35)) drop-shadow(0 4px 16px rgba(0,0,0,0.7))"
-                }
-              })
+        React.createElement('div', { className: "screen boot-screen"}
+          , React.createElement('div', { className: "boot-title"}
+            , "AURISAR"
+            , React.createElement('span', { className: "boot-title-sub"}, "FITNESS")
           )
-                    , React.createElement('div', { className: "orn", style: {margin:"-8px 0"}}, "⸻ ✦ ⸻"  )
-          , React.createElement('p', { style: {color:"#8a8478",fontStyle:"italic",textAlign:"center",maxWidth:290,fontSize:".88rem"}}, "Every rep. Every step. Every drop of sweat earns you glory."          )
-          , React.createElement('button', { className: "btn btn-gold" , onClick: ()=>setScreen("onboard")}, "Boot Up" )
+          , React.createElement('div', { className: "boot-log"}
+            , React.createElement('div', { className: "boot-bar-wrap"}
+              , React.createElement('div', { className: "boot-bar", style: {width: bootStep>=4?"100%": bootStep>=3?"58%": bootStep>=2?"34%": bootStep>=1?"12%":"2%"}})
+            )
+            , React.createElement('div', { className: "boot-log-lines"}
+              , bootStep>=1 && React.createElement('div', { className: "boot-line boot-line-in"}, React.createElement('span', { className: "boot-prompt"}, ">"), " Loading combat modules...", React.createElement('span', { className: "boot-check"}, " ✓"))
+              , bootStep>=2 && React.createElement('div', { className: "boot-line boot-line-in"}, React.createElement('span', { className: "boot-prompt"}, ">"), " Calibrating XP engine...", React.createElement('span', { className: "boot-check"}, " ✓"))
+              , bootStep>=3 && React.createElement('div', { className: "boot-line boot-line-in"}, React.createElement('span', { className: "boot-prompt"}, ">"), " Assigning warrior class...", bootStep>=4 ? React.createElement('span', { className: "boot-check"}, " ✓") : React.createElement('span', { className: "boot-ellipsis"}, " ..."))
+            )
+          )
+          , React.createElement('button', {
+              className: `btn btn-gold${bootStep>=4?" boot-btn-ready":""}`,
+              onClick: ()=>setScreen("onboard")
+            }, bootStep>=4 ? "BEGIN" : "BOOT UP")
+          , React.createElement('button', {
+              className: "btn btn-ghost boot-cancel-btn",
+              onClick: async ()=>{
+                await sb.auth.signOut();
+                setAuthUser(null); setAuthIsNew(false); setAuthEmail(""); setAuthPassword("");
+                setScreen("home");
+              }
+            }, "← Cancel")
+          , obDraft && React.createElement('div', { className: "boot-resume-card boot-line-in" }
+            , React.createElement('div', {className:"boot-resume-label"}, "⟳ Resume where you left off?")
+            , React.createElement('div', {className:"boot-resume-step"}, `Step ${obDraft.obStep} of 6${obDraft.obFirstName ? " · "+obDraft.obFirstName : ""}`)
+            , React.createElement('div', {style:{display:"flex",gap:8,justifyContent:"center",marginTop:8}}
+              , React.createElement('button', {
+                  className:"btn btn-ghost", style:{fontSize:".65rem",padding:"5px 14px"},
+                  onClick:()=>{
+                    setObStep(obDraft.obStep); setObName(obDraft.obName); setObFirstName(obDraft.obFirstName);
+                    setObLastName(obDraft.obLastName); setObBio(obDraft.obBio); setObAge(obDraft.obAge);
+                    setObGender(obDraft.obGender); setObSports(obDraft.obSports); setObFreq(obDraft.obFreq);
+                    setObTiming(obDraft.obTiming); setObPriorities(obDraft.obPriorities); setObStyle(obDraft.obStyle);
+                    setObState(obDraft.obState); setObCountry(obDraft.obCountry);
+                    setObDraft(null); setScreen("onboard");
+                  }
+                }, "Resume")
+              , React.createElement('span', {
+                  style:{fontSize:".58rem",color:"#3a3834",cursor:"pointer",alignSelf:"center",padding:"4px 6px"},
+                  onClick:()=>{
+                    try { localStorage.removeItem("aurisar_ob_draft_"+authUser.id); } catch(e) {}
+                    setObDraft(null); setObStep(1); setObName(""); setObFirstName(""); setObLastName("");
+                    setObBio(""); setObAge(""); setObGender(""); setObSports([]); setObFreq("");
+                    setObTiming(""); setObPriorities([]); setObStyle(""); setObState(""); setObCountry("United States");
+                    setScreen("onboard");
+                  }
+                }, "Start fresh")
+            )
+          )
         )
       )
 
@@ -3058,10 +3221,11 @@ function App() {
                 {icon:"🏆", label:"Leaderboard", action:()=>guardAll(()=>{setActiveTab("leaderboard");setNavMenuOpen(false);})},
                 {icon:"💬", label:"Messages", action:()=>guardAll(()=>{setActiveTab("messages");setMsgView("list");loadConversations();setNavMenuOpen(false);}), badge:msgUnreadTotal||null, badgeDanger:true},
                 {icon:"🎯", label:"Quests",      action:()=>guardAll(()=>{setActiveTab("quests");setNavMenuOpen(false);}), badge:pendingQuestCount},
-                {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
-                {icon:"💬", label:"Feedback",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setNavMenuOpen(false);}},
+                // Map feature hidden — re-enable when ready
+                // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
+                {icon:"🛟", label:"Support",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setFeedbackEmail(_optionalChain([authUser, 'optionalAccess', _a => _a.email])||"");setFeedbackAccountId(myPublicId||"");setHelpConfirmShown(false);setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
-                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("login");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
+                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("home");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
                 React.createElement('button', {
                     key: item.label,
@@ -3096,6 +3260,10 @@ function App() {
                   style: {fontSize:".5rem",color:"#5a5650",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"},
                   onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
                 }, "↺ Retro")
+              , React.createElement('button', {
+                  style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
+                  onClick: ()=>setShowWNMockup(true)
+                }, "📲 Notification")
               , React.createElement('button', {
                   style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
                   disabled: profile.lastCheckIn===todayStr(),
@@ -3177,7 +3345,7 @@ function App() {
                               , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478",textTransform:"uppercase",letterSpacing:".08em"} }, "Muscle Group")
                               , React.createElement('span', { style: {fontSize:".65rem",color:"#b4ac9e",cursor:"pointer"}, onClick: ()=>{setExMuscleFilter("All");setMusclePickerOpen(false);} }, "Clear")
                             )
-                            , ["chest","shoulder","bicep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
+                            , ["chest","shoulder","bicep","tricep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
                               React.createElement('div', {
                                   key: mg,
                                   style: {display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid rgba(45,42,36,.15)"},
@@ -3314,7 +3482,7 @@ function App() {
                 , exSubTab==="library" && (()=>{
                   const TYPE_OPTS  = ["strength","cardio","flexibility","yoga","stretching","plyometric","calisthenics","functional","isometric","warmup","cooldown"];
                   const TYPE_LABELS = {strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flexibility",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali",functional:"🔧 Functional",isometric:"🧱 Isometric",warmup:"🌅 Warmup",cooldown:"🌙 Cooldown"};
-                  const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","full_body","cardio"];
+                  const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","full_body","cardio"];
                   const ALL_EQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
 
                   const toggleSet = (setter, val) => setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; });
@@ -3566,8 +3734,7 @@ function App() {
                     /* Count + clear row */
                     React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}},
                       React.createElement('div', {style:{fontSize:".68rem",color:"#4a4438"}},
-                        libFiltered.length+" exercises",
-                        !_ymoveLoaded && React.createElement('span',{style:{color:"#6a6050",marginLeft:6}},"(loading more…)")
+                        libFiltered.length+" exercises"
                       ),
                       hasFilters && React.createElement('button', {
                         onClick:clearAll,
@@ -3578,26 +3745,26 @@ function App() {
                     /* Select mode action bar */
                     libSelectMode && libSelected.size>0 && React.createElement('div', {
                       style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,
-                             padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}
+                             padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}
                     },
-                      React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700",flexShrink:0}}, libSelected.size+" selected"),
-                      React.createElement('div',{style:{flex:1}}),
+                      React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, libSelected.size+" selected"),
+                      React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
                       React.createElement('button',{
                         onClick:()=>{
                           const exs=[...libSelected].map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
                           setAddToWorkoutPicker({exercises:exs});
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
+                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       }, "➕ Existing"),
                       React.createElement('button',{
                         onClick:()=>{
                           const exs=[...libSelected].map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
-                          setWbExercises(exs);setWbName("");setWbIcon("💪");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
+                          setWbExercises(exs);setWbName("");setWbIcon("💪");setWbDesc("");setWbEditId(null);setWbIsOneOff(false);
                           setWorkoutView("builder");setActiveTab("workouts");
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
-                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
+                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       }, "⚡ New Workout"),
                       React.createElement('button',{
                         onClick:()=>{
@@ -3607,9 +3774,9 @@ function App() {
                           setSpwName("Selected Exercises");setSpwIcon("📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap"}
+                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       }, "📋 Plan")
-                    ),
+                    )),
 
                     /* Exercise list */
                     React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}},
@@ -3662,7 +3829,6 @@ function App() {
                                 letterSpacing:".01em",
                               }}, ex.name),
                               hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆"),
-                              ex.hasVideo && React.createElement('span',{style:{fontSize:".58rem",color:"#2ecc71",background:"rgba(46,204,113,.1)",padding:"1px 5px",borderRadius:3,fontWeight:700}}, "▶")
                             ),
                             React.createElement('div', {style:{
                               fontSize:".62rem", fontStyle:"italic", lineHeight:1.4,
@@ -3712,13 +3878,10 @@ function App() {
                         style:{background:"linear-gradient(160deg,rgba(18,16,12,.92),rgba(12,12,10,.95))",border:"1px solid rgba(180,172,158,.06)",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:"20px 18px 32px"}
                       },
                         React.createElement('div',{style:{width:36,height:4,background:"rgba(45,42,36,.3)",borderRadius:2,margin:"0 auto 16px"}}),
-                        libDetailEx.hasVideo
-                          ? React.createElement(ExerciseVideo, {exerciseId:libDetailEx.id, height:220})
-                          : React.createElement('div',{style:{height:90,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}, React.createElement(ExIcon,{ex:libDetailEx,size:"3.5rem",color:getTypeColor(libDetailEx.category)})),
+                        React.createElement('div',{style:{height:90,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}, React.createElement(ExIcon,{ex:libDetailEx,size:"3.5rem",color:getTypeColor(libDetailEx.category)})),
                         React.createElement('div',{style:{marginBottom:10}},
                           React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}},
                             React.createElement('span',{style:{fontSize:"1rem",fontWeight:"700",color:"#e8e0d0"}}, libDetailEx.name),
-                            libDetailEx.hasVideo && React.createElement('span',{style:{background:"rgba(46,204,113,.15)",color:"#2ecc71",fontSize:".6rem",padding:"2px 7px",borderRadius:4,fontWeight:"700"}}, "▶ VIDEO"),
                             (profile.exercisePBs||{})[libDetailEx.id] && React.createElement('span',{style:{background:"rgba(180,172,158,.1)",color:"#b4ac9e",fontSize:".6rem",padding:"2px 7px",borderRadius:4,fontWeight:"700"}}, "🏆 PB")
                           ),
                           React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}},
@@ -3739,7 +3902,7 @@ function App() {
                           style:{width:"100%",background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer"}
                         }, (profile.favoriteExercises||[]).includes(libDetailEx.id)?"⭐ Saved to Favorites":"☆ Save to Favorites"),
                         React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
-                          React.createElement('button', {
+                          libDetailEx.id!=="rest_day"&&React.createElement('button', {
                             onClick:()=>{
                               const exEntry = {exId:libDetailEx.id,sets:(libDetailEx.defaultSets!=null?libDetailEx.defaultSets:3),reps:(libDetailEx.defaultReps!=null?libDetailEx.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};
                               setAddToWorkoutPicker({exercises:[exEntry]});
@@ -3768,7 +3931,7 @@ function App() {
                             setActiveTab("exercises");
                           },
                           style:{width:"100%",marginTop:8,background:"linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",border:"1px solid rgba(41,128,185,.3)",color:"#2980b9",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer",textAlign:"center"}
-                        }, "\u26A1 Edit & Complete Now")
+                        }, "\u2699 Configure")
                       )
                     )
                   );
@@ -3785,28 +3948,28 @@ function App() {
                       }, favSelectMode?"✕ Cancel":"☐ Select")
                     )
                     /* Multi-select action bar */
-                    , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.3)",border:"1px solid rgba(180,172,158,.08)",borderRadius:10,padding:"10px 12px",marginBottom:10,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}
-                      , React.createElement('span',{style:{fontSize:".68rem",color:"#b4ac9e",fontWeight:600,marginRight:4}}, favSelected.size+" selected")
+                    , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}
+                      , React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, favSelected.size+" selected")
+                      , React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
+                      React.createElement('button',{
+                        onClick:()=>{
+                          const ids=[...favSelected];
+                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
+                          setAddToWorkoutPicker({exercises:exs});
+                          setFavSelectMode(false);setFavSelected(new Set());
+                        },
+                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                      },"➕ Existing")
                       , React.createElement('button',{
                         onClick:()=>{
                           const ids=[...favSelected];
-                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};});
+                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:(e&&e.defaultDurationMin)||null,weightPct:100,distanceMi:null,hrZone:null};});
                           setWbExercises(exs);setWbName("");setWbIcon("💪");setWbDesc("");setWbEditId(null);setWbIsOneOff(false);
                           setWorkoutView("builder");setActiveTab("workouts");
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",fontSize:".6rem",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontWeight:600}
-                      },"💪 Workout")
-                      , React.createElement('button',{
-                        onClick:()=>{
-                          const ids=[...favSelected];
-                          const exs=ids.map(id=>{const e=allExById[id];return {exId:id,sets:(e&&e.defaultSets!=null?e.defaultSets:3),reps:(e&&e.defaultReps!=null?e.defaultReps:10),weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};});
-                          setWbExercises(exs);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
-                          setWorkoutView("builder");setActiveTab("workouts");
-                          setFavSelectMode(false);setFavSelected(new Set());
-                        },
-                        style:{background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",fontSize:".6rem",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontWeight:600}
-                      },"⚡ One-Off")
+                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                      },"⚡ New Workout")
                       , React.createElement('button',{
                         onClick:()=>{
                           const ids=[...favSelected];
@@ -3814,9 +3977,9 @@ function App() {
                           setSpwName("Selected Favorites");setSpwIcon("📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",fontSize:".6rem",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontWeight:600}
+                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       },"📋 Plan")
-                    )
+                    ))
                     , (profile.favoriteExercises||[]).length===0
                         ? React.createElement('div',{className:"empty",style:{padding:"16px 0"}},"No favorites yet — tap ⭐ on any exercise.")
                         : React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:6}}
@@ -3905,7 +4068,6 @@ function App() {
                                     React.createElement('span',{style:{fontSize:".83rem",fontWeight:600,color:"#d4cec4",letterSpacing:".01em"}}, ex.name),
                                     React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:2}}, "custom"),
                                     hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆"),
-                                    ex.hasVideo && React.createElement('span',{style:{fontSize:".58rem",color:"#2ecc71",background:"rgba(46,204,113,.1)",padding:"1px 5px",borderRadius:3,fontWeight:700}}, "▶")
                                   ),
                                   React.createElement('div',{style:{fontSize:".62rem",fontStyle:"italic",lineHeight:1.4}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))
                                 ),
@@ -3973,14 +4135,95 @@ function App() {
                       React.createElement('button', { key: t, className: `log-subtab-btn ${workoutSubTab===t?"on":""}`, onClick: ()=>setWorkoutSubTab(t)}, l)
                     ))
                   )
+                  /* Label filter dropdown */
+                  , (profile.workoutLabels||[]).length>0 && React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,position:"relative"}},
+                    woLabelDropOpen && React.createElement('div', {onClick:()=>setWoLabelDropOpen(false), style:{position:"fixed",inset:0,zIndex:19}}),
+                    React.createElement('div', {style:{position:"relative",zIndex:20}},
+                      React.createElement('button', {
+                        onClick:()=>setWoLabelDropOpen(!woLabelDropOpen),
+                        style:{padding:"7px 28px 7px 10px",borderRadius:9,
+                               border:"1px solid "+(woLabelFilters.size>0?"#C4A044":"rgba(45,42,36,.3)"),
+                               background:"rgba(14,14,12,.95)",
+                               color:woLabelFilters.size>0?"#C4A044":"#8a8478",
+                               fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                      },
+                        woLabelFilters.size>0?"Labels ("+woLabelFilters.size+")":"Labels",
+                        React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
+                          transform:"translateY(-50%) rotate("+(woLabelDropOpen?"180deg":"0deg")+")",
+                          color:woLabelFilters.size>0?"#C4A044":"#6a6050",fontSize:".6rem",
+                          transition:"transform .15s",lineHeight:1}},"▼")
+                      ),
+                      woLabelDropOpen && React.createElement('div', {
+                        style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:180,
+                               background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.07)",
+                               borderRadius:9,padding:"6px 4px",zIndex:21,
+                               boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
+                      },
+                        (profile.workoutLabels||[]).map(l=>{
+                          const sel=woLabelFilters.has(l);
+                          return React.createElement('div', {
+                            key:l,
+                            onClick:()=>setWoLabelFilters(s=>{const n=new Set(s);n.has(l)?n.delete(l):n.add(l);return n;}),
+                            style:{display:"flex",alignItems:"center",gap:8,
+                                   padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                   background:sel?"rgba(196,160,68,.12)":"transparent"}
+                          },
+                            React.createElement('div', {style:{
+                              width:14,height:14,borderRadius:3,flexShrink:0,
+                              border:"1.5px solid "+(sel?"#C4A044":"rgba(180,172,158,.08)"),
+                              background:sel?"rgba(196,160,68,.25)":"transparent",
+                              display:"flex",alignItems:"center",justifyContent:"center"
+                            }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:"#C4A044",lineHeight:1}},"✓")),
+                            React.createElement('span',{style:{fontSize:".72rem",
+                              color:sel?"#C4A044":"#b4ac9e",whiteSpace:"nowrap"}},l)
+                          );
+                        }),
+                        React.createElement('div', {className:"wo-label-new-row"},
+                          React.createElement('input', {className:"wo-label-new-inp", value:newLabelInput,
+                            onChange:e=>setNewLabelInput(e.target.value),
+                            onClick:e=>e.stopPropagation(),
+                            onKeyDown:e=>{
+                              if(e.key==="Enter"&&newLabelInput.trim()){
+                                const lbl=newLabelInput.trim();
+                                if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                                  setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                                }
+                                setNewLabelInput("");
+                              }
+                            },
+                            placeholder:"+ New label…"}),
+                          React.createElement('button', {className:"btn btn-ghost btn-xs", style:{padding:"2px 6px",fontSize:".6rem"},
+                            onClick:e=>{
+                              e.stopPropagation();
+                              const lbl=newLabelInput.trim(); if(!lbl) return;
+                              if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                                setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                              }
+                              setNewLabelInput("");
+                            }},"+")
+                        )
+                      )
+                    ),
+                    woLabelFilters.size>0 && React.createElement('button', {
+                      className:"btn btn-ghost btn-xs",
+                      style:{fontSize:".6rem",color:"#8a8478",alignSelf:"center"},
+                      onClick:()=>setWoLabelFilters(new Set())
+                    },"Clear")
+                  )
                   , workoutSubTab==="reusable"&&(
                     React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:13}}
                         , React.createElement('button', { className: "btn btn-gold btn-sm"  , onClick: ()=>initWorkoutBuilder(null)}, "＋ New Workout"  )
                         , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setWorkoutView("recipes")}, "📋 Recipes" )
                       )
-                      , allW.filter(w=>!w.oneOff).length===0&&React.createElement('div', { className: "empty"}, "No reusable workouts yet."   , React.createElement('br', null), "Create your first custom workout or start from a template."         )
-                  , allW.filter(w=>!w.oneOff).map(wo=>{
+                      , (()=>{
+                        const reusableWo = allW.filter(w=>!w.oneOff);
+                        const filtered = reusableWo.filter(w=>woLabelFilters.size===0||(w.labels||[]).some(l=>woLabelFilters.has(l)));
+                        if(reusableWo.length===0) return React.createElement('div', { className: "empty"}, "No reusable workouts yet.", React.createElement('br', null), "Create your first custom workout or start from a template.");
+                        if(filtered.length===0 && woLabelFilters.size>0) return React.createElement('div', { className: "empty"}, "No workouts match the selected labels.");
+                        return null;
+                      })()
+                  , allW.filter(w=>!w.oneOff).filter(w=>woLabelFilters.size===0||(w.labels||[]).some(l=>woLabelFilters.has(l))).map(wo=>{
                     const exCount = wo.exercises.length;
                     const xp = calcWorkoutXP(wo);
                     return (
@@ -3992,13 +4235,14 @@ function App() {
                             , React.createElement('div', { className: "workout-meta"}
                               , React.createElement('span', { className: "workout-tag"}, exCount, " exercise" , exCount!==1?"s":"")
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
+                              , (wo.labels||[]).map(l=>React.createElement('span', {key:l, className:"wo-label-chip", style:{pointerEvents:"none",marginLeft:2}}, l))
                             )
                             , wo.desc&&React.createElement('div', { className: "workout-desc", style:{marginTop:3}}, wo.desc)
                           )
-                          , React.createElement('div', { style: {display:"flex",gap:4,flexShrink:0,alignItems:"center"}, onClick: e=>e.stopPropagation() }
-                            , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Copy", onClick: ()=>copyWorkout(wo)}, "\u2398")
-                            , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Edit", onClick: ()=>initWorkoutBuilder(wo)}, "\u270E")
-                            , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Delete", style:{color:"#e74c3c"}, onClick: ()=>setConfirmDelete({type:"workout",id:wo.id,name:wo.name,icon:wo.icon})}, "\u2715")
+                          , React.createElement('div', { style: {display:"flex",gap:0,border:"1px solid rgba(180,172,158,.05)",borderRadius:9,overflow:"hidden",background:"rgba(45,42,36,.3)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",flexShrink:0}, onClick: e=>e.stopPropagation() }
+                            , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#5a5650",background:"transparent",border:"none",borderRight:"1px solid rgba(180,172,158,.06)",textTransform:"uppercase"}, title: "Copy", onClick: ()=>copyWorkout(wo)}, "\u2398 Copy")
+                            , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#5a5650",background:"transparent",border:"none",borderRight:"1px solid rgba(180,172,158,.06)",textTransform:"uppercase"}, title: "Edit", onClick: ()=>initWorkoutBuilder(wo)}, "\u270E Edit")
+                            , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#e74c3c",background:"transparent",border:"none",textTransform:"uppercase"}, title: "Delete", onClick: ()=>setConfirmDelete({type:"workout",id:wo.id,name:wo.name,icon:wo.icon})}, "\u2715 Del")
                           )
                         )
                       )
@@ -4009,7 +4253,7 @@ function App() {
                   , workoutSubTab==="oneoff"&&(
                     React.createElement(React.Fragment, null
                       , (()=>{
-                        const today = todayStr();
+                        const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
                         const grouped = {};
                         (profile.scheduledWorkouts||[]).forEach(sw=>{
                           if(!sw.sourceWorkoutId) return;
@@ -4018,9 +4262,14 @@ function App() {
                           if(!grouped[key]) grouped[key]={id:sw.sourceWorkoutId, name:sw.sourceWorkoutName, icon:sw.sourceWorkoutIcon||"⚡", date:sw.scheduledDate, items:[]};
                           grouped[key].items.push(sw);
                         });
-                        const scheduled = Object.values(grouped).sort((a,b)=>a.date.localeCompare(b.date));
+                        const scheduled = Object.values(grouped).filter(g=>{
+                          if(woLabelFilters.size===0) return true;
+                          const wo = (profile.workouts||[]).find(w=>w.id===g.id);
+                          return (wo&&wo.labels||[]).some(l=>woLabelFilters.has(l));
+                        }).sort((a,b)=>a.date.localeCompare(b.date));
                         const hasSoloExs = (profile.scheduledWorkouts||[]).some(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today);
-                        if(scheduled.length===0 && !hasSoloExs) return React.createElement('div', { className: "empty"}, "No upcoming one-off workouts."   , React.createElement('br', null), "Select exercises and tap ⚡ One-Off Workout to schedule one."         );
+                        if(scheduled.length===0 && !hasSoloExs && woLabelFilters.size===0) return React.createElement('div', { className: "empty"}, "No upcoming one-off workouts."   , React.createElement('br', null), "Select exercises and tap ⚡ One-Off Workout to schedule one."         );
+                        if(scheduled.length===0 && !hasSoloExs && woLabelFilters.size>0) return React.createElement('div', { className: "empty"}, "No one-off workouts match the selected labels.");
                         if(scheduled.length===0) return null;
                         return scheduled.map(g=>{
                           const days = daysUntil(g.date);
@@ -4038,20 +4287,22 @@ function App() {
                                     , React.createElement('span', { className: "workout-tag"}, g.items.length, " exercise" , g.items.length!==1?"s":"")
                                     , React.createElement('span', { className: "workout-tag"}, "\u26A1 " , xp.toLocaleString(), " XP" )
                                     , React.createElement('span', { className: `upcoming-badge ${badgeCls}`, style: {marginLeft:4}}, badgeTxt)
+                                    , (wo.labels||[]).map(l=>React.createElement('span', {key:l, className:"wo-label-chip", style:{pointerEvents:"none",marginLeft:2}}, l))
                                   )
                                   , wo.desc&&React.createElement('div', { className: "workout-desc", style:{marginTop:3}}, wo.desc)
                                 )
-                                , React.createElement('div', { style: {display:"flex",gap:4,flexShrink:0,alignItems:"center"}, onClick: e=>e.stopPropagation() }
-                                  , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Edit", onClick: ()=>{
+                                , React.createElement('div', { style: {display:"flex",gap:0,border:"1px solid rgba(180,172,158,.05)",borderRadius:9,overflow:"hidden",background:"rgba(45,42,36,.3)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",flexShrink:0}, onClick: e=>e.stopPropagation() }
+                                  , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#5a5650",background:"transparent",border:"none",borderRight:"1px solid rgba(180,172,158,.06)",textTransform:"uppercase"}, title: "Edit", onClick: ()=>{
                                     setWbName(wo.name); setWbIcon(wo.icon); setWbDesc(wo.desc||"");
                                     setWbExercises(wo.exercises.map(e=>({...e})));
                                     setWbEditId(wo.id); setWbIsOneOff(true);
+                                    setWbLabels(wo.labels||[]); setNewLabelInput("");
                                     setWorkoutView("builder");
-                                  }}, "\u270E")
-                                  , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Delete", style:{color:"#e74c3c"}, onClick: ()=>{
+                                  }}, "\u270E Edit")
+                                  , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#e74c3c",background:"transparent",border:"none",textTransform:"uppercase"}, title: "Delete", onClick: ()=>{
                                     setProfile(p=>({...p,scheduledWorkouts:(p.scheduledWorkouts||[]).filter(sw=>sw.sourceWorkoutId!==g.id)}));
                                     showToast("Scheduled workout removed.");
-                                  }}, "\u2715")
+                                  }}, "\u2715 Del")
                                 )
                               )
                               /* Action row */
@@ -4080,7 +4331,7 @@ function App() {
                         });
                       })()
                       , (()=>{
-                        const today = todayStr();
+                        const _now2 = new Date(); const today = `${_now2.getFullYear()}-${String(_now2.getMonth()+1).padStart(2,'0')}-${String(_now2.getDate()).padStart(2,'0')}`;
                         const soloExs = (profile.scheduledWorkouts||[]).filter(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today).sort((a,b)=>a.scheduledDate.localeCompare(b.scheduledDate));
                         if(soloExs.length===0) return null;
                         return React.createElement(React.Fragment, null
@@ -4102,6 +4353,7 @@ function App() {
                                   , sw.notes && React.createElement('div', {className:"workout-desc", style:{marginTop:3}}, sw.notes)
                                 )
                                 , React.createElement('div', {style:{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}
+                                  , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".65rem",color:"#b4ac9e",padding:"3px 6px"}, onClick:(e)=>{e.stopPropagation(); setSelEx(sw.exId);setPendingSoloRemoveId(sw.id);}}, "✎")
                                   , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{color:"#e74c3c"}, onClick:()=>{
                                     setProfile(p=>({...p,scheduledWorkouts:(p.scheduledWorkouts||[]).filter(s=>s.id!==sw.id)}));
                                     showToast("Scheduled exercise removed.");
@@ -4109,7 +4361,13 @@ function App() {
                                 )
                               )
                               , React.createElement('div', {style:{display:"flex",gap:6,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(180,172,158,.04)"}}
-                                , React.createElement('button', {className:"btn btn-gold btn-sm", onClick:()=>quickLogSoloEx(sw)}, "\u26A1 Log Now")
+                                , React.createElement('button', {className:"btn btn-gold btn-sm", style:{flex:1}, onClick:()=>quickLogSoloEx(sw)}, "\u26A1 Quick Log")
+                                , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,fontSize:".58rem",borderColor:"rgba(180,172,158,.15)",color:"#b4ac9e"}, onClick:(e)=>{e.stopPropagation(); openScheduleEx(sw.exId, sw.id);}}, "\uD83D\uDCC5 Reschedule")
+                                , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{flex:1,fontSize:".58rem",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"}, onClick:()=>{
+                                    const ex2=allExById[sw.exId]; if(!ex2) return;
+                                    const exEntry={exId:ex2.id,sets:ex2.defaultSets||3,reps:ex2.defaultReps||10,weightLbs:null,durationMin:null,weightPct:100,distanceMi:null,hrZone:null};
+                                    setAddToWorkoutPicker({exercises:[exEntry]});
+                                  }}, "\u2795 Add to Workout")
                               )
                             );
                           })
@@ -4230,7 +4488,7 @@ function App() {
                               , exD.name
                               , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:5}}, "custom")
                             )
-                            , React.createElement('div', { className: "workout-detail-ex-meta"}
+                            , ex.exId!=="rest_day"&&React.createElement('div', { className: "workout-detail-ex-meta"}
                               , ex.sets, "×", ex.reps, isC||isF?" min":""
                               , showW&&ex.weightLbs?React.createElement('span', { style: {color:"#8a8478",marginLeft:6}}, metric?lbsToKg(ex.weightLbs)+" kg":ex.weightLbs+" lbs"):""
                             )
@@ -4247,11 +4505,11 @@ function App() {
                     })
                     , React.createElement('div', { className: "div"})
                     , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"}}
-                      , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2}, onClick: ()=>{
+                      , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem"}, onClick: ()=>{
                         openStatsPromptIfNeeded(wo, (woWithStats, _sr)=>{
                           setCompletionModal({workout:woWithStats, fromStats:_sr});setCompletionDate(todayStr());setCompletionAction("today");
                         });
-                      }}, "✓ Complete Workout"  )
+                      }}, "✓ Mark Complete or Schedule"  )
                       , React.createElement('button', { className: "btn btn-gold btn-sm"  , style: {flex:1}, onClick: ()=>setAddToPlanPicker({workout:wo})}, "📋 Add to Plan"   )
                       , React.createElement('button', { className: "btn btn-danger btn-sm"  , style: {flex:0,paddingLeft:10,paddingRight:10}, onClick: ()=>deleteWorkout(wo.id)}, "🗑")
                     )
@@ -4263,7 +4521,7 @@ function App() {
               if(workoutView==="builder") return (
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { className: "builder-nav-hdr" }
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setWorkoutView("list"); setWbCopySource(null); setWbIsOneOff(false); setWbEditId(null); setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal("");} }, "← Cancel")
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>{setWorkoutView("list"); setWbCopySource(null); setWbIsOneOff(false); setWbEditId(null); setWbDuration(""); setWbDurSec(""); setWbActiveCal(""); setWbTotalCal(""); setWbLabels([]); setNewLabelInput("");} }, "← Cancel")
                     , React.createElement('div', { style: {flex:1,minWidth:0} }
                       , React.createElement('div', { className: "builder-nav-title" }
                         , wbIsOneOff
@@ -4291,6 +4549,41 @@ function App() {
                   , React.createElement('div', { className: "field"}
                     , React.createElement('label', null, "Description " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
                     , React.createElement('input', { className: "inp", value: wbDesc, onChange: e=>setWbDesc(e.target.value), placeholder: "e.g. Upper body strength focus…"    })
+                  )
+                  /* Labels */
+                  , React.createElement('div', { className: "field"}
+                    , React.createElement('label', null, "Labels " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
+                    , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}
+                      , (profile.workoutLabels||[]).map(l=>
+                        React.createElement('span', { key: l, className: "wo-label-chip"+(wbLabels.includes(l)?" sel":""),
+                          onClick: ()=>setWbLabels(prev=>prev.includes(l)?prev.filter(x=>x!==l):[...prev,l])
+                        }, l)
+                      )
+                      , React.createElement('span', { style: {display:"inline-flex",alignItems:"center",gap:4}}
+                        , React.createElement('input', { className: "wo-label-new-inp", value: newLabelInput,
+                          onChange: e=>setNewLabelInput(e.target.value),
+                          onKeyDown: e=>{
+                            if(e.key==="Enter"&&newLabelInput.trim()){
+                              const lbl=newLabelInput.trim();
+                              if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                                setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                              }
+                              if(!wbLabels.includes(lbl)) setWbLabels(prev=>[...prev,lbl]);
+                              setNewLabelInput("");
+                            }
+                          },
+                          placeholder: "+ New label…", style: {width:100} })
+                        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 6px",fontSize:".6rem"},
+                          onClick: ()=>{
+                            const lbl=newLabelInput.trim(); if(!lbl) return;
+                            if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
+                              setProfile(p=>({...p,workoutLabels:[...(p.workoutLabels||[]),lbl]}));
+                            }
+                            if(!wbLabels.includes(lbl)) setWbLabels(prev=>[...prev,lbl]);
+                            setNewLabelInput("");
+                          }}, "+")
+                      )
+                    )
                   )
                   /* Workout-level stats (optional) */
                   , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:4}}
@@ -4336,17 +4629,7 @@ function App() {
                     )
                   )
                   , wbExercises.length===0&&React.createElement('div', { className: "empty", style: {padding:"16px 0"}}, "No techniques yet. Add from the arsenal or forge a custom one."           )
-                  /* Superset checkbox action bar */
-                  , ssChecked.size>0 && React.createElement('div',{className:"ss-action-bar"},
-                    React.createElement('span',{className:"ss-action-text"}, ssChecked.size+" exercise"+(ssChecked.size!==1?"s":"")+" selected"),
-                    ssChecked.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
-                      const [a,b]=[...ssChecked];
-                      setWbExercises(exs=>exs.map((x,xi)=>xi===a?{...x,supersetWith:b}:xi===b?{...x,supersetWith:a}:x));
-                      setSsChecked(new Set());
-                    }},"🔗 Group as Superset"),
-                    React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsChecked(new Set())},"✕")
-                  )
-                  , wbExercises.map((ex,i)=>{
+                  , (()=>{const minSsChecked = ssChecked.size>0 ? Math.min(...ssChecked) : -1; return wbExercises.map((ex,i)=>{
                     const exD=allExById[ex.exId]; if(!exD) return null;
                     const isC=exD.category==="cardio";
                     const isF=exD.category==="flexibility";
@@ -4398,6 +4681,15 @@ function App() {
                       );
                     }
                     return React.createElement(React.Fragment, {key:i},
+                      i===minSsChecked && ssChecked.size>0 && React.createElement('div',{className:"ss-action-bar"},
+                        React.createElement('span',{className:"ss-action-text"}, ssChecked.size+" exercise"+(ssChecked.size!==1?"s":"")+" selected"),
+                        ssChecked.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
+                          const [a,b]=[...ssChecked];
+                          setWbExercises(exs=>exs.map((x,xi)=>xi===a?{...x,supersetWith:b}:xi===b?{...x,supersetWith:a}:x));
+                          setSsChecked(new Set());
+                        }},"🔗 Group as Superset"),
+                        React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsChecked(new Set())},"✕")
+                      ),
                       React.createElement('div', {
                         className: `wb-ex-row ${dragWbExIdx===i?"dragging":""}`,
                         style: {
@@ -4411,50 +4703,41 @@ function App() {
                         onDragEnd: ()=>setDragWbExIdx(null)}
                         , (()=>{
                           const collapsed=!!collapsedWbEx[i];
-                          const isDone=!!wbExCompleted[i];
                           return (
                             React.createElement(React.Fragment, null
                               /* Header */
-                              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:8,
-                                background:isDone?"rgba(46,204,113,.07)":"transparent",
-                                borderRadius:isDone?6:0,padding:isDone?"4px 6px":"0",transition:"all .2s",marginLeft:-4,marginRight:-4}}
+                              , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:8,
+                                background:"transparent",cursor:"pointer",
+                                borderRadius:0,padding:"0",transition:"all .2s",marginLeft:-4,marginRight:-4},
+                                onClick:()=>toggleWbEx(i)}
                                 /* Order: ▲▼ arrows (leftmost) + SS checkbox + drag handle */
                                 , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
                                   , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();reorderWbEx(i,i-1);}}, "▲")
                                   , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===wbExercises.length-1?.3:1}, disabled: i===wbExercises.length-1, onClick: e=>{e.stopPropagation();reorderWbEx(i,i+1);}}, "▼")
                                 )
                                 , ex.supersetWith==null && wbExercises.filter(e=>!e.supersetWith).length>=2 && React.createElement('div', {
-                                    className:`ss-cb ${ssChecked.has(i)?"on":""}`,
+                                    style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
                                     title:"Select for superset",
                                     onClick:e=>{e.stopPropagation();setSsChecked(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
-                                  })
+                                  },
+                                    React.createElement('div', {className:`ss-cb ${ssChecked.has(i)?"on":""}`}),
+                                    React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
+                                  )
                                 , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
                                 , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColor} }, exD.icon)
-                                , React.createElement('div', { className: "builder-ex-name-styled", style: {textDecoration:isDone?"line-through":"none",color:isDone?"#5a8f6a":undefined}}
+                                , React.createElement('div', { className: "builder-ex-name-styled"}
                                   , exD.name
                                   , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:4}}, "custom")
-                                  , exD.custom&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {marginLeft:6,fontSize:".55rem",padding:"1px 5px"}, onClick: ()=>openExEditor("edit",exD)}, "✎ edit" )
+                                  , exD.custom&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {marginLeft:6,fontSize:".55rem",padding:"1px 5px"}, onClick: e=>{e.stopPropagation();openExEditor("edit",exD);}}, "✎ edit" )
                                 )
                                 , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
                                 , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
-                                , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
+                                , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
                                 , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
-                                /* Completion checkmark */
-                                , React.createElement('button', {
-                                  style: {width:22,height:22,borderRadius:"50%",border:`2px solid ${isDone?"#2ecc71":"rgba(180,172,158,.08)"}`,background:isDone?"rgba(46,204,113,.2)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:".75rem",transition:"all .2s"},
-                                  onClick: e=>{e.stopPropagation();setWbExCompleted(prev=>({...prev,[i]:!prev[i]}));},
-                                  title: isDone?"Mark incomplete":"Mark complete"}
-                                  , isDone&&React.createElement('span', { style: {color:"#2ecc71"}}, "✓")
-                                )
-                                , React.createElement('span', { className: "ex-collapse-btn", onClick: e=>{e.stopPropagation();toggleWbEx(i);}}
-                                        , React.createElement('svg', { width: "14", height: "14", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
-                                          , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg1", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
-                                          , React.createElement('polyline', { points: "3,5 7,9 11,5"  , stroke: "url(#cg1)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"})
-                                        )
-                                      )
-                                , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: ()=>removeWbEx(i)}, "✕")
+                                , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
+                                , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: e=>{e.stopPropagation();removeWbEx(i);}}, "✕")
                               )
-                              , !collapsed&&React.createElement(React.Fragment, null
+                              , !collapsed&&exD.id!=="rest_day"&&React.createElement(React.Fragment, null
                                 /* Sets + Reps/Duration + Weight row */
                                 , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
                                   , !noSetsEx&&React.createElement('div', { style: {flex:1}}
@@ -4605,7 +4888,7 @@ function App() {
                       )
 
                     );
-                  })
+                  });})()
                   , React.createElement('div', { className: "div"})
                   , wbIsOneOff ? (
                     wbEditId ? (
@@ -4614,7 +4897,7 @@ function App() {
                         if(!wbName.trim()){ showToast("Name your workout first!"); return; }
                         if(wbExercises.length===0){ showToast("Add at least one exercise."); return; }
                         const updated = {id:wbEditId, name:wbName.trim(), icon:wbIcon, desc:wbDesc.trim(),
-                          exercises:wbExercises, createdAt:todayStr(), oneOff:true};
+                          exercises:wbExercises, createdAt:todayStr(), oneOff:true, labels:wbLabels};
                         setProfile(p=>({
                           ...p,
                           // Update the saved workout object
@@ -4641,7 +4924,8 @@ function App() {
                           exercises:wbExercises,createdAt:todayStr(),oneOff:true,
                           durationMin:dur||null,
                           activeCal:wbActiveCal||null,
-                          totalCal:wbTotalCal||null};
+                          totalCal:wbTotalCal||null,
+                          labels:wbLabels};
                         openStatsPromptIfNeeded(wo,(woWithStats, _sr)=>{
                           setCompletionModal({workout:woWithStats, fromStats:_sr});
                           setCompletionDate(todayStr());
@@ -4657,7 +4941,22 @@ function App() {
                         React.createElement('button', {className:"btn btn-ghost", style:{flex:1}, onClick:saveAsNewWorkout}, "📋 Save As New")
                       )
                     ) : (
-                      React.createElement('button', {className:"btn btn-gold", style:{width:"100%"}, onClick:saveBuiltWorkout}, "💾 Save Workout")
+                      React.createElement('div', {style:{display:"flex",gap:8,width:"100%"}},
+                        React.createElement('button', { className: "btn btn-gold" , style: {flex:1}, onClick: saveBuiltWorkout}, "💾 Save Workout"),
+                        React.createElement('button', { className: "btn btn-gold" , style: {flex:1,background:"linear-gradient(135deg,#8B7425,#A89030)"}, onClick: ()=>{
+                          if(!wbName.trim()){ showToast("Name your workout first!"); return; }
+                          if(wbExercises.length===0){ showToast("Add at least one exercise."); return; }
+                          const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
+                          const wo={id:uid(),name:wbName.trim(),icon:wbIcon,desc:wbDesc.trim(),
+                            exercises:wbExercises,createdAt:todayStr(),oneOff:true,
+                            durationMin:dur||null,activeCal:wbActiveCal||null,totalCal:wbTotalCal||null,labels:wbLabels};
+                          openStatsPromptIfNeeded(wo,(woWithStats, _sr)=>{
+                            setCompletionModal({workout:woWithStats, fromStats:_sr});
+                            setCompletionDate(todayStr());setCompletionAction("today");
+                          });
+                          setWorkoutView("list");
+                        }}, "✓ Complete / Schedule")
+                      )
                     )
                   )
                 )
@@ -4726,7 +5025,7 @@ function App() {
                       const daysN = hasSched ? daysUntil(plan.scheduledDate) : null;
                       return (
                         React.createElement('div', { key: plan.id, className: "plan-card", style: {"--pc":cls&&cls.color||"#b4ac9e"}}
-                          , React.createElement('div', { className: "plan-card-top", onClick: ()=>{setActivePlan(plan);setBDayIdx(0);setPlanView("detail");}}
+                          , React.createElement('div', { className: "plan-card-top", onClick: ()=>{initBuilderFromTemplate(plan,true);}}
                             , React.createElement('div', { className: "plan-icon"}, plan.icon)
                             , React.createElement('div', { style: {flex:1,minWidth:0}}
                               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:2}}
@@ -4744,14 +5043,14 @@ function App() {
                             )
                             , React.createElement('div', { className: "plan-xp-badge"}, "⚡ " , planXP.toLocaleString())
                           )
-                          , plan.description&&React.createElement('div', { className: "plan-desc", onClick: ()=>{setActivePlan(plan);setBDayIdx(0);setPlanView("detail");}}, plan.description)
+                          , plan.description&&React.createElement('div', { className: "plan-desc", onClick: ()=>{initBuilderFromTemplate(plan,true);}}, plan.description)
                           , React.createElement('div', { style: {display:"flex",gap:7,marginTop:7,paddingTop:7,borderTop:"1px solid rgba(45,42,36,.18)"}}
                             , React.createElement('button', { className: `plan-sched-btn ${hasSched?"plan-sched-active":""}`,
                               onClick: e=>{e.stopPropagation();openSchedulePlan(plan);}}
                               , hasSched?("📅 "+formatScheduledDate(plan.scheduledDate)):"📅 Schedule"
                             )
                             , React.createElement('div', { style: {flex:1}})
-                            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , onClick: e=>{e.stopPropagation();setActivePlan(plan);setBDayIdx(0);setPlanView("detail");}}, "View →" )
+                            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , onClick: e=>{e.stopPropagation();initBuilderFromTemplate(plan,true);}}, "View →" )
                           )
                         )
                       );
@@ -4772,11 +5071,10 @@ function App() {
                         React.createElement('div', { key: type}
                           , React.createElement('div', { className: "sec", style: {textTransform:"capitalize",marginBottom:8}}, type, " Plans" )
                           , typePlans.map(tpl=>{
-                            const isRec = tpl.bestFor.includes(profile.chosenClass);
-                            const tplXP = calcPlanXP(tpl,profile.chosenClass,allExById);
-                            const activeDays = tpl.days.filter(d=>d.exercises.length>0);
-                            const allTplExIds = [...new Set(tpl.days.flatMap(d=>d.exercises.map(e=>e.exId)))];
                             const isCollapsed = !!collapsedTpls[tpl.id];
+                            const isRec = tpl.bestFor.includes(profile.chosenClass);
+                            const activeDays = tpl.days.filter(d=>d.exercises.length>0);
+                            const tplXP = calcPlanXP(tpl,profile.chosenClass,allExById);
                             return (
                               React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:10}}
                                 /* Header — always visible, click to collapse */
@@ -4809,8 +5107,9 @@ function App() {
                                   )
                                 )
                                 /* Expanded content */
-                                , !isCollapsed&&(
-                                  React.createElement('div', { style: {marginTop:10}}
+                                , !isCollapsed&&(()=>{
+                                  const allTplExIds = [...new Set(tpl.days.flatMap(d=>d.exercises.map(e=>e.exId)))];
+                                  return React.createElement('div', { style: {marginTop:10}}
                                     , React.createElement('div', { className: "workout-ex-pill-row", style: {marginBottom:10}}
                                       , allTplExIds.slice(0,6).map((exId,i)=>{
                                         const exD=allExById[exId];
@@ -4842,8 +5141,8 @@ function App() {
 
                                       )
                                     )
-                                  )
-                                )
+                                  );
+                                })()
                               )
                             );
                           })
@@ -4857,7 +5156,7 @@ function App() {
                   const plan=activePlan;
                   const metric=isMetric(profile.units);
                   const wUnit=weightLabel(profile.units);
-                  const [vDayIdx,setVDayIdx]=[bDayIdx,setBDayIdx];
+                  const [vDayIdx,setVDayIdx]=[detailDayIdx,setDetailDayIdx];
                   const totalXP=calcPlanXP(plan,profile.chosenClass,allExById);
                   const currentDay=plan.days[vDayIdx]||plan.days[0];
                   const dayXP=calcDayXP(currentDay,profile.chosenClass,allExById);
@@ -4869,7 +5168,7 @@ function App() {
                   return (
                     React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,marginBottom:13}}
-                        , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setPlanView("list");setActivePlan(null);setBDayIdx(0);}}, "← Back" )
+                        , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setPlanView("list");setActivePlan(null);setDetailDayIdx(0);}}, "← Back" )
                         , React.createElement('div', { style: {flex:1}}, React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".86rem",color:"#d4cec4"}}, plan.icon, " " , plan.name, plan.level&&React.createElement('span', { className: `plan-level-badge ${plan.level.toLowerCase()}`, style: {marginLeft:8,verticalAlign:"middle"}}, plan.level)))
                         , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flexShrink:0}, onClick: ()=>initBuilderFromTemplate(plan,true)}, "✎ Customize" )
                         , plan.custom&&React.createElement('button', { className: "btn btn-gold btn-sm"  , onClick: ()=>savePlanEdits(plan)}, "💾 Save" )
@@ -4910,7 +5209,7 @@ function App() {
                           const noSetsEx=NO_SETS_EX_IDS.has(exData.id);
                           const isRunningEx=exData.id===RUNNING_EX_ID;
                           const distMiVal=ex.distanceMi?parseFloat(ex.distanceMi):0;
-                          const exXP=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);
+                          const exXP=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null,ex.weightLbs||null,null);
                           const clsD=profile.chosenClass?CLASSES[profile.chosenClass]:null; const mult=clsD&&clsD.bonuses&&exData.category?(clsD.bonuses[exData.category]||1):1;
                           const isCardioEx=exData.category==="cardio"||exData.category==="endurance";
                           const hasWeightEx = !isCardioEx && exData.category!=="flexibility";
@@ -4947,7 +5246,7 @@ function App() {
                                       , React.createElement('span', { className: "plan-ex-icon"}, exData.icon)
                                       , React.createElement('div', { style: {flex:1,minWidth:0}}
                                         , React.createElement('div', { className: "plan-ex-name"}, exData.name)
-                                        , React.createElement('div', { className: "plan-ex-sets"}
+                                        , exData.id!=="rest_day"&&React.createElement('div', { className: "plan-ex-sets"}
                                           , noSetsEx?"":ex.sets+"×", ex.reps
                                           , ex.weightLbs&&React.createElement('span', { style: {color:"#8a8478",marginLeft:5}}, metric?lbsToKg(ex.weightLbs)+" kg":ex.weightLbs+" lbs")
                                           , ex.durationMin&&React.createElement('span', { style: {color:"#8a8478",marginLeft:5}}, ex.durationMin, " min" )
@@ -4966,7 +5265,7 @@ function App() {
                                         )
                                       )
                                     )
-                                    , !collapsed&&React.createElement(React.Fragment, null
+                                    , !collapsed&&exData.id!=="rest_day"&&React.createElement(React.Fragment, null
                                       /* Sets + Reps/Duration + Weight */
                                       , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
                                         , !noSetsEx&&React.createElement('div', { style: {flex:1}}
@@ -5075,508 +5374,23 @@ function App() {
                   );
                 })()
 
-                , planView==="builder" && (
-                  React.createElement(React.Fragment, null
-                    , React.createElement('div', { className: "builder-nav-hdr" }
-                      , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setPlanView(bEditId?"detail":"list") }, "← Cancel")
-                      , React.createElement('div', { className: "builder-nav-title" }, bEditId ? "✎ Edit Plan" : "📜 New Plan")
-                    )
-                    , React.createElement('div', { className: "builder-wrap"}
-                      , React.createElement('div', { className: "field"}, React.createElement('label', null, "Plan Name" ), React.createElement('input', { className: "inp", value: bName, onChange: e=>setBName(e.target.value), placeholder: "Name your plan…"  }))
-                      , React.createElement('div', { className: "field"}
-                        , React.createElement('label', null, "Level " , React.createElement('span', { style: {fontSize:".55rem",opacity:.6}}, "(optional)"))
-                        , React.createElement('div', { style: {display:"flex",gap:6}}
-                          , ["Beginner","Intermediate","Expert"].map(lvl=>(
-                            React.createElement('button', { key: lvl, className: "btn btn-ghost btn-xs"  ,
-                              style: {flex:1,fontSize:".62rem",
-                                border:bLevel===lvl?`1px solid ${lvl==="Beginner"?"#5A8A58":lvl==="Intermediate"?"#A8843C":"#7A2838"}`:"",
-                                color:bLevel===lvl?(lvl==="Beginner"?"#5A8A58":lvl==="Intermediate"?"#A8843C":"#7A2838"):"",
-                                background:bLevel===lvl?"rgba(45,42,36,.15)":""},
-                              onClick: ()=>setBLevel(bLevel===lvl?"":lvl)}
-                              , lvl
-                            )
-                          ))
-                        )
-                      )
-
-                      /* Duration Type + Count */
-                      , React.createElement('div', { className: "field"}
-                        , React.createElement('label', null, "Duration")
-                        , React.createElement('div', { className: "dur-row"}
-                          , React.createElement('select', { className: "dur-count-sel", value: bDurCount,
-                            onChange: e=>setBDurCount(parseInt(e.target.value))}
-                            , (()=>{
-                              const max = bType==="day"?31:bType==="week"?52:bType==="month"?12:3;
-                              return Array.from({length:max},(_,i)=>i+1).map(n=>(
-                                React.createElement('option', { key: n, value: n}, n)
-                              ));
-                            })()
-                          )
-                          , React.createElement('select', { className: "dur-type-sel", value: bType,
-                            onChange: e=>{
-                              const t=e.target.value;
-                              setBType(t);
-                              // Clamp count to new max
-                              const max=t==="day"?31:t==="week"?52:t==="month"?12:3;
-                              setBDurCount(c=>Math.min(c,max));
-                            }}
-                            , React.createElement('option', { value: "day"}, "Day", bDurCount>1?"s":"")
-                            , React.createElement('option', { value: "week"}, "Week", bDurCount>1?"s":"")
-                            , React.createElement('option', { value: "month"}, "Month", bDurCount>1?"s":"")
-                            , React.createElement('option', { value: "year"}, "Year", bDurCount>1?"s":"")
-                          )
-                        )
-                        , React.createElement('div', { style: {fontSize:".62rem",color:"#5a5650",marginTop:4,fontStyle:"italic"}}
-                          , bDurCount===1?"Single "+bType+" plan":`${bDurCount}-${bType} program`
-                        )
-                      )
-
-                      /* Start / End Dates */
-                      , React.createElement('div', { className: "plan-date-row"}
-                        , React.createElement('div', { className: "field"}
-                          , React.createElement('label', null, "Start Date "  , React.createElement('span', { style: {fontSize:".55rem",opacity:.6}}, "(optional)"))
-                          , React.createElement('input', { className: "inp", type: "date", value: bStartDate,
-                            onChange: e=>{
-                              setBStartDate(e.target.value);
-                              if(e.target.value && !bEndDate) {
-                                const d = new Date(e.target.value+"T12:00:00");
-                                if(bType==="day")   d.setDate(d.getDate()+bDurCount-1);
-                                else if(bType==="week")  d.setDate(d.getDate()+bDurCount*7-1);
-                                else if(bType==="month") d.setMonth(d.getMonth()+bDurCount);
-                                else                d.setFullYear(d.getFullYear()+bDurCount);
-                                setBEndDate(d.toISOString().slice(0,10));
-                              }
-                              // If end date is now before start, clear it
-                              if(bEndDate && e.target.value && bEndDate < e.target.value) setBEndDate("");
-                            }})
-                        )
-                        , React.createElement('div', { className: "field"}
-                          , React.createElement('label', null, "End Date "  , React.createElement('span', { style: {fontSize:".55rem",opacity:.6}}, "(optional)"))
-                          , React.createElement('input', { className: "inp", type: "date", value: bEndDate,
-                            min: (()=>{
-                              if(!bStartDate) return undefined;
-                              // Min end date = start + duration
-                              const d = new Date(bStartDate+"T12:00:00");
-                              if(bType==="day")   d.setDate(d.getDate()+bDurCount-1);
-                              else if(bType==="week")  d.setDate(d.getDate()+bDurCount*7-1);
-                              else if(bType==="month") d.setMonth(d.getMonth()+bDurCount);
-                              else                d.setFullYear(d.getFullYear()+bDurCount);
-                              return d.toISOString().slice(0,10);
-                            })(),
-                            onChange: e=>{
-                              if(!bStartDate){ setBEndDate(e.target.value); return; }
-                              // Enforce end >= start + duration
-                              const d = new Date(bStartDate+"T12:00:00");
-                              if(bType==="day")   d.setDate(d.getDate()+bDurCount-1);
-                              else if(bType==="week")  d.setDate(d.getDate()+bDurCount*7-1);
-                              else if(bType==="month") d.setMonth(d.getMonth()+bDurCount);
-                              else                d.setFullYear(d.getFullYear()+bDurCount);
-                              const minEnd = d.toISOString().slice(0,10);
-                              if(e.target.value < minEnd){
-                                setBEndDate(minEnd);
-                              } else {
-                                setBEndDate(e.target.value);
-                              }
-                            }})
-                        )
-                      )
-                      , bStartDate&&bEndDate&&(
-                        React.createElement('div', { style: {fontSize:".65rem",color:"#b4ac9e",marginTop:-8,marginBottom:4,fontStyle:"italic"}}, "📅 "
-                           , (()=>{
-                            const s=new Date(bStartDate+"T12:00:00");
-                            const e=new Date(bEndDate+"T12:00:00");
-                            const days=Math.round((e-s)/(1000*60*60*24))+1;
-                            return s.toLocaleDateString([],{month:"short",day:"numeric"})+" → "+e.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})+" ("+days+" day"+(days!==1?"s":"")+")"
-                          })()
-                        )
-                      )
-                      , React.createElement('div', { className: "field"}, React.createElement('label', null, "Icon")
-                        , React.createElement('div', { className: "icon-row"}, ICONS.map(ic=>React.createElement('div', { key: ic, className: `icon-opt ${bIcon===ic?"sel":""}`, onClick: ()=>setBIcon(ic)}, ic)))
-                      )
-                      , React.createElement('div', { className: "xp-projection"}
-                        , React.createElement('div', null, React.createElement('div', { className: "xp-proj-label"}, "Projected Total XP"  ), React.createElement('div', { className: "xp-proj-detail"}, bDays.filter(d=>d.exercises.length>0).length, " active days"  ))
-                        , React.createElement('div', { className: "xp-proj-value"}, "⚡ " , builderXP.toLocaleString())
-                      )
-                      , React.createElement('div', { className: "div", style: {margin:"3px 0"}})
-                      , React.createElement('div', null, React.createElement('label', { style: {marginBottom:6}}, "Days " , React.createElement('span', { style: {fontSize:".58rem",color:"#8a8478",fontStyle:"italic"}}, "drag to reorder"  ))
-                        , (()=>{
-                          // Group days into weeks of 7
-                          const totalDays = bDays.length;
-                          const multiWeek = totalDays > 7;
-                          if(!multiWeek) {
-                            // Single week — flat day tabs as before
-                            return (
-                              React.createElement('div', { className: "builder-day-tabs"}
-                                , bDays.map((d,i)=>(
-                                  React.createElement('div', { key: i,
-                                    className: `bday-tab ${bDayIdx===i?"on":""} ${dragDayIdx===i?"dragging":""}`,
-                                    draggable: true,
-                                    onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragDayIdx(i);},
-                                    onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                                    onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,i);setDragDayIdx(null);},
-                                    onDragEnd: ()=>setDragDayIdx(null),
-                                    onClick: ()=>setBDayIdx(i)}
-                                    , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",marginRight:3,fontSize:".7rem"}}, "⠿")
-                                    , d.label||`Day ${i+1}`
-                                    , bDays.length>1&&React.createElement('div', { className: "bday-tab-del", onClick: e=>{e.stopPropagation();removeDayFromBuilder(i);}}, "✕")
-                                  )
-                                ))
-                                , React.createElement('div', { className: "bday-tab", style: {color:"#b4ac9e",borderColor:"rgba(45,42,36,.3)"}, onClick: addDayToBuilder}, "＋")
-                              )
-                            );
-                          }
-                          // Multi-week — grouped with collapse/expand and week drag
-                          const weeks = [];
-                          for(let w=0;w<Math.ceil(totalDays/7);w++) {
-                            weeks.push(bDays.slice(w*7, w*7+7));
-                          }
-                          return (
-                            React.createElement('div', null
-                              , weeks.map((weekDays, wk)=>{
-                                const collapsed = !!collapsedWeeks[wk];
-                                const weekStart = wk*7;
-                                const weekXP = weekDays.reduce((t,d)=>t+calcDayXP(d,profile.chosenClass,allExById),0);
-                                return (
-                                  React.createElement('div', { key: wk,
-                                    className: `week-group ${dragWeekIdx===wk?"dragging-week":""}`,
-                                    draggable: true,
-                                    onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragWeekIdx(wk);e.stopPropagation();},
-                                    onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                                    onDrop: e=>{e.preventDefault();if(dragWeekIdx!==null&&dragWeekIdx!==wk){reorderWeek(dragWeekIdx,wk);}setDragWeekIdx(null);},
-                                    onDragEnd: ()=>setDragWeekIdx(null)}
-                                    /* Week header */
-                                    , React.createElement('div', { className: "week-group-hdr", onClick: ()=>toggleWeek(wk)}
-                                      , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".8rem"}, onClick: e=>e.stopPropagation()}, "⠿")
-                                      , React.createElement('span', { style: {fontSize:".72rem",color:"#b4ac9e",fontWeight:700,flex:1}}, "Week " , wk+1)
-                                      , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478"}}, weekDays.filter(d=>d.exercises.length>0).length, "/", weekDays.length, " days active"  )
-                                      , React.createElement('span', { style: {fontSize:".6rem",color:"#b4ac9e",marginLeft:6}}, "⚡", weekXP.toLocaleString())
-                                      , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".55rem",marginLeft:6,padding:"2px 6px"},
-                                        onClick: e=>{e.stopPropagation();duplicateWeek(wk);}}, "⎘ Dup" )
-                                      , React.createElement('svg', { width: "14", height: "14", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {marginLeft:4,flexShrink:0,transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
-                                        , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg4", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
-                                        , React.createElement('polyline', { points: "3,5 7,9 11,5"  , stroke: "url(#cg4)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"})
-                                      )
-                                    )
-                                    , !collapsed&&(
-                                      React.createElement('div', { className: "week-group-body"}
-                                        , React.createElement('div', { className: "builder-day-tabs", style: {marginBottom:4}}
-                                          , weekDays.map((d,wi)=>{
-                                            const globalIdx=weekStart+wi;
-                                            return (
-                                              React.createElement('div', { key: globalIdx,
-                                                className: `bday-tab ${bDayIdx===globalIdx?"on":""} ${dragDayIdx===globalIdx?"dragging":""}`,
-                                                draggable: true,
-                                                onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragDayIdx(globalIdx);e.stopPropagation();},
-                                                onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                                                onDrop: e=>{e.preventDefault();reorderDay(dragDayIdx,globalIdx);setDragDayIdx(null);},
-                                                onDragEnd: ()=>setDragDayIdx(null),
-                                                onClick: ()=>setBDayIdx(globalIdx)}
-                                                , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",marginRight:3,fontSize:".7rem"}}, "⠿")
-                                                , d.label||`Day ${globalIdx+1}`
-                                                , bDays.length>1&&React.createElement('div', { className: "bday-tab-del", onClick: e=>{e.stopPropagation();removeDayFromBuilder(globalIdx);}}, "✕")
-                                              )
-                                            );
-                                          })
-                                        )
-                                      )
-                                    )
-                                  )
-                                );
-                              })
-                              , React.createElement('div', { className: "bday-tab", style: {color:"#b4ac9e",borderColor:"rgba(45,42,36,.3)",marginTop:4}, onClick: addDayToBuilder}, "＋ Add Day"  )
-                            )
-                          );
-                        })()
-                        , bDays.length<=7&&React.createElement('div', { className: "bday-tab", style: {color:"#b4ac9e",borderColor:"rgba(45,42,36,.3)"}, onClick: addDayToBuilder}, "＋")
-                      )
-                      , React.createElement('div', null
-                        , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,marginBottom:8}}
-                          , React.createElement('input', { className: "inp", value: _optionalChain([bDays, 'access', _97 => _97[bDayIdx], 'optionalAccess', _98 => _98.label])||"", onChange: e=>updateDayLabel(bDayIdx,e.target.value), placeholder: "Day label…" , style: {flex:1,padding:"6px 10px",fontSize:".8rem"}})
-                          , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "⚡ " , calcDayXP(bDays[bDayIdx]||{exercises:[]},profile.chosenClass,allExById))
-                        )
-                        /* Optional day-level stats */
-                        , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
-                          , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric", placeholder: "Duration HH:MM" ,
-                            style: {flex:1.5,fontSize:".65rem",padding:"5px 8px"},
-                            value: _optionalChain([bDays, 'access', _99 => _99[bDayIdx], 'optionalAccess', _100 => _100._durHHMM])!==undefined ? bDays[bDayIdx]._durHHMM : (_optionalChain([bDays, 'access', _101 => _101[bDayIdx], 'optionalAccess', _102 => _102.durationSec]) ? secToHHMMSplit(bDays[bDayIdx].durationSec).hhmm : ""),
-                            onChange: e=>{const v=e.target.value;setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,_durHHMM:v}));},
-                            onBlur: e=>{const norm=normalizeHHMM(e.target.value);const sec=combineHHMMSec(norm,_optionalChain([bDays, 'access', _103 => _103[bDayIdx], 'optionalAccess', _104 => _104._durSec])||"");setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durHHMM:sec?norm:undefined,durationMin:sec?sec/60:null}));}})
-                          , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: "Sec (0-59)" ,
-                            style: {flex:0.8,fontSize:".65rem",padding:"5px 8px"},
-                            value: _optionalChain([bDays, 'access', _105 => _105[bDayIdx], 'optionalAccess', _106 => _106._durSec])||"",
-                            onChange: e=>{const v=e.target.value;setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,_durSec:v}));},
-                            onBlur: e=>{const sec=combineHHMMSec(_optionalChain([bDays, 'access', _107 => _107[bDayIdx], 'optionalAccess', _108 => _108._durHHMM])||"",e.target.value);setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durSec:undefined,durationMin:sec?sec/60:null}));}})
-                          , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", placeholder: "Active Cal" ,
-                            style: {flex:1,fontSize:".65rem",padding:"5px 8px"},
-                            value: _optionalChain([bDays, 'access', _109 => _109[bDayIdx], 'optionalAccess', _110 => _110.activeCal])||"",
-                            onChange: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,activeCal:e.target.value||null}))})
-                          , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", placeholder: "Total Cal" ,
-                            style: {flex:1,fontSize:".65rem",padding:"5px 8px"},
-                            value: _optionalChain([bDays, 'access', _111 => _111[bDayIdx], 'optionalAccess', _112 => _112.totalCal])||"",
-                            onChange: e=>setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}))})
-                        )
-                        /* Plan builder superset action bar */
-                        , ssCheckedPlan.size>0 && React.createElement('div',{className:"ss-action-bar",style:{marginBottom:8}},
-                          React.createElement('span',{className:"ss-action-text"}, ssCheckedPlan.size+" selected"),
-                          ssCheckedPlan.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
-                            const [a,b]=[...ssCheckedPlan]; planGroupSuperset(bDayIdx,a,b);
-                          }},"🔗 Group as Superset"),
-                          React.createElement('button',{className:"ss-action-cancel",onClick:()=>setSsCheckedPlan(new Set())},"✕")
-                        )
-                        , (_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises])||[]).map((ex,i)=>{
-                          const exData=allExById[ex.exId]; if(!exData) return null;
-                          /* Plan superset: skip second in pair */
-                          const planExs = (_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises])||[]);
-                          const isPlanSecond = planExs.some((x,xi) => x.supersetWith != null && x.supersetWith === i && xi < i);
-                          if (isPlanSecond) return null;
-                          const planPartnerIdx = ex.supersetWith != null ? ex.supersetWith : null;
-                          const planPartnerEx = planPartnerIdx != null ? planExs[planPartnerIdx] : null;
-                          const planPartnerExD = planPartnerEx ? (allExById[planPartnerEx.exId]||null) : null;
-                          /* Render accordion card for superset pairs */
-                          if (planPartnerIdx != null && planPartnerExD) {
-                            const xpA = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
-                            const xpB = calcExXP(planPartnerEx.exId,planPartnerEx.sets||3,planPartnerEx.reps||10,profile.chosenClass,allExById);
-                            return React.createElement('div', {key:i, className:"ss-accordion"},
-                              React.createElement('div', {className:"ss-accordion-hdr"},
-                                React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:2,flexShrink:0}},
-                                  React.createElement('button', {className:"btn btn-ghost btn-xs",style:{padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:Math.min(i,planPartnerIdx)===0?.3:1},
-                                    onClick:e=>{e.stopPropagation();
-                                      const minI=Math.min(i,planPartnerIdx);
-                                      if(minI<=0) return;
-                                      setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];
-                                        const above=exs[minI-1]; exs[minI-1]=exs[minI]; exs[minI]=exs[minI+1]; exs[minI+1]=above;
-                                        return {...d,exercises:exs.map(e=>{if(e.supersetWith===minI-1)return{...e,supersetWith:minI+1};if(e.supersetWith===minI)return{...e,supersetWith:minI-1};if(e.supersetWith===minI+1)return{...e,supersetWith:minI};return e;})};
-                                      }));
-                                    }}, "▲"),
-                                  React.createElement('button', {className:"btn btn-ghost btn-xs",style:{padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:Math.max(i,planPartnerIdx)>=((_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises, 'access', _114b => _114b.length])||1)-1)?.3:1},
-                                    onClick:e=>{e.stopPropagation();
-                                      const maxI=Math.max(i,planPartnerIdx); const minI=Math.min(i,planPartnerIdx);
-                                      const len=(_optionalChain([bDays, 'access', _113 => _113[bDayIdx], 'optionalAccess', _114 => _114.exercises, 'access', _114c => _114c.length])||0);
-                                      if(maxI>=len-1) return;
-                                      setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];
-                                        const below=exs[maxI+1]; exs[maxI+1]=exs[maxI]; exs[maxI]=exs[minI]; exs[minI]=below;
-                                        return {...d,exercises:exs.map(e=>{if(e.supersetWith===minI)return{...e,supersetWith:minI+1};if(e.supersetWith===minI+1)return{...e,supersetWith:minI+2};if(e.supersetWith===maxI+1)return{...e,supersetWith:minI};return e;})};
-                                      }));
-                                    }}, "▼")
-                                ),
-                                React.createElement('span', {className:"ss-accordion-hdr-title"}, "🔗 Superset"),
-                                React.createElement('span', {className:"ss-accordion-xp"}, (xpA+xpB)+" XP total"),
-                                React.createElement('button', {className:"ss-accordion-ungroup",
-                                  onClick:()=>planUngroupSuperset(bDayIdx,i,planPartnerIdx)
-                                }, "✕ Ungroup")
-                              ),
-                              renderPlanSsSection(ex, bDayIdx, i, exData, "A", "plan_"+bDayIdx+"_"+i+"_a"),
-                              renderPlanSsSection(planPartnerEx, bDayIdx, planPartnerIdx, planPartnerExD, "B", "plan_"+bDayIdx+"_"+i+"_b")
-                            );
-                          }
-                          const isCardioEx = exData.category==="cardio";
-                          const isFlexEx   = exData.category==="flexibility";
-                          const hasWeight  = !isCardioEx && !isFlexEx;
-                          const hasDur     = isCardioEx || isFlexEx;
-                          const noSetsEx   = NO_SETS_EX_IDS.has(exData.id);
-                          const isRunningEx= exData.id===RUNNING_EX_ID;
-                          const bWUnit     = weightLabel(profile.units);
-                          const bMetric    = isMetric(profile.units);
-                          const dispW = ex.weightLbs != null && ex.weightLbs !== "" ? (bMetric ? lbsToKg(ex.weightLbs) : String(ex.weightLbs)) : "";
-                          const dispReps = ex.reps;
-                          const dispDist = ex.distanceMi ? (bMetric ? String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)) : String(ex.distanceMi)) : "";
-                          const age = profile.age || 30;
-                          const pbPaceMi=profile.runningPB||null;
-                          const pbDisp=pbPaceMi?(bMetric?parseFloat((pbPaceMi*1.60934).toFixed(2))+" min/km":parseFloat(pbPaceMi.toFixed(2))+" min/mi"):null;
-                          const exPB3=(profile.exercisePBs||{})[exData.id]||null;
-                          const exPBDisp3=exPB3?(exPB3.type==="cardio"?(bMetric?parseFloat((exPB3.value*1.60934).toFixed(2))+" min/km":parseFloat(exPB3.value.toFixed(2))+" min/mi"):(exPB3.type==="assisted"?"1RM: "+exPB3.value+(bMetric?" kg":" lbs")+" (Assisted)":"1RM: "+exPB3.value+(bMetric?" kg":" lbs"))):null;
-                          const durationMin=parseFloat(ex.reps||0);
-                          const distMiVal=ex.distanceMi?parseFloat(ex.distanceMi):0;
-                          const runPace=(isRunningEx&&distMiVal>0&&durationMin>0)?durationMin/distMiVal:null;
-                          const runBoostPct=runPace?(runPace<=8?20:5):0;
-                          const catColorPlan=getTypeColor(exData.category);
-                          return (
-                            React.createElement('div', { key: i, className: `builder-ex-row ${dragPlanExIdx===i?"dragging":""}`,
-                              style: {flexDirection:"column",alignItems:"stretch",gap:0,opacity:dragPlanExIdx===i?0.5:1,"--cat-color":catColorPlan},
-                              draggable: true,
-                              onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragPlanExIdx(i);},
-                              onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
-                              onDrop: e=>{e.preventDefault();reorderPlanEx(bDayIdx,dragPlanExIdx,i);setDragPlanExIdx(null);},
-                              onDragEnd: ()=>setDragPlanExIdx(null)}
-                              /* Header row */
-                              , (()=>{
-                                const collapsed=!!collapsedPlanEx[`${bDayIdx}_${i}`];
-                                return (
-                                  React.createElement(React.Fragment, null
-                                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:4,marginBottom:collapsed?0:8}}
-                                      , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
-                                        , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();const nd=bDays.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i-1,0,m);return{...d,exercises:exs};});setBDays(nd);}}, "▲")
-                                        , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===_optionalChain([bDays, 'access', _118 => _118[bDayIdx], 'optionalAccess', _119 => _119.exercises, 'access', _120 => _120.length])-1?.3:1}, disabled: i===_optionalChain([bDays, 'access', _121 => _121[bDayIdx], 'optionalAccess', _122 => _122.exercises, 'access', _123 => _123.length])-1, onClick: e=>{e.stopPropagation();const nd=bDays.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i+1,0,m);return{...d,exercises:exs};});setBDays(nd);}}, "▼")
-                                      )
-                                      , ex.supersetWith==null && planExs.filter(e=>!e.supersetWith).length>=2 && React.createElement('div', {
-                                          className:`ss-cb ${ssCheckedPlan.has(i)?"on":""}`,
-                                          title:"Select for superset",
-                                          onClick:e=>{e.stopPropagation();setSsCheckedPlan(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
-                                        })
-                                      , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",marginRight:2}}, "⠿")
-                                      , exData.custom&&React.createElement('div', { className: "ex-edit-btn", style: {position:"static",marginRight:2}, onClick: ()=>openExEditor("edit",exData)}, "✎")
-                                      , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColorPlan} }, exData.icon)
-                                      , React.createElement('span', { className: "builder-ex-name-styled", style: {flex:1} }, exData.name)
-                                      , (isRunningEx&&pbDisp||exPBDisp3)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp3)
-                                      , collapsed&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:"")
-                                      , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",minWidth:36,textAlign:"right"}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})())
-                                      , React.createElement('span', { className: "ex-collapse-btn", onClick: e=>{e.stopPropagation();togglePlanEx(bDayIdx,i);}}
-                                        , React.createElement('svg', { width: "14", height: "14", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
-                                          , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg3", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
-                                          , React.createElement('polyline', { points: "3,5 7,9 11,5"  , stroke: "url(#cg3)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"})
-                                        )
-                                      )
-                                      , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:2}, onClick: ()=>removeExFromDay(bDayIdx,i)}, "✕")
-                                    )
-                                    , !collapsed&&React.createElement(React.Fragment, null
-                                      /* Top row: Sets+Reps+Weight or Duration+Sec+Dist */
-                                      , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:6}}
-                                        , !noSetsEx&&!hasDur&&React.createElement('div', { style: {flex:1,minWidth:0}}
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
-                                          , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
-                                            value: ex.sets===0||ex.sets===""?"":ex.sets, onChange: e=>updateExInDay(bDayIdx,i,"sets",e.target.value)})
-                                        )
-                                        , hasDur ? (React.createElement(React.Fragment, null
-                                          , React.createElement('div', { style: {flex:1.6,minWidth:0}}
-                                            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration")
-                                            , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "numeric",
-                                              value: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
-                                              onChange: e=>updateExInDay(bDayIdx,i,"_durHHMM",e.target.value),
-                                              onBlur: e=>{
-                                                const norm=normalizeHHMM(e.target.value);
-                                                updateExInDay(bDayIdx,i,"_durHHMM",norm||undefined);
-                                                const sec=combineHHMMSec(norm,ex._durSec||"");
-                                                updateExInDay(bDayIdx,i,"durationSec",sec);
-                                                if(sec) updateExInDay(bDayIdx,i,"reps",Math.max(1,Math.floor(sec/60)));
-                                              },
-                                              placeholder: "00:00"})
-                                          )
-                                          , React.createElement('div', { style: {flex:0.8,minWidth:0}}
-                                            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
-                                            , React.createElement('input', { className: "builder-ex-input", style: {width:"100%",textAlign:"center"}, type: "number", min: "0", max: "59",
-                                              value: ex._durSec!==undefined ? String(ex._durSec).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
-                                              onChange: e=>{
-                                                const v=e.target.value;
-                                                updateExInDay(bDayIdx,i,"_durSec",v);
-                                                const sec=combineHHMMSec(ex._durHHMM||"",v);
-                                                updateExInDay(bDayIdx,i,"durationSec",sec);
-                                                if(sec) updateExInDay(bDayIdx,i,"reps",Math.max(1,Math.floor(sec/60)));
-                                              },
-                                              placeholder: "00"})
-                                          )
-                                          , React.createElement('div', { style: {flex:1.2,minWidth:0}}
-                                            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , bMetric?"km":"mi", ")")
-                                            , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
-                                              value: dispDist, placeholder: "0",
-                                              onChange: e=>{const v=e.target.value;const mi=v&&bMetric?kmToMi(v):v;updateExInDay(bDayIdx,i,"distanceMi",mi||null);}})
-                                          )
-                                        )) : (
-                                          React.createElement(React.Fragment, null
-                                            , React.createElement('div', { style: {flex:1,minWidth:0}}
-                                              , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
-                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
-                                                value: dispReps===0||dispReps===""?"":dispReps, onChange: e=>updateExInDay(bDayIdx,i,"reps",e.target.value)})
-                                            )
-                                            , hasWeight&&(
-                                              React.createElement('div', { style: {flex:1.2,minWidth:0}}
-                                                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, bWUnit)
-                                                , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal", step: bMetric?"0.5":"2.5",
-                                                  value: dispW, placeholder: "—",
-                                                  onChange: e=>{const v=e.target.value;const lbs=v&&bMetric?kgToLbs(v):v;updateExInDay(bDayIdx,i,"weightLbs",lbs||null);}})
-                                              )
-                                            )
-                                          )
-                                        )
-                                      )
-                                      , isRunningEx&&runBoostPct>0&&(
-                                        React.createElement('div', { style: {fontSize:".65rem",color:"#FFE87C",marginBottom:5}}, "⚡ +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
-                                      )
-                                      /* Treadmill controls */
-                                      , hasDur&&exData.hasTreadmill&&(
-                                        React.createElement('div', { style: {marginBottom:6}}
-                                          , React.createElement('div', { style: {display:"flex",gap:8}}
-                                            , React.createElement('div', { style: {flex:1}}
-                                              , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
-                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: ex.incline||"", onChange: e=>updateExInDay(bDayIdx,i,"incline",e.target.value?parseFloat(e.target.value):null)})
-                                            )
-                                            , React.createElement('div', { style: {flex:1}}
-                                              , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
-                                              , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: ex.speed||"", onChange: e=>updateExInDay(bDayIdx,i,"speed",e.target.value?parseFloat(e.target.value):null)})
-                                            )
-                                          )
-                                        )
-                                      )
-                                      /* Intervals toggle — all cardio */
-                                      , hasDur&&(
-                                        React.createElement('button', { className: "btn btn-sm" , style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",
-                                          background:ex.intervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",
-                                          border:`1.5px solid ${ex.intervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,
-                                          color:ex.intervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer",transition:"all .2s"},
-                                          onClick: ()=>updateExInDay(bDayIdx,i,"intervals",!ex.intervals)}, "⚡ Intervals "
-                                            , ex.intervals?"ON · +25% XP":"OFF"
-                                        )
-                                      )
-                                      /* Extra interval/set rows */
-                                      , (ex.extraRows||[]).map((row,ri)=>(
-                                        React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
-                                          , React.createElement('span', { style: {fontSize:".58rem",color:"#9a8a78",flexShrink:0,minWidth:18}}, hasDur?`I${ri+2}`:`S${ri+2}`)
-                                          , !hasDur&&!noSetsEx&&React.createElement('input', { className: "builder-ex-input", style: {flex:1,minWidth:40,fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , React.createElement('input', { className: "builder-ex-input", style: {flex:1.5,minWidth:52,fontSize:".7rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
-                                            value: row.hhmm||"",
-                                            onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);},
-                                            onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:".7rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , hasDur&&React.createElement('input', { className: "builder-ex-input", style: {flex:1,minWidth:38,fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: bMetric?"km":"mi", value: row.distanceMi||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , hasDur&&exData.hasTreadmill&&React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , hasDur&&exData.hasTreadmill&&React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , hasWeight&&React.createElement('input', { className: "builder-ex-input", style: {flex:1,minWidth:38,fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: bWUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                                          , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateExInDay(bDayIdx,i,"extraRows",rr);}}, "✕")
-                                        )
-                                      ))
-                                      , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
-                                        onClick: ()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateExInDay(bDayIdx,i,"extraRows",rr);}}, "＋ Add Row (e.g. "
-                                            , hasDur?"interval":"progressive weight", ")"
-                                      )
-                                      /* Avg HR Zone — last for cardio */
-                                      , hasDur&&(
-                                        React.createElement('div', null
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
-                                          , React.createElement('div', { className: "hr-zone-row"}
-                                            , HR_ZONES.map(z=>{
-                                              const sel=ex.hrZone===z.z;
-                                              const range=hrRange(age,z);
-                                              return (
-                                                React.createElement('div', { key: z.z, className: `hr-zone-btn ${sel?"sel":""}`,
-                                                  style: {"--zc":z.color,borderColor:sel?z.color:"rgba(45,42,36,.2)",background:sel?`${z.color}22`:"rgba(45,42,36,.12)"},
-                                                  onClick: ()=>updateExInDay(bDayIdx,i,"hrZone",sel?null:z.z)}
-                                                  , React.createElement('span', { className: "hz-name", style: {color:sel?z.color:"#5a5650"}}, "Z", z.z, " " , z.name)
-                                                  , React.createElement('span', { className: "hz-bpm", style: {color:sel?z.color:"#6a645a"}}, range.lo, "–", range.hi)
-                                                )
-                                              );
-                                            })
-                                          )
-                                          , ex.hrZone&&React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",marginTop:4}}, HR_ZONES[ex.hrZone-1].desc)
-                                        )
-                                      )
-                                    )
-                                  )
-                                );
-                              })()
-                            )
-                          );
-                        })
-                        , React.createElement('div', { style: {display:"flex",gap:6,marginTop:5}}
-                          , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "＋ Add Exercise"  )
-                          , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "💪 Add Workout"  )
-                        )
-                      )
-                      , React.createElement('div', { className: "div", style: {margin:"3px 0"}})
-                      , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"}, onClick: saveBuiltPlan}, "💾 Save Plan"  )
-                    )
-                  )
-                )
-              )
-            )
+                , planView==="builder" && React.createElement(PlanWizard, {
+                  editPlan: wizardEditPlan,
+                  templatePlan: wizardTemplatePlan,
+                  profile: profile,
+                  allExercises: allExercises,
+                  allExById: allExById,
+                  onSave: handlePlanWizardSave,
+                  onClose: ()=>{ setPlanView("list"); },
+                  onCompleteDayStart: openStatsPromptIfNeeded,
+                  onStartPlanWorkout: startPlanWorkout,
+                  onDeletePlan: deletePlan,
+                  onSchedulePlan: openSchedulePlan,
+                  onOpenExEditor: openExEditor,
+                  showToast: showToast,
+                })
+              ) /* close plans tab React.createElement(React.Fragment) */
+            ) /* close activeTab==="plans" && () */
 
             /* ── CALENDAR TAB ────────────────────── */
             , activeTab==="calendar" && (()=>{
@@ -5718,7 +5532,7 @@ function App() {
                               , ev.kind==="plan" && (
                                 React.createElement('button', { className: "cal-sched-btn", onClick: ()=>{
                                   const pl=profile.plans.find(p=>p.id===ev.planId);
-                                  if(pl){setActivePlan(pl);setBDayIdx(0);setPlanView("detail");setActiveTab("plans");}
+                                  if(pl){initBuilderFromTemplate(pl,true);setActiveTab("plans");}
                                 }}, "View →" )
                               )
                               , React.createElement('div', { className: "upcoming-del", onClick: ()=>{
@@ -5751,41 +5565,61 @@ function App() {
                             const collapsed = !openLogGroups[cKey];
                             const label = first.sourcePlanName || first.sourceWorkoutName || "Workout";
                             const icon = first.sourcePlanIcon || first.sourceWorkoutIcon || "💪";
+                            const uniqueExCount = new Set(entries.map(e=>e.exId)).size;
+                            const gStats = getEntryStats(first);
+                            const hasStats = gStats.durationSec || gStats.activeCal || gStats.totalCal;
                             return React.createElement('div', { key: gi, className: "log-group-card", style:{marginBottom:8} }
                               , React.createElement('div', { className: "log-group-hdr "+(collapsed?"collapsed":""), onClick:()=>toggleLogGroup(cKey), style:{cursor:"pointer"} }
                                 , React.createElement('span', { className: "log-group-icon" }, icon)
                                 , React.createElement('div', { style:{flex:1,minWidth:0} }
                                   , React.createElement('div', { className: "log-group-name" }, label)
-                                  , React.createElement('div', { className: "log-group-meta" }, entries.length, " exercise", entries.length!==1?"s":"", " · ", first.time)
+                                  , React.createElement('div', { className: "log-group-meta" }, uniqueExCount, " exercise", uniqueExCount!==1?"s":"", " · ", first.time)
+                                  , hasStats && React.createElement('div', { style:{fontSize:".5rem",color:"#6a645a",marginTop:2,display:"flex",gap:8} }
+                                    , gStats.durationSec>0 && React.createElement('span', null, "⏱ ", secToHMS(gStats.durationSec))
+                                    , gStats.totalCal>0 && React.createElement('span', null, "🔥 ", gStats.totalCal, " cal")
+                                    , gStats.activeCal>0 && React.createElement('span', null, "⚡ ", gStats.activeCal, " active")
+                                  )
                                 )
                                 , React.createElement('div', { className: "log-group-xp" }, "⚡ ", groupXP.toLocaleString(), " XP")
                                 , React.createElement('span', { style:{fontSize:".6rem",color:"#5a5650",flexShrink:0,transition:"transform .2s",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",marginLeft:6} }, "▾")
                               )
-                              , !collapsed && React.createElement('div', { className: "log-group-body" }
-                                , entries.map((e,i)=>{
-                                  const isSuperset = entries.some((o,oi)=>oi!==i && o.sourceGroupId===e.sourceGroupId && Math.abs(oi-i)===1 && ((o.supersetWith!=null && o.supersetWith===i)||(e.supersetWith!=null && e.supersetWith===oi)));
-                                  return React.createElement('div', { key:i, className:"h-entry", style:{marginBottom:4} }
-                                    , React.createElement('span', {style:{fontSize:"1rem",flexShrink:0,width:26,textAlign:"center"}}, e.icon)
-                                    , React.createElement('div', {style:{flex:1,minWidth:0}}
-                                      , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4}}
-                                        , React.createElement('span', {style:{fontSize:".72rem",fontWeight:600,color:"#d4cec4"}}, e.exercise)
-                                        , isSuperset && React.createElement('span', {style:{fontSize:".48rem",color:"#b4ac9e",background:"rgba(180,172,158,.1)",padding:"1px 5px",borderRadius:3,fontWeight:600}}, "SS")
+                              , !collapsed && (()=>{
+                                // Consolidate entries by exId
+                                const byExId = {};
+                                entries.forEach(e=>{ if(!byExId[e.exId]) byExId[e.exId]=[]; byExId[e.exId].push(e); });
+                                const consolidated = Object.values(byExId);
+                                return React.createElement('div', { className: "log-group-body" }
+                                  , consolidated.map((exEntries,ci)=>{
+                                    const ef = exEntries[0];
+                                    const exXP = exEntries.reduce((s,e)=>s+e.xp,0);
+                                    const isSuperset = exEntries.some(e=>entries.some((o,oi)=>o.exId!==e.exId && o.sourceGroupId===e.sourceGroupId && ((o.supersetWith!=null)||(e.supersetWith!=null))));
+                                    return React.createElement('div', { key:ci, className:"h-entry", style:{marginBottom:4,cursor:"pointer"},
+                                      onClick:()=>setCalExDetailModal({ entries:exEntries, exerciseName:ef.exercise, exerciseIcon:ef.icon,
+                                        sourceName:first.sourcePlanName||first.sourceWorkoutName||null, sourceIcon:icon,
+                                        totalCal:gStats.totalCal, activeCal:gStats.activeCal, durationSec:gStats.durationSec }) }
+                                      , React.createElement('span', {style:{fontSize:"1rem",flexShrink:0,width:26,textAlign:"center"}}, ef.icon)
+                                      , React.createElement('div', {style:{flex:1,minWidth:0}}
+                                        , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4}}
+                                          , React.createElement('span', {style:{fontSize:".72rem",fontWeight:600,color:"#d4cec4"}}, ef.exercise)
+                                          , isSuperset && React.createElement('span', {style:{fontSize:".48rem",color:"#b4ac9e",background:"rgba(180,172,158,.1)",padding:"1px 5px",borderRadius:3,fontWeight:600}}, "SS")
+                                          , exEntries.length>1 && React.createElement('span', {style:{fontSize:".48rem",color:"#8a8478",background:"rgba(180,172,158,.08)",padding:"1px 5px",borderRadius:3}}, exEntries.length, " sets")
+                                        )
                                       )
-                                      , React.createElement('div', {style:{fontSize:".58rem",color:"#8a8478"}}
-                                        , e.sets, "×", e.reps
-                                        , e.weightLbs ? " · "+(isMetric(profile.units)?lbsToKg(e.weightLbs)+" kg":e.weightLbs+" lbs") : ""
-                                        , e.distanceMi ? " · "+(isMetric(profile.units)?miToKm(e.distanceMi)+" km":e.distanceMi+" mi") : ""
-                                      )
-                                    )
-                                    , React.createElement('div', {style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e",flexShrink:0}}, "+", e.xp, " XP")
-                                  );
-                                })
-                              )
+                                      , React.createElement('div', {style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e",flexShrink:0}}, "+", exXP, " XP")
+                                    );
+                                  })
+                                );
+                              })()
                             );
                           })
                           /* Ungrouped standalone exercises */
-                          , ungrouped.map((e,i)=>
-                            React.createElement('div', { key: "u"+i, className: "cal-event-row log-entry" }
+                          , ungrouped.map((e,i)=>{
+                            const uStats = getEntryStats(e);
+                            const uHasStats = uStats.durationSec || uStats.activeCal || uStats.totalCal;
+                            return React.createElement('div', { key: "u"+i, className: "cal-event-row log-entry", style:{cursor:"pointer"},
+                              onClick:()=>setCalExDetailModal({ entries:[e], exerciseName:e.exercise, exerciseIcon:e.icon,
+                                sourceName:null, sourceIcon:null,
+                                totalCal:uStats.totalCal, activeCal:uStats.activeCal, durationSec:uStats.durationSec }) }
                               , React.createElement('span', { className: "cal-event-icon" }, e.icon)
                               , React.createElement('div', { style: {flex:1,minWidth:0} }
                                 , React.createElement('div', { className: "cal-event-name" }, e.exercise)
@@ -5795,10 +5629,15 @@ function App() {
                                   , e.distanceMi?React.createElement('span', { style: {marginLeft:5} }, isMetric(profile.units)?miToKm(e.distanceMi)+" km":e.distanceMi+" mi"):""
                                   , React.createElement('span', { style: {marginLeft:5,color:"#6a645a"} }, e.time)
                                 )
+                                , uHasStats && React.createElement('div', { style:{fontSize:".5rem",color:"#6a645a",marginTop:2,display:"flex",gap:8} }
+                                  , uStats.durationSec>0 && React.createElement('span', null, "⏱ ", secToHMS(uStats.durationSec))
+                                  , uStats.totalCal>0 && React.createElement('span', null, "🔥 ", uStats.totalCal, " cal")
+                                  , uStats.activeCal>0 && React.createElement('span', null, "⚡ ", uStats.activeCal, " active")
+                                )
                               )
                               , React.createElement('div', { className: "cal-event-xp" }, "+", e.xp, " XP")
-                            )
-                          )
+                            );
+                          })
                         );
                       })()
 
@@ -5840,13 +5679,25 @@ function App() {
                   , (()=>{
                     const mPrefix = `${y}-${String(m+1).padStart(2,"0")}`;
                     const mEntries = profile.log.filter(e=>e.dateKey&&e.dateKey.startsWith(mPrefix));
-                    const mExCount = mEntries.length;
-                    const estMin = mEntries.reduce((s,e)=>s+((e.sets||1)*1.25),0);
-                    const estC = Math.round(mExCount * 8.5);
-                    const estA = Math.round(estC * 0.82);
-                    const dH = Math.floor(estMin/60);
-                    const dM = Math.round(estMin%60);
-                    const dStr = dH>0 ? dH+"h "+dM+"m" : dM+"m";
+                    // Deduplicate grouped entries (workouts/plans share a sourceGroupId)
+                    const grouped = {};
+                    const ungrouped = [];
+                    mEntries.forEach(e => {
+                      if (e.sourceGroupId) {
+                        if (!grouped[e.sourceGroupId]) grouped[e.sourceGroupId] = e;
+                      } else {
+                        ungrouped.push(e);
+                      }
+                    });
+                    const sources = [...Object.values(grouped), ...ungrouped];
+                    const statsArr = sources.map(e => getEntryStats(e));
+                    const estC = statsArr.reduce((s, st) => s + st.totalCal, 0);
+                    const estA = statsArr.reduce((s, st) => s + st.activeCal, 0);
+                    const totalSec = statsArr.reduce((s, st) => s + st.durationSec, 0);
+                    const dH = Math.floor(totalSec / 3600);
+                    const dM = Math.floor((totalSec % 3600) / 60);
+                    const dS = totalSec % 60;
+                    const dStr = String(dH).padStart(2,"0")+":"+String(dM).padStart(2,"0")+":"+String(dS).padStart(2,"0");
                     return React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
                       React.createElement('div', { className: "eff-weight", style: {flex:1} },
                         React.createElement('span', { className: "eff-weight-val" }, dStr),
@@ -6503,7 +6354,7 @@ function App() {
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { className: "sec"}, "Battle Record — "   , profile.log.length, " sessions · "   , profile.xp.toLocaleString(), " total XP"  )
                   , React.createElement('div', { className: "log-subtab-bar"}
-                    , [["exercises","⚔️ Exercises"],["workouts","💪 Workouts"],["plans","📋 Plans"],["deleted","🗑 Deleted"]].map(([t,l])=>(
+                    , [["exercises","⚔️ Exercises"],["workouts","💪 Workouts"],["plans","📋 Plans"],["trends","📊 Trends"],["deleted","🗑 Deleted"]].map(([t,l])=>(
                       React.createElement('button', { key: t, className: `log-subtab-btn ${logSubTab===t?"on":""}`,
                         onClick: ()=>setLogSubTab(t)}, l
                         , t==="deleted"&&(profile.deletedItems||[]).filter(d=>((new Date()-new Date(d.deletedAt))/(1000*60*60*24))<7).length>0&&React.createElement('span', { style: {marginLeft:4,background:"#6a645a",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:".45rem",display:"inline-flex",alignItems:"center",justifyContent:"center"}}, (profile.deletedItems||[]).filter(d=>((new Date()-new Date(d.deletedAt))/(1000*60*60*24))<7).length)
@@ -6513,6 +6364,7 @@ function App() {
                   , logSubTab==="exercises"&&React.createElement(ExercisesTab,null)
                   , logSubTab==="workouts"&&React.createElement(WorkoutsTab,null)
                   , logSubTab==="plans"&&React.createElement(PlansTab,null)
+                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order})),workouts:profile.workouts,plans:profile.plans})
                   , logSubTab==="deleted"&&(()=>{
                     const now = new Date();
                     const active = (profile.deletedItems||[])
@@ -6574,7 +6426,7 @@ function App() {
             })()
 
             , activeTab==="social"&&(()=>{
-                    const levelFor = xp => { const t=buildXPTable(70); let lv=1; for(let i=1;i<t.length;i++){if(xp>=t[i])lv=i+1;else break;} return lv; };
+                    const levelFor = xp => { const t=buildXPTable(100); let lv=1; for(let i=1;i<t.length;i++){if(xp>=t[i])lv=i+1;else break;} return lv; };
                     const recentWorkout = log => {
                       if(!log||!log.length) return null;
                       const entry = log[0];
@@ -7031,6 +6883,13 @@ function App() {
                   , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".58rem",flexShrink:0}, onClick:()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "Edit")
                 )
 
+                /* Action buttons */
+                , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:11}}
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "✎ Edit"  )
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setNotifMode(false);setSecurityMode(true);}}, "🔒 Security" )
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setSecurityMode(false);setNotifMode(true);}}, "🔔 Alerts" )
+                )
+
                 /* ── IDENTITY SECTION — Name visibility with App/Game/Hide toggles ── */
                 , (()=>{
                   const nv = profile.nameVisibility || { displayName:["app","game"], realName:["hide"] };
@@ -7115,28 +6974,84 @@ function App() {
                   const pbEntries = Object.entries(allPBs);
                   if(pbEntries.length === 0) return null;
                   const metric = isMetric(profile.units);
+
+                  // Compute effective selection: leaderboard PBs pre-selected by default
+                  const effectiveSelected = pbSelectedFilters === null
+                    ? pbEntries.filter(([id]) => LEADERBOARD_PB_IDS.has(id)).map(([id]) => id)
+                    : pbSelectedFilters;
+
+                  // Build options for the filter dropdown
+                  const pbOptions = pbEntries.map(([exId]) => {
+                    const ex = EX_BY_ID[exId];
+                    return { id: exId, label: ex ? ex.name : exId, icon: ex ? ex.icon : "💪" };
+                  });
+
+                  // Filter visible entries
+                  const visibleEntries = pbEntries.filter(([exId]) => effectiveSelected.includes(exId));
+
+                  // PB Filter Dropdown
+                  const chipLabel = effectiveSelected.length === pbOptions.length ? "All PBs"
+                    : effectiveSelected.length === 0 ? "Filter PBs"
+                    : effectiveSelected.length <= 2 ? effectiveSelected.map(id=>{const ex=EX_BY_ID[id]; return ex?ex.name:id;}).join(", ")
+                    : effectiveSelected.length+" selected";
+
+                  const filterDrop = React.createElement('div', {style:{position:"relative",marginBottom:8}},
+                    React.createElement('div', {
+                      style:{background:pbFilterOpen?"rgba(45,42,36,.45)":"rgba(45,42,36,.2)",border:"1px solid "+(pbFilterOpen?"rgba(180,172,158,.12)":"rgba(180,172,158,.06)"),borderRadius:8,padding:"7px 10px",fontSize:".6rem",fontWeight:600,color:effectiveSelected.length===0?"#5a5650":"#b4ac9e",cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all .15s",userSelect:"none"},
+                      onClick:()=>setPbFilterOpen(!pbFilterOpen)
+                    },
+                      React.createElement('span',{style:{fontSize:".7rem"}}, "🏆"),
+                      React.createElement('span',{style:{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, chipLabel),
+                      React.createElement('span',{style:{fontSize:".46rem",color:"#5a5650",flexShrink:0}}, pbFilterOpen?"▲":"▼")
+                    ),
+                    pbFilterOpen && React.createElement('div', {style:{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:60,background:"#16160f",border:"1px solid rgba(180,172,158,.1)",borderRadius:10,boxShadow:"0 8px 32px rgba(0,0,0,.6)",overflow:"hidden"}},
+                      React.createElement('div',{style:{display:"flex",justifyContent:"space-between",padding:"8px 10px",borderBottom:"1px solid rgba(180,172,158,.06)",background:"rgba(45,42,36,.15)"}},
+                        React.createElement('span',{style:{fontSize:".56rem",color:"#b4ac9e",cursor:"pointer",fontWeight:600},onClick:()=>setPbSelectedFilters(pbOptions.map(o=>o.id))}, "Select All"),
+                        React.createElement('span',{style:{fontSize:".56rem",color:"#e05555",cursor:"pointer",fontWeight:600},onClick:()=>setPbSelectedFilters([])}, "Clear All")
+                      ),
+                      React.createElement('div',{style:{maxHeight:200,overflowY:"auto",padding:"4px 4px",scrollbarWidth:"thin",scrollbarColor:"rgba(180,172,158,.15) transparent"}},
+                        pbOptions.map(opt => {
+                          const on = effectiveSelected.includes(opt.id);
+                          return React.createElement('div', {key:opt.id, style:{display:"flex",alignItems:"center",gap:7,padding:"6px 8px",cursor:"pointer",borderRadius:5,background:on?"rgba(180,172,158,.07)":"transparent",transition:"background .1s",fontSize:".62rem",color:on?"#d4cec4":"#6a645a"},
+                            onClick:()=>{const newSel = on ? effectiveSelected.filter(s=>s!==opt.id) : [...effectiveSelected, opt.id]; setPbSelectedFilters(newSel);}
+                          },
+                            React.createElement('span',{style:{width:15,height:15,borderRadius:3,border:"1.5px solid "+(on?"#b4ac9e":"rgba(180,172,158,.12)"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:".52rem",color:"#b4ac9e",flexShrink:0,background:on?"rgba(180,172,158,.08)":"transparent"}}, on?"✓":""),
+                            React.createElement('span',{style:{fontSize:".7rem",marginRight:4}}, opt.icon),
+                            opt.label
+                          );
+                        })
+                      ),
+                      React.createElement('div',{style:{padding:"6px 10px",borderTop:"1px solid rgba(180,172,158,.06)",background:"rgba(45,42,36,.1)"}},
+                        React.createElement('div',{style:{textAlign:"center",fontSize:".58rem",color:"#b4ac9e",cursor:"pointer",fontWeight:600,padding:"4px 0"},onClick:()=>setPbFilterOpen(false)}, "✓ Done ("+effectiveSelected.length+")")
+                      )
+                    )
+                  );
+
                   return React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11} }
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ Personal Bests ⠿"))
-                    , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6} }
-                      , pbEntries.map(([exId, pb]) => {
-                        const ex = EX_BY_ID[exId];
-                        const name = ex ? ex.name : exId;
-                        const icon = ex ? ex.icon : "💪";
-                        let valDisp = "";
-                        if(pb.type === "cardio") {
-                          valDisp = metric ? parseFloat((pb.value*1.60934).toFixed(2))+" min/km" : parseFloat(pb.value.toFixed(2))+" min/mi";
-                        } else if(pb.type === "assisted") {
-                          valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " (Assisted)";
-                        } else {
-                          valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " 1RM";
-                        }
-                        return React.createElement('div', { key: exId, style: {display:"flex",alignItems:"center",gap:8,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)"} }
-                          , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0} }, icon)
-                          , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"} }, name)
-                          , React.createElement('span', { style: {fontSize:".68rem",color:"#b4ac9e",fontWeight:600,flexShrink:0,fontFamily:"'Inter',sans-serif"} }, "🏆 ", valDisp)
-                        );
-                      })
-                    )
+                    , filterDrop
+                    , visibleEntries.length === 0
+                      ? React.createElement('div', {style:{textAlign:"center",fontSize:".62rem",color:"#5a5650",padding:"10px 0"}}, "Use the filter above to select which Personal Bests to display.")
+                      : React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6} }
+                        , visibleEntries.map(([exId, pb]) => {
+                          const ex = EX_BY_ID[exId];
+                          const name = ex ? ex.name : exId;
+                          const icon = ex ? ex.icon : "💪";
+                          let valDisp = "";
+                          if(pb.type === "cardio") {
+                            valDisp = metric ? parseFloat((pb.value*1.60934).toFixed(2))+" min/km" : parseFloat(pb.value.toFixed(2))+" min/mi";
+                          } else if(pb.type === "assisted") {
+                            valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " (Assisted)";
+                          } else {
+                            valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " 1RM";
+                          }
+                          return React.createElement('div', { key: exId, style: {display:"flex",alignItems:"center",gap:8,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)"} }
+                            , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0} }, icon)
+                            , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"} }, name)
+                            , React.createElement('span', { style: {fontSize:".68rem",color:"#b4ac9e",fontWeight:600,flexShrink:0,fontFamily:"'Inter',sans-serif"} }, "🏆 ", valDisp)
+                          );
+                        })
+                      )
                   );
                 })()
 
@@ -7186,12 +7101,6 @@ function App() {
                   )
                 ) : null
 
-                /* Action buttons */
-                , React.createElement('div', { style: {display:"flex",gap:8}}
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "✎ Edit"  )
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setNotifMode(false);setSecurityMode(true);}}, "🔒 Security" )
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>{setEditMode(false);setSecurityMode(false);setNotifMode(true);}}, "🔔 Alerts" )
-                )
               )
             )
 
@@ -7714,6 +7623,7 @@ function App() {
                     {key:"friendRequest", icon:"🤝", label:"Friend Requests", desc:"When someone sends you a friend request"},
                     {key:"friendAccepted", icon:"✅", label:"Request Accepted", desc:"When someone accepts your friend request"},
                     {key:"messageReceived", icon:"💬", label:"New Messages", desc:"Email me when I receive a new direct message", defaultOff:true},
+                    {key:"reviewBattleStats", icon:"📊", label:"Review Battle Stats", desc:"Remind me to input Duration, Total Calories & Active Calories for each completed Workout or Exercise"},
                   ];
                   return React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:8} }
                     , items.map(item => {
@@ -7743,240 +7653,9 @@ function App() {
         )
       )
 
-      /* ══ PLAN BUILDER WORKOUT PICKER ════════════ */
-      , bWoPickerOpen && (
-        React.createElement('div', { className: "ex-picker-backdrop", onClick: ()=>setBWoPickerOpen(false)}
-          , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation()}
-            , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
-              , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Add Workout to Day"   )
-              , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setBWoPickerOpen(false)}, "✕")
-            )
-            , profile.workouts&&profile.workouts.length>0 ? profile.workouts.map(wo=>(
-              React.createElement('div', { key: wo.id, className: "ex-pick-item", style: {marginBottom:6,flexDirection:"column",alignItems:"flex-start",gap:4},
-                onClick: ()=>{
-                  // Merge all workout exercises into current day
-                  const newExs = wo.exercises.map(e=>({
-                    exId:e.exId, sets:e.sets||3, reps:e.reps||10,
-                    weightLbs:e.weightLbs||null, durationMin:e.durationMin||null,
-                    distanceMi:null, hrZone:null, weightPct:100,
-                  }));
-                  setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,...newExs]}));
-                  setBWoPickerOpen(false);
-                  showToast(wo.icon+" "+wo.name+" exercises added!");
-                }}
-                , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,width:"100%"}}
-                  , React.createElement('span', { style: {fontSize:"1.3rem"}}, wo.icon)
-                  , React.createElement('div', { style: {flex:1}}
-                    , React.createElement('div', { className: "ex-pick-name"}, wo.name)
-                    , React.createElement('div', { className: "ex-pick-xp"}, wo.exercises.length, " exercise" , wo.exercises.length!==1?"s":"")
-                  )
-                )
-              )
-            )) : (
-              React.createElement('div', { className: "empty", style: {padding:"20px 0"}}, "No saved workouts yet. Build one in the 💪 Work tab first."           )
-            )
-          )
-        )
-      )
-
-      /* ══ EXERCISE PICKER ════════════════════════ */
-      , exPickerOpen && (
-        React.createElement('div', { className: "ex-picker-backdrop", onClick: ()=>pickerConfigOpen?null:closePicker()}
-          , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation(), style: {maxHeight:"85vh"}}
-            , !pickerConfigOpen ? React.createElement(React.Fragment, null
-                            /* ── BROWSE VIEW — Charcoal Inset style ── */
-              , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
-                , React.createElement('div', {style:{fontFamily:"'Inter',sans-serif",fontSize:".72rem",fontWeight:600,color:"#8a8478"}},
-                    "Add to Plan", pickerSelected.length>0&&React.createElement('span',{style:{color:"#b4ac9e",marginLeft:6}},pickerSelected.length+" selected"))
-                , React.createElement('div', {style:{display:"flex",gap:6}},
-                    pickerSelected.length>0&&React.createElement('button',{className:"btn btn-gold btn-xs",onClick:()=>setPickerConfigOpen(true)},"Configure & Add →"),
-                    React.createElement('button',{className:"btn btn-ghost btn-xs",onClick:()=>{closePicker();openExEditor("create",null);}},"✦ New Custom"),
-                    React.createElement('button',{className:"btn btn-ghost btn-sm",onClick:closePicker},"✕")
-                )
-              )
-              , React.createElement('div', {style:{marginBottom:8}},
-                React.createElement('input', {className:"inp",style:{width:"100%",padding:"7px 11px",fontSize:".82rem"},
-                  placeholder:"Search exercises…", value:pickerSearch,
-                  onChange:e=>setPickerSearch(e.target.value), autoFocus:true})
-              )
-              , (()=>{
-                const PTYPE_LABELS2={strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flex",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali"};
-                const PTYPE_OPTS2=Object.keys(PTYPE_LABELS2);
-                const PEQUIP_OPTS2=["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
-                const PMUSCLE_OPTS2=["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","cardio"];
-                const closeDrops2=()=>setPickerOpenDrop(null);
-                return React.createElement('div',{style:{position:"relative",marginBottom:10}},
-                  pickerOpenDrop&&React.createElement('div',{onClick:closeDrops2,style:{position:"fixed",inset:0,zIndex:19}}),
-                  React.createElement('div',{style:{display:"flex",gap:7}},
-                    React.createElement('div',{style:{position:"relative",flex:1,zIndex:20}},
-                      React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="muscle2"?null:"muscle2"),style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}},
-                        pickerMuscle==="All"?"Muscle":pickerMuscle.charAt(0).toUpperCase()+pickerMuscle.slice(1),
-                        React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="muscle2"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerMuscle!=="All"?"#b4ac9e":"#5a5650",transition:"transform .15s"}},"▼")),
-                      pickerOpenDrop==="muscle2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerMuscle("All");closeDrops2();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerMuscle==="All"?"#b4ac9e":"#8a8478",background:pickerMuscle==="All"?"rgba(45,42,36,.2)":"transparent"}},"All Muscles"),
-                        PMUSCLE_OPTS2.map(m=>React.createElement('div',{key:m,onClick:()=>{setPickerMuscle(m);closeDrops2();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerMuscle===m?getMuscleColor(m):"#8a8478",background:pickerMuscle===m?"rgba(45,42,36,.2)":"transparent",textTransform:"capitalize"}},m)))
-                    ),
-                    React.createElement('div',{style:{position:"relative",flex:1,zIndex:20}},
-                      React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="type2"?null:"type2"),style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}},
-                        pickerTypeFilter==="all"?"Type":(PTYPE_LABELS2[pickerTypeFilter]||pickerTypeFilter),
-                        React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="type2"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerTypeFilter!=="all"?"#d4cec4":"#5a5650",transition:"transform .15s"}},"▼")),
-                      pickerOpenDrop==="type2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerTypeFilter("all");closeDrops2();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerTypeFilter==="all"?"#d4cec4":"#8a8478",background:pickerTypeFilter==="all"?"rgba(45,42,36,.2)":"transparent"}},"All Types"),
-                        PTYPE_OPTS2.map(t=>React.createElement('div',{key:t,onClick:()=>{setPickerTypeFilter(t);closeDrops2();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerTypeFilter===t?getTypeColor(t):"#8a8478",background:pickerTypeFilter===t?"rgba(45,42,36,.2)":"transparent"}},PTYPE_LABELS2[t])))
-                    ),
-                    React.createElement('div',{style:{position:"relative",flex:1,zIndex:20}},
-                      React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="equip2"?null:"equip2"),style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerEquipFilter!=="all"?"#9b59b6":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?"#9b59b6":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}},
-                        pickerEquipFilter==="all"?"Equipment":pickerEquipFilter.charAt(0).toUpperCase()+pickerEquipFilter.slice(1),
-                        React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip2"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerEquipFilter!=="all"?"#9b59b6":"#5a5650",transition:"transform .15s"}},"▼")),
-                      pickerOpenDrop==="equip2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerEquipFilter("all");closeDrops2();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter==="all"?"#9b59b6":"#8a8478",background:pickerEquipFilter==="all"?"rgba(155,89,182,.12)":"transparent"}},"All Equipment"),
-                        PEQUIP_OPTS2.map(e=>React.createElement('div',{key:e,onClick:()=>{setPickerEquipFilter(e);closeDrops2();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter===e?"#9b59b6":"#8a8478",background:pickerEquipFilter===e?"rgba(155,89,182,.12)":"transparent",textTransform:"capitalize"}},e)))
-                    )
-                  )
-                );
-              })()
-              , (()=>{
-                const q=pickerSearch.toLowerCase().trim();
-                const filtered=allExercises.filter(e=>{
-                  if(pickerMuscle!=="All"&&e.muscleGroup!==pickerMuscle) return false;
-                  if(pickerTypeFilter!=="all"){const ty=(e.exerciseType||"").toLowerCase(),ca=(e.category||"").toLowerCase();if(!ty.includes(pickerTypeFilter)&&ca!==pickerTypeFilter) return false;}
-                  if(pickerEquipFilter!=="all"&&(e.equipment||"bodyweight").toLowerCase()!==pickerEquipFilter) return false;
-                  if(q&&!e.name.toLowerCase().includes(q)) return false;
-                  return true;
-                });
-                if(filtered.length===0) return React.createElement('div',{className:"empty",style:{padding:"20px 0"}},"No exercises found.");
-                const selIds=new Set(pickerSelected.map(e=>e.exId));
-                const visible=filtered.slice(0,80);
-                return React.createElement(React.Fragment,null,
-                  React.createElement('div',{style:{fontSize:".62rem",color:"#5a5650",marginBottom:6,textAlign:"right"}},
-                    (q||pickerMuscle!=="All"||pickerTypeFilter!=="all"||pickerEquipFilter!=="all")?filtered.length+" match"+(filtered.length!==1?"es":""):"Showing 80 of "+filtered.length+" · search or filter"),
-                  React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:5}},
-                    visible.map(ex=>{
-                      const sel=selIds.has(ex.id);
-                      const diffLabel=ex.difficulty||(ex.baseXP>=60?"Advanced":ex.baseXP>=45?"Intermediate":"Beginner");
-                      const diffColor=diffLabel==="Advanced"?"#7A2838":diffLabel==="Beginner"?"#5A8A58":"#A8843C";
-                      const diffBg=diffLabel==="Advanced"?"#2e1515":diffLabel==="Beginner"?"#1a2e1a":"#2e2010";
-                      const subParts=[ex.category?ex.category.charAt(0).toUpperCase()+ex.category.slice(1):null,ex.muscleGroup?ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1):null].filter(Boolean).join(" · ");
-                      return React.createElement('div',{key:ex.id,onClick:()=>pickerToggleEx(ex.id),style:{background:sel?"rgba(45,42,36,.25)":"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",border:"1px solid "+(sel?"rgba(180,172,158,.35)":"rgba(180,172,158,.05)"),borderRadius:9,padding:"9px 12px",display:"flex",alignItems:"center",gap:11,cursor:"pointer",boxShadow:sel?"0 0 0 1.5px rgba(180,172,158,.3),0 3px 14px rgba(180,172,158,.06)":"none",transition:"all .15s"}},
-                        React.createElement('div',{style:{width:30,height:30,borderRadius:7,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},React.createElement(ExIcon,{ex:ex,size:".9rem",color:getTypeColor(ex.category)})),
-                        React.createElement('div',{style:{flex:1,minWidth:0}},
-                          React.createElement('div',{style:{fontSize:".8rem",fontWeight:600,color:sel?"#d4cec4":"#d4cec4",marginBottom:2}},ex.name,ex.custom&&React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:4}},"custom")),
-                          React.createElement('div',{style:{fontSize:".6rem",fontStyle:"italic"}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))),
-                        React.createElement('div',{style:{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}},
-                          React.createElement('span',{style:{fontSize:".63rem",fontWeight:700,color:"#b4ac9e"}},ex.baseXP+" XP"),
-                          React.createElement('span',{style:{fontSize:".56rem",fontWeight:700,color:diffColor,background:diffBg,padding:"1px 6px",borderRadius:3,letterSpacing:".04em"}},diffLabel))
-                      );
-                    })
-                  )
-                );
-              })()
-            ) : React.createElement(React.Fragment, null
-              /* ── CONFIG VIEW ── */
-              , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
-                , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setPickerConfigOpen(false)}, "← Back" )
-                , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Configure " , pickerSelected.length, " Exercise" , pickerSelected.length!==1?"s":"")
-                , React.createElement('button', { className: "btn btn-gold btn-sm"  , onClick: commitPickerToPlan}, "Add to Plan ✓"   )
-              )
-              , pickerSelected.map((entry,idx)=>{
-                const ex=allExById[entry.exId]; if(!ex) return null;
-                const isCardio=ex.category==="cardio"||ex.category==="flexibility";
-                const isTreadEx=ex.hasTreadmill||false;
-                const noSets=NO_SETS_EX_IDS.has(ex.id);
-                const metric=isMetric(profile.units);
-                const wUnit=weightLabel(profile.units);
-                const dUnit=distLabel(profile.units);
-                return (
-                  React.createElement('div', { key: entry.exId, style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(180,172,158,.05)",borderRadius:10,padding:"10px 12px",marginBottom:8}}
-                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8}}
-                      , React.createElement('span', { style: {fontSize:"1.1rem"}}, ex.icon)
-                      , React.createElement('span', { style: {fontSize:".82rem",color:"#d4cec4",flex:1}}, ex.name)
-                      , React.createElement('span', { style: {fontSize:".65rem",cursor:"pointer",color:"#e74c3c"}, onClick: ()=>setPickerSelected(p=>p.filter(e=>e.exId!==entry.exId))}, "✕")
-                    )
-                    /* Top row — category-specific */
-                    , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}
-                      , !noSets&&!isCardio&&React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
-                        , React.createElement('label', null, "Sets")
-                        , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric", value: entry.sets||"", onChange: e=>pickerUpdateEx(entry.exId,"sets",e.target.value), placeholder: "3"})
-                      )
-                      , isCardio ? (React.createElement(React.Fragment, null
-                        , React.createElement('div', { className: "field", style: {flex:1.6,minWidth:70,marginBottom:0}}
-                          , React.createElement('label', null, "Duration (HH:MM)" )
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric",
-                            value: entry._durHHMM||"",
-                            onChange: e=>pickerUpdateEx(entry.exId,"_durHHMM",e.target.value),
-                            onBlur: e=>{const n=normalizeHHMM(e.target.value);pickerUpdateEx(entry.exId,"_durHHMM",n);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(n,entry._durSec||"")/60))));},
-                            placeholder: "00:00"})
-                        )
-                        , React.createElement('div', { className: "field", style: {flex:0.8,minWidth:50,marginBottom:0}}
-                          , React.createElement('label', null, "Seconds")
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "59",
-                            value: entry._durSec||"",
-                            onChange: e=>{pickerUpdateEx(entry.exId,"_durSec",e.target.value);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(entry._durHHMM||"",e.target.value)/60))));},
-                            placeholder: "00"})
-                        )
-                        , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
-                          , React.createElement('label', null, "Dist (" , dUnit, ")")
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "decimal", value: entry.distanceMi||"", onChange: e=>pickerUpdateEx(entry.exId,"distanceMi",e.target.value), placeholder: "0"})
-                        )
-                      )) : (React.createElement(React.Fragment, null
-                        , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
-                          , React.createElement('label', null, "Reps")
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric", value: entry.reps||"", onChange: e=>pickerUpdateEx(entry.exId,"reps",e.target.value), placeholder: "10"})
-                        )
-                        , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
-                          , React.createElement('label', null, "Weight (" , wUnit, ")")
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "decimal", value: entry.weightLbs||"", onChange: e=>pickerUpdateEx(entry.exId,"weightLbs",e.target.value), placeholder: "0"})
-                        )
-                      ))
-                    )
-                    /* Treadmill: Incline + Speed */
-                    , isTreadEx&&(
-                      React.createElement('div', { style: {display:"flex",gap:6,marginBottom:6}}
-                        , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
-                          , React.createElement('label', null, "Incline (0.5–15)" )
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "number", min: "0.5", max: "15", step: "0.5", value: entry.incline||"", onChange: e=>pickerUpdateEx(entry.exId,"incline",e.target.value?parseFloat(e.target.value):null), placeholder: "—"})
-                        )
-                        , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
-                          , React.createElement('label', null, "Speed (0.5–15)" )
-                          , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "number", min: "0.5", max: "15", step: "0.5", value: entry.speed||"", onChange: e=>pickerUpdateEx(entry.exId,"speed",e.target.value?parseFloat(e.target.value):null), placeholder: "—"})
-                        )
-                      )
-                    )
-                    /* +Add Row */
-                    , (entry.extraRows||[]).map((row,ri)=>(
-                      React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"5px 7px",background:"rgba(45,42,36,.18)",borderRadius:5,alignItems:"center",flexWrap:"wrap"}}
-                        , React.createElement('span', { style: {fontSize:".55rem",color:"#9a8a78",flexShrink:0,minWidth:16}}, isCardio?`I${ri+2}`:`S${ri+2}`)
-                        , isCardio ? (React.createElement(React.Fragment, null
-                          , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:50,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
-                            value: row.hhmm||"",
-                            onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);},
-                            onBlur: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:36,padding:"4px 7px",fontSize:".72rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: dUnit, value: row.distanceMi||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        )) : (React.createElement(React.Fragment, null
-                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        ))
-                        , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 4px",flexShrink:0}, onClick: ()=>{const rr=(entry.extraRows||[]).filter((_,j)=>j!==ri);pickerUpdateEx(entry.exId,"extraRows",rr);}}, "✕")
-                      )
-                    ))
-                    , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
-                      onClick: ()=>{const rr=[...(entry.extraRows||[]),isCardio?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:"",reps:"",weightLbs:""}];pickerUpdateEx(entry.exId,"extraRows",rr);}}, "＋ Add Row (e.g. "
-                          , isCardio?"interval":"progressive set", ")"
-                    )
-                  )
-                );
-              })
-            )
-          )
-        )
-      )
 
       /* ══ EXERCISE EDITOR MODAL ══════════════════ */
-      , exEditorOpen && exEditorDraft && (()=>{
+      , exEditorOpen && exEditorDraft && createPortal((()=>{ try {
         const ed = exEditorDraft;
         const setEd = patch => setExEditorDraft(d=>({...d,...patch}));
         const isCardioED = ed.category==="cardio";
@@ -8070,7 +7749,7 @@ function App() {
                 , React.createElement('div', { className: "field"}
                   , React.createElement('label', {}, "Muscle Group")
                   , React.createElement('div', { style: {display:"flex",gap:4,flexWrap:"wrap"}}
-                    , ["chest","back","shoulder","bicep","forearm","legs","glutes","calves","abs"].map(mg=>(
+                    , ["chest","back","shoulder","bicep","tricep","forearm","legs","glutes","calves","abs"].map(mg=>(
                       React.createElement('button', { key: mg,
                         className: `btn btn-sm ${ed.muscleGroup===mg?"btn-gold":"btn-ghost"}`,
                         style: {textTransform:"capitalize",fontSize:".54rem",padding:"4px 8px"},
@@ -8228,7 +7907,7 @@ function App() {
             )
           )
         );
-      })()
+      } catch(e) { console.error("Exercise editor render error:", e); return null; } })(), document.body)
 
       /* ══ EXERCISE DETAIL MODAL ══════════════════ */
       , detailEx && (
@@ -8499,7 +8178,7 @@ function App() {
 
       /* ══ WORKOUT EXERCISE PICKER ═════════════════ */
       , wbExPickerOpen && (
-        React.createElement('div', { className: "ex-picker-backdrop", onClick: ()=>pickerConfigOpen?null:closePicker()}
+        React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();if(!pickerConfigOpen)closePicker();}}
           , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation(), style: {maxHeight:"85vh"}}
             , !pickerConfigOpen ? React.createElement(React.Fragment, null
               /* ── BROWSE VIEW — Charcoal Inset style ── */
@@ -8523,7 +8202,7 @@ function App() {
                 const PTYPE_LABELS = {strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flex",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali"};
                 const PTYPE_OPTS   = Object.keys(PTYPE_LABELS);
                 const PEQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
-                const PMUSCLE_OPTS = ["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","cardio"];
+                const PMUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","cardio"];
                 const closeDrops   = () => setPickerOpenDrop(null);
                 return React.createElement('div', {style:{position:"relative",marginBottom:10}},
                   pickerOpenDrop && React.createElement('div',{onClick:closeDrops,style:{position:"fixed",inset:0,zIndex:19}}),
@@ -8577,6 +8256,7 @@ function App() {
               , (()=>{
                 const q   = pickerSearch.toLowerCase().trim();
                 const filtered = allExercises.filter(e=>{
+                  if(e.id==="rest_day") return false; // Rest Day is plan-only
                   if(pickerMuscle!=="All" && e.muscleGroup!==pickerMuscle) return false;
                   if(pickerTypeFilter!=="all"){
                     const ty=(e.exerciseType||"").toLowerCase(), ca=(e.category||"").toLowerCase();
@@ -8869,20 +8549,25 @@ function App() {
           },0);
           return (Math.round(baseXP*zb*wb*pb*intBoost)+rowsXP).toLocaleString();
         })();
-        return (
+        try { return (
           React.createElement('div', { style: {position:"fixed",inset:0,background:"rgba(0,0,0,.78)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
-            onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);}}
+            onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}
             , React.createElement('div', { style: {width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",background:"linear-gradient(160deg,#0c0c0a,#0c0c0a)",border:"1px solid rgba(180,172,158,.06)",borderRadius:"18px 18px 0 0",padding:"0 0 24px"},
               onClick: e=>e.stopPropagation()}
               /* Header */
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px 4px"}}
-                , React.createElement('div', { style: {fontSize:".95rem",color:"#d4cec4",fontFamily:"'Inter',sans-serif",fontWeight:600}}, ex.icon, " " , ex.name)
-                , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);}}, "✕")
+                , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8}}
+                  , React.createElement('button', { className: "btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
+                      onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);setLibDetailEx(ex);}}, "← Back")
+                  , React.createElement('div', { style: {fontSize:".95rem",color:"#d4cec4",fontFamily:"'Inter',sans-serif",fontWeight:600}}, ex.icon, " " , ex.name)
+                )
+                , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>{setSelEx(null);setExHHMM("");setExSec("");setQuickRows([]);setPendingSoloRemoveId(null);}}, "✕")
               )
               , React.createElement('div', { style: {padding:"0 14px"}}
                 , React.createElement('div', { className: "log-form"}
+                  , ex.id==="rest_day" ? React.createElement('div', { style: {textAlign:"center",padding:"18px 0",color:"#8a8478",fontSize:".78rem",fontStyle:"italic"}}, "🛌 Rest day — no stats to track. Recover well!") : null
                   /* Top row: Sets/Reps or Duration+Sec+Dist, then Weight */
-                  , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
                     , !noSets&&!(isCardio||isFlex)&&React.createElement('div', { style: {flex:1}}
                       , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
                       , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: "3"})
@@ -8912,7 +8597,7 @@ function App() {
                     ))
                   )
                   /* Extra rows */
-                  , React.createElement('div', { style: {marginBottom:9}}
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9}}
                     , quickRows.map((row,ri)=>(
                       React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
                         , React.createElement('span', { style: {fontSize:".6rem",color:"#a09080",flexShrink:0,minWidth:18}}, isCardio||isFlex?`I${ri+2}`:`S${ri+2}`)
@@ -8935,34 +8620,34 @@ function App() {
                     ))
                   )
                   /* Distance bonus info (field is now in top row) */
-                  , showDist&&rawDist>0&&(
+                  , ex.id!=="rest_day"&&showDist&&rawDist>0&&(
                     React.createElement('div', { style: {fontSize:".62rem",color:"#6a645a",marginBottom:6,marginTop:-4}}
                       , metric?`${rawDist} km = ${parseFloat(kmToMi(rawDist)).toFixed(2)} mi`:`${rawDist} mi = ${parseFloat(miToKm(rawDist)).toFixed(2)} km`
                       , React.createElement('span', { style: {color:"#e67e22",marginLeft:6}}, "+", Math.round(Math.min(distMi*0.05,0.5)*100), "% dist bonus"  )
                     )
                   )
                   /* Treadmill: Incline + Speed */
-                  , isTreadmill&&(
+                  , ex.id!=="rest_day"&&isTreadmill&&(
                     React.createElement('div', { style: {display:"flex",gap:8,marginBottom:10}}
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Incline (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exIncline||"", onChange: e=>setExIncline(e.target.value?parseFloat(e.target.value):null)}))
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Speed (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exSpeed||"", onChange: e=>setExSpeed(e.target.value?parseFloat(e.target.value):null)}))
                     )
                   )
                   /* Intervals toggle — all cardio */
-                  , showHR&&(
+                  , ex.id!=="rest_day"&&showHR&&(
                     React.createElement('button', { style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",background:exIntervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",border:`1.5px solid ${exIntervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,color:exIntervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer"}, onClick: ()=>setExIntervals(v=>!v)}, "⚡ Intervals "
                         , exIntervals?"ON · +25% XP":"OFF"
                     )
                   )
                   /* Add Row button */
-                  , (isCardio||isFlex||showWeight)&&(
+                  , ex.id!=="rest_day"&&(isCardio||isFlex||showWeight)&&(
                     React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
                       onClick: ()=>setQuickRows([...quickRows,(isCardio||isFlex)?{hhmm:"",sec:"",dist:"",incline:"",speed:""}:{sets:sets||"",reps:reps||"",weightLbs:exWeight||""}])}, "＋ Add Row ("
                          , isCardio||isFlex?"e.g. interval":"progressive weight/sets", ")"
                     )
                   )
                   /* Weight Intensity slider (weight field is now in top row) */
-                  , showWeight&&(
+                  , ex.id!=="rest_day"&&showWeight&&(
                     React.createElement('div', { style: {marginBottom:11}}
                       , React.createElement('div', { className: "intensity-row"}
                         , React.createElement('label', { style: {marginBottom:0,flex:1}}, "Weight Intensity" )
@@ -8975,7 +8660,7 @@ function App() {
                     )
                   )
                   /* Avg HR Zone — last */
-                  , showHR&&(
+                  , ex.id!=="rest_day"&&showHR&&(
                     React.createElement('div', { style: {marginBottom:11}}
                       , React.createElement('label', null, "Avg Heart Rate Zone "    , profile.age?`(Age ${profile.age})`:"")
                       , React.createElement('div', { className: "hr-zone-row"}
@@ -8995,12 +8680,12 @@ function App() {
                     )
                   )
                   /* Personal Best display */
-                  , (isRunning&&pbDisp||exPBDisp4) && React.createElement('div', { style: {fontSize:".68rem",color:"#b4ac9e",marginBottom:7,display:"flex",alignItems:"center",gap:5} }
+                  , ex.id!=="rest_day"&&(isRunning&&pbDisp||exPBDisp4) && React.createElement('div', { style: {fontSize:".68rem",color:"#b4ac9e",marginBottom:7,display:"flex",alignItems:"center",gap:5} }
                     , React.createElement('span', null, "🏆")
                     , React.createElement('span', null, "Current PB: ", isRunning&&pbDisp?pbDisp:exPBDisp4)
                   )
                   /* XP estimate */
-                  , React.createElement('div', { style: {marginBottom:9,fontSize:".7rem",color:"#8a8478",fontStyle:"italic"}}, "Est. XP: "
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9,fontSize:".7rem",color:"#8a8478",fontStyle:"italic"}}, "Est. XP: "
                       , React.createElement('span', { style: {color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, estXP)
                     , showHR&&hrZone&&React.createElement('span', { style: {color:"#e67e22",marginLeft:6}}, "Z", hrZone, " +" , ((hrZone-1)*4), "% XP" )
                     , showWeight&&effW>0&&React.createElement('span', { style: {color:"#2ecc71",marginLeft:6}}, "+", Math.round(Math.min(effW/500,0.3)*100), "% wt bonus"  )
@@ -9008,13 +8693,13 @@ function App() {
                   )
                   /* Primary action row */
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
-                    , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "Complete ⚡" )
+                    , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{openScheduleEx(ex.id);setSelEx(null);}}, "📅 Schedule" )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
                   /* Secondary actions — add to existing workout / plan */
                   , React.createElement('div', { style: {display:"flex",gap:6}}
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
                       onClick: ()=>{
                         const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
                         setAddToWorkoutPicker({exercises:[exEntry]});
@@ -9028,7 +8713,7 @@ function App() {
                         setSpwName(ex.name);setSpwIcon(ex.icon||"📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                         setSelEx(null);
                       }}, "📋 Add to Plan"   )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
                       onClick: ()=>{
                         const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
                         setWbExercises([exEntry]);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
@@ -9040,20 +8725,37 @@ function App() {
             )
           )
         );
+      } catch(e) { console.error("Quick-log render error:", e); return null; }
       })()
 
       /* ══ STATS PROMPT MODAL ══════════════════════ */
-      , statsPromptModal&&(
+      , statsPromptModal&&createPortal(
         React.createElement('div', { className: "modal-backdrop", onClick: ()=>setStatsPromptModal(null)}
           , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
             , React.createElement('div', { className: "modal-body"}
+              /* ── Glass dismiss banner ── */
+              , React.createElement('div', {
+                  style: {background:"rgba(45,42,36,.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1px solid rgba(180,172,158,.10)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10,cursor:"pointer"},
+                  onClick: ()=>{
+                    setProfile(p=>({...p,notificationPrefs:{...(p.notificationPrefs||{}),reviewBattleStats:false}}));
+                    statsPromptModal.onConfirm(statsPromptModal.wo);
+                    setStatsPromptModal(null); setSpMakeReusable(false); setSpDurSec("");
+                  }
+                }
+                , React.createElement('div', { style: {width:16,height:16,borderRadius:3,border:"1.5px solid rgba(180,172,158,.25)",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0} })
+                , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",lineHeight:1.35} }
+                  , "Want this reminder off? Check here. To re-enable, you can do so in "
+                  , React.createElement('span', { style: {color:"#b4ac9e",fontWeight:600} }, "Alerts settings")
+                  , "."
+                )
+              )
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10} }
                 , React.createElement('div', null
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}},
                     React.createElement('button', {className:"btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
-                      onClick:()=>{ setStatsPromptModal(null); setWorkoutView("builder"); setActiveTab("workouts"); }
+                      onClick:()=>{ setStatsPromptModal(null); if(statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId){ setSelEx(statsPromptModal.wo._soloExId); } else if(!statsPromptModal.wo.soloEx){ setWorkoutView("builder"); setActiveTab("workouts"); } }
                     }, "← Back"),
-                    React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", statsPromptModal.wo.oneOff?"Review Battle Stats":"Record Battle Stats")
+                    React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", "Review Battle Stats ", React.createElement('span',{style:{color:"#5a5650",fontWeight:"normal",fontSize:".72rem"}},"(Optional)"))
                   )
                 )
                 , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setStatsPromptModal(null) }, "✕")
@@ -9075,8 +8777,8 @@ function App() {
                     onBlur: e=>setSpDuration(normalizeHHMM(e.target.value))})
                 )
                 , React.createElement('div', { className: "field", style: {flex:0.8,marginBottom:0}}
-                  , React.createElement('label', null, "Seconds")
-                  , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: "0",
+                  , React.createElement('label', null, "Sec")
+                  , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59", placeholder: ":00",
                     value: spDurSec,
                     onChange: e=>setSpDurSec(e.target.value)})
                 )
@@ -9115,6 +8817,84 @@ function App() {
                   statsPromptModal.onConfirm(wo, _statsRef);
                   setStatsPromptModal(null); setSpMakeReusable(false); setSpDurSec("");
                 }}, "✓ Save & Complete"   )
+              )
+            )
+          )
+        )
+      , document.body)
+
+      /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */
+      , calExDetailModal && (
+        React.createElement('div', { className: "modal-backdrop", onClick: ()=>setCalExDetailModal(null)}
+          , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
+            , React.createElement('div', { className: "modal-body"}
+              /* Header */
+              , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10} }
+                , React.createElement('div', { style:{display:"flex",alignItems:"center",gap:8} }
+                  , React.createElement('span', { style:{fontSize:"1.2rem"} }, calExDetailModal.exerciseIcon)
+                  , React.createElement('div', { className: "stats-modal-title" }, calExDetailModal.exerciseName)
+                )
+                , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setCalExDetailModal(null) }, "✕")
+              )
+              /* Source info */
+              , calExDetailModal.sourceName && React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",padding:"6px 10px",background:"rgba(45,42,36,.12)",borderRadius:7,border:"1px solid rgba(45,42,36,.2)",marginBottom:10} }
+                , React.createElement('span', null, calExDetailModal.sourceIcon||"💪", " From: ", React.createElement('b', { style:{color:"#b4ac9e"} }, calExDetailModal.sourceName))
+              )
+              , !calExDetailModal.sourceName && React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",padding:"6px 10px",background:"rgba(45,42,36,.12)",borderRadius:7,border:"1px solid rgba(45,42,36,.2)",marginBottom:10} }
+                , "Solo Exercise"
+              )
+              /* Stats row */
+              , (calExDetailModal.durationSec>0 || calExDetailModal.activeCal>0 || calExDetailModal.totalCal>0) && React.createElement('div', { style:{display:"flex",gap:8,marginBottom:12} }
+                , calExDetailModal.durationSec>0 && React.createElement('div', { className: "eff-weight", style: {flex:1} }
+                  , React.createElement('span', { className: "eff-weight-val" }, secToHMS(calExDetailModal.durationSec))
+                  , React.createElement('span', { className: "eff-weight-lbl" }, "Duration")
+                )
+                , calExDetailModal.totalCal>0 && React.createElement('div', { className: "eff-weight", style: {flex:1} }
+                  , React.createElement('span', { className: "eff-weight-val" }, calExDetailModal.totalCal)
+                  , React.createElement('span', { className: "eff-weight-lbl" }, "Total Cal")
+                )
+                , calExDetailModal.activeCal>0 && React.createElement('div', { className: "eff-weight", style: {flex:1} }
+                  , React.createElement('span', { className: "eff-weight-val" }, calExDetailModal.activeCal)
+                  , React.createElement('span', { className: "eff-weight-lbl" }, "Active Cal")
+                )
+              )
+              /* Entry rows */
+              , React.createElement('div', { style:{marginBottom:8} }
+                , calExDetailModal.entries.length>1 && React.createElement('div', { style:{fontSize:".58rem",color:"#5a5650",textTransform:"uppercase",letterSpacing:".08em",marginBottom:6} }, calExDetailModal.entries.length, " Sets / Rows")
+                , calExDetailModal.entries.map((e,i)=>
+                  React.createElement('div', { key:i, style:{background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:8,padding:"10px 12px",marginBottom:6} }
+                    , React.createElement('div', { style:{display:"flex",justifyContent:"space-between",alignItems:"center"} }
+                      , React.createElement('div', { style:{fontSize:".72rem",color:"#d4cec4",fontWeight:600} }
+                        , calExDetailModal.entries.length>1 ? "Set "+(i+1) : "Details"
+                      )
+                      , React.createElement('div', { style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e"} }, "+", e.xp, " XP")
+                    )
+                    , React.createElement('div', { style:{display:"flex",gap:12,marginTop:6,flexWrap:"wrap"} }
+                      , React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Sets: "), e.sets
+                      )
+                      , React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Reps: "), e.reps
+                      )
+                      , e.weightLbs && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Weight: "), isMetric(profile.units)?lbsToKg(e.weightLbs)+" kg":e.weightLbs+" lbs"
+                      )
+                      , e.distanceMi && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Distance: "), isMetric(profile.units)?miToKm(e.distanceMi)+" km":e.distanceMi+" mi"
+                      )
+                      , e.hrZone && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "HR Zone: "), e.hrZone
+                      )
+                      , e.seconds && React.createElement('div', { style:{fontSize:".62rem",color:"#8a8478"} }
+                        , React.createElement('span', { style:{color:"#5a5650"} }, "Seconds: "), e.seconds
+                      )
+                    )
+                  )
+                )
+              )
+              /* Total XP */
+              , React.createElement('div', { style:{display:"flex",justifyContent:"flex-end",padding:"8px 0",borderTop:"1px solid rgba(180,172,158,.08)"} }
+                , React.createElement('div', { style:{fontSize:".75rem",fontWeight:700,color:"#b4ac9e"} }, "Total: +", calExDetailModal.entries.reduce((s,e)=>s+e.xp,0), " XP")
               )
             )
           )
@@ -9449,13 +9229,23 @@ function App() {
                 , !inScheduleMode ? (
                   React.createElement('button', { className: "btn btn-cls" , style: {flex:2},
                     disabled: inPickMode&&!pickerValue,
-                    onClick: confirmWorkoutComplete}, "✓ Confirm & Claim XP"
+                    onClick: ()=>{
+                      if(completionModal.soloExCallback){
+                        const dateStr=(completionAction==="past"&&completionDate&&completionDate!=="pick")?completionDate:todayStr();
+                        completionModal.soloExCallback(dateStr);
+                        setCompletionModal(null);setCompletionDate("");setCompletionAction("today");setScheduleWoDate("");
+                      } else { confirmWorkoutComplete(); }
+                    }}, "✓ Confirm & Claim XP"
 
                   )
                 ) : (
                   React.createElement('button', { className: "btn btn-gold" , style: {flex:2},
                     disabled: !scheduleWoDate,
-                    onClick: scheduleWorkoutForDate}, "📅 Schedule Workout"
+                    onClick: ()=>{
+                      if(completionModal.soloExScheduleCallback){
+                        completionModal.soloExScheduleCallback(scheduleWoDate);
+                      } else { scheduleWorkoutForDate(); }
+                    }}, "📅 Schedule Workout"
 
                   )
                 )
@@ -9647,7 +9437,7 @@ function App() {
             /* Header */
             , React.createElement('div', { style: {width:"100%",maxWidth:420,display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexShrink:0}}
               , React.createElement('div', null
-                , React.createElement('div', { style: {fontFamily:"'Cinzel Decorative',serif,Arial",fontSize:".95rem",color:"#b4ac9e",letterSpacing:".08em"}}, "⚔️ Middle-earth" )
+                , React.createElement('div', { style: {fontFamily:"'Cinzel Decorative',serif,Arial",fontSize:".95rem",color:"#b4ac9e",letterSpacing:".08em"}}, "⚔️ Auranthel" )
                 , React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",marginTop:2,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}
                   , React.createElement('span', null, myRegion.icon, " " , myRegion.name, " · Level "   , level)
                   , React.createElement('span', { style: {color:"#b4ac9e"}}, myRegion.boost.emoji, " +7% "  , myRegion.boost.label)
@@ -9809,20 +9599,30 @@ function App() {
           , React.createElement('div', { className: "modal-sheet", onClick: e=>e.stopPropagation(), style: {borderRadius:16,padding:0}}
             , React.createElement('div', { className: "modal-body"}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}
-                , React.createElement('div', { className: "feedback-title" }, "💬 Share Your Scroll")
+                , React.createElement('div', { className: "feedback-title" }, "🛟 Support")
                 , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setFeedbackOpen(false)}, "✕")
               )
               , feedbackSent ? (
-                React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
-                  , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "⚡")
-                  , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Feedback received!" )
-                  , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478"}}, "Thanks for helping forge Aurisar into something legendary."        )
-                  , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
+                helpConfirmShown ? (
+                  React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
+                    , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "📬")
+                    , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Help request received!")
+                    , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",lineHeight:1.6,maxWidth:280,margin:"0 auto"}},
+                      "You\u2019ll receive an email from Support@aurisargames.com upon review that will ask for your 12-character Private User ID to verify your identity.")
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
+                  )
+                ) : (
+                  React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
+                    , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "⚡")
+                    , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Feedback received!" )
+                    , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478"}}, "Thanks for helping forge Aurisar into something legendary.")
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
+                  )
                 )
               ) : (
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:12}}
-                    , [["idea","💡 Idea"],["bug","🐛 Bug"],["other","💬 Other"]].map(([v,l])=>(
+                    , [["idea","💡 Idea"],["bug","🐛 Bug"],["help","❓ Help"]].map(([v,l])=>(
                       React.createElement('button', { key: v, className: "btn btn-ghost btn-xs"  ,
                         style: {flex:1,fontSize:".65rem",
                           border:feedbackType===v?"1px solid rgba(180,172,158,.12)":"",
@@ -9831,38 +9631,65 @@ function App() {
                         onClick: ()=>setFeedbackType(v)}, l)
                     ))
                   )
+                  , React.createElement('div', { className: "field", style: {marginBottom:8}}
+                    , React.createElement('label', null, "Email Address")
+                    , React.createElement('input', { className: "inp", type: "email",
+                      placeholder: "your@email.com",
+                      value: feedbackEmail,
+                      onChange: e=>setFeedbackEmail(e.target.value)})
+                  )
+                  , React.createElement('div', { className: "field", style: {marginBottom:8}}
+                    , React.createElement('label', null, "Account ID")
+                    , React.createElement('input', { className: "inp", type: "text",
+                      placeholder: "e.g. A7XK9M",
+                      value: feedbackAccountId,
+                      onChange: e=>setFeedbackAccountId(e.target.value)})
+                  )
                   , React.createElement('div', { className: "field", style: {marginBottom:12}}
-                    , React.createElement('label', null, feedbackType==="bug"?"Describe the bug":"What's on your mind?")
+                    , React.createElement('label', null, feedbackType==="bug"?"Describe the bug":feedbackType==="help"?"How can we help?":"What's on your mind?")
                     , React.createElement('textarea', { className: "inp", rows: 5,
                       style: {resize:"vertical",minHeight:100,lineHeight:1.5},
-                      placeholder: feedbackType==="idea"?"I'd love to see…":feedbackType==="bug"?"When I tap… it does…":"Type here…",
+                      placeholder: feedbackType==="idea"?"I'd love to see…":feedbackType==="bug"?"When I tap… it does…":"Describe your issue…",
                       value: feedbackText,
                       onChange: e=>setFeedbackText(e.target.value)})
                   )
-                  , authUser&&React.createElement('div', { style: {fontSize:".62rem",color:"#6a645a",marginBottom:10}}, "Submitting as: "  , authUser.email)
                   , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"},
                     disabled: !feedbackText.trim(),
                     onClick: async()=>{
                       const msg = feedbackText.trim();
                       const type = feedbackType;
-                      // Always show success immediately — don't wait on network
+                      const email = feedbackEmail.trim();
+                      const acctId = feedbackAccountId.trim();
+                      // Show success immediately (optimistic UI)
                       setFeedbackSent(true);
+                      if (type === "help") setHelpConfirmShown(true);
                       setFeedbackText("");
-                      // Try Supabase first, silently fall back to mailto
+                      // Store in Supabase
                       try {
                         await sb.from("feedback").insert({
                           user_id:_optionalChain([authUser, 'optionalAccess', _193 => _193.id])||null,
-                          email:_optionalChain([authUser, 'optionalAccess', _194 => _194.email])||"anonymous",
+                          email: email||"anonymous",
                           type,
                           message:msg,
+                          account_id: acctId||null,
                           created_at:new Date().toISOString(),
                         });
                       } catch(e) {
-                        // Supabase table may not exist yet — silently ignore
-                        // Could also do: window.location.href = `mailto:feedback@aurisargames.com?subject=...`
-                        console.log("Feedback stored locally only:", type, msg);
+                        console.log("Supabase feedback insert failed:", e);
                       }
-                    }}, "Send Feedback ⚡"
+                      // For Idea/Bug, also create a GitHub issue
+                      if (type === "idea" || type === "bug") {
+                        try {
+                          await fetch("/api/create-github-issue", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({ type, message: msg, email, accountId: acctId }),
+                          });
+                        } catch(e) {
+                          console.log("GitHub issue creation failed:", e);
+                        }
+                      }
+                    }}, "Submit"
 
                   )
                 )
