@@ -19381,6 +19381,314 @@ const EXERCISES = [
     id:"deep_stretch", name:"Deep Stretch", category:"flexibility", muscleGroup:"full_body", icon:"🤸", baseXP:30,
     muscles:"Full Body", desc:"Full-body flexibility and mobility session. Focus on breathing, holding stretches, and releasing tension.", tips:[], images:[],
   },
+  // ── Legacy exercises (needed by workout templates) ──
+  {
+    id:"arnold_press", name:"Arnold Press", category:"strength", muscleGroup:"shoulder", icon:"🏋️", baseXP:45,
+    muscles:"Shoulder", desc:"Overhead pressing movement developing shoulder strength. Brace core and press in a vertical path.", tips:[], images:[],
+  },
+  {
+    id:"bench_dip", name:"Bench Dip", category:"strength", muscleGroup:"bicep", icon:"💪", baseXP:35,
+    muscles:"Bicep", desc:"Strength exercise targeting the bicep. Focus on form and controlled range of motion.", tips:[], images:[],
+  },
+  {
+    id:"bicycle_crunch", name:"Bicycle Crunch", category:"strength", muscleGroup:"abs", icon:"🧱", baseXP:35,
+    muscles:"Abs", desc:"Core flexion exercise targeting the abs. Focus on drawing ribs to hips, not pulling the neck.", tips:[], images:[],
+  },
+  {
+    id:"box_jump", name:"Box Jump", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:35,
+    muscles:"Legs", desc:"Strength exercise targeting the legs. Focus on form and controlled range of motion.", tips:[], images:[],
+  },
+  {
+    id:"dumbbell_floor_press", name:"Dumbbell Floor Press", category:"strength", muscleGroup:"chest", icon:"💪", baseXP:50,
+    muscles:"Chest", desc:"Pressing movement targeting the chest. Retract shoulder blades and press through full range of motion.", tips:[], images:[],
+  },
+  {
+    id:"dumbbell_lunge", name:"Dumbbell Lunge", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:50,
+    muscles:"Legs", desc:"Single-leg movement building unilateral leg strength and stability. Keep torso upright throughout.", tips:[], images:[],
+  },
+  {
+    id:"good_morning", name:"Good Morning", category:"strength", muscleGroup:"back", icon:"🏋️", baseXP:35,
+    muscles:"Back", desc:"Strength exercise targeting the back. Focus on form and controlled range of motion.", tips:[], images:[],
+  },
+  {
+    id:"hammer_curl", name:"Hammer Curl", category:"strength", muscleGroup:"bicep", icon:"💪", baseXP:35,
+    muscles:"Bicep", desc:"Targets the bicep through a full curl motion. Keep upper arms stationary and squeeze at the top.", tips:[], images:[],
+  },
+  {
+    id:"jumpRope", name:"Jump Rope", category:"cardio", secondaryCategory:"endurance", muscleGroup:"cardio", icon:"⭕", baseXP:50,
+    muscles:"Cardio", desc:"Jump Rope builds cardiovascular endurance and burns calories effectively. Maintain steady pace and controlled breathing.", tips:[], images:[],
+  },
+  {
+    id:"jump_squat", name:"Jump Squat", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:50,
+    muscles:"Legs", desc:"Squat variation developing lower body strength. Keep chest up, knees tracking over toes.", tips:[], images:[],
+  },
+  {
+    id:"jumping_lunge", name:"Jumping Lunge", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:50,
+    muscles:"Legs", desc:"Single-leg movement building unilateral leg strength and stability. Keep torso upright throughout.", tips:[], images:[],
+  },
+  {
+    id:"kettlebell_thrusters", name:"Kettlebell Thrusters", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:50,
+    muscles:"Legs", desc:"Strength exercise targeting the legs. Focus on form and controlled range of motion.", tips:[], images:[],
+  },
+  {
+    id:"leg_extension", name:"Leg Extension", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:35,
+    muscles:"Legs", desc:"Extension exercise targeting the legs. Full range of motion maximises muscle activation.", tips:[], images:[],
+  },
+  {
+    id:"lying_leg_curl", name:"Lying Leg Curl", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:35,
+    muscles:"Legs", desc:"Targets the legs through a full curl motion. Keep upper arms stationary and squeeze at the top.", tips:[], images:[],
+  },
+  {
+    id:"machine_chest_press", name:"Machine Chest Press", category:"strength", muscleGroup:"chest", icon:"💪", baseXP:50,
+    muscles:"Chest", desc:"Pressing movement targeting the chest. Retract shoulder blades and press through full range of motion.", tips:[], images:[],
+  },
+  {
+    id:"plank", name:"Plank", category:"strength", secondaryCategory:"endurance", muscleGroup:"abs", icon:"🧱", baseXP:38,
+    muscles:"Abs", desc:"Core stability exercise building anti-extension strength. Keep body in a rigid straight line.", tips:[], images:[],
+  },
+  {
+    id:"plank_with_shoulder_taps", name:"Plank with Shoulder Taps", category:"strength", secondaryCategory:"endurance", muscleGroup:"abs", icon:"🧱", baseXP:38,
+    muscles:"Abs", desc:"Core stability exercise building anti-extension strength. Keep body in a rigid straight line.", tips:[], images:[],
+  },
+  {
+    id:"rowing_machine", name:"Rowing Machine", category:"cardio", secondaryCategory:"endurance", muscleGroup:"cardio", icon:"🚣", baseXP:50,
+    muscles:"Cardio", desc:"Rowing Machine builds cardiovascular endurance and burns calories effectively. Maintain steady pace and controlled breathing.", tips:[], images:[],
+  },
+  {
+    id:"standing_calf_raise", name:"Standing Calf Raise", category:"strength", muscleGroup:"calves", icon:"🦶", baseXP:35,
+    muscles:"Calves", desc:"Raise movement isolating the calves. Avoid momentum — lift with the target muscle.", tips:[], images:[],
+  },
+
+  // ── Prebuilt Workout Additions ─────────────────────────────────
+  {
+    id:"nordic_hamstring_curl", name:"Nordic Hamstring Curl", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:50,
+    muscles:"Hamstrings", desc:"Partner or machine-assisted eccentric hamstring exercise. Kneel and slowly lower your torso forward, controlling the descent with your hamstrings.", tips:[], images:[],
+  },
+  {
+    id:"sissy_squat", name:"Sissy Squat", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:40,
+    muscles:"Quads, VMO", desc:"Quad isolation exercise. Lean back while bending knees, keeping hips extended. Use a sissy squat bench or hold a support for balance.", tips:[], images:[],
+  },
+  {
+    id:"battle_ropes", name:"Battle Ropes", category:"cardio", muscleGroup:"cardio", icon:"🪢", baseXP:40,
+    muscles:"Shoulders, Arms, Core", desc:"Alternating wave slams with heavy ropes. Keep a slight squat stance and generate waves from your shoulders.", tips:[], images:[],
+  },
+  {
+    id:"jump_rope_double_unders", name:"Jump Rope (Double Unders)", category:"cardio", muscleGroup:"cardio", icon:"⏫", baseXP:45,
+    muscles:"Calves, Shoulders, Cardiovascular", desc:"Advanced jump rope variation where the rope passes under your feet twice per jump. Requires fast wrist rotation and higher jump.", tips:[], images:[],
+  },
+ 
+  {
+    id:"roundhouse_kick", name:"Roundhouse Kick", category:"cardio", muscleGroup:"cardio", icon:"🦶", baseXP:30,
+    muscles:"Hips, Core, Legs", desc:"Rotational kick from a fighting stance. Pivot on the standing foot, rotate hips, and strike with the shin or instep.", tips:[], images:[],
+  },
+ 
+  {
+    id:"hip_90_90_stretch", name:"Hip 90/90 Stretch", category:"flexibility", muscleGroup:"legs", icon:"🧘", baseXP:20,
+    muscles:"Hips (Internal/External Rotation)", desc:"Sit with both legs at 90-degree angles. Rotate between internal and external hip positions. Improves hip mobility.", tips:[], images:[],
+  },
+  {
+    id:"frog_pump", name:"Frog Pump", category:"strength", muscleGroup:"glutes", icon:"🍑", baseXP:30,
+    muscles:"Glutes", desc:"Lie on your back with soles of feet together, knees out. Bridge up and squeeze glutes at the top. Great glute activation drill.", tips:[], images:[],
+  },
+  {
+    id:"prone_y_raise", name:"Prone Y-Raise", category:"strength", muscleGroup:"shoulder", icon:"🏋️", baseXP:25,
+    muscles:"Lower Traps, Rear Delts, Scapular Stabilizers", desc:"Lie face-down on an incline bench. Raise arms in a Y shape with thumbs up. Targets scapular health and upper back.", tips:[], images:[],
+  },
+  {
+    id:"dumbbell_curl_to_press", name:"Dumbbell Curl to Press", category:"strength", muscleGroup:"shoulder", icon:"💪", baseXP:45,
+    muscles:"Biceps, Shoulders", desc:"Curl dumbbells to shoulders then press overhead. A compound movement combining bicep curl with shoulder press.", tips:[], images:[],
+  },
+  {
+    id:"cable_pullover", name:"Cable Pullover", category:"strength", muscleGroup:"back", icon:"🏋️", baseXP:35,
+    muscles:"Lats, Serratus Anterior", desc:"Stand facing away from a high cable. Pull the bar down in an arc from overhead to your thighs, keeping arms mostly straight.", tips:[], images:[],
+  },
+  {
+    id:"thoracic_spine_rotation", name:"Thoracic Spine Rotation", category:"flexibility", muscleGroup:"back", icon:"🧘", baseXP:20,
+    muscles:"Thoracic Spine, Obliques", desc:"On hands and knees, place one hand behind your head and rotate that elbow toward the ceiling. Improves mid-back mobility.", tips:[], images:[],
+  },
+  {
+    id:"pigeon_stretch", name:"Pigeon Stretch", category:"flexibility", muscleGroup:"glutes", icon:"🧘", baseXP:20,
+    muscles:"Glutes, Hip Flexors, Piriformis", desc:"From a lunge position, lower your front shin to the floor. Extend the rear leg back. Deep hip opener targeting the glutes.", tips:[], images:[],
+  },
+  {
+    id:"childs_pose", name:"Child's Pose", category:"flexibility", muscleGroup:"back", icon:"🧘", baseXP:15,
+    muscles:"Lower Back, Lats, Shoulders", desc:"Kneel and sit back on your heels. Reach arms forward on the floor. A restorative stretch for the back and shoulders.", tips:[], images:[],
+  },
+  {
+    id:"foam_rolling", name:"Foam Rolling", category:"flexibility", muscleGroup:"legs", icon:"🧘", baseXP:20,
+    muscles:"Full Body (Soft Tissue)", desc:"Self-myofascial release using a foam roller. Roll slowly over tight areas including quads, IT band, lats, and thoracic spine.", tips:[], images:[],
+  },
+  {
+    id:"cat_cow_stretch", name:"Cat-Cow Stretch", category:"flexibility", muscleGroup:"back", icon:"🧘", baseXP:15,
+    muscles:"Spine, Core", desc:"On hands and knees, alternate between arching (cow) and rounding (cat) your spine. Warms up the entire spinal column.", tips:[], images:[],
+  },
+  {
+    id:"wall_sit", name:"Wall Sit", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:30,
+    muscles:"Quads, Glutes", desc:"Lean against a wall with thighs parallel to the floor. Hold the position. An isometric leg endurance exercise.", tips:[], images:[],
+    secondaryCategory:"endurance",
+  },
+ 
+ 
+  {
+    id:"high_knees", name:"High Knees", category:"cardio", muscleGroup:"cardio", icon:"🏃", baseXP:30,
+    muscles:"Hip Flexors, Quads, Core", desc:"Run in place driving knees as high as possible. A high-intensity cardio drill that builds speed and agility.", tips:[], images:[],
+  },
+  {
+    id:"jumping_jacks", name:"Jumping Jacks", category:"cardio", muscleGroup:"cardio", icon:"⭐", baseXP:20,
+    muscles:"Full Body, Cardiovascular", desc:"Jump feet apart while raising arms overhead, then return. A classic warm-up and cardio exercise.", tips:[], images:[],
+  },
+  {
+    id:"wide_push_up", name:"Wide Push-Up", category:"strength", muscleGroup:"chest", icon:"💪", baseXP:30,
+    muscles:"Chest, Shoulders", desc:"Push-up with hands placed wider than shoulder width. Increases chest activation compared to standard push-ups.", tips:[], images:[],
+  },
+  {
+    id:"diamond_push_up", name:"Diamond Push-Up", category:"strength", muscleGroup:"bicep", icon:"💪", baseXP:40,
+    muscles:"Triceps, Chest", desc:"Push-up with hands close together forming a diamond shape. Heavy tricep emphasis.", tips:[], images:[],
+  },
+  {
+    id:"pike_push_up", name:"Pike Push-Up", category:"strength", muscleGroup:"shoulder", icon:"💪", baseXP:40,
+    muscles:"Shoulders, Triceps", desc:"Push-up with hips raised high in an inverted V position. Targets shoulders similar to an overhead press.", tips:[], images:[],
+  },
+  {
+    id:"reverse_fly", name:"Reverse Fly", category:"strength", muscleGroup:"shoulder", icon:"🏋️", baseXP:30,
+    muscles:"Rear Delts, Rhomboids", desc:"Bend over and raise dumbbells out to the sides. Targets the rear deltoids and upper back.", tips:[], images:[],
+  },
+  {
+    id:"reverse_curl", name:"Reverse Curl", category:"strength", muscleGroup:"forearm", icon:"💪", baseXP:30,
+    muscles:"Forearms, Brachioradialis", desc:"Curl a barbell or EZ bar with palms facing down. Emphasizes the forearms and brachioradialis.", tips:[], images:[],
+  },
+  {
+    id:"skull_crushers", name:"Skull Crushers", category:"strength", muscleGroup:"bicep", icon:"💪", baseXP:40,
+    muscles:"Triceps", desc:"Lie on a bench and lower an EZ bar toward your forehead, then extend. A classic tricep isolation exercise.", tips:[], images:[],
+  },
+ 
+  {
+    id:"incline_barbell_press", name:"Incline Barbell Press", category:"strength", muscleGroup:"chest", icon:"💪", baseXP:50,
+    muscles:"Upper Chest, Shoulders, Triceps", desc:"Barbell bench press on an incline bench (30-45 degrees). Targets the upper portion of the chest.", tips:[], images:[],
+  },
+  {
+    id:"burpees", name:"Burpees", category:"cardio", muscleGroup:"cardio", icon:"🔥", baseXP:45,
+    muscles:"Full Body", desc:"Drop to a push-up, jump feet in, then explode upward. A full-body conditioning exercise that builds endurance and power.", tips:[], images:[],
+  },
+  {
+    id:"dumbbell_close_grip_press", name:"Dumbbell Close-Grip Press", category:"strength", muscleGroup:"bicep", icon:"💪", baseXP:35,
+    muscles:"Triceps, Chest", desc:"Press dumbbells with elbows tucked close to the body. Shifts emphasis from chest to triceps.", tips:[], images:[],
+  },
+  {
+    id:"dumbbell_upright_row", name:"Dumbbell Upright Row", category:"strength", muscleGroup:"shoulder", icon:"🏋️", baseXP:35,
+    muscles:"Shoulders, Traps", desc:"Pull dumbbells up along your body with elbows high. Targets the lateral deltoids and upper traps.", tips:[], images:[],
+  },
+ 
+  {
+    id:"reverse_lunge", name:"Reverse Lunge", category:"strength", muscleGroup:"legs", icon:"🦵", baseXP:35,
+    muscles:"Quads, Glutes, Hamstrings", desc:"Step backward into a lunge position, then drive back up. Easier on the knees than forward lunges.", tips:[], images:[],
+  },
+  {
+    id:"hyperextension", name:"Hyperextension", category:"strength", muscleGroup:"back", icon:"🏋️", baseXP:30,
+    muscles:"Lower Back, Glutes, Hamstrings", desc:"Lie face down on a hyperextension bench and raise your torso. Strengthens the posterior chain.", tips:[], images:[],
+  },
+  {
+    id:"dumbbell_tricep_kickback", name:"Dumbbell Tricep Kickback", category:"strength", muscleGroup:"bicep", icon:"💪", baseXP:30,
+    muscles:"Triceps", desc:"Bend over with elbow at 90 degrees and extend the dumbbell behind you. Squeeze at full extension.", tips:[], images:[],
+  },
+  {
+    id:"jab_cross", name:"Jab-Cross Combo", category:"cardio", muscleGroup:"cardio", icon:"🥊", baseXP:25,
+    muscles:"Shoulders, Core", desc:"Basic boxing combination. Lead hand jab followed by rear hand cross. Focus on rotation and speed.", tips:[], images:[],
+  },
+  {
+    id:"front_kick", name:"Front Kick", category:"cardio", muscleGroup:"cardio", icon:"🦶", baseXP:25,
+    muscles:"Quads, Hip Flexors, Core", desc:"Drive your knee up and extend your foot forward in a push kick. Alternate legs.", tips:[], images:[],
+  },
+  {
+    id:"hook", name:"Hook Punch", category:"cardio", muscleGroup:"cardio", icon:"🥊", baseXP:25,
+    muscles:"Obliques, Shoulders, Core", desc:"Circular punch targeting the side of an opponent. Rotate your hips and core for power.", tips:[], images:[],
+  },
+]
+const EX_BY_ID = Object.fromEntries(EXERCISES.map(e=>[e.id,e]));
+
+// ═══════════════════════════════════════════════════════════════════
+// PHASE 1 — Iconify Exercise Icons (SVG API)
+// Uses Iconify's SVG API to render icons as plain <img> tags.
+// No web component, no JS runtime, no font files — just HTTP-cached SVGs.
+// Works on iOS Safari, Android, every desktop browser, everywhere.
+// Primary sets: game-icons (RPG-themed), mdi (fitness)
+// Browse: https://icon-sets.iconify.design
+// ═══════════════════════════════════════════════════════════════════
+
+// MUSCLE_COLORS defined in color section below — referenced by getExIconColor
+const CAT_ICON_COLORS = {
+  strength:"#e05555", cardio:"#2ecc71", flexibility:"#9b59b6", endurance:"#3498db",
+};
+
+const NAME_ICON_MAP = [
+  // CHEST
+  [/bench press|chest press|floor press/i,         "game-icons:weight-lifting-up"],
+  [/push.?up|press.?up/i,                          "game-icons:push"],
+  [/dip\b/i,                                       "game-icons:muscle-up"],
+  [/fly|flye|pec.?dec|cable cross/i,               "game-icons:eagle-emblem"],
+  [/chest/i,                                       "game-icons:chest-armor"],
+  // BACK
+  [/pull.?up|chin.?up/i,                           "game-icons:muscle-up"],
+  [/lat pull|pulldown/i,                           "game-icons:weight-lifting-down"],
+  [/row|bent.?over|pendlay|t.?bar/i,               "game-icons:weight-lifting-up"],
+  [/deadlift|rack pull/i,                          "game-icons:weight-lifting-up"],
+  [/shrug|trap/i,                                  "game-icons:shoulder-armor"],
+  [/face pull/i,                                   "game-icons:muscle-fat"],
+  [/back ext/i,                                    "game-icons:back-pain"],
+  // SHOULDERS
+  [/overhead|ohp|military|shoulder press/i,        "game-icons:weight-lifting-up"],
+  [/lateral raise|side raise/i,                    "game-icons:wingspan"],
+  [/front raise/i,                                 "game-icons:wingfoot"],
+  [/rear delt|reverse fly/i,                       "game-icons:eagle-emblem"],
+  [/shoulder/i,                                    "game-icons:shoulder-armor"],
+  // ARMS
+  [/bicep|curl|preacher|hammer curl|concentration/i, "game-icons:biceps"],
+  [/tricep|skull crush|push.?down|kick.?back/i,     "game-icons:fist"],
+  [/wrist curl|forearm|grip/i,                       "game-icons:grab"],
+  // LEGS
+  [/squat|goblet|hack squat|front squat/i,         "game-icons:leg-armor"],
+  [/lunge|split squat|bulgarian|step.?up/i,        "game-icons:boot-stomp"],
+  [/leg press/i,                                   "game-icons:leg-armor"],
+  [/leg curl|hamstring|rdl|romanian/i,             "game-icons:leg"],
+  [/leg ext|quad/i,                                "game-icons:leg-armor"],
+  [/calf|soleus|gastro/i,                          "game-icons:boot-stomp"],
+  [/hip thrust|glute|bridge|kickback/i,            "game-icons:muscle-fat"],
+  // CORE
+  [/plank|hollow|dead bug|l.?sit/i,                "game-icons:stone-block"],
+  [/crunch|sit.?up|ab.?wheel|v.?up/i,             "game-icons:abdominal-armor"],
+  [/twist|wood.?chop|rotation|oblique/i,           "game-icons:spinning-sword"],
+  [/hang.?raise|leg raise|knee raise/i,            "game-icons:muscle-up"],
+  [/core|ab\b/i,                                   "game-icons:abdominal-armor"],
+  // CARDIO
+  [/sprint/i,                                      "game-icons:running-ninja"],
+  [/run|jog|treadmill/i,                           "game-icons:run"],
+  [/cycl|bike|spin|peloton/i,                      "mdi:bike"],
+  [/swim|pool|lap|stroke/i,                        "game-icons:swimming"],
+  [/row|erg|concept/i,                             "game-icons:rowing"],
+  [/jump rope|skipping/i,                          "game-icons:jump-across"],
+  [/jump|box jump|plyo|burpee/i,                   "game-icons:jump-across"],
+  [/stair|stepper|step mill/i,                     "game-icons:stairs-goal"],
+  [/hike|incline walk|mountain/i,                  "game-icons:mountain-climbing"],
+  [/walk|march/i,                                  "game-icons:walk"],
+  [/elliptical|cross.?train/i,                     "game-icons:run"],
+  [/battle rope|wave/i,                            "game-icons:lasso"],
+  [/ski/i,                                         "game-icons:ski-boot"],
+  [/sled/i,                                        "game-icons:push"],
+  // FLEXIBILITY
+  [/yoga|sun salut|warrior pose|vinyasa/i,         "game-icons:meditation"],
+  [/stretch|mobility|foam roll|pigeon/i,           "game-icons:body-balance"],
+  [/lotus|meditation/i,                            "game-icons:lotus-flower"],
+  // EQUIPMENT
+  [/kettlebell|kb swing|clean.*press/i,            "game-icons:kettlebell"],
+  [/ball slam|medicine ball|wall ball/i,           "game-icons:bowling-strike"],
+  [/band|resistance|banded/i,                      "game-icons:chain"],
+  [/cable|machine/i,                               "game-icons:gear-hammer"],
+  [/bar hang|farmer|carry/i,                       "game-icons:grab"],
+  [/muscle.?up/i,                                  "game-icons:muscle-up"],
+  [/clean.?and.?jerk|snatch|power clean/i,         "game-icons:weight-lifting-up"],
+  [/box/i,                                         "game-icons:wooden-crate"],
+  // REST / RECOVERY
+  [/rest day|rest|recovery|off day|deload/i,       "game-icons:camping-tent"],
 ];
 
 export { CLASSES, EXERCISES };

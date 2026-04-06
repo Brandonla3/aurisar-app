@@ -227,16 +227,774 @@ const QUESTS = [
 // ═══════════════════════════════════════════════════════════════════
 const WORKOUT_TEMPLATES = [
   {
-    id: "murph",
-    name: "The Murph",
-    icon: "🎖️",
-    desc: '"The Murph" is a famous CrossFit "Hero" workout, often performed on Memorial Day to honor Navy SEAL Lt. Michael Murphy, who was killed in Afghanistan in 2005. It is an intense, high-volume fitness challenge consisting of a 1-mile run, 100 pull-ups, 200 push-ups, 300 squats, and a final 1-mile run, often completed in a 20lb vest.\n\nIntermediate: Cut the reps in half.',
-    exercises: [
-      { exId:"run",     sets:1,  reps:10, distanceMi:1,  weightLbs:null, durationMin:10, weightPct:100, hrZone:null },
-      { exId:"bodyweight_squat", sets:10, reps:30, distanceMi:null, weightLbs:null, durationMin:null, weightPct:100, hrZone:null },
-      { exId:"pushup",  sets:10, reps:20, distanceMi:null, weightLbs:null, durationMin:null, weightPct:100, hrZone:null },
-      { exId:"pullups", sets:10, reps:10, distanceMi:null, weightLbs:null, durationMin:null, weightPct:100, hrZone:null },
-      { exId:"run",     sets:1,  reps:10, distanceMi:1,  weightLbs:null, durationMin:10, weightPct:100, hrZone:null },
+    id:"murph", name:"The Murph", icon:"🎖️",
+    category:"Full Body", difficulty:"Advanced", equipment:"Bodyweight", aurisarClass:"warlord",
+    targetMuscles:"Full Body", durationMin:60,
+    desc:'"The Murph" is a famous CrossFit Hero workout honoring Navy SEAL Lt. Michael Murphy. 1-mile run, 100 pull-ups, 200 push-ups, 300 squats, and a final 1-mile run.\n\nIntermediate: Cut the reps in half.',
+    exercises:[
+      {exId:"run",sets:1,reps:10,distanceMi:1,weightLbs:null,durationMin:10,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:10,reps:30,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:10,reps:20,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
+      {exId:"pullups",sets:10,reps:10,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
+      {exId:"run",sets:1,reps:10,distanceMi:1,weightLbs:null,durationMin:10,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 1. Iron Press — Beginner Push Day ──
+  {
+    id:"iron_press", name:"Iron Press — Beginner Push Day", icon:"⚔️",
+    category:"Push", difficulty:"Beginner", equipment:"Gym", aurisarClass:"warrior",
+    targetMuscles:"Chest, Shoulders, Triceps", durationMin:45,
+    desc:"Foundation push workout building pressing strength with controlled tempo.",
+    exercises:[
+      {exId:"dumbbell_chest_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"machine_chest_press",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"seated_dumbbell_shoulder_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"tricep_pushdown_with_bar",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lateral_raise",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:2,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 2. Forge Ahead — Intermediate Push Day ──
+  {
+    id:"forge_ahead", name:"Forge Ahead — Intermediate Push Day", icon:"🔥",
+    category:"Push", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Chest, Shoulders, Triceps", durationMin:55,
+    desc:"Higher volume push session with compound and isolation work.",
+    exercises:[
+      {exId:"bench",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"incline_dumbbell_press",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"ohp",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"standing_cable_chest_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lateral_raise",sets:4,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"overhead_cable_triceps_extension_upper",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dips",sets:3,reps:"8-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 3. Warlord's Onslaught — Advanced Push Day ──
+  {
+    id:"warlords_onslaught", name:"Warlord's Onslaught — Advanced Push Day", icon:"⚔️",
+    category:"Push", difficulty:"Advanced", equipment:"Gym", aurisarClass:"warlord",
+    targetMuscles:"Chest, Shoulders, Triceps", durationMin:70,
+    desc:"Heavy compounds with intensity techniques for experienced lifters.",
+    exercises:[
+      {exId:"bench",sets:5,reps:"5-6",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"incline_barbell_press",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"ohp",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_chest_fly",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"arnold_press",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_lateral_raise",sets:4,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"skull_crushers",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dips",sets:3,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 4. Steel Back — Beginner Pull Day ──
+  {
+    id:"steel_back", name:"Steel Back — Beginner Pull Day", icon:"🛡️",
+    category:"Pull", difficulty:"Beginner", equipment:"Gym", aurisarClass:"warrior",
+    targetMuscles:"Back, Biceps, Rear Delts", durationMin:45,
+    desc:"Develop pulling strength with machine and cable assistance.",
+    exercises:[
+      {exId:"lat_pulldown_pronated_grip",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_close_grip_seated_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"face_pull",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_curl",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hammer_curl",sets:2,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 5. Titan's Pull — Intermediate Pull Day ──
+  {
+    id:"titans_pull", name:"Titan's Pull — Intermediate Pull Day", icon:"🛡️",
+    category:"Pull", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Back, Biceps, Rear Delts", durationMin:55,
+    desc:"Compound-heavy pull day with progressive overload focus.",
+    exercises:[
+      {exId:"row",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pullups",sets:4,reps:"6-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_close_grip_seated_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_pullover",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"face_pull",sets:3,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"barbell_curl",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"incline_dumbbell_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 6. Phantom Strike — Advanced Pull Day ──
+  {
+    id:"phantom_strike", name:"Phantom Strike — Advanced Pull Day", icon:"👁️",
+    category:"Pull", difficulty:"Advanced", equipment:"Gym", aurisarClass:"phantom",
+    targetMuscles:"Back, Biceps, Rear Delts, Traps", durationMin:70,
+    desc:"High-intensity pulling with heavy rows and advanced techniques.",
+    exercises:[
+      {exId:"deadlift",sets:4,reps:"5",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pullups",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"row",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_pullover",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"barbell_shrug",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"barbell_preacher_curl",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_curl",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 7. Foundation Legs — Beginner Leg Day ──
+  {
+    id:"foundation_legs", name:"Foundation Legs — Beginner Leg Day", icon:"🦵",
+    category:"Legs", difficulty:"Beginner", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Quads, Hamstrings, Glutes, Calves", durationMin:45,
+    desc:"Build lower body strength with machine-assisted compound movements.",
+    exercises:[
+      {exId:"leg_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"goblet_squat",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"leg_extension",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"lying_leg_curl",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lunge",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"standing_calf_raise",sets:3,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 8. Colosseum Legs — Intermediate Leg Day ──
+  {
+    id:"colosseum_legs", name:"Colosseum Legs — Intermediate Leg Day", icon:"🦵",
+    category:"Legs", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Quads, Hamstrings, Glutes, Calves", durationMin:60,
+    desc:"Barbell-focused leg training with quad and hamstring balance.",
+    exercises:[
+      {exId:"squat",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"stiff_legged_deadlift",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"leg_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bulgarian_split_squat",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"seated_leg_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"standing_calf_raise",sets:4,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"leg_extension",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 9. Titan's Stance — Advanced Leg Day ──
+  {
+    id:"titans_stance", name:"Titan's Stance — Advanced Leg Day", icon:"🦵",
+    category:"Legs", difficulty:"Advanced", equipment:"Gym", aurisarClass:"warlord",
+    targetMuscles:"Quads, Hamstrings, Glutes, Calves", durationMin:75,
+    desc:"Powerlifting-inspired leg session with high intensity and volume.",
+    exercises:[
+      {exId:"squat",sets:5,reps:"5",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"front_squat",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"stiff_legged_deadlift",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hack_squat_machine",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lunge",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"nordic_hamstring_curl",sets:3,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"seated_calf_raise",sets:4,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"leg_extension",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 10. Homefront Upper — Push/Pull Hybrid ──
+  {
+    id:"homefront_upper", name:"Homefront Upper — Push/Pull Hybrid", icon:"🏠",
+    category:"Upper Body", difficulty:"Intermediate", equipment:"Home Gym", aurisarClass:"warden",
+    targetMuscles:"Chest, Back, Shoulders, Arms", durationMin:50,
+    desc:"Dumbbell-only upper body session for home gym warriors.",
+    exercises:[
+      {exId:"dumbbell_floor_press",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_row",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_shoulder_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_chest_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_rear_delt_row",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_tricep_kickback",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 11. Homefront Lower — Dumbbell Leg Day ──
+  {
+    id:"homefront_lower", name:"Homefront Lower — Dumbbell Leg Day", icon:"🏠",
+    category:"Lower Body", difficulty:"Intermediate", equipment:"Home Gym", aurisarClass:"warden",
+    targetMuscles:"Quads, Hamstrings, Glutes, Calves", durationMin:45,
+    desc:"Effective lower body training with dumbbells at home.",
+    exercises:[
+      {exId:"goblet_squat",sets:4,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_romanian_deadlift",sets:4,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lunge",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"step_up",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_squat",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"standing_calf_raise",sets:3,reps:"15 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"glute_bridge",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 12. Shadow Press — Bodyweight Push ──
+  {
+    id:"shadow_press", name:"Shadow Press — Bodyweight Push", icon:"🤸",
+    category:"Push", difficulty:"Beginner", equipment:"Bodyweight", aurisarClass:"phantom",
+    targetMuscles:"Chest, Shoulders, Triceps", durationMin:35,
+    desc:"No equipment needed. Master your bodyweight with pressing patterns.",
+    exercises:[
+      {exId:"pushup",sets:4,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"diamond_push_up",sets:3,reps:"8-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pike_push_up",sets:3,reps:"8-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"wide_push_up",sets:3,reps:"10-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bench_dip",sets:3,reps:"10-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank_to_push_up",sets:3,reps:"8 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 13. Anvil Chest — Chest Blast ──
+  {
+    id:"anvil_chest", name:"Anvil Chest — Chest Blast", icon:"💪",
+    category:"Chest", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warrior",
+    targetMuscles:"Chest (Upper, Mid, Lower)", durationMin:50,
+    desc:"Hit all three heads of the chest with angles and volume.",
+    exercises:[
+      {exId:"bench",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"incline_dumbbell_press",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"standing_cable_chest_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_chest_fly",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"decline_push_up",sets:3,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"machine_chest_press",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 14. Dragon's Back — Back Attack ──
+  {
+    id:"dragons_back", name:"Dragon's Back — Back Attack", icon:"🐉",
+    category:"Back", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Lats, Rhomboids, Traps, Erectors", durationMin:55,
+    desc:"Width and thickness work for a complete back session.",
+    exercises:[
+      {exId:"pullups",sets:4,reps:"6-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"row",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"lat_pulldown_pronated_grip",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_close_grip_seated_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_row",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"straight_arm_lat_pulldown",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hyperextension",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 15. Crown of Blades — Shoulder Sculpt ──
+  {
+    id:"crown_of_blades", name:"Crown of Blades — Shoulder Sculpt", icon:"👑",
+    category:"Shoulders", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Front, Side, Rear Deltoids", durationMin:50,
+    desc:"All three delt heads trained with compounds and isolations.",
+    exercises:[
+      {exId:"ohp",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lateral_raise",sets:4,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"face_pull",sets:3,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"arnold_press",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_lateral_raise",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_front_raise",sets:2,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 16. Gauntlet Arms — Biceps & Triceps ──
+  {
+    id:"gauntlet_arms", name:"Gauntlet Arms — Biceps & Triceps", icon:"🤜",
+    category:"Arms", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Biceps, Triceps, Forearms", durationMin:45,
+    desc:"Dedicated arm day with balanced bi/tri volume.",
+    exercises:[
+      {exId:"barbell_curl",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"skull_crushers",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hammer_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"tricep_pushdown_with_bar",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"incline_dumbbell_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"overhead_cable_triceps_extension_upper",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_curl",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 17. Siege Engine — Quad Crusher ──
+  {
+    id:"siege_engine", name:"Siege Engine — Quad Crusher", icon:"🏰",
+    category:"Legs", difficulty:"Advanced", equipment:"Gym", aurisarClass:"warlord",
+    targetMuscles:"Quads, VMO", durationMin:55,
+    desc:"Quad-dominant leg day to build massive frontal thigh development.",
+    exercises:[
+      {exId:"front_squat",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hack_squat_machine",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"leg_extension",sets:4,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lunge",sets:3,reps:"12 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"sissy_squat",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"wall_sit",sets:3,reps:"45-60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 18. Warden's Pillars — Hamstring & Glute Focus ──
+  {
+    id:"wardens_pillars", name:"Warden's Pillars — Hamstring & Glute Focus", icon:"🏛️",
+    category:"Glutes", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Hamstrings, Glutes", durationMin:50,
+    desc:"Posterior chain emphasis for strength and aesthetics.",
+    exercises:[
+      {exId:"stiff_legged_deadlift",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hip_thrust",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"seated_leg_curl",sets:4,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_pull_through",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"glute_bridge",sets:3,reps:"12 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"good_morning",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_hyperextension",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 19. Oracle's Core — Ab Destroyer ──
+  {
+    id:"oracles_core", name:"Oracle's Core — Ab Destroyer", icon:"🔮",
+    category:"Core", difficulty:"Intermediate", equipment:"Bodyweight", aurisarClass:"oracle",
+    targetMuscles:"Abs, Obliques, Transverse Abdominis", durationMin:30,
+    desc:"Targeted core session with no equipment needed.",
+    exercises:[
+      {exId:"plank",sets:3,reps:"45-60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bicycle_crunch",sets:3,reps:"20 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"lying_leg_raise",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"russian_twist",sets:3,reps:"15 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"mountain_climbers",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dead_bug",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"side_plank",sets:3,reps:"30s each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 20. Hearthfire Chest — Home Chest & Triceps ──
+  {
+    id:"hearthfire_chest", name:"Hearthfire Chest — Home Chest & Triceps", icon:"🏠",
+    category:"Chest", difficulty:"Beginner", equipment:"Home Gym", aurisarClass:"warrior",
+    targetMuscles:"Chest, Triceps", durationMin:40,
+    desc:"Effective chest training with just dumbbells and bodyweight.",
+    exercises:[
+      {exId:"dumbbell_floor_press",sets:4,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:4,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_chest_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"diamond_push_up",sets:3,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_pullover",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bench_dip",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 21. Hearthfire Back — Home Back & Biceps ──
+  {
+    id:"hearthfire_back", name:"Hearthfire Back — Home Back & Biceps", icon:"🏠",
+    category:"Back", difficulty:"Beginner", equipment:"Home Gym", aurisarClass:"warden",
+    targetMuscles:"Back, Biceps", durationMin:40,
+    desc:"Home dumbbell back session. Pull-up bar optional.",
+    exercises:[
+      {exId:"dumbbell_row",sets:4,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_rear_delt_row",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hammer_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"superman_raise",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pullups",sets:3,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 22. Ember Shoulders — Home Shoulder Builder ──
+  {
+    id:"ember_shoulders", name:"Ember Shoulders — Home Shoulder Builder", icon:"🏠",
+    category:"Shoulders", difficulty:"Intermediate", equipment:"Home Gym", aurisarClass:"gladiator",
+    targetMuscles:"All Deltoid Heads", durationMin:40,
+    desc:"Dumbbell shoulder session hitting all three heads at home.",
+    exercises:[
+      {exId:"dumbbell_shoulder_press",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lateral_raise",sets:4,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_front_raise",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_rear_delt_row",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"arnold_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_upright_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 23. Ember Arms — Home Arm Pump ──
+  {
+    id:"ember_arms", name:"Ember Arms — Home Arm Pump", icon:"🏠",
+    category:"Arms", difficulty:"Beginner", equipment:"Home Gym", aurisarClass:"warrior",
+    targetMuscles:"Biceps, Triceps", durationMin:35,
+    desc:"Dumbbell-only arm day you can do in your living room.",
+    exercises:[
+      {exId:"dumbbell_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_tricep_kickback",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hammer_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_standing_triceps_extension",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"concentration_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_close_grip_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 24. Throne Builder — Glute Specialization ──
+  {
+    id:"throne_builder", name:"Throne Builder — Glute Specialization", icon:"🍑",
+    category:"Glutes", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Glutes (Maximus, Medius, Minimus)", durationMin:50,
+    desc:"Glute-dominant session for building strength and shape.",
+    exercises:[
+      {exId:"hip_thrust",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"sumo_deadlift",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bulgarian_split_squat",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_glute_kickback",sets:3,reps:"12-15 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"lateral_walk_with_band",sets:3,reps:"15 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"frog_pump",sets:3,reps:"20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 25. Bastion Core — Calf & Core Combo ──
+  {
+    id:"bastion_core", name:"Bastion Core — Calf & Core Combo", icon:"🧱",
+    category:"Core", difficulty:"Beginner", equipment:"Gym", aurisarClass:"oracle",
+    targetMuscles:"Calves, Abs, Obliques", durationMin:35,
+    desc:"Often-neglected calves paired with a solid core circuit.",
+    exercises:[
+      {exId:"standing_calf_raise",sets:4,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"seated_calf_raise",sets:3,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hanging_leg_raise",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_crunch",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:3,reps:"45s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"kneeling_ab_wheel_roll_out",sets:3,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 26. Sentinel Posture — Rear Delt & Upper Back ──
+  {
+    id:"sentinel_posture", name:"Sentinel Posture — Rear Delt & Upper Back", icon:"🛡️",
+    category:"Back", difficulty:"Beginner", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Rear Delts, Rhomboids, Mid Traps", durationMin:35,
+    desc:"Posture-correcting workout targeting the upper back.",
+    exercises:[
+      {exId:"face_pull",sets:4,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"cable_close_grip_seated_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"band_pull_apart",sets:3,reps:"20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_rear_delt_row",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"prone_y_raise",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 27. Long Road — Steady State Cardio ──
+  {
+    id:"long_road", name:"Long Road — Steady State Cardio", icon:"🛤️",
+    category:"Cardio", difficulty:"Beginner", equipment:"Gym", aurisarClass:"druid",
+    targetMuscles:"Cardiovascular System, Legs", durationMin:40,
+    desc:"Zone 2 steady-state cardio for endurance and recovery.",
+    exercises:[
+      {exId:"treadmill_walk",sets:1,reps:20,distanceMi:null,weightLbs:null,durationMin:20,weightPct:100,hrZone:2},
+      {exId:"elliptical",sets:1,reps:10,distanceMi:null,weightLbs:null,durationMin:10,weightPct:100,hrZone:2},
+      {exId:"stationary_bike",sets:1,reps:10,distanceMi:null,weightLbs:null,durationMin:10,weightPct:100,hrZone:2},
+    ],
+  },
+  // ── 28. Tempest Sprint — HIIT Sprints ──
+  {
+    id:"tempest_sprint", name:"Tempest Sprint — HIIT Sprints", icon:"⚡",
+    category:"HIIT", difficulty:"Advanced", equipment:"Gym", aurisarClass:"tempest",
+    targetMuscles:"Full Body, Cardiovascular", durationMin:25,
+    desc:"High intensity sprint intervals for maximum calorie burn.",
+    exercises:[
+      {exId:"treadmill_run",sets:8,reps:"30s sprint",distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:5},
+      {exId:"battle_ropes",sets:4,reps:"30s",distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
+      {exId:"box_jump",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 29. Inferno Protocol — Tabata Bodyweight ──
+  {
+    id:"inferno_protocol", name:"Inferno Protocol — Tabata Bodyweight", icon:"🔥",
+    category:"HIIT", difficulty:"Intermediate", equipment:"Bodyweight", aurisarClass:"tempest",
+    targetMuscles:"Full Body", durationMin:25,
+    desc:"Classic Tabata: 20s work, 10s rest, 8 rounds per exercise.",
+    exercises:[
+      {exId:"burpees",sets:8,reps:"20s on",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"mountain_climbers",sets:8,reps:"20s on",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jump_squat",sets:8,reps:"20s on",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"high_knees",sets:8,reps:"20s on",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:8,reps:"20s on",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 30. War Drum EMOM ──
+  {
+    id:"war_drum_emom", name:"War Drum EMOM — Every Minute on the Minute", icon:"🥁",
+    category:"HIIT", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"tempest",
+    targetMuscles:"Full Body", durationMin:30,
+    desc:"Perform reps at the top of every minute. Rest remaining time.",
+    exercises:[
+      {exId:"kettlebell_swing",sets:5,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:5,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"goblet_squat",sets:5,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"burpees",sets:5,reps:"8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:5,reps:"40s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 31. Crucible AMRAP ──
+  {
+    id:"crucible_amrap", name:"Crucible AMRAP — As Many Rounds As Possible", icon:"🔥",
+    category:"HIIT", difficulty:"Advanced", equipment:"Bodyweight", aurisarClass:"tempest",
+    targetMuscles:"Full Body", durationMin:20,
+    desc:"20 minutes, as many rounds as possible. Track your score.",
+    exercises:[
+      {exId:"burpees",sets:1,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:1,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:1,reps:"20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"sit_up",sets:1,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jumping_lunge",sets:1,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 32. Rope Storm — Jump Rope HIIT ──
+  {
+    id:"rope_storm", name:"Rope Storm — Jump Rope HIIT", icon:"⚡",
+    category:"HIIT", difficulty:"Intermediate", equipment:"Home Gym", aurisarClass:"phantom",
+    targetMuscles:"Calves, Shoulders, Cardiovascular", durationMin:25,
+    desc:"Jump rope intervals mixed with bodyweight exercises.",
+    exercises:[
+      {exId:"jumpRope",sets:1,reps:2,distanceMi:null,weightLbs:null,durationMin:2,weightPct:100,hrZone:null},
+      {exId:"high_knees",sets:5,reps:"45s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:5,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jump_rope_double_unders",sets:5,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 33. Iron Oar — Rowing Machine Intervals ──
+  {
+    id:"iron_oar", name:"Iron Oar — Rowing Machine Intervals", icon:"🚣",
+    category:"Cardio", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Back, Legs, Arms, Cardiovascular", durationMin:30,
+    desc:"Rowing intervals for full-body conditioning.",
+    exercises:[
+      {exId:"rowing_machine",sets:1,reps:5,distanceMi:null,weightLbs:null,durationMin:5,weightPct:100,hrZone:2},
+      {exId:"rowing_machine",sets:6,reps:"500m",distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:4},
+      {exId:"rowing_machine",sets:1,reps:5,distanceMi:null,weightLbs:null,durationMin:5,weightPct:100,hrZone:1},
+    ],
+  },
+  // ── 34. Alchemist's Forge — Metabolic Conditioning ──
+  {
+    id:"alchemists_forge", name:"Alchemist's Forge — Metabolic Conditioning", icon:"⚗️",
+    category:"HIIT", difficulty:"Advanced", equipment:"Gym", aurisarClass:"tempest",
+    targetMuscles:"Full Body", durationMin:40,
+    desc:"Strength-cardio hybrid that keeps your heart rate elevated throughout.",
+    exercises:[
+      {exId:"kettlebell_swing",sets:4,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"kettlebell_thrusters",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"renegade_row",sets:4,reps:"8 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"box_jump",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"farmers_walk",sets:4,reps:"30 yards",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"burpees",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 35. Phantom Dance — Cardio Kickboxing ──
+  {
+    id:"phantom_dance", name:"Phantom Dance — Cardio Kickboxing", icon:"🥊",
+    category:"Cardio", difficulty:"Beginner", equipment:"Bodyweight", aurisarClass:"phantom",
+    targetMuscles:"Full Body, Core", durationMin:35,
+    desc:"Punching and kicking combos for fun, stress-relieving cardio.",
+    exercises:[
+      {exId:"jab_cross",sets:3,reps:"60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"front_kick",sets:3,reps:"60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hook",sets:3,reps:"60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"roundhouse_kick",sets:3,reps:"60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jab_cross",sets:3,reps:"60s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"high_knees",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 36. Summit Climb — Stairmaster Endurance ──
+  {
+    id:"summit_climb", name:"Summit Climb — Stairmaster Endurance", icon:"🏔️",
+    category:"Cardio", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Glutes, Quads, Cardiovascular", durationMin:35,
+    desc:"Stairmaster intervals for lower body endurance and cardio.",
+    exercises:[
+      {exId:"stairmaster",sets:1,reps:5,distanceMi:null,weightLbs:null,durationMin:5,weightPct:100,hrZone:2},
+      {exId:"stairmaster",sets:5,reps:2,distanceMi:null,weightLbs:null,durationMin:2,weightPct:100,hrZone:4},
+      {exId:"stairmaster",sets:3,reps:2,distanceMi:null,weightLbs:null,durationMin:2,weightPct:100,hrZone:3},
+      {exId:"stairmaster",sets:1,reps:5,distanceMi:null,weightLbs:null,durationMin:5,weightPct:100,hrZone:1},
+    ],
+  },
+  // ── 37. Clash of Steel — Chest & Back Superset ──
+  {
+    id:"clash_of_steel", name:"Clash of Steel — Chest & Back Superset", icon:"⚔️",
+    category:"Superset", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Chest, Back", durationMin:50,
+    desc:"Antagonist supersets pairing chest and back movements. No rest between paired exercises.",
+    exercises:[
+      {exId:"bench",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:1},
+      {exId:"row",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:0},
+      {exId:"incline_dumbbell_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:3},
+      {exId:"lat_pulldown_pronated_grip",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:2},
+      {exId:"standing_cable_chest_fly",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:5},
+      {exId:"cable_close_grip_seated_row",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:4},
+    ],
+  },
+  // ── 38. Forge & Anvil — Biceps & Triceps Superset ──
+  {
+    id:"forge_and_anvil", name:"Forge & Anvil — Biceps & Triceps Superset", icon:"🔨",
+    category:"Superset", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Biceps, Triceps", durationMin:40,
+    desc:"Antagonist arm supersets for maximum pump.",
+    exercises:[
+      {exId:"barbell_curl",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:1},
+      {exId:"skull_crushers",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:0},
+      {exId:"hammer_curl",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:3},
+      {exId:"tricep_pushdown_with_bar",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:2},
+      {exId:"concentration_curl",sets:3,reps:"12 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:5},
+      {exId:"overhead_cable_triceps_extension_upper",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:4},
+    ],
+  },
+  // ── 39. First Light — Full Body Circuit (Beginner) ──
+  {
+    id:"first_light", name:"First Light — Full Body Circuit (Beginner)", icon:"🌅",
+    category:"Circuit", difficulty:"Beginner", equipment:"Bodyweight", aurisarClass:"warden",
+    targetMuscles:"Full Body", durationMin:30,
+    desc:"3 rounds through all exercises. Rest 15s between exercises, 90s between rounds.",
+    exercises:[
+      {exId:"bodyweight_squat",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_row",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"reverse_lunge",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jumping_jacks",sets:3,reps:"30",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 40. Gladiator Circuit — Full Body Advanced ──
+  {
+    id:"gladiator_circuit", name:"Gladiator Circuit — Full Body Advanced", icon:"⚔️",
+    category:"Circuit", difficulty:"Advanced", equipment:"Gym", aurisarClass:"gladiator",
+    targetMuscles:"Full Body", durationMin:45,
+    desc:"5 rounds. Minimal rest. For battle-tested athletes only.",
+    exercises:[
+      {exId:"kettlebell_clean_and_press",sets:5,reps:"5",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pullups",sets:5,reps:"8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"kettlebell_thrusters",sets:5,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"kettlebell_swing",sets:5,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"burpees",sets:5,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:5,reps:"45s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 41. Thunder & Lightning — Upper Body Superset ──
+  {
+    id:"thunder_lightning", name:"Thunder & Lightning — Upper Body Superset", icon:"⛈️",
+    category:"Superset", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warrior",
+    targetMuscles:"Chest, Back, Shoulders, Arms", durationMin:50,
+    desc:"Full upper body trained with superset pairings.",
+    exercises:[
+      {exId:"dumbbell_chest_press",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:1},
+      {exId:"dumbbell_row",sets:4,reps:"8-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:0},
+      {exId:"dumbbell_shoulder_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:3},
+      {exId:"lat_pulldown_pronated_grip",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:2},
+      {exId:"dumbbell_curl",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:5},
+      {exId:"tricep_pushdown_with_bar",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:4},
+      {exId:"dumbbell_lateral_raise",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:7},
+      {exId:"face_pull",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:6},
+    ],
+  },
+  // ── 42. Quake — Leg Superset Destroyer ──
+  {
+    id:"quake", name:"Quake — Leg Superset Destroyer", icon:"💥",
+    category:"Superset", difficulty:"Advanced", equipment:"Gym", aurisarClass:"warlord",
+    targetMuscles:"Quads, Hamstrings, Glutes, Calves", durationMin:55,
+    desc:"Quad-ham and compound-isolation leg supersets.",
+    exercises:[
+      {exId:"squat",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:1},
+      {exId:"lying_leg_curl",sets:4,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:0},
+      {exId:"leg_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:3},
+      {exId:"dumbbell_romanian_deadlift",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:2},
+      {exId:"leg_extension",sets:3,reps:"12-15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:5},
+      {exId:"standing_calf_raise",sets:3,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:4},
+    ],
+  },
+  // ── 43. Tidal Force — Push-Pull Superset ──
+  {
+    id:"tidal_force", name:"Tidal Force — Push-Pull Superset", icon:"🌊",
+    category:"Superset", difficulty:"Intermediate", equipment:"Gym", aurisarClass:"warrior",
+    targetMuscles:"Chest, Back, Shoulders", durationMin:50,
+    desc:"Push and pull movements paired for efficient full upper body work.",
+    exercises:[
+      {exId:"bench",sets:4,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:1},
+      {exId:"pullups",sets:4,reps:"6-10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:0},
+      {exId:"dumbbell_shoulder_press",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:3},
+      {exId:"cable_close_grip_seated_row",sets:3,reps:"10-12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:2},
+      {exId:"dips",sets:3,reps:"AMRAP",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:5},
+      {exId:"face_pull",sets:3,reps:"15-20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:4},
+    ],
+  },
+  // ── 44. Iron Homestead — Dumbbell Only Circuit ──
+  {
+    id:"iron_homestead", name:"Iron Homestead — Dumbbell Only Circuit", icon:"🏠",
+    category:"Circuit", difficulty:"Intermediate", equipment:"Home Gym", aurisarClass:"warden",
+    targetMuscles:"Full Body", durationMin:35,
+    desc:"4 rounds with one pair of dumbbells. No excuses needed.",
+    exercises:[
+      {exId:"kettlebell_thrusters",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_row",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_lunge",sets:4,reps:"8 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_floor_press",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_curl_to_press",sets:4,reps:"8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"renegade_row",sets:4,reps:"6 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 45. Phantom Blaze — Bodyweight Burn ──
+  {
+    id:"phantom_blaze", name:"Phantom Blaze — Bodyweight Burn", icon:"🔥",
+    category:"Circuit", difficulty:"Intermediate", equipment:"Bodyweight", aurisarClass:"phantom",
+    targetMuscles:"Full Body", durationMin:30,
+    desc:"Zero equipment, maximum effort. 4 rounds.",
+    exercises:[
+      {exId:"burpees",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:4,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jump_squat",sets:4,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank_to_push_up",sets:4,reps:"8 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jumping_lunge",sets:4,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"mountain_climbers",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 46. Compound Dominion — Superset Power ──
+  {
+    id:"compound_dominion", name:"Compound Dominion — Superset Power", icon:"👑",
+    category:"Superset", difficulty:"Advanced", equipment:"Gym", aurisarClass:"warlord",
+    targetMuscles:"Full Body", durationMin:60,
+    desc:"Only compound lifts, all supersetted. For serious lifters.",
+    exercises:[
+      {exId:"squat",sets:4,reps:"6",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:1},
+      {exId:"row",sets:4,reps:"6",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:0},
+      {exId:"bench",sets:4,reps:"6",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:3},
+      {exId:"deadlift",sets:4,reps:"5",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:2},
+      {exId:"ohp",sets:3,reps:"8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:5},
+      {exId:"pullups",sets:3,reps:"6-8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null,supersetWith:4},
+    ],
+  },
+  // ── 47. Welcome to Aurisar — Beginner Full Body ──
+  {
+    id:"welcome_aurisar", name:"Welcome to Aurisar — Beginner Full Body", icon:"🌟",
+    category:"Full Body", difficulty:"Beginner", equipment:"Gym", aurisarClass:"warden",
+    targetMuscles:"Full Body", durationMin:45,
+    desc:"Your first workout in Aurisar. Learn the basics, build the foundation.",
+    exercises:[
+      {exId:"goblet_squat",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_chest_press",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"lat_pulldown_pronated_grip",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"seated_dumbbell_shoulder_press",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"leg_press",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"dumbbell_curl",sets:2,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"tricep_pushdown_with_bar",sets:2,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 48. Druid's Rest — Active Recovery & Mobility ──
+  {
+    id:"druids_rest", name:"Druid's Rest — Active Recovery & Mobility", icon:"🌿",
+    category:"Recovery", difficulty:"Beginner", equipment:"Bodyweight", aurisarClass:"druid",
+    targetMuscles:"Full Body (Flexibility & Mobility)", durationMin:30,
+    desc:"Light movement day for recovery. Focus on breathing and range of motion.",
+    exercises:[
+      {exId:"cat_cow_stretch",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"worlds_greatest_stretch",sets:3,reps:"5 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"hip_90_90_stretch",sets:3,reps:"30s each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"thoracic_spine_rotation",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pigeon_stretch",sets:3,reps:"30s each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"childs_pose",sets:3,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"foam_rolling",sets:1,reps:10,distanceMi:null,weightLbs:null,durationMin:10,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 49. Striker's Arena — Athletic Performance ──
+  {
+    id:"strikers_arena", name:"Striker's Arena — Athletic Performance", icon:"🎯",
+    category:"Functional", difficulty:"Advanced", equipment:"Gym", aurisarClass:"phantom",
+    targetMuscles:"Full Body (Power, Agility, Coordination)", durationMin:50,
+    desc:"Functional training for athleticism, explosiveness, and coordination.",
+    exercises:[
+      {exId:"box_jump",sets:4,reps:"8",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"ball_slams",sets:4,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"kettlebell_clean_and_press",sets:4,reps:"5",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"lateral_bound",sets:3,reps:"8 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"single_leg_romanian_deadlift",sets:3,reps:"8 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"farmers_walk",sets:3,reps:"40 yards",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank_with_shoulder_taps",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+    ],
+  },
+  // ── 50. Lightning Round — 20-Min Express Total Body ──
+  {
+    id:"lightning_round", name:"Lightning Round — 20-Min Express Total Body", icon:"⚡",
+    category:"Express", difficulty:"Intermediate", equipment:"Bodyweight", aurisarClass:"tempest",
+    targetMuscles:"Full Body", durationMin:20,
+    desc:"When you only have 20 minutes. No excuses. 4 rounds, 30s each, 10s transition.",
+    exercises:[
+      {exId:"burpees",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"pushup",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"mountain_climbers",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"plank",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"jump_squat",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
     ],
   },
 ];
@@ -399,7 +1157,7 @@ function ensureRestDay(profile) {
 }
 // Zones based on % of max HR (220 - age)
 // Exercises that track a single continuous effort — no "Sets" field
-const NO_SETS_EX_IDS = new Set(["run","walk","cycle_ride","jog","jumprope","swim_lap","stationary_bike","rowing","echo_bike","treadmill_walk","treadmill_run"]);
+const NO_SETS_EX_IDS = new Set(["run","walk","cycle_ride","jog","jumpRope","jumprope","swim_lap","rowing_machine","stationary_bike","rowing","echo_bike","treadmill_walk","treadmill_run","stairmaster","elliptical","battle_ropes","foam_rolling"]);
 // Exercise that tracks Personal Best pace
 const RUNNING_EX_ID = "run";
 
