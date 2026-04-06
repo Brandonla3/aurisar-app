@@ -233,7 +233,7 @@ const WORKOUT_TEMPLATES = [
     desc:'"The Murph" is a famous CrossFit Hero workout honoring Navy SEAL Lt. Michael Murphy. 1-mile run, 100 pull-ups, 200 push-ups, 300 squats, and a final 1-mile run.\n\nIntermediate: Cut the reps in half.',
     exercises:[
       {exId:"run",sets:1,reps:10,distanceMi:1,weightLbs:null,durationMin:10,weightPct:100,hrZone:null},
-      {exId:"air_squat",sets:10,reps:30,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:10,reps:30,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
       {exId:"pushup",sets:10,reps:20,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
       {exId:"pullups",sets:10,reps:10,distanceMi:null,weightLbs:null,durationMin:null,weightPct:100,hrZone:null},
       {exId:"run",sets:1,reps:10,distanceMi:1,weightLbs:null,durationMin:10,weightPct:100,hrZone:null},
@@ -707,7 +707,7 @@ const WORKOUT_TEMPLATES = [
     exercises:[
       {exId:"burpees",sets:1,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"pushup",sets:1,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
-      {exId:"air_squat",sets:1,reps:"20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:1,reps:"20",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"sit_up",sets:1,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"jumping_lunge",sets:1,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
     ],
@@ -818,7 +818,7 @@ const WORKOUT_TEMPLATES = [
     targetMuscles:"Full Body", durationMin:30,
     desc:"3 rounds through all exercises. Rest 15s between exercises, 90s between rounds.",
     exercises:[
-      {exId:"air_squat",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:3,reps:"15",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"pushup",sets:3,reps:"10",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"dumbbell_row",sets:3,reps:"12",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"reverse_lunge",sets:3,reps:"10 each",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
@@ -991,7 +991,7 @@ const WORKOUT_TEMPLATES = [
     exercises:[
       {exId:"burpees",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"pushup",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
-      {exId:"air_squat",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
+      {exId:"bodyweight_squat",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"mountain_climbers",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"plank",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
       {exId:"jump_squat",sets:4,reps:"30s",weightLbs:null,durationMin:null,distanceMi:null,weightPct:100,hrZone:null},
