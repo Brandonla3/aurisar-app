@@ -242,6 +242,8 @@ function App() {
   const [addToWorkoutPicker,setAddToWorkoutPicker] = useState(null); // {exercises} — pick existing workout
   const [workoutSubTab,setWorkoutSubTab] = useState("reusable"); // "reusable"|"oneoff"
   const [collapsedWo,setCollapsedWo] = useState(new Set());
+  const [expandedRecipeDesc,setExpandedRecipeDesc] = useState(new Set()); // which recipe descs are expanded
+  const [recipeFilter,setRecipeFilter] = useState("All"); // recipe category filter
   const [oneOffModal,setOneOffModal] = useState(null); // {exercises, name, icon} — naming step
   // Workout-level optional stats (builder)
   const [wbDuration,setWbDuration]   = useState(""); // HH:MM string
@@ -3982,7 +3984,7 @@ function App() {
                               , React.createElement('span', { className: "workout-tag"}, exCount, " exercise" , exCount!==1?"s":"")
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
                             )
-                            , wo.desc&&React.createElement('div', { className: "workout-desc", style:{marginTop:3}}, wo.desc)
+                            , wo.desc&&React.createElement('div', { className: "workout-desc recipe-desc-collapsed", style:{marginTop:3}}, wo.desc)
                           )
                           , React.createElement('div', { style: {display:"flex",gap:4,flexShrink:0,alignItems:"center"}, onClick: e=>e.stopPropagation() }
                             , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Copy", onClick: ()=>copyWorkout(wo)}, "\u2398")
@@ -4028,7 +4030,7 @@ function App() {
                                     , React.createElement('span', { className: "workout-tag"}, "\u26A1 " , xp.toLocaleString(), " XP" )
                                     , React.createElement('span', { className: `upcoming-badge ${badgeCls}`, style: {marginLeft:4}}, badgeTxt)
                                   )
-                                  , wo.desc&&React.createElement('div', { className: "workout-desc", style:{marginTop:3}}, wo.desc)
+                                  , wo.desc&&React.createElement('div', { className: "workout-desc recipe-desc-collapsed", style:{marginTop:3}}, wo.desc)
                                 )
                                 , React.createElement('div', { style: {display:"flex",gap:4,flexShrink:0,alignItems:"center"}, onClick: e=>e.stopPropagation() }
                                   , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Edit", onClick: ()=>{
@@ -4110,15 +4112,26 @@ function App() {
               );
 
               // ── TEMPLATES ──────────────────────────
-              if(workoutView==="recipes") return (
+              if(workoutView==="recipes") {
+                const RECIPE_CATS = ["All",...[...new Set(WORKOUT_TEMPLATES.map(t=>t.category).filter(Boolean))].sort()];
+                const filteredTpls = recipeFilter==="All" ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t=>t.category===recipeFilter);
+                const DIFF_COLORS = {Beginner:"#2ecc71",Intermediate:"#f1c40f",Advanced:"#e74c3c"};
+                const EQUIP_ICONS = {Gym:"🏋️","Home Gym":"🏠",Bodyweight:"🤸"};
+                return (
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:11}}
+                  , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setWorkoutView("list")}, "← Back" )
                     , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Workout Recipes" )
                     , React.createElement('div', null)
                   )
-                  , WORKOUT_TEMPLATES.map(tpl=>{
+                  /* Category filter bar */
+                  , React.createElement('div', { className: "recipe-filter-bar"}
+                    , RECIPE_CATS.map(cat=>React.createElement('button', { key: cat, className: `recipe-filter-btn ${recipeFilter===cat?"on":""}`, onClick: ()=>setRecipeFilter(cat)}, cat))
+                  )
+                  , filteredTpls.length===0&&React.createElement('div', { className: "empty"}, "No recipes in this category.")
+                  , filteredTpls.map(tpl=>{
                     const xp = tpl.exercises.reduce((t,ex)=>t+calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById),0);
+                    const descExpanded = expandedRecipeDesc.has(tpl.id);
                     return (
                       React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:12}}
                         , React.createElement('div', { className: "workout-card-top"}
@@ -4128,35 +4141,69 @@ function App() {
                             , React.createElement('div', { className: "workout-meta"}
                               , React.createElement('span', { className: "workout-tag"}, tpl.exercises.length, " exercises" )
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
+                              , tpl.durationMin&&React.createElement('span', { className: "workout-tag"}, "⏱ " , tpl.durationMin, "min" )
+                              , tpl.difficulty&&React.createElement('span', { className: "workout-tag", style:{color:DIFF_COLORS[tpl.difficulty]||"#b4ac9e"}}, tpl.difficulty)
+                              , tpl.equipment&&React.createElement('span', { className: "workout-tag"}, EQUIP_ICONS[tpl.equipment]||"", " " , tpl.equipment)
                             )
                           )
                         )
-                        /* Exercise pills */
-                        , React.createElement('div', { className: "workout-ex-pill-row", style: {marginBottom:10}}
-                          , tpl.exercises.map((ex,i)=>{
-                            const exD=allExById[ex.exId];
-                            return exD?React.createElement('span', { key: i, className: "workout-ex-pill"}, exD.icon, " " , exD.name, ex.distanceMi?` · ${ex.distanceMi}mi`:""):null;
-                          })
+                        /* Collapsible Description */
+                        , tpl.desc&&React.createElement('div', { style: {position:"relative",marginBottom:descExpanded?10:4,marginTop:6}}
+                          , React.createElement('div', {
+                            className: descExpanded?"":"recipe-desc-collapsed",
+                            style: {fontSize:".72rem",color:"#8a8478",fontStyle:"italic",lineHeight:1.5,whiteSpace:"pre-line",paddingRight:20}
+                          }, tpl.desc)
+                          , React.createElement('span', {
+                            className: `ex-collapse-btn ${descExpanded?"open":""}`,
+                            style: {position:"absolute",top:0,right:0,fontSize:".7rem",padding:"0 4px",cursor:"pointer"},
+                            onClick: ()=>setExpandedRecipeDesc(s=>{const n=new Set(s);n.has(tpl.id)?n.delete(tpl.id):n.add(tpl.id);return n;})
+                          }, "▼")
                         )
-                        /* Description */
-                        , tpl.desc&&React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",fontStyle:"italic",marginBottom:12,lineHeight:1.6,whiteSpace:"pre-line"}}, tpl.desc)
-                        /* Exercise breakdown */
+                        /* Exercise breakdown with superset grouping */
                         , React.createElement('div', { style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:8,padding:"8px 12px",marginBottom:12}}
-                          , tpl.exercises.map((ex,i)=>{
-                            const exD=allExById[ex.exId]; if(!exD) return null;
-                            const noSets=NO_SETS_EX_IDS.has(ex.exId);
-                            return (
-                              React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:i<tpl.exercises.length-1?"1px solid rgba(45,42,36,.15)":""}}
-                                , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0}}, exD.icon)
-                                , React.createElement('span', { style: {fontSize:".75rem",color:"#d4cec4",flex:1}}, exD.name)
-                                , React.createElement('span', { style: {fontSize:".68rem",color:"#8a8478"}}
-                                  , noSets
-                                    ? `${ex.distanceMi?ex.distanceMi+"mi · ":""}${ex.reps} min`
-                                    : `${ex.sets} × ${ex.reps}`
+                          , (()=>{
+                            const rendered = new Set();
+                            return tpl.exercises.map((ex,i)=>{
+                              if(rendered.has(i)) return null;
+                              const exD=allExById[ex.exId]; if(!exD) return null;
+                              const noSets=NO_SETS_EX_IDS.has(ex.exId);
+                              // Check for superset pair
+                              if(ex.supersetWith!=null && !rendered.has(ex.supersetWith)){
+                                const j = ex.supersetWith;
+                                const exB = tpl.exercises[j];
+                                const exDB = allExById[exB?.exId];
+                                if(exDB){
+                                  rendered.add(i); rendered.add(j);
+                                  const noSetsB = NO_SETS_EX_IDS.has(exB.exId);
+                                  return React.createElement('div', { key: i, className: "recipe-ss-group", style: {borderLeft:"2px solid #C4A044",paddingLeft:8,marginBottom:6,marginTop:i>0?6:0}}
+                                    , React.createElement('div', { style: {fontSize:".58rem",color:"#C4A044",fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}, "🔗 Superset")
+                                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,padding:"3px 0"}}
+                                      , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0}}, exD.icon)
+                                      , React.createElement('span', { style: {fontSize:".75rem",color:"#d4cec4",flex:1}}, exD.name)
+                                      , React.createElement('span', { style: {fontSize:".68rem",color:"#8a8478"}}, noSets?`${ex.reps} min`:`${ex.sets} × ${ex.reps}`)
+                                    )
+                                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,padding:"3px 0"}}
+                                      , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0}}, exDB.icon)
+                                      , React.createElement('span', { style: {fontSize:".75rem",color:"#d4cec4",flex:1}}, exDB.name)
+                                      , React.createElement('span', { style: {fontSize:".68rem",color:"#8a8478"}}, noSetsB?`${exB.reps} min`:`${exB.sets} × ${exB.reps}`)
+                                    )
+                                  );
+                                }
+                              }
+                              rendered.add(i);
+                              return (
+                                React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:i<tpl.exercises.length-1?"1px solid rgba(45,42,36,.15)":""}}
+                                  , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0}}, exD.icon)
+                                  , React.createElement('span', { style: {fontSize:".75rem",color:"#d4cec4",flex:1}}, exD.name)
+                                  , React.createElement('span', { style: {fontSize:".68rem",color:"#8a8478"}}
+                                    , noSets
+                                      ? `${ex.distanceMi?ex.distanceMi+"mi · ":""}${ex.reps} min`
+                                      : `${ex.sets} × ${ex.reps}`
+                                  )
                                 )
-                              )
-                            );
-                          })
+                              );
+                            });
+                          })()
                         )
                         , React.createElement('div', { style: {display:"flex",gap:8}}
                           , React.createElement('button', { className: "btn btn-gold btn-sm"  , style: {flex:1},
@@ -4170,7 +4217,6 @@ function App() {
                           )
                           , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1},
                             onClick: ()=>{
-                              // Open in builder to edit before saving
                               setWbName(tpl.name); setWbIcon(tpl.icon); setWbDesc(tpl.desc);
                               setWbExercises(tpl.exercises.map(e=>({...e}))); setWbEditId(null);
                               setWorkoutView("builder");
@@ -4183,6 +4229,7 @@ function App() {
                   })
                 )
               );
+              }
 
               // ── DETAIL ─────────────────────────────
               if(workoutView==="detail" && activeWorkout) {

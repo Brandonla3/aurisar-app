@@ -724,6 +724,19 @@
     .workout-ex-pill-row{display:flex;gap:4px;flex-wrap:wrap}
     .workout-ex-pill{font-size:.58rem;color:#5a5650;background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);border-radius:4px;padding:2px 6px;white-space:nowrap}
 
+    /* ── Recipe filter bar ── */
+    .recipe-filter-bar{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-ms-overflow-style:none}
+    .recipe-filter-bar::-webkit-scrollbar{display:none}
+    .recipe-filter-btn{font-size:.62rem;padding:4px 12px;border-radius:14px;border:1px solid rgba(180,172,158,.12);background:rgba(45,42,36,.18);color:#8a8478;cursor:pointer;white-space:nowrap;transition:all .18s;font-family:Inter,system-ui,sans-serif}
+    .recipe-filter-btn.on{background:rgba(196,160,68,.22);border-color:rgba(196,160,68,.35);color:#C4A044}
+    .recipe-filter-btn:hover{border-color:rgba(180,172,158,.25)}
+
+    /* ── Collapsible description ── */
+    .recipe-desc-collapsed{max-height:1.3em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important}
+
+    /* ── Superset group in recipe breakdown ── */
+    .recipe-ss-group{border-left:2px solid #C4A044;padding-left:8px;margin:4px 0}
+
     /* ── Plan cards (Campaign tab) ── */
     .plan-card{background:linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:14px;margin-bottom:9px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
     .plan-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--pc,#b4ac9e) 60%,transparent),transparent);opacity:.45}
