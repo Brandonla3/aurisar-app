@@ -26,6 +26,7 @@ import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import PlanWizard from './components/PlanWizard';
 import WorkoutNotificationMockup from './components/WorkoutNotificationMockup';
 import loginBg from './assets/login-bg.png';
+import { LandingPage } from './components/LandingPage';
 
 const PREVIEW_PIN = "1234";
 
@@ -380,7 +381,7 @@ function App() {
       // Explicit sign-out — always go to login
       if(_event === "SIGNED_OUT") {
         setAuthUser(null);
-        setScreen("login");
+        setScreen("landing");
         return;
       }
 
@@ -399,7 +400,7 @@ function App() {
     // Check existing session on mount — handle both cases explicitly
     sb.auth.getSession().then(async ({data:{session}})=>{
       if(!session) {
-        setScreen("home");
+        setScreen("landing");
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
@@ -411,16 +412,16 @@ function App() {
             ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
             setScreen("main");
           } else {
-            setScreen("home");
+            setScreen("landing");
           }
         } catch(e) {
           console.error("loadSave error:", e);
-          setScreen("home");
+          setScreen("landing");
         }
       }
-    }).catch(()=>setScreen("login"));
-    // Safety fallback — if nothing resolves in 5s, go to login
-    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"login":s), 5000);
+    }).catch(()=>setScreen("landing"));
+    // Safety fallback — if nothing resolves in 5s, go to landing
+    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"landing":s), 5000);
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
   useEffect(()=>{ if(screen==="main") doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen]);
@@ -1373,7 +1374,7 @@ function App() {
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
-    setScreen("home");
+    setScreen("landing");
   }
 
   // ── Legacy class migration — maps old keys to new equivalents ──
@@ -2551,7 +2552,7 @@ function App() {
             setMfaRecoveryMode(false);
             setMfaRecoveryInput("");
             setAuthUser(null);
-            setScreen("home");
+            setScreen("landing");
           } }, "\u2190 Back to Sign In")
           , React.createElement('div', { style: {fontSize:".56rem", color:"#3a3834", marginTop:8} }, "Lost your authenticator AND recovery codes?")
           , React.createElement('div', { style: {fontSize:".56rem", color:"#5a5650"} }, "Contact support for an admin-assisted reset.")
@@ -2560,103 +2561,11 @@ function App() {
     )
   );
 
-  /* ══ HOMEPAGE / LANDING PAGE ══════════════════════════════════ */
-  if(screen==="home") return (
-    React.createElement('div', { style: {
-      minHeight:"100vh",
-      backgroundImage:`radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.4) 100%), linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${loginBg})`,
-      backgroundSize:"cover", backgroundPosition:"center", backgroundRepeat:"no-repeat",
-      backgroundColor:"#0c0c0a",
-      color:"#d4cec4", fontFamily:"'Inter',sans-serif", overflowX:"hidden"
-    }}
-      , React.createElement('style', null, CSS)
-
-      /* ── Sticky Nav Bar ── */
-      , React.createElement('nav', { className: "hp-nav" }
-        , React.createElement('div', { className: "hp-nav-logo" }
-          , React.createElement('span', { className: "hp-nav-wordmark" }, "AURISAR")
-          , React.createElement('span', { className: "hp-nav-fitness" }, "FITNESS")
-        )
-        , React.createElement('div', { className: "hp-nav-btns" }
-          , React.createElement('button', { className: "hp-btn-login", onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Login")
-          , React.createElement('button', { className: "hp-btn-signup", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Sign Up")
-        )
-      )
-
-      /* ── Glass Nav Links ── */
-      , React.createElement('div', { className: "hp-glass-links" }
-        , ["About Aurisar","Future Roadmap","Leaderboards"].map((label,i)=>
-          React.createElement('button', { className: "hp-glass-link", key: i }, label)
-        )
-      )
-
-      /* ── Hero Section — Logo Banner ── */
-      , React.createElement('section', { className: "hp-hero" }
-        , React.createElement('img', { src: "/male-female-flame logo.png", alt: "Aurisar", className: "hp-hero-banner" })
-        , React.createElement('h1', { className: "hp-hero-title" }, "Your Fitness. Your Legend.")
-        , React.createElement('p', { className: "hp-hero-sub" }, "The RPG-powered fitness tracker that turns every rep into an adventure.")
-        , React.createElement('div', { className: "hp-orn" }, "\u2014 \u2726 \u2014")
-        , React.createElement('button', { className: "hp-hero-cta", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Begin Your Journey")
-        , React.createElement('p', { className: "hp-hero-signin" }
-          , "Already have an account? "
-          , React.createElement('span', { onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Sign In")
-        )
-      )
-
-      /* ── What Is Aurisar? ── */
-      , React.createElement('section', { className: "hp-section" }
-        , React.createElement('h2', { className: "hp-section-title" }, "Forge Your Body. Level Your Character.")
-        , React.createElement('p', { className: "hp-section-body" },
-          "Whether you\u2019re just getting started, grinding daily, coaching a team, or chasing competition PRs \u2014 Aurisar meets you where you are. It\u2019s a fitness tracker wrapped in an RPG universe: log your workouts, earn XP, unlock character classes, complete quests, and compete on leaderboards. Casual or competitive, solo or social \u2014 every rep counts, and every rep is rewarded."
-        )
-      )
-
-      /* ── Feature Cards ── */
-      , React.createElement('div', { className: "hp-features" }
-        , [
-          { icon:"\u2694\uFE0F", title:"11 Character Classes", desc:"Choose your path \u2014 Warrior, Phantom, Tempest, Druid, and more. Each class amplifies different workout styles." },
-          { icon:"\u2728",       title:"Earn XP & Level Up",    desc:"Every set, rep, and mile earns experience points. Watch your character grow stronger as you do." },
-          { icon:"\uD83C\uDFCB\uFE0F", title:"1,500+ Exercises", desc:"Strength, cardio, flexibility \u2014 log any workout with detailed tracking for sets, reps, weight, and distance." },
-          { icon:"\uD83D\uDDE1\uFE0F", title:"Quests & Achievements", desc:"Complete challenges like \u201CRun 50 miles\u201D or \u201CHit a 225lb bench\u201D to unlock rewards and prove your dedication." },
-          { icon:"\uD83D\uDC65", title:"Social & Leaderboards",  desc:"Add friends, share workouts, climb the global leaderboard, and send messages." },
-          { icon:"\uD83D\uDCC5", title:"Plans & Calendar",       desc:"Build custom workout plans, schedule training days, and track your history on a visual calendar." }
-        ].map((f,i)=> React.createElement('div', { className: "hp-feat-card", key: i }
-          , React.createElement('span', { className: "hp-feat-icon" }, f.icon)
-          , React.createElement('div', { className: "hp-feat-title" }, f.title)
-          , React.createElement('div', { className: "hp-feat-desc" }, f.desc)
-        ))
-      )
-
-      /* ── Class Showcase ── */
-      , React.createElement('section', { className: "hp-section", style: {paddingBottom:12} }
-        , React.createElement('h2', { className: "hp-section-title" }, "Choose Your Class")
-      )
-      , React.createElement('div', { className: "hp-classes" }
-        , Object.entries(CLASSES).filter(([,c])=>!c.locked).map(([key,c])=>
-          React.createElement('div', { className: "hp-class-pill", key: key, style: {"--pill-color":c.color} }
-            , React.createElement('span', { className: "hp-class-emoji" }, c.icon)
-            , React.createElement('div', { className: "hp-class-name" }, c.name)
-            , React.createElement('div', { className: "hp-class-tag" }, c.description.split(".")[0])
-          )
-        )
-      )
-
-      /* ── Bottom CTA ── */
-      , React.createElement('section', { className: "hp-cta" }
-        , React.createElement('h2', { className: "hp-cta-title" }, "Ready to Begin?")
-        , React.createElement('p', { className: "hp-cta-sub" }, "Join the ranks. Your legend starts with one rep.")
-        , React.createElement('button', { className: "hp-hero-cta", onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setLoginSubScreen(null);setScreen("login");} }, "Create Your Free Account")
-      )
-
-      /* ── Footer ── */
-      , React.createElement('footer', { className: "hp-footer" }
-        , React.createElement('div', { className: "hp-footer-text" }
-          , "\u00A9 2026 Aurisar Games \u00A0\u00B7\u00A0 "
-          , React.createElement('a', { href: "mailto:support@aurisargames.com" }, "support@aurisargames.com")
-        )
-      )
-    )
-  );
+  /* ══ LANDING PAGE ═══════════════════════════════════════════ */
+  if(screen==="landing") return React.createElement(LandingPage, {
+    onLogin: () => { setAuthIsNew(false); setScreen("login"); },
+    onSignUp: () => { setAuthIsNew(true); setScreen("login"); }
+  });
 
   if(screen==="login") return (
     React.createElement('div', { style: {
@@ -2671,7 +2580,7 @@ function App() {
 
       /* ── Back to Home ── */
       , React.createElement('div', { style: {padding:"14px 20px 0", display:"flex", justifyContent:"flex-start"} }
-        , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer", letterSpacing:".04em"}, onClick: ()=>setScreen("home") }, "\u2190 Back")
+        , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer", letterSpacing:".04em"}, onClick: ()=>setScreen("landing") }, "\u2190 Back")
       )
 
       /* ── Logo ── */
@@ -2985,7 +2894,7 @@ function App() {
               onClick: async ()=>{
                 await sb.auth.signOut();
                 setAuthUser(null); setAuthIsNew(false); setAuthEmail(""); setAuthPassword("");
-                setScreen("home");
+                setScreen("landing");
               }
             }, "← Cancel")
           , obDraft && React.createElement('div', { className: "boot-resume-card boot-line-in" }
@@ -3237,7 +3146,7 @@ function App() {
                 // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
                 {icon:"🛟", label:"Support",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setFeedbackEmail(_optionalChain([authUser, 'optionalAccess', _a => _a.email])||"");setFeedbackAccountId(myPublicId||"");setHelpConfirmShown(false);setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
-                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("home");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
+                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("landing");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
                 React.createElement('button', {
                     key: item.label,
