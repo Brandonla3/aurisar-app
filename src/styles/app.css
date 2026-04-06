@@ -732,7 +732,7 @@
     .recipe-filter-btn:hover{border-color:rgba(180,172,158,.25)}
 
     /* ── Collapsible description ── */
-    .recipe-desc-collapsed{max-height:1.3em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important}
+    .recipe-desc-collapsed{max-height:1.3em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
     /* ── Superset group in recipe breakdown ── */
     .recipe-ss-group{border-left:2px solid #C4A044;padding-left:8px;margin:4px 0}

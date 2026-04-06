@@ -9,6 +9,11 @@ import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, dete
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
 import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
+
+// ── Recipe view constants (hoisted from render for perf) ──
+const RECIPE_CATS = ["All",...[...new Set(WORKOUT_TEMPLATES.map(t=>t.category).filter(Boolean))].sort()];
+const DIFF_COLORS = {Beginner:"#2ecc71",Intermediate:"#f1c40f",Advanced:"#e74c3c"};
+const EQUIP_ICONS = {Gym:"🏋️","Home Gym":"🏠",Bodyweight:"🤸"};
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { ExerciseVideo } from './components/ExerciseVideo';
@@ -3984,7 +3989,14 @@ function App() {
                               , React.createElement('span', { className: "workout-tag"}, exCount, " exercise" , exCount!==1?"s":"")
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
                             )
-                            , wo.desc&&React.createElement('div', { className: "workout-desc recipe-desc-collapsed", style:{marginTop:3}}, wo.desc)
+                            , wo.desc&&React.createElement('div', { className: `workout-desc ${collapsedWo.has(wo.id)?"":"recipe-desc-collapsed"}`, style:{marginTop:3,position:"relative",paddingRight:wo.desc.length>60?16:0}, title: wo.desc}
+                              , wo.desc
+                              , wo.desc.length>60&&React.createElement('span', {
+                                className: `ex-collapse-btn ${collapsedWo.has(wo.id)?"open":""}`,
+                                style: {position:"absolute",top:0,right:0,fontSize:".6rem",padding:"0 2px"},
+                                onClick: (e)=>{e.stopPropagation();setCollapsedWo(s=>{const n=new Set(s);n.has(wo.id)?n.delete(wo.id):n.add(wo.id);return n;});}
+                              }, "▼")
+                            )
                           )
                           , React.createElement('div', { style: {display:"flex",gap:4,flexShrink:0,alignItems:"center"}, onClick: e=>e.stopPropagation() }
                             , React.createElement('button', { className: "btn btn-ghost btn-sm", title: "Copy", onClick: ()=>copyWorkout(wo)}, "\u2398")
@@ -4113,10 +4125,7 @@ function App() {
 
               // ── TEMPLATES ──────────────────────────
               if(workoutView==="recipes") {
-                const RECIPE_CATS = ["All",...[...new Set(WORKOUT_TEMPLATES.map(t=>t.category).filter(Boolean))].sort()];
                 const filteredTpls = recipeFilter==="All" ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t=>t.category===recipeFilter);
-                const DIFF_COLORS = {Beginner:"#2ecc71",Intermediate:"#f1c40f",Advanced:"#e74c3c"};
-                const EQUIP_ICONS = {Gym:"🏋️","Home Gym":"🏠",Bodyweight:"🤸"};
                 return (
                 React.createElement(React.Fragment, null
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
