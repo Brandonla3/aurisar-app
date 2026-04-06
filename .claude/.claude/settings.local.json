@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/brand/Aurisar Build/aurisar-app/**)",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/brand/Aurisar Build/aurisar-app/.claude/$LOCALAPPDATA/Programs/**)",
+      "Read(//c/Users/brand/Aurisar Build/aurisar-app/.claude/$HOME/scoop/shims/**)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI:/c/Program Files \\(x86\\)/GitHub CLI\")",
+      "Bash(gh --version)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r \"durCount\\\\|PlanWizard\" '/c/Users/brand/Aurisar Build/aurisar-app/src' --include=*.js --include=*.jsx)"
+    ]
+  }
+}

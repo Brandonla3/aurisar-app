@@ -1,0 +1,157 @@
+Homepage Landing Page & Login Screen Improvements
+==================================================
+
+Latest Update: Homepage Modernization + Font Fix
+-------------------------------------------------
+- Switched all homepage headings from Cinzel Decorative (ornate) to plain
+  Cinzel with wider letter-spacing to match the brand logo image
+- Added a subtle gold glow pulse animation on CTA buttons ("Begin Your
+  Journey", "Create Your Free Account") for a modern-gaming feel
+- Added a dark vignette overlay (radial gradient darkening edges) on the
+  homepage background for cinematic depth
+- Feature cards now glow gold on hover instead of just changing border color
+- Banner image has a stronger ambient gold glow shadow
+- Login page is untouched
+
+Overview
+--------
+Previously, unauthenticated visitors landed directly on a login/signup form
+with no context about what Aurisar is. This update adds a full scrollable
+homepage that introduces the app before asking users to sign up, along with
+login screen improvements and a PIN-gated preview mode for dev access.
+
+
+What Changed
+------------
+
+1. NEW HOMEPAGE / LANDING PAGE (screen: "home")
+
+   Unauthenticated visitors now land on a homepage instead of the login form.
+   The page uses the same login-bg.png background with a dark overlay and
+   glassmorphism card styling as the login screen, so both pages feel cohesive.
+
+   Sections (top to bottom):
+
+   - Sticky Nav Bar
+     "AURISAR" gold wordmark on the left. Glass-style "Login" button and
+     gold "Sign Up" button on the right. Semi-transparent with backdrop blur,
+     stays fixed at the top while scrolling.
+
+   - Glass Nav Links
+     Three borderless, semi-transparent buttons above the banner image:
+     "About Aurisar", "Future Roadmap", "Leaderboards". Easy to add more
+     later — just append to the array in the code.
+
+   - Hero Banner
+     The male-female-flame logo (warriors + gold Aurisar flame) displayed
+     as a large, prominent banner image with rounded corners and a subtle
+     gold glow shadow.
+
+   - Title & Subtitle
+     "Your Fitness. Your Legend." in Cinzel Decorative gold gradient.
+     Italic subtitle: "The RPG-powered fitness tracker that turns every
+     rep into an adventure."
+
+   - CTA Button
+     Gold "Begin Your Journey" button -> navigates to signup form.
+     Secondary "Already have an account? Sign In" link below.
+
+   - "What Is Aurisar?" Section
+     Heading: "Forge Your Body. Level Your Character."
+     Inclusive body copy that speaks to casual gym-goers, daily grinders,
+     coaches, competitive athletes, and everyone in between.
+
+   - Feature Highlight Cards (2-column grid, stacks on mobile)
+     Six glass cards with icons, titles, and descriptions:
+       * 11 Character Classes
+       * Earn XP & Level Up
+       * 1,500+ Exercises
+       * Quests & Achievements
+       * Social & Leaderboards
+       * Plans & Calendar
+
+   - Class Showcase
+     Horizontal scrollable row of the 8 unlocked character classes
+     (Warrior, Gladiator, Warden, Phantom, Tempest, Warlord, Druid, Oracle).
+     Each pill shows the class emoji, name, and tagline with the class's
+     signature color as an accent.
+
+   - Bottom CTA
+     "Ready to Begin?" heading with "Create Your Free Account" gold button.
+
+   - Footer
+     Copyright 2026 Aurisar Games + support email link.
+
+
+2. LOGIN SCREEN IMPROVEMENTS
+
+   - "Back" Link
+     A "<- Back" link at the top left of the login screen navigates back
+     to the homepage, giving users an escape route to learn more before
+     committing to sign up.
+
+   - Screen Flow Change
+     All auth-check fallbacks changed from "login" to "home" so
+     unauthenticated users always see the homepage first. This includes
+     session checks, error fallbacks, signout redirects, MFA back
+     navigation, and the 5-second safety timeout.
+
+
+3. PREVIEW MODE — PIN-GATED DEV ACCESS
+
+   Preview Mode is now hidden behind a PIN for dev-only access.
+
+   - Clicking "Preview Mode" on the login screen opens an inline PIN input
+   - Correct PIN (currently "1234") launches the preview; wrong PIN shows
+     an error message
+   - PREVIEW_PIN constant at the top of App.js — easy to change
+   - previewPinEnabled state variable acts as an on/off switch:
+     set to false to bypass the PIN entirely
+   - Preview mode logic extracted into a reusable launchPreviewMode()
+     function (was previously inline)
+   - Label changed from "No account needed" to "Dev access only"
+
+
+4. VISUAL CONSISTENCY
+
+   The homepage matches the login screen exactly:
+
+   - Same login-bg.png atmospheric background with dark overlay
+   - Same glassmorphism recipe on all cards/panels:
+     background: linear-gradient(145deg, rgba(45,42,36,.38), rgba(32,30,26,.22))
+     backdrop-filter: blur(16px)
+     border: 1px solid rgba(180,172,158,.07)
+   - Same font stack: Cinzel Decorative (titles), Cinzel (headings),
+     Inter (body)
+   - Same color palette: #d4cec4 primary, #6a645a body, #5a5650 muted,
+     gold gradient (#c49428 -> #f0d060 -> #8a6010) for titles/CTAs
+   - Max-width 520px to match login screen proportions
+   - Mobile-first: stacks to single column below 420px
+
+
+Files Modified
+--------------
+- src/App.js
+    * Added PREVIEW_PIN constant and heroBg import (later removed)
+    * Added preview PIN state variables (previewPinEnabled, showPreviewPin,
+      previewPinInput, previewPinError)
+    * Added launchPreviewMode() function
+    * Changed all "login" fallbacks to "home" in auth-check logic
+    * Added full homepage rendering block (screen === "home")
+    * Added "Back" link to login screen
+    * Replaced inline preview mode code with PIN-gated UI
+    * Updated Exit Preview to route to "home" instead of "login"
+
+- src/styles/app.css
+    * Added ~65 lines of homepage CSS classes:
+      .hp-nav, .hp-nav-logo, .hp-nav-wordmark, .hp-nav-btns
+      .hp-btn-login, .hp-btn-signup
+      .hp-glass-links, .hp-glass-link
+      .hp-hero, .hp-hero-banner, .hp-hero-title, .hp-hero-sub
+      .hp-orn, .hp-hero-cta, .hp-hero-signin
+      .hp-section, .hp-section-title, .hp-section-body
+      .hp-features, .hp-feat-card, .hp-feat-icon, .hp-feat-title, .hp-feat-desc
+      .hp-classes, .hp-class-pill, .hp-class-emoji, .hp-class-name, .hp-class-tag
+      .hp-cta, .hp-cta-title, .hp-cta-sub
+      .hp-footer, .hp-footer-text
+      .preview-pin-wrap, .preview-pin-inp, .preview-pin-go
