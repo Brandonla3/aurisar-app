@@ -1,6 +1,7 @@
 import React from 'react';
 import { EXERCISES } from '../data/exercises';
 import { EX_BY_ID } from '../data/constants';
+import { sb } from './supabase';
 
 let _ymoveLoaded = false;
 let _ymoveCallbacks = [];
@@ -18,12 +19,22 @@ function onYMoveLoaded(fn) {
 async function loadYMoveExercises() {
   if (_ymoveLoaded) return;
   try {
-    const { data, error } = await sb
-      .from('exercise_library')
-      .select('*')
-      .order('name');
-    if (error) throw error;
-    if (!data || data.length === 0) { _notifyYMoveLoaded(); return; }
+    // Paginate to fetch all rows (Supabase default limit is 1000)
+    let data = [], page = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+      const { data: batch, error } = await sb
+        .from('exercises')
+        .select('*')
+        .order('name')
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      if (!batch || batch.length === 0) break;
+      data = data.concat(batch);
+      if (batch.length < PAGE_SIZE) break;
+      page++;
+    }
+    if (data.length === 0) { _notifyYMoveLoaded(); return; }
 
     const existingIds = new Set(EXERCISES.map(e => e.id));
     let added = 0, patched = 0;
