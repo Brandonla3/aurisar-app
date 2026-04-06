@@ -38,16 +38,28 @@ function scaleDur(baseDur, pct) {
   return Math.max(1, Math.round(parseFloat(baseDur||0) * pct / 100));
 }
 
-function buildXPTable(max=70) {
-  const t=[0,0]; let inc=20000;
-  for(let lv=2;lv<=max;lv++){
-    t[lv]=t[lv-1]+Math.round(inc);
-    if(lv<10) inc*=1.30; else if(lv<30) inc*=1.50; else if(lv<40) inc*=2.25;
+const _XP_PER_LEVEL = [
+  1200,2488,2664,2848,3040,3240,3448,3664,3888,4120,
+  4360,4608,4864,5128,5400,5680,5968,6264,6568,6880,
+  7200,7528,7864,8208,8560,8920,9288,9664,10048,10440,
+  10840,11248,11664,12088,12520,12960,13408,13864,14328,14800,
+  15280,15768,16264,16768,17280,17800,18328,18864,19408,19960,
+  20520,21088,21664,22248,22840,23440,24048,24664,25288,25920,
+  26560,27208,27864,28528,29200,29880,30568,31264,31968,32680,
+  33400,34128,34864,35608,36360,37120,37888,38664,39448,40240,
+  41040,41848,42664,43488,44320,45160,46008,46864,47728,48600,
+  49480,50368,51264,52168,53080,54000,54928,55864,56808
+];
+
+function buildXPTable(max=100) {
+  const t=[0,0];
+  for(let lv=2;lv<=Math.min(max,100);lv++){
+    t[lv]=t[lv-1]+_XP_PER_LEVEL[lv-2];
   }
   return t;
 }
 
-const XP_TABLE = buildXPTable(70);
+const XP_TABLE = buildXPTable(100);
 
 const xpToLevel = xp => { let lv=1; while(lv<XP_TABLE.length-1&&xp>=XP_TABLE[lv+1]) lv++; return lv; };
 const xpForLevel = l  => XP_TABLE[Math.min(l,XP_TABLE.length-1)]||0;
@@ -107,14 +119,19 @@ const detectClass = bio => {
   return detectClassFromAnswers(sports, priorities, style);
 };
 
-function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi) {
+function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi,weightLbs,hrZone) {
   const ex=(exLookup||EX_BY_ID)[exId]||EX_BY_ID[exId]; if(!ex) return 0;
-  const mult=classKey?(_optionalChain([CLASSES, 'access', _2 => _2[classKey], 'optionalAccess', _3 => _3.bonuses, 'access', _4 => _4[ex.category]])||1):1;
+  // Prefer per-exercise class multiplier from xpClassMap, fall back to category bonus
+  const mult = (ex.xpClassMap && classKey && ex.xpClassMap[classKey])
+    ? ex.xpClassMap[classKey]
+    : (classKey ? (_optionalChain([CLASSES, 'access', _2 => _2[classKey], 'optionalAccess', _3 => _3.bonuses, 'access', _4 => _4[ex.category]])||1) : 1);
   const s=parseInt(sets)||0,r=parseInt(reps)||0;
   const distBonus = distanceMi ? 1+Math.min(distanceMi*0.05,0.5) : 1;
   const runPace = (exId===RUNNING_EX_ID && distanceMi && r) ? r/distanceMi : null;
   const paceBonus = runPace ? (runPace<=8 ? 1.20 : 1.05) : 1;
-  return Math.round(ex.baseXP*mult*(1+(s*r-1)*0.05)*distBonus*paceBonus);
+  const weightBonus = ex.tracksWeight && weightLbs ? 1+Math.min(weightLbs/500,0.3) : 1;
+  const zoneBonus = hrZone ? 1+(hrZone-1)*0.04 : 1;
+  return Math.round(ex.baseXP*mult*(1+(s*r-1)*0.05)*distBonus*paceBonus*weightBonus*zoneBonus);
 }
 
 function calcPlanXP(plan,classKey,exLookup) {
@@ -126,10 +143,16 @@ function calcDayXP(day,classKey,exLookup) {
 }
 
 // ── PERSONAL BEST CALCULATOR ─────────────────────────────────────
-// Returns { exId: { type:"strength"|"assisted"|"cardio", value, display } }
-// Strength 1RM: highest weight at exactly 1 set × 1 rep
-// Assisted 1RM: lowest weight at exactly 1 set × 1 rep (lower = better)
-// Cardio PB: best (lowest) pace in min/mi from distanceMi + reps(duration)
+// Returns { exId: { type, value, display } }
+// Supports 7 PB types from the master exercise list:
+//   "Heaviest Weight"    — highest weightLbs across ALL entries
+//   "Max Reps Per 1 Set" — highest reps in any single entry
+//   "Assisted Weight"    — lowest weightLbs at 1 set × 1 rep (lower = better)
+//   "Strength 1RM"       — highest weightLbs at exactly 1 set × 1 rep
+//   "Cardio Pace"        — best (lowest) pace in min/mi
+//   "Longest Hold"       — highest duration
+//   "Fastest Time"       — lowest duration (shorter = better)
+// Falls back to legacy heuristic if ex.pbType is not set (custom exercises)
 function calcExercisePBs(log, exLookup) {
   const pbs = {};
   const lookup = exLookup || EX_BY_ID;
@@ -138,32 +161,66 @@ function calcExercisePBs(log, exLookup) {
     if(!exId) return;
     const ex = lookup[exId];
     if(!ex) return;
-    const isCardio = ex.category === "cardio";
-    const isAssisted = ex.name && ex.name.toLowerCase().includes("assisted");
-    if(isCardio) {
-      // Cardio PB: best pace = lowest min/mi
-      if(entry.distanceMi && entry.distanceMi > 0 && entry.reps && entry.reps > 0) {
-        const pace = entry.reps / entry.distanceMi; // min/mi
-        if(!pbs[exId] || pace < pbs[exId].value) {
-          pbs[exId] = { type:"cardio", value:pace };
+
+    const pbType = ex.pbType;
+    const sets = parseInt(entry.sets)||0;
+    const reps = parseInt(entry.reps)||0;
+    const weight = parseFloat(entry.weightLbs)||0;
+    const duration = parseFloat(entry.durationMin)||0;
+    const distance = parseFloat(entry.distanceMi)||0;
+
+    if (pbType === "Heaviest Weight") {
+      if (weight > 0 && (!pbs[exId] || weight > pbs[exId].value)) {
+        pbs[exId] = { type:"Heaviest Weight", value:weight };
+      }
+    } else if (pbType === "Max Reps Per 1 Set") {
+      if (reps > 0 && (!pbs[exId] || reps > pbs[exId].value)) {
+        pbs[exId] = { type:"Max Reps Per 1 Set", value:reps };
+      }
+    } else if (pbType === "Assisted Weight") {
+      if (sets === 1 && reps === 1 && weight > 0 && (!pbs[exId] || weight < pbs[exId].value)) {
+        pbs[exId] = { type:"Assisted Weight", value:weight };
+      }
+    } else if (pbType === "Strength 1RM") {
+      if (sets === 1 && reps === 1 && weight > 0 && (!pbs[exId] || weight > pbs[exId].value)) {
+        pbs[exId] = { type:"Strength 1RM", value:weight };
+      }
+    } else if (pbType === "Cardio Pace") {
+      if (distance > 0 && reps > 0) {
+        const pace = reps / distance; // min/mi
+        if (!pbs[exId] || pace < pbs[exId].value) {
+          pbs[exId] = { type:"Cardio Pace", value:pace };
         }
       }
+    } else if (pbType === "Longest Hold") {
+      const dur = duration || reps; // duration in minutes or reps as seconds
+      if (dur > 0 && (!pbs[exId] || dur > pbs[exId].value)) {
+        pbs[exId] = { type:"Longest Hold", value:dur };
+      }
+    } else if (pbType === "Fastest Time") {
+      const dur = duration || reps;
+      if (dur > 0 && (!pbs[exId] || dur < pbs[exId].value)) {
+        pbs[exId] = { type:"Fastest Time", value:dur };
+      }
     } else {
-      // Strength 1RM: exactly 1 set × 1 rep
-      const sets = parseInt(entry.sets)||0;
-      const reps = parseInt(entry.reps)||0;
-      const weight = parseFloat(entry.weightLbs)||0;
-      if(sets === 1 && reps === 1 && weight > 0) {
-        const existing = pbs[exId];
-        if(isAssisted) {
-          // Assisted: lower weight = better
-          if(!existing || weight < existing.value) {
-            pbs[exId] = { type:"assisted", value:weight };
+      // Legacy fallback for custom exercises or exercises without pbType
+      const isCardio = ex.category === "cardio";
+      const isAssisted = ex.name && ex.name.toLowerCase().includes("assisted");
+      if (isCardio) {
+        if (distance > 0 && reps > 0) {
+          const pace = reps / distance;
+          if (!pbs[exId] || pace < pbs[exId].value) {
+            pbs[exId] = { type:"Cardio Pace", value:pace };
+          }
+        }
+      } else if (sets === 1 && reps === 1 && weight > 0) {
+        if (isAssisted) {
+          if (!pbs[exId] || weight < pbs[exId].value) {
+            pbs[exId] = { type:"Assisted Weight", value:weight };
           }
         } else {
-          // Standard: higher weight = better
-          if(!existing || weight > existing.value) {
-            pbs[exId] = { type:"strength", value:weight };
+          if (!pbs[exId] || weight > pbs[exId].value) {
+            pbs[exId] = { type:"Strength 1RM", value:weight };
           }
         }
       }
@@ -295,7 +352,7 @@ function checkQuestCompletion(quest, log, streak) {
   if(quest.streak) return streak >= quest.streak;
   if(_optionalChain([quest, 'access', _5 => _5.auto, 'optionalAccess', _6 => _6.total])) return log.length >= quest.auto.total;
   if(_optionalChain([quest, 'access', _7 => _7.auto, 'optionalAccess', _8 => _8.exId])) {
-    const count = log.filter(e=>_optionalChain([EXERCISES, 'access', _9 => _9.find, 'call', _10 => _10(ex=>ex.name===e.exercise), 'optionalAccess', _11 => _11.id])===quest.auto.exId).length;
+    const count = log.filter(e=>(e.exId||_optionalChain([EXERCISES, 'access', _9 => _9.find, 'call', _10 => _10(ex=>ex.name===e.exercise), 'optionalAccess', _11 => _11.id]))===quest.auto.exId).length;
     return count >= quest.auto.count;
   }
   return false;
