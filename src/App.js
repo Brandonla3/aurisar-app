@@ -3508,6 +3508,17 @@ function App() {
                      onSeeAll:()=>{setLibEquipFilters(new Set(["barbell"]));setLibBrowseMode("filtered");}},
                   ] : []);
 
+                  // Fade-edge scroll handler
+                  const handleHScroll = (e) => {
+                    const el = e.currentTarget;
+                    const wrap = el.parentElement;
+                    if(!wrap) return;
+                    const atLeft = el.scrollLeft > 8;
+                    const atRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 8;
+                    wrap.classList.toggle('fade-left', atLeft);
+                    wrap.classList.toggle('fade-right-off', !atRight);
+                  };
+
                   return React.createElement('div', null,
                     /* Search + Select row */
                     React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,alignItems:"center"}},
@@ -3536,15 +3547,16 @@ function App() {
                       /* Your Exercises — horizontal scroll */
                       yourExercises.length > 0 && React.createElement('div', {style:{marginBottom:20}},
                         React.createElement('div', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",marginBottom:8,letterSpacing:".03em"}}, "Your Exercises"),
-                        React.createElement('div', {className:"lib-hscroll"},
+                        React.createElement('div', {className:"lib-hscroll-wrap"},
+                        React.createElement('div', {className:"lib-hscroll",onScroll:handleHScroll},
                           yourExercises.map(ex=>
                             React.createElement('div', {
                               key:"yr-"+ex.id,
+                              className:"lib-glass-card",
                               onClick:()=>setLibDetailEx(ex),
                               style:{
                                 minWidth:100,maxWidth:100,flexShrink:0,
-                                background:"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                                border:"1px solid rgba(180,172,158,.05)",borderRadius:10,
+                                borderRadius:10,
                                 padding:"12px 10px",cursor:"pointer",textAlign:"center",
                                 display:"flex",flexDirection:"column",alignItems:"center",gap:6
                               }
@@ -3558,6 +3570,7 @@ function App() {
                               React.createElement('span', {style:{fontSize:".65rem",color:"#b4ac9e",fontWeight:600,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%"}}, ex.name)
                             )
                           )
+                        )
                         )
                       ),
 
@@ -3601,15 +3614,16 @@ function App() {
                               style:{background:"transparent",border:"none",color:"#6a6050",fontSize:".68rem",cursor:"pointer",padding:0}
                             }, "See All →")
                           ),
-                          React.createElement('div', {className:"lib-hscroll"},
+                          React.createElement('div', {className:"lib-hscroll-wrap"},
+                          React.createElement('div', {className:"lib-hscroll",onScroll:handleHScroll},
                             row.exercises.map(ex=>
                               React.createElement('div', {
                                 key:"d-"+ex.id,
+                                className:"lib-glass-card",
                                 onClick:()=>setLibDetailEx(ex),
                                 style:{
                                   minWidth:110,maxWidth:110,flexShrink:0,
-                                  background:"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                                  border:"1px solid rgba(180,172,158,.05)",borderRadius:10,
+                                  borderRadius:10,
                                   padding:"10px 8px",cursor:"pointer",textAlign:"center",
                                   display:"flex",flexDirection:"column",alignItems:"center",gap:5
                                 }
@@ -3624,6 +3638,7 @@ function App() {
                                 React.createElement('span', {style:{fontSize:".55rem",color:"#6a6050"}}, ex.baseXP+" XP")
                               )
                             )
+                          )
                           )
                         )
                       )

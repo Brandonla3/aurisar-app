@@ -345,9 +345,20 @@
 
     .intensity-title{font-family:'Inter',sans-serif;font-size:.58rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
     /* LIBRARY HOME SCROLL */
-    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
-    .lib-hscroll::-webkit-scrollbar{height:2px}
-    .lib-hscroll::-webkit-scrollbar-thumb{background:rgba(45,42,36,.3);border-radius:1px}
+    .lib-hscroll-wrap{position:relative;overflow:hidden}
+    .lib-hscroll-wrap::before,.lib-hscroll-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:28px;z-index:2;pointer-events:none;transition:opacity .25s}
+    .lib-hscroll-wrap::before{left:0;background:linear-gradient(to right,rgba(10,10,8,1) 0%,transparent 100%);opacity:0}
+    .lib-hscroll-wrap::after{right:0;background:linear-gradient(to left,rgba(10,10,8,1) 0%,transparent 100%);opacity:1}
+    .lib-hscroll-wrap.fade-left::before{opacity:1}
+    .lib-hscroll-wrap.fade-right-off::after{opacity:0}
+    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent}
+    .lib-hscroll::-webkit-scrollbar{height:6px}
+    .lib-hscroll::-webkit-scrollbar-track{background:rgba(45,42,36,.15);border-radius:3px}
+    .lib-hscroll::-webkit-scrollbar-thumb{background:rgba(180,172,158,.25);border-radius:3px}
+    .lib-hscroll::-webkit-scrollbar-thumb:hover{background:rgba(180,172,158,.4)}
+    /* Glass exercise cards */
+    .lib-glass-card{background:rgba(255,255,255,.03)!important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(180,172,158,.1)!important;box-shadow:0 2px 12px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.04);transition:all .2s}
+    .lib-glass-card:hover{background:rgba(255,255,255,.06)!important;border-color:rgba(180,172,158,.18)!important;box-shadow:0 4px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06)}
 
     /* CATEGORY FILTER */
     .cat-filter{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px}
