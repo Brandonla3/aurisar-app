@@ -344,6 +344,11 @@
     /* INTENSITY PANEL */
 
     .intensity-title{font-family:'Inter',sans-serif;font-size:.58rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    /* LIBRARY HOME SCROLL */
+    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+    .lib-hscroll::-webkit-scrollbar{height:2px}
+    .lib-hscroll::-webkit-scrollbar-thumb{background:rgba(45,42,36,.3);border-radius:1px}
+
     /* CATEGORY FILTER */
     .cat-filter{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px}
     .cat-filter::-webkit-scrollbar{height:2px}

@@ -84,6 +84,7 @@ function App() {
   const [libDetailEx,setLibDetailEx] = useState(null);
   const [libSelectMode,setLibSelectMode] = useState(false);
   const [libSelected,setLibSelected]     = useState(()=>new Set());
+  const [libBrowseMode,setLibBrowseMode] = useState("home");
   const [lbFilter,setLbFilter] = useState("overall_xp");
   const [lbScope,setLbScope] = useState("world"); // "world" | "friends"
   const [lbStateFilters,setLbStateFilters] = useState(["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"]);
@@ -3307,7 +3308,7 @@ function App() {
                   const ALL_EQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
 
                   const toggleSet = (setter, val) => setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; });
-                  const clearAll  = () => { setLibTypeFilters(new Set()); setLibMuscleFilters(new Set()); setLibEquipFilters(new Set()); setLibSearch(""); };
+                  const clearAll  = () => { setLibTypeFilters(new Set()); setLibMuscleFilters(new Set()); setLibEquipFilters(new Set()); setLibSearch(""); setLibBrowseMode("home"); };
                   const hasFilters = libTypeFilters.size>0 || libMuscleFilters.size>0 || libEquipFilters.size>0 || libSearch;
 
                   const q2 = libSearch.toLowerCase().trim();
@@ -3366,6 +3367,42 @@ function App() {
 
                   const toggleSel = (id) => setLibSelected(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; });
 
+                  /* ── Home view computed data ── */
+                  const hexRgba = (hex, a) => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
+
+                  const MUSCLE_EMOJIS = {chest:"💪",back:"🏋️",shoulder:"🎯",bicep:"💪",legs:"🦵",glutes:"🍑",abs:"🔥",calves:"🦶",forearm:"✊",cardio:"❤️"};
+                  const MUSCLE_CARD_DATA = ALL_MUSCLE_OPTS.filter(m=>m!=="full_body").map(mg=>{
+                    const count = allExercises.filter(ex=>(ex.muscleGroup||"").toLowerCase().trim()===mg).length;
+                    return {mg, label:mg.charAt(0).toUpperCase()+mg.slice(1).replace("_"," "), emoji:MUSCLE_EMOJIS[mg]||"💪", count, color:getMuscleColor(mg)};
+                  }).filter(d=>d.count>0);
+
+                  // Recent exercises — deduped from log, padded with favorites
+                  const recentExIds = []; const seenIds = new Set();
+                  for(const entry of (profile.log||[]).slice(0,100)){
+                    if(entry.exId && !seenIds.has(entry.exId) && allExById[entry.exId]){ recentExIds.push(entry.exId); seenIds.add(entry.exId); }
+                    if(recentExIds.length>=10) break;
+                  }
+                  for(const fId of (profile.favoriteExercises||[])){
+                    if(!seenIds.has(fId) && allExById[fId]){ recentExIds.push(fId); seenIds.add(fId); }
+                    if(recentExIds.length>=10) break;
+                  }
+                  const yourExercises = recentExIds.map(id=>allExById[id]).filter(Boolean);
+
+                  // Discover rows
+                  const discoverRows = [
+                    {label:"Beginner Friendly", exercises:allExercises.filter(ex=>(ex.baseXP||0)<45).slice(0,15),
+                     onSeeAll:()=>setLibBrowseMode("filtered")},
+                    {label:"Advanced Challenges", exercises:allExercises.filter(ex=>(ex.baseXP||0)>=60).slice(0,15),
+                     onSeeAll:()=>setLibBrowseMode("filtered")},
+                  ].concat(_ymoveLoaded ? [
+                    {label:"Bodyweight Only", exercises:allExercises.filter(ex=>(ex.equipment||"bodyweight").toLowerCase()==="bodyweight").slice(0,15),
+                     onSeeAll:()=>{setLibEquipFilters(new Set(["bodyweight"]));setLibBrowseMode("filtered");}},
+                    {label:"Dumbbell Exercises", exercises:allExercises.filter(ex=>(ex.equipment||"").toLowerCase()==="dumbbell").slice(0,15),
+                     onSeeAll:()=>{setLibEquipFilters(new Set(["dumbbell"]));setLibBrowseMode("filtered");}},
+                    {label:"Barbell Essentials", exercises:allExercises.filter(ex=>(ex.equipment||"").toLowerCase()==="barbell").slice(0,15),
+                     onSeeAll:()=>{setLibEquipFilters(new Set(["barbell"]));setLibBrowseMode("filtered");}},
+                  ] : []);
+
                   return React.createElement('div', null,
                     /* Search + Select row */
                     React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,alignItems:"center"}},
@@ -3375,17 +3412,126 @@ function App() {
                           className:"tech-search-inp",
                           placeholder:`Search ${allExercises.length} exercises…`,
                           value:libSearch,
-                          onChange:e=>setLibSearch(e.target.value)
+                          onChange:e=>{setLibSearch(e.target.value);if(e.target.value&&libBrowseMode==="home")setLibBrowseMode("filtered");}
                         }),
-                        libSearch && React.createElement('span', {className:"tech-search-clear",onClick:()=>setLibSearch("")}, "✕")
+                        libSearch && React.createElement('span', {className:"tech-search-clear",onClick:()=>{setLibSearch("");if(libMuscleFilters.size===0&&libTypeFilters.size===0&&libEquipFilters.size===0)setLibBrowseMode("home");}}, "✕")
                       ),
-                      React.createElement('button', {
+                      libBrowseMode==="filtered" && React.createElement('button', {
                         onClick:()=>{ setLibSelectMode(m=>!m); setLibSelected(new Set()); },
                         style:{flexShrink:0,padding:"6px 12px",borderRadius:8,border:"1px solid",
                                borderColor:libSelectMode?"#B0A898":"rgba(45,42,36,.3)",
                                background:libSelectMode?"rgba(45,42,36,.26)":"transparent",
                                color:libSelectMode?"#B0A898":"#8a8478",fontSize:".7rem",fontWeight:libSelectMode?"700":"400",cursor:"pointer",whiteSpace:"nowrap"}
                       }, libSelectMode?"✕ Cancel":"⊞ Select")
+                    ),
+
+                    /* ═══ HOME VIEW ═══ */
+                    libBrowseMode === "home" && React.createElement('div', null,
+
+                      /* Your Exercises — horizontal scroll */
+                      yourExercises.length > 0 && React.createElement('div', {style:{marginBottom:20}},
+                        React.createElement('div', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",marginBottom:8,letterSpacing:".03em"}}, "Your Exercises"),
+                        React.createElement('div', {className:"lib-hscroll"},
+                          yourExercises.map(ex=>
+                            React.createElement('div', {
+                              key:"yr-"+ex.id,
+                              onClick:()=>setLibDetailEx(ex),
+                              style:{
+                                minWidth:100,maxWidth:100,flexShrink:0,
+                                background:"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
+                                border:"1px solid rgba(180,172,158,.05)",borderRadius:10,
+                                padding:"12px 10px",cursor:"pointer",textAlign:"center",
+                                display:"flex",flexDirection:"column",alignItems:"center",gap:6
+                              }
+                            },
+                              React.createElement('div', {style:{
+                                width:36,height:36,borderRadius:8,
+                                background:hexRgba(getTypeColor(ex.category),.12),
+                                border:"1px solid "+hexRgba(getTypeColor(ex.category),.18),
+                                display:"flex",alignItems:"center",justifyContent:"center"
+                              }}, React.createElement(ExIcon, {ex, size:"1.1rem", color:getTypeColor(ex.category)})),
+                              React.createElement('span', {style:{fontSize:".65rem",color:"#b4ac9e",fontWeight:600,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%"}}, ex.name)
+                            )
+                          )
+                        )
+                      ),
+
+                      /* Browse by Muscle — 2-column card grid */
+                      React.createElement('div', {style:{marginBottom:20}},
+                        React.createElement('div', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",marginBottom:8,letterSpacing:".03em"}}, "Browse by Muscle"),
+                        React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+                          MUSCLE_CARD_DATA.map(({mg, label, emoji, count, color})=>
+                            React.createElement('div', {
+                              key:"mc-"+mg,
+                              onClick:()=>{setLibMuscleFilters(new Set([mg]));setLibBrowseMode("filtered");},
+                              style:{
+                                background:"linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.22))",
+                                border:"1px solid "+hexRgba(color,.2),
+                                borderRadius:12,padding:"14px 12px",cursor:"pointer",
+                                display:"flex",alignItems:"center",gap:10,
+                                transition:"all .18s"
+                              }
+                            },
+                              React.createElement('div', {style:{
+                                width:36,height:36,borderRadius:8,flexShrink:0,
+                                background:hexRgba(color,.12),
+                                display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem"
+                              }}, emoji),
+                              React.createElement('div', null,
+                                React.createElement('div', {style:{fontSize:".78rem",fontWeight:600,color:"#d4cec4"}}, label),
+                                React.createElement('div', {style:{fontSize:".62rem",color:"#6a6050"}}, count+" exercises")
+                              )
+                            )
+                          )
+                        )
+                      ),
+
+                      /* Discover Rows — Netflix-style horizontal scroll */
+                      discoverRows.map(row=>
+                        row.exercises.length >= 3 && React.createElement('div', {key:"dr-"+row.label,style:{marginBottom:18}},
+                          React.createElement('div', {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+                            React.createElement('span', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",letterSpacing:".03em"}}, row.label),
+                            React.createElement('button', {
+                              onClick:row.onSeeAll,
+                              style:{background:"transparent",border:"none",color:"#6a6050",fontSize:".68rem",cursor:"pointer",padding:0}
+                            }, "See All →")
+                          ),
+                          React.createElement('div', {className:"lib-hscroll"},
+                            row.exercises.map(ex=>
+                              React.createElement('div', {
+                                key:"d-"+ex.id,
+                                onClick:()=>setLibDetailEx(ex),
+                                style:{
+                                  minWidth:110,maxWidth:110,flexShrink:0,
+                                  background:"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
+                                  border:"1px solid rgba(180,172,158,.05)",borderRadius:10,
+                                  padding:"10px 8px",cursor:"pointer",textAlign:"center",
+                                  display:"flex",flexDirection:"column",alignItems:"center",gap:5
+                                }
+                              },
+                                React.createElement('div', {style:{
+                                  width:32,height:32,borderRadius:7,
+                                  background:hexRgba(getTypeColor(ex.category),.12),
+                                  border:"1px solid "+hexRgba(getTypeColor(ex.category),.18),
+                                  display:"flex",alignItems:"center",justifyContent:"center"
+                                }}, React.createElement(ExIcon, {ex, size:".9rem", color:getTypeColor(ex.category)})),
+                                React.createElement('span', {style:{fontSize:".62rem",color:"#b4ac9e",fontWeight:600,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%"}}, ex.name),
+                                React.createElement('span', {style:{fontSize:".55rem",color:"#6a6050"}}, ex.baseXP+" XP")
+                              )
+                            )
+                          )
+                        )
+                      )
+                    ),
+
+                    /* ═══ FILTERED VIEW ═══ */
+                    libBrowseMode === "filtered" && React.createElement('div', null,
+                    /* Back to browse */
+                    React.createElement('div', {style:{marginBottom:10}},
+                      React.createElement('button', {
+                        onClick:()=>clearAll(),
+                        style:{background:"transparent",border:"none",color:"#b4ac9e",fontSize:".78rem",cursor:"pointer",padding:"4px 0",display:"flex",alignItems:"center",gap:4}
+                      }, "← Browse Library")
                     ),
 
                     /* Filter dropdowns row — custom panels that stay open for multi-select */
@@ -3689,7 +3835,8 @@ function App() {
                           )
                         );
                       })
-                    ),
+                    )
+                    ), /* ── end filtered view ── */
 
                     /* Detail bottom sheet */
                     libDetailEx && React.createElement('div', {
