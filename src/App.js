@@ -16,6 +16,7 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import { AvatarPreview3D } from './components/AvatarPreview3D';
 import { _ymoveLoaded, useYMoveExercises, loadYMoveExercises } from './utils/ymove';
 import loginBg from './assets/login-bg.png';
+import { LandingPage } from './components/LandingPage';
 
 
 function App() {
@@ -338,13 +339,13 @@ function App() {
         ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
         setScreen("main");
       } else {
-        setScreen(user ? "intro" : "login");
+        setScreen(user ? "intro" : "landing");
       }
     });
     // Check existing session on mount — handle both cases explicitly
     sb.auth.getSession().then(async ({data:{session}})=>{
       if(!session) {
-        setScreen("login");
+        setScreen("landing");
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
@@ -360,12 +361,12 @@ function App() {
           }
         } catch(e) {
           console.error("loadSave error:", e);
-          setScreen("login");
+          setScreen("landing");
         }
       }
-    }).catch(()=>setScreen("login"));
+    }).catch(()=>setScreen("landing"));
     // Safety fallback — if nothing resolves in 5s, go to login
-    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"login":s), 5000);
+    const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"landing":s), 5000);
     loadYMoveExercises();
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
@@ -1296,7 +1297,7 @@ function App() {
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
-    setScreen("login");
+    setScreen("landing");
   }
 
   // ── Legacy class migration — maps old keys to new equivalents ──
@@ -2481,6 +2482,11 @@ function App() {
     )
   );
 
+  if(screen==="landing") return React.createElement(LandingPage, {
+    onLogin: () => { setAuthIsNew(false); setScreen("login"); },
+    onSignUp: () => { setAuthIsNew(true); setScreen("login"); }
+  });
+
   if(screen==="login") return (
     React.createElement('div', { style: {
       minHeight:"100vh",
@@ -3050,7 +3056,7 @@ function App() {
                 {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
                 {icon:"💬", label:"Feedback",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
-                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("login");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
+                !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("landing");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
                 React.createElement('button', {
                     key: item.label,
