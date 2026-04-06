@@ -2647,17 +2647,20 @@ function App() {
   );
 
   if(screen==="login") return (
-    React.createElement('div', { style: {
+    React.createElement('div', { className:"login-root-wrap", style: {
       minHeight:"100vh",
-      background:`linear-gradient(to bottom, rgba(12,12,10,0.10) 0%, rgba(12,12,10,0.40) 45%, rgba(12,12,10,0.88) 75%, #0c0c0a 100%), url(${loginBg}) center top / contain no-repeat`,
-      backgroundColor:"#0c0c0a",
+      backgroundImage:`linear-gradient(to bottom, rgba(10,14,22,0.15) 0%, rgba(10,14,22,0.45) 50%, rgba(10,14,22,0.92) 80%, #0a0e16 100%), url(${loginBg})`,
+      backgroundSize:"cover",
+      backgroundPosition:"center top",
+      backgroundRepeat:"no-repeat",
+      backgroundColor:"#0a0e16",
       color:"#d4cec4", fontFamily:"'Inter',sans-serif", overflowX:"hidden",
       display:"flex", flexDirection:"column", alignItems:"stretch",
       overflowY:"auto"
     }}
       , React.createElement('style', null, CSS + `
         @media(max-width:600px){
-          .login-root{background-size:100% auto !important;background-position:center top !important;}
+          .login-root-wrap{background-size:contain !important;}
         }
       `)
 
