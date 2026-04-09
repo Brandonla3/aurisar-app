@@ -12,6 +12,9 @@ import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
 
+// ── Debounce utility ──
+function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); }; }
+
 // ── Recipe view constants (hoisted from render for perf) ──
 const RECIPE_CATS = [...new Set([
   ...WORKOUT_TEMPLATES.map(t=>t.category).filter(Boolean),
@@ -127,6 +130,8 @@ function App() {
   const [favSelectMode,setFavSelectMode] = useState(false);
   const [favSelected,setFavSelected] = useState(()=>new Set());
   const [libSearch,setLibSearch]   = useState("");
+  const [libSearchDebounced,setLibSearchDebounced] = useState("");
+  const debouncedSetLibSearch = React.useRef(debounce(v => setLibSearchDebounced(v), 200)).current;
   const [libTypeFilters,setLibTypeFilters]   = useState(()=>new Set());
   const [libMuscleFilters,setLibMuscleFilters] = useState(()=>new Set());
   const [libEquipFilters,setLibEquipFilters]   = useState(()=>new Set());
@@ -135,6 +140,7 @@ function App() {
   const [libSelectMode,setLibSelectMode] = useState(false);
   const [libSelected,setLibSelected]     = useState(()=>new Set());
   const [libBrowseMode,setLibBrowseMode] = useState("home");
+  const [libVisibleCount,setLibVisibleCount] = useState(60);
   const [lbFilter,setLbFilter] = useState("overall_xp");
   const [lbScope,setLbScope] = useState("world"); // "world" | "friends"
   const [lbStateFilters,setLbStateFilters] = useState(["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"]);
@@ -3453,11 +3459,11 @@ function App() {
                   const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","full_body","cardio"];
                   const ALL_EQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
 
-                  const toggleSet = (setter, val) => setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; });
-                  const clearAll  = () => { setLibTypeFilters(new Set()); setLibMuscleFilters(new Set()); setLibEquipFilters(new Set()); setLibSearch(""); setLibBrowseMode("home"); };
+                  const toggleSet = (setter, val) => { setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; }); setLibVisibleCount(60); };
+                  const clearAll  = () => { setLibTypeFilters(new Set()); setLibMuscleFilters(new Set()); setLibEquipFilters(new Set()); setLibSearch(""); setLibSearchDebounced(""); setLibVisibleCount(60); setLibBrowseMode("home"); };
                   const hasFilters = libTypeFilters.size>0 || libMuscleFilters.size>0 || libEquipFilters.size>0 || libSearch;
 
-                  const q2 = libSearch.toLowerCase().trim();
+                  const q2 = libSearchDebounced.toLowerCase().trim();
 
                   // Filter function — checks all three filter sets (OR within each, AND across sets)
                   const matchesFilters = (ex, tF, mF, eF) => {
@@ -3570,9 +3576,9 @@ function App() {
                           className:"tech-search-inp",
                           placeholder:`Search ${allExercises.length} exercises…`,
                           value:libSearch,
-                          onChange:e=>{setLibSearch(e.target.value);if(e.target.value&&libBrowseMode==="home")setLibBrowseMode("filtered");}
+                          onChange:e=>{const v=e.target.value;setLibSearch(v);debouncedSetLibSearch(v);if(v&&libBrowseMode==="home")setLibBrowseMode("filtered");}
                         }),
-                        libSearch && React.createElement('span', {className:"tech-search-clear",onClick:()=>{setLibSearch("");if(libMuscleFilters.size===0&&libTypeFilters.size===0&&libEquipFilters.size===0)setLibBrowseMode("home");}}, "✕")
+                        libSearch && React.createElement('span', {className:"tech-search-clear",onClick:()=>{setLibSearch("");setLibSearchDebounced("");setLibVisibleCount(60);if(libMuscleFilters.size===0&&libTypeFilters.size===0&&libEquipFilters.size===0)setLibBrowseMode("home");}}, "✕")
                       ),
                       libBrowseMode==="filtered" && React.createElement('button', {
                         onClick:()=>{ setLibSelectMode(m=>!m); setLibSelected(new Set()); },
@@ -3905,10 +3911,10 @@ function App() {
                       }, "📋 Plan")
                     )),
 
-                    /* Exercise list */
+                    /* Exercise list (paginated) */
                     React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}},
                       libFiltered.length===0 && React.createElement('div',{className:"empty",style:{padding:"24px 0"}},"No exercises match your filters."),
-                      libFiltered.map(ex=>{
+                      libFiltered.slice(0, libVisibleCount).map(ex=>{
                         const isFav=(profile.favoriteExercises||[]).includes(ex.id);
                         const hasPB=!!(profile.exercisePBs||{})[ex.id];
                         const isSel=libSelected.has(ex.id);
@@ -3977,7 +3983,14 @@ function App() {
                             }, isFav?"⭐":"☆")
                           )
                         );
-                      })
+                      }),
+                      /* Load More / count info */
+                      libFiltered.length > libVisibleCount && React.createElement('button', {
+                        onClick:()=>setLibVisibleCount(c=>c+60),
+                        style:{alignSelf:"center",margin:"12px auto",padding:"8px 24px",borderRadius:8,
+                               border:"1px solid rgba(180,172,158,.12)",background:"rgba(45,42,36,.3)",
+                               color:"#b4ac9e",fontSize:".75rem",fontWeight:600,cursor:"pointer",letterSpacing:".02em"}
+                      }, `Load More (${Math.min(libVisibleCount, libFiltered.length)} of ${libFiltered.length})`)
                     )
                     ), /* ── end filtered view ── */
 
@@ -6889,39 +6902,34 @@ function App() {
                       return days+"d";
                     })() : "";
 
-                    return React.createElement("div", {key: conv.channel_id, style:{
-                      display:"flex", alignItems:"center", gap:10,
-                      padding:"12px 14px",
-                      background: unread > 0 ? "rgba(45,42,36,.2)" : "transparent",
-                      borderBottom:"1px solid rgba(45,42,36,.12)",
-                      cursor:"pointer", transition:"background .15s"
-                    }, onClick: ()=>{
+                    return React.createElement("div", {key: conv.channel_id,
+                      className:`msg-conv-card${unread>0?" unread":""}`,
+                      onClick: ()=>{
                       setMsgActiveChannel(conv);
                       loadChannelMessages(conv.channel_id);
                       setMsgView("chat");
                     }},
                       // Avatar
-                      React.createElement("div", {style:{width:38,height:38,borderRadius:"50%",flexShrink:0,
+                      React.createElement("div", {className:"msg-avatar",style:{
                         background:(otherCls?otherCls.color:"#5a5650")+"18",
-                        border:"2px solid "+(otherCls?otherCls.color:"#5a5650")+"44",
-                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem"}},
+                        border:"1px solid "+(otherCls?otherCls.color:"#5a5650")+"44"}},
                         otherCls ? React.createElement(ClassIcon,{classKey:other.chosen_class,size:18,color:otherCls.color}) : "\uD83D\uDCAC"
                       ),
                       // Name + last message
                       React.createElement("div", {style:{flex:1,minWidth:0}},
                         React.createElement("div", {style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}},
-                          React.createElement("span", {style:{fontSize:".78rem",fontWeight:unread>0?700:600,color:unread>0?"#d4cec4":"#b4ac9e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                          React.createElement("span", {className:"msg-conv-name",style:{fontWeight:unread>0?700:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
                             other ? other.player_name : (conv.name||"Chat")),
                           React.createElement("span", {style:{fontSize:".52rem",color:"#5a5650",flexShrink:0}}, timeAgo)
                         ),
-                        lastMsg && React.createElement("div", {style:{fontSize:".62rem",color:unread>0?"#8a8478":"#5a5650",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                        lastMsg && React.createElement("div", {className:`msg-conv-preview${unread>0?" unread":""}`},
                           lastMsg.sender_id === authUser?.id ? "You: " : "",
                           lastMsg.content
                         ),
                         !lastMsg && React.createElement("div", {style:{fontSize:".62rem",color:"#3a3834",fontStyle:"italic",marginTop:2}}, "No messages yet")
                       ),
                       // Unread badge
-                      unread > 0 && React.createElement("div", {style:{width:20,height:20,borderRadius:"50%",background:"#2980b9",color:"#fff",fontSize:".52rem",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, unread > 99 ? "99+" : unread)
+                      unread > 0 && React.createElement("div", {className:"msg-unread-badge"}, unread > 99 ? "99+" : unread)
                     );
                   })
                 );
@@ -6933,7 +6941,7 @@ function App() {
 
               return React.createElement("div", {style:{display:"flex",flexDirection:"column",flex:1,minHeight:0}},
                 // Chat header
-                React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid rgba(180,172,158,.04)",flexShrink:0}},
+                React.createElement("div", {className:"msg-chat-hdr"},
                   React.createElement("button", {style:{background:"transparent",border:"none",color:"#b4ac9e",fontSize:".82rem",cursor:"pointer",padding:"4px"},
                     onClick:()=>{setMsgView("list");setMsgActiveChannel(null);setMsgMessages([]);loadConversations();loadUnreadCount();}}, "\u2190"),
                   React.createElement("div", {style:{width:30,height:30,borderRadius:"50%",flexShrink:0,
@@ -6962,37 +6970,31 @@ function App() {
                     const isSystem = msg.message_type === "system" || msg.message_type === "event";
                     if(isSystem) {
                       return React.createElement("div", {key:msg.id, style:{textAlign:"center",padding:"4px 0"}},
-                        React.createElement("span", {style:{fontSize:".56rem",color:"#5a5650",fontStyle:"italic",background:"rgba(45,42,36,.15)",padding:"3px 10px",borderRadius:6}}, msg.content)
+                        React.createElement("span", {className:"msg-bubble system"}, msg.content)
                       );
                     }
                     const time = new Date(msg.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
                     return React.createElement("div", {key:msg.id, style:{display:"flex",flexDirection:"column",alignItems:isMine?"flex-end":"flex-start",maxWidth:"80%",alignSelf:isMine?"flex-end":"flex-start"}},
                       !isMine && React.createElement("div", {style:{fontSize:".48rem",color:"#5a5650",marginBottom:1,marginLeft:4}}, msg.sender_name),
-                      React.createElement("div", {style:{
-                        padding:"8px 12px",
-                        borderRadius:isMine?"12px 12px 3px 12px":"12px 12px 12px 3px",
-                        background:isMine?"rgba(41,128,185,.15)":"rgba(45,42,36,.25)",
-                        border:"1px solid "+(isMine?"rgba(41,128,185,.2)":"rgba(180,172,158,.06)"),
-                        fontSize:".76rem", color:isMine?"#85B7EB":"#d4cec4", lineHeight:1.5,
-                        wordBreak:"break-word"
-                      }}, msg.content),
-                      React.createElement("div", {style:{fontSize:".44rem",color:"#3a3834",marginTop:2,marginLeft:4,marginRight:4}}, time,
+                      React.createElement("div", {className:`msg-bubble ${isMine?"own":"other"}`}, msg.content),
+                      React.createElement("div", {className:"msg-timestamp",style:{marginLeft:4,marginRight:4}}, time,
                         msg.edited_at ? " \u00b7 edited" : "")
                     );
                   })
                 ),
 
                 // Input bar
-                React.createElement("div", {style:{display:"flex",gap:8,padding:"8px 14px 12px",borderTop:"1px solid rgba(180,172,158,.06)",flexShrink:0,background:"rgba(12,12,10,.95)"}},
+                React.createElement("div", {className:"msg-input-bar"},
                   React.createElement("input", {
-                    style:{flex:1,background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",color:"#d4cec4",fontSize:".78rem",fontFamily:"'Inter',sans-serif",outline:"none"},
+                    className:"msg-input",
                     placeholder:"Type a message\u2026",
                     value:msgInput,
                     onChange:e=>setMsgInput(e.target.value),
                     onKeyDown:e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMsg();}}
                   }),
                   React.createElement("button", {
-                    style:{width:40,height:40,borderRadius:10,background:msgInput.trim()?"rgba(41,128,185,.2)":"rgba(45,42,36,.15)",border:"1px solid "+(msgInput.trim()?"rgba(41,128,185,.3)":"rgba(180,172,158,.06)"),color:msgInput.trim()?"#2980b9":"#3a3834",fontSize:"1rem",cursor:msgInput.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"},
+                    className:"msg-send-btn",
+                    style:{width:40,height:40,opacity:msgInput.trim()?1:.4,cursor:msgInput.trim()?"pointer":"default"},
                     disabled:msgSending||!msgInput.trim(),
                     onClick:sendMsg
                   }, msgSending ? "\u2026" : "\u2191")
@@ -7033,9 +7035,7 @@ function App() {
                 return level >= (s.unlockLevel||1);
               };
               const setAv = (field, val) => setProfile(p=>({...p, [field]:val}));
-              const btnSel = {background:"rgba(180,172,158,.1)",border:"1px solid rgba(180,172,158,.08)",borderRadius:8,padding:"6px 11px",color:"#b4ac9e",fontSize:".72rem",cursor:"pointer",fontWeight:600};
-              const btnBase = {background:"rgba(45,42,36,.18)",border:"1px solid rgba(180,172,158,.05)",borderRadius:8,padding:"6px 11px",color:"#8a8478",fontSize:".72rem",cursor:"pointer"};
-              const section = {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"12px 14px",marginBottom:11};
+              /* btn styling now via .char-sub-btn / .char-sub-btn.sel */
               const rune = (label) => React.createElement('div',{className:"profile-rune-divider",style:{margin:"0 0 10px"}},React.createElement('span',{className:"profile-rune-label"},`⠿ ${label} ⠿`));
               return React.createElement('div', {style:{"--cls-color":cls.color,"--cls-glow":cls.glow}}
 
@@ -7061,14 +7061,15 @@ function App() {
                 , React.createElement('div',{style:{display:"flex",gap:6,marginBottom:12}}
                   , ["avatar","stats","equipment"].map(t=>React.createElement('button',{
                       key:t, onClick:()=>setCharSubTab(t),
-                      style:{...(charSubTab===t?btnSel:btnBase), flex:1, textAlign:"center", textTransform:"capitalize", padding:"8px 4px"}
+                      className:`char-sub-btn${charSubTab===t?" sel":""}`,
+                      style:{flex:1, textAlign:"center", padding:"8px 4px"}
                     }, t==="avatar"?"⚔️ Avatar":t==="stats"?"📊 Stats":"🎒 Equipment")
                   )
                 )
 
                 /* ══ AVATAR SUB-TAB ══════════════════════════ */
                 , charSubTab==="avatar" && React.createElement('div', null
-                  , React.createElement('div', {style:{textAlign:"center",padding:"52px 24px",borderRadius:12,border:"1px dashed rgba(180,172,158,.08)",background:"rgba(45,42,36,.12)",margin:"4px 0 12px"}}
+                  , React.createElement('div', {className:"char-section",style:{textAlign:"center",padding:"52px 24px"}}
                     , React.createElement('div', {style:{fontSize:"2.6rem",marginBottom:14}}, "⚔️")
                     , React.createElement('div', {style:{fontSize:".95rem",color:"#b4ac9e",fontWeight:600,marginBottom:8,letterSpacing:".02em"}}, "Avatar Creator")
                     , React.createElement('div', {style:{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",borderRadius:20,padding:"5px 14px",marginBottom:14}}
@@ -7081,18 +7082,18 @@ function App() {
                 )
                 /* ══ STATS SUB-TAB ════════════════════════════ */
                 , charSubTab==="stats" && React.createElement('div', null
-                  , React.createElement('div', {style:section}
+                  , React.createElement('div', {className:"char-section"}
                     , rune("Character Stats")
                     , React.createElement('div',{style:{fontSize:".6rem",color:"#5a5650",fontStyle:"italic",textAlign:"center",marginBottom:10}},"Stats grow dynamically as you train — full calculation coming soon")
                     , Object.entries(STAT_META).map(([key,meta])=>{
                       const val=charStats[key]||0, pct=Math.round((val/statMax)*100);
-                      return React.createElement('div',{key,style:{display:"flex",alignItems:"center",gap:8,marginBottom:7}}
-                        , React.createElement('span',{style:{fontSize:"1rem",width:22,textAlign:"center",flexShrink:0}},meta.icon)
-                        , React.createElement('span',{style:{fontSize:".65rem",color:"#8a8478",width:80,flexShrink:0}},meta.label)
-                        , React.createElement('div',{style:{flex:1,height:6,background:"rgba(45,42,36,.2)",borderRadius:3,overflow:"hidden"}}
-                          , React.createElement('div',{style:{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${meta.color}99,${meta.color})`,borderRadius:3,transition:"width .6s ease"}})
+                      return React.createElement('div',{key,className:"char-stat-row"}
+                        , React.createElement('span',{className:"char-stat-icon"},meta.icon)
+                        , React.createElement('span',{className:"char-stat-label",style:{width:80}},meta.label)
+                        , React.createElement('div',{className:"char-stat-bar"}
+                          , React.createElement('div',{className:"char-stat-fill",style:{width:`${pct}%`,background:`linear-gradient(90deg,${meta.color}99,${meta.color})`}})
                         )
-                        , React.createElement('span',{style:{fontSize:".65rem",color:"#6a645a",width:26,textAlign:"right",flexShrink:0,fontFamily:"'Inter',sans-serif"}},val)
+                        , React.createElement('span',{className:"char-stat-val"},val)
                       );
                     })
                   )
@@ -7100,16 +7101,16 @@ function App() {
 
                 /* ══ EQUIPMENT SUB-TAB ═══════════════════════ */
                 , charSubTab==="equipment" && React.createElement('div', null
-                  , React.createElement('div', {style:section}
+                  , React.createElement('div', {className:"char-section"}
                     , rune("Equipment")
                     , React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px"}}
                       , EQUIP_SLOTS.map(slot=>{
                         const item=equipment[slot.key]||null;
-                        return React.createElement('div',{key:slot.key,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:"1px solid rgba(45,42,36,.2)",borderRadius:9,background:"rgba(45,42,36,.1)",minWidth:0}}
-                          , React.createElement('div',{style:{width:30,height:30,borderRadius:7,border:`1px solid ${item?"rgba(180,172,158,.1)":"rgba(180,172,158,.06)"}`,background:item?"rgba(45,42,36,.18)":"rgba(45,42,36,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem",flexShrink:0}},slot.icon)
+                        return React.createElement('div',{key:slot.key,className:"char-equip-slot"}
+                          , React.createElement('div',{className:"char-equip-icon",style:{width:30,height:30,borderRadius:7,border:`1px solid ${item?"rgba(180,172,158,.1)":"rgba(180,172,158,.06)"}`,background:item?"rgba(45,42,36,.18)":"rgba(45,42,36,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem"}},slot.icon)
                           , React.createElement('div',{style:{flex:1,minWidth:0}}
-                            , React.createElement('div',{style:{fontSize:".65rem",color:"#8a8478",fontWeight:600,lineHeight:1.2}},slot.label)
-                            , React.createElement('div',{style:{fontSize:".58rem",color:item?"#b4ac9e":"#3a3834",marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},item||slot.hint)
+                            , React.createElement('div',{className:"char-equip-label",style:{fontWeight:600}},slot.label)
+                            , React.createElement('div',{className:"char-equip-name",style:{color:item?"#b4ac9e":"#3a3834"}},item||slot.hint)
                           )
                         );
                       })
@@ -7170,7 +7171,7 @@ function App() {
                       )
                     );
                   };
-                  return React.createElement("div", {style:{background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"12px 14px",marginBottom:11}},
+                  return React.createElement("div", {className:"profile-section"},
                     React.createElement("div", {className:"profile-rune-divider",style:{margin:"0 0 6px"}},
                       React.createElement("span", {className:"profile-rune-label"}, "⠿ Identity ⠿")),
                     /* Account ID */
@@ -7199,7 +7200,7 @@ function App() {
                 })()
 
                 /* ── COMBAT RECORD — WoW achievement panel / D4 stats tab ── */
-                , React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11}}
+                , React.createElement('div', {className:"profile-section"}
                   , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"}}, React.createElement('span', { className: "profile-rune-label"}, "⠿ Combat Record ⠿"   ))
                   , React.createElement('div', { className: "combat-grid"}
                     , React.createElement('div', { className: "combat-chip"}, React.createElement('span', { className: "combat-chip-val"}, profile.xp.toLocaleString()), React.createElement('span', { className: "combat-chip-lbl"}, "Total XP" ))
@@ -7279,7 +7280,7 @@ function App() {
                     )
                   );
 
-                  return React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11} }
+                  return React.createElement('div', { className:"profile-section" }
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ Personal Bests ⠿"))
                     , filterDrop
                     , visibleEntries.length === 0
@@ -7308,7 +7309,7 @@ function App() {
                 })()
 
                 /* ── PHYSICAL STATS — Final Fantasy XIV character panel style ── */
-                , React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:14}}
+                , React.createElement('div', { className:"profile-section"}
                   , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, `⠿ ${cls.name} Data ⠿`))
                   , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px 16px"}}
                     , [
@@ -7331,7 +7332,7 @@ function App() {
 
                 /* ── ABOUT YOU ── */
                 , (profile.sportsBackground||[]).length>0 || profile.trainingStyle || profile.fitnessPriorities?.length>0 || profile.disciplineTrait || profile.motto ? (
-                  React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11} }
+                  React.createElement('div', { className:"profile-section" }
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ About You ⠿"))
                     , profile.motto && React.createElement('div', { style: {fontSize:".76rem",color:"#b4ac9e",fontStyle:"italic",marginBottom:8,textAlign:"center"} }, `"${profile.motto}"`)
                     , profile.disciplineTrait && React.createElement('div', { style: {marginBottom:7} }
@@ -7881,7 +7882,8 @@ function App() {
                     , items.map(item => {
                       const isOn = item.defaultOff ? prefs[item.key] === true : prefs[item.key] !== false;
                       return React.createElement('div', { key: item.key,
-                        style: {background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:10,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",transition:"border-color .15s",borderColor:isOn?"rgba(46,204,113,.18)":"rgba(45,42,36,.2)"},
+                        className:"profile-notif-row",
+                        style: {cursor:"pointer",borderColor:isOn?"rgba(46,204,113,.18)":"rgba(180,172,158,.05)"},
                         onClick: ()=>toggleNotifPref(item.key) }
                         , React.createElement('span', { style: {fontSize:"1.1rem",flexShrink:0} }, item.icon)
                         , React.createElement('div', { style: {flex:1,minWidth:0} }
