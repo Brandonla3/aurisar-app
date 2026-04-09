@@ -112,7 +112,7 @@
     .cls-mini.sel{border-color:var(--bc)}
     .cls-mini-icon{font-size:1.5rem;display:block;margin-bottom:3px}
     .cls-mini-name{font-family:'Inter',sans-serif;font-size:.62rem;color:#8a8478;letter-spacing:.02em}
-    .edit-panel{--mg-color:#8a8478;background:linear-gradient(145deg,color-mix(in srgb,var(--mg-color) 9%,rgba(45,42,36,.45)),color-mix(in srgb,var(--mg-color) 4%,rgba(32,30,26,.3)));border:1px solid color-mix(in srgb,var(--mg-color) 12%,rgba(180,172,158,.06));border-radius:14px;padding:20px;width:100%;display:flex;flex-direction:column;gap:13px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+    .edit-panel{--mg-color:#8a8478;background:linear-gradient(145deg,color-mix(in srgb,var(--mg-color) 6%,rgba(34,32,26,.92)),color-mix(in srgb,var(--mg-color) 2%,rgba(20,18,14,.9)) 60%,rgba(16,14,10,.92));border:1px solid rgba(180,172,158,.07);border-radius:14px;padding:20px;width:100%;display:flex;flex-direction:column;gap:13px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
     /* Profile Hero Card */
     .profile-hero{position:relative;border:1px solid var(--cls-color,#b4ac9e);border-radius:14px;overflow:hidden;margin-bottom:14px;background:linear-gradient(145deg,rgba(0,0,0,.55),rgba(32,30,26,.25))}
     .profile-hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,color-mix(in srgb,var(--cls-color) 14%,transparent),transparent 60%);pointer-events:none;z-index:0}
@@ -1498,7 +1498,7 @@
     .char-stat-bar{flex:1;height:6px;background:rgba(45,42,36,.2);border-radius:3px;overflow:hidden}
     .char-stat-fill{height:100%;border-radius:3px;transition:width .4s}
     .char-stat-val{font-family:'Cinzel',serif;font-size:.62rem;color:#b4ac9e;width:28px;text-align:right;flex-shrink:0}
-    .char-equip-slot{background:linear-gradient(155deg,rgba(38,35,29,.75),rgba(28,26,20,.6));border:1px solid rgba(180,172,158,.05);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;transition:all .18s}
+    .char-equip-slot{background:linear-gradient(155deg,rgba(30,28,22,.9),rgba(18,16,12,.88));border:1px solid rgba(180,172,158,.06);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;transition:all .18s}
     .char-equip-icon{font-size:.85rem;flex-shrink:0;width:22px;text-align:center;opacity:.5}
     .char-equip-label{font-size:.56rem;color:#6a645a;letter-spacing:.04em;text-transform:uppercase}
     .char-equip-name{font-size:.62rem;color:#8a8478;margin-top:1px}
