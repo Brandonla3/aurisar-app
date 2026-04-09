@@ -7364,7 +7364,7 @@ function App() {
                   , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "✎ Edit Profile"  )
                   , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setEditMode(false)}, "✕ Cancel" )
                 )
-                , React.createElement('div', { className: "edit-panel"}
+                , React.createElement('div', { className: "edit-panel", style: {"--cls-color":cls.color,"--cls-glow":cls.glow}}
 
                   /* ── IDENTITY ── */
                   , React.createElement('div', null

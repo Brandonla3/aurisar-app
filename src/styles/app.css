@@ -112,7 +112,7 @@
     .cls-mini.sel{border-color:var(--bc)}
     .cls-mini-icon{font-size:1.5rem;display:block;margin-bottom:3px}
     .cls-mini-name{font-family:'Inter',sans-serif;font-size:.62rem;color:#8a8478;letter-spacing:.02em}
-    .edit-panel{--mg-color:#8a8478;background:linear-gradient(145deg,color-mix(in srgb,var(--mg-color) 6%,rgba(34,32,26,.92)),color-mix(in srgb,var(--mg-color) 2%,rgba(20,18,14,.9)) 60%,rgba(16,14,10,.92));border:1px solid rgba(180,172,158,.07);border-radius:14px;padding:20px;width:100%;display:flex;flex-direction:column;gap:13px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+    .edit-panel{background:linear-gradient(145deg,color-mix(in srgb,var(--cls-color,#8a8478) 5%,rgba(34,32,26,.92)),color-mix(in srgb,var(--cls-color,#8a8478) 2%,rgba(20,18,14,.9)) 60%,rgba(16,14,10,.92));border:1px solid color-mix(in srgb,var(--cls-color,#8a8478) 10%,rgba(180,172,158,.07));border-radius:14px;padding:20px;width:100%;display:flex;flex-direction:column;gap:13px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
     /* Profile Hero Card */
     .profile-hero{position:relative;border:1px solid var(--cls-color,#b4ac9e);border-radius:14px;overflow:hidden;margin-bottom:14px;background:linear-gradient(145deg,rgba(0,0,0,.55),rgba(32,30,26,.25))}
     .profile-hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,color-mix(in srgb,var(--cls-color) 14%,transparent),transparent 60%);pointer-events:none;z-index:0}
