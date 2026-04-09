@@ -3921,31 +3921,16 @@ function App() {
                           ex.muscleGroup ? ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1) : null,
                           ex.equipment && ex.equipment!=="bodyweight" ? ex.equipment : null,
                         ].filter(Boolean).join(" · ");
+                        const exMgColor = getMuscleColor(ex.muscleGroup);
                         return React.createElement('div', {
                           key:ex.id,
+                          className:`picker-ex-row${isSel?" sel":""}`,
                           onClick:()=>{ if(libSelectMode){ toggleSel(ex.id); } else { setLibDetailEx(ex); } },
-                          style:{
-                            background: isSel
-                              ? "rgba(45,42,36,.25)"
-                              : "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                            border:"1px solid",
-                            borderColor: isSel ? "rgba(180,172,158,.35)" : "rgba(180,172,158,.05)",
-                            borderRadius:10, padding:"11px 13px",
-                            display:"flex", alignItems:"center", gap:12, cursor:"pointer",
-                            boxShadow: isSel
-                              ? "0 0 0 1.5px rgba(180,172,158,.3), 0 4px 20px rgba(180,172,158,.06)"
-                              : "none",
-                            transition:"all .18s",
-                          }
+                          style:{"--mg-color":exMgColor}
                         },
                           /* Icon orb */
-                          React.createElement('div', {style:{
-                            width:34, height:34, borderRadius:8, flexShrink:0,
-                            background:"rgba("+parseInt(getTypeColor(ex.category).slice(1,3),16)+","+parseInt(getTypeColor(ex.category).slice(3,5),16)+","+parseInt(getTypeColor(ex.category).slice(5,7),16)+",.12)",
-                            border:"1px solid rgba("+parseInt(getTypeColor(ex.category).slice(1,3),16)+","+parseInt(getTypeColor(ex.category).slice(3,5),16)+","+parseInt(getTypeColor(ex.category).slice(5,7),16)+",.18)",
-                            display:"flex", alignItems:"center", justifyContent:"center",
-                          }},
-                            React.createElement(ExIcon, {ex:ex, size:"1rem", color:getTypeColor(ex.category)})
+                          React.createElement('div', {className:"picker-ex-orb"},
+                            React.createElement(ExIcon, {ex:ex, size:"1rem", color:"#d4cec4"})
                           ),
                           /* Body */
                           React.createElement('div', {style:{flex:1, minWidth:0}},
@@ -4727,9 +4712,10 @@ function App() {
                       const isC=exD.category==="cardio";
                       const isF=exD.category==="flexibility";
                       const showW=!isC&&!isF;
+                      const exMgColor=getMuscleColor(exD.muscleGroup);
                       return (
-                        React.createElement('div', { key: i, className: "workout-detail-ex"}
-                          , React.createElement('span', { className: "workout-detail-ex-icon"}, exD.icon)
+                        React.createElement('div', { key: i, className: "workout-detail-ex", style: {"--mg-color":exMgColor}}
+                          , React.createElement('div', { className: "workout-detail-ex-orb"}, React.createElement(ExIcon, {ex:exD,size:".95rem",color:"#d4cec4"}))
                           , React.createElement('div', { style: {flex:1,minWidth:0}}
                             , React.createElement('div', { className: "workout-detail-ex-name"}
                               , exD.name
@@ -4745,7 +4731,7 @@ function App() {
                               React.createElement('button', { className: "btn btn-ghost btn-xs"  , title: "Edit custom exercise"  ,
                                 onClick: ()=>openExEditor("edit",exD)}, "✎")
                             )
-                            , React.createElement('div', { style: {fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "+", calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById), " XP" )
+                            , React.createElement('div', { className: "workout-detail-ex-xp"}, "+", calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById), " XP" )
                           )
                         )
                       );
@@ -4911,6 +4897,7 @@ function App() {
                     const runPace=(isRunningEx&&distMiVal>0&&durationMin>0)?durationMin/distMiVal:null;
                     const runBoostPct=runPace?(runPace<=8?20:5):0;
                     const catColor=getTypeColor(exD.category);
+                    const mgColor=getMuscleColor(exD.muscleGroup);
                     /* ── ACCORDION SUPERSET CARD — replaces both solo rows when paired ── */
                     if (partnerIdx!=null && partnerExD) {
                       const totalXP = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById) + calcExXP(partnerEx.exId,partnerEx.sets||3,partnerEx.reps||10,profile.chosenClass,allExById);
@@ -4947,6 +4934,7 @@ function App() {
                         style: {
                           opacity:dragWbExIdx===i?0.5:1,flexDirection:"column",alignItems:"stretch",gap:0,
                           "--cat-color":catColor,
+                          "--mg-color":mgColor,
                         },
                         draggable: true,
                         onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragWbExIdx(i);},
@@ -4976,7 +4964,7 @@ function App() {
                                     React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
                                   )
                                 , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
-                                , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColor} }, exD.icon)
+                                , React.createElement('div', { className: "builder-ex-orb", style: {"--mg-color":mgColor} }, React.createElement(ExIcon, {ex:exD, size:".95rem", color:"#d4cec4"}))
                                 , React.createElement('div', { className: "builder-ex-name-styled"}
                                   , exD.name
                                   , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:4}}, "custom")
@@ -5820,7 +5808,9 @@ function App() {
                             const uniqueExCount = new Set(entries.map(e=>e.exId)).size;
                             const gStats = getEntryStats(first);
                             const hasStats = gStats.durationSec || gStats.activeCal || gStats.totalCal;
-                            return React.createElement('div', { key: gi, className: "log-group-card", style:{marginBottom:8} }
+                            const calGrpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                            const calGrpMgColor = getMuscleColor(calGrpFirstEx && calGrpFirstEx.muscleGroup);
+                            return React.createElement('div', { key: gi, className: "log-group-card", style:{marginBottom:8, "--mg-color":calGrpMgColor} }
                               , React.createElement('div', { className: "log-group-hdr "+(collapsed?"collapsed":""), onClick:()=>toggleLogGroup(cKey), style:{cursor:"pointer"} }
                                 , React.createElement('span', { className: "log-group-icon" }, icon)
                                 , React.createElement('div', { style:{flex:1,minWidth:0} }
@@ -5845,19 +5835,21 @@ function App() {
                                     const ef = exEntries[0];
                                     const exXP = exEntries.reduce((s,e)=>s+e.xp,0);
                                     const isSuperset = exEntries.some(e=>entries.some((o,oi)=>o.exId!==e.exId && o.sourceGroupId===e.sourceGroupId && ((o.supersetWith!=null)||(e.supersetWith!=null))));
-                                    return React.createElement('div', { key:ci, className:"h-entry", style:{marginBottom:4,cursor:"pointer"},
+                                    const efData = allExById[ef.exId];
+                                    const efMgColor = getMuscleColor(efData && efData.muscleGroup);
+                                    return React.createElement('div', { key:ci, className:"h-entry", style:{marginBottom:4,cursor:"pointer","--mg-color":efMgColor},
                                       onClick:()=>setCalExDetailModal({ entries:exEntries, exerciseName:ef.exercise, exerciseIcon:ef.icon,
                                         sourceName:first.sourcePlanName||first.sourceWorkoutName||null, sourceIcon:icon,
                                         totalCal:gStats.totalCal, activeCal:gStats.activeCal, durationSec:gStats.durationSec }) }
-                                      , React.createElement('span', {style:{fontSize:"1rem",flexShrink:0,width:26,textAlign:"center"}}, ef.icon)
+                                      , React.createElement('span', {className:"h-icon"}, ef.icon)
                                       , React.createElement('div', {style:{flex:1,minWidth:0}}
-                                        , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4}}
-                                          , React.createElement('span', {style:{fontSize:".72rem",fontWeight:600,color:"#d4cec4"}}, ef.exercise)
+                                        , React.createElement('div', {className:"h-name", style:{display:"flex",alignItems:"center",gap:4}}
+                                          , React.createElement('span', null, ef.exercise)
                                           , isSuperset && React.createElement('span', {style:{fontSize:".48rem",color:"#b4ac9e",background:"rgba(180,172,158,.1)",padding:"1px 5px",borderRadius:3,fontWeight:600}}, "SS")
                                           , exEntries.length>1 && React.createElement('span', {style:{fontSize:".48rem",color:"#8a8478",background:"rgba(180,172,158,.08)",padding:"1px 5px",borderRadius:3}}, exEntries.length, " sets")
                                         )
                                       )
-                                      , React.createElement('div', {style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e",flexShrink:0}}, "+", exXP, " XP")
+                                      , React.createElement('div', {className:"h-xp"}, "+", exXP, " XP")
                                     );
                                   })
                                 );
@@ -6291,7 +6283,7 @@ function App() {
                 }).map(q=>{
                   const qs=_optionalChain([profile, 'access', _128 => _128.quests, 'optionalAccess', _129 => _129[q.id]])||{};
                   return (
-                    React.createElement('div', { key: q.id, className: "quest-card complete" , style: {border:"1px solid rgba(180,172,158,.08)"}}
+                    React.createElement('div', { key: q.id, className: "quest-card complete"}
                       , React.createElement('div', { className: "quest-top"}
                         , React.createElement('div', { className: "quest-icon-wrap"}, q.icon)
                         , React.createElement('div', { style: {flex:1}}
@@ -6350,8 +6342,9 @@ function App() {
                 const exData = allExById[e.exId];
                 const isC = exData ? exData.category==="cardio" : false;
                 const isF = exData ? exData.category==="flexibility" : false;
+                const exMgColor = getMuscleColor(exData && exData.muscleGroup);
                 return (
-                  React.createElement('div', { className: "h-entry"}
+                  React.createElement('div', { className: "h-entry", style: {"--mg-color":exMgColor}}
                     , React.createElement('span', { className: "h-icon"}, e.icon)
                     , React.createElement('div', { style: {flex:1,minWidth:0}}
                       , React.createElement('div', { className: "h-name"}
@@ -6398,8 +6391,11 @@ function App() {
                       const groupXP=entries.reduce((s,e)=>s+e.xp,0);
                       const displayDate=_optionalChain([entries, 'access', _141 => _141[0], 'optionalAccess', _142 => _142.date])||dk;
                       const collapsed = !openLogGroups["ex_"+dk]; // default collapsed
+                      // Dominant muscle-group color = first valid entry's muscle group
+                      const grpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                      const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
                       return (
-                        React.createElement('div', { key: dk, className: "log-group-card"}
+                        React.createElement('div', { key: dk, className: "log-group-card", style: {"--mg-color":grpMgColor}}
                           , React.createElement('div', { className: `log-group-hdr ${collapsed?"collapsed":""}`,
                             onClick: ()=>toggleLogGroup("ex_"+dk)}
                             , React.createElement('span', { className: "log-group-icon"}, "📅")
@@ -6459,8 +6455,10 @@ function App() {
                   const gid=first.sourceGroupId||first.sourceWorkoutId||String(gi);
                   const collapsed=!openLogGroups[gid];
                   const isOneOff=first.sourceWorkoutType==="oneoff";
+                  const grpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                  const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
                   return (
-                    React.createElement('div', { className: "log-group-card"}
+                    React.createElement('div', { className: "log-group-card", style: {"--mg-color":grpMgColor}}
                       , React.createElement('div', { className: `log-group-hdr ${collapsed?"collapsed":""}`, onClick: ()=>toggleLogGroup(gid)}
                         , React.createElement('span', { className: "log-group-icon"}, first.sourceWorkoutIcon||"💪")
                         , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -6554,8 +6552,10 @@ function App() {
                       const groupXP = entries.reduce((s,e)=>s+e.xp,0);
                       const gid = first.sourceGroupId||first.sourcePlanId||String(gi);
                       const collapsed = !openLogGroups[gid]; // default collapsed, open when toggled
+                      const grpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                      const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
                       return (
-                        React.createElement('div', { key: gid, className: "log-group-card"}
+                        React.createElement('div', { key: gid, className: "log-group-card", style: {"--mg-color":grpMgColor}}
                           , React.createElement('div', { className: `log-group-hdr ${collapsed?"collapsed":""}`, onClick: ()=>toggleLogGroup(gid)}
                             , React.createElement('span', { className: "log-group-icon"}, first.sourcePlanIcon||"📋")
                             , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -7919,7 +7919,8 @@ function App() {
         const age = profile.age||30;
         return (
           React.createElement('div', { className: "ex-editor-backdrop", onClick: ()=>setExEditorOpen(false)}
-            , React.createElement('div', { className: "ex-editor-sheet", onClick: e=>e.stopPropagation()}
+            , React.createElement('div', { className: "ex-editor-sheet", onClick: e=>e.stopPropagation(),
+                style: {"--mg-color": getMuscleColor(ed.muscleGroup||"chest")} }
               , React.createElement('div', { className: "ex-editor-hdr"}
                 , React.createElement('div', null
                   , React.createElement('div', { className: "ex-editor-title"}
@@ -8020,7 +8021,7 @@ function App() {
                 )
 
                 /* ── Default Workout Values ───────────────── */
-                , React.createElement('div', { style: {background:"rgba(45,42,36,.14)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"12px 13px",display:"flex",flexDirection:"column",gap:10}}
+                , React.createElement('div', { className: "ex-editor-section" }
                   , React.createElement('div', { className: "ex-editor-section-title" }, "Default Values When Logging"
 
                   )
@@ -8982,7 +8983,7 @@ function App() {
             , React.createElement('div', { className: "modal-body"}
               /* ── Glass dismiss banner ── */
               , React.createElement('div', {
-                  style: {background:"rgba(45,42,36,.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1px solid rgba(180,172,158,.10)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10,cursor:"pointer"},
+                  className: "stats-prompt-banner",
                   onClick: ()=>{
                     setProfile(p=>({...p,notificationPrefs:{...(p.notificationPrefs||{}),reviewBattleStats:false}}));
                     statsPromptModal.onConfirm(statsPromptModal.wo);
@@ -8990,9 +8991,9 @@ function App() {
                   }
                 }
                 , React.createElement('div', { style: {width:16,height:16,borderRadius:3,border:"1.5px solid rgba(180,172,158,.25)",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0} })
-                , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",lineHeight:1.35} }
+                , React.createElement('div', { className: "stats-prompt-banner-text" }
                   , "Want this reminder off? Check here. To re-enable, you can do so in "
-                  , React.createElement('span', { style: {color:"#b4ac9e",fontWeight:600} }, "Alerts settings")
+                  , React.createElement('strong', null, "Alerts settings")
                   , "."
                 )
               )
@@ -9015,7 +9016,7 @@ function App() {
                       return missing.length ? `${missing.join(", ")} ${missing.length===1?"was":"were"} not recorded. Would you like to add ${missing.length===1?"it":"them"} before completing?` : "Review your workout stats before completing.";
                     })()
               )
-              , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:14}}
+              , React.createElement('div', { className: "stats-prompt-fields"}
                 , React.createElement('div', { className: "field", style: {flex:1.5,marginBottom:0}}
                   , React.createElement('label', null, "Duration " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(HH:MM)"))
                   , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric", placeholder: "00:00",
@@ -9040,14 +9041,14 @@ function App() {
               )
               /* Make Reusable checkbox — only for one-off workouts */
               , statsPromptModal.wo.oneOff&&(
-                React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,marginBottom:14,padding:"10px 12px",background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.06)",borderRadius:9,cursor:"pointer"},
+                React.createElement('div', { className: "stats-prompt-reusable",
                   onClick: ()=>setSpMakeReusable(v=>!v)}
-                  , React.createElement('div', { style: {width:18,height:18,borderRadius:4,border:`2px solid ${spMakeReusable?"#b4ac9e":"rgba(180,172,158,.08)"}`,background:spMakeReusable?"#b4ac9e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}
+                  , React.createElement('div', { style: {width:18,height:18,borderRadius:4,border:`2px solid ${spMakeReusable?"#b4ac9e":"rgba(180,172,158,.18)"}`,background:spMakeReusable?"#b4ac9e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}
                     , spMakeReusable&&React.createElement('span', { style: {fontSize:".7rem",color:"#0c0c0a",fontWeight:"bold"}}, "✓")
                   )
                   , React.createElement('div', null
-                    , React.createElement('div', { style: {fontSize:".72rem",color:"#d4cec4",fontWeight:600}}, "💪 Also save as Reusable Workout"     )
-                    , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",marginTop:2}}, "Keep this workout in your Re-Usable tab for future use"         )
+                    , React.createElement('div', { className: "stats-prompt-reusable-title"}, "💪 Also save as Reusable Workout"     )
+                    , React.createElement('div', { className: "stats-prompt-reusable-sub"}, "Keep this workout in your Re-Usable tab for future use"         )
                   )
                 )
               )
@@ -9362,6 +9363,9 @@ function App() {
       , completionModal && (()=>{
         const wo = completionModal.workout;
         const xp = wo.exercises.reduce((s,ex)=>s+calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById),0);
+        // Pick the dominant muscle group from the workout's first valid exercise as the theme color
+        const firstEx = wo.exercises.map(e=>allExById[e.exId]).find(Boolean);
+        const woMgColor = getMuscleColor(firstEx?.muscleGroup);
         // inPickMode: true when user tapped "Choose Day" or selected a specific date
         // pickerValue: the actual date string when a date is selected
         const inPickMode = completionAction==="past";
@@ -9369,7 +9373,7 @@ function App() {
         const pickerValue = (inPickMode && completionDate!=="pick") ? completionDate : "";
         return (
           React.createElement('div', { className: "completion-backdrop", onClick: ()=>{setCompletionModal(null);setCompletionAction("today");setScheduleWoDate("");}}
-            , React.createElement('div', { className: "completion-sheet", onClick: e=>e.stopPropagation()}
+            , React.createElement('div', { className: "completion-sheet", onClick: e=>e.stopPropagation(), style: {"--mg-color":woMgColor}}
               /* Header */
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8} }
                 , completionModal.fromStats && React.createElement('button', {
@@ -9465,9 +9469,9 @@ function App() {
 
               /* XP preview — only for log actions */
               , (completionAction==="today"||(inPickMode&&pickerValue))&&(
-                React.createElement('div', { style: {background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.06)",borderRadius:9,padding:"10px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-                  , React.createElement('div', { style: {fontSize:".7rem",color:"#5a5650"}}, "XP to be claimed"   )
-                  , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:"1rem",color:"#b4ac9e"}}, "⚡ " , xp.toLocaleString())
+                React.createElement('div', { className: "completion-xp-preview"}
+                  , React.createElement('div', { className: "completion-xp-preview-label"}, "XP to be claimed"   )
+                  , React.createElement('div', { className: "completion-xp-preview-value"}, "⚡ " , xp.toLocaleString())
                 )
               )
 

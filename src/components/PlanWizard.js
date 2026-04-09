@@ -951,20 +951,20 @@ function PlanWizard(props) {
               return React.createElement(React.Fragment,null,
                 React.createElement('div',{style:{fontSize:".62rem",color:"#5a5650",marginBottom:6,textAlign:"right"}},
                   (q||pickerMuscle!=="All"||pickerTypeFilter!=="all"||pickerEquipFilter!=="all")?filtered.length+" match"+(filtered.length!==1?"es":""):"Showing 80 of "+filtered.length+" \u00B7 search or filter"),
-                React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:5}},
+                React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:6}},
                   visible.map(ex=>{
                     const sel=selIds.has(ex.id);
                     const diffLabel=ex.difficulty||(ex.baseXP>=60?"Advanced":ex.baseXP>=45?"Intermediate":"Beginner");
                     const diffColor=diffLabel==="Advanced"?"#7A2838":diffLabel==="Beginner"?"#5A8A58":"#A8843C";
                     const diffBg=diffLabel==="Advanced"?"#2e1515":diffLabel==="Beginner"?"#1a2e1a":"#2e2010";
-                    const subParts=[ex.category?ex.category.charAt(0).toUpperCase()+ex.category.slice(1):null,ex.muscleGroup?ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1):null].filter(Boolean).join(" \u00B7 ");
-                    return React.createElement('div',{key:ex.id,onClick:()=>pickerToggleEx(ex.id),style:{background:sel?"rgba(45,42,36,.25)":"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",border:"1px solid "+(sel?"rgba(180,172,158,.35)":"rgba(180,172,158,.05)"),borderRadius:9,padding:"9px 12px",display:"flex",alignItems:"center",gap:11,cursor:"pointer",boxShadow:sel?"0 0 0 1.5px rgba(180,172,158,.3),0 3px 14px rgba(180,172,158,.06)":"none",transition:"all .15s"}},
-                      React.createElement('div',{style:{width:30,height:30,borderRadius:7,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},React.createElement(ExIcon,{ex:ex,size:".9rem",color:getTypeColor(ex.category)})),
+                    const exMgColor=getMuscleColor(ex.muscleGroup);
+                    return React.createElement('div',{key:ex.id,className:"picker-ex-row"+(sel?" sel":""),style:{"--mg-color":exMgColor},onClick:()=>pickerToggleEx(ex.id)},
+                      React.createElement('div',{className:"picker-ex-orb"},React.createElement(ExIcon,{ex:ex,size:".95rem",color:"#d4cec4"})),
                       React.createElement('div',{style:{flex:1,minWidth:0}},
-                        React.createElement('div',{style:{fontSize:".8rem",fontWeight:600,color:sel?"#d4cec4":"#d4cec4",marginBottom:2}},ex.name,ex.custom&&React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:4}},"custom")),
-                        React.createElement('div',{style:{fontSize:".6rem",fontStyle:"italic"}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," \u00B7 "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))),
+                        React.createElement('div',{style:{fontFamily:"'Cinzel',serif",fontSize:".8rem",fontWeight:600,color:"#d4cec4",marginBottom:2,letterSpacing:".01em"}},ex.name,ex.custom&&React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:4}},"custom")),
+                        React.createElement('div',{style:{fontSize:".6rem",fontStyle:"italic"}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," \u00B7 "), ex.muscleGroup&&React.createElement('span',{style:{color:exMgColor}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))),
                       React.createElement('div',{style:{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}},
-                        React.createElement('span',{style:{fontSize:".63rem",fontWeight:700,color:"#b4ac9e"}},ex.baseXP+" XP"),
+                        React.createElement('span',{style:{fontFamily:"'Cinzel',serif",fontSize:".63rem",fontWeight:700,color:"#d4cec4",letterSpacing:".04em"}},ex.baseXP+" XP"),
                         React.createElement('span',{style:{fontSize:".56rem",fontWeight:700,color:diffColor,background:diffBg,padding:"1px 6px",borderRadius:3,letterSpacing:".04em"}},diffLabel))
                     );
                   })
