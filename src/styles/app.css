@@ -2,6 +2,7 @@
     @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600&family=Inter:wght@400;500;600;700&display=swap');
     
     *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bottom-nav-h:calc(58px + env(safe-area-inset-bottom,0px))}
     html{font-size:17.333px}
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
     .bg{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 60% at 30% 20%,rgba(45,42,36,.3) 0%,transparent 65%),radial-gradient(ellipse 50% 45% at 70% 75%,rgba(32,30,26,.18) 0%,transparent 55%),#0c0c0a}.bg::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 45%,transparent 40%,rgba(0,0,0,.2) 100%);z-index:0}
@@ -53,15 +54,17 @@
     .xp-track{height:5px;background:rgba(45,42,36,.18);border-radius:3px;overflow:hidden;margin-top:4px}
     .xp-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cls-color),var(--cls-glow));transition:width .6s ease}
     .xp-lbl{display:flex;justify-content:space-between;font-size:.6rem;color:#8a8478;margin-top:2px}
-    /* Tabs */
-    .tabs{display:flex;gap:3px;margin-bottom:11px;background:rgba(45,42,36,.3);border-radius:8px;padding:3px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-    .tab{flex:1;padding:11px 2px;text-align:center;font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.03em;color:#8a8478;border-radius:6px;cursor:pointer;transition:all .2s;border:none;background:transparent;line-height:1.3;position:relative}
-    .tab.on{background:rgba(180,172,158,.06);color:#d4cec4}
-    .hud-nav-panel{background:linear-gradient(160deg,rgba(45,42,36,.35),rgba(32,30,26,.2));border:1px solid rgba(180,172,158,.05);border-radius:14px;margin-bottom:11px;overflow:hidden;position:relative;box-shadow:0 4px 24px rgba(0,0,0,.3);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-    .hud-nav-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:none;pointer-events:none;z-index:1}
-    .hud-checkin-strip{padding:13px 15px 12px;border-top:1px solid rgba(180,172,158,.04)}
-    .tab-badge{position:absolute;top:3px;right:6px;background:#e74c3c;color:#fff;border-radius:50%;width:13px;height:13px;font-size:.45rem;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif}
-    .scroll-area{flex:1;overflow-y:auto;padding-bottom:20px}
+    /* Tabs — Bottom Tab Bar (iOS material) */
+    .hud-nav-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(20,18,14,.78);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:0.5px solid rgba(180,172,158,.14);border-radius:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));margin:0;z-index:100;box-shadow:0 -2px 16px rgba(0,0,0,.35)}
+    .tabs{display:flex;gap:0;background:transparent;border-radius:0;padding:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+    .tab{flex:1;padding:7px 2px 5px;text-align:center;font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.06em;text-transform:uppercase;color:#6a6050;border-radius:8px;cursor:pointer;transition:color .18s,background .18s;border:none;background:transparent;line-height:1.25;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;-webkit-tap-highlight-color:transparent}
+    .tab .tab-icon{display:flex;align-items:center;justify-content:center;width:22px;height:22px;transition:transform .18s}
+    .tab.on{color:#d4cec4;background:transparent}
+    .tab.on .tab-icon{transform:translateY(-1px)}
+    .tab:active .tab-icon{transform:scale(.88)}
+    .tab-badge{position:absolute;top:2px;right:calc(50% - 18px);background:#e74c3c;color:#fff;border-radius:50%;width:14px;height:14px;font-size:.46rem;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-weight:700;box-shadow:0 0 0 2px rgba(20,18,14,.78)}
+    .hud-checkin-strip{display:flex;align-items:center;gap:10px;padding:11px 14px;background:linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2));border:1px solid rgba(180,172,158,.05);border-radius:12px;margin-bottom:14px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
     .scroll-area::-webkit-scrollbar{width:3px}
     .scroll-area::-webkit-scrollbar-thumb{background:rgba(45,42,36,.3);border-radius:2px}
     .sec{font-family:'Inter',sans-serif;font-size:.6rem;color:#8a8478;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid rgba(180,172,158,.04)}
@@ -233,8 +236,8 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .reveal-name{font-family:'Inter',sans-serif;font-size:1.35rem;color:var(--cls-glow);margin-bottom:7px}
     /* EX PICKER */
-    .ex-picker-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9100;display:flex;align-items:flex-end;justify-content:center}
-    .ex-picker-sheet{background:rgba(14,14,12,.88);border:1px solid rgba(180,172,158,.05);border-radius:16px 16px 0 0;padding:17px;width:100%;max-width:520px;max-height:70vh;overflow-y:auto;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+    .ex-picker-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9100;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .ex-picker-sheet{background:rgba(14,14,12,.88);border:1px solid rgba(180,172,158,.05);border-radius:16px 16px 0 0;padding:17px;width:100%;max-width:520px;max-height:calc(70vh - var(--bottom-nav-h));overflow-y:auto;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
     .ex-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
     .ex-pick-item{background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);border-radius:9px;padding:9px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:8px}
     .ex-pick-item:hover{background:rgba(45,42,36,.22);border-color:rgba(180,172,158,.07)}
@@ -242,8 +245,8 @@
     .ex-pick-name{font-size:.74rem;color:#b4ac9e;line-height:1.2}
     .ex-pick-xp{font-size:.6rem;color:#b4ac9e;margin-top:2px}
     /* EXERCISE DETAIL MODAL */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9300;display:flex;align-items:flex-end;justify-content:center}
-    .modal-sheet{background:linear-gradient(160deg,rgba(18,18,14,.88),rgba(12,12,10,.92));border:1px solid rgba(180,172,158,.05);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9300;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .modal-sheet{background:linear-gradient(160deg,rgba(18,18,14,.88),rgba(12,12,10,.92));border:1px solid rgba(180,172,158,.05);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:calc(88vh - var(--bottom-nav-h));overflow-y:auto;display:flex;flex-direction:column;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
     .modal-img-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:14px 14px 0}
     .modal-img{width:100%;height:160px;object-fit:cover;border-radius:10px;background:rgba(45,42,36,.15)}
     .modal-img-placeholder{width:100%;height:160px;border-radius:10px;background:linear-gradient(135deg,color-mix(in srgb,var(--cls-color) 14%,transparent),rgba(45,42,36,.12));display:flex;align-items:center;justify-content:center;font-size:3rem}
@@ -311,7 +314,7 @@
     .hist-date-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid rgba(180,172,158,.04)}
     .hist-date-lbl{font-family:'Inter',sans-serif;font-size:.58rem;color:#5a5650;letter-spacing:.1em}
     /* LOG SUB-TABS */
-    .log-subtab-bar{display:flex;gap:0;border:1px solid rgba(180,172,158,.05);border-radius:9px;overflow:hidden;margin-bottom:14px;flex-shrink:0;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .log-subtab-bar{display:flex;gap:0;border:none;border-radius:10px;overflow:visible;margin-bottom:14px;flex-shrink:0;background:rgba(45,42,36,.55);padding:3px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 rgba(0,0,0,.18)}
     .friend-card{background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.06);border-radius:12px;padding:13px 14px;margin-bottom:10px}
     .friend-card-top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
     .friend-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:rgba(45,42,36,.18);border:1.5px solid rgba(180,172,158,.06);flex-shrink:0}
@@ -319,9 +322,9 @@
     .friend-meta{font-size:.65rem;color:#8a8478;margin-top:2px}
     .friend-recent{background:rgba(45,42,36,.12);border-radius:8px;padding:8px 10px;font-size:.68rem;color:#8a8478;margin-top:6px;border:1px solid rgba(180,172,158,.05)}
     .req-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(45,42,36,.14);border:1px solid rgba(180,172,158,.06);border-radius:10px;margin-bottom:8px}
-    .log-subtab-btn{flex:1;padding:7px 6px;text-align:center;font-family:'Inter',sans-serif;font-size:.55rem;letter-spacing:.05em;cursor:pointer;transition:all .2s;color:#5a5650;background:rgba(45,42,36,.12);border:none;border-right:1px solid rgba(180,172,158,.06)}
+    .log-subtab-btn{flex:1;padding:7px 12px;text-align:center;font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.06em;cursor:pointer;transition:all .22s ease;color:#8a8478;background:transparent;border:none;border-radius:8px;text-transform:uppercase;-webkit-tap-highlight-color:transparent}
     .log-subtab-btn:last-child{border-right:none}
-    .log-subtab-btn.on{background:rgba(45,42,36,.24);color:#b4ac9e}
+    .log-subtab-btn.on{background:rgba(180,172,158,.16);color:#d4cec4;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.2)}
     /* SOURCE BADGE on log entries */
     .log-source-badge{display:inline-flex;align-items:center;gap:3px;font-size:.56rem;padding:1px 6px;border-radius:4px;margin-left:5px;font-family:'Inter',sans-serif;letter-spacing:.02em;vertical-align:middle}
     .log-source-badge.plan{background:rgba(45,42,36,.2);color:#b4ac9e;border:1px solid rgba(180,172,158,.06)}
@@ -339,11 +342,14 @@
     .log-group-chevron.open{transform:rotate(180deg)}
     .log-group-body{padding:8px 10px;display:flex;flex-direction:column;gap:5px}
     /* LOG EDIT MODAL */
-    .ledit-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:88;display:flex;align-items:flex-end;justify-content:center}
-    .ledit-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:13px}
+    .ledit-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:88;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .ledit-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(88vh - var(--bottom-nav-h));overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:13px}
     /* INTENSITY PANEL */
 
     .intensity-title{font-family:'Inter',sans-serif;font-size:.58rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+    /* LIBRARY HOME — sticky translucent search bar (iOS material) */
+    .lib-sticky-search{position:sticky;top:-1px;z-index:5;margin:0 -12px 10px;padding:8px 12px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
+
     /* LIBRARY HOME SCROLL */
     .lib-hscroll-wrap{position:relative;overflow:hidden}
     .lib-hscroll-wrap::before,.lib-hscroll-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:28px;z-index:2;pointer-events:none;transition:opacity .25s}
@@ -351,7 +357,7 @@
     .lib-hscroll-wrap::after{right:0;background:linear-gradient(to left,rgba(10,10,8,1) 0%,transparent 100%);opacity:1}
     .lib-hscroll-wrap.fade-left::before{opacity:1}
     .lib-hscroll-wrap.fade-right-off::after{opacity:0}
-    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent}
+    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent;scroll-snap-type:x mandatory;scroll-padding-left:2px}
     .lib-hscroll::-webkit-scrollbar{height:6px}
     .lib-hscroll::-webkit-scrollbar-track{background:rgba(45,42,36,.15);border-radius:3px}
     .lib-hscroll::-webkit-scrollbar-thumb{background:rgba(180,172,158,.25);border-radius:3px}
@@ -359,6 +365,131 @@
     /* Glass exercise cards */
     .lib-glass-card{background:rgba(255,255,255,.03)!important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(180,172,158,.1)!important;box-shadow:0 2px 12px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.04);transition:all .2s}
     .lib-glass-card:hover{background:rgba(255,255,255,.06)!important;border-color:rgba(180,172,158,.18)!important;box-shadow:0 4px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06)}
+
+    /* ── LIBRARY HOME: Section Layout ── */
+    @keyframes libFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+    .lib-home-section{animation:libFadeUp .4s ease-out both}
+    .lib-home-section:nth-child(2){animation-delay:.08s}
+    .lib-home-section:nth-child(3){animation-delay:.16s}
+    .lib-home-section:nth-child(4){animation-delay:.22s}
+    .lib-home-section:nth-child(5){animation-delay:.28s}
+
+    .lib-section-hdr{font-family:'Cinzel',serif;font-size:.8rem;font-weight:600;color:#b4ac9e;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .lib-section-hdr .lib-hdr-icon{font-size:.9rem;opacity:.7}
+    .lib-see-all{background:transparent;border:none;color:#6a6050;font-size:.65rem;cursor:pointer;padding:2px 0;transition:color .2s;font-family:'Inter',sans-serif;letter-spacing:.02em}
+    .lib-see-all:hover{color:#b4ac9e}
+    .lib-divider{height:1px;margin:22px 0;background:linear-gradient(90deg,transparent,rgba(180,172,158,.1) 20%,rgba(180,172,158,.14) 50%,rgba(180,172,158,.1) 80%,transparent)}
+
+    /* ── LIBRARY HOME: Hero Cards (Your Exercises) ── */
+    .lib-hero-card{
+      position:relative;min-width:108px;max-width:108px;flex-shrink:0;border-radius:11px;
+      padding:12px 8px 10px;cursor:pointer;text-align:center;
+      display:flex;flex-direction:column;align-items:center;gap:6px;
+      background:linear-gradient(165deg,color-mix(in srgb,var(--mg-color) 10%,rgba(45,42,36,.35)),rgba(32,30,26,.2) 60%,color-mix(in srgb,var(--mg-color) 5%,rgba(20,18,14,.3)));
+      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.03);
+      transition:all .22s;overflow:hidden;scroll-snap-align:start;-webkit-tap-highlight-color:transparent
+    }
+    .lib-hero-card:active{transform:scale(.97);transition:transform .1s ease}
+    .lib-hero-card::before{
+      content:'';position:absolute;top:0;left:10%;right:10%;height:1.5px;
+      background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.35;transition:opacity .22s
+    }
+    .lib-hero-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--mg-color) 28%,transparent);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 20px color-mix(in srgb,var(--mg-color) 10%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
+    .lib-hero-card:hover::before{opacity:.65}
+
+    @keyframes libOrbGlow{0%,100%{box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 16px color-mix(in srgb,var(--mg-color) 15%,transparent),inset 0 0 8px rgba(0,0,0,.4)}50%{box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 22px color-mix(in srgb,var(--mg-color) 25%,transparent),inset 0 0 8px rgba(0,0,0,.3)}}
+    .lib-hero-orb{
+      width:42px;height:42px;border-radius:10px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 28%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 12%,rgba(25,23,18,.6)));
+      box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 16px color-mix(in srgb,var(--mg-color) 15%,transparent),inset 0 0 8px rgba(0,0,0,.4);
+      animation:libOrbGlow 4s ease-in-out infinite
+    }
+    .lib-hero-name{font-size:.66rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
+    .lib-muscle-pill{padding:2px 7px;border-radius:9px;font-size:.48rem;font-weight:600;letter-spacing:.02em;color:var(--mg-color);background:color-mix(in srgb,var(--mg-color) 12%,transparent);border:1px solid color-mix(in srgb,var(--mg-color) 15%,transparent);text-transform:capitalize}
+
+    /* ── LIBRARY HOME: Muscle Tiles (Browse by Muscle) ── */
+    .lib-muscle-tile{
+      position:relative;overflow:hidden;border-radius:11px;padding:11px 12px;cursor:pointer;
+      display:flex;align-items:center;gap:10px;min-height:62px;
+      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 15%,rgba(45,42,36,.38)),color-mix(in srgb,var(--mg-color) 5%,rgba(32,30,26,.2)));
+      border:1px solid color-mix(in srgb,var(--mg-color) 22%,transparent);
+      border-left:3px solid color-mix(in srgb,var(--mg-color) 40%,transparent);
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      box-shadow:0 2px 12px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.02);
+      transition:all .22s;-webkit-tap-highlight-color:transparent
+    }
+    .lib-muscle-tile:active{transform:scale(.97);transition:transform .1s ease}
+    .lib-muscle-tile:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 32%,transparent);box-shadow:0 6px 22px rgba(0,0,0,.4),0 0 16px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
+    .lib-muscle-tile .lib-tile-watermark{position:absolute;top:4px;right:8px;font-size:2rem;opacity:.07;pointer-events:none;filter:grayscale(.3)}
+    .lib-tile-orb{
+      width:32px;height:32px;border-radius:9px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 25%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 10%,rgba(25,23,18,.6)));
+      box-shadow:0 2px 8px rgba(0,0,0,.4),inset 0 0 6px rgba(0,0,0,.3)
+    }
+    .lib-tile-name{font-family:'Cinzel',serif;font-size:.7rem;font-weight:600;color:#d4cec4;letter-spacing:.02em}
+    .lib-tile-count{font-size:.55rem;color:var(--mg-color);font-weight:500;margin-top:2px}
+
+    /* ── EXERCISE PICKER: Themed Selection Rows (Add Exercise screens) ── */
+    .picker-ex-row{
+      --mg-color:#B0A090;
+      position:relative;border-radius:10px;padding:9px 12px;cursor:pointer;
+      display:flex;align-items:center;gap:11px;
+      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 11%,rgba(45,42,36,.36)),color-mix(in srgb,var(--mg-color) 4%,rgba(32,30,26,.2)));
+      border:1px solid color-mix(in srgb,var(--mg-color) 16%,transparent);
+      border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      box-shadow:0 2px 10px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.025);
+      transition:all .18s;-webkit-tap-highlight-color:transparent
+    }
+    .picker-ex-row:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--mg-color) 26%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.32),0 0 12px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
+    .picker-ex-row:active{transform:scale(.985);transition:transform .1s ease}
+    .picker-ex-row.sel{
+      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 22%,rgba(45,42,36,.4)),color-mix(in srgb,var(--mg-color) 9%,rgba(32,30,26,.25)));
+      border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
+      border-left-color:color-mix(in srgb,var(--mg-color) 70%,transparent);
+      box-shadow:0 0 0 1.5px color-mix(in srgb,var(--mg-color) 35%,transparent),0 4px 16px color-mix(in srgb,var(--mg-color) 12%,rgba(0,0,0,.3))
+    }
+    .picker-ex-orb{
+      width:34px;height:34px;border-radius:9px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 26%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 10%,rgba(25,23,18,.62)));
+      box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 10px color-mix(in srgb,var(--mg-color) 10%,transparent),inset 0 0 6px rgba(0,0,0,.3)
+    }
+
+    /* ── LIBRARY HOME: Discover Cards ── */
+    .lib-discover-card{
+      position:relative;min-width:125px;max-width:125px;flex-shrink:0;border-radius:11px;
+      padding:12px 8px 10px;cursor:pointer;text-align:center;
+      display:flex;flex-direction:column;align-items:center;gap:6px;overflow:hidden;
+      background:linear-gradient(160deg,color-mix(in srgb,var(--mg-color) 6%,rgba(45,42,36,.32)),rgba(32,30,26,.18));
+      border:1px solid color-mix(in srgb,var(--mg-color) 12%,transparent);
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      box-shadow:0 2px 10px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.03);
+      transition:all .22s;scroll-snap-align:start;-webkit-tap-highlight-color:transparent
+    }
+    .lib-discover-card:active{transform:scale(.97);transition:transform .1s ease}
+    .lib-discover-card::before{
+      content:'';position:absolute;top:0;left:15%;right:15%;height:1px;
+      background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.25;transition:opacity .22s
+    }
+    .lib-discover-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 20%,transparent);box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
+    .lib-discover-card:hover::before{opacity:.5}
+    .lib-discover-orb{
+      width:40px;height:40px;border-radius:10px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 22%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 8%,rgba(25,23,18,.6)));
+      box-shadow:0 2px 10px rgba(0,0,0,.45),inset 0 0 6px rgba(0,0,0,.35)
+    }
+    .lib-discover-name{font-size:.65rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
+    .lib-diff-badge{padding:1px 6px;border-radius:8px;font-size:.5rem;font-weight:700;letter-spacing:.02em;text-transform:capitalize}
+    .lib-diff-beginner{background:rgba(90,138,88,.12);color:#6aaa68;border:1px solid rgba(90,138,88,.2)}
+    .lib-diff-intermediate{background:rgba(168,132,60,.12);color:#c4a044;border:1px solid rgba(168,132,60,.2)}
+    .lib-diff-advanced{background:rgba(122,40,56,.14);color:#c45868;border:1px solid rgba(122,40,56,.22)}
+    .lib-discover-meta{display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center}
 
     /* CATEGORY FILTER */
     .cat-filter{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px}
@@ -380,8 +511,8 @@
     .dist-input-wrap{display:flex;align-items:center;gap:8px}
     .dist-unit-lbl{font-family:'Inter',sans-serif;font-size:.76rem;color:#b4ac9e;flex-shrink:0}
     /* EXERCISE EDITOR MODAL */
-    .ex-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9200;display:flex;align-items:flex-end;justify-content:center}
-    .ex-editor-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.06);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto}
+    .ex-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9200;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .ex-editor-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.06);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:calc(92vh - var(--bottom-nav-h));overflow-y:auto}
     .ex-editor-body{padding:16px;display:flex;flex-direction:column;gap:12px}
     .ex-editor-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
     .ex-editor-title{font-family:'Inter',sans-serif;font-size:.84rem;color:#d4cec4}
@@ -407,8 +538,8 @@
     .ex-edit-btn{position:absolute;top:7px;left:7px;font-size:.58rem;color:#5a5650;cursor:pointer;width:18px;height:18px;border-radius:50%;background:rgba(45,42,36,.15);display:flex;align-items:center;justify-content:center;transition:all .2s}
     .ex-edit-btn:hover{color:#b4ac9e;background:rgba(45,42,36,.22)}
     /* SAVE-AS-PLAN WIZARD */
-    .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center}
-    .spw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+    .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .spw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
     .spw-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
     .spw-title{font-family:'Inter',sans-serif;font-size:.88rem;color:#d4cec4}
     .spw-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
@@ -490,8 +621,8 @@
     .cdel-name{color:#d4cec4;font-weight:bold}
     .cdel-warning{font-size:.65rem;color:rgba(231,76,60,.8);text-align:center;font-style:italic}
     /* Save-as-workout wizard */
-    .saw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center}
-    .saw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+    .saw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .saw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
     /* CALENDAR */
     .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
     .cal-month-lbl{font-family:'Inter',sans-serif;font-size:.82rem;color:#d4cec4;letter-spacing:.07em}
@@ -635,8 +766,8 @@
     .icon-opt.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.28);box-shadow:0 0 8px rgba(180,172,158,.08)}
 
     /* ── Exercise Editor Modal ── */
-    .ex-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9200;display:flex;align-items:flex-end;justify-content:center}
-    .ex-editor-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.7)}
+    .ex-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9200;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .ex-editor-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:calc(92vh - var(--bottom-nav-h));overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.7)}
     .ex-editor-sheet::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.04),transparent);position:sticky;top:0;z-index:1}
     .ex-editor-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 0}
     .ex-editor-title{font-family:'Cinzel',serif;font-size:.88rem;color:#d4cec4;letter-spacing:.04em}
@@ -645,7 +776,7 @@
     .ex-editor-section-title{font-family:'Cinzel',serif;font-size:.56rem;color:rgba(180,172,158,.35);letter-spacing:.18em;text-transform:uppercase}
 
     /* ── Stats / Review Modal ── */
-    .modal-sheet{background:linear-gradient(160deg,rgba(18,18,14,.88),rgba(12,12,10,.92));border:1px solid rgba(180,172,158,.05);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+    .modal-sheet{background:linear-gradient(160deg,rgba(18,18,14,.88),rgba(12,12,10,.92));border:1px solid rgba(180,172,158,.05);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:calc(88vh - var(--bottom-nav-h));overflow-y:auto;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
     .modal-sheet::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.04),transparent)}
     .modal-title{font-family:'Cinzel',serif;font-size:1.0rem;color:#d4cec4;margin-bottom:4px;letter-spacing:.04em}
     .modal-muscles{font-size:.7rem;color:var(--cls-color);font-style:italic;margin-bottom:11px;font-family:'Cinzel',serif;letter-spacing:.04em}
@@ -681,9 +812,20 @@
     .inp::placeholder{color:#4a4438}
 
     /* ── Builder back/cancel header ── */
-    .builder-nav-hdr{display:flex;align-items:center;gap:9px;margin-bottom:12px}
-    .builder-nav-title{font-family:'Cinzel',serif;font-size:.78rem;color:#d4cec4;letter-spacing:.05em;flex:1}
-    .builder-nav-sub{font-size:.58rem;color:#5a5650;margin-top:2px;font-style:italic;font-family:'Inter',sans-serif}
+    .builder-nav-hdr{display:flex;align-items:center;gap:9px;margin-bottom:14px;padding:10px 12px;border-radius:12px;background:linear-gradient(155deg,rgba(45,42,36,.32),rgba(32,30,26,.18));border:1px solid rgba(180,172,158,.07);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.03);position:relative;overflow:hidden}
+    .builder-nav-hdr::before{content:'';position:absolute;top:0;left:14%;right:14%;height:1.5px;background:linear-gradient(90deg,transparent,rgba(196,160,68,.5),transparent);opacity:.5;pointer-events:none}
+    .builder-nav-title{font-family:'Cinzel',serif;font-size:.82rem;color:#d4cec4;letter-spacing:.06em;flex:1;text-transform:uppercase}
+    .builder-nav-sub{font-size:.58rem;color:#8a7858;margin-top:2px;font-style:italic;font-family:'Inter',sans-serif;letter-spacing:.02em}
+
+    /* ── Builder section panels (glass cards) ── */
+    .wb-section{position:relative;background:linear-gradient(155deg,rgba(45,42,36,.3),rgba(32,30,26,.16) 60%,rgba(20,18,14,.22));border:1px solid rgba(180,172,158,.07);border-radius:12px;padding:13px 14px 12px;margin-bottom:11px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 2px 12px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.025);overflow:hidden}
+    .wb-section::before{content:'';position:absolute;top:0;left:14%;right:14%;height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.18),transparent);opacity:.5;pointer-events:none}
+    .wb-section-hdr{font-family:'Cinzel',serif;font-size:.62rem;color:rgba(196,160,68,.85);letter-spacing:.14em;text-transform:uppercase;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+    .wb-section-hdr-icon{font-size:.78rem;opacity:.85}
+    .wb-section .field{margin-bottom:0}
+    .wb-section .field+.field{margin-top:9px}
+    .wb-stats-row{display:flex;gap:8px;flex-wrap:wrap}
+    .wb-stats-row .field{flex:1;min-width:80px}
 
     /* ── Plan Wizard Full-Screen Overlay ── */
     .plan-wizard-backdrop{position:fixed;inset:0;background:rgba(12,12,10,.97);z-index:9000;display:flex;flex-direction:column;align-items:center;overflow:hidden}
@@ -735,11 +877,14 @@
     .rpg-sec-line-r{background:linear-gradient(270deg,transparent,rgba(180,172,158,.06))}
     .rpg-sec-title{font-family:'Cinzel',serif;font-size:.62rem;color:rgba(180,172,158,.4);letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
 
-    /* ── Tab bar ── */
-    .tabs{display:flex;gap:0;margin-bottom:0;background:transparent;border:none;border-radius:0;padding:0;border-bottom:1px solid rgba(180,172,158,.05)}
-    .tab{flex:1;padding:11px 4px 10px;text-align:center;font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.06em;color:#6a645a;border-radius:0;cursor:pointer;transition:all .2s;border:none;background:transparent;line-height:1.45;position:relative;white-space:pre-line;text-transform:uppercase}
-    .tab:hover{color:#b4ac9e;background:rgba(45,42,36,.12)}
-    .tab.on{color:#d4cec4;background:transparent;box-shadow:none;border-bottom:2px solid rgba(180,172,158,.2);margin-bottom:-1px}
+    /* ── Tab bar (bottom nav — overrides early definition) ── */
+    .tabs{display:flex;gap:0;margin-bottom:0;background:transparent;border:none;border-radius:0;padding:0}
+    .tab{flex:1;padding:7px 2px 5px;text-align:center;font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.06em;color:#6a6050;border-radius:8px;cursor:pointer;transition:color .18s,background .18s;border:none;background:transparent;line-height:1.25;position:relative;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:3px;-webkit-tap-highlight-color:transparent}
+    .tab .tab-icon{display:flex;align-items:center;justify-content:center;width:22px;height:22px;transition:transform .18s}
+    .tab:hover{color:#b4ac9e}
+    .tab.on{color:#d4cec4;background:transparent;box-shadow:none;border-bottom:none;margin-bottom:0}
+    .tab.on .tab-icon{transform:translateY(-1px)}
+    .tab:active .tab-icon{transform:scale(.88)}
 
     /* ── Multi-select Category Filter ── */
     .filter-section{margin-bottom:10px;display:flex;flex-direction:column;gap:7px}
@@ -762,19 +907,50 @@
     .grim-fav-btn:hover{opacity:.8;transform:scale(1.15)}
     .grim-fav-btn.faved{opacity:1;color:#b4ac9e;filter:drop-shadow(0 0 4px rgba(180,172,158,.4))}
 
-    /* ── Workout cards (Forge tab) ── */
-    .workout-card{background:linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:13px;margin-bottom:9px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-    .workout-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.06),transparent);opacity:.4}
-    .workout-card:hover{border-color:rgba(180,172,158,.06);transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,0,0,.4)}
-    .workout-card:hover::before{opacity:.85}
-    .workout-card-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-    .workout-icon{font-size:1.5rem;width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.06);flex-shrink:0}
-    .workout-name{font-family:'Cinzel',serif;font-size:.8rem;color:#d4cec4;line-height:1.2;margin-bottom:3px}
-    .workout-meta{display:flex;gap:6px;flex-wrap:wrap}
-    .workout-tag{font-size:.6rem;color:#6a645a;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.05);border-radius:4px;padding:1px 7px;letter-spacing:.02em}
+    /* ── Workout cards (Forge tab) — themed via --mg-color ── */
+    .workout-card{
+      --mg-color:#B0A090;
+      position:relative;border-radius:13px;padding:13px;margin-bottom:10px;cursor:pointer;overflow:hidden;
+      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 11%,rgba(45,42,36,.36)),rgba(32,30,26,.2) 60%,color-mix(in srgb,var(--mg-color) 5%,rgba(20,18,14,.28)));
+      border:1px solid color-mix(in srgb,var(--mg-color) 16%,transparent);
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.03);
+      transition:all .22s;-webkit-tap-highlight-color:transparent
+    }
+    .workout-card::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1.5px;background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.32;transition:opacity .22s;pointer-events:none}
+    .workout-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 26%,transparent);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 18px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
+    .workout-card:hover::before{opacity:.7}
+    .workout-card:active{transform:scale(.985);transition:transform .1s ease}
+    .workout-card-top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+    .workout-icon{
+      font-size:1.4rem;width:46px;height:46px;border-radius:11px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 26%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 10%,rgba(25,23,18,.62)));
+      border:1px solid color-mix(in srgb,var(--mg-color) 22%,transparent);
+      box-shadow:0 3px 10px rgba(0,0,0,.45),0 0 14px color-mix(in srgb,var(--mg-color) 12%,transparent),inset 0 0 6px rgba(0,0,0,.35)
+    }
+    .workout-name{font-family:'Cinzel',serif;font-size:.82rem;color:#d4cec4;line-height:1.2;margin-bottom:3px;letter-spacing:.02em}
+    .workout-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .workout-tag{font-size:.58rem;color:color-mix(in srgb,var(--mg-color) 75%,#b4ac9e);background:color-mix(in srgb,var(--mg-color) 9%,rgba(45,42,36,.22));border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.05));border-radius:6px;padding:2px 7px;letter-spacing:.02em;font-family:'Inter',sans-serif}
     .workout-desc{font-size:.72rem;color:#6a645a;font-style:italic;margin-bottom:8px;line-height:1.45}
     .workout-ex-pill-row{display:flex;gap:4px;flex-wrap:wrap}
     .workout-ex-pill{font-size:.58rem;color:#5a5650;background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);border-radius:4px;padding:2px 6px;white-space:nowrap}
+
+    /* ── Workouts/Recipes themed pills ── */
+    .wo-cat-pill{padding:2px 8px;border-radius:10px;font-size:.52rem;font-weight:600;letter-spacing:.04em;color:var(--mg-color);background:color-mix(in srgb,var(--mg-color) 12%,transparent);border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);text-transform:uppercase;font-family:'Cinzel',serif}
+    .wo-diff-pill{padding:1px 7px;border-radius:8px;font-size:.5rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-family:'Cinzel',serif}
+    .wo-diff-beginner{background:rgba(90,138,88,.13);color:#6aaa68;border:1px solid rgba(90,138,88,.22)}
+    .wo-diff-intermediate{background:rgba(168,132,60,.13);color:#c4a044;border:1px solid rgba(168,132,60,.22)}
+    .wo-diff-advanced{background:rgba(122,40,56,.14);color:#c45868;border:1px solid rgba(122,40,56,.24)}
+
+    /* ── Workouts section header (mirrors lib-section-hdr) ── */
+    .wo-section-hdr{font-family:'Cinzel',serif;font-size:.72rem;font-weight:600;color:#b4ac9e;letter-spacing:.08em;text-transform:uppercase;margin:14px 0 9px;display:flex;align-items:center;gap:8px}
+    .wo-section-hdr::before,.wo-section-hdr::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.12),transparent)}
+    .wo-section-hdr-text{padding:0 4px;color:rgba(180,172,158,.7)}
+    .wo-divider{height:1px;margin:18px 0;background:linear-gradient(90deg,transparent,rgba(180,172,158,.1) 20%,rgba(180,172,158,.14) 50%,rgba(180,172,158,.1) 80%,transparent)}
+
+    /* ── Workouts/Recipes sticky filter bar (iOS material) ── */
+    .wo-sticky-filters{position:sticky;top:-1px;z-index:5;margin:0 -12px 10px;padding:8px 12px 4px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
 
     /* ── Recipe filter bar ── */
     .recipe-filter-bar{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-ms-overflow-style:none}
@@ -845,10 +1021,10 @@
     .cal-day.has-events{border-color:rgba(180,172,158,.06) !important;background:rgba(45,42,36,.14) !important}
 
     /* ── Log sub-tabs ── */
-    .log-subtab-bar{display:flex;gap:0;border:1px solid rgba(180,172,158,.05);border-radius:9px;overflow:hidden;margin-bottom:14px;flex-shrink:0;background:rgba(45,42,36,.3);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-    .log-subtab-btn{flex:1;padding:8px 6px;text-align:center;font-family:'Cinzel',serif;font-size:.53rem;letter-spacing:.06em;cursor:pointer;transition:all .2s;color:#5a5650;background:transparent;border:none;border-right:1px solid rgba(180,172,158,.06);text-transform:uppercase}
+    .log-subtab-bar{display:flex;gap:0;border:none;border-radius:10px;overflow:visible;margin-bottom:14px;flex-shrink:0;background:rgba(45,42,36,.55);padding:3px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 rgba(0,0,0,.18)}
+    .log-subtab-btn{flex:1;padding:7px 12px;text-align:center;font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.06em;cursor:pointer;transition:all .22s ease;color:#8a8478;background:transparent;border:none;border-radius:8px;text-transform:uppercase;-webkit-tap-highlight-color:transparent}
     .log-subtab-btn:last-child{border-right:none}
-    .log-subtab-btn.on{background:rgba(45,42,36,.22);color:#b4ac9e}
+    .log-subtab-btn.on{background:rgba(180,172,158,.16);color:#d4cec4;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.2)}
 
     /* ── Profile Hero upgrades ── */
     .profile-name{font-family:'Cinzel',serif !important;font-size:1.05rem !important}

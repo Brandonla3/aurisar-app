@@ -1168,15 +1168,31 @@ const HR_ZONES = [
   { z:4, name:"Threshold", pct:[80,90], color:"#e67e22", desc:"Hard. Anaerobic. Max sustainable effort." },
   { z:5, name:"Max",       pct:[90,100],color:"#e74c3c", desc:"All-out. Short bursts only. Peak performance." },
 ];
+// Masculine, darker/desaturated palette — locked Apr 2026
+// Burnt Bronze, Forest Watch, Steel Plum, Burgundy Iron, Tactical Olive,
+// Hunter Bronze, Teal Ironwood, Storm Graphite, Gunmetal Steel, Slate Navy
 const MUSCLE_COLORS = {
-  chest:"#9E7B6B", back:"#7B8D7A", shoulder:"#A89070", bicep:"#8B7E6A",
-  legs:"#7A8F8B", glutes:"#A08878", abs:"#8A9880", calves:"#9A8A7A",
-  forearm:"#7E8E80", full_body:"#B0A090", cardio:"#809090"
+  chest:"#8B5A2B",   back:"#2E4D38",   shoulder:"#3D343F", bicep:"#6B2A2A",
+  tricep:"#8B5A2B",  legs:"#5C5C2E",   glutes:"#4F4318",   abs:"#2A4347",
+  calves:"#494C56",  forearm:"#4A5560", full_body:"#2C4564", cardio:"#2C4564"
 };
 const TYPE_COLORS = {
   strength:"#C4A044", cardio:"#C4A044", flexibility:"#C4A044", yoga:"#C4A044",
   calisthenics:"#8A7858", plyometric:"#8A7858", isometric:"#8A7858", functional:"#8A7858",
   stretching:"#B0A898", warmup:"#B0A898", cooldown:"#B0A898"
+};
+const MUSCLE_META = {
+  chest:    { emoji:"💪", label:"Chest",    icon:"game-icons:chest-armor" },
+  back:     { emoji:"🏋️", label:"Back",     icon:"game-icons:muscle-up" },
+  shoulder: { emoji:"🎯", label:"Shoulders",icon:"game-icons:shoulder-armor" },
+  bicep:    { emoji:"💪", label:"Biceps",   icon:"game-icons:biceps" },
+  tricep:   { emoji:"✊", label:"Triceps",  icon:"game-icons:fist" },
+  legs:     { emoji:"🦵", label:"Legs",     icon:"game-icons:leg-armor" },
+  glutes:   { emoji:"🍑", label:"Glutes",   icon:"game-icons:muscle-fat" },
+  abs:      { emoji:"🔥", label:"Abs",      icon:"game-icons:abdominal-armor" },
+  calves:   { emoji:"🦶", label:"Calves",   icon:"game-icons:boot-stomp" },
+  forearm:  { emoji:"✊", label:"Forearms", icon:"game-icons:grab" },
+  cardio:   { emoji:"❤️", label:"Cardio",   icon:"game-icons:run" },
 };
 function getMuscleColor(mg) { return MUSCLE_COLORS[(mg||"").toLowerCase().trim()] || "#B0A090"; }
 function getTypeColor(cat) { return TYPE_COLORS[(cat||"").toLowerCase().trim()] || "#B0A898"; }
@@ -1237,6 +1253,7 @@ export {
   RUNNING_EX_ID,
   HR_ZONES,
   MUSCLE_COLORS,
+  MUSCLE_META,
   TYPE_COLORS,
   MAP_REGIONS,
   MAP_POINTS,

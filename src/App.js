@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
-import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS, MAP_REGIONS } from './data/constants';
+import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
@@ -19,6 +19,34 @@ const RECIPE_CATS = [...new Set([
 ])].sort();
 const DIFF_COLORS = {Beginner:"#2ecc71",Intermediate:"#f1c40f",Advanced:"#e74c3c"};
 const EQUIP_ICONS = {Gym:"🏋️","Home Gym":"🏠",Bodyweight:"🤸"};
+// Recipe category → themed color (drives --mg-color on themed cards/pills)
+// Uses the locked masculine palette from MUSCLE_COLORS
+const RECIPE_CAT_COLORS = {
+  "Push":"#8B5A2B","Pull":"#2E4D38","Legs":"#5C5C2E","Full Body":"#2C4564",
+  "Upper Body":"#6B2A2A","Lower Body":"#5C5C2E","Chest":"#8B5A2B","Back":"#2E4D38",
+  "Shoulders":"#3D343F","Arms":"#4A5560","Glutes":"#4F4318","Core":"#2A4347",
+  "Abs":"#2A4347","Cardio":"#2C4564","HIIT":"#6B2A2A","Endurance":"#494C56",
+  "Flexibility":"#3D343F","Yoga":"#3D343F","Mobility":"#3D343F",
+  "Gym":"#4F4318","Home Gym":"#8B5A2B","Bodyweight":"#2E4D38"
+};
+function getRecipeMgColor(tpl){
+  if(!tpl) return "#B0A090";
+  return RECIPE_CAT_COLORS[tpl.category] || RECIPE_CAT_COLORS[tpl.equipment] || "#B0A090";
+}
+// Derive workout color from its most-common muscle group
+function getWorkoutMgColor(wo, exById, mgColors){
+  if(!wo || !wo.exercises) return "#B0A090";
+  const counts = {};
+  for(const ex of wo.exercises){
+    const exD = exById[ex.exId]; if(!exD) continue;
+    const mg = (exD.muscleGroup||"").toLowerCase().trim();
+    if(!mg) continue;
+    counts[mg] = (counts[mg]||0)+1;
+  }
+  let top=null, topN=0;
+  for(const k in counts){ if(counts[k]>topN){ top=k; topN=counts[k]; } }
+  return (top && mgColors[top]) || "#B0A090";
+}
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
@@ -3166,36 +3194,28 @@ function App() {
               )
           )
 
-          /* ══ UNIFIED NAV + CHECK-IN PANEL ══ */
+          /* ══ BOTTOM TAB BAR — fixed iOS material ══ */
           , React.createElement('div', { className: "hud-nav-panel" }
-            /* Tabs row */
             , React.createElement('div', { className: "tabs" }
-              , [["workout","🏋️\nExercises"],["workouts","💪\nWorkouts"],["calendar","📅\nCalendar"],["character","⚔️\nCharacter"],["social","👥\nGuild"]].map(([t,l])=>(
-                React.createElement('button', { key: t, className: `tab ${activeTab===t?"on":""}`, style: {position:"relative"}, onClick: ()=>guardAll(()=>{setActiveTab(t);if(t==="workouts")setWorkoutView("list");if(t==="social"&&authUser){loadSocialData();loadIncomingShares();}}) }
-                  , l
-                  , t==="social"&&(friendRequests.length+incomingShares.length)>0&&React.createElement('span', { className: "tab-badge" }, friendRequests.length+incomingShares.length)
-                )
-              ))
-            )
-            /* Daily Check-In strip — only on Exercises tab */
-            , activeTab==="workout" && React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid rgba(180,172,158,.04)"} }
-              , React.createElement('span', { style: {fontSize:"1.05rem"} }, "🔥")
-              , React.createElement('span', { style: {fontSize:".88rem",fontWeight:700,color:"#b4ac9e"} }, profile.checkInStreak)
-              , React.createElement('span', { style: {fontSize:".58rem",color:"#8a8478"} }, "day streak")
-              , React.createElement('div', { style: {flex:1} })
-              , React.createElement('button', {
-                  style: {fontSize:".5rem",color:"#5a5650",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"},
-                  onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
-                }, "↺ Retro")
-              , React.createElement('button', {
-                  style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
-                  onClick: ()=>setShowWNMockup(true)
-                }, "📲 Notification")
-              , React.createElement('button', {
-                  style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
-                  disabled: profile.lastCheckIn===todayStr(),
-                  onClick: doCheckIn
-                }, profile.lastCheckIn===todayStr() ? "✓ Checked In" : "Check In")
+              , [
+                  ["workout","Exercises","mdi:dumbbell"],
+                  ["workouts","Workouts","mdi:weight-lifter"],
+                  ["calendar","Calendar","mdi:calendar-blank"],
+                  ["character","Character","game-icons:crossed-swords"],
+                  ["social","Guild","game-icons:tribal-pendant"]
+                ].map(([t,l,iconName])=>{
+                  const isOn = activeTab===t;
+                  const tabColor = isOn ? "#d4cec4" : "#6a6050";
+                  const iconPath = iconName.replace(":","/");
+                  const iconSrc = `https://api.iconify.design/${iconPath}.svg?color=${encodeURIComponent(tabColor)}`;
+                  return React.createElement('button', { key: t, className: `tab ${isOn?"on":""}`, onClick: ()=>guardAll(()=>{setActiveTab(t);if(t==="workouts")setWorkoutView("list");if(t==="social"&&authUser){loadSocialData();loadIncomingShares();}}) }
+                    , React.createElement('span', { className: "tab-icon" }
+                      , React.createElement('img', { src: iconSrc, alt: "", width: 22, height: 22, style: { display:"block" } })
+                    )
+                    , React.createElement('span', { className: "tab-label" }, l)
+                    , t==="social"&&(friendRequests.length+incomingShares.length)>0&&React.createElement('span', { className: "tab-badge" }, friendRequests.length+incomingShares.length)
+                  );
+                })
             )
           )
 
@@ -3204,6 +3224,27 @@ function App() {
             /* ── WORKOUT TAB ─────────────────────── */
             , activeTab==="workout" && (
               React.createElement(React.Fragment, null
+
+                /* ══ DAILY CHECK-IN STRIP ══ */
+                , React.createElement('div', { className: "hud-checkin-strip" }
+                  , React.createElement('span', { style: {fontSize:"1.05rem"} }, "🔥")
+                  , React.createElement('span', { style: {fontSize:".88rem",fontWeight:700,color:"#b4ac9e"} }, profile.checkInStreak)
+                  , React.createElement('span', { style: {fontSize:".58rem",color:"#8a8478"} }, "day streak")
+                  , React.createElement('div', { style: {flex:1} })
+                  , React.createElement('button', {
+                      style: {fontSize:".5rem",color:"#5a5650",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"},
+                      onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
+                    }, "↺ Retro")
+                  , React.createElement('button', {
+                      style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
+                      onClick: ()=>setShowWNMockup(true)
+                    }, "📲 Notification")
+                  , React.createElement('button', {
+                      style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
+                      disabled: profile.lastCheckIn===todayStr(),
+                      onClick: doCheckIn
+                    }, profile.lastCheckIn===todayStr() ? "✓ Checked In" : "Check In")
+                )
 
                 /* ══ EXERCISES SUB-TAB BAR ══ */
                 , React.createElement('div', { className:"log-subtab-bar", style:{marginBottom:14} }
@@ -3475,10 +3516,10 @@ function App() {
                   /* ── Home view computed data ── */
                   const hexRgba = (hex, a) => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
 
-                  const MUSCLE_EMOJIS = {chest:"💪",back:"🏋️",shoulder:"🎯",bicep:"💪",legs:"🦵",glutes:"🍑",abs:"🔥",calves:"🦶",forearm:"✊",cardio:"❤️"};
                   const MUSCLE_CARD_DATA = ALL_MUSCLE_OPTS.filter(m=>m!=="full_body").map(mg=>{
                     const count = allExercises.filter(ex=>(ex.muscleGroup||"").toLowerCase().trim()===mg).length;
-                    return {mg, label:mg.charAt(0).toUpperCase()+mg.slice(1).replace("_"," "), emoji:MUSCLE_EMOJIS[mg]||"💪", count, color:getMuscleColor(mg)};
+                    const meta = MUSCLE_META[mg] || {emoji:"💪",label:mg.charAt(0).toUpperCase()+mg.slice(1),icon:"game-icons:weight-lifting-up"};
+                    return {mg, label:meta.label, emoji:meta.emoji, icon:meta.icon, count, color:getMuscleColor(mg)};
                   }).filter(d=>d.count>0);
 
                   // Recent exercises — deduped from log, padded with favorites
@@ -3520,9 +3561,10 @@ function App() {
                   };
 
                   return React.createElement('div', null,
-                    /* Search + Select row */
-                    React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,alignItems:"center"}},
-                      React.createElement('div', {className:"tech-search-wrap",style:{flex:1}},
+                    /* Sticky search bar — translucent material */
+                    React.createElement('div', {className:"lib-sticky-search"},
+                    React.createElement('div', {style:{display:"flex",gap:8,alignItems:"center"}},
+                      React.createElement('div', {className:"tech-search-wrap",style:{flex:1,marginBottom:0}},
                         React.createElement('span', {className:"tech-search-icon"}, "🔍"),
                         React.createElement('input', {
                           className:"tech-search-inp",
@@ -3539,105 +3581,103 @@ function App() {
                                background:libSelectMode?"rgba(45,42,36,.26)":"transparent",
                                color:libSelectMode?"#B0A898":"#8a8478",fontSize:".7rem",fontWeight:libSelectMode?"700":"400",cursor:"pointer",whiteSpace:"nowrap"}
                       }, libSelectMode?"✕ Cancel":"⊞ Select")
+                    )
                     ),
 
                     /* ═══ HOME VIEW ═══ */
                     libBrowseMode === "home" && React.createElement('div', null,
 
-                      /* Your Exercises — horizontal scroll */
-                      yourExercises.length > 0 && React.createElement('div', {style:{marginBottom:20}},
-                        React.createElement('div', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",marginBottom:8,letterSpacing:".03em"}}, "Your Exercises"),
+                      /* Your Exercises — hero carousel */
+                      yourExercises.length > 0 && React.createElement('div', {className:"lib-home-section",style:{marginBottom:4}},
+                        React.createElement('div', {className:"lib-section-hdr"},
+                          React.createElement('span', {className:"lib-hdr-icon"}, "⚔️"),
+                          "Your Exercises"
+                        ),
                         React.createElement('div', {className:"lib-hscroll-wrap"},
                         React.createElement('div', {className:"lib-hscroll",onScroll:handleHScroll},
-                          yourExercises.map(ex=>
-                            React.createElement('div', {
+                          yourExercises.map(ex=>{
+                            const mgColor = getMuscleColor(ex.muscleGroup);
+                            const mgLabel = (MUSCLE_META[(ex.muscleGroup||"").toLowerCase()] || {}).label || ex.muscleGroup || "";
+                            return React.createElement('div', {
                               key:"yr-"+ex.id,
-                              className:"lib-glass-card",
+                              className:"lib-hero-card",
                               onClick:()=>setLibDetailEx(ex),
-                              style:{
-                                minWidth:100,maxWidth:100,flexShrink:0,
-                                borderRadius:10,
-                                padding:"12px 10px",cursor:"pointer",textAlign:"center",
-                                display:"flex",flexDirection:"column",alignItems:"center",gap:6
-                              }
+                              style:{'--mg-color':mgColor}
                             },
-                              React.createElement('div', {style:{
-                                width:36,height:36,borderRadius:8,
-                                background:hexRgba(getTypeColor(ex.category),.12),
-                                border:"1px solid "+hexRgba(getTypeColor(ex.category),.18),
-                                display:"flex",alignItems:"center",justifyContent:"center"
-                              }}, React.createElement(ExIcon, {ex, size:"1.1rem", color:getTypeColor(ex.category)})),
-                              React.createElement('span', {style:{fontSize:".65rem",color:"#b4ac9e",fontWeight:600,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%"}}, ex.name)
-                            )
-                          )
+                              React.createElement('div', {className:"lib-hero-orb",style:{'--mg-color':mgColor}},
+                                React.createElement(ExIcon, {ex, size:"1.4rem", color:mgColor})
+                              ),
+                              React.createElement('span', {className:"lib-hero-name"}, ex.name),
+                              mgLabel && React.createElement('span', {className:"lib-muscle-pill",style:{'--mg-color':mgColor}}, mgLabel)
+                            );
+                          })
                         )
                         )
                       ),
 
-                      /* Browse by Muscle — 2-column card grid */
-                      React.createElement('div', {style:{marginBottom:20}},
-                        React.createElement('div', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",marginBottom:8,letterSpacing:".03em"}}, "Browse by Muscle"),
-                        React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
-                          MUSCLE_CARD_DATA.map(({mg, label, emoji, count, color})=>
+                      yourExercises.length > 0 && React.createElement('div', {className:"lib-divider"}),
+
+                      /* Browse by Muscle — feature tiles */
+                      React.createElement('div', {className:"lib-home-section",style:{marginBottom:4}},
+                        React.createElement('div', {className:"lib-section-hdr"},
+                          React.createElement('span', {className:"lib-hdr-icon"}, "🗺️"),
+                          "Browse by Muscle"
+                        ),
+                        React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},
+                          MUSCLE_CARD_DATA.map(({mg, label, emoji, icon, count, color})=>
                             React.createElement('div', {
                               key:"mc-"+mg,
+                              className:"lib-muscle-tile",
                               onClick:()=>{setLibMuscleFilters(new Set([mg]));setLibBrowseMode("filtered");},
-                              style:{
-                                background:"linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.22))",
-                                border:"1px solid "+hexRgba(color,.2),
-                                borderRadius:12,padding:"14px 12px",cursor:"pointer",
-                                display:"flex",alignItems:"center",gap:10,
-                                transition:"all .18s"
-                              }
+                              style:{'--mg-color':color}
                             },
-                              React.createElement('div', {style:{
-                                width:36,height:36,borderRadius:8,flexShrink:0,
-                                background:hexRgba(color,.12),
-                                display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem"
-                              }}, emoji),
+                              React.createElement('span', {className:"lib-tile-watermark"}, emoji),
+                              React.createElement('div', {className:"lib-tile-orb",style:{'--mg-color':color}},
+                                React.createElement(ExIcon, {ex:{muscleGroup:mg,category:"strength"}, size:"1.15rem", color:color})
+                              ),
                               React.createElement('div', null,
-                                React.createElement('div', {style:{fontSize:".78rem",fontWeight:600,color:"#d4cec4"}}, label),
-                                React.createElement('div', {style:{fontSize:".62rem",color:"#6a6050"}}, count+" exercises")
+                                React.createElement('div', {className:"lib-tile-name"}, label),
+                                React.createElement('div', {className:"lib-tile-count",style:{'--mg-color':color}}, count+" exercises")
                               )
                             )
                           )
                         )
                       ),
 
+                      React.createElement('div', {className:"lib-divider"}),
+
                       /* Discover Rows — Netflix-style horizontal scroll */
-                      discoverRows.map(row=>
-                        row.exercises.length >= 3 && React.createElement('div', {key:"dr-"+row.label,style:{marginBottom:18}},
-                          React.createElement('div', {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
-                            React.createElement('span', {style:{fontSize:".78rem",fontWeight:700,color:"#b4ac9e",letterSpacing:".03em"}}, row.label),
-                            React.createElement('button', {
-                              onClick:row.onSeeAll,
-                              style:{background:"transparent",border:"none",color:"#6a6050",fontSize:".68rem",cursor:"pointer",padding:0}
-                            }, "See All →")
+                      discoverRows.map((row,ri)=>
+                        row.exercises.length >= 3 && React.createElement('div', {key:"dr-"+row.label,className:"lib-home-section",style:{marginBottom:ri < discoverRows.length-1 ? 18 : 0}},
+                          React.createElement('div', {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},
+                            React.createElement('span', {className:"lib-section-hdr",style:{marginBottom:0}}, row.label),
+                            React.createElement('button', {className:"lib-see-all",onClick:row.onSeeAll}, "See All →")
                           ),
                           React.createElement('div', {className:"lib-hscroll-wrap"},
                           React.createElement('div', {className:"lib-hscroll",onScroll:handleHScroll},
-                            row.exercises.map(ex=>
-                              React.createElement('div', {
+                            row.exercises.map(ex=>{
+                              const mgColor = getMuscleColor(ex.muscleGroup);
+                              const diff = (ex.difficulty||"").toLowerCase();
+                              const diffCls = diff === "beginner" ? "lib-diff-beginner" : diff === "advanced" ? "lib-diff-advanced" : diff === "intermediate" ? "lib-diff-intermediate" : "";
+                              const mgLabel = (MUSCLE_META[(ex.muscleGroup||"").toLowerCase()] || {}).label || "";
+                              return React.createElement('div', {
                                 key:"d-"+ex.id,
-                                className:"lib-glass-card",
+                                className:"lib-discover-card",
                                 onClick:()=>setLibDetailEx(ex),
-                                style:{
-                                  minWidth:110,maxWidth:110,flexShrink:0,
-                                  borderRadius:10,
-                                  padding:"10px 8px",cursor:"pointer",textAlign:"center",
-                                  display:"flex",flexDirection:"column",alignItems:"center",gap:5
-                                }
+                                style:{'--mg-color':mgColor}
                               },
-                                React.createElement('div', {style:{
-                                  width:32,height:32,borderRadius:7,
-                                  background:hexRgba(getTypeColor(ex.category),.12),
-                                  border:"1px solid "+hexRgba(getTypeColor(ex.category),.18),
-                                  display:"flex",alignItems:"center",justifyContent:"center"
-                                }}, React.createElement(ExIcon, {ex, size:".9rem", color:getTypeColor(ex.category)})),
-                                React.createElement('span', {style:{fontSize:".62rem",color:"#b4ac9e",fontWeight:600,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%"}}, ex.name),
-                                React.createElement('span', {style:{fontSize:".55rem",color:"#6a6050"}}, ex.baseXP+" XP")
-                              )
-                            )
+                                React.createElement('div', {className:"lib-discover-orb",style:{'--mg-color':mgColor}},
+                                  React.createElement(ExIcon, {ex, size:"1.1rem", color:mgColor})
+                                ),
+                                React.createElement('span', {className:"lib-discover-name"}, ex.name),
+                                React.createElement('div', {className:"lib-discover-meta"},
+                                  mgLabel && React.createElement('span', {style:{fontSize:".5rem",color:mgColor,fontWeight:500}}, mgLabel),
+                                  mgLabel && diffCls && React.createElement('span', {style:{fontSize:".45rem",color:"#3a3834"}}, "·"),
+                                  diffCls && React.createElement('span', {className:"lib-diff-badge "+diffCls}, ex.difficulty),
+                                  React.createElement('span', {style:{fontSize:".5rem",color:"#6a6050",fontWeight:600}}, (ex.baseXP||0)+" XP")
+                                )
+                              );
+                            })
                           )
                           )
                         )
@@ -4212,16 +4252,18 @@ function App() {
               // ── LIST ───────────────────────────────
               if(workoutView==="list") return (
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {marginBottom:8} }
-                    , React.createElement('div', {className:"rpg-sec-header rpg-sec-header-center"}, React.createElement('div', {className:"rpg-sec-line rpg-sec-line-l"}), React.createElement('span', {className:"rpg-sec-title"}, "\u2726 Arsenal \u2726",
-                      React.createElement('span', { className: "info-icon", style: {display:"inline-flex",alignItems:"center",justifyContent:"center",width:16,height:16,borderRadius:"50%",border:"1px solid rgba(180,172,158,.15)",fontSize:".48rem",fontWeight:700,color:"#8a8478",fontStyle:"normal",marginLeft:6,verticalAlign:"middle",cursor:"pointer",position:"relative"} }, "?", React.createElement('span', { className: "info-tooltip" }, "Pre-defined groups of exercises. Build once, reuse anytime in plans or as one-off sessions."))
-                    ), React.createElement('div', {className:"rpg-sec-line rpg-sec-line-r"}))
-                  )
-                  /* Subtabs */
-                  , React.createElement('div', { className: "log-subtab-bar", style: {marginBottom:12}}
-                    , [["reusable","⚔ Re-Usable"],["oneoff","⚡ One-Off"]].map(([t,l])=>(
-                      React.createElement('button', { key: t, className: `log-subtab-btn ${workoutSubTab===t?"on":""}`, onClick: ()=>setWorkoutSubTab(t)}, l)
-                    ))
+                  , React.createElement('div', { className: "wo-sticky-filters" }
+                    , React.createElement('div', { style: {marginBottom:8} }
+                      , React.createElement('div', {className:"rpg-sec-header rpg-sec-header-center"}, React.createElement('div', {className:"rpg-sec-line rpg-sec-line-l"}), React.createElement('span', {className:"rpg-sec-title"}, "\u2726 Arsenal \u2726",
+                        React.createElement('span', { className: "info-icon", style: {display:"inline-flex",alignItems:"center",justifyContent:"center",width:16,height:16,borderRadius:"50%",border:"1px solid rgba(180,172,158,.15)",fontSize:".48rem",fontWeight:700,color:"#8a8478",fontStyle:"normal",marginLeft:6,verticalAlign:"middle",cursor:"pointer",position:"relative"} }, "?", React.createElement('span', { className: "info-tooltip" }, "Pre-defined groups of exercises. Build once, reuse anytime in plans or as one-off sessions."))
+                      ), React.createElement('div', {className:"rpg-sec-line rpg-sec-line-r"}))
+                    )
+                    /* Subtabs */
+                    , React.createElement('div', { className: "log-subtab-bar", style: {marginBottom:0}}
+                      , [["reusable","⚔ Re-Usable"],["oneoff","⚡ One-Off"]].map(([t,l])=>(
+                        React.createElement('button', { key: t, className: `log-subtab-btn ${workoutSubTab===t?"on":""}`, onClick: ()=>setWorkoutSubTab(t)}, l)
+                      ))
+                    )
                   )
                   /* Label filter dropdown */
                   , (profile.workoutLabels||[]).length>0 && React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,position:"relative"}},
@@ -4314,8 +4356,9 @@ function App() {
                   , allW.filter(w=>!w.oneOff).filter(w=>woLabelFilters.size===0||(w.labels||[]).some(l=>woLabelFilters.has(l))).map(wo=>{
                     const exCount = wo.exercises.length;
                     const xp = calcWorkoutXP(wo);
+                    const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
                     return (
-                      React.createElement('div', { key: wo.id, className: "workout-card"}
+                      React.createElement('div', { key: wo.id, className: "workout-card", style:{"--mg-color":woMgColor}}
                         , React.createElement('div', { className: "workout-card-top", style:{cursor:"pointer"}, onClick: ()=>{setActiveWorkout(wo);setWorkoutView("detail");}}
                           , React.createElement('div', { className: "workout-icon"}, wo.icon)
                           , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -4372,8 +4415,9 @@ function App() {
                           const badgeTxt = days===0?"Today":days===1?"Tomorrow":`${days}d away`;
                           const wo = (profile.workouts||[]).find(w=>w.id===g.id) || {id:g.id,name:g.name,icon:g.icon,desc:"",exercises:g.items.map(sw=>({exId:sw.exId,sets:3,reps:10,weightLbs:null,weightPct:100,distanceMi:null,hrZone:null})),oneOff:true,durationMin:null,activeCal:null,totalCal:null};
                           const xp = calcWorkoutXP(wo);
+                          const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
                           return (
-                            React.createElement('div', { key: g.id, className: "workout-card"}
+                            React.createElement('div', { key: g.id, className: "workout-card", style:{"--mg-color":woMgColor}}
                               , React.createElement('div', { className: "workout-card-top", style:{cursor:"pointer"}, onClick: ()=>{setActiveWorkout(wo);setWorkoutView("detail");}}
                                 , React.createElement('div', { className: "workout-icon"}, g.icon)
                                 , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -4430,14 +4474,16 @@ function App() {
                         const soloExs = (profile.scheduledWorkouts||[]).filter(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today).sort((a,b)=>a.scheduledDate.localeCompare(b.scheduledDate));
                         if(soloExs.length===0) return null;
                         return React.createElement(React.Fragment, null
-                          , React.createElement('div', {style:{fontSize:".65rem",color:"#4a4438",textTransform:"uppercase",letterSpacing:".1em",marginTop:14,marginBottom:8}}, "Solo Exercises")
+                          , React.createElement('div', {className:"wo-section-hdr"}, React.createElement('span',{className:"wo-section-hdr-text"}, "Solo Exercises"))
                           , soloExs.map(sw=>{
                             const ex = allExById[sw.exId];
                             if(!ex) return null;
                             const days = daysUntil(sw.scheduledDate);
                             const badgeCls = days===0?"badge-today":days<=3?"badge-soon":"badge-future";
                             const badgeTxt = days===0?"Today":days===1?"Tomorrow":`${days}d away`;
-                            return React.createElement('div', {key:sw.id, className:"workout-card"}
+                            const soloMg = (ex.muscleGroup||"").toLowerCase().trim();
+                            const soloMgColor = MUSCLE_COLORS[soloMg] || "#B0A090";
+                            return React.createElement('div', {key:sw.id, className:"workout-card", style:{"--mg-color":soloMgColor}}
                               , React.createElement('div', {className:"workout-card-top"}
                                 , React.createElement('div', {className:"workout-icon"}, ex.icon)
                                 , React.createElement('div', {style:{flex:1,minWidth:0}}
@@ -4478,13 +4524,14 @@ function App() {
                 const filteredTpls = recipeFilter.size===0 ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t=>recipeFilter.has(t.category)||recipeFilter.has(t.equipment));
                 return (
                 React.createElement(React.Fragment, null
+                  , React.createElement('div', { className: "wo-sticky-filters" }
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setWorkoutView("list")}, "← Back" )
                     , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Workout Recipes" )
                     , React.createElement('div', null)
                   )
                   /* Category multi-select dropdown */
-                  , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,position:"relative"}},
+                  , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:0,position:"relative"}},
                     recipeCatDrop && React.createElement('div', {onClick:()=>setRecipeCatDrop(false), style:{position:"fixed",inset:0,zIndex:19}}),
                     React.createElement('div', {style:{position:"relative",zIndex:20}},
                       React.createElement('button', {
@@ -4534,21 +4581,25 @@ function App() {
                       onClick:()=>setRecipeFilter(new Set())
                     },"Clear")
                   )
+                  )
                   , filteredTpls.length===0&&React.createElement('div', { className: "empty"}, "No recipes match the selected categories.")
                   , filteredTpls.map(tpl=>{
                     const xp = tpl.exercises.reduce((t,ex)=>t+calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById),0);
                     const descExpanded = expandedRecipeDesc.has(tpl.id);
+                    const tplMgColor = getRecipeMgColor(tpl);
+                    const diffCls = tpl.difficulty?`wo-diff-pill wo-diff-${tpl.difficulty.toLowerCase()}`:null;
                     return (
-                      React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:12}}
+                      React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:12,"--mg-color":tplMgColor}}
                         , React.createElement('div', { className: "workout-card-top"}
                           , React.createElement('div', { className: "workout-icon"}, tpl.icon)
                           , React.createElement('div', { style: {flex:1,minWidth:0}}
                             , React.createElement('div', { className: "workout-name"}, tpl.name)
                             , React.createElement('div', { className: "workout-meta"}
-                              , React.createElement('span', { className: "workout-tag"}, tpl.exercises.length, " exercises" )
+                              , tpl.category&&React.createElement('span', { className: "wo-cat-pill"}, tpl.category)
+                              , tpl.difficulty&&React.createElement('span', { className: diffCls}, tpl.difficulty)
+                              , React.createElement('span', { className: "workout-tag"}, tpl.exercises.length, " ex")
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
                               , tpl.durationMin&&React.createElement('span', { className: "workout-tag"}, "⏱ " , tpl.durationMin, "min" )
-                              , tpl.difficulty&&React.createElement('span', { className: "workout-tag", style:{color:DIFF_COLORS[tpl.difficulty]||"#b4ac9e"}}, tpl.difficulty)
                               , tpl.equipment&&React.createElement('span', { className: "workout-tag"}, EQUIP_ICONS[tpl.equipment]||"", " " , tpl.equipment)
                             )
                           )
@@ -4727,28 +4778,29 @@ function App() {
                       , wbCopySource && React.createElement('div', { className: "builder-nav-sub" }, "Forging from: ", wbCopySource)
                     )
                   )
-                  /* Name */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Workout Name" )
-                    , React.createElement('input', { className: "inp", value: wbName, onChange: e=>setWbName(e.target.value), placeholder: "e.g. Morning Push Day…"   })
-                  )
-                  /* Icon */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Icon")
-                    , React.createElement('div', { className: "icon-row", style: {flexWrap:"wrap",gap:6}}
-                      , ["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾"].map(ic=>(
-                        React.createElement('div', { key: ic, className: `icon-opt ${wbIcon===ic?"sel":""}`, style: {fontSize:"1.2rem",width:36,height:36}, onClick: ()=>setWbIcon(ic)}, ic)
-                      ))
+                  /* Identity panel: Name + Icon + Description */
+                  , React.createElement('div', { className: "wb-section" }
+                    , React.createElement('div', { className: "wb-section-hdr" }, React.createElement('span', {className:"wb-section-hdr-icon"}, "✦"), "Identity")
+                    , React.createElement('div', { className: "field"}
+                      , React.createElement('label', null, "Workout Name" )
+                      , React.createElement('input', { className: "inp", value: wbName, onChange: e=>setWbName(e.target.value), placeholder: "e.g. Morning Push Day…"   })
+                    )
+                    , React.createElement('div', { className: "field"}
+                      , React.createElement('label', null, "Icon")
+                      , React.createElement('div', { className: "icon-row", style: {flexWrap:"wrap",gap:6}}
+                        , ["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾"].map(ic=>(
+                          React.createElement('div', { key: ic, className: `icon-opt ${wbIcon===ic?"sel":""}`, style: {fontSize:"1.2rem",width:36,height:36}, onClick: ()=>setWbIcon(ic)}, ic)
+                        ))
+                      )
+                    )
+                    , React.createElement('div', { className: "field"}
+                      , React.createElement('label', null, "Description " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
+                      , React.createElement('input', { className: "inp", value: wbDesc, onChange: e=>setWbDesc(e.target.value), placeholder: "e.g. Upper body strength focus…"    })
                     )
                   )
-                  /* Description */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Description " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
-                    , React.createElement('input', { className: "inp", value: wbDesc, onChange: e=>setWbDesc(e.target.value), placeholder: "e.g. Upper body strength focus…"    })
-                  )
-                  /* Labels */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Labels " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
+                  /* Labels panel */
+                  , React.createElement('div', { className: "wb-section" }
+                    , React.createElement('div', { className: "wb-section-hdr" }, React.createElement('span', {className:"wb-section-hdr-icon"}, "❖"), "Labels", React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal",letterSpacing:".05em",marginLeft:6,textTransform:"none"}}, "(optional)"))
                     , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}
                       , (profile.workoutLabels||[]).map(l=>
                         React.createElement('span', { key: l, className: "wo-label-chip"+(wbLabels.includes(l)?" sel":""),
@@ -4781,35 +4833,39 @@ function App() {
                       )
                     )
                   )
-                  /* Workout-level stats (optional) */
-                  , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:4}}
-                    , React.createElement('div', { className: "field", style: {flex:1.5,marginBottom:0}}
-                      , React.createElement('label', null, "Duration " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(HH:MM)"))
-                      , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric",
-                        value: wbDuration,
-                        onChange: e=>setWbDuration(e.target.value),
-                        onBlur: e=>setWbDuration(normalizeHHMM(e.target.value)),
-                        placeholder: "00:00"})
-                    )
-                    , React.createElement('div', { className: "field", style: {flex:0.8,marginBottom:0}}
-                      , React.createElement('label', null, "Seconds")
-                      , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59",
-                        value: wbDurSec,
-                        onChange: e=>setWbDurSec(e.target.value),
-                        placeholder: "0"})
-                    )
-                    , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
-                      , React.createElement('label', null, "Active Cal" )
-                      , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbActiveCal, onChange: e=>setWbActiveCal(e.target.value), placeholder: "e.g. 320" })
-                    )
-                    , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
-                      , React.createElement('label', null, "Total Cal" )
-                      , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbTotalCal, onChange: e=>setWbTotalCal(e.target.value), placeholder: "e.g. 450" })
+                  /* Stats panel: Duration / Calories */
+                  , React.createElement('div', { className: "wb-section" }
+                    , React.createElement('div', { className: "wb-section-hdr" }, React.createElement('span', {className:"wb-section-hdr-icon"}, "⏱"), "Session Stats", React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal",letterSpacing:".05em",marginLeft:6,textTransform:"none"}}, "(optional)"))
+                    , React.createElement('div', { className: "wb-stats-row"}
+                      , React.createElement('div', { className: "field", style: {flex:1.5,marginBottom:0}}
+                        , React.createElement('label', null, "Duration " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(HH:MM)"))
+                        , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric",
+                          value: wbDuration,
+                          onChange: e=>setWbDuration(e.target.value),
+                          onBlur: e=>setWbDuration(normalizeHHMM(e.target.value)),
+                          placeholder: "00:00"})
+                      )
+                      , React.createElement('div', { className: "field", style: {flex:0.8,marginBottom:0}}
+                        , React.createElement('label', null, "Seconds")
+                        , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59",
+                          value: wbDurSec,
+                          onChange: e=>setWbDurSec(e.target.value),
+                          placeholder: "0"})
+                      )
+                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
+                        , React.createElement('label', null, "Active Cal" )
+                        , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbActiveCal, onChange: e=>setWbActiveCal(e.target.value), placeholder: "e.g. 320" })
+                      )
+                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
+                        , React.createElement('label', null, "Total Cal" )
+                        , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbTotalCal, onChange: e=>setWbTotalCal(e.target.value), placeholder: "e.g. 450" })
+                      )
                     )
                   )
                   /* Exercise list */
+                  , React.createElement('div', { className: "wo-section-hdr", style:{marginTop:18,marginBottom:10}}, React.createElement('span', {className:"wo-section-hdr-text"}, "⚔ Techniques"))
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
-                    , React.createElement('label', null, "⚔ Techniques (", wbExercises.length, ")"
+                    , React.createElement('label', null, "(", wbExercises.length, " exercise", wbExercises.length!==1?"s":"", ")"
                       , wbExercises.length>0&&React.createElement('span', { style: {marginLeft:8,fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "⚡ "
                          , wbExercises.reduce((s,ex)=>{
                           const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
@@ -8478,20 +8534,15 @@ function App() {
                       const diffColor = diffLabel==="Advanced"?"#7A2838":diffLabel==="Beginner"?"#5A8A58":"#A8843C";
                       const diffBg    = diffLabel==="Advanced"?"#2e1515":diffLabel==="Beginner"?"#1a2e1a":"#2e2010";
                       const subParts  = [ex.category?ex.category.charAt(0).toUpperCase()+ex.category.slice(1):null, ex.muscleGroup?ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1):null].filter(Boolean).join(" · ");
+                      const exMgColor = getMuscleColor(ex.muscleGroup);
                       return React.createElement('div',{
                         key:ex.id,
+                        className:`picker-ex-row${sel?" sel":""}`,
                         onClick:()=>pickerToggleEx(ex.id),
-                        style:{
-                          background:sel?"rgba(45,42,36,.25)":"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                          border:"1px solid "+(sel?"rgba(180,172,158,.35)":"rgba(180,172,158,.05)"),
-                          borderRadius:9, padding:"9px 12px",
-                          display:"flex", alignItems:"center", gap:11, cursor:"pointer",
-                          boxShadow:sel?"0 0 0 1.5px rgba(180,172,158,.3),0 3px 14px rgba(180,172,158,.06)":"none",
-                          transition:"all .15s",
-                        }
+                        style:{"--mg-color":exMgColor}
                       },
-                        React.createElement('div',{style:{width:30,height:30,borderRadius:7,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},
-                          React.createElement(ExIcon,{ex:ex,size:".9rem",color:getTypeColor(ex.category)})
+                        React.createElement('div',{className:"picker-ex-orb"},
+                          React.createElement(ExIcon,{ex:ex,size:".95rem",color:"#d4cec4"})
                         ),
                         React.createElement('div',{style:{flex:1,minWidth:0}},
                           React.createElement('div',{style:{fontSize:".8rem",fontWeight:600,color:sel?"#d4cec4":"#d4cec4",marginBottom:2}},

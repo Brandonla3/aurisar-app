@@ -1,18 +1,6 @@
 import { _optionalChain } from './helpers.js';
 import { CLASSES, EXERCISES } from '../data/exercises.js';
-import { EX_BY_ID, RUNNING_EX_ID } from '../data/constants.js';
-
-const MUSCLE_COLORS = {
-  chest:"#9E7B6B", back:"#7B8D7A", shoulder:"#A89070", bicep:"#8B7E6A",
-  legs:"#7A8F8B", glutes:"#A08878", abs:"#8A9880", calves:"#9A8A7A",
-  forearm:"#7E8E80", full_body:"#B0A090", cardio:"#809090"
-};
-
-const TYPE_COLORS = {
-  strength:"#C4A044", cardio:"#C4A044", flexibility:"#C4A044", yoga:"#C4A044",
-  calisthenics:"#8A7858", plyometric:"#8A7858", isometric:"#8A7858", functional:"#8A7858",
-  stretching:"#B0A898", warmup:"#B0A898", cooldown:"#B0A898"
-};
+import { EX_BY_ID, RUNNING_EX_ID, MUSCLE_COLORS, TYPE_COLORS } from '../data/constants.js';
 
 function getMuscleColor(mg) {
   return MUSCLE_COLORS[(mg||"").toLowerCase().trim()] || "#B0A090";
