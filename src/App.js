@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
-import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, TYPE_COLORS, MAP_REGIONS } from './data/constants';
+import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
@@ -10,6 +10,10 @@ import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, dete
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
 import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
+import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
+
+// ── Debounce utility ──
+function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); }; }
 
 // ── Recipe view constants (hoisted from render for perf) ──
 const RECIPE_CATS = [...new Set([
@@ -18,6 +22,34 @@ const RECIPE_CATS = [...new Set([
 ])].sort();
 const DIFF_COLORS = {Beginner:"#2ecc71",Intermediate:"#f1c40f",Advanced:"#e74c3c"};
 const EQUIP_ICONS = {Gym:"🏋️","Home Gym":"🏠",Bodyweight:"🤸"};
+// Recipe category → themed color (drives --mg-color on themed cards/pills)
+// Uses the locked masculine palette from MUSCLE_COLORS
+const RECIPE_CAT_COLORS = {
+  "Push":"#8B5A2B","Pull":"#2E4D38","Legs":"#5C5C2E","Full Body":"#2C4564",
+  "Upper Body":"#6B2A2A","Lower Body":"#5C5C2E","Chest":"#8B5A2B","Back":"#2E4D38",
+  "Shoulders":"#3D343F","Arms":"#4A5560","Glutes":"#4F4318","Core":"#2A4347",
+  "Abs":"#2A4347","Cardio":"#2C4564","HIIT":"#6B2A2A","Endurance":"#494C56",
+  "Flexibility":"#3D343F","Yoga":"#3D343F","Mobility":"#3D343F",
+  "Gym":"#4F4318","Home Gym":"#8B5A2B","Bodyweight":"#2E4D38"
+};
+function getRecipeMgColor(tpl){
+  if(!tpl) return "#B0A090";
+  return RECIPE_CAT_COLORS[tpl.category] || RECIPE_CAT_COLORS[tpl.equipment] || "#B0A090";
+}
+// Derive workout color from its most-common muscle group
+function getWorkoutMgColor(wo, exById, mgColors){
+  if(!wo || !wo.exercises) return "#B0A090";
+  const counts = {};
+  for(const ex of wo.exercises){
+    const exD = exById[ex.exId]; if(!exD) continue;
+    const mg = (exD.muscleGroup||"").toLowerCase().trim();
+    if(!mg) continue;
+    counts[mg] = (counts[mg]||0)+1;
+  }
+  let top=null, topN=0;
+  for(const k in counts){ if(counts[k]>topN){ top=k; topN=counts[k]; } }
+  return (top && mgColors[top]) || "#B0A090";
+}
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
@@ -98,6 +130,8 @@ function App() {
   const [favSelectMode,setFavSelectMode] = useState(false);
   const [favSelected,setFavSelected] = useState(()=>new Set());
   const [libSearch,setLibSearch]   = useState("");
+  const [libSearchDebounced,setLibSearchDebounced] = useState("");
+  const debouncedSetLibSearch = React.useRef(debounce(v => setLibSearchDebounced(v), 200)).current;
   const [libTypeFilters,setLibTypeFilters]   = useState(()=>new Set());
   const [libMuscleFilters,setLibMuscleFilters] = useState(()=>new Set());
   const [libEquipFilters,setLibEquipFilters]   = useState(()=>new Set());
@@ -105,6 +139,8 @@ function App() {
   const [libDetailEx,setLibDetailEx] = useState(null);
   const [libSelectMode,setLibSelectMode] = useState(false);
   const [libSelected,setLibSelected]     = useState(()=>new Set());
+  const [libBrowseMode,setLibBrowseMode] = useState("home");
+  const [libVisibleCount,setLibVisibleCount] = useState(60);
   const [lbFilter,setLbFilter] = useState("overall_xp");
   const [lbScope,setLbScope] = useState("world"); // "world" | "friends"
   const [lbStateFilters,setLbStateFilters] = useState(["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"]);
@@ -347,6 +383,10 @@ function App() {
   // Save-to-Plan wizard mode: "new" | "existing"
   const [spwMode,setSpwMode] = useState("new"); // within savePlanWizard
   const [spwTargetPlanId,setSpwTargetPlanId] = useState(null);
+
+  // Load Supabase exercises on startup; useExercises() triggers re-render when done
+  const _exReady = useExercises();
+  useEffect(()=>{ loadExercises(); },[]);
 
   useEffect(()=>{
     // Listen for auth state changes (login, logout, magic link click)
@@ -1400,7 +1440,7 @@ function App() {
 
   // Merged exercise list (built-in + custom) — memoized to avoid rebuilding on every render
   const _customExRef = profile.customExercises;
-  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef]);
+  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef, _exReady]);
   const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
 
   // Auto-update quest completion state when log or streak changes
@@ -3160,36 +3200,28 @@ function App() {
               )
           )
 
-          /* ══ UNIFIED NAV + CHECK-IN PANEL ══ */
+          /* ══ BOTTOM TAB BAR — fixed iOS material ══ */
           , React.createElement('div', { className: "hud-nav-panel" }
-            /* Tabs row */
             , React.createElement('div', { className: "tabs" }
-              , [["workout","🏋️\nExercises"],["workouts","💪\nWorkouts"],["calendar","📅\nCalendar"],["character","⚔️\nCharacter"],["social","👥\nGuild"]].map(([t,l])=>(
-                React.createElement('button', { key: t, className: `tab ${activeTab===t?"on":""}`, style: {position:"relative"}, onClick: ()=>guardAll(()=>{setActiveTab(t);if(t==="workouts")setWorkoutView("list");if(t==="social"&&authUser){loadSocialData();loadIncomingShares();}}) }
-                  , l
-                  , t==="social"&&(friendRequests.length+incomingShares.length)>0&&React.createElement('span', { className: "tab-badge" }, friendRequests.length+incomingShares.length)
-                )
-              ))
-            )
-            /* Daily Check-In strip — only on Exercises tab */
-            , activeTab==="workout" && React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid rgba(180,172,158,.04)"} }
-              , React.createElement('span', { style: {fontSize:"1.05rem"} }, "🔥")
-              , React.createElement('span', { style: {fontSize:".88rem",fontWeight:700,color:"#b4ac9e"} }, profile.checkInStreak)
-              , React.createElement('span', { style: {fontSize:".58rem",color:"#8a8478"} }, "day streak")
-              , React.createElement('div', { style: {flex:1} })
-              , React.createElement('button', {
-                  style: {fontSize:".5rem",color:"#5a5650",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"},
-                  onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
-                }, "↺ Retro")
-              , React.createElement('button', {
-                  style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
-                  onClick: ()=>setShowWNMockup(true)
-                }, "📲 Notification")
-              , React.createElement('button', {
-                  style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
-                  disabled: profile.lastCheckIn===todayStr(),
-                  onClick: doCheckIn
-                }, profile.lastCheckIn===todayStr() ? "✓ Checked In" : "Check In")
+              , [
+                  ["workout","Exercises","mdi:dumbbell"],
+                  ["workouts","Workouts","mdi:weight-lifter"],
+                  ["calendar","Calendar","mdi:calendar-blank"],
+                  ["character","Character","game-icons:crossed-swords"],
+                  ["social","Guild","game-icons:tribal-pendant"]
+                ].map(([t,l,iconName])=>{
+                  const isOn = activeTab===t;
+                  const tabColor = isOn ? "#d4cec4" : "#6a6050";
+                  const iconPath = iconName.replace(":","/");
+                  const iconSrc = `https://api.iconify.design/${iconPath}.svg?color=${encodeURIComponent(tabColor)}`;
+                  return React.createElement('button', { key: t, className: `tab ${isOn?"on":""}`, onClick: ()=>guardAll(()=>{setActiveTab(t);if(t==="workouts")setWorkoutView("list");if(t==="social"&&authUser){loadSocialData();loadIncomingShares();}}) }
+                    , React.createElement('span', { className: "tab-icon" }
+                      , React.createElement('img', { src: iconSrc, alt: "", width: 22, height: 22, style: { display:"block" } })
+                    )
+                    , React.createElement('span', { className: "tab-label" }, l)
+                    , t==="social"&&(friendRequests.length+incomingShares.length)>0&&React.createElement('span', { className: "tab-badge" }, friendRequests.length+incomingShares.length)
+                  );
+                })
             )
           )
 
@@ -3198,6 +3230,27 @@ function App() {
             /* ── WORKOUT TAB ─────────────────────── */
             , activeTab==="workout" && (
               React.createElement(React.Fragment, null
+
+                /* ══ DAILY CHECK-IN STRIP ══ */
+                , React.createElement('div', { className: "hud-checkin-strip" }
+                  , React.createElement('span', { style: {fontSize:"1.05rem"} }, "🔥")
+                  , React.createElement('span', { style: {fontSize:".88rem",fontWeight:700,color:"#b4ac9e"} }, profile.checkInStreak)
+                  , React.createElement('span', { style: {fontSize:".58rem",color:"#8a8478"} }, "day streak")
+                  , React.createElement('div', { style: {flex:1} })
+                  , React.createElement('button', {
+                      style: {fontSize:".5rem",color:"#5a5650",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"},
+                      onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
+                    }, "↺ Retro")
+                  , React.createElement('button', {
+                      style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
+                      onClick: ()=>setShowWNMockup(true)
+                    }, "📲 Notification")
+                  , React.createElement('button', {
+                      style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
+                      disabled: profile.lastCheckIn===todayStr(),
+                      onClick: doCheckIn
+                    }, profile.lastCheckIn===todayStr() ? "✓ Checked In" : "Check In")
+                )
 
                 /* ══ EXERCISES SUB-TAB BAR ══ */
                 , React.createElement('div', { className:"log-subtab-bar", style:{marginBottom:14} }
@@ -3406,11 +3459,11 @@ function App() {
                   const ALL_MUSCLE_OPTS = ["chest","back","shoulder","bicep","tricep","legs","glutes","abs","calves","forearm","full_body","cardio"];
                   const ALL_EQUIP_OPTS  = ["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
 
-                  const toggleSet = (setter, val) => setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; });
-                  const clearAll  = () => { setLibTypeFilters(new Set()); setLibMuscleFilters(new Set()); setLibEquipFilters(new Set()); setLibSearch(""); };
+                  const toggleSet = (setter, val) => { setter(s=>{ const n=new Set(s); n.has(val)?n.delete(val):n.add(val); return n; }); setLibVisibleCount(60); };
+                  const clearAll  = () => { setLibTypeFilters(new Set()); setLibMuscleFilters(new Set()); setLibEquipFilters(new Set()); setLibSearch(""); setLibSearchDebounced(""); setLibVisibleCount(60); setLibBrowseMode("home"); };
                   const hasFilters = libTypeFilters.size>0 || libMuscleFilters.size>0 || libEquipFilters.size>0 || libSearch;
 
-                  const q2 = libSearch.toLowerCase().trim();
+                  const q2 = libSearchDebounced.toLowerCase().trim();
 
                   // Filter function — checks all three filter sets (OR within each, AND across sets)
                   const matchesFilters = (ex, tF, mF, eF) => {
@@ -3466,26 +3519,185 @@ function App() {
 
                   const toggleSel = (id) => setLibSelected(s=>{ const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; });
 
+                  /* ── Home view computed data ── */
+                  const hexRgba = (hex, a) => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
+
+                  const MUSCLE_CARD_DATA = ALL_MUSCLE_OPTS.filter(m=>m!=="full_body").map(mg=>{
+                    const count = allExercises.filter(ex=>(ex.muscleGroup||"").toLowerCase().trim()===mg).length;
+                    const meta = MUSCLE_META[mg] || {emoji:"💪",label:mg.charAt(0).toUpperCase()+mg.slice(1),icon:"game-icons:weight-lifting-up"};
+                    return {mg, label:meta.label, emoji:meta.emoji, icon:meta.icon, count, color:getMuscleColor(mg)};
+                  }).filter(d=>d.count>0);
+
+                  // Recent exercises — deduped from log, padded with favorites
+                  const recentExIds = []; const seenIds = new Set();
+                  for(const entry of (profile.log||[]).slice(0,100)){
+                    if(entry.exId && !seenIds.has(entry.exId) && allExById[entry.exId]){ recentExIds.push(entry.exId); seenIds.add(entry.exId); }
+                    if(recentExIds.length>=10) break;
+                  }
+                  for(const fId of (profile.favoriteExercises||[])){
+                    if(!seenIds.has(fId) && allExById[fId]){ recentExIds.push(fId); seenIds.add(fId); }
+                    if(recentExIds.length>=10) break;
+                  }
+                  const yourExercises = recentExIds.map(id=>allExById[id]).filter(Boolean);
+
+                  // Discover rows
+                  const discoverRows = [
+                    {label:"Beginner Friendly", exercises:allExercises.filter(ex=>(ex.baseXP||0)<45).slice(0,15),
+                     onSeeAll:()=>setLibBrowseMode("filtered")},
+                    {label:"Advanced Challenges", exercises:allExercises.filter(ex=>(ex.baseXP||0)>=60).slice(0,15),
+                     onSeeAll:()=>setLibBrowseMode("filtered")},
+                  ].concat(_exercisesLoaded ? [
+                    {label:"Bodyweight Only", exercises:allExercises.filter(ex=>(ex.equipment||"bodyweight").toLowerCase()==="bodyweight").slice(0,15),
+                     onSeeAll:()=>{setLibEquipFilters(new Set(["bodyweight"]));setLibBrowseMode("filtered");}},
+                    {label:"Dumbbell Exercises", exercises:allExercises.filter(ex=>(ex.equipment||"").toLowerCase()==="dumbbell").slice(0,15),
+                     onSeeAll:()=>{setLibEquipFilters(new Set(["dumbbell"]));setLibBrowseMode("filtered");}},
+                    {label:"Barbell Essentials", exercises:allExercises.filter(ex=>(ex.equipment||"").toLowerCase()==="barbell").slice(0,15),
+                     onSeeAll:()=>{setLibEquipFilters(new Set(["barbell"]));setLibBrowseMode("filtered");}},
+                  ] : []);
+
+                  // Fade-edge scroll handler
+                  const handleHScroll = (e) => {
+                    const el = e.currentTarget;
+                    const wrap = el.parentElement;
+                    if(!wrap) return;
+                    const atLeft = el.scrollLeft > 8;
+                    const atRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 8;
+                    wrap.classList.toggle('fade-left', atLeft);
+                    wrap.classList.toggle('fade-right-off', !atRight);
+                  };
+
                   return React.createElement('div', null,
-                    /* Search + Select row */
-                    React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,alignItems:"center"}},
-                      React.createElement('div', {className:"tech-search-wrap",style:{flex:1}},
+                    /* Sticky search bar — translucent material */
+                    React.createElement('div', {className:"lib-sticky-search"},
+                    React.createElement('div', {style:{display:"flex",gap:8,alignItems:"center"}},
+                      React.createElement('div', {className:"tech-search-wrap",style:{flex:1,marginBottom:0}},
                         React.createElement('span', {className:"tech-search-icon"}, "🔍"),
                         React.createElement('input', {
                           className:"tech-search-inp",
                           placeholder:`Search ${allExercises.length} exercises…`,
                           value:libSearch,
-                          onChange:e=>setLibSearch(e.target.value)
+                          onChange:e=>{const v=e.target.value;setLibSearch(v);debouncedSetLibSearch(v);if(v&&libBrowseMode==="home")setLibBrowseMode("filtered");}
                         }),
-                        libSearch && React.createElement('span', {className:"tech-search-clear",onClick:()=>setLibSearch("")}, "✕")
+                        libSearch && React.createElement('span', {className:"tech-search-clear",onClick:()=>{setLibSearch("");setLibSearchDebounced("");setLibVisibleCount(60);if(libMuscleFilters.size===0&&libTypeFilters.size===0&&libEquipFilters.size===0)setLibBrowseMode("home");}}, "✕")
                       ),
-                      React.createElement('button', {
+                      libBrowseMode==="filtered" && React.createElement('button', {
                         onClick:()=>{ setLibSelectMode(m=>!m); setLibSelected(new Set()); },
                         style:{flexShrink:0,padding:"6px 12px",borderRadius:8,border:"1px solid",
                                borderColor:libSelectMode?"#B0A898":"rgba(45,42,36,.3)",
                                background:libSelectMode?"rgba(45,42,36,.26)":"transparent",
                                color:libSelectMode?"#B0A898":"#8a8478",fontSize:".7rem",fontWeight:libSelectMode?"700":"400",cursor:"pointer",whiteSpace:"nowrap"}
                       }, libSelectMode?"✕ Cancel":"⊞ Select")
+                    )
+                    ),
+
+                    /* ═══ HOME VIEW ═══ */
+                    libBrowseMode === "home" && React.createElement('div', null,
+
+                      /* Your Exercises — hero carousel */
+                      yourExercises.length > 0 && React.createElement('div', {className:"lib-home-section",style:{marginBottom:4}},
+                        React.createElement('div', {className:"lib-section-hdr"},
+                          React.createElement('span', {className:"lib-hdr-icon"}, "⚔️"),
+                          "Your Exercises"
+                        ),
+                        React.createElement('div', {className:"lib-hscroll-wrap"},
+                        React.createElement('div', {className:"lib-hscroll",onScroll:handleHScroll},
+                          yourExercises.map(ex=>{
+                            const mgColor = getMuscleColor(ex.muscleGroup);
+                            const mgLabel = (MUSCLE_META[(ex.muscleGroup||"").toLowerCase()] || {}).label || ex.muscleGroup || "";
+                            return React.createElement('div', {
+                              key:"yr-"+ex.id,
+                              className:"lib-hero-card",
+                              onClick:()=>setLibDetailEx(ex),
+                              style:{'--mg-color':mgColor}
+                            },
+                              React.createElement('div', {className:"lib-hero-orb",style:{'--mg-color':mgColor}},
+                                React.createElement(ExIcon, {ex, size:"1.4rem", color:mgColor})
+                              ),
+                              React.createElement('span', {className:"lib-hero-name"}, ex.name),
+                              mgLabel && React.createElement('span', {className:"lib-muscle-pill",style:{'--mg-color':mgColor}}, mgLabel)
+                            );
+                          })
+                        )
+                        )
+                      ),
+
+                      yourExercises.length > 0 && React.createElement('div', {className:"lib-divider"}),
+
+                      /* Browse by Muscle — feature tiles */
+                      React.createElement('div', {className:"lib-home-section",style:{marginBottom:4}},
+                        React.createElement('div', {className:"lib-section-hdr"},
+                          React.createElement('span', {className:"lib-hdr-icon"}, "🗺️"),
+                          "Browse by Muscle"
+                        ),
+                        React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},
+                          MUSCLE_CARD_DATA.map(({mg, label, emoji, icon, count, color})=>
+                            React.createElement('div', {
+                              key:"mc-"+mg,
+                              className:"lib-muscle-tile",
+                              onClick:()=>{setLibMuscleFilters(new Set([mg]));setLibBrowseMode("filtered");},
+                              style:{'--mg-color':color}
+                            },
+                              React.createElement('span', {className:"lib-tile-watermark"}, emoji),
+                              React.createElement('div', {className:"lib-tile-orb",style:{'--mg-color':color}},
+                                React.createElement(ExIcon, {ex:{muscleGroup:mg,category:"strength"}, size:"1.15rem", color:color})
+                              ),
+                              React.createElement('div', null,
+                                React.createElement('div', {className:"lib-tile-name"}, label),
+                                React.createElement('div', {className:"lib-tile-count",style:{'--mg-color':color}}, count+" exercises")
+                              )
+                            )
+                          )
+                        )
+                      ),
+
+                      React.createElement('div', {className:"lib-divider"}),
+
+                      /* Discover Rows — Netflix-style horizontal scroll */
+                      discoverRows.map((row,ri)=>
+                        row.exercises.length >= 3 && React.createElement('div', {key:"dr-"+row.label,className:"lib-home-section",style:{marginBottom:ri < discoverRows.length-1 ? 18 : 0}},
+                          React.createElement('div', {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},
+                            React.createElement('span', {className:"lib-section-hdr",style:{marginBottom:0}}, row.label),
+                            React.createElement('button', {className:"lib-see-all",onClick:row.onSeeAll}, "See All →")
+                          ),
+                          React.createElement('div', {className:"lib-hscroll-wrap"},
+                          React.createElement('div', {className:"lib-hscroll",onScroll:handleHScroll},
+                            row.exercises.map(ex=>{
+                              const mgColor = getMuscleColor(ex.muscleGroup);
+                              const diff = (ex.difficulty||"").toLowerCase();
+                              const diffCls = diff === "beginner" ? "lib-diff-beginner" : diff === "advanced" ? "lib-diff-advanced" : diff === "intermediate" ? "lib-diff-intermediate" : "";
+                              const mgLabel = (MUSCLE_META[(ex.muscleGroup||"").toLowerCase()] || {}).label || "";
+                              return React.createElement('div', {
+                                key:"d-"+ex.id,
+                                className:"lib-discover-card",
+                                onClick:()=>setLibDetailEx(ex),
+                                style:{'--mg-color':mgColor}
+                              },
+                                React.createElement('div', {className:"lib-discover-orb",style:{'--mg-color':mgColor}},
+                                  React.createElement(ExIcon, {ex, size:"1.1rem", color:mgColor})
+                                ),
+                                React.createElement('span', {className:"lib-discover-name"}, ex.name),
+                                React.createElement('div', {className:"lib-discover-meta"},
+                                  mgLabel && React.createElement('span', {style:{fontSize:".5rem",color:mgColor,fontWeight:500}}, mgLabel),
+                                  mgLabel && diffCls && React.createElement('span', {style:{fontSize:".45rem",color:"#3a3834"}}, "·"),
+                                  diffCls && React.createElement('span', {className:"lib-diff-badge "+diffCls}, ex.difficulty),
+                                  React.createElement('span', {style:{fontSize:".5rem",color:"#6a6050",fontWeight:600}}, (ex.baseXP||0)+" XP")
+                                )
+                              );
+                            })
+                          )
+                          )
+                        )
+                      )
+                    ),
+
+                    /* ═══ FILTERED VIEW ═══ */
+                    libBrowseMode === "filtered" && React.createElement('div', null,
+                    /* Back to browse */
+                    React.createElement('div', {style:{marginBottom:10}},
+                      React.createElement('button', {
+                        onClick:()=>clearAll(),
+                        style:{background:"transparent",border:"none",color:"#b4ac9e",fontSize:".78rem",cursor:"pointer",padding:"4px 0",display:"flex",alignItems:"center",gap:4}
+                      }, "← Browse Library")
                     ),
 
                     /* Filter dropdowns row — custom panels that stay open for multi-select */
@@ -3699,10 +3911,10 @@ function App() {
                       }, "📋 Plan")
                     )),
 
-                    /* Exercise list */
+                    /* Exercise list (paginated) */
                     React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}},
                       libFiltered.length===0 && React.createElement('div',{className:"empty",style:{padding:"24px 0"}},"No exercises match your filters."),
-                      libFiltered.map(ex=>{
+                      libFiltered.slice(0, libVisibleCount).map(ex=>{
                         const isFav=(profile.favoriteExercises||[]).includes(ex.id);
                         const hasPB=!!(profile.exercisePBs||{})[ex.id];
                         const isSel=libSelected.has(ex.id);
@@ -3715,31 +3927,16 @@ function App() {
                           ex.muscleGroup ? ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1) : null,
                           ex.equipment && ex.equipment!=="bodyweight" ? ex.equipment : null,
                         ].filter(Boolean).join(" · ");
+                        const exMgColor = getMuscleColor(ex.muscleGroup);
                         return React.createElement('div', {
                           key:ex.id,
+                          className:`picker-ex-row${isSel?" sel":""}`,
                           onClick:()=>{ if(libSelectMode){ toggleSel(ex.id); } else { setLibDetailEx(ex); } },
-                          style:{
-                            background: isSel
-                              ? "rgba(45,42,36,.25)"
-                              : "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                            border:"1px solid",
-                            borderColor: isSel ? "rgba(180,172,158,.35)" : "rgba(180,172,158,.05)",
-                            borderRadius:10, padding:"11px 13px",
-                            display:"flex", alignItems:"center", gap:12, cursor:"pointer",
-                            boxShadow: isSel
-                              ? "0 0 0 1.5px rgba(180,172,158,.3), 0 4px 20px rgba(180,172,158,.06)"
-                              : "none",
-                            transition:"all .18s",
-                          }
+                          style:{"--mg-color":exMgColor}
                         },
                           /* Icon orb */
-                          React.createElement('div', {style:{
-                            width:34, height:34, borderRadius:8, flexShrink:0,
-                            background:"rgba("+parseInt(getTypeColor(ex.category).slice(1,3),16)+","+parseInt(getTypeColor(ex.category).slice(3,5),16)+","+parseInt(getTypeColor(ex.category).slice(5,7),16)+",.12)",
-                            border:"1px solid rgba("+parseInt(getTypeColor(ex.category).slice(1,3),16)+","+parseInt(getTypeColor(ex.category).slice(3,5),16)+","+parseInt(getTypeColor(ex.category).slice(5,7),16)+",.18)",
-                            display:"flex", alignItems:"center", justifyContent:"center",
-                          }},
-                            React.createElement(ExIcon, {ex:ex, size:"1rem", color:getTypeColor(ex.category)})
+                          React.createElement('div', {className:"picker-ex-orb"},
+                            React.createElement(ExIcon, {ex:ex, size:"1rem", color:"#d4cec4"})
                           ),
                           /* Body */
                           React.createElement('div', {style:{flex:1, minWidth:0}},
@@ -3786,8 +3983,16 @@ function App() {
                             }, isFav?"⭐":"☆")
                           )
                         );
-                      })
-                    ),
+                      }),
+                      /* Load More / count info */
+                      libFiltered.length > libVisibleCount && React.createElement('button', {
+                        onClick:()=>setLibVisibleCount(c=>c+60),
+                        style:{alignSelf:"center",margin:"12px auto",padding:"8px 24px",borderRadius:8,
+                               border:"1px solid rgba(180,172,158,.12)",background:"rgba(45,42,36,.3)",
+                               color:"#b4ac9e",fontSize:".75rem",fontWeight:600,cursor:"pointer",letterSpacing:".02em"}
+                      }, `Load More (${Math.min(libVisibleCount, libFiltered.length)} of ${libFiltered.length})`)
+                    )
+                    ), /* ── end filtered view ── */
 
                     /* Detail bottom sheet */
                     libDetailEx && React.createElement('div', {
@@ -4045,16 +4250,18 @@ function App() {
               // ── LIST ───────────────────────────────
               if(workoutView==="list") return (
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {marginBottom:8} }
-                    , React.createElement('div', {className:"rpg-sec-header rpg-sec-header-center"}, React.createElement('div', {className:"rpg-sec-line rpg-sec-line-l"}), React.createElement('span', {className:"rpg-sec-title"}, "\u2726 Arsenal \u2726",
-                      React.createElement('span', { className: "info-icon", style: {display:"inline-flex",alignItems:"center",justifyContent:"center",width:16,height:16,borderRadius:"50%",border:"1px solid rgba(180,172,158,.15)",fontSize:".48rem",fontWeight:700,color:"#8a8478",fontStyle:"normal",marginLeft:6,verticalAlign:"middle",cursor:"pointer",position:"relative"} }, "?", React.createElement('span', { className: "info-tooltip" }, "Pre-defined groups of exercises. Build once, reuse anytime in plans or as one-off sessions."))
-                    ), React.createElement('div', {className:"rpg-sec-line rpg-sec-line-r"}))
-                  )
-                  /* Subtabs */
-                  , React.createElement('div', { className: "log-subtab-bar", style: {marginBottom:12}}
-                    , [["reusable","⚔ Re-Usable"],["oneoff","⚡ One-Off"]].map(([t,l])=>(
-                      React.createElement('button', { key: t, className: `log-subtab-btn ${workoutSubTab===t?"on":""}`, onClick: ()=>setWorkoutSubTab(t)}, l)
-                    ))
+                  , React.createElement('div', { className: "wo-sticky-filters" }
+                    , React.createElement('div', { style: {marginBottom:8} }
+                      , React.createElement('div', {className:"rpg-sec-header rpg-sec-header-center"}, React.createElement('div', {className:"rpg-sec-line rpg-sec-line-l"}), React.createElement('span', {className:"rpg-sec-title"}, "\u2726 Arsenal \u2726",
+                        React.createElement('span', { className: "info-icon", style: {display:"inline-flex",alignItems:"center",justifyContent:"center",width:16,height:16,borderRadius:"50%",border:"1px solid rgba(180,172,158,.15)",fontSize:".48rem",fontWeight:700,color:"#8a8478",fontStyle:"normal",marginLeft:6,verticalAlign:"middle",cursor:"pointer",position:"relative"} }, "?", React.createElement('span', { className: "info-tooltip" }, "Pre-defined groups of exercises. Build once, reuse anytime in plans or as one-off sessions."))
+                      ), React.createElement('div', {className:"rpg-sec-line rpg-sec-line-r"}))
+                    )
+                    /* Subtabs */
+                    , React.createElement('div', { className: "log-subtab-bar", style: {marginBottom:0}}
+                      , [["reusable","⚔ Re-Usable"],["oneoff","⚡ One-Off"]].map(([t,l])=>(
+                        React.createElement('button', { key: t, className: `log-subtab-btn ${workoutSubTab===t?"on":""}`, onClick: ()=>setWorkoutSubTab(t)}, l)
+                      ))
+                    )
                   )
                   /* Label filter dropdown */
                   , (profile.workoutLabels||[]).length>0 && React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,position:"relative"}},
@@ -4147,8 +4354,9 @@ function App() {
                   , allW.filter(w=>!w.oneOff).filter(w=>woLabelFilters.size===0||(w.labels||[]).some(l=>woLabelFilters.has(l))).map(wo=>{
                     const exCount = wo.exercises.length;
                     const xp = calcWorkoutXP(wo);
+                    const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
                     return (
-                      React.createElement('div', { key: wo.id, className: "workout-card"}
+                      React.createElement('div', { key: wo.id, className: "workout-card", style:{"--mg-color":woMgColor}}
                         , React.createElement('div', { className: "workout-card-top", style:{cursor:"pointer"}, onClick: ()=>{setActiveWorkout(wo);setWorkoutView("detail");}}
                           , React.createElement('div', { className: "workout-icon"}, wo.icon)
                           , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -4205,8 +4413,9 @@ function App() {
                           const badgeTxt = days===0?"Today":days===1?"Tomorrow":`${days}d away`;
                           const wo = (profile.workouts||[]).find(w=>w.id===g.id) || {id:g.id,name:g.name,icon:g.icon,desc:"",exercises:g.items.map(sw=>({exId:sw.exId,sets:3,reps:10,weightLbs:null,weightPct:100,distanceMi:null,hrZone:null})),oneOff:true,durationMin:null,activeCal:null,totalCal:null};
                           const xp = calcWorkoutXP(wo);
+                          const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
                           return (
-                            React.createElement('div', { key: g.id, className: "workout-card"}
+                            React.createElement('div', { key: g.id, className: "workout-card", style:{"--mg-color":woMgColor}}
                               , React.createElement('div', { className: "workout-card-top", style:{cursor:"pointer"}, onClick: ()=>{setActiveWorkout(wo);setWorkoutView("detail");}}
                                 , React.createElement('div', { className: "workout-icon"}, g.icon)
                                 , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -4263,14 +4472,16 @@ function App() {
                         const soloExs = (profile.scheduledWorkouts||[]).filter(sw=>!sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today).sort((a,b)=>a.scheduledDate.localeCompare(b.scheduledDate));
                         if(soloExs.length===0) return null;
                         return React.createElement(React.Fragment, null
-                          , React.createElement('div', {style:{fontSize:".65rem",color:"#4a4438",textTransform:"uppercase",letterSpacing:".1em",marginTop:14,marginBottom:8}}, "Solo Exercises")
+                          , React.createElement('div', {className:"wo-section-hdr"}, React.createElement('span',{className:"wo-section-hdr-text"}, "Solo Exercises"))
                           , soloExs.map(sw=>{
                             const ex = allExById[sw.exId];
                             if(!ex) return null;
                             const days = daysUntil(sw.scheduledDate);
                             const badgeCls = days===0?"badge-today":days<=3?"badge-soon":"badge-future";
                             const badgeTxt = days===0?"Today":days===1?"Tomorrow":`${days}d away`;
-                            return React.createElement('div', {key:sw.id, className:"workout-card"}
+                            const soloMg = (ex.muscleGroup||"").toLowerCase().trim();
+                            const soloMgColor = MUSCLE_COLORS[soloMg] || "#B0A090";
+                            return React.createElement('div', {key:sw.id, className:"workout-card", style:{"--mg-color":soloMgColor}}
                               , React.createElement('div', {className:"workout-card-top"}
                                 , React.createElement('div', {className:"workout-icon"}, ex.icon)
                                 , React.createElement('div', {style:{flex:1,minWidth:0}}
@@ -4311,13 +4522,14 @@ function App() {
                 const filteredTpls = recipeFilter.size===0 ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t=>recipeFilter.has(t.category)||recipeFilter.has(t.equipment));
                 return (
                 React.createElement(React.Fragment, null
+                  , React.createElement('div', { className: "wo-sticky-filters" }
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setWorkoutView("list")}, "← Back" )
                     , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Workout Recipes" )
                     , React.createElement('div', null)
                   )
                   /* Category multi-select dropdown */
-                  , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10,position:"relative"}},
+                  , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:0,position:"relative"}},
                     recipeCatDrop && React.createElement('div', {onClick:()=>setRecipeCatDrop(false), style:{position:"fixed",inset:0,zIndex:19}}),
                     React.createElement('div', {style:{position:"relative",zIndex:20}},
                       React.createElement('button', {
@@ -4367,21 +4579,25 @@ function App() {
                       onClick:()=>setRecipeFilter(new Set())
                     },"Clear")
                   )
+                  )
                   , filteredTpls.length===0&&React.createElement('div', { className: "empty"}, "No recipes match the selected categories.")
                   , filteredTpls.map(tpl=>{
                     const xp = tpl.exercises.reduce((t,ex)=>t+calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById),0);
                     const descExpanded = expandedRecipeDesc.has(tpl.id);
+                    const tplMgColor = getRecipeMgColor(tpl);
+                    const diffCls = tpl.difficulty?`wo-diff-pill wo-diff-${tpl.difficulty.toLowerCase()}`:null;
                     return (
-                      React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:12}}
+                      React.createElement('div', { key: tpl.id, className: "workout-card", style: {marginBottom:12,"--mg-color":tplMgColor}}
                         , React.createElement('div', { className: "workout-card-top"}
                           , React.createElement('div', { className: "workout-icon"}, tpl.icon)
                           , React.createElement('div', { style: {flex:1,minWidth:0}}
                             , React.createElement('div', { className: "workout-name"}, tpl.name)
                             , React.createElement('div', { className: "workout-meta"}
-                              , React.createElement('span', { className: "workout-tag"}, tpl.exercises.length, " exercises" )
+                              , tpl.category&&React.createElement('span', { className: "wo-cat-pill"}, tpl.category)
+                              , tpl.difficulty&&React.createElement('span', { className: diffCls}, tpl.difficulty)
+                              , React.createElement('span', { className: "workout-tag"}, tpl.exercises.length, " ex")
                               , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
                               , tpl.durationMin&&React.createElement('span', { className: "workout-tag"}, "⏱ " , tpl.durationMin, "min" )
-                              , tpl.difficulty&&React.createElement('span', { className: "workout-tag", style:{color:DIFF_COLORS[tpl.difficulty]||"#b4ac9e"}}, tpl.difficulty)
                               , tpl.equipment&&React.createElement('span', { className: "workout-tag"}, EQUIP_ICONS[tpl.equipment]||"", " " , tpl.equipment)
                             )
                           )
@@ -4509,9 +4725,10 @@ function App() {
                       const isC=exD.category==="cardio";
                       const isF=exD.category==="flexibility";
                       const showW=!isC&&!isF;
+                      const exMgColor=getMuscleColor(exD.muscleGroup);
                       return (
-                        React.createElement('div', { key: i, className: "workout-detail-ex"}
-                          , React.createElement('span', { className: "workout-detail-ex-icon"}, exD.icon)
+                        React.createElement('div', { key: i, className: "workout-detail-ex", style: {"--mg-color":exMgColor}}
+                          , React.createElement('div', { className: "workout-detail-ex-orb"}, React.createElement(ExIcon, {ex:exD,size:".95rem",color:"#d4cec4"}))
                           , React.createElement('div', { style: {flex:1,minWidth:0}}
                             , React.createElement('div', { className: "workout-detail-ex-name"}
                               , exD.name
@@ -4527,7 +4744,7 @@ function App() {
                               React.createElement('button', { className: "btn btn-ghost btn-xs"  , title: "Edit custom exercise"  ,
                                 onClick: ()=>openExEditor("edit",exD)}, "✎")
                             )
-                            , React.createElement('div', { style: {fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "+", calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById), " XP" )
+                            , React.createElement('div', { className: "workout-detail-ex-xp"}, "+", calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById), " XP" )
                           )
                         )
                       );
@@ -4560,28 +4777,29 @@ function App() {
                       , wbCopySource && React.createElement('div', { className: "builder-nav-sub" }, "Forging from: ", wbCopySource)
                     )
                   )
-                  /* Name */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Workout Name" )
-                    , React.createElement('input', { className: "inp", value: wbName, onChange: e=>setWbName(e.target.value), placeholder: "e.g. Morning Push Day…"   })
-                  )
-                  /* Icon */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Icon")
-                    , React.createElement('div', { className: "icon-row", style: {flexWrap:"wrap",gap:6}}
-                      , ["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾"].map(ic=>(
-                        React.createElement('div', { key: ic, className: `icon-opt ${wbIcon===ic?"sel":""}`, style: {fontSize:"1.2rem",width:36,height:36}, onClick: ()=>setWbIcon(ic)}, ic)
-                      ))
+                  /* Identity panel: Name + Icon + Description */
+                  , React.createElement('div', { className: "wb-section" }
+                    , React.createElement('div', { className: "wb-section-hdr" }, React.createElement('span', {className:"wb-section-hdr-icon"}, "✦"), "Identity")
+                    , React.createElement('div', { className: "field"}
+                      , React.createElement('label', null, "Workout Name" )
+                      , React.createElement('input', { className: "inp", value: wbName, onChange: e=>setWbName(e.target.value), placeholder: "e.g. Morning Push Day…"   })
+                    )
+                    , React.createElement('div', { className: "field"}
+                      , React.createElement('label', null, "Icon")
+                      , React.createElement('div', { className: "icon-row", style: {flexWrap:"wrap",gap:6}}
+                        , ["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾"].map(ic=>(
+                          React.createElement('div', { key: ic, className: `icon-opt ${wbIcon===ic?"sel":""}`, style: {fontSize:"1.2rem",width:36,height:36}, onClick: ()=>setWbIcon(ic)}, ic)
+                        ))
+                      )
+                    )
+                    , React.createElement('div', { className: "field"}
+                      , React.createElement('label', null, "Description " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
+                      , React.createElement('input', { className: "inp", value: wbDesc, onChange: e=>setWbDesc(e.target.value), placeholder: "e.g. Upper body strength focus…"    })
                     )
                   )
-                  /* Description */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Description " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
-                    , React.createElement('input', { className: "inp", value: wbDesc, onChange: e=>setWbDesc(e.target.value), placeholder: "e.g. Upper body strength focus…"    })
-                  )
-                  /* Labels */
-                  , React.createElement('div', { className: "field"}
-                    , React.createElement('label', null, "Labels " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(optional)"))
+                  /* Labels panel */
+                  , React.createElement('div', { className: "wb-section" }
+                    , React.createElement('div', { className: "wb-section-hdr" }, React.createElement('span', {className:"wb-section-hdr-icon"}, "❖"), "Labels", React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal",letterSpacing:".05em",marginLeft:6,textTransform:"none"}}, "(optional)"))
                     , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}
                       , (profile.workoutLabels||[]).map(l=>
                         React.createElement('span', { key: l, className: "wo-label-chip"+(wbLabels.includes(l)?" sel":""),
@@ -4614,35 +4832,39 @@ function App() {
                       )
                     )
                   )
-                  /* Workout-level stats (optional) */
-                  , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:4}}
-                    , React.createElement('div', { className: "field", style: {flex:1.5,marginBottom:0}}
-                      , React.createElement('label', null, "Duration " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(HH:MM)"))
-                      , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric",
-                        value: wbDuration,
-                        onChange: e=>setWbDuration(e.target.value),
-                        onBlur: e=>setWbDuration(normalizeHHMM(e.target.value)),
-                        placeholder: "00:00"})
-                    )
-                    , React.createElement('div', { className: "field", style: {flex:0.8,marginBottom:0}}
-                      , React.createElement('label', null, "Seconds")
-                      , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59",
-                        value: wbDurSec,
-                        onChange: e=>setWbDurSec(e.target.value),
-                        placeholder: "0"})
-                    )
-                    , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
-                      , React.createElement('label', null, "Active Cal" )
-                      , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbActiveCal, onChange: e=>setWbActiveCal(e.target.value), placeholder: "e.g. 320" })
-                    )
-                    , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
-                      , React.createElement('label', null, "Total Cal" )
-                      , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbTotalCal, onChange: e=>setWbTotalCal(e.target.value), placeholder: "e.g. 450" })
+                  /* Stats panel: Duration / Calories */
+                  , React.createElement('div', { className: "wb-section" }
+                    , React.createElement('div', { className: "wb-section-hdr" }, React.createElement('span', {className:"wb-section-hdr-icon"}, "⏱"), "Session Stats", React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal",letterSpacing:".05em",marginLeft:6,textTransform:"none"}}, "(optional)"))
+                    , React.createElement('div', { className: "wb-stats-row"}
+                      , React.createElement('div', { className: "field", style: {flex:1.5,marginBottom:0}}
+                        , React.createElement('label', null, "Duration " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(HH:MM)"))
+                        , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric",
+                          value: wbDuration,
+                          onChange: e=>setWbDuration(e.target.value),
+                          onBlur: e=>setWbDuration(normalizeHHMM(e.target.value)),
+                          placeholder: "00:00"})
+                      )
+                      , React.createElement('div', { className: "field", style: {flex:0.8,marginBottom:0}}
+                        , React.createElement('label', null, "Seconds")
+                        , React.createElement('input', { className: "inp", type: "number", min: "0", max: "59",
+                          value: wbDurSec,
+                          onChange: e=>setWbDurSec(e.target.value),
+                          placeholder: "0"})
+                      )
+                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
+                        , React.createElement('label', null, "Active Cal" )
+                        , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbActiveCal, onChange: e=>setWbActiveCal(e.target.value), placeholder: "e.g. 320" })
+                      )
+                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
+                        , React.createElement('label', null, "Total Cal" )
+                        , React.createElement('input', { className: "inp", type: "number", min: "0", max: "9999", value: wbTotalCal, onChange: e=>setWbTotalCal(e.target.value), placeholder: "e.g. 450" })
+                      )
                     )
                   )
                   /* Exercise list */
+                  , React.createElement('div', { className: "wo-section-hdr", style:{marginTop:18,marginBottom:10}}, React.createElement('span', {className:"wo-section-hdr-text"}, "⚔ Techniques"))
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
-                    , React.createElement('label', null, "⚔ Techniques (", wbExercises.length, ")"
+                    , React.createElement('label', null, "(", wbExercises.length, " exercise", wbExercises.length!==1?"s":"", ")"
                       , wbExercises.length>0&&React.createElement('span', { style: {marginLeft:8,fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "⚡ "
                          , wbExercises.reduce((s,ex)=>{
                           const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
@@ -4688,6 +4910,7 @@ function App() {
                     const runPace=(isRunningEx&&distMiVal>0&&durationMin>0)?durationMin/distMiVal:null;
                     const runBoostPct=runPace?(runPace<=8?20:5):0;
                     const catColor=getTypeColor(exD.category);
+                    const mgColor=getMuscleColor(exD.muscleGroup);
                     /* ── ACCORDION SUPERSET CARD — replaces both solo rows when paired ── */
                     if (partnerIdx!=null && partnerExD) {
                       const totalXP = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById) + calcExXP(partnerEx.exId,partnerEx.sets||3,partnerEx.reps||10,profile.chosenClass,allExById);
@@ -4724,6 +4947,7 @@ function App() {
                         style: {
                           opacity:dragWbExIdx===i?0.5:1,flexDirection:"column",alignItems:"stretch",gap:0,
                           "--cat-color":catColor,
+                          "--mg-color":mgColor,
                         },
                         draggable: true,
                         onDragStart: e=>{e.dataTransfer.effectAllowed="move";setDragWbExIdx(i);},
@@ -4753,7 +4977,7 @@ function App() {
                                     React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
                                   )
                                 , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
-                                , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColor} }, exD.icon)
+                                , React.createElement('div', { className: "builder-ex-orb", style: {"--mg-color":mgColor} }, React.createElement(ExIcon, {ex:exD, size:".95rem", color:"#d4cec4"}))
                                 , React.createElement('div', { className: "builder-ex-name-styled"}
                                   , exD.name
                                   , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:4}}, "custom")
@@ -5597,7 +5821,9 @@ function App() {
                             const uniqueExCount = new Set(entries.map(e=>e.exId)).size;
                             const gStats = getEntryStats(first);
                             const hasStats = gStats.durationSec || gStats.activeCal || gStats.totalCal;
-                            return React.createElement('div', { key: gi, className: "log-group-card", style:{marginBottom:8} }
+                            const calGrpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                            const calGrpMgColor = getMuscleColor(calGrpFirstEx && calGrpFirstEx.muscleGroup);
+                            return React.createElement('div', { key: gi, className: "log-group-card", style:{marginBottom:8, "--mg-color":calGrpMgColor} }
                               , React.createElement('div', { className: "log-group-hdr "+(collapsed?"collapsed":""), onClick:()=>toggleLogGroup(cKey), style:{cursor:"pointer"} }
                                 , React.createElement('span', { className: "log-group-icon" }, icon)
                                 , React.createElement('div', { style:{flex:1,minWidth:0} }
@@ -5622,19 +5848,21 @@ function App() {
                                     const ef = exEntries[0];
                                     const exXP = exEntries.reduce((s,e)=>s+e.xp,0);
                                     const isSuperset = exEntries.some(e=>entries.some((o,oi)=>o.exId!==e.exId && o.sourceGroupId===e.sourceGroupId && ((o.supersetWith!=null)||(e.supersetWith!=null))));
-                                    return React.createElement('div', { key:ci, className:"h-entry", style:{marginBottom:4,cursor:"pointer"},
+                                    const efData = allExById[ef.exId];
+                                    const efMgColor = getMuscleColor(efData && efData.muscleGroup);
+                                    return React.createElement('div', { key:ci, className:"h-entry", style:{marginBottom:4,cursor:"pointer","--mg-color":efMgColor},
                                       onClick:()=>setCalExDetailModal({ entries:exEntries, exerciseName:ef.exercise, exerciseIcon:ef.icon,
                                         sourceName:first.sourcePlanName||first.sourceWorkoutName||null, sourceIcon:icon,
                                         totalCal:gStats.totalCal, activeCal:gStats.activeCal, durationSec:gStats.durationSec }) }
-                                      , React.createElement('span', {style:{fontSize:"1rem",flexShrink:0,width:26,textAlign:"center"}}, ef.icon)
+                                      , React.createElement('span', {className:"h-icon"}, ef.icon)
                                       , React.createElement('div', {style:{flex:1,minWidth:0}}
-                                        , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4}}
-                                          , React.createElement('span', {style:{fontSize:".72rem",fontWeight:600,color:"#d4cec4"}}, ef.exercise)
+                                        , React.createElement('div', {className:"h-name", style:{display:"flex",alignItems:"center",gap:4}}
+                                          , React.createElement('span', null, ef.exercise)
                                           , isSuperset && React.createElement('span', {style:{fontSize:".48rem",color:"#b4ac9e",background:"rgba(180,172,158,.1)",padding:"1px 5px",borderRadius:3,fontWeight:600}}, "SS")
                                           , exEntries.length>1 && React.createElement('span', {style:{fontSize:".48rem",color:"#8a8478",background:"rgba(180,172,158,.08)",padding:"1px 5px",borderRadius:3}}, exEntries.length, " sets")
                                         )
                                       )
-                                      , React.createElement('div', {style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e",flexShrink:0}}, "+", exXP, " XP")
+                                      , React.createElement('div', {className:"h-xp"}, "+", exXP, " XP")
                                     );
                                   })
                                 );
@@ -6068,7 +6296,7 @@ function App() {
                 }).map(q=>{
                   const qs=_optionalChain([profile, 'access', _128 => _128.quests, 'optionalAccess', _129 => _129[q.id]])||{};
                   return (
-                    React.createElement('div', { key: q.id, className: "quest-card complete" , style: {border:"1px solid rgba(180,172,158,.08)"}}
+                    React.createElement('div', { key: q.id, className: "quest-card complete"}
                       , React.createElement('div', { className: "quest-top"}
                         , React.createElement('div', { className: "quest-icon-wrap"}, q.icon)
                         , React.createElement('div', { style: {flex:1}}
@@ -6127,8 +6355,9 @@ function App() {
                 const exData = allExById[e.exId];
                 const isC = exData ? exData.category==="cardio" : false;
                 const isF = exData ? exData.category==="flexibility" : false;
+                const exMgColor = getMuscleColor(exData && exData.muscleGroup);
                 return (
-                  React.createElement('div', { className: "h-entry"}
+                  React.createElement('div', { className: "h-entry", style: {"--mg-color":exMgColor}}
                     , React.createElement('span', { className: "h-icon"}, e.icon)
                     , React.createElement('div', { style: {flex:1,minWidth:0}}
                       , React.createElement('div', { className: "h-name"}
@@ -6175,8 +6404,11 @@ function App() {
                       const groupXP=entries.reduce((s,e)=>s+e.xp,0);
                       const displayDate=_optionalChain([entries, 'access', _141 => _141[0], 'optionalAccess', _142 => _142.date])||dk;
                       const collapsed = !openLogGroups["ex_"+dk]; // default collapsed
+                      // Dominant muscle-group color = first valid entry's muscle group
+                      const grpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                      const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
                       return (
-                        React.createElement('div', { key: dk, className: "log-group-card"}
+                        React.createElement('div', { key: dk, className: "log-group-card", style: {"--mg-color":grpMgColor}}
                           , React.createElement('div', { className: `log-group-hdr ${collapsed?"collapsed":""}`,
                             onClick: ()=>toggleLogGroup("ex_"+dk)}
                             , React.createElement('span', { className: "log-group-icon"}, "📅")
@@ -6236,8 +6468,10 @@ function App() {
                   const gid=first.sourceGroupId||first.sourceWorkoutId||String(gi);
                   const collapsed=!openLogGroups[gid];
                   const isOneOff=first.sourceWorkoutType==="oneoff";
+                  const grpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                  const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
                   return (
-                    React.createElement('div', { className: "log-group-card"}
+                    React.createElement('div', { className: "log-group-card", style: {"--mg-color":grpMgColor}}
                       , React.createElement('div', { className: `log-group-hdr ${collapsed?"collapsed":""}`, onClick: ()=>toggleLogGroup(gid)}
                         , React.createElement('span', { className: "log-group-icon"}, first.sourceWorkoutIcon||"💪")
                         , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -6331,8 +6565,10 @@ function App() {
                       const groupXP = entries.reduce((s,e)=>s+e.xp,0);
                       const gid = first.sourceGroupId||first.sourcePlanId||String(gi);
                       const collapsed = !openLogGroups[gid]; // default collapsed, open when toggled
+                      const grpFirstEx = entries.map(en=>allExById[en.exId]).find(Boolean);
+                      const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
                       return (
-                        React.createElement('div', { key: gid, className: "log-group-card"}
+                        React.createElement('div', { key: gid, className: "log-group-card", style: {"--mg-color":grpMgColor}}
                           , React.createElement('div', { className: `log-group-hdr ${collapsed?"collapsed":""}`, onClick: ()=>toggleLogGroup(gid)}
                             , React.createElement('span', { className: "log-group-icon"}, first.sourcePlanIcon||"📋")
                             , React.createElement('div', { style: {flex:1,minWidth:0}}
@@ -6666,39 +6902,34 @@ function App() {
                       return days+"d";
                     })() : "";
 
-                    return React.createElement("div", {key: conv.channel_id, style:{
-                      display:"flex", alignItems:"center", gap:10,
-                      padding:"12px 14px",
-                      background: unread > 0 ? "rgba(45,42,36,.2)" : "transparent",
-                      borderBottom:"1px solid rgba(45,42,36,.12)",
-                      cursor:"pointer", transition:"background .15s"
-                    }, onClick: ()=>{
+                    return React.createElement("div", {key: conv.channel_id,
+                      className:`msg-conv-card${unread>0?" unread":""}`,
+                      onClick: ()=>{
                       setMsgActiveChannel(conv);
                       loadChannelMessages(conv.channel_id);
                       setMsgView("chat");
                     }},
                       // Avatar
-                      React.createElement("div", {style:{width:38,height:38,borderRadius:"50%",flexShrink:0,
+                      React.createElement("div", {className:"msg-avatar",style:{
                         background:(otherCls?otherCls.color:"#5a5650")+"18",
-                        border:"2px solid "+(otherCls?otherCls.color:"#5a5650")+"44",
-                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem"}},
+                        border:"1px solid "+(otherCls?otherCls.color:"#5a5650")+"44"}},
                         otherCls ? React.createElement(ClassIcon,{classKey:other.chosen_class,size:18,color:otherCls.color}) : "\uD83D\uDCAC"
                       ),
                       // Name + last message
                       React.createElement("div", {style:{flex:1,minWidth:0}},
                         React.createElement("div", {style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}},
-                          React.createElement("span", {style:{fontSize:".78rem",fontWeight:unread>0?700:600,color:unread>0?"#d4cec4":"#b4ac9e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                          React.createElement("span", {className:"msg-conv-name",style:{fontWeight:unread>0?700:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
                             other ? other.player_name : (conv.name||"Chat")),
                           React.createElement("span", {style:{fontSize:".52rem",color:"#5a5650",flexShrink:0}}, timeAgo)
                         ),
-                        lastMsg && React.createElement("div", {style:{fontSize:".62rem",color:unread>0?"#8a8478":"#5a5650",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                        lastMsg && React.createElement("div", {className:`msg-conv-preview${unread>0?" unread":""}`},
                           lastMsg.sender_id === authUser?.id ? "You: " : "",
                           lastMsg.content
                         ),
                         !lastMsg && React.createElement("div", {style:{fontSize:".62rem",color:"#3a3834",fontStyle:"italic",marginTop:2}}, "No messages yet")
                       ),
                       // Unread badge
-                      unread > 0 && React.createElement("div", {style:{width:20,height:20,borderRadius:"50%",background:"#2980b9",color:"#fff",fontSize:".52rem",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, unread > 99 ? "99+" : unread)
+                      unread > 0 && React.createElement("div", {className:"msg-unread-badge"}, unread > 99 ? "99+" : unread)
                     );
                   })
                 );
@@ -6710,7 +6941,7 @@ function App() {
 
               return React.createElement("div", {style:{display:"flex",flexDirection:"column",flex:1,minHeight:0}},
                 // Chat header
-                React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid rgba(180,172,158,.04)",flexShrink:0}},
+                React.createElement("div", {className:"msg-chat-hdr"},
                   React.createElement("button", {style:{background:"transparent",border:"none",color:"#b4ac9e",fontSize:".82rem",cursor:"pointer",padding:"4px"},
                     onClick:()=>{setMsgView("list");setMsgActiveChannel(null);setMsgMessages([]);loadConversations();loadUnreadCount();}}, "\u2190"),
                   React.createElement("div", {style:{width:30,height:30,borderRadius:"50%",flexShrink:0,
@@ -6739,37 +6970,31 @@ function App() {
                     const isSystem = msg.message_type === "system" || msg.message_type === "event";
                     if(isSystem) {
                       return React.createElement("div", {key:msg.id, style:{textAlign:"center",padding:"4px 0"}},
-                        React.createElement("span", {style:{fontSize:".56rem",color:"#5a5650",fontStyle:"italic",background:"rgba(45,42,36,.15)",padding:"3px 10px",borderRadius:6}}, msg.content)
+                        React.createElement("span", {className:"msg-bubble system"}, msg.content)
                       );
                     }
                     const time = new Date(msg.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
                     return React.createElement("div", {key:msg.id, style:{display:"flex",flexDirection:"column",alignItems:isMine?"flex-end":"flex-start",maxWidth:"80%",alignSelf:isMine?"flex-end":"flex-start"}},
                       !isMine && React.createElement("div", {style:{fontSize:".48rem",color:"#5a5650",marginBottom:1,marginLeft:4}}, msg.sender_name),
-                      React.createElement("div", {style:{
-                        padding:"8px 12px",
-                        borderRadius:isMine?"12px 12px 3px 12px":"12px 12px 12px 3px",
-                        background:isMine?"rgba(41,128,185,.15)":"rgba(45,42,36,.25)",
-                        border:"1px solid "+(isMine?"rgba(41,128,185,.2)":"rgba(180,172,158,.06)"),
-                        fontSize:".76rem", color:isMine?"#85B7EB":"#d4cec4", lineHeight:1.5,
-                        wordBreak:"break-word"
-                      }}, msg.content),
-                      React.createElement("div", {style:{fontSize:".44rem",color:"#3a3834",marginTop:2,marginLeft:4,marginRight:4}}, time,
+                      React.createElement("div", {className:`msg-bubble ${isMine?"own":"other"}`}, msg.content),
+                      React.createElement("div", {className:"msg-timestamp",style:{marginLeft:4,marginRight:4}}, time,
                         msg.edited_at ? " \u00b7 edited" : "")
                     );
                   })
                 ),
 
                 // Input bar
-                React.createElement("div", {style:{display:"flex",gap:8,padding:"8px 14px 12px",borderTop:"1px solid rgba(180,172,158,.06)",flexShrink:0,background:"rgba(12,12,10,.95)"}},
+                React.createElement("div", {className:"msg-input-bar"},
                   React.createElement("input", {
-                    style:{flex:1,background:"rgba(45,42,36,.25)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",color:"#d4cec4",fontSize:".78rem",fontFamily:"'Inter',sans-serif",outline:"none"},
+                    className:"msg-input",
                     placeholder:"Type a message\u2026",
                     value:msgInput,
                     onChange:e=>setMsgInput(e.target.value),
                     onKeyDown:e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMsg();}}
                   }),
                   React.createElement("button", {
-                    style:{width:40,height:40,borderRadius:10,background:msgInput.trim()?"rgba(41,128,185,.2)":"rgba(45,42,36,.15)",border:"1px solid "+(msgInput.trim()?"rgba(41,128,185,.3)":"rgba(180,172,158,.06)"),color:msgInput.trim()?"#2980b9":"#3a3834",fontSize:"1rem",cursor:msgInput.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"},
+                    className:"msg-send-btn",
+                    style:{width:40,height:40,opacity:msgInput.trim()?1:.4,cursor:msgInput.trim()?"pointer":"default"},
                     disabled:msgSending||!msgInput.trim(),
                     onClick:sendMsg
                   }, msgSending ? "\u2026" : "\u2191")
@@ -6810,9 +7035,7 @@ function App() {
                 return level >= (s.unlockLevel||1);
               };
               const setAv = (field, val) => setProfile(p=>({...p, [field]:val}));
-              const btnSel = {background:"rgba(180,172,158,.1)",border:"1px solid rgba(180,172,158,.08)",borderRadius:8,padding:"6px 11px",color:"#b4ac9e",fontSize:".72rem",cursor:"pointer",fontWeight:600};
-              const btnBase = {background:"rgba(45,42,36,.18)",border:"1px solid rgba(180,172,158,.05)",borderRadius:8,padding:"6px 11px",color:"#8a8478",fontSize:".72rem",cursor:"pointer"};
-              const section = {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"12px 14px",marginBottom:11};
+              /* btn styling now via .char-sub-btn / .char-sub-btn.sel */
               const rune = (label) => React.createElement('div',{className:"profile-rune-divider",style:{margin:"0 0 10px"}},React.createElement('span',{className:"profile-rune-label"},`⠿ ${label} ⠿`));
               return React.createElement('div', {style:{"--cls-color":cls.color,"--cls-glow":cls.glow}}
 
@@ -6838,14 +7061,15 @@ function App() {
                 , React.createElement('div',{style:{display:"flex",gap:6,marginBottom:12}}
                   , ["avatar","stats","equipment"].map(t=>React.createElement('button',{
                       key:t, onClick:()=>setCharSubTab(t),
-                      style:{...(charSubTab===t?btnSel:btnBase), flex:1, textAlign:"center", textTransform:"capitalize", padding:"8px 4px"}
+                      className:`char-sub-btn${charSubTab===t?" sel":""}`,
+                      style:{flex:1, textAlign:"center", padding:"8px 4px"}
                     }, t==="avatar"?"⚔️ Avatar":t==="stats"?"📊 Stats":"🎒 Equipment")
                   )
                 )
 
                 /* ══ AVATAR SUB-TAB ══════════════════════════ */
                 , charSubTab==="avatar" && React.createElement('div', null
-                  , React.createElement('div', {style:{textAlign:"center",padding:"52px 24px",borderRadius:12,border:"1px dashed rgba(180,172,158,.08)",background:"rgba(45,42,36,.12)",margin:"4px 0 12px"}}
+                  , React.createElement('div', {className:"char-section",style:{textAlign:"center",padding:"52px 24px"}}
                     , React.createElement('div', {style:{fontSize:"2.6rem",marginBottom:14}}, "⚔️")
                     , React.createElement('div', {style:{fontSize:".95rem",color:"#b4ac9e",fontWeight:600,marginBottom:8,letterSpacing:".02em"}}, "Avatar Creator")
                     , React.createElement('div', {style:{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",borderRadius:20,padding:"5px 14px",marginBottom:14}}
@@ -6858,18 +7082,18 @@ function App() {
                 )
                 /* ══ STATS SUB-TAB ════════════════════════════ */
                 , charSubTab==="stats" && React.createElement('div', null
-                  , React.createElement('div', {style:section}
+                  , React.createElement('div', {className:"char-section"}
                     , rune("Character Stats")
                     , React.createElement('div',{style:{fontSize:".6rem",color:"#5a5650",fontStyle:"italic",textAlign:"center",marginBottom:10}},"Stats grow dynamically as you train — full calculation coming soon")
                     , Object.entries(STAT_META).map(([key,meta])=>{
                       const val=charStats[key]||0, pct=Math.round((val/statMax)*100);
-                      return React.createElement('div',{key,style:{display:"flex",alignItems:"center",gap:8,marginBottom:7}}
-                        , React.createElement('span',{style:{fontSize:"1rem",width:22,textAlign:"center",flexShrink:0}},meta.icon)
-                        , React.createElement('span',{style:{fontSize:".65rem",color:"#8a8478",width:80,flexShrink:0}},meta.label)
-                        , React.createElement('div',{style:{flex:1,height:6,background:"rgba(45,42,36,.2)",borderRadius:3,overflow:"hidden"}}
-                          , React.createElement('div',{style:{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${meta.color}99,${meta.color})`,borderRadius:3,transition:"width .6s ease"}})
+                      return React.createElement('div',{key,className:"char-stat-row"}
+                        , React.createElement('span',{className:"char-stat-icon"},meta.icon)
+                        , React.createElement('span',{className:"char-stat-label",style:{width:80}},meta.label)
+                        , React.createElement('div',{className:"char-stat-bar"}
+                          , React.createElement('div',{className:"char-stat-fill",style:{width:`${pct}%`,background:`linear-gradient(90deg,${meta.color}99,${meta.color})`}})
                         )
-                        , React.createElement('span',{style:{fontSize:".65rem",color:"#6a645a",width:26,textAlign:"right",flexShrink:0,fontFamily:"'Inter',sans-serif"}},val)
+                        , React.createElement('span',{className:"char-stat-val"},val)
                       );
                     })
                   )
@@ -6877,16 +7101,16 @@ function App() {
 
                 /* ══ EQUIPMENT SUB-TAB ═══════════════════════ */
                 , charSubTab==="equipment" && React.createElement('div', null
-                  , React.createElement('div', {style:section}
+                  , React.createElement('div', {className:"char-section"}
                     , rune("Equipment")
                     , React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px"}}
                       , EQUIP_SLOTS.map(slot=>{
                         const item=equipment[slot.key]||null;
-                        return React.createElement('div',{key:slot.key,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:"1px solid rgba(45,42,36,.2)",borderRadius:9,background:"rgba(45,42,36,.1)",minWidth:0}}
-                          , React.createElement('div',{style:{width:30,height:30,borderRadius:7,border:`1px solid ${item?"rgba(180,172,158,.1)":"rgba(180,172,158,.06)"}`,background:item?"rgba(45,42,36,.18)":"rgba(45,42,36,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem",flexShrink:0}},slot.icon)
+                        return React.createElement('div',{key:slot.key,className:"char-equip-slot"}
+                          , React.createElement('div',{className:"char-equip-icon",style:{width:30,height:30,borderRadius:7,border:`1px solid ${item?"rgba(180,172,158,.1)":"rgba(180,172,158,.06)"}`,background:item?"rgba(45,42,36,.18)":"rgba(45,42,36,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem"}},slot.icon)
                           , React.createElement('div',{style:{flex:1,minWidth:0}}
-                            , React.createElement('div',{style:{fontSize:".65rem",color:"#8a8478",fontWeight:600,lineHeight:1.2}},slot.label)
-                            , React.createElement('div',{style:{fontSize:".58rem",color:item?"#b4ac9e":"#3a3834",marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},item||slot.hint)
+                            , React.createElement('div',{className:"char-equip-label",style:{fontWeight:600}},slot.label)
+                            , React.createElement('div',{className:"char-equip-name",style:{color:item?"#b4ac9e":"#3a3834"}},item||slot.hint)
                           )
                         );
                       })
@@ -6947,7 +7171,7 @@ function App() {
                       )
                     );
                   };
-                  return React.createElement("div", {style:{background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"12px 14px",marginBottom:11}},
+                  return React.createElement("div", {className:"profile-section"},
                     React.createElement("div", {className:"profile-rune-divider",style:{margin:"0 0 6px"}},
                       React.createElement("span", {className:"profile-rune-label"}, "⠿ Identity ⠿")),
                     /* Account ID */
@@ -6976,7 +7200,7 @@ function App() {
                 })()
 
                 /* ── COMBAT RECORD — WoW achievement panel / D4 stats tab ── */
-                , React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11}}
+                , React.createElement('div', {className:"profile-section"}
                   , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"}}, React.createElement('span', { className: "profile-rune-label"}, "⠿ Combat Record ⠿"   ))
                   , React.createElement('div', { className: "combat-grid"}
                     , React.createElement('div', { className: "combat-chip"}, React.createElement('span', { className: "combat-chip-val"}, profile.xp.toLocaleString()), React.createElement('span', { className: "combat-chip-lbl"}, "Total XP" ))
@@ -7056,7 +7280,7 @@ function App() {
                     )
                   );
 
-                  return React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11} }
+                  return React.createElement('div', { className:"profile-section" }
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ Personal Bests ⠿"))
                     , filterDrop
                     , visibleEntries.length === 0
@@ -7085,7 +7309,7 @@ function App() {
                 })()
 
                 /* ── PHYSICAL STATS — Final Fantasy XIV character panel style ── */
-                , React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:14}}
+                , React.createElement('div', { className:"profile-section"}
                   , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, `⠿ ${cls.name} Data ⠿`))
                   , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px 16px"}}
                     , [
@@ -7108,7 +7332,7 @@ function App() {
 
                 /* ── ABOUT YOU ── */
                 , (profile.sportsBackground||[]).length>0 || profile.trainingStyle || profile.fitnessPriorities?.length>0 || profile.disciplineTrait || profile.motto ? (
-                  React.createElement('div', { style: {background:"rgba(45,42,36,.1)",border:"1px solid rgba(45,42,36,.2)",borderRadius:12,padding:"13px 14px",marginBottom:11} }
+                  React.createElement('div', { className:"profile-section" }
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ About You ⠿"))
                     , profile.motto && React.createElement('div', { style: {fontSize:".76rem",color:"#b4ac9e",fontStyle:"italic",marginBottom:8,textAlign:"center"} }, `"${profile.motto}"`)
                     , profile.disciplineTrait && React.createElement('div', { style: {marginBottom:7} }
@@ -7140,7 +7364,7 @@ function App() {
                   , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "✎ Edit Profile"  )
                   , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setEditMode(false)}, "✕ Cancel" )
                 )
-                , React.createElement('div', { className: "edit-panel"}
+                , React.createElement('div', { className: "edit-panel", style: {"--cls-color":cls.color,"--cls-glow":cls.glow}}
 
                   /* ── IDENTITY ── */
                   , React.createElement('div', null
@@ -7658,7 +7882,8 @@ function App() {
                     , items.map(item => {
                       const isOn = item.defaultOff ? prefs[item.key] === true : prefs[item.key] !== false;
                       return React.createElement('div', { key: item.key,
-                        style: {background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:10,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",transition:"border-color .15s",borderColor:isOn?"rgba(46,204,113,.18)":"rgba(45,42,36,.2)"},
+                        className:"profile-notif-row",
+                        style: {cursor:"pointer",borderColor:isOn?"rgba(46,204,113,.18)":"rgba(180,172,158,.05)"},
                         onClick: ()=>toggleNotifPref(item.key) }
                         , React.createElement('span', { style: {fontSize:"1.1rem",flexShrink:0} }, item.icon)
                         , React.createElement('div', { style: {flex:1,minWidth:0} }
@@ -7696,7 +7921,8 @@ function App() {
         const age = profile.age||30;
         return (
           React.createElement('div', { className: "ex-editor-backdrop", onClick: ()=>setExEditorOpen(false)}
-            , React.createElement('div', { className: "ex-editor-sheet", onClick: e=>e.stopPropagation()}
+            , React.createElement('div', { className: "ex-editor-sheet", onClick: e=>e.stopPropagation(),
+                style: {"--mg-color": getMuscleColor(ed.muscleGroup||"chest")} }
               , React.createElement('div', { className: "ex-editor-hdr"}
                 , React.createElement('div', null
                   , React.createElement('div', { className: "ex-editor-title"}
@@ -7797,7 +8023,7 @@ function App() {
                 )
 
                 /* ── Default Workout Values ───────────────── */
-                , React.createElement('div', { style: {background:"rgba(45,42,36,.14)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"12px 13px",display:"flex",flexDirection:"column",gap:10}}
+                , React.createElement('div', { className: "ex-editor-section" }
                   , React.createElement('div', { className: "ex-editor-section-title" }, "Default Values When Logging"
 
                   )
@@ -8311,20 +8537,15 @@ function App() {
                       const diffColor = diffLabel==="Advanced"?"#7A2838":diffLabel==="Beginner"?"#5A8A58":"#A8843C";
                       const diffBg    = diffLabel==="Advanced"?"#2e1515":diffLabel==="Beginner"?"#1a2e1a":"#2e2010";
                       const subParts  = [ex.category?ex.category.charAt(0).toUpperCase()+ex.category.slice(1):null, ex.muscleGroup?ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1):null].filter(Boolean).join(" · ");
+                      const exMgColor = getMuscleColor(ex.muscleGroup);
                       return React.createElement('div',{
                         key:ex.id,
+                        className:`picker-ex-row${sel?" sel":""}`,
                         onClick:()=>pickerToggleEx(ex.id),
-                        style:{
-                          background:sel?"rgba(45,42,36,.25)":"linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                          border:"1px solid "+(sel?"rgba(180,172,158,.35)":"rgba(180,172,158,.05)"),
-                          borderRadius:9, padding:"9px 12px",
-                          display:"flex", alignItems:"center", gap:11, cursor:"pointer",
-                          boxShadow:sel?"0 0 0 1.5px rgba(180,172,158,.3),0 3px 14px rgba(180,172,158,.06)":"none",
-                          transition:"all .15s",
-                        }
+                        style:{"--mg-color":exMgColor}
                       },
-                        React.createElement('div',{style:{width:30,height:30,borderRadius:7,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},
-                          React.createElement(ExIcon,{ex:ex,size:".9rem",color:getTypeColor(ex.category)})
+                        React.createElement('div',{className:"picker-ex-orb"},
+                          React.createElement(ExIcon,{ex:ex,size:".95rem",color:"#d4cec4"})
                         ),
                         React.createElement('div',{style:{flex:1,minWidth:0}},
                           React.createElement('div',{style:{fontSize:".8rem",fontWeight:600,color:sel?"#d4cec4":"#d4cec4",marginBottom:2}},
@@ -8764,7 +8985,7 @@ function App() {
             , React.createElement('div', { className: "modal-body"}
               /* ── Glass dismiss banner ── */
               , React.createElement('div', {
-                  style: {background:"rgba(45,42,36,.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1px solid rgba(180,172,158,.10)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10,cursor:"pointer"},
+                  className: "stats-prompt-banner",
                   onClick: ()=>{
                     setProfile(p=>({...p,notificationPrefs:{...(p.notificationPrefs||{}),reviewBattleStats:false}}));
                     statsPromptModal.onConfirm(statsPromptModal.wo);
@@ -8772,9 +8993,9 @@ function App() {
                   }
                 }
                 , React.createElement('div', { style: {width:16,height:16,borderRadius:3,border:"1.5px solid rgba(180,172,158,.25)",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0} })
-                , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",lineHeight:1.35} }
+                , React.createElement('div', { className: "stats-prompt-banner-text" }
                   , "Want this reminder off? Check here. To re-enable, you can do so in "
-                  , React.createElement('span', { style: {color:"#b4ac9e",fontWeight:600} }, "Alerts settings")
+                  , React.createElement('strong', null, "Alerts settings")
                   , "."
                 )
               )
@@ -8797,7 +9018,7 @@ function App() {
                       return missing.length ? `${missing.join(", ")} ${missing.length===1?"was":"were"} not recorded. Would you like to add ${missing.length===1?"it":"them"} before completing?` : "Review your workout stats before completing.";
                     })()
               )
-              , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:14}}
+              , React.createElement('div', { className: "stats-prompt-fields"}
                 , React.createElement('div', { className: "field", style: {flex:1.5,marginBottom:0}}
                   , React.createElement('label', null, "Duration " , React.createElement('span', { style: {color:"#5a5650",fontWeight:"normal"}}, "(HH:MM)"))
                   , React.createElement('input', { className: "inp", type: "text", inputMode: "numeric", placeholder: "00:00",
@@ -8822,14 +9043,14 @@ function App() {
               )
               /* Make Reusable checkbox — only for one-off workouts */
               , statsPromptModal.wo.oneOff&&(
-                React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,marginBottom:14,padding:"10px 12px",background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.06)",borderRadius:9,cursor:"pointer"},
+                React.createElement('div', { className: "stats-prompt-reusable",
                   onClick: ()=>setSpMakeReusable(v=>!v)}
-                  , React.createElement('div', { style: {width:18,height:18,borderRadius:4,border:`2px solid ${spMakeReusable?"#b4ac9e":"rgba(180,172,158,.08)"}`,background:spMakeReusable?"#b4ac9e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}
+                  , React.createElement('div', { style: {width:18,height:18,borderRadius:4,border:`2px solid ${spMakeReusable?"#b4ac9e":"rgba(180,172,158,.18)"}`,background:spMakeReusable?"#b4ac9e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}
                     , spMakeReusable&&React.createElement('span', { style: {fontSize:".7rem",color:"#0c0c0a",fontWeight:"bold"}}, "✓")
                   )
                   , React.createElement('div', null
-                    , React.createElement('div', { style: {fontSize:".72rem",color:"#d4cec4",fontWeight:600}}, "💪 Also save as Reusable Workout"     )
-                    , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",marginTop:2}}, "Keep this workout in your Re-Usable tab for future use"         )
+                    , React.createElement('div', { className: "stats-prompt-reusable-title"}, "💪 Also save as Reusable Workout"     )
+                    , React.createElement('div', { className: "stats-prompt-reusable-sub"}, "Keep this workout in your Re-Usable tab for future use"         )
                   )
                 )
               )
@@ -9144,6 +9365,9 @@ function App() {
       , completionModal && (()=>{
         const wo = completionModal.workout;
         const xp = wo.exercises.reduce((s,ex)=>s+calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById),0);
+        // Pick the dominant muscle group from the workout's first valid exercise as the theme color
+        const firstEx = wo.exercises.map(e=>allExById[e.exId]).find(Boolean);
+        const woMgColor = getMuscleColor(firstEx?.muscleGroup);
         // inPickMode: true when user tapped "Choose Day" or selected a specific date
         // pickerValue: the actual date string when a date is selected
         const inPickMode = completionAction==="past";
@@ -9151,7 +9375,7 @@ function App() {
         const pickerValue = (inPickMode && completionDate!=="pick") ? completionDate : "";
         return (
           React.createElement('div', { className: "completion-backdrop", onClick: ()=>{setCompletionModal(null);setCompletionAction("today");setScheduleWoDate("");}}
-            , React.createElement('div', { className: "completion-sheet", onClick: e=>e.stopPropagation()}
+            , React.createElement('div', { className: "completion-sheet", onClick: e=>e.stopPropagation(), style: {"--mg-color":woMgColor}}
               /* Header */
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8} }
                 , completionModal.fromStats && React.createElement('button', {
@@ -9247,9 +9471,9 @@ function App() {
 
               /* XP preview — only for log actions */
               , (completionAction==="today"||(inPickMode&&pickerValue))&&(
-                React.createElement('div', { style: {background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.06)",borderRadius:9,padding:"10px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-                  , React.createElement('div', { style: {fontSize:".7rem",color:"#5a5650"}}, "XP to be claimed"   )
-                  , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:"1rem",color:"#b4ac9e"}}, "⚡ " , xp.toLocaleString())
+                React.createElement('div', { className: "completion-xp-preview"}
+                  , React.createElement('div', { className: "completion-xp-preview-label"}, "XP to be claimed"   )
+                  , React.createElement('div', { className: "completion-xp-preview-value"}, "⚡ " , xp.toLocaleString())
                 )
               )
 
