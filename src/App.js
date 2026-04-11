@@ -91,6 +91,7 @@ function App() {
   const [showPreviewPin,setShowPreviewPin] = useState(false);
   const [previewPinInput,setPreviewPinInput] = useState("");
   const [previewPinError,setPreviewPinError] = useState(false);
+  const [isPreviewMode,setIsPreviewMode] = useState(false);
   const [detectedClass,setDetectedClass] = useState(null);
   const [activeTab,setActiveTab] = useState("workout");
   const [xpFlash,setXpFlash] = useState(null);
@@ -464,7 +465,7 @@ function App() {
     const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"landing":s), 5000);
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
-  useEffect(()=>{ if(screen==="main") doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen]);
+  useEffect(()=>{ if(screen==="main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen,isPreviewMode]);
   useEffect(()=>{
     if(screen!=="intro"){ setBootStep(0); return; }
     setBootStep(0);
@@ -2497,6 +2498,7 @@ function App() {
     setShowPreviewPin(false);
     setPreviewPinInput("");
     setPreviewPinError(false);
+    setIsPreviewMode(true);
     setScreen("main");
   }
 
