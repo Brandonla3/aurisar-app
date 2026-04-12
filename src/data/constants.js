@@ -1142,6 +1142,7 @@ const EMPTY_PROFILE = {
     friendAccepted:true,
     messageReceived:false,
     reviewBattleStats:true,
+    friendExercise:true,
   },
 };
 
