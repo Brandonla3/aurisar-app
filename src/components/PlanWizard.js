@@ -171,6 +171,8 @@ function PlanWizard(props) {
   function removeExFromDay(di,ei){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)}));}); }
 
   function updateExInDay(di,ei,field,val){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})}));}); }
+  // Direct (non-deferred) version for add/delete row — gives instant visual feedback
+  function updateExInDayNow(di,ei,field,val){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})})); }
 
   function updateExInDayBatch(di,ei,fields){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,...fields})}));}); }
 
@@ -788,11 +790,11 @@ function PlanWizard(props) {
                               , hasDur&&exData.hasTreadmill&&React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
                               , hasDur&&exData.hasTreadmill&&React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateExInDay(bDayIdx,i,"extraRows",rr);}})
                               , hasWeight&&React.createElement('input', { className: "builder-ex-input", style: {flex:1,minWidth:38,fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: bWUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateExInDay(bDayIdx,i,"extraRows",rr);}})
-                              , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateExInDay(bDayIdx,i,"extraRows",rr);}}, "\u2715")
+                              , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateExInDayNow(bDayIdx,i,"extraRows",rr);}}, "\u2715")
                             )
                           ))
                           , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
-                            onClick: ()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateExInDay(bDayIdx,i,"extraRows",rr);}}, "\uFF0B Add Row (e.g. "
+                            onClick: ()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateExInDayNow(bDayIdx,i,"extraRows",rr);}}, "\uFF0B Add Row (e.g. "
                                 , hasDur?"interval":"progressive weight", ")"
                           )
                           /* Avg HR Zone -- last for cardio */
