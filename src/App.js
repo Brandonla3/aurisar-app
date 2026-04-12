@@ -1581,10 +1581,10 @@ function App() {
     const metric = isMetric(profile.units);
     const noSetsEx = NO_SETS_EX_IDS.has(ex.id);
     const mult=getMult(ex),rv=parseInt(reps)||0,sv=noSetsEx?1:(parseInt(sets)||0);
-    // Convert weight to lbs for internal storage/XP
+    // Convert weight to lbs for internal storage/XP (weight input already reflects intensity)
     const rawW = parseFloat(exWeight||0);
     const weightInLbs = metric ? parseFloat(kgToLbs(rawW)) : rawW;
-    const effectiveW = scaleWeight(weightInLbs, weightPct);
+    const effectiveW = weightInLbs;
     // Convert distance to miles for storage
     const rawDist = parseFloat(distanceVal||0);
     const distMi = rawDist>0 ? (metric ? parseFloat(kmToMi(rawDist)) : rawDist) : null;
@@ -3413,7 +3413,7 @@ function App() {
                                 style: {"--cat-color": catColor},
                                 onClick: ()=>{
                                   if(multiMode){setMultiSelEx(s=>{const n=new Set(s);n.has(ex.id)?n.delete(ex.id):n.add(ex.id);return n;});}
-                                  else{setSelEx(selEx===ex.id?null:ex.id);setMusclePickerOpen(false);}
+                                  else{const toggling=selEx===ex.id;setSelEx(toggling?null:ex.id);setMusclePickerOpen(false);if(!toggling){setSets("");setReps("");setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);setExHHMM("");setExSec("");setQuickRows([]);}}
                                 }
                               }
                               , multiMode && React.createElement('div', { className: `grim-checkbox ${isMultiSel?"checked":""}` }, isMultiSel && "✓")
@@ -4046,9 +4046,9 @@ function App() {
                         React.createElement('button', {
                           onClick:()=>{
                             setSelEx(libDetailEx.id);
-                            setSets(String(libDetailEx.defaultSets!=null?libDetailEx.defaultSets:3));
-                            setReps(String(libDetailEx.defaultReps!=null?libDetailEx.defaultReps:10));
-                            setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);
+                            setSets("");
+                            setReps("");
+                            setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);setExHHMM("");setExSec("");setQuickRows([]);
                             setLibDetailEx(null);
                             setActiveTab("exercises");
                           },
@@ -8766,7 +8766,7 @@ function App() {
         const age=profile.age||30;
         const rawW=parseFloat(exWeight||0);
         const wLbs=metric?parseFloat(kgToLbs(rawW)||0):rawW;
-        const effW=scaleWeight(wLbs,weightPct);
+        const effW=wLbs;
         const effWDisp=metric?lbsToKg(effW):effW;
         const wUnit=weightLabel(profile.units);
         const dUnit=distLabel(profile.units);
@@ -8780,8 +8780,8 @@ function App() {
         const runPace=(isRunning&&distMi>0&&durationMin>0)?durationMin/distMi:null;
         const runBoostPct=runPace?(runPace<=8?20:5):0;
         const estXP=(()=>{
-          const sv=noSets?1:(parseInt(sets)||3);
-          const rv=isCardio||isFlex ? Math.max(1,Math.floor(combineHHMMSec(exHHMM,exSec)/60)||parseInt(reps)||1) : (parseInt(reps)||10);
+          const sv=noSets?1:(parseInt(sets)||0);
+          const rv=isCardio||isFlex ? Math.max(1,Math.floor(combineHHMMSec(exHHMM,exSec)/60)||parseInt(reps)||1) : (parseInt(reps)||0);
           const baseXP=calcExXP(ex.id,sv,rv,profile.chosenClass,allExById,distMi||null);
           const zb=showHR&&hrZone?1+(hrZone-1)*0.04:1;
           const wb=effW>0?1+Math.min(effW/500,0.3):1;
@@ -8816,7 +8816,7 @@ function App() {
                   , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
                     , !noSets&&!(isCardio||isFlex)&&React.createElement('div', { style: {flex:1}}
                       , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
-                      , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: "3"})
+                      , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: ""})
                     )
                     , isCardio||isFlex ? (React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {flex:2}}
@@ -8834,7 +8834,7 @@ function App() {
                     )) : (React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {flex:1}}
                         , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Reps")
-                        , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "200", value: reps, onChange: e=>setReps(e.target.value), placeholder: "10"})
+                        , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "200", value: reps, onChange: e=>setReps(e.target.value), placeholder: ""})
                       )
                       , showWeight&&React.createElement('div', { style: {flex:1.5}}
                         , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Weight (" , wUnit, ")")
@@ -8899,7 +8899,7 @@ function App() {
                         , React.createElement('label', { style: {marginBottom:0,flex:1}}, "Weight Intensity" )
                         , React.createElement('span', { className: "intensity-val"}, weightPct, "%")
                       )
-                      , React.createElement('input', { type: "range", className: "pct-slider", min: "0", max: "100", step: "5", value: pctToSlider(weightPct), onChange: e=>setWeightPct(sliderToPct(Number(e.target.value)))})
+                      , React.createElement('input', { type: "range", className: "pct-slider", min: "0", max: "100", step: "5", value: pctToSlider(weightPct), onChange: e=>{const newPct=sliderToPct(Number(e.target.value));const curW=parseFloat(exWeight);if(curW&&weightPct>0){const scaled=Math.round(curW*newPct/weightPct*100)/100;setExWeight(String(scaled));}setWeightPct(newPct);}})
                       , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",fontSize:".58rem",color:"#6a645a",marginTop:2}}
                         , React.createElement('span', null, "50% Deload" ), React.createElement('span', null, "100% Normal" ), React.createElement('span', null, "200% Max" )
                       )
@@ -8946,7 +8946,7 @@ function App() {
                   , React.createElement('div', { style: {display:"flex",gap:6}}
                     , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
                       onClick: ()=>{
-                        const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
+                        const exEntry={exId:ex.id,sets:parseInt(sets)||0,reps:parseInt(reps)||0,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
                         setAddToWorkoutPicker({exercises:[exEntry]});
                         setSelEx(null);
                       }}, "➕ Add to Workout"   )
