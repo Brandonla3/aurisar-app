@@ -1581,6 +1581,23 @@ function App() {
     setTimeout(()=>setXpFlash(null),2000);
     showToast(`Checked in! +${xpEarned} XP · ${newStreak} day streak 🔥`);
   }
+  function applyAutoCheckIn(base, dateKey) {
+    const today = todayStr();
+    if(dateKey !== today) return {profile:base, checkInApplied:false, checkInXP:0, checkInStreak:base.checkInStreak||0};
+    if((base.checkInHistory||[]).includes(today)) return {profile:base, checkInApplied:false, checkInXP:0, checkInStreak:base.checkInStreak||0};
+    const history = [...(base.checkInHistory||[]), today];
+    const {checkInStreak, lastCheckIn, totalCheckIns} = rebuildStreakFromHistory(history);
+    const xpEarned = checkInStreak%7===0 ? 500 : 125;
+    const quests = {...(base.quests||{})};
+    QUESTS.filter(q=>q.streak).forEach(q=>{
+      if(!_optionalChain([quests, 'access', _ => _[q.id], 'optionalAccess', _ => _.completed]) && checkInStreak>=q.streak)
+        quests[q.id]={completed:true, completedAt:today, claimed:false};
+    });
+    return {
+      profile:{...base, lastCheckIn, checkInStreak, totalCheckIns, checkInHistory:history, xp:base.xp+xpEarned, quests},
+      checkInApplied:true, checkInXP:xpEarned, checkInStreak,
+    };
+  }
   function doRetroCheckIn() {
     if(!retroDate) { showToast("Pick a date first!"); return; }
     if(retroDate>todayStr()) { showToast("Can't check in for a future date!"); return; }
@@ -1653,10 +1670,10 @@ function App() {
     const metric = isMetric(profile.units);
     const noSetsEx = NO_SETS_EX_IDS.has(ex.id);
     const mult=getMult(ex),rv=parseInt(reps)||0,sv=noSetsEx?1:(parseInt(sets)||0);
-    // Convert weight to lbs for internal storage/XP
+    // Convert weight to lbs for internal storage/XP (weight input already reflects intensity)
     const rawW = parseFloat(exWeight||0);
     const weightInLbs = metric ? parseFloat(kgToLbs(rawW)) : rawW;
-    const effectiveW = scaleWeight(weightInLbs, weightPct);
+    const effectiveW = weightInLbs;
     // Convert distance to miles for storage
     const rawDist = parseFloat(distanceVal||0);
     const distMi = rawDist>0 ? (metric ? parseFloat(kmToMi(rawDist)) : rawDist) : null;
@@ -1713,21 +1730,25 @@ function App() {
         const oldPB = (profile.exercisePBs||{})[entry.exId];
         const curPB = newExPBs[entry.exId];
         const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
+        let _ciResult = {checkInApplied:false, checkInXP:0, checkInStreak:0};
         setProfile(p=>{
           const base = {...p,xp:p.xp+finalEarned,log:newLog,quests:newQuests,runningPB:newPB!==null?newPB:p.runningPB,exercisePBs:newExPBs};
           if(capturedPendingSoloRemoveId) base.scheduledWorkouts=(p.scheduledWorkouts||[]).filter(s=>s.id!==capturedPendingSoloRemoveId);
-          return base;
+          const ci = applyAutoCheckIn(base, dateStr);
+          _ciResult = ci;
+          return ci.profile;
         });
         if(capturedPendingSoloRemoveId) setPendingSoloRemoveId(null);
-        setXpFlash({amount:finalEarned,mult,travel:travelActive});
+        setXpFlash({amount:finalEarned+_ciResult.checkInXP,mult,travel:travelActive});
         setTimeout(()=>setXpFlash(null),2000);
+        const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
         if(newPB!==null && newPB===runPace && (!profile.runningPB || runPace<profile.runningPB))
-          showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}`);
+          showToast(`🏆 New Personal Best! ${metric?parseFloat((runPace*1.60934).toFixed(2))+" min/km":parseFloat(runPace.toFixed(2))+" min/mi"}${ciSuffix}`);
         else if(isNewPB && curPB.type==="strength")
-          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs`);
+          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs${ciSuffix}`);
         else if(isNewPB && curPB.type==="assisted")
-          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)`);
-        else showToast(travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`);
+          showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)${ciSuffix}`);
+        else showToast((travelActive&&regionBoost>1?`+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️`:travelActive?`+${finalEarned} XP (+10% travel bonus) ⚔️`:regionBoost>1?`+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}`:`+${finalEarned} XP earned!`)+ciSuffix);
         // Clean up form state after successful completion
         setSets("");setReps("");setExWeight("");setWeightPct(100);setHrZone(null);setDistanceVal("");
         setExHHMM("");setExSec("");setQuickRows([]);
@@ -1783,17 +1804,24 @@ function App() {
       });
       const newLog = [entry, ...profile.log];
       const newExPBs = calcExercisePBs(newLog);
-      setProfile(p => ({
-        ...p,
-        xp: p.xp + finalEarned,
-        log: [entry, ...p.log],
-        quests: newQuests,
-        exercisePBs: newExPBs,
-        scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
-      }));
-      setXpFlash({amount: finalEarned, mult, travel: travelActive});
+      let _ciResult = {checkInApplied:false, checkInXP:0, checkInStreak:0};
+      setProfile(p => {
+        const base = {
+          ...p,
+          xp: p.xp + finalEarned,
+          log: [entry, ...p.log],
+          quests: newQuests,
+          exercisePBs: newExPBs,
+          scheduledWorkouts: (p.scheduledWorkouts||[]).filter(s => s.id !== sw.id),
+        };
+        const ci = applyAutoCheckIn(base, todayStr());
+        _ciResult = ci;
+        return ci.profile;
+      });
+      const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
+      setXpFlash({amount: finalEarned+_ciResult.checkInXP, mult, travel: travelActive});
       setTimeout(() => setXpFlash(null), 2000);
-      showToast(travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`);
+      showToast((travelActive && regionBoost>1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost>1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`)+ciSuffix);
     });
   }
 
@@ -2263,19 +2291,25 @@ function App() {
     if(wo.makeReusable) {
       entries.forEach(e => { e.sourceWorkoutType = "reusable"; });
     }
-    setProfile(p=>({
-      ...p, xp:p.xp+totalXP, log:newLog, quests:newQuests, workouts:newWorkouts,
-      // Remove scheduled entries for this one-off so it leaves the tab
-      scheduledWorkouts: wo.oneOff
-        ? (p.scheduledWorkouts||[]).filter(sw=>sw.sourceWorkoutId!==wo.id)
-        : (p.scheduledWorkouts||[]),
-    }));
-    setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500);
+    let _ciResult = {checkInApplied:false, checkInXP:0, checkInStreak:0};
+    setProfile(p=>{
+      const base = {
+        ...p, xp:p.xp+totalXP, log:newLog, quests:newQuests, workouts:newWorkouts,
+        scheduledWorkouts: wo.oneOff
+          ? (p.scheduledWorkouts||[]).filter(sw=>sw.sourceWorkoutId!==wo.id)
+          : (p.scheduledWorkouts||[]),
+      };
+      const ci = applyAutoCheckIn(base, dateStr);
+      _ciResult = ci;
+      return ci.profile;
+    });
+    setXpFlash({amount:totalXP+_ciResult.checkInXP,mult:1}); setTimeout(()=>setXpFlash(null),2500);
     setCompletionModal(null); setCompletionDate(""); setCompletionAction("today"); setScheduleWoDate("");
     if(wo.makeReusable) { setWorkoutSubTab("reusable"); }
     const label = dateStr===todayStr()?"today":displayDate;
     const reusableNote = wo.makeReusable ? " · Saved to Re-Usable tab!" : "";
-    showToast(wo.icon+" "+wo.name+" completed "+label+"! +"+totalXP.toLocaleString()+" XP ⚡"+reusableNote);
+    const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
+    showToast(wo.icon+" "+wo.name+" completed "+label+"! +"+totalXP.toLocaleString()+" XP ⚡"+reusableNote+ciSuffix);
   }
 
   function scheduleWorkoutForDate() {
@@ -2507,7 +2541,7 @@ function App() {
     }
   }
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
-  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); setProfile(p=>({...p,xp:p.xp+totalXP,log:newLog,quests:newQuests})); setXpFlash({amount:totalXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`); }
+  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); let _ciResult={checkInApplied:false,checkInXP:0,checkInStreak:0}; setProfile(p=>{const base={...p,xp:p.xp+totalXP,log:newLog,quests:newQuests};const ci=applyAutoCheckIn(base,todayStr());_ciResult=ci;return ci.profile;}); const ciSuffix=_ciResult.checkInApplied?` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥`:""; setXpFlash({amount:totalXP+_ciResult.checkInXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`+ciSuffix); }
 
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
 
@@ -3456,12 +3490,6 @@ function App() {
                             setWorkoutView("builder");setActiveTab("workouts");
                             setMultiMode(false);setMultiSelEx(()=>new Set());
                           }}, "💪 Reusable")
-                        , React.createElement('button', { className: "cab-btn", onClick: ()=>{
-                            const exs=[...multiSelEx].map(id=>{const e=allExById[id];return {exId:id,sets:_optionalChain([e,'optionalAccess',_=>_.defaultSets])||3,reps:_optionalChain([e,'optionalAccess',_=>_.defaultReps])||10,weightLbs:_optionalChain([e,'optionalAccess',_=>_.defaultWeightLbs])||null,durationMin:_optionalChain([e,'optionalAccess',_=>_.defaultDurationMin])||null,weightPct:100,distanceMi:null,hrZone:null};});
-                            setWbExercises(exs);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
-                            setWorkoutView("builder");setActiveTab("workouts");
-                            setMultiMode(false);setMultiSelEx(()=>new Set());
-                          }}, "⚡ One-Off")
                       )
                     )
                   )
@@ -3498,7 +3526,7 @@ function App() {
                                 style: {"--cat-color": catColor},
                                 onClick: ()=>{
                                   if(multiMode){setMultiSelEx(s=>{const n=new Set(s);n.has(ex.id)?n.delete(ex.id):n.add(ex.id);return n;});}
-                                  else{setSelEx(selEx===ex.id?null:ex.id);setMusclePickerOpen(false);}
+                                  else{const toggling=selEx===ex.id;setSelEx(toggling?null:ex.id);setMusclePickerOpen(false);if(!toggling){setSets("");setReps("");setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);setExHHMM("");setExSec("");setQuickRows([]);}}
                                 }
                               }
                               , multiMode && React.createElement('div', { className: `grim-checkbox ${isMultiSel?"checked":""}` }, isMultiSel && "✓")
@@ -4131,11 +4159,11 @@ function App() {
                         React.createElement('button', {
                           onClick:()=>{
                             setSelEx(libDetailEx.id);
-                            setSets(String(libDetailEx.defaultSets!=null?libDetailEx.defaultSets:3));
-                            setReps(String(libDetailEx.defaultReps!=null?libDetailEx.defaultReps:10));
-                            setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);
+                            setSets("");
+                            setReps("");
+                            setExWeight("");setWeightPct(100);setDistanceVal("");setHrZone(null);setExHHMM("");setExSec("");setQuickRows([]);
                             setLibDetailEx(null);
-                            setActiveTab("exercises");
+                            setActiveTab("workout");
                           },
                           style:{width:"100%",marginTop:8,background:"linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",border:"1px solid rgba(41,128,185,.3)",color:"#2980b9",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer",textAlign:"center"}
                         }, "\u2699 Configure")
@@ -8852,7 +8880,7 @@ function App() {
         const age=profile.age||30;
         const rawW=parseFloat(exWeight||0);
         const wLbs=metric?parseFloat(kgToLbs(rawW)||0):rawW;
-        const effW=scaleWeight(wLbs,weightPct);
+        const effW=wLbs;
         const effWDisp=metric?lbsToKg(effW):effW;
         const wUnit=weightLabel(profile.units);
         const dUnit=distLabel(profile.units);
@@ -8866,8 +8894,8 @@ function App() {
         const runPace=(isRunning&&distMi>0&&durationMin>0)?durationMin/distMi:null;
         const runBoostPct=runPace?(runPace<=8?20:5):0;
         const estXP=(()=>{
-          const sv=noSets?1:(parseInt(sets)||3);
-          const rv=isCardio||isFlex ? Math.max(1,Math.floor(combineHHMMSec(exHHMM,exSec)/60)||parseInt(reps)||1) : (parseInt(reps)||10);
+          const sv=noSets?1:(parseInt(sets)||0);
+          const rv=isCardio||isFlex ? Math.max(1,Math.floor(combineHHMMSec(exHHMM,exSec)/60)||parseInt(reps)||1) : (parseInt(reps)||0);
           const baseXP=calcExXP(ex.id,sv,rv,profile.chosenClass,allExById,distMi||null);
           const zb=showHR&&hrZone?1+(hrZone-1)*0.04:1;
           const wb=effW>0?1+Math.min(effW/500,0.3):1;
@@ -8902,7 +8930,7 @@ function App() {
                   , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
                     , !noSets&&!(isCardio||isFlex)&&React.createElement('div', { style: {flex:1}}
                       , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
-                      , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: "3"})
+                      , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: ""})
                     )
                     , isCardio||isFlex ? (React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {flex:2}}
@@ -8920,7 +8948,7 @@ function App() {
                     )) : (React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {flex:1}}
                         , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Reps")
-                        , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "200", value: reps, onChange: e=>setReps(e.target.value), placeholder: "10"})
+                        , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "200", value: reps, onChange: e=>setReps(e.target.value), placeholder: ""})
                       )
                       , showWeight&&React.createElement('div', { style: {flex:1.5}}
                         , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Weight (" , wUnit, ")")
@@ -8985,7 +9013,7 @@ function App() {
                         , React.createElement('label', { style: {marginBottom:0,flex:1}}, "Weight Intensity" )
                         , React.createElement('span', { className: "intensity-val"}, weightPct, "%")
                       )
-                      , React.createElement('input', { type: "range", className: "pct-slider", min: "0", max: "100", step: "5", value: pctToSlider(weightPct), onChange: e=>setWeightPct(sliderToPct(Number(e.target.value)))})
+                      , React.createElement('input', { type: "range", className: "pct-slider", min: "0", max: "100", step: "5", value: pctToSlider(weightPct), onChange: e=>{const newPct=sliderToPct(Number(e.target.value));const curW=parseFloat(exWeight);if(curW&&weightPct>0){const scaled=Math.round(curW*newPct/weightPct*100)/100;setExWeight(String(scaled));}setWeightPct(newPct);}})
                       , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",fontSize:".58rem",color:"#6a645a",marginTop:2}}
                         , React.createElement('span', null, "50% Deload" ), React.createElement('span', null, "100% Normal" ), React.createElement('span', null, "200% Max" )
                       )
@@ -9026,14 +9054,13 @@ function App() {
                   /* Primary action row */
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{openScheduleEx(ex.id);setSelEx(null);}}, "📅 Schedule" )
                     , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
                   /* Secondary actions — add to existing workout / plan */
                   , React.createElement('div', { style: {display:"flex",gap:6}}
                     , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
                       onClick: ()=>{
-                        const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
+                        const exEntry={exId:ex.id,sets:parseInt(sets)||0,reps:parseInt(reps)||0,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
                         setAddToWorkoutPicker({exercises:[exEntry]});
                         setSelEx(null);
                       }}, "➕ Add to Workout"   )
@@ -9045,12 +9072,6 @@ function App() {
                         setSpwName(ex.name);setSpwIcon(ex.icon||"📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                         setSelEx(null);
                       }}, "📋 Add to Plan"   )
-                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
-                      onClick: ()=>{
-                        const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
-                        setWbExercises([exEntry]);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
-                        setWorkoutView("builder");setActiveTab("workouts");setSelEx(null);
-                      }}, "⚡ One-Off" )
                   )
                 )
               )
