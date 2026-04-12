@@ -165,6 +165,11 @@ function App() {
   const [editMode,setEditMode] = useState(false);
   const [securityMode,setSecurityMode] = useState(false);
   const [notifMode,setNotifMode] = useState(false);
+  // Friend exercise banner notification
+  const [friendExBanner, setFriendExBanner] = useState(null);
+  const friendLogLengthsRef = React.useRef({});
+  const friendBannerTimerRef = React.useRef(null);
+  const notifPrefsRef = React.useRef(null);
   // Personal Bests filter
   const LEADERBOARD_PB_IDS = new Set(["bench","bench_press","squat","barbell_back_squat","deadlift","barbell_deadlift","overhead_press","ohp","pull_up","pullups","push_up","pushups","running","treadmill_run","run"]);
   const [pbFilterOpen,setPbFilterOpen] = useState(false);
@@ -502,6 +507,29 @@ function App() {
   },[]);
 
   const showToast = (msg,dur=2800) => { setToast(msg); setTimeout(()=>setToast(null),dur); };
+
+  // Keep notifPrefsRef in sync so realtime handler avoids stale closure
+  useEffect(() => { notifPrefsRef.current = profile.notificationPrefs || {}; }, [profile.notificationPrefs]);
+
+  // Show a friend exercise banner notification (auto-dismiss after 5s)
+  function showFriendExBanner(data) {
+    if(friendBannerTimerRef.current) clearTimeout(friendBannerTimerRef.current);
+    const k = Date.now();
+    setFriendExBanner({ ...data, key: k });
+    friendBannerTimerRef.current = setTimeout(() => setFriendExBanner(null), 5000);
+  }
+
+  // Format PB info for friend exercise banner
+  function formatFriendPB(pb) {
+    if(!pb) return null;
+    if(pb.type==="Strength 1RM"||pb.type==="Heaviest Weight") return "\uD83C\uDFC6 PB: "+pb.value+" lbs";
+    if(pb.type==="Cardio Pace") return "\uD83C\uDFC6 PB: "+parseFloat(pb.value).toFixed(2)+" min/mi";
+    if(pb.type==="Max Reps Per 1 Set") return "\uD83C\uDFC6 PB: "+pb.value+" reps";
+    if(pb.type==="Assisted Weight") return "\uD83C\uDFC6 PB: "+pb.value+" lbs (assisted)";
+    if(pb.type==="Longest Hold") return "\uD83C\uDFC6 PB: "+parseFloat(pb.value).toFixed(1)+" min";
+    if(pb.type==="Fastest Time") return "\uD83C\uDFC6 PB: "+parseFloat(pb.value).toFixed(1)+" min";
+    return null;
+  }
 
   async function handleAuthSubmit() {
     if(!authEmail.trim()||!authPassword.trim()) return;
@@ -1005,6 +1033,50 @@ function App() {
       .subscribe();
     return () => { sb.removeChannel(channel); };
   }, [authUser?.id, msgActiveChannel?.channel_id]);
+
+  // Realtime subscription for friend exercise completions (in-app banner)
+  useEffect(() => {
+    if(!authUser || friends.length === 0) return;
+    const friendIds = friends.map(f => f.id);
+    // Snapshot current log lengths so only genuinely new entries trigger banners
+    friends.forEach(f => {
+      if(friendLogLengthsRef.current[f.id] === undefined)
+        friendLogLengthsRef.current[f.id] = (f.log || []).length;
+    });
+    const channel = sb.channel('friend-exercise-realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+      }, payload => {
+        const fId = payload.new.id;
+        if(!friendIds.includes(fId)) return; // not a friend
+        const fData = payload.new.data;
+        if(!fData || !fData.log || fData.log.length === 0) return;
+        const prevLen = friendLogLengthsRef.current[fId] || 0;
+        const newLen = fData.log.length;
+        if(newLen <= prevLen) { friendLogLengthsRef.current[fId] = newLen; return; }
+        friendLogLengthsRef.current[fId] = newLen;
+        // Check notification preference via ref (avoids stale closure)
+        if(notifPrefsRef.current && notifPrefsRef.current.friendExercise === false) return;
+        // New exercise logged — latest entry is at index 0
+        const latest = fData.log[0];
+        const friendName = fData.playerName || "A friend";
+        const exId = latest.exId;
+        let pbInfo = null;
+        if(LEADERBOARD_PB_IDS.has(exId) && fData.exercisePBs && fData.exercisePBs[exId]) {
+          pbInfo = fData.exercisePBs[exId];
+        }
+        showFriendExBanner({
+          friendName,
+          exerciseName: latest.exercise || exId || "an exercise",
+          exerciseIcon: latest.icon || "\uD83D\uDCAA",
+          pbInfo,
+        });
+      })
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [authUser?.id, friends.map(f=>f.id).join(',')]);
 
   // Load unread on auth and periodically
   useEffect(() => {
@@ -2908,6 +2980,13 @@ function App() {
       , PARTICLES.map(p=>React.createElement('div', { key: p.id, className: "pt", style: {left:`${p.x}%`,bottom:`${Math.random()*100}%`,width:p.size,height:p.size,"--dur":`${p.duration}s`,"--dly":`${p.delay}s`}}))
       , xpFlash && React.createElement('div', { className: "xp-flash"}, "+", xpFlash.amount.toLocaleString(), " XP" , xpFlash.mult>1.02?" ⚡":"")
       , toast    && React.createElement('div', { className: "toast"}, toast)
+      , friendExBanner && React.createElement('div', { className: "friend-ex-banner", key: friendExBanner.key, onClick: () => setFriendExBanner(null) }
+        , React.createElement('div', { className: "friend-ex-banner-icon" }, friendExBanner.exerciseIcon || "\uD83D\uDCAA")
+        , React.createElement('div', { className: "friend-ex-banner-text" }
+          , React.createElement('div', { className: "friend-ex-banner-title" }, friendExBanner.friendName, " completed ", friendExBanner.exerciseName, "!")
+          , friendExBanner.pbInfo && React.createElement('div', { className: "friend-ex-banner-pb" }, formatFriendPB(friendExBanner.pbInfo))
+        )
+      )
       , showWNMockup && React.createElement(WorkoutNotificationMockup, { onClose: ()=>setShowWNMockup(false) })
 
       /* ══ INTRO ══════════════════════════════════ */
@@ -7875,6 +7954,7 @@ function App() {
                   const items = [
                     {key:"sharedWorkout", icon:"📋", label:"Shared Workouts", desc:"When a friend shares a workout with you"},
                     {key:"friendLevelUp", icon:"⬆️", label:"Friend Level Ups", desc:"When one of your friends levels up"},
+                    {key:"friendExercise", icon:"🏋️", label:"Friend Exercises", desc:"In-app banner when a friend completes an exercise"},
                     {key:"friendRequest", icon:"🤝", label:"Friend Requests", desc:"When someone sends you a friend request"},
                     {key:"friendAccepted", icon:"✅", label:"Request Accepted", desc:"When someone accepts your friend request"},
                     {key:"messageReceived", icon:"💬", label:"New Messages", desc:"Email me when I receive a new direct message", defaultOff:true},
