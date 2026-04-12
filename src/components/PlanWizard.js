@@ -122,7 +122,8 @@ function PlanWizard(props) {
       const noSets = NO_SETS_EX_IDS.has(ex.exId);
       const base = calcExXP(ex.exId,noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,ex.distanceMi||null);
       const rowsXP = (ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
-      return ex.intervals ? Math.round((base+rowsXP)*1.25) : (base+rowsXP);
+      const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";
+      return (_isCardio&&(ex.extraRows||[]).length>0) ? Math.round((base+rowsXP)*1.25) : (base+rowsXP);
     });
   },[bDays,bDayIdx,profile.chosenClass,allExById]);
 
@@ -772,16 +773,6 @@ function PlanWizard(props) {
                                   , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "\u2014", defaultValue: ex.speed||"", onBlur: e=>updateExInDay(bDayIdx,i,"speed",e.target.value?parseFloat(e.target.value):null)})
                                 )
                               )
-                            )
-                          )
-                          /* Intervals toggle -- all cardio */
-                          , hasDur&&(
-                            React.createElement('button', { className: "btn btn-sm" , style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",
-                              background:ex.intervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",
-                              border:`1.5px solid ${ex.intervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,
-                              color:ex.intervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer",transition:"all .2s"},
-                              onClick: ()=>updateExInDay(bDayIdx,i,"intervals",!ex.intervals)}, "\u26A1 Intervals "
-                                , ex.intervals?"ON \u00B7 +25% XP":"OFF"
                             )
                           )
                           /* Extra interval/set rows */

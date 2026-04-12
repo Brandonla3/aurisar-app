@@ -117,7 +117,6 @@ function App() {
   const [distanceVal,setDistanceVal] = useState(""); // distance in user's unit
   const [exIncline,setExIncline]     = useState(null);
   const [exSpeed,setExSpeed]         = useState(null);
-  const [exIntervals,setExIntervals] = useState(false);
   const [exHHMM,setExHHMM]           = useState("");  // HH:MM portion of duration
   const [exSec,setExSec]             = useState("");  // 0-59 seconds portion
   const [quickRows,setQuickRows]     = useState([]); // extra set rows [{sets,reps,weightLbs}]
@@ -2108,7 +2107,7 @@ function App() {
     const _isRunning = exD.id===RUNNING_EX_ID;
     const _runPace = (_isRunning&&_distMiVal>0&&_durMin>0)?_durMin/_distMiVal:null;
     const _runBoost = _runPace?(_runPace<=8?20:5):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
+    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return (_isC&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);})();
     const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_metric?lbsToKg(ex.weightLbs):ex.weightLbs}${_wUnit}`:"");
     return React.createElement('div', {className:"ss-section"},
       React.createElement('div', {className:"ss-section-hdr",
@@ -2252,7 +2251,7 @@ function App() {
       const allRows = [{sets:ex.sets||3, reps:ex.reps||10, weightLbs:ex.weightLbs||null},...(ex.extraRows||[])];
       return allRows.map(row=>{
         const baseXp = calcExXP(ex.exId, row.sets||3, row.reps||10, profile.chosenClass, allExById);
-        const xp = ex.intervals ? Math.round(baseXp * 1.25) : baseXp;
+        const xp = (isC&&(ex.extraRows||[]).length>0) ? Math.round(baseXp * 1.25) : baseXp;
         return {
           exId:ex.exId, exercise:exData.name, icon:exData.icon, xp,
           mult:getMult(exData), sets:parseInt(row.sets)||3, reps:parseInt(row.reps)||10,
@@ -4347,12 +4346,13 @@ function App() {
               const wUnit  = weightLabel(profile.units);
               const allW   = profile.workouts||[];
               const calcWorkoutXP = (wo) => (wo.exercises||[]).reduce((s,ex)=>{
+                const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";const _hasRows=(ex.extraRows||[]).length>0;
                 const base = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
                 const rowsXP = (ex.extraRows||[]).reduce((rs,row)=>{
                   const rb=calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById);
-                  return rs+(ex.intervals?Math.round(rb*1.25):rb);
+                  return rs+(_isCardio&&_hasRows?Math.round(rb*1.25):rb);
                 },0);
-                const xp = ex.intervals ? Math.round(base*1.25) : base;
+                const xp = _isCardio&&_hasRows ? Math.round(base*1.25) : base;
                 return s+xp+rowsXP;
               },0);
 
@@ -4976,9 +4976,10 @@ function App() {
                     , React.createElement('label', null, "(", wbExercises.length, " exercise", wbExercises.length!==1?"s":"", ")"
                       , wbExercises.length>0&&React.createElement('span', { style: {marginLeft:8,fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "⚡ "
                          , wbExercises.reduce((s,ex)=>{
+                          const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";
                           const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
                           const r=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
-                          const t=ex.intervals?Math.round((b+r)*1.25):(b+r);
+                          const t=(_isCardio&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);
                           return s+t;
                         },0).toLocaleString(), " XP total"
                       )
@@ -5095,7 +5096,7 @@ function App() {
                                 , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
                                 , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
                                 , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
-                                , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
+                                , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=(isC&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
                                 , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
                                 , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: e=>{e.stopPropagation();removeWbEx(i);}}, "✕")
                               )
@@ -5184,16 +5185,6 @@ function App() {
                                           onChange: e=>updateWbEx(i,"speed",e.target.value?parseFloat(e.target.value):null)})
                                       )
                                     )
-                                  )
-                                )
-                                /* Intervals toggle — all cardio */
-                                , showHR&&(
-                                  React.createElement('button', { className: "btn btn-sm" , style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",
-                                    background:ex.intervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",
-                                    border:`1.5px solid ${ex.intervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,
-                                    color:ex.intervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer",transition:"all .2s"},
-                                    onClick: ()=>updateWbEx(i,"intervals",!ex.intervals)}, "⚡ Intervals "
-                                      , ex.intervals?"ON · +25% XP":"OFF"
                                   )
                                 )
                                 /* Extra interval/set rows */
@@ -8900,7 +8891,7 @@ function App() {
           const zb=showHR&&hrZone?1+(hrZone-1)*0.04:1;
           const wb=effW>0?1+Math.min(effW/500,0.3):1;
           const pb=1+(runBoostPct/100);
-          const intBoost=exIntervals?1.25:1;
+          const intBoost=(isCardio&&quickRows.length>0)?1.25:1;
           // Add XP from extra rows
           const rowsXP=quickRows.reduce((s,row)=>{
             const rs=noSets?1:(parseInt(row.sets)||sv);
@@ -8991,12 +8982,6 @@ function App() {
                     React.createElement('div', { style: {display:"flex",gap:8,marginBottom:10}}
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Incline (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exIncline||"", onChange: e=>setExIncline(e.target.value?parseFloat(e.target.value):null)}))
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Speed (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exSpeed||"", onChange: e=>setExSpeed(e.target.value?parseFloat(e.target.value):null)}))
-                    )
-                  )
-                  /* Intervals toggle — all cardio */
-                  , ex.id!=="rest_day"&&showHR&&(
-                    React.createElement('button', { style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",background:exIntervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",border:`1.5px solid ${exIntervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,color:exIntervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer"}, onClick: ()=>setExIntervals(v=>!v)}, "⚡ Intervals "
-                        , exIntervals?"ON · +25% XP":"OFF"
                     )
                   )
                   /* Add Row button */
