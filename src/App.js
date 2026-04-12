@@ -3377,12 +3377,6 @@ function App() {
                             setWorkoutView("builder");setActiveTab("workouts");
                             setMultiMode(false);setMultiSelEx(()=>new Set());
                           }}, "💪 Reusable")
-                        , React.createElement('button', { className: "cab-btn", onClick: ()=>{
-                            const exs=[...multiSelEx].map(id=>{const e=allExById[id];return {exId:id,sets:_optionalChain([e,'optionalAccess',_=>_.defaultSets])||3,reps:_optionalChain([e,'optionalAccess',_=>_.defaultReps])||10,weightLbs:_optionalChain([e,'optionalAccess',_=>_.defaultWeightLbs])||null,durationMin:_optionalChain([e,'optionalAccess',_=>_.defaultDurationMin])||null,weightPct:100,distanceMi:null,hrZone:null};});
-                            setWbExercises(exs);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
-                            setWorkoutView("builder");setActiveTab("workouts");
-                            setMultiMode(false);setMultiSelEx(()=>new Set());
-                          }}, "⚡ One-Off")
                       )
                     )
                   )
@@ -8946,7 +8940,6 @@ function App() {
                   /* Primary action row */
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
                     , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{openScheduleEx(ex.id);setSelEx(null);}}, "📅 Schedule" )
                     , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
                   /* Secondary actions — add to existing workout / plan */
@@ -8965,12 +8958,6 @@ function App() {
                         setSpwName(ex.name);setSpwIcon(ex.icon||"📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                         setSelEx(null);
                       }}, "📋 Add to Plan"   )
-                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".58rem",padding:"6px 8px",borderColor:"rgba(45,42,36,.3)",color:"#8a8478"},
-                      onClick: ()=>{
-                        const exEntry={exId:ex.id,sets:parseInt(sets)||3,reps:parseInt(reps)||10,weightLbs:wLbs||null,durationMin:null,weightPct,distanceMi:distMi||null,hrZone:hrZone||null};
-                        setWbExercises([exEntry]);setWbName("One-Off Workout");setWbIcon("⚡");setWbDesc("");setWbEditId(null);setWbIsOneOff(true);
-                        setWorkoutView("builder");setActiveTab("workouts");setSelEx(null);
-                      }}, "⚡ One-Off" )
                   )
                 )
               )
