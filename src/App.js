@@ -62,6 +62,193 @@ import { LandingPage } from './components/LandingPage';
 
 const PREVIEW_PIN = "1234";
 
+const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, allExById, metric, wUnit, setWbExercises, setCollapsedWbEx, setSsChecked, ssChecked, exCount, openExEditor }) {
+  function updateField(field, val) { setWbExercises(exs=>exs.map((e,j)=>j!==i?e:{...e,[field]:val})); }
+  function removeEx() { setWbExercises(exs=>{const updated=exs.map((e,j)=>{if(j===i)return null;if(e.supersetWith===i)return{...e,supersetWith:null};if(e.supersetWith!=null&&e.supersetWith>i)return{...e,supersetWith:e.supersetWith-1};return e;}).filter(Boolean);return updated;}); }
+  function toggleCollapse() { setCollapsedWbEx(s=>({...s,[i]:!s[i]})); }
+  function reorder(toIdx) { if(i===toIdx)return; setWbExercises(exs=>{const arr=[...exs];const[moved]=arr.splice(i,1);arr.splice(toIdx,0,moved);const indexMap={};const temp=exs.map((_,idx)=>idx);const[movedIdx]=temp.splice(i,1);temp.splice(toIdx,0,movedIdx);temp.forEach((oldIdx,newIdx)=>{indexMap[oldIdx]=newIdx;});return arr.map(e=>{if(e.supersetWith!=null&&indexMap[e.supersetWith]!=null)return{...e,supersetWith:indexMap[e.supersetWith]};return e;});}); }
+
+  const isC=exD.category==="cardio";
+  const isF=exD.category==="flexibility";
+  const showW=!isC&&!isF;
+  const showHR=isC;
+  const isTreadmill=exD.hasTreadmill||false;
+  const noSetsEx=NO_SETS_EX_IDS.has(exD.id);
+  const isRunningEx=exD.id===RUNNING_EX_ID;
+  const age=profile.age||30;
+  const dispW=ex.weightLbs?(metric?lbsToKg(ex.weightLbs):ex.weightLbs):"";
+  const dispDist=ex.distanceMi?(metric?String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)):String(ex.distanceMi)):"";
+  const pbPaceMi=profile.runningPB||null;
+  const pbDisp=pbPaceMi?(metric?parseFloat((pbPaceMi*1.60934).toFixed(2))+" min/km":parseFloat(pbPaceMi.toFixed(2))+" min/mi"):null;
+  const exPB=(profile.exercisePBs||{})[exD.id]||null;
+  const exPBDisp=exPB?(exPB.type==="cardio"?(metric?parseFloat((exPB.value*1.60934).toFixed(2))+" min/km":parseFloat(exPB.value.toFixed(2))+" min/mi"):(exPB.type==="assisted"?"🏆 1RM: "+exPB.value+(metric?" kg":" lbs")+" (Assisted)":"🏆 1RM: "+exPB.value+(metric?" kg":" lbs"))):null;
+  const durationMin=parseFloat(ex.reps||0);
+  const distMiVal=ex.distanceMi?parseFloat(ex.distanceMi):0;
+  const runPace=(isRunningEx&&distMiVal>0&&durationMin>0)?durationMin/distMiVal:null;
+  const runBoostPct=runPace?(runPace<=8?20:5):0;
+  const mgColor=getMuscleColor(exD.muscleGroup);
+
+  return (
+    React.createElement(React.Fragment, null
+      , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:8,
+        background:"transparent",cursor:"pointer",borderRadius:0,padding:"0",transition:"all .2s",marginLeft:-4,marginRight:-4},
+        onClick:()=>toggleCollapse()}
+        , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
+          , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();reorder(i-1);}}, "▲")
+          , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===exCount-1?.3:1}, disabled: i===exCount-1, onClick: e=>{e.stopPropagation();reorder(i+1);}}, "▼")
+        )
+        , ex.supersetWith==null && exCount>=2 && React.createElement('div', {
+            style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
+            title:"Select for superset",
+            onClick:e=>{e.stopPropagation();setSsChecked(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
+          },
+            React.createElement('div', {className:`ss-cb ${ssChecked.has(i)?"on":""}`}),
+            React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
+          )
+        , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
+        , React.createElement('div', { className: "builder-ex-orb", style: {"--mg-color":mgColor} }, React.createElement(ExIcon, {ex:exD, size:".95rem", color:"#d4cec4"}))
+        , React.createElement('div', { className: "builder-ex-name-styled"}
+          , exD.name
+          , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:4}}, "custom")
+          , exD.custom&&React.createElement('button', { className: "btn btn-ghost btn-xs", style: {marginLeft:6,fontSize:".55rem",padding:"1px 5px"}, onClick: e=>{e.stopPropagation();openExEditor("edit",exD);}}, "✎ edit" )
+        )
+        , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
+        , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
+        , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
+        , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=(isC&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
+        , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
+        , React.createElement('button', { className: "btn btn-danger btn-xs", onClick: e=>{e.stopPropagation();removeEx();}}, "✕")
+      )
+      , !collapsed&&exD.id!=="rest_day"&&React.createElement(React.Fragment, null
+        , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
+          , !noSetsEx&&React.createElement('div', { style: {flex:1}}
+            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
+            , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"5px 7px"}, type: "text", inputMode: "decimal",
+              value: ex.sets===0||ex.sets===""?"":ex.sets||"", onChange: e=>updateField("sets",e.target.value)})
+          )
+          , (isC||isF) ? (
+            React.createElement(React.Fragment, null
+              , React.createElement('div', { style: {flex:1.6,minWidth:0}}
+                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration (HH:MM)" )
+                , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "numeric",
+                  value: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):"") ,
+                  onChange: e=>updateField("_durHHMM",e.target.value),
+                  onBlur: e=>{
+                    const hhmm=normalizeHHMM(e.target.value);
+                    updateField("_durHHMM",hhmm||undefined);
+                    const sec=combineHHMMSec(hhmm, ex._durSecRaw||ex.durationSec?secToHHMMSplit(ex.durationSec||0).sec:"");
+                    updateField("durationSec",sec);
+                    if(sec) updateField("reps",Math.max(1,Math.floor(sec/60)));
+                  },
+                  placeholder: "00:00"})
+              )
+              , React.createElement('div', { style: {flex:0.9,minWidth:0}}
+                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
+                , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px",textAlign:"center"}, type: "number", min: "0", max: "59",
+                  value: ex._durSecRaw!==undefined ? String(ex._durSecRaw).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
+                  onChange: e=>{
+                    const v=e.target.value;
+                    updateField("_durSecRaw",v);
+                    const hhmm=ex._durHHMM||(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:"");
+                    const sec=combineHHMMSec(hhmm,v);
+                    updateField("durationSec",sec);
+                    if(sec) updateField("reps",Math.max(1,Math.floor(sec/60)));
+                  },
+                  placeholder: "00"})
+              )
+              , React.createElement('div', { style: {flex:1.4,minWidth:0}}
+                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , metric?"km":"mi", ")")
+                , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal",
+                  value: dispDist, placeholder: "0",
+                  onChange: e=>{const v=e.target.value;const mi=v&&metric?kmToMi(v):v;updateField("distanceMi",mi||null);}})
+              )
+            )
+          ) : (
+            React.createElement(React.Fragment, null
+              , React.createElement('div', { style: {flex:1,minWidth:0}}
+                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
+                , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal",
+                  value: ex.reps===0||ex.reps===""?"":ex.reps||"", onChange: e=>updateField("reps",e.target.value)})
+              )
+              , showW&&(
+                React.createElement('div', { style: {flex:1.2,minWidth:0}}
+                  , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, wUnit)
+                  , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal", step: metric?"0.5":"2.5",
+                    value: dispW, placeholder: "—",
+                    onChange: e=>{const v=e.target.value;const lbs=v&&metric?kgToLbs(v):v;updateField("weightLbs",lbs||null);}})
+                )
+              )
+            )
+          )
+        )
+        , isRunningEx&&runBoostPct>0&&(
+          React.createElement('div', { style: {fontSize:".65rem",color:"#FFE87C",marginBottom:5}}, "⚡ +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
+        )
+        , isTreadmill&&(
+          React.createElement('div', { style: {marginBottom:6}}
+            , React.createElement('div', { style: {display:"flex",gap:8}}
+              , React.createElement('div', { style: {flex:1}}
+                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
+                , React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—",
+                  value: ex.incline||"",
+                  onChange: e=>updateField("incline",e.target.value?parseFloat(e.target.value):null)})
+              )
+              , React.createElement('div', { style: {flex:1}}
+                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
+                , React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—",
+                  value: ex.speed||"",
+                  onChange: e=>updateField("speed",e.target.value?parseFloat(e.target.value):null)})
+              )
+            )
+          )
+        )
+        , (ex.extraRows||[]).map((row,ri)=>(
+          React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
+            , React.createElement('span', { style: {fontSize:".58rem",color:"#9a8a78",flexShrink:0,minWidth:18}}, (isC||isF)?`I${ri+2}`:`S${ri+2}`)
+            , (isC||isF) ? (React.createElement(React.Fragment, null
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1.5,minWidth:52,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
+                defaultValue: row.hhmm||"",
+                onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};updateField("extraRows",rr);}})
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", defaultValue: row.sec||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateField("extraRows",rr);}})
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: metric?"km":"mi", defaultValue: row.distanceMi||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateField("extraRows",rr);}})
+              , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateField("extraRows",rr);}})
+              , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateField("extraRows",rr);}})
+            )) : (React.createElement(React.Fragment, null
+              , !noSetsEx&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateField("extraRows",rr);}})
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Reps", defaultValue: row.reps||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};updateField("extraRows",rr);}})
+              , showW&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: wUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateField("extraRows",rr);}})
+            ))
+            , React.createElement('button', { className: "btn btn-danger btn-xs", style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateField("extraRows",rr);}}, "✕")
+          )
+        ))
+        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {width:"100%",marginTop:4,marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
+          onClick: ()=>{const rr=[...(ex.extraRows||[]),(isC||isF)?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateField("extraRows",rr);}}, "＋ Add Row (e.g. "
+              , (isC||isF)?"interval":"progressive weight", ")"
+        )
+        , showHR&&(
+          React.createElement('div', null
+            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
+            , React.createElement('div', { className: "hr-zone-row"}
+              , HR_ZONES.map(z=>{
+                const sel=ex.hrZone===z.z;
+                const range=hrRange(age,z);
+                return (
+                  React.createElement('div', { key: z.z, className: `hr-zone-btn ${sel?"sel":""}`,
+                    style: {"--zc":z.color,borderColor:sel?z.color:"rgba(45,42,36,.2)",background:sel?`${z.color}22`:"rgba(45,42,36,.12)"},
+                    onClick: ()=>updateField("hrZone",sel?null:z.z)}
+                    , React.createElement('span', { className: "hz-name", style: {color:sel?z.color:"#5a5650"}}, "Z", z.z, " " , z.name)
+                    , React.createElement('span', { className: "hz-bpm", style: {color:sel?z.color:"#6a645a"}}, range.lo, "–", range.hi)
+                  )
+                );
+              })
+            )
+            , ex.hrZone&&React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",marginTop:4}}, HR_ZONES[ex.hrZone-1].desc)
+          )
+        )
+      )
+    )
+  );
+});
 
 function App() {
   const [screen,setScreen]   = useState("loading");
@@ -117,7 +304,6 @@ function App() {
   const [distanceVal,setDistanceVal] = useState(""); // distance in user's unit
   const [exIncline,setExIncline]     = useState(null);
   const [exSpeed,setExSpeed]         = useState(null);
-  const [exIntervals,setExIntervals] = useState(false);
   const [exHHMM,setExHHMM]           = useState("");  // HH:MM portion of duration
   const [exSec,setExSec]             = useState("");  // 0-59 seconds portion
   const [quickRows,setQuickRows]     = useState([]); // extra set rows [{sets,reps,weightLbs}]
@@ -1516,6 +1702,14 @@ function App() {
   const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef, _exReady]);
   const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
 
+  const wbTotalXP = useMemo(()=>wbExercises.reduce((s,ex)=>{
+    const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";
+    const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
+    const r=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
+    const t=(_isCardio&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);
+    return s+t;
+  },0),[wbExercises,profile.chosenClass,allExById]);
+
   // Auto-update quest completion state when log or streak changes
   const computedQuests = () => {
     const updated = {...(profile.quests||{})};
@@ -2108,7 +2302,7 @@ function App() {
     const _isRunning = exD.id===RUNNING_EX_ID;
     const _runPace = (_isRunning&&_distMiVal>0&&_durMin>0)?_durMin/_distMiVal:null;
     const _runBoost = _runPace?(_runPace<=8?20:5):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return ex.intervals?Math.round((b+r)*1.25):(b+r);})();
+    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return (_isC&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);})();
     const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_metric?lbsToKg(ex.weightLbs):ex.weightLbs}${_wUnit}`:"");
     return React.createElement('div', {className:"ss-section"},
       React.createElement('div', {className:"ss-section-hdr",
@@ -2252,7 +2446,7 @@ function App() {
       const allRows = [{sets:ex.sets||3, reps:ex.reps||10, weightLbs:ex.weightLbs||null},...(ex.extraRows||[])];
       return allRows.map(row=>{
         const baseXp = calcExXP(ex.exId, row.sets||3, row.reps||10, profile.chosenClass, allExById);
-        const xp = ex.intervals ? Math.round(baseXp * 1.25) : baseXp;
+        const xp = (isC&&(ex.extraRows||[]).length>0) ? Math.round(baseXp * 1.25) : baseXp;
         return {
           exId:ex.exId, exercise:exData.name, icon:exData.icon, xp,
           mult:getMult(exData), sets:parseInt(row.sets)||3, reps:parseInt(row.reps)||10,
@@ -4347,12 +4541,13 @@ function App() {
               const wUnit  = weightLabel(profile.units);
               const allW   = profile.workouts||[];
               const calcWorkoutXP = (wo) => (wo.exercises||[]).reduce((s,ex)=>{
+                const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";const _hasRows=(ex.extraRows||[]).length>0;
                 const base = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
                 const rowsXP = (ex.extraRows||[]).reduce((rs,row)=>{
                   const rb=calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById);
-                  return rs+(ex.intervals?Math.round(rb*1.25):rb);
+                  return rs+(_isCardio&&_hasRows?Math.round(rb*1.25):rb);
                 },0);
-                const xp = ex.intervals ? Math.round(base*1.25) : base;
+                const xp = _isCardio&&_hasRows ? Math.round(base*1.25) : base;
                 return s+xp+rowsXP;
               },0);
 
@@ -4975,12 +5170,7 @@ function App() {
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
                     , React.createElement('label', null, "(", wbExercises.length, " exercise", wbExercises.length!==1?"s":"", ")"
                       , wbExercises.length>0&&React.createElement('span', { style: {marginLeft:8,fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "⚡ "
-                         , wbExercises.reduce((s,ex)=>{
-                          const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
-                          const r=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
-                          const t=ex.intervals?Math.round((b+r)*1.25):(b+r);
-                          return s+t;
-                        },0).toLocaleString(), " XP total"
+                         , wbTotalXP.toLocaleString(), " XP total"
                       )
                     )
                     , React.createElement('div', { style: {display:"flex",gap:6}}
@@ -5063,190 +5253,15 @@ function App() {
                         onDragOver: e=>{e.preventDefault();e.dataTransfer.dropEffect="move";},
                         onDrop: e=>{e.preventDefault();reorderWbEx(dragWbExIdx,i);setDragWbExIdx(null);},
                         onDragEnd: ()=>setDragWbExIdx(null)}
-                        , (()=>{
-                          const collapsed=!!collapsedWbEx[i];
-                          return (
-                            React.createElement(React.Fragment, null
-                              /* Header */
-                              , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:8,
-                                background:"transparent",cursor:"pointer",
-                                borderRadius:0,padding:"0",transition:"all .2s",marginLeft:-4,marginRight:-4},
-                                onClick:()=>toggleWbEx(i)}
-                                /* Order: ▲▼ arrows (leftmost) + SS checkbox + drag handle */
-                                , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
-                                  , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();reorderWbEx(i,i-1);}}, "▲")
-                                  , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===wbExercises.length-1?.3:1}, disabled: i===wbExercises.length-1, onClick: e=>{e.stopPropagation();reorderWbEx(i,i+1);}}, "▼")
-                                )
-                                , ex.supersetWith==null && wbExercises.filter(e=>!e.supersetWith).length>=2 && React.createElement('div', {
-                                    style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
-                                    title:"Select for superset",
-                                    onClick:e=>{e.stopPropagation();setSsChecked(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
-                                  },
-                                    React.createElement('div', {className:`ss-cb ${ssChecked.has(i)?"on":""}`}),
-                                    React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
-                                  )
-                                , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
-                                , React.createElement('div', { className: "builder-ex-orb", style: {"--mg-color":mgColor} }, React.createElement(ExIcon, {ex:exD, size:".95rem", color:"#d4cec4"}))
-                                , React.createElement('div', { className: "builder-ex-name-styled"}
-                                  , exD.name
-                                  , exD.custom&&React.createElement('span', { className: "custom-ex-badge", style: {marginLeft:4}}, "custom")
-                                  , exD.custom&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {marginLeft:6,fontSize:".55rem",padding:"1px 5px"}, onClick: e=>{e.stopPropagation();openExEditor("edit",exD);}}, "✎ edit" )
-                                )
-                                , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
-                                , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
-                                , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
-                                , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=ex.intervals?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
-                                , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
-                                , React.createElement('button', { className: "btn btn-danger btn-xs"  , onClick: e=>{e.stopPropagation();removeWbEx(i);}}, "✕")
-                              )
-                              , !collapsed&&exD.id!=="rest_day"&&React.createElement(React.Fragment, null
-                                /* Sets + Reps/Duration + Weight row */
-                                , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
-                                  , !noSetsEx&&React.createElement('div', { style: {flex:1}}
-                                    , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
-                                    , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"5px 7px"}, type: "text", inputMode: "decimal",
-                                      value: ex.sets===0||ex.sets===""?"":ex.sets||"", onChange: e=>updateWbEx(i,"sets",e.target.value)})
-                                  )
-                                  , (isC||isF) ? (
-                                    React.createElement(React.Fragment, null
-                                      , React.createElement('div', { style: {flex:1.6,minWidth:0}}
-                                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration (HH:MM)" )
-                                        , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "numeric",
-                                          value: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):"") ,
-                                          onChange: e=>updateWbEx(i,"_durHHMM",e.target.value),
-                                          onBlur: e=>{
-                                            const hhmm=normalizeHHMM(e.target.value);
-                                            updateWbEx(i,"_durHHMM",hhmm||undefined);
-                                            const sec=combineHHMMSec(hhmm, ex._durSecRaw||ex.durationSec?secToHHMMSplit(ex.durationSec||0).sec:"");
-                                            updateWbEx(i,"durationSec",sec);
-                                            if(sec) updateWbEx(i,"reps",Math.max(1,Math.floor(sec/60)));
-                                          },
-                                          placeholder: "00:00"})
-                                      )
-                                      , React.createElement('div', { style: {flex:0.9,minWidth:0}}
-                                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
-                                        , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px",textAlign:"center"}, type: "number", min: "0", max: "59",
-                                          value: ex._durSecRaw!==undefined ? String(ex._durSecRaw).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
-                                          onChange: e=>{
-                                            const v=e.target.value;
-                                            updateWbEx(i,"_durSecRaw",v);
-                                            const hhmm=ex._durHHMM||(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:"");
-                                            const sec=combineHHMMSec(hhmm,v);
-                                            updateWbEx(i,"durationSec",sec);
-                                            if(sec) updateWbEx(i,"reps",Math.max(1,Math.floor(sec/60)));
-                                          },
-                                          placeholder: "00"})
-                                      )
-                                      , React.createElement('div', { style: {flex:1.4,minWidth:0}}
-                                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , metric?"km":"mi", ")")
-                                        , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal",
-                                          value: dispDist, placeholder: "0",
-                                          onChange: e=>{const v=e.target.value;const mi=v&&metric?kmToMi(v):v;updateWbEx(i,"distanceMi",mi||null);}})
-                                      )
-                                    )
-                                  ) : (
-                                    React.createElement(React.Fragment, null
-                                      , React.createElement('div', { style: {flex:1,minWidth:0}}
-                                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
-                                        , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal",
-                                          value: ex.reps===0||ex.reps===""?"":ex.reps||"", onChange: e=>updateWbEx(i,"reps",e.target.value)})
-                                      )
-                                      , showW&&(
-                                        React.createElement('div', { style: {flex:1.2,minWidth:0}}
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, wUnit)
-                                          , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal", step: metric?"0.5":"2.5",
-                                            value: dispW, placeholder: "—",
-                                            onChange: e=>{const v=e.target.value;const lbs=v&&metric?kgToLbs(v):v;updateWbEx(i,"weightLbs",lbs||null);}})
-                                        )
-                                      )
-                                    )
-                                  )
-                                )
-                                , isRunningEx&&runBoostPct>0&&(
-                                  React.createElement('div', { style: {fontSize:".65rem",color:"#FFE87C",marginBottom:5}}, "⚡ +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
-                                )
-
-
-                                /* Treadmill: Incline + Speed */
-                                , isTreadmill&&(
-                                  React.createElement('div', { style: {marginBottom:6}}
-                                    , React.createElement('div', { style: {display:"flex",gap:8}}
-                                      , React.createElement('div', { style: {flex:1}}
-                                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
-                                        , React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—",
-                                          value: ex.incline||"",
-                                          onChange: e=>updateWbEx(i,"incline",e.target.value?parseFloat(e.target.value):null)})
-                                      )
-                                      , React.createElement('div', { style: {flex:1}}
-                                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
-                                        , React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—",
-                                          value: ex.speed||"",
-                                          onChange: e=>updateWbEx(i,"speed",e.target.value?parseFloat(e.target.value):null)})
-                                      )
-                                    )
-                                  )
-                                )
-                                /* Intervals toggle — all cardio */
-                                , showHR&&(
-                                  React.createElement('button', { className: "btn btn-sm" , style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",
-                                    background:ex.intervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",
-                                    border:`1.5px solid ${ex.intervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,
-                                    color:ex.intervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer",transition:"all .2s"},
-                                    onClick: ()=>updateWbEx(i,"intervals",!ex.intervals)}, "⚡ Intervals "
-                                      , ex.intervals?"ON · +25% XP":"OFF"
-                                  )
-                                )
-                                /* Extra interval/set rows */
-                                , (ex.extraRows||[]).map((row,ri)=>(
-                                  React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
-                                    , React.createElement('span', { style: {fontSize:".58rem",color:"#9a8a78",flexShrink:0,minWidth:18}}, (isC||isF)?`I${ri+2}`:`S${ri+2}`)
-                                    , (isC||isF) ? (React.createElement(React.Fragment, null
-                                      , React.createElement('input', { className: "wb-ex-inp", style: {flex:1.5,minWidth:52,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
-                                        value: row.hhmm||"",
-                                        onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};updateWbEx(i,"extraRows",rr);},
-                                        onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};updateWbEx(i,"extraRows",rr);}})
-                                      , React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateWbEx(i,"extraRows",rr);}})
-                                      , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: metric?"km":"mi", value: row.distanceMi||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateWbEx(i,"extraRows",rr);}})
-                                      , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateWbEx(i,"extraRows",rr);}})
-                                      , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateWbEx(i,"extraRows",rr);}})
-                                    )) : (React.createElement(React.Fragment, null
-                                      , !noSetsEx&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateWbEx(i,"extraRows",rr);}})
-                                      , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};updateWbEx(i,"extraRows",rr);}})
-                                      , showW&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateWbEx(i,"extraRows",rr);}})
-                                    ))
-                                    , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateWbEx(i,"extraRows",rr);}}, "✕")
-                                  )
-                                ))
-                                /* Add Row button */
-                                , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
-                                  onClick: ()=>{const rr=[...(ex.extraRows||[]),(isC||isF)?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateWbEx(i,"extraRows",rr);}}, "＋ Add Row (e.g. "
-                                      , (isC||isF)?"interval":"progressive weight", ")"
-                                )
-                                /* Avg HR Zone — last */
-                                , showHR&&(
-                                  React.createElement('div', null
-                                    , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
-                                    , React.createElement('div', { className: "hr-zone-row"}
-                                      , HR_ZONES.map(z=>{
-                                        const sel=ex.hrZone===z.z;
-                                        const range=hrRange(age,z);
-                                        return (
-                                          React.createElement('div', { key: z.z, className: `hr-zone-btn ${sel?"sel":""}`,
-                                            style: {"--zc":z.color,borderColor:sel?z.color:"rgba(45,42,36,.2)",background:sel?`${z.color}22`:"rgba(45,42,36,.12)"},
-                                            onClick: ()=>updateWbEx(i,"hrZone",sel?null:z.z)}
-                                            , React.createElement('span', { className: "hz-name", style: {color:sel?z.color:"#5a5650"}}, "Z", z.z, " " , z.name)
-                                            , React.createElement('span', { className: "hz-bpm", style: {color:sel?z.color:"#6a645a"}}, range.lo, "–", range.hi)
-                                          )
-                                        );
-                                      })
-                                    )
-                                    , ex.hrZone&&React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",marginTop:4}}, HR_ZONES[ex.hrZone-1].desc)
-                                  )
-                                )
-                              )
-                            )
-                          );
-                        })()
+                        , React.createElement(WbExCard, {
+                            ex:ex, i:i, exD:exD,
+                            collapsed: !!collapsedWbEx[i],
+                            profile:profile, allExById:allExById,
+                            metric:metric, wUnit:wUnit,
+                            setWbExercises:setWbExercises, setCollapsedWbEx:setCollapsedWbEx,
+                            setSsChecked:setSsChecked, ssChecked:ssChecked,
+                            exCount:wbExercises.length, openExEditor:openExEditor
+                          })
                       )
 
                     );
@@ -8900,7 +8915,7 @@ function App() {
           const zb=showHR&&hrZone?1+(hrZone-1)*0.04:1;
           const wb=effW>0?1+Math.min(effW/500,0.3):1;
           const pb=1+(runBoostPct/100);
-          const intBoost=exIntervals?1.25:1;
+          const intBoost=(isCardio&&quickRows.length>0)?1.25:1;
           // Add XP from extra rows
           const rowsXP=quickRows.reduce((s,row)=>{
             const rs=noSets?1:(parseInt(row.sets)||sv);
@@ -8963,17 +8978,16 @@ function App() {
                         , React.createElement('span', { style: {fontSize:".6rem",color:"#a09080",flexShrink:0,minWidth:18}}, isCardio||isFlex?`I${ri+2}`:`S${ri+2}`)
                         , (isCardio||isFlex) ? (React.createElement(React.Fragment, null
                           , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:52,padding:"4px 8px",fontSize:".72rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
-                            value: row.hhmm||"",
-                            onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],hhmm:e.target.value};setQuickRows(rr);},
+                            defaultValue: row.hhmm||"",
                             onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};setQuickRows(rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:36,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sec:e.target.value};setQuickRows(rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: dUnit, value: row.dist||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],dist:e.target.value};setQuickRows(rr);}})
-                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],incline:e.target.value};setQuickRows(rr);}})
-                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],speed:e.target.value};setQuickRows(rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:36,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", defaultValue: row.sec||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sec:e.target.value};setQuickRows(rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: dUnit, defaultValue: row.dist||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],dist:e.target.value};setQuickRows(rr);}})
+                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],incline:e.target.value};setQuickRows(rr);}})
+                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],speed:e.target.value};setQuickRows(rr);}})
                         )) : (React.createElement(React.Fragment, null
-                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "1", max: "20", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sets:e.target.value};setQuickRows(rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "1", max: "200", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],reps:e.target.value};setQuickRows(rr);}})
-                          , showWeight&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],weightLbs:e.target.value};setQuickRows(rr);}})
+                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "1", max: "20", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sets:e.target.value};setQuickRows(rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "1", max: "200", placeholder: "Reps", defaultValue: row.reps||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],reps:e.target.value};setQuickRows(rr);}})
+                          , showWeight&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0", placeholder: wUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],weightLbs:e.target.value};setQuickRows(rr);}})
                         ))
                         , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>setQuickRows(quickRows.filter((_,j)=>j!==ri))}, "✕")
                       )
@@ -8991,12 +9005,6 @@ function App() {
                     React.createElement('div', { style: {display:"flex",gap:8,marginBottom:10}}
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Incline (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exIncline||"", onChange: e=>setExIncline(e.target.value?parseFloat(e.target.value):null)}))
                       , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Speed (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exSpeed||"", onChange: e=>setExSpeed(e.target.value?parseFloat(e.target.value):null)}))
-                    )
-                  )
-                  /* Intervals toggle — all cardio */
-                  , ex.id!=="rest_day"&&showHR&&(
-                    React.createElement('button', { style: {width:"100%",marginBottom:8,padding:"8px 12px",fontSize:".68rem",fontFamily:"'Inter',sans-serif",background:exIntervals?"rgba(45,42,36,.3)":"rgba(45,42,36,.15)",border:`1.5px solid ${exIntervals?"rgba(180,172,158,.18)":"rgba(180,172,158,.06)"}`,color:exIntervals?"#b4ac9e":"#5a5650",borderRadius:8,cursor:"pointer"}, onClick: ()=>setExIntervals(v=>!v)}, "⚡ Intervals "
-                        , exIntervals?"ON · +25% XP":"OFF"
                     )
                   )
                   /* Add Row button */
