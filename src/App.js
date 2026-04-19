@@ -7415,10 +7415,17 @@ function App() {
                           const name = ex ? ex.name : exId;
                           const icon = ex ? ex.icon : "💪";
                           let valDisp = "";
-                          if(pb.type === "cardio") {
-                            valDisp = metric ? parseFloat((pb.value*1.60934).toFixed(2))+" min/km" : parseFloat(pb.value.toFixed(2))+" min/mi";
-                          } else if(pb.type === "assisted") {
+                          if(pb.type === "Cardio Pace") {
+                            const pace = metric ? pb.value / 1.60934 : pb.value;
+                            valDisp = pace.toFixed(2) + (metric ? " min/km" : " min/mi");
+                          } else if(pb.type === "Assisted Weight") {
                             valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " (Assisted)";
+                          } else if(pb.type === "Max Reps Per 1 Set") {
+                            valDisp = pb.value + " reps";
+                          } else if(pb.type === "Longest Hold" || pb.type === "Fastest Time") {
+                            valDisp = parseFloat(pb.value.toFixed(2)) + " min";
+                          } else if(pb.type === "Heaviest Weight") {
+                            valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs");
                           } else {
                             valDisp = (metric ? parseFloat(lbsToKg(pb.value)).toFixed(1) : pb.value) + (metric?" kg":" lbs") + " 1RM";
                           }
