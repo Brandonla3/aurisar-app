@@ -8909,9 +8909,22 @@ function App() {
         const rawDist=parseFloat(distanceVal||0);
         const distMi=rawDist>0?(metric?parseFloat(kmToMi(rawDist)):rawDist):0;
         const pbPaceMi=profile.runningPB||null;
-        const pbDisp=pbPaceMi?(metric?`${parseFloat((pbPaceMi*1.60934).toFixed(2))} min/km`:`${parseFloat(pbPaceMi.toFixed(2))} min/mi`):null;
+        const pbDisp=pbPaceMi?(metric?`${(pbPaceMi/1.60934).toFixed(2)} min/km`:`${pbPaceMi.toFixed(2)} min/mi`):null;
         const exPB4=(profile.exercisePBs||{})[ex.id]||null;
-        const exPBDisp4=exPB4?(exPB4.type==="cardio"?(metric?parseFloat((exPB4.value*1.60934).toFixed(2))+" min/km":parseFloat(exPB4.value.toFixed(2))+" min/mi"):(exPB4.type==="assisted"?"1RM: "+exPB4.value+(metric?" kg":" lbs")+" (Assisted)":"1RM: "+exPB4.value+(metric?" kg":" lbs"))):null;
+        const pbWeightDisp=(v)=>(metric?parseFloat(lbsToKg(v)).toFixed(1):v)+(metric?" kg":" lbs");
+        const exPBDisp4=exPB4?(
+          exPB4.type==="Cardio Pace"
+            ? (metric?(exPB4.value/1.60934).toFixed(2)+" min/km":exPB4.value.toFixed(2)+" min/mi")
+          : exPB4.type==="Assisted Weight"
+            ? "1RM: "+pbWeightDisp(exPB4.value)+" (Assisted)"
+          : exPB4.type==="Max Reps Per 1 Set"
+            ? exPB4.value+" reps"
+          : (exPB4.type==="Longest Hold"||exPB4.type==="Fastest Time")
+            ? parseFloat(exPB4.value.toFixed(2))+" min"
+          : exPB4.type==="Heaviest Weight"
+            ? pbWeightDisp(exPB4.value)
+          : "1RM: "+pbWeightDisp(exPB4.value)
+        ):null;
         const durationMin=parseFloat(reps||0);
         const runPace=(isRunning&&distMi>0&&durationMin>0)?durationMin/distMi:null;
         const runBoostPct=runPace?(runPace<=8?20:5):0;
