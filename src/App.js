@@ -3493,7 +3493,7 @@ function App() {
                 {icon:"🎯", label:"Quests",      action:()=>guardAll(()=>{setActiveTab("quests");setNavMenuOpen(false);}), badge:pendingQuestCount},
                 // Map feature hidden — re-enable when ready
                 // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
-                {icon:"🛟", label:"Support",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setFeedbackEmail(_optionalChain([authUser, 'optionalAccess', _a => _a.email])||"");setFeedbackAccountId(myPublicId||"");setHelpConfirmShown(false);setNavMenuOpen(false);}},
+                {icon:"🛟", label:"Support",    action:()=>{setFeedbackOpen(true);setFeedbackSent(false);setFeedbackText("");setFeedbackEmail(_optionalChain([authUser, 'optionalAccess', _a => _a.email])||"");setFeedbackAccountId(myPublicId||"");setFeedbackType("help");setHelpConfirmShown(false);setNavMenuOpen(false);}},
                 authUser&&{icon:"🚪", label:"Sign Out", action:()=>{signOut();setNavMenuOpen(false);}, danger:true},
                 !authUser&&{icon:"🚪", label:"Exit Preview", action:()=>{setScreen("landing");setProfile(EMPTY_PROFILE);setNavMenuOpen(false);}, danger:true},
               ].filter(Boolean).map((item)=>
@@ -10005,16 +10005,6 @@ function App() {
                 )
               ) : (
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:12}}
-                    , [["idea","💡 Idea"],["bug","🐛 Bug"],["help","❓ Help"]].map(([v,l])=>(
-                      React.createElement('button', { key: v, className: "btn btn-ghost btn-xs"  ,
-                        style: {flex:1,fontSize:".65rem",
-                          border:feedbackType===v?"1px solid rgba(180,172,158,.12)":"",
-                          color:feedbackType===v?"#b4ac9e":"#8a8478",
-                          background:feedbackType===v?"rgba(45,42,36,.18)":""},
-                        onClick: ()=>setFeedbackType(v)}, l)
-                    ))
-                  )
                   , React.createElement('div', { className: "field", style: {marginBottom:8}}
                     , React.createElement('label', null, "Email Address")
                     , React.createElement('input', { className: "inp", type: "email",
