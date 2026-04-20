@@ -288,6 +288,14 @@ export default function AvatarPreview3D({
   pose      = 'hero',
   clsColor  = '#8B6A3E',
 }) {
+  // R3F's ResizeObserver doesn't fire when the canvas mounts inside a
+  // tab that was hidden or just became visible. Dispatching 'resize'
+  // after a paint cycle forces R3F to re-measure the container.
+  useEffect(() => {
+    const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    return () => clearTimeout(t);
+  }, []);
+
   const skinHex = SKIN_HEX[skinTone] || '#C0703E';
   const hairHex = HAIR_HEX[hairColor] || '#1A1008';
   const eyeHex  = EYE_HEX[eyeColor]  || '#3B1A08';
