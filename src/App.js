@@ -53,7 +53,7 @@ function getWorkoutMgColor(wo, exById, mgColors){
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
-import { AvatarPreview3D } from './components/AvatarPreview3D';
+import AvatarPortrait from './components/AvatarPortrait';
 import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import PlanWizard from './components/PlanWizard';
 import WorkoutNotificationMockup from './components/WorkoutNotificationMockup';
@@ -7193,12 +7193,6 @@ function App() {
 
                 /* ══ AVATAR SUB-TAB ══════════════════════════ */
                 , charSubTab==="avatar" && (()=>{
-                  const HAIR_TO_3JS = {
-                    ma_short:'buzz_cut', ma_modern_side:'undercut', ma_surfer:'long_loose',
-                    ma_long:'long_loose', ma_textured:'buzz_cut', ma_beard_1:'buzz_cut', ma_beard_2:'buzz_cut',
-                    fe_a_line_bob:'ponytail', fe_long:'long_loose', fe_medium:'ponytail',
-                    fe_short:'buzz_cut', fe_bob:'ponytail',
-                  };
                   const isMale = (profile.avatarGender||'male')==='male';
                   const hairOpts = isMale
                     ? [{key:"ma_short",label:"Short"},{key:"ma_modern_side",label:"Modern Side"},{key:"ma_surfer",label:"Surfer"},{key:"ma_long",label:"Long"},{key:"ma_textured",label:"Textured"},{key:"ma_beard_1",label:"Beard"},{key:"ma_beard_2",label:"Beard 2"}]
@@ -7206,16 +7200,11 @@ function App() {
                   const outfitOpts = isMale
                     ? [{key:"ma_casual",label:"Casual"},{key:"ma_sport",label:"Sport"},{key:"ma_hoodie",label:"Hoodie"},{key:"ma_business",label:"Business"}]
                     : [{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sporty"},{key:"fe_business",label:"Business"}];
-                  const threejsHair = HAIR_TO_3JS[profile.avatarHairStyle||'ma_short'] || 'buzz_cut';
                   return React.createElement('div', null
-                    , React.createElement(AvatarPreview3D, {
-                        race:     'human',
-                        bodyType: profile.avatarBodyType || 'athletic',
-                        skinTone: profile.avatarSkinTone || 'mid_3',
-                        hairColor:profile.avatarHairColor|| 'black',
-                        hairStyle:threejsHair,
-                        facePreset:profile.avatarFacePreset||'balanced',
-                        clsColor: cls.color, clsKey: clsKey
+                    , React.createElement(AvatarPortrait, {
+                        gender:  profile.avatarGender || 'male',
+                        outfit:  profile.avatarOutfit  || 'ma_casual',
+                        clsColor: cls.color
                       })
                     , React.createElement('div',{className:"char-section",style:{marginTop:12}}
                       , rune("Gender")
