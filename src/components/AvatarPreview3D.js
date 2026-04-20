@@ -1,21 +1,17 @@
 /**
  * AvatarPreview3D — React Three Fiber viewer for exported UE character GLBs.
+ * Written with React.createElement (no JSX) to match the project convention.
  *
  * Loads 6 mesh pieces in parallel from /public/avatars/models/:
- *   body_{ma|fe}.glb          base body
- *   head_{ma|fe}.glb          head
- *   upper_{outfit}.glb        shirt / top
- *   lower_{outfit}.glb        trousers / skirt
- *   feet_{outfit}.glb         shoes
- *   hair_{hairStyle}.glb      hair mesh
- *
- * Run ue_scripts/export_character_models.py from UE once to generate files.
+ *   body_{ma|fe}.glb, head_{ma|fe}.glb,
+ *   upper/lower/feet_{outfit}.glb, hair_{hairStyle}.glb
  */
 
 import React, { Suspense, useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, ContactShadows, Html, OrbitControls } from '@react-three/drei';
-import * as THREE from 'three';
+
+const e = React.createElement;
 
 // ─── Colour tables ────────────────────────────────────────────────────────────
 const SKIN_HEX = {
@@ -36,14 +32,14 @@ const HAIR_HEX = {
   frost_blue:'#60A8D8',  ember_org:'#D84820',
 };
 
-// Hair styles that were added to the UI but have no UE asset — map to closest real style
+// Fallback for any hair key that was removed from UE but still in saved profile
 const HAIR_FALLBACK = {
   ma_mohawk:'ma_short', ma_braids:'ma_long', ma_ponytail:'ma_surfer',
   ma_shaved:'ma_short', ma_warrior:'ma_old',
   fe_braids:'fe_medium', fe_ponytail:'fe_medium', fe_bun:'fe_bob', fe_mohawk:'fe_short',
 };
 
-// ─── Material-name helpers ────────────────────────────────────────────────────
+// ─── Material helpers ─────────────────────────────────────────────────────────
 const looksLikeSkin = id => /skin|body|torso|head|face|neck|hand|arm|chest|back|flesh/i.test(id);
 const looksLikeHair = id => /hair|beard|brow/i.test(id);
 const looksLikeEye  = id => /eye|iris|pupil|cornea|sclera/i.test(id);
@@ -55,20 +51,17 @@ function applyColours(scene, skinHex, hairHex) {
     const id = (node.name + '|' + (Array.isArray(node.material)
       ? node.material.map(m => m.name).join('|')
       : node.material?.name ?? '')).toLowerCase();
-
-    if (looksLikeEye(id)) return; // never touch eyes
-
-    const applyToMat = mat => {
+    if (looksLikeEye(id)) return;
+    const tint = mat => {
       if (!mat) return mat;
       const m = mat.clone();
       if (skinHex && looksLikeSkin(id)) m.color.set(skinHex);
       if (hairHex && looksLikeHair(id)) m.color.set(hairHex);
       return m;
     };
-
     node.material = Array.isArray(node.material)
-      ? node.material.map(applyToMat)
-      : applyToMat(node.material);
+      ? node.material.map(tint)
+      : tint(node.material);
   });
   return clone;
 }
@@ -93,27 +86,25 @@ class ModelErrorBoundary extends React.Component {
   render() { return this.state.err ? (this.props.fallback ?? null) : this.props.children; }
 }
 
-// ─── Individual mesh piece ────────────────────────────────────────────────────
+// ─── Single mesh piece ────────────────────────────────────────────────────────
 function MeshPiece({ url, skinHex, hairHex, tintHair }) {
   const { scene } = useGLTF(url);
   const mesh = useMemo(
     () => tintHair ? applyHairColour(scene, hairHex) : applyColours(scene, skinHex, hairHex),
     [scene, skinHex, hairHex, tintHair]
   );
-  return <primitive object={mesh} />;
+  return e('primitive', { object: mesh });
 }
 
 function SafePiece(props) {
-  return (
-    <ModelErrorBoundary fallback={null}>
-      <Suspense fallback={null}>
-        <MeshPiece {...props} />
-      </Suspense>
-    </ModelErrorBoundary>
+  return e(ModelErrorBoundary, { fallback: null },
+    e(Suspense, { fallback: null },
+      e(MeshPiece, props)
+    )
   );
 }
 
-// ─── Full assembled character ─────────────────────────────────────────────────
+// ─── Assembled character ──────────────────────────────────────────────────────
 function CharacterModel({ gender, outfit, hairStyle, skinHex, hairHex }) {
   const gd   = gender === 'male' ? 'ma' : 'fe';
   const base = '/avatars/models';
@@ -125,62 +116,58 @@ function CharacterModel({ gender, outfit, hairStyle, skinHex, hairHex }) {
       groupRef.current.rotation.y = Math.sin(clock.elapsedTime * 0.4) * 0.18;
   });
 
-  return (
-    <group ref={groupRef}>
-      <SafePiece url={`${base}/body_${gd}.glb`}      skinHex={skinHex} hairHex={hairHex} />
-      <SafePiece url={`${base}/head_${gd}.glb`}      skinHex={skinHex} hairHex={hairHex} />
-      <SafePiece url={`${base}/upper_${outfit}.glb`} />
-      <SafePiece url={`${base}/lower_${outfit}.glb`} />
-      <SafePiece url={`${base}/feet_${outfit}.glb`}  />
-      <SafePiece url={`${base}/hair_${hair}.glb`}    hairHex={hairHex} tintHair />
-      {gender === 'female' && (
-        <SafePiece url={`${base}/accs_earring.glb`} />
-      )}
-    </group>
+  return e('group', { ref: groupRef },
+    e(SafePiece, { key:'body',  url:`${base}/body_${gd}.glb`,      skinHex, hairHex }),
+    e(SafePiece, { key:'head',  url:`${base}/head_${gd}.glb`,      skinHex, hairHex }),
+    e(SafePiece, { key:'upper', url:`${base}/upper_${outfit}.glb` }),
+    e(SafePiece, { key:'lower', url:`${base}/lower_${outfit}.glb` }),
+    e(SafePiece, { key:'feet',  url:`${base}/feet_${outfit}.glb`  }),
+    e(SafePiece, { key:'hair',  url:`${base}/hair_${hair}.glb`,   hairHex, tintHair: true }),
+    gender === 'female' && e(SafePiece, { key:'accs', url:`${base}/accs_earring.glb` }),
   );
 }
 
 // ─── Overlays ─────────────────────────────────────────────────────────────────
 function LoadingOverlay() {
-  return (
-    <Html center>
-      <div style={{ color:'#8a8070', fontSize:12, textAlign:'center' }}>
-        <div style={{ marginBottom:4, fontSize:20 }}>⚔️</div>Loading…
-      </div>
-    </Html>
+  return e(Html, { center: true },
+    e('div', { style: { color:'#8a8070', fontSize:12, textAlign:'center' } },
+      e('div', { style: { marginBottom:4, fontSize:20 } }, '⚔️'),
+      'Loading…'
+    )
   );
 }
 
 function PendingOverlay() {
-  return (
-    <Html center>
-      <div style={{ color:'#6a645a', fontSize:12, textAlign:'center', lineHeight:1.7 }}>
-        <div style={{ marginBottom:6, fontSize:26 }}>⚙️</div>
-        <div style={{ color:'#a09880' }}>3D models pending</div>
-        <div style={{ fontSize:10, marginTop:4, opacity:0.65 }}>
-          Open UE → run<br />
-          <code style={{ background:'#1a1812', padding:'1px 5px', borderRadius:3 }}>
-            export_character_models.py
-          </code>
-        </div>
-      </div>
-    </Html>
+  return e(Html, { center: true },
+    e('div', { style: { color:'#6a645a', fontSize:12, textAlign:'center', lineHeight:'1.7' } },
+      e('div', { style: { marginBottom:6, fontSize:26 } }, '⚙️'),
+      e('div', { style: { color:'#a09880' } }, '3D models pending'),
+      e('div', { style: { fontSize:10, marginTop:4, opacity:0.65 } },
+        'Open UE → run', e('br', null),
+        e('code', { style: { background:'#1a1812', padding:'1px 5px', borderRadius:3 } },
+          'export_character_models.py'
+        )
+      )
+    )
   );
 }
 
-// ─── Lighting ─────────────────────────────────────────────────────────────────
+// ─── Lights ───────────────────────────────────────────────────────────────────
 function Lights({ clsColor }) {
-  return (
-    <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[2.5, 5, 3]} intensity={1.4} castShadow
-        shadow-mapSize={[1024,1024]}
-        shadow-camera-near={0.1} shadow-camera-far={30}
-        shadow-camera-left={-3}  shadow-camera-right={3}
-        shadow-camera-top={5}    shadow-camera-bottom={-1} />
-      <directionalLight position={[-2, 2, -2]} intensity={0.4} color={clsColor || '#4466ff'} />
-      <pointLight position={[0, 4, 1]} intensity={0.25} color="#ffeecc" />
-    </>
+  return e(React.Fragment, null,
+    e('ambientLight',      { intensity: 0.6 }),
+    e('directionalLight',  {
+      position: [2.5, 5, 3], intensity: 1.4, castShadow: true,
+      'shadow-mapSize':        [1024, 1024],
+      'shadow-camera-near':    0.1,
+      'shadow-camera-far':     30,
+      'shadow-camera-left':    -3,
+      'shadow-camera-right':   3,
+      'shadow-camera-top':     5,
+      'shadow-camera-bottom': -1,
+    }),
+    e('directionalLight',  { position: [-2, 2, -2], intensity: 0.4, color: clsColor || '#4466ff' }),
+    e('pointLight',        { position: [0, 4, 1],   intensity: 0.25, color: '#ffeecc' }),
   );
 }
 
@@ -196,51 +183,40 @@ export default function AvatarPreview3D({
   const skinHex = SKIN_HEX[skinTone] || '#C0703E';
   const hairHex = HAIR_HEX[hairColor] || '#1A1008';
 
-  // Guard against mismatched gender/outfit keys still in state
   const effectiveOutfit = outfit.startsWith(gender === 'male' ? 'ma' : 'fe')
     ? outfit
     : (gender === 'male' ? 'ma_casual' : 'fe_casual');
 
-  return (
-    <div style={{
+  return e('div', {
+    style: {
       width:'100%', height:400,
       borderRadius:12, overflow:'hidden',
       background:'#0d0c0a',
       border:`1px solid ${clsColor}28`,
-    }}>
-      <Canvas
-        camera={{ position:[0, 0.9, 2.8], fov:38 }}
-        gl={{ antialias:true, alpha:false }}
-        shadows
-      >
-        <color attach="background" args={['#0d0c0a']} />
-        <Lights clsColor={clsColor} />
+    }},
+    e(Canvas, {
+      camera:  { position: [0, 0.9, 2.8], fov: 38 },
+      gl:      { antialias: true, alpha: false },
+      shadows: true,
+    },
+      e('color', { attach: 'background', args: ['#0d0c0a'] }),
+      e(Lights, { clsColor }),
 
-        <ModelErrorBoundary fallback={<PendingOverlay />}>
-          <Suspense fallback={<LoadingOverlay />}>
-            <CharacterModel
-              gender={gender}
-              outfit={effectiveOutfit}
-              hairStyle={hairStyle}
-              skinHex={skinHex}
-              hairHex={hairHex}
-            />
-            <ContactShadows
-              position={[0, -0.01, 0]}
-              opacity={0.4} scale={4} blur={2.5} far={3}
-            />
-          </Suspense>
-        </ModelErrorBoundary>
+      e(ModelErrorBoundary, { fallback: e(PendingOverlay, null) },
+        e(Suspense, { fallback: e(LoadingOverlay, null) },
+          e(CharacterModel, { gender, outfit: effectiveOutfit, hairStyle, skinHex, hairHex }),
+          e(ContactShadows, { position: [0, -0.01, 0], opacity: 0.4, scale: 4, blur: 2.5, far: 3 }),
+        )
+      ),
 
-        <OrbitControls
-          enablePan={false}
-          enableZoom={false}
-          minPolarAngle={Math.PI / 5}
-          maxPolarAngle={Math.PI * 0.65}
-          target={[0, 0.8, 0]}
-        />
-      </Canvas>
-    </div>
+      e(OrbitControls, {
+        enablePan:       false,
+        enableZoom:      false,
+        minPolarAngle:   Math.PI / 5,
+        maxPolarAngle:   Math.PI * 0.65,
+        target:          [0, 0.8, 0],
+      }),
+    )
   );
 }
 
