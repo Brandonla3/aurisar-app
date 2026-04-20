@@ -25,8 +25,18 @@ const Silhouette = (clsColor) =>
     }, 'Portrait render pending')
   );
 
-export default function AvatarPortrait({ gender = 'male', outfit = 'ma_casual', clsColor = '#8B6A3E' }) {
-  const primary = `/avatars/${gender}_${outfit}.png`;
+export default function AvatarPortrait({
+  gender = 'male',
+  outfit = 'ma_casual',
+  clsColor = '#8B6A3E',
+  previewVersion = null,
+  isRendering = false,
+}) {
+  const staticSrc  = `/avatars/${gender}_${outfit}.png`;
+  const previewSrc = previewVersion != null
+    ? `/avatars/portrait_preview.png?v=${previewVersion}`
+    : null;
+  const primary  = previewSrc || staticSrc;
   const fallback = `/avatars/${gender}_default.png`;
 
   const [src, setSrc] = useState(primary);
@@ -38,11 +48,8 @@ export default function AvatarPortrait({ gender = 'male', outfit = 'ma_casual', 
   }, [primary]);
 
   const handleError = () => {
-    if (src === primary) {
-      setSrc(fallback);
-    } else {
-      setFailed(true);
-    }
+    if (src !== fallback) { setSrc(fallback); }
+    else { setFailed(true); }
   };
 
   return React.createElement('div', {
@@ -58,8 +65,31 @@ export default function AvatarPortrait({ gender = 'male', outfit = 'ma_casual', 
       ? Silhouette(clsColor)
       : React.createElement('img', {
           src, alt: 'avatar portrait', onError: handleError,
-          style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+          style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                   transition: 'opacity .3s', opacity: isRendering ? 0.4 : 1 },
         }),
+    // Rendering spinner overlay
+    isRendering && React.createElement('div', {
+      style: {
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(10,8,6,0.55)',
+        gap: 8,
+      }
+    },
+      React.createElement('div', {
+        style: {
+          width: 28, height: 28, borderRadius: '50%',
+          border: `3px solid ${clsColor}44`,
+          borderTopColor: clsColor,
+          animation: 'spin 0.8s linear infinite',
+        }
+      }),
+      React.createElement('span', {
+        style: { fontSize: '.6rem', color: `${clsColor}cc`, letterSpacing: 1 }
+      }, 'RENDERING')
+    ),
     React.createElement('div', {
       style: {
         position: 'absolute', inset: 0, borderRadius: 8,

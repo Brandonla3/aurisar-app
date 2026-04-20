@@ -414,6 +414,9 @@ function App() {
   const [obDraft,setObDraft] = useState(null); // null | saved onboarding draft from localStorage
   // Plans
   const [charSubTab, setCharSubTab] = useState("avatar");
+  const [portraitRenderState, setPortraitRenderState] = useState('idle'); // 'idle'|'pending'|'done'
+  const [portraitVersion, setPortraitVersion] = useState(null);
+  const portraitReqIdRef = React.useRef(null);
   const [bodyTypeLocked, setBodyTypeLocked] = useState(false);
   const [planView,setPlanView]     = useState("list");
   const [collapsedTpls,setCollapsedTpls] = useState(()=>{
@@ -656,6 +659,21 @@ function App() {
     const fallback = setTimeout(()=>setScreen(s=>s==="loading"?"landing":s), 5000);
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
+  useEffect(()=>{
+    if(portraitRenderState !== 'pending') return;
+    const id = setInterval(async()=>{
+      try {
+        const r = await fetch('/avatars/portrait_status.json?t='+Date.now());
+        if(!r.ok) return;
+        const d = await r.json();
+        if(d.requestId && d.requestId === portraitReqIdRef.current){
+          setPortraitVersion(d.version);
+          setPortraitRenderState('done');
+        }
+      } catch {}
+    }, 1500);
+    return ()=>clearInterval(id);
+  },[portraitRenderState]);
   useEffect(()=>{ if(screen==="main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen,isPreviewMode]);
   useEffect(()=>{
     if(screen!=="intro"){ setBootStep(0); return; }
@@ -7159,6 +7177,26 @@ function App() {
                 return level >= (s.unlockLevel||1);
               };
               const setAv = (field, val) => setProfile(p=>({...p, [field]:val}));
+              const requestPortraitRender = async () => {
+                const reqId = String(Date.now());
+                portraitReqIdRef.current = reqId;
+                setPortraitRenderState('pending');
+                setPortraitVersion(null);
+                try {
+                  await fetch('/api/request-render', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                      requestId: reqId,
+                      gender:    profile.avatarGender   || 'male',
+                      outfit:    profile.avatarOutfit   || 'ma_casual',
+                      hairStyle: profile.avatarHairStyle|| 'ma_short',
+                      skinTone:  profile.avatarSkinTone || 'mid_3',
+                      hairColor: profile.avatarHairColor|| 'black',
+                    }),
+                  });
+                } catch { setPortraitRenderState('idle'); }
+              };
               /* btn styling now via .char-sub-btn / .char-sub-btn.sel */
               const rune = (label) => React.createElement('div',{className:"profile-rune-divider",style:{margin:"0 0 10px"}},React.createElement('span',{className:"profile-rune-label"},`⠿ ${label} ⠿`));
               return React.createElement('div', {style:{"--cls-color":cls.color,"--cls-glow":cls.glow}}
@@ -7202,10 +7240,19 @@ function App() {
                     : [{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sporty"},{key:"fe_business",label:"Business"}];
                   return React.createElement('div', null
                     , React.createElement(AvatarPortrait, {
-                        gender:  profile.avatarGender || 'male',
-                        outfit:  profile.avatarOutfit  || 'ma_casual',
-                        clsColor: cls.color
+                        gender:       profile.avatarGender || 'male',
+                        outfit:       profile.avatarOutfit  || 'ma_casual',
+                        clsColor:     cls.color,
+                        previewVersion: portraitVersion,
+                        isRendering:  portraitRenderState === 'pending',
                       })
+                    , React.createElement('button', {
+                        onClick:   requestPortraitRender,
+                        disabled:  portraitRenderState === 'pending',
+                        className: 'char-sub-btn',
+                        style:{ width:'100%', maxWidth:220, margin:'8px auto 0', display:'block',
+                                opacity: portraitRenderState === 'pending' ? 0.55 : 1 },
+                      }, portraitRenderState === 'pending' ? '⏳ Rendering...' : '📸 Render Portrait')
                     , React.createElement('div',{className:"char-section",style:{marginTop:12}}
                       , rune("Gender")
                       , React.createElement('div',{style:{display:"flex",gap:6}}
