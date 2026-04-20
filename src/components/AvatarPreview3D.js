@@ -14,7 +14,7 @@
 import React, { Suspense, useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, ContactShadows, Html, OrbitControls, useAnimations } from '@react-three/drei';
-import * as THREE from 'three';
+import { Quaternion, Euler } from 'three';
 
 const e = React.createElement;
 
@@ -55,12 +55,12 @@ const HAIR_FALLBACK = {
 // Values are in Three.js/GLTF right-handed Y-up space.
 // Tune these if the crossed-arms look needs adjustment.
 const CROSS_OVERLAY = {
-  clavicle_l: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.12,  0.28, 0.0)),
-  clavicle_r: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.12, -0.28, 0.0)),
-  upperarm_l: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.85, -0.55, 0.20)),
-  upperarm_r: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.85,  0.55,-0.20)),
-  lowerarm_l: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.0,   1.30, 0.0)),
-  lowerarm_r: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.0,  -1.30, 0.0)),
+  clavicle_l: new Quaternion().setFromEuler(new Euler( 0.12,  0.28, 0.0)),
+  clavicle_r: new Quaternion().setFromEuler(new Euler( 0.12, -0.28, 0.0)),
+  upperarm_l: new Quaternion().setFromEuler(new Euler( 0.85, -0.55, 0.20)),
+  upperarm_r: new Quaternion().setFromEuler(new Euler( 0.85,  0.55,-0.20)),
+  lowerarm_l: new Quaternion().setFromEuler(new Euler( 0.0,   1.30, 0.0)),
+  lowerarm_r: new Quaternion().setFromEuler(new Euler( 0.0,  -1.30, 0.0)),
 };
 
 // ─── Material helpers ─────────────────────────────────────────────────────────
@@ -78,21 +78,27 @@ function applyColours(scene, skinHex, hairHex, eyeHex) {
       ? node.material.map(m => m.name).join('|')
       : node.material?.name ?? '')).toLowerCase();
 
-    // Keep sclera (whites) untouched
-    if (looksLikeSclera(id)) return;
-    // Skip refractive/cornea overlay layer — don't tint it
-    if (/cornea|refract/i.test(id)) return;
+    if (looksLikeEye(id)) {
+      // Iris/pupil: apply eyeHex only when the material has a proper .color
+      if (eyeHex && looksLikeIris(id)) {
+        const tintIris = mat => {
+          if (!mat || !mat.color || typeof mat.color.set !== 'function') return mat;
+          const m = mat.clone();
+          m.color.set(eyeHex);
+          return m;
+        };
+        node.material = Array.isArray(node.material)
+          ? node.material.map(tintIris)
+          : tintIris(node.material);
+      }
+      return; // sclera, cornea, and anything else eye-related stays untouched
+    }
 
     const tint = mat => {
       if (!mat) return mat;
       const m = mat.clone();
       if (skinHex && looksLikeSkin(id)) m.color.set(skinHex);
       if (hairHex && looksLikeHair(id)) m.color.set(hairHex);
-      if (eyeHex  && looksLikeIris(id)) {
-        m.color.set(eyeHex);
-        // Slight emissive boost so the iris is visible even with dark lighting
-        if (m.emissive) m.emissive.set(eyeHex).multiplyScalar(0.15);
-      }
       return m;
     };
     node.material = Array.isArray(node.material)
