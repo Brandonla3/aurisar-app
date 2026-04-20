@@ -7192,52 +7192,71 @@ function App() {
                 )
 
                 /* ══ AVATAR SUB-TAB ══════════════════════════ */
-                , charSubTab==="avatar" && React.createElement('div', null
-                  , React.createElement(AvatarPreview3D, {
-                      race:     profile.avatarRace     || 'human',
-                      bodyType: profile.avatarBodyType || 'athletic',
-                      skinTone: profile.avatarSkinTone || 'mid_3',
-                      hairColor:profile.avatarHairColor|| 'black',
-                      hairStyle:profile.avatarHairStyle|| 'buzz_cut',
-                      facePreset:profile.avatarFacePreset||'balanced',
-                      clsColor: cls.color, clsKey: clsKey
-                    })
-                  , React.createElement('div',{className:"char-section",style:{marginTop:12}}
-                    , rune("Race")
-                    , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
-                      , [{key:"human",label:"Human",icon:"🧍"},{key:"elf",label:"Elf",icon:"🌿"},{key:"dwarf",label:"Dwarf",icon:"⛏️"},{key:"orc",label:"Orc",icon:"💀"},{key:"fae",label:"Fae",icon:"🦋"},{key:"halfgiant",label:"Half-Giant",icon:"🏔️"},{key:"golem",label:"Golem",icon:"🪨"}]
-                        .map(r=>React.createElement('button',{key:r.key,onClick:()=>setAv('avatarRace',r.key),className:"char-sub-btn"+(profile.avatarRace===r.key?" sel":"")},r.icon+" "+r.label))
+                , charSubTab==="avatar" && (()=>{
+                  const HAIR_TO_3JS = {
+                    ma_short:'buzz_cut', ma_modern_side:'undercut', ma_surfer:'long_loose',
+                    ma_long:'long_loose', ma_textured:'buzz_cut', ma_beard_1:'buzz_cut', ma_beard_2:'buzz_cut',
+                    fe_a_line_bob:'ponytail', fe_long:'long_loose', fe_medium:'ponytail',
+                    fe_short:'buzz_cut', fe_bob:'ponytail',
+                  };
+                  const isMale = (profile.avatarGender||'male')==='male';
+                  const hairOpts = isMale
+                    ? [{key:"ma_short",label:"Short"},{key:"ma_modern_side",label:"Modern Side"},{key:"ma_surfer",label:"Surfer"},{key:"ma_long",label:"Long"},{key:"ma_textured",label:"Textured"},{key:"ma_beard_1",label:"Beard"},{key:"ma_beard_2",label:"Beard 2"}]
+                    : [{key:"fe_a_line_bob",label:"A-Line Bob"},{key:"fe_long",label:"Long"},{key:"fe_medium",label:"Medium"},{key:"fe_short",label:"Short"},{key:"fe_bob",label:"Bob"}];
+                  const outfitOpts = isMale
+                    ? [{key:"ma_casual",label:"Casual"},{key:"ma_sport",label:"Sport"},{key:"ma_hoodie",label:"Hoodie"},{key:"ma_business",label:"Business"}]
+                    : [{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sporty"},{key:"fe_business",label:"Business"}];
+                  const threejsHair = HAIR_TO_3JS[profile.avatarHairStyle||'ma_short'] || 'buzz_cut';
+                  return React.createElement('div', null
+                    , React.createElement(AvatarPreview3D, {
+                        race:     'human',
+                        bodyType: profile.avatarBodyType || 'athletic',
+                        skinTone: profile.avatarSkinTone || 'mid_3',
+                        hairColor:profile.avatarHairColor|| 'black',
+                        hairStyle:threejsHair,
+                        facePreset:profile.avatarFacePreset||'balanced',
+                        clsColor: cls.color, clsKey: clsKey
+                      })
+                    , React.createElement('div',{className:"char-section",style:{marginTop:12}}
+                      , rune("Gender")
+                      , React.createElement('div',{style:{display:"flex",gap:6}}
+                        , [{key:"male",label:"♂ Male"},{key:"female",label:"♀ Female"}].map(g=>
+                            React.createElement('button',{key:g.key,
+                              onClick:()=>setProfile(p=>({...p,avatarGender:g.key,avatarHairStyle:g.key==='male'?'ma_short':'fe_a_line_bob',avatarOutfit:g.key==='male'?'ma_casual':'fe_casual'})),
+                              className:"char-sub-btn"+((profile.avatarGender||'male')===g.key?" sel":""),
+                              style:{flex:1,textAlign:"center"}
+                            },g.label)
+                          )
+                      )
                     )
-                  )
-                  , React.createElement('div',{className:"char-section"}
-                    , rune("Build")
-                    , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
-                      , [{key:"lean",label:"Lean"},{key:"wiry",label:"Wiry"},{key:"athletic",label:"Athletic"},{key:"stocky",label:"Stocky"},{key:"powerful",label:"Powerful"},{key:"massive",label:"Massive"}]
-                        .map(b=>React.createElement('button',{key:b.key,onClick:()=>setAv('avatarBodyType',b.key),className:"char-sub-btn"+(profile.avatarBodyType===b.key?" sel":"")},b.label))
+                    , React.createElement('div',{className:"char-section"}
+                      , rune("Hair Style")
+                      , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
+                        , hairOpts.map(h=>React.createElement('button',{key:h.key,onClick:()=>setAv('avatarHairStyle',h.key),className:"char-sub-btn"+(profile.avatarHairStyle===h.key?" sel":"")},h.label))
+                      )
                     )
-                  )
-                  , React.createElement('div',{className:"char-section"}
-                    , rune("Skin Tone")
-                    , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
-                      , Object.entries({fair_1:'#FDDBB4',fair_2:'#F5C89A',mid_1:'#E8A97C',mid_2:'#D4895C',mid_3:'#C0703E',tan_1:'#A85830',tan_2:'#8B4220',deep_1:'#6B2D10',deep_2:'#4A1C08',deep_3:'#2E0F04',orc_1:'#5A7A3A',orc_2:'#3D5C28',orc_3:'#8B5E3C',stone_1:'#8C8C9A',stone_2:'#6B7B8C',iron_1:'#7A6A50'})
-                        .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarSkinTone',key),title:key,style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarSkinTone===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarSkinTone===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                    , React.createElement('div',{className:"char-section"}
+                      , rune("Outfit")
+                      , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
+                        , outfitOpts.map(o=>React.createElement('button',{key:o.key,onClick:()=>setAv('avatarOutfit',o.key),className:"char-sub-btn"+(profile.avatarOutfit===o.key?" sel":"")},o.label))
+                      )
                     )
-                  )
-                  , React.createElement('div',{className:"char-section"}
-                    , rune("Hair Style")
-                    , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
-                      , [{key:"buzz_cut",label:"Buzz"},{key:"fade_high",label:"Fade"},{key:"undercut",label:"Undercut"},{key:"mohawk",label:"Mohawk"},{key:"bun",label:"Bun"},{key:"warrior_knot",label:"Knot"},{key:"ponytail",label:"Ponytail"},{key:"braids_short",label:"Braids"},{key:"locs_short",label:"Locs"},{key:"long_loose",label:"Long"},{key:"braids_long",label:"Long Braids"},{key:"bald",label:"Bald"}]
-                        .map(h=>React.createElement('button',{key:h.key,onClick:()=>setAv('avatarHairStyle',h.key),className:"char-sub-btn"+(profile.avatarHairStyle===h.key?" sel":"")},h.label))
+                    , React.createElement('div',{className:"char-section"}
+                      , rune("Skin Tone")
+                      , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
+                        , Object.entries({fair_1:'#FDDBB4',fair_2:'#F5C89A',mid_1:'#E8A97C',mid_2:'#D4895C',mid_3:'#C0703E',tan_1:'#A85830',tan_2:'#8B4220',deep_1:'#6B2D10',deep_2:'#4A1C08',deep_3:'#2E0F04'})
+                            .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarSkinTone',key),title:key,style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarSkinTone===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarSkinTone===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                      )
                     )
-                  )
-                  , React.createElement('div',{className:"char-section"}
-                    , rune("Hair Color")
-                    , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
-                      , Object.entries({black:'#1A1008',dk_brown:'#3B2010',brown:'#6B3820',auburn:'#A05828',lt_brown:'#C88040',blonde:'#D4AA60',lt_blonde:'#E8C880',red:'#E85030',grey:'#B0A898',white:'#F0EEE8',deep_violet:'#4A3888',forest_grn:'#2A7858',ocean_blue:'#185898',blood_red:'#983848',molten_gld:'#C8A020',void_black:'#101018',silver_wht:'#E8E8F8'})
-                        .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarHairColor',key),title:key.replace(/_/g,' '),style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarHairColor===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarHairColor===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                    , React.createElement('div',{className:"char-section"}
+                      , rune("Hair Color")
+                      , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
+                        , Object.entries({black:'#1A1008',dk_brown:'#3B2010',brown:'#6B3820',auburn:'#A05828',lt_brown:'#C88040',blonde:'#D4AA60',lt_blonde:'#E8C880',red:'#E85030',grey:'#B0A898',white:'#F0EEE8'})
+                            .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarHairColor',key),title:key.replace(/_/g,' '),style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarHairColor===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarHairColor===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                      )
                     )
-                  )
-                )
+                  );
+                })()
                 /* ══ STATS SUB-TAB ════════════════════════════ */
                 , charSubTab==="stats" && React.createElement('div', null
                   , React.createElement('div', {className:"char-section"}

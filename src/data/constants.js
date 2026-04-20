@@ -1119,7 +1119,8 @@ const EMPTY_PROFILE = {
   sportsBackground:[], fitnessPriorities:[], trainingStyle:"", workoutTiming:"", workoutFreq:"", disciplineTrait:"", motto:"",
   // HUD banner visibility toggles
   hudFields:{weight:false, height:false, bmi:false},
-  avatarRace:"human", avatarBodyType:"athletic", avatarSkinTone:"mid_3", avatarHairStyle:"buzz_cut", avatarHairColor:"black", avatarFacePreset:"balanced",
+  avatarGender:"male", avatarRace:"human", avatarBodyType:"athletic", avatarSkinTone:"mid_3",
+  avatarHairStyle:"ma_short", avatarHairColor:"black", avatarFacePreset:"balanced", avatarOutfit:"ma_casual",
   // Progression
   titles:[], achievements:{},
   xp:0, log:[], plans:[],
