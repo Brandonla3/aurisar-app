@@ -81,6 +81,25 @@ ALL_MESHES = {
 }
 
 
+def _make_options(lod=1):
+    """
+    Build GLTFExportOptions for web-optimised output.
+    Heads use LOD2 (~7 MB), everything else LOD1 (~0.1-1.5 MB).
+    Textures are JPEG q75 — a good balance for a character preview screen.
+    """
+    opts = unreal.GLTFExportOptions()
+    opts.export_animation_sequences = False
+    opts.export_cameras             = False
+    opts.export_lights              = False
+    opts.export_level_sequences     = False
+    opts.export_vertex_skin_weights = True
+    opts.bake_material_inputs       = unreal.GLTFMaterialBakeMode.DISABLED
+    opts.texture_image_format       = unreal.GLTFTextureImageFormat.JPEG
+    opts.texture_image_quality      = 75
+    opts.default_level_of_detail    = lod
+    return opts
+
+
 def run_export():
     os.makedirs(OUT, exist_ok=True)
 
@@ -88,14 +107,6 @@ def run_export():
         unreal.log_error('[Export] GLTFExporter plugin not enabled. '
                          'Enable it in Edit → Plugins → GLTF Exporter, then restart.')
         return
-
-    options = unreal.GLTFExportOptions()
-    options.export_animation_sequences = False
-    options.export_cameras             = False
-    options.export_lights              = False
-    options.export_level_sequences     = False
-    options.export_vertex_skin_weights = True
-    options.bake_material_inputs       = unreal.GLTFMaterialBakeMode.DISABLED
 
     exporter = unreal.GLTFExporter.get_default_object()
     ok, skipped, failed = [], [], []
@@ -114,9 +125,12 @@ def run_export():
                 unreal.log_warning(f'[Export] Asset not found: {asset_path}')
                 continue
 
+            # Heads are high-poly MetaHuman meshes — use LOD2 to keep them ~7 MB.
+            # Everything else uses LOD1 for a good quality/size balance.
+            lod = 2 if name.startswith('head_') else 1
             out_path = os.path.join(OUT, name + '.glb').replace('\\', '/')
             try:
-                exporter.export_to_gltf(mesh, out_path, options, [])
+                exporter.export_to_gltf(mesh, out_path, _make_options(lod), [])
                 if os.path.exists(out_path):
                     ok.append(name)
                     unreal.log(f'[Export] ✓  {name}.glb')
