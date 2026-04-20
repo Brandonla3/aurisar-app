@@ -160,13 +160,16 @@ function PoseSyncer({ gender, groupRef, pose }) {
   useEffect(() => {
     const a = actions && Object.values(actions)[0];
     if (!a) return;
-    // Play once, pause at ~0.4 s — a natural standing frame from the idle cycle
+    // Advance 0.4 s WHILE playing (effectiveTimeScale=1) so bones are updated,
+    // then pause.  mixer.setTime() resets action.time to 0 first and skips
+    // paused actions, so it must NOT be used here.
     a.reset().play();
-    a.paused  = true;
-    mixer.setTime(0.4);
+    mixer.update(0.4);
+    a.paused = true;
   }, [actions, mixer]);
 
-  // Priority 1 runs after drei's own mixer.update (priority 0)
+  // Default priority (0) — runs before R3F's scene render so bone changes are
+  // visible this frame, not deferred to the next.
   useFrame(() => {
     if (!groupRef.current) return;
 
@@ -193,7 +196,7 @@ function PoseSyncer({ gender, groupRef, pose }) {
         });
       });
     }
-  }, 1);
+  });
 
   return null;
 }
