@@ -15,9 +15,10 @@ REQUIREMENTS:
 FILES WRITTEN  →  public/avatars/models/
   body_{ma|fe}.glb               base body
   head_{ma|fe}.glb               head
-  upper/lower/feet_{outfit}.glb  clothing pieces  (7 outfit presets)
+  upper/lower/feet_{outfit}.glb  clothing pieces  (8 outfit presets)
   hair_{style}.glb               hair meshes      (12 male + 5 female)
   accs_earring.glb               female earring
+  anim_idle_{ma|fe}.glb          idle animation skeleton (drives in-browser poses)
 """
 
 import unreal
@@ -57,6 +58,18 @@ ALL_MESHES = {
     'upper_fe_business': PARTS+'UpperBody/SK_fe_chest_shirt_longsleve',
     'lower_fe_business': PARTS+'LowerBody/SK_fe_pants_business',
     'feet_fe_business':  PARTS+'Feet/SK_fe_feet_highheels_02',
+    # RPG "Wanderer" outfit — male (long-sleeve linen shirt + trousers + boots)
+    'upper_ma_wanderer': PARTS+'UpperBody/SK_ma_chest_longsleeve_casual',
+    'lower_ma_wanderer': PARTS+'LowerBody/SK_ma_leg_jeans',
+    'feet_ma_wanderer':  PARTS+'Feet/SK_ma_feet_boot_casual',
+    # RPG "Wanderer" outfit — female (v-neck shirt + full trousers + boots)
+    'upper_fe_wanderer': PARTS+'UpperBody/SK_fe_chest_shirt_v_neck',
+    'lower_fe_wanderer': PARTS+'LowerBody/SK_fe_pants_jeans',
+    'feet_fe_wanderer':  PARTS+'Feet/SK_fe_feet_boot_casual',
+    # Extra pieces
+    'lower_fe_skirt':    PARTS+'LowerBody/SK_fe_skirt_a',
+    'feet_fe_sandals':   PARTS+'Feet/SK_fe_feet_sandals',
+    'feet_ma_sandals':   PARTS+'Feet/SK_ma_feet_sandals',
     # Accessories
     'accs_earring': PARTS+'Accessories/SK_fe_earring_01',
     # Hair — male (all confirmed to exist in this project)
@@ -145,3 +158,23 @@ def run_export():
     unreal.log(f'[Export] Output: {OUT}')
     if failed:
         unreal.log_warning(f'[Export] Failed: {failed}')
+
+    # ── Export idle animations (drives hero/crossed poses in the browser) ──────
+    ANIM_BASE = '/Game/CharacterEditor/Base/Animations/Basebody_UE4/'
+    ANIMS = {
+        'anim_idle_ma': ANIM_BASE + 'A_ma_ThirdPersonIdle1',
+        'anim_idle_fe': ANIM_BASE + 'A_fe_ThirdPersonIdle',
+    }
+    anim_opts = _make_options(1)
+    anim_opts.export_animation_sequences = True
+    for name, path in ANIMS.items():
+        anim_asset = unreal.load_asset(path)
+        if not anim_asset:
+            unreal.log_warning(f'[Export] Anim not found: {path}')
+            continue
+        out_path = os.path.join(OUT, name + '.glb').replace('\\', '/')
+        try:
+            exporter.export_to_gltf(anim_asset, out_path, anim_opts, [])
+            unreal.log(f'[Export] ✓  {name}.glb (animation)')
+        except Exception as ex:
+            unreal.log_error(f'[Export] ✗  {name}: {ex}')

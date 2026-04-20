@@ -5,11 +5,16 @@
  * Loads 6 mesh pieces in parallel from /public/avatars/models/:
  *   body_{ma|fe}.glb, head_{ma|fe}.glb,
  *   upper/lower/feet_{outfit}.glb, hair_{hairStyle}.glb
+ *
+ * Poses (set via `pose` prop):
+ *   'hero'    — idle animation (arms relaxed at sides)
+ *   'crossed' — hero base + arms-crossed overlay
  */
 
-import React, { Suspense, useMemo, useRef } from 'react';
+import React, { Suspense, useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, ContactShadows, Html, OrbitControls } from '@react-three/drei';
+import { useGLTF, ContactShadows, Html, OrbitControls, useAnimations } from '@react-three/drei';
+import * as THREE from 'three';
 
 const e = React.createElement;
 
@@ -31,6 +36,12 @@ const HAIR_HEX = {
   silver_wht:'#E8E8F8',  poison_grn:'#50C840', arcane_prpl:'#7B2D8B',
   frost_blue:'#60A8D8',  ember_org:'#D84820',
 };
+const EYE_HEX = {
+  dark_brown:'#3B1A08', brown:'#6B3010',   hazel:'#8B6040',
+  green:'#3A6B28',      blue:'#2050A0',    grey:'#708090',
+  amber:'#C07020',      gold:'#C8A020',    violet:'#6030A0',
+  red:'#A01818',        silver:'#C0C8D0',  teal:'#1A7070',
+};
 
 // Fallback for any hair key that was removed from UE but still in saved profile
 const HAIR_FALLBACK = {
@@ -39,24 +50,49 @@ const HAIR_FALLBACK = {
   fe_braids:'fe_medium', fe_ponytail:'fe_medium', fe_bun:'fe_bob', fe_mohawk:'fe_short',
 };
 
-// ─── Material helpers ─────────────────────────────────────────────────────────
-const looksLikeSkin = id => /skin|body|torso|head|face|neck|hand|arm|chest|back|flesh/i.test(id);
-const looksLikeHair = id => /hair|beard|brow/i.test(id);
-const looksLikeEye  = id => /eye|iris|pupil|cornea|sclera/i.test(id);
+// ─── Arms-crossed overlay bone rotations ─────────────────────────────────────
+// Applied on top of the idle/hero pose (premultiplied).
+// Values are in Three.js/GLTF right-handed Y-up space.
+// Tune these if the crossed-arms look needs adjustment.
+const CROSS_OVERLAY = {
+  clavicle_l: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.12,  0.28, 0.0)),
+  clavicle_r: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.12, -0.28, 0.0)),
+  upperarm_l: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.85, -0.55, 0.20)),
+  upperarm_r: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.85,  0.55,-0.20)),
+  lowerarm_l: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.0,   1.30, 0.0)),
+  lowerarm_r: new THREE.Quaternion().setFromEuler(new THREE.Euler( 0.0,  -1.30, 0.0)),
+};
 
-function applyColours(scene, skinHex, hairHex) {
+// ─── Material helpers ─────────────────────────────────────────────────────────
+const looksLikeSkin   = id => /skin|body|torso|head|face|neck|hand|arm|chest|back|flesh/i.test(id);
+const looksLikeHair   = id => /hair|beard|brow/i.test(id);
+const looksLikeIris   = id => /iris|pupil/i.test(id);
+const looksLikeSclera = id => /sclera/i.test(id);
+const looksLikeEye    = id => /eye|iris|pupil|cornea|sclera/i.test(id);
+
+function applyColours(scene, skinHex, hairHex, eyeHex) {
   const clone = scene.clone(true);
   clone.traverse(node => {
     if (!node.isMesh) return;
     const id = (node.name + '|' + (Array.isArray(node.material)
       ? node.material.map(m => m.name).join('|')
       : node.material?.name ?? '')).toLowerCase();
-    if (looksLikeEye(id)) return;
+
+    // Keep sclera (whites) untouched
+    if (looksLikeSclera(id)) return;
+    // Skip refractive/cornea overlay layer — don't tint it
+    if (/cornea|refract/i.test(id)) return;
+
     const tint = mat => {
       if (!mat) return mat;
       const m = mat.clone();
       if (skinHex && looksLikeSkin(id)) m.color.set(skinHex);
       if (hairHex && looksLikeHair(id)) m.color.set(hairHex);
+      if (eyeHex  && looksLikeIris(id)) {
+        m.color.set(eyeHex);
+        // Slight emissive boost so the iris is visible even with dark lighting
+        if (m.emissive) m.emissive.set(eyeHex).multiplyScalar(0.15);
+      }
       return m;
     };
     node.material = Array.isArray(node.material)
@@ -87,11 +123,13 @@ class ModelErrorBoundary extends React.Component {
 }
 
 // ─── Single mesh piece ────────────────────────────────────────────────────────
-function MeshPiece({ url, skinHex, hairHex, tintHair }) {
+function MeshPiece({ url, skinHex, hairHex, eyeHex, tintHair }) {
   const { scene } = useGLTF(url);
   const mesh = useMemo(
-    () => tintHair ? applyHairColour(scene, hairHex) : applyColours(scene, skinHex, hairHex),
-    [scene, skinHex, hairHex, tintHair]
+    () => tintHair
+      ? applyHairColour(scene, hairHex)
+      : applyColours(scene, skinHex, hairHex, eyeHex),
+    [scene, skinHex, hairHex, eyeHex, tintHair]
   );
   return e('primitive', { object: mesh });
 }
@@ -104,8 +142,66 @@ function SafePiece(props) {
   );
 }
 
+// ─── Animation-driven pose syncer ─────────────────────────────────────────────
+// Loads anim_idle_{ma|fe}.glb (skeleton + idle clip exported from UE),
+// then each frame copies the driven bone quaternions to every SkinnedMesh in
+// `groupRef` — including all separate clothing/hair GLBs.
+function PoseSyncer({ gender, groupRef, pose }) {
+  const gd = gender === 'male' ? 'ma' : 'fe';
+  const { scene: animScene, animations } = useGLTF(`/avatars/models/anim_idle_${gd}.glb`);
+  const { actions, mixer } = useAnimations(animations, animScene);
+
+  useEffect(() => {
+    const a = actions && Object.values(actions)[0];
+    if (!a) return;
+    // Play once, pause at ~0.4 s — a natural standing frame from the idle cycle
+    a.reset().play();
+    a.paused  = true;
+    mixer.setTime(0.4);
+  }, [actions, mixer]);
+
+  // Priority 1 runs after drei's own mixer.update (priority 0)
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    // Gather current quaternions from every named node in the anim scene
+    const src = {};
+    animScene.traverse(n => { if (n.name) src[n.name] = n.quaternion; });
+    if (!Object.keys(src).length) return;
+
+    // Apply to ALL SkinnedMeshes in the character group
+    groupRef.current.traverse(n => {
+      if (!n.isSkinnedMesh) return;
+      n.skeleton.bones.forEach(b => {
+        if (src[b.name]) b.quaternion.copy(src[b.name]);
+      });
+    });
+
+    // Arms-crossed overlay applied on top of the idle
+    if (pose === 'crossed') {
+      groupRef.current.traverse(n => {
+        if (!n.isSkinnedMesh) return;
+        n.skeleton.bones.forEach(b => {
+          const ov = CROSS_OVERLAY[b.name];
+          if (ov) b.quaternion.premultiply(ov);
+        });
+      });
+    }
+  }, 1);
+
+  return null;
+}
+
+function SafePoseSyncer({ gender, groupRef, pose }) {
+  return e(ModelErrorBoundary, { fallback: null },
+    e(Suspense, { fallback: null },
+      e(PoseSyncer, { gender, groupRef, pose })
+    )
+  );
+}
+
 // ─── Assembled character ──────────────────────────────────────────────────────
-function CharacterModel({ gender, outfit, hairStyle, skinHex, hairHex }) {
+function CharacterModel({ gender, outfit, hairStyle, skinHex, hairHex, eyeHex, pose }) {
   const gd   = gender === 'male' ? 'ma' : 'fe';
   const base = '/avatars/models';
   const hair = HAIR_FALLBACK[hairStyle] || hairStyle;
@@ -118,8 +214,11 @@ function CharacterModel({ gender, outfit, hairStyle, skinHex, hairHex }) {
 
   // UE exports in cm; GLTF expects m — scale 0.01 converts correctly
   return e('group', { ref: groupRef, scale: 0.01 },
-    e(SafePiece, { key:'body',  url:`${base}/body_${gd}.glb`,      skinHex, hairHex }),
-    e(SafePiece, { key:'head',  url:`${base}/head_${gd}.glb`,      skinHex, hairHex }),
+    // Pose syncer drives bones from the idle animation when pose !== 'tpose'
+    pose !== 'tpose' && e(SafePoseSyncer, { gender, groupRef, pose }),
+
+    e(SafePiece, { key:'body',  url:`${base}/body_${gd}.glb`,      skinHex, hairHex, eyeHex }),
+    e(SafePiece, { key:'head',  url:`${base}/head_${gd}.glb`,      skinHex, hairHex, eyeHex }),
     e(SafePiece, { key:'upper', url:`${base}/upper_${outfit}.glb` }),
     e(SafePiece, { key:'lower', url:`${base}/lower_${outfit}.glb` }),
     e(SafePiece, { key:'feet',  url:`${base}/feet_${outfit}.glb`  }),
@@ -179,10 +278,13 @@ export default function AvatarPreview3D({
   hairStyle = 'ma_short',
   skinTone  = 'mid_3',
   hairColor = 'black',
+  eyeColor  = 'dark_brown',
+  pose      = 'hero',
   clsColor  = '#8B6A3E',
 }) {
   const skinHex = SKIN_HEX[skinTone] || '#C0703E';
   const hairHex = HAIR_HEX[hairColor] || '#1A1008';
+  const eyeHex  = EYE_HEX[eyeColor]  || '#3B1A08';
 
   const effectiveOutfit = outfit.startsWith(gender === 'male' ? 'ma' : 'fe')
     ? outfit
@@ -205,7 +307,10 @@ export default function AvatarPreview3D({
 
       e(ModelErrorBoundary, { fallback: e(PendingOverlay, null) },
         e(Suspense, { fallback: e(LoadingOverlay, null) },
-          e(CharacterModel, { gender, outfit: effectiveOutfit, hairStyle, skinHex, hairHex }),
+          e(CharacterModel, {
+            gender, outfit: effectiveOutfit, hairStyle,
+            skinHex, hairHex, eyeHex, pose,
+          }),
           e(ContactShadows, { position: [0, 0, 0], opacity: 0.4, scale: 4, blur: 2.5, far: 3 }),
         )
       ),
@@ -221,4 +326,4 @@ export default function AvatarPreview3D({
   );
 }
 
-export { AvatarPreview3D };
+export { AvatarPreview3D, EYE_HEX };

@@ -53,7 +53,7 @@ function getWorkoutMgColor(wo, exById, mgColors){
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
-import AvatarPreview3D from './components/AvatarPreview3D';
+import AvatarPreview3D, { EYE_HEX } from './components/AvatarPreview3D';
 import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
 import PlanWizard from './components/PlanWizard';
 import WorkoutNotificationMockup from './components/WorkoutNotificationMockup';
@@ -7204,8 +7204,8 @@ function App() {
                         {key:"fe_a_line_bob",label:"A-Line Bob"},{key:"fe_long",label:"Beach Waves"},{key:"fe_medium",label:"Bob Cut"},{key:"fe_short",label:"Punk Short"},{key:"fe_bob",label:"Classic Bob"},
                       ];
                   const outfitOpts = isMale
-                    ? [{key:"ma_casual",label:"Casual"},{key:"ma_sport",label:"Sport"},{key:"ma_hoodie",label:"Hoodie"},{key:"ma_business",label:"Business"}]
-                    : [{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sport"},{key:"fe_business",label:"Business"}];
+                    ? [{key:"ma_wanderer",label:"Wanderer"},{key:"ma_casual",label:"Casual"},{key:"ma_sport",label:"Sport"},{key:"ma_hoodie",label:"Hoodie"},{key:"ma_business",label:"Business"}]
+                    : [{key:"fe_wanderer",label:"Wanderer"},{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sport"},{key:"fe_business",label:"Business"}];
                   return React.createElement('div', null
                     , React.createElement(AvatarPreview3D, {
                         gender:    profile.avatarGender    || 'male',
@@ -7213,6 +7213,8 @@ function App() {
                         hairStyle: profile.avatarHairStyle || 'ma_short',
                         skinTone:  profile.avatarSkinTone  || 'mid_3',
                         hairColor: profile.avatarHairColor || 'black',
+                        eyeColor:  profile.avatarEyeColor  || 'dark_brown',
+                        pose:      profile.avatarPose      || 'hero',
                         clsColor:  cls.color,
                       })
                     , React.createElement('div',{className:"char-section",style:{marginTop:12}}
@@ -7266,6 +7268,20 @@ function App() {
                             frost_blue:'#60A8D8',ember_org:'#D84820',
                           })
                             .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarHairColor',key),title:key.replace(/_/g,' '),style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarHairColor===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarHairColor===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                      )
+                    )
+                    , React.createElement('div',{className:"char-section"}
+                      , rune("Eye Color")
+                      , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
+                        , Object.entries(EYE_HEX)
+                            .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarEyeColor',key),title:key.replace(/_/g,' '),style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+((profile.avatarEyeColor||'dark_brown')===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:(profile.avatarEyeColor||'dark_brown')===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                      )
+                    )
+                    , React.createElement('div',{className:"char-section"}
+                      , rune("Pose")
+                      , React.createElement('div',{style:{display:"flex",gap:6}}
+                        , [{key:"hero",label:"Hero Stance"},{key:"crossed",label:"Arms Crossed"},{key:"tpose",label:"T-Pose"}]
+                            .map(p=>React.createElement('button',{key:p.key,onClick:()=>setAv('avatarPose',p.key),className:"char-sub-btn"+((profile.avatarPose||'hero')===p.key?" sel":""),style:{flex:1,textAlign:"center"}},p.label))
                       )
                     )
                   );
