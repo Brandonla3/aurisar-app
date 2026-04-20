@@ -9986,6 +9986,21 @@ function App() {
                 , React.createElement('div', { className: "feedback-title" }, "🛟 Support")
                 , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setFeedbackOpen(false)}, "✕")
               )
+              , !feedbackSent && React.createElement('div', { style: {display:"flex",gap:6,marginBottom:14}}
+                , ["bug","idea","help"].map(t=>
+                  React.createElement('button', {
+                    key: t,
+                    onClick: ()=>setFeedbackType(t),
+                    style: {
+                      flex:1, padding:"6px 0", borderRadius:8, fontSize:".72rem", fontWeight:600,
+                      border: feedbackType===t ? "1.5px solid #c9a84c" : "1.5px solid #3a342c",
+                      background: feedbackType===t ? "#2a2318" : "transparent",
+                      color: feedbackType===t ? "#c9a84c" : "#8a8478",
+                      cursor:"pointer", textTransform:"capitalize",
+                    }
+                  }, t==="bug"?"🐛 Bug":t==="idea"?"💡 Idea":"🛟 Help")
+                )
+              )
               , feedbackSent ? (
                 helpConfirmShown ? (
                   React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
