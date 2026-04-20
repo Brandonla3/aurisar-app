@@ -10066,6 +10066,16 @@ function App() {
                       } catch(e) {
                         console.log("Supabase feedback insert failed:", e);
                       }
+                      // Send email to support@aurisargames.com for all types
+                      try {
+                        await fetch("/api/send-support-email", {
+                          method: "POST",
+                          headers: {"Content-Type":"application/json"},
+                          body: JSON.stringify({ type, message: msg, email, accountId: acctId }),
+                        });
+                      } catch(e) {
+                        console.log("Support email failed:", e);
+                      }
                       // For Idea/Bug, also create a GitHub issue
                       if (type === "idea" || type === "bug") {
                         try {
