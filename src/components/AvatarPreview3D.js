@@ -6,8 +6,8 @@ function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePr
 
   React.useEffect(()=>{
     const el = mountRef.current;
-    if(!el || !window.THREE) return;
-    const T = window.THREE;
+    if(!el) return;
+    const T = THREE;
     const W = el.clientWidth || 320;
     const H = 420;
 
@@ -422,7 +422,7 @@ function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePr
       renderer.dispose();
       if(el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
     };
-  }, []);
+  }, [race, bodyType, skinTone, hairColor, hairStyle, facePreset, clsColor, clsKey]);
 
   return React.createElement('div', {
     ref: mountRef,
