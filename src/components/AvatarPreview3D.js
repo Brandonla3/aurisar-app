@@ -116,7 +116,8 @@ function CharacterModel({ gender, outfit, hairStyle, skinHex, hairHex }) {
       groupRef.current.rotation.y = Math.sin(clock.elapsedTime * 0.4) * 0.18;
   });
 
-  return e('group', { ref: groupRef },
+  // UE exports in cm; GLTF expects m — scale 0.01 converts correctly
+  return e('group', { ref: groupRef, scale: 0.01 },
     e(SafePiece, { key:'body',  url:`${base}/body_${gd}.glb`,      skinHex, hairHex }),
     e(SafePiece, { key:'head',  url:`${base}/head_${gd}.glb`,      skinHex, hairHex }),
     e(SafePiece, { key:'upper', url:`${base}/upper_${outfit}.glb` }),
@@ -195,7 +196,7 @@ export default function AvatarPreview3D({
       border:`1px solid ${clsColor}28`,
     }},
     e(Canvas, {
-      camera:  { position: [0, 0.9, 2.8], fov: 38 },
+      camera:  { position: [0, 1.0, 3.2], fov: 38 },
       gl:      { antialias: true, alpha: false },
       shadows: true,
     },
@@ -205,7 +206,7 @@ export default function AvatarPreview3D({
       e(ModelErrorBoundary, { fallback: e(PendingOverlay, null) },
         e(Suspense, { fallback: e(LoadingOverlay, null) },
           e(CharacterModel, { gender, outfit: effectiveOutfit, hairStyle, skinHex, hairHex }),
-          e(ContactShadows, { position: [0, -0.01, 0], opacity: 0.4, scale: 4, blur: 2.5, far: 3 }),
+          e(ContactShadows, { position: [0, 0, 0], opacity: 0.4, scale: 4, blur: 2.5, far: 3 }),
         )
       ),
 
@@ -214,7 +215,7 @@ export default function AvatarPreview3D({
         enableZoom:      false,
         minPolarAngle:   Math.PI / 5,
         maxPolarAngle:   Math.PI * 0.65,
-        target:          [0, 0.8, 0],
+        target:          [0, 0.9, 0],
       }),
     )
   );
