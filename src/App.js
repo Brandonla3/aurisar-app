@@ -7197,12 +7197,11 @@ function App() {
                   const hairOpts = isMale
                     ? [
                         {key:"ma_short",label:"Spiky Short"},{key:"ma_modern_side",label:"Side Sweep"},{key:"ma_surfer",label:"Surfer"},{key:"ma_long",label:"Long"},{key:"ma_textured",label:"Textured"},
-                        {key:"ma_mohawk",label:"Mohawk"},{key:"ma_braids",label:"Braids"},{key:"ma_ponytail",label:"Ponytail"},{key:"ma_shaved",label:"Shaved"},{key:"ma_warrior",label:"Warrior Knot"},
-                        {key:"ma_beard_1",label:"Beard I"},{key:"ma_beard_2",label:"Beard II"},
+                        {key:"ma_old",label:"Classic"},{key:"ma_tough",label:"Crew Cut"},{key:"ma_twotails",label:"Two Tails"},
+                        {key:"ma_beard_1",label:"Beard I"},{key:"ma_beard_2",label:"Beard II"},{key:"ma_beard_3",label:"Beard III"},{key:"ma_avgbeard",label:"Full Beard"},
                       ]
                     : [
                         {key:"fe_a_line_bob",label:"A-Line Bob"},{key:"fe_long",label:"Beach Waves"},{key:"fe_medium",label:"Bob Cut"},{key:"fe_short",label:"Punk Short"},{key:"fe_bob",label:"Classic Bob"},
-                        {key:"fe_braids",label:"Braids"},{key:"fe_ponytail",label:"Ponytail"},{key:"fe_bun",label:"Bun"},{key:"fe_mohawk",label:"Mohawk"},
                       ];
                   const outfitOpts = isMale
                     ? [{key:"ma_casual",label:"Casual"},{key:"ma_sport",label:"Sport"},{key:"ma_hoodie",label:"Hoodie"},{key:"ma_business",label:"Business"}]
