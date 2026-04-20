@@ -26,8 +26,8 @@ const Silhouette = (clsColor) =>
   );
 
 export default function AvatarPortrait({ gender = 'male', outfit = 'ma_casual', clsColor = '#8B6A3E' }) {
-  const primary = `/avatars/${gender}_${outfit}.jpg`;
-  const fallback = `/avatars/${gender}_default.jpg`;
+  const primary = `/avatars/${gender}_${outfit}.png`;
+  const fallback = `/avatars/${gender}_default.png`;
 
   const [src, setSrc] = useState(primary);
   const [failed, setFailed] = useState(false);
