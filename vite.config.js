@@ -35,6 +35,11 @@ export default defineConfig({
       },
     },
   ],
+  resolve: {
+    // Ensure only one copy of React and Three.js exists — prevents
+    // "Invalid hook call" when @react-three/fiber ships its own React copy.
+    dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei'],
+  },
   build: {
     outDir: 'build',
   },
