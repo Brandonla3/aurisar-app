@@ -7233,11 +7233,18 @@ function App() {
                 , charSubTab==="avatar" && (()=>{
                   const isMale = (profile.avatarGender||'male')==='male';
                   const hairOpts = isMale
-                    ? [{key:"ma_short",label:"Short"},{key:"ma_modern_side",label:"Modern Side"},{key:"ma_surfer",label:"Surfer"},{key:"ma_long",label:"Long"},{key:"ma_textured",label:"Textured"},{key:"ma_beard_1",label:"Beard"},{key:"ma_beard_2",label:"Beard 2"}]
-                    : [{key:"fe_a_line_bob",label:"A-Line Bob"},{key:"fe_long",label:"Long"},{key:"fe_medium",label:"Medium"},{key:"fe_short",label:"Short"},{key:"fe_bob",label:"Bob"}];
+                    ? [
+                        {key:"ma_short",label:"Spiky Short"},{key:"ma_modern_side",label:"Side Sweep"},{key:"ma_surfer",label:"Surfer"},{key:"ma_long",label:"Long"},{key:"ma_textured",label:"Textured"},
+                        {key:"ma_mohawk",label:"Mohawk"},{key:"ma_braids",label:"Braids"},{key:"ma_ponytail",label:"Ponytail"},{key:"ma_shaved",label:"Shaved"},{key:"ma_warrior",label:"Warrior Knot"},
+                        {key:"ma_beard_1",label:"Beard I"},{key:"ma_beard_2",label:"Beard II"},
+                      ]
+                    : [
+                        {key:"fe_a_line_bob",label:"A-Line Bob"},{key:"fe_long",label:"Beach Waves"},{key:"fe_medium",label:"Bob Cut"},{key:"fe_short",label:"Punk Short"},{key:"fe_bob",label:"Classic Bob"},
+                        {key:"fe_braids",label:"Braids"},{key:"fe_ponytail",label:"Ponytail"},{key:"fe_bun",label:"Bun"},{key:"fe_mohawk",label:"Mohawk"},
+                      ];
                   const outfitOpts = isMale
                     ? [{key:"ma_casual",label:"Casual"},{key:"ma_sport",label:"Sport"},{key:"ma_hoodie",label:"Hoodie"},{key:"ma_business",label:"Business"}]
-                    : [{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sporty"},{key:"fe_business",label:"Business"}];
+                    : [{key:"fe_casual",label:"Casual"},{key:"fe_sporty",label:"Sport"},{key:"fe_business",label:"Business"}];
                   return React.createElement('div', null
                     , React.createElement(AvatarPortrait, {
                         gender:       profile.avatarGender || 'male',
@@ -7258,7 +7265,7 @@ function App() {
                       , React.createElement('div',{style:{display:"flex",gap:6}}
                         , [{key:"male",label:"♂ Male"},{key:"female",label:"♀ Female"}].map(g=>
                             React.createElement('button',{key:g.key,
-                              onClick:()=>setProfile(p=>({...p,avatarGender:g.key,avatarHairStyle:g.key==='male'?'ma_short':'fe_a_line_bob',avatarOutfit:g.key==='male'?'ma_casual':'fe_casual'})),
+                              onClick:()=>setProfile(p=>({...p,avatarGender:g.key,avatarHairStyle:g.key==='male'?'ma_short':'fe_a_line_bob'})),
                               className:"char-sub-btn"+((profile.avatarGender||'male')===g.key?" sel":""),
                               style:{flex:1,textAlign:"center"}
                             },g.label)
@@ -7280,14 +7287,29 @@ function App() {
                     , React.createElement('div',{className:"char-section"}
                       , rune("Skin Tone")
                       , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
-                        , Object.entries({fair_1:'#FDDBB4',fair_2:'#F5C89A',mid_1:'#E8A97C',mid_2:'#D4895C',mid_3:'#C0703E',tan_1:'#A85830',tan_2:'#8B4220',deep_1:'#6B2D10',deep_2:'#4A1C08',deep_3:'#2E0F04'})
-                            .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarSkinTone',key),title:key,style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarSkinTone===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarSkinTone===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
+                        , Object.entries({
+                            fair_1:'#FDDBB4',fair_2:'#F5C89A',mid_1:'#E8A97C',mid_2:'#D4895C',mid_3:'#C0703E',
+                            tan_1:'#A85830',tan_2:'#8B4220',deep_1:'#6B2D10',deep_2:'#4A1C08',deep_3:'#2E0F04',
+                            orc_1:'#5A7A3A',orc_2:'#3D5C28',orc_3:'#8B5E3C',
+                            elf_1:'#C8D8C0',elf_2:'#9ABAA0',
+                            stone_1:'#8C8C9A',stone_2:'#6B7B8C',iron_1:'#7A6A50',
+                            void_1:'#2A1A3A',gold_1:'#C8AA60',
+                          })
+                            .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarSkinTone',key),title:key.replace(/_/g,' '),style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarSkinTone===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarSkinTone===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
                       )
                     )
                     , React.createElement('div',{className:"char-section"}
                       , rune("Hair Color")
                       , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
-                        , Object.entries({black:'#1A1008',dk_brown:'#3B2010',brown:'#6B3820',auburn:'#A05828',lt_brown:'#C88040',blonde:'#D4AA60',lt_blonde:'#E8C880',red:'#E85030',grey:'#B0A898',white:'#F0EEE8'})
+                        , Object.entries({
+                            black:'#1A1008',dk_brown:'#3B2010',brown:'#6B3820',auburn:'#A05828',
+                            lt_brown:'#C88040',blonde:'#D4AA60',lt_blonde:'#E8C880',red:'#E85030',
+                            grey:'#B0A898',white:'#F0EEE8',
+                            deep_violet:'#4A3888',forest_grn:'#2A7858',ocean_blue:'#185898',
+                            blood_red:'#983848',molten_gld:'#C8A020',void_black:'#101018',
+                            silver_wht:'#E8E8F8',poison_grn:'#50C840',arcane_prpl:'#7B2D8B',
+                            frost_blue:'#60A8D8',ember_org:'#D84820',
+                          })
                             .map(([key,hex])=>React.createElement('button',{key,onClick:()=>setAv('avatarHairColor',key),title:key.replace(/_/g,' '),style:{width:28,height:28,borderRadius:"50%",background:hex,border:"2px solid "+(profile.avatarHairColor===key?"#d4cec4":"rgba(45,42,36,.3)"),cursor:"pointer",padding:0,outline:"none",boxShadow:profile.avatarHairColor===key?"0 0 0 2px rgba(180,172,158,.25)":"none",transition:"border .15s,box-shadow .15s"}}))
                       )
                     )

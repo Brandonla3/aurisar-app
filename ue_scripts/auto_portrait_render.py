@@ -31,18 +31,29 @@ BASE   = '/Game/CharacterEditor/Base/Meshes/Basebody_UE4/'
 PARTS  = '/Game/CharacterEditor/CharacterParts/Meshes/'
 
 HAIR_MAP = {
-    # Female
+    # ── Female ────────────────────────────────────────────────────────────────
     'fe_a_line_bob': PARTS + 'Hairstyles/SK_fe_hair_a_line_bob',
     'fe_long':       PARTS + 'Hairstyles/SK_fe_hair_beach',
     'fe_medium':     PARTS + 'Hairstyles/SK_fe_hair_bob',
     'fe_short':      PARTS + 'Hairstyles/SK_fe_hair_punky',
     'fe_bob':        PARTS + 'Hairstyles/SK_fe_hair_the_bob',
-    # Male
+    # Female RPG / additional
+    'fe_braids':     PARTS + 'Hairstyles/SK_fe_hair_braids',
+    'fe_ponytail':   PARTS + 'Hairstyles/SK_fe_hair_ponytail',
+    'fe_bun':        PARTS + 'Hairstyles/SK_fe_hair_bun',
+    'fe_mohawk':     PARTS + 'Hairstyles/SK_fe_hair_mohawk',
+    # ── Male ──────────────────────────────────────────────────────────────────
     'ma_short':       PARTS + 'Hairstyles/SK_ma_hair_spiky_short',
     'ma_modern_side': PARTS + 'Hairstyles/SK_ma_hair_modern_side',
     'ma_surfer':      PARTS + 'Hairstyles/SK_ma_hair_surfer',
     'ma_long':        PARTS + 'Hairstyles/SK_ma_hair_long',
     'ma_textured':    PARTS + 'Hairstyles/SK_ma_hair_used_look',
+    # Male RPG / additional
+    'ma_mohawk':      PARTS + 'Hairstyles/SK_ma_hair_mohawk',
+    'ma_braids':      PARTS + 'Hairstyles/SK_ma_hair_braids',
+    'ma_ponytail':    PARTS + 'Hairstyles/SK_ma_hair_ponytail',
+    'ma_shaved':      PARTS + 'Hairstyles/SK_ma_hair_shaved',
+    'ma_warrior':     PARTS + 'Hairstyles/SK_ma_hair_warrior_knot',
     'ma_beard_1':     PARTS + 'Hairstyles/SK_ma_beard_01',
     'ma_beard_2':     PARTS + 'Hairstyles/SK_ma_beard_02',
 }
@@ -133,8 +144,14 @@ def _swap(comp_name, asset_path):
         mesh = unreal.load_asset(asset_path)
         if mesh:
             comp.set_skeletal_mesh_asset(mesh)
+            comp.set_visibility(True)
+        # if mesh path is wrong/missing, keep component hidden rather than showing grey
+        else:
+            comp.set_skeletal_mesh_asset(None)
+            comp.set_visibility(False)
     else:
         comp.set_skeletal_mesh_asset(None)
+        comp.set_visibility(False)
 
 def _render(profile):
     world   = unreal.EditorLevelLibrary.get_editor_world()
