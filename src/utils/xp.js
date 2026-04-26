@@ -3,7 +3,7 @@ import { CLASSES, EXERCISES } from '../data/exercises.js';
 import { EX_BY_ID, RUNNING_EX_ID, MUSCLE_COLORS, TYPE_COLORS } from '../data/constants.js';
 
 function getMuscleColor(mg) {
-  return MUSCLE_COLORS[(mg||"").toLowerCase().trim()] || "#B0A090";
+  return MUSCLE_COLORS[(mg||"").toLowerCase().trim()] || "#B0A898";
 }
 
 function getTypeColor(cat) {

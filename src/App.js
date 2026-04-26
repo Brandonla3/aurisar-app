@@ -2869,7 +2869,7 @@ function App() {
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
   function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); let _ciResult={checkInApplied:false,checkInXP:0,checkInStreak:0}; setProfile(p=>{const base={...p,xp:p.xp+totalXP,log:newLog,quests:newQuests};const ci=applyAutoCheckIn(base,todayStr());_ciResult=ci;return ci.profile;}); const ciSuffix=_ciResult.checkInApplied?` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥`:""; setXpFlash({amount:totalXP+_ciResult.checkInXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! ${formatXP(totalXP,{signed:true})} claimed!`+ciSuffix); }
 
-  const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
+  const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||UI_COLORS.accent};
 
   // Pending quest claims
   const pendingQuestCount = QUESTS.filter(q=>{
@@ -4197,7 +4197,7 @@ function App() {
                         React.createElement('button', {
                           onClick:()=>setLibOpenDrop(libOpenDrop==="muscle"?null:"muscle"),
                           style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:9,
-                                 border:"1px solid "+(libMuscleFilters.size>0?"#3498db":"rgba(45,42,36,.3)"),
+                                 border:"1px solid "+(libMuscleFilters.size>0?UI_COLORS.accent:"rgba(45,42,36,.3)"),
                                  background:"rgba(14,14,12,.95)",
                                  color:libMuscleFilters.size>0?"#7A8F8B":"#8a8478",
                                  fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
@@ -4228,7 +4228,7 @@ function App() {
                                 border:"1.5px solid "+(sel?"#7A8F8B":"rgba(122,143,139,.3)"),
                                 background:sel?"rgba(122,143,139,.25)":"transparent",
                                 display:"flex",alignItems:"center",justifyContent:"center"
-                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:"#3498db",lineHeight:1}},"✓")),
+                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:UI_COLORS.accent,lineHeight:1}},"✓")),
                               React.createElement('span',{style:{fontSize:".72rem",
                                 color:sel?"#7A8F8B":"#b4ac9e",whiteSpace:"nowrap"}},
                                 m.charAt(0).toUpperCase()+m.slice(1).replace("_"," "))
@@ -4242,20 +4242,20 @@ function App() {
                         React.createElement('button', {
                           onClick:()=>setLibOpenDrop(libOpenDrop==="equip"?null:"equip"),
                           style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:9,
-                                 border:"1px solid "+(libEquipFilters.size>0?"#9b59b6":"rgba(45,42,36,.3)"),
+                                 border:"1px solid "+(libEquipFilters.size>0?UI_COLORS.accent:"rgba(45,42,36,.3)"),
                                  background:"rgba(14,14,12,.95)",
-                                 color:libEquipFilters.size>0?"#9b59b6":"#8a8478",
+                                 color:libEquipFilters.size>0?UI_COLORS.accent:"#8a8478",
                                  fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
                         },
                           libEquipFilters.size>0?"Equip ("+libEquipFilters.size+")":"Equipment",
                           React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
                             transform:"translateY(-50%) rotate("+(libOpenDrop==="equip"?"180deg":"0deg")+")",
-                            color:libEquipFilters.size>0?"#9b59b6":"#6a6050",fontSize:".6rem",
+                            color:libEquipFilters.size>0?UI_COLORS.accent:"#6a6050",fontSize:".6rem",
                             transition:"transform .15s",lineHeight:1}},"▼")
                         ),
                         libOpenDrop==="equip" && React.createElement('div', {
                           style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",
-                                 background:"rgba(16,14,10,.95)",border:"1px solid rgba(155,89,182,.25)",
+                                 background:"rgba(16,14,10,.95)",border:"1px solid rgba(196,148,40,0.25)",
                                  borderRadius:9,padding:"6px 4px",zIndex:21,
                                  boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
                         },
@@ -4266,16 +4266,16 @@ function App() {
                               onClick:()=>toggleSet(setLibEquipFilters,eq),
                               style:{display:"flex",alignItems:"center",gap:8,
                                      padding:"6px 10px",borderRadius:6,cursor:"pointer",
-                                     background:sel?"rgba(155,89,182,.12)":"transparent"}
+                                     background:sel?"rgba(196,148,40,0.12)":"transparent"}
                             },
                               React.createElement('div', {style:{
                                 width:14,height:14,borderRadius:3,flexShrink:0,
-                                border:"1.5px solid "+(sel?"#9b59b6":"rgba(155,89,182,.3)"),
-                                background:sel?"rgba(155,89,182,.25)":"transparent",
+                                border:"1.5px solid "+(sel?UI_COLORS.accent:"rgba(196,148,40,0.3)"),
+                                background:sel?"rgba(196,148,40,0.25)":"transparent",
                                 display:"flex",alignItems:"center",justifyContent:"center"
-                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:"#9b59b6",lineHeight:1}},"✓")),
+                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:UI_COLORS.accent,lineHeight:1}},"✓")),
                               React.createElement('span',{style:{fontSize:".72rem",
-                                color:sel?"#9b59b6":"#b4ac9e",whiteSpace:"nowrap"}},
+                                color:sel?UI_COLORS.accent:"#b4ac9e",whiteSpace:"nowrap"}},
                                 eq.charAt(0).toUpperCase()+eq.slice(1))
                             );
                           })
@@ -4294,7 +4294,7 @@ function App() {
                                fontSize:".62rem",padding:"3px 8px",borderRadius:12,cursor:"pointer",display:"flex",alignItems:"center",gap:4}},
                         v.charAt(0).toUpperCase()+v.slice(1).replace("_"," ")," ✕")),
                       [...libEquipFilters].map(v=>React.createElement('span',{key:"e"+v,onClick:()=>toggleSet(setLibEquipFilters,v),
-                        style:{background:"rgba(155,89,182,.15)",border:"1px solid #9b59b644",color:"#9b59b6",
+                        style:{background:"rgba(196,148,40,0.15)",border:"1px solid rgba(196,148,40,0.27)",color:UI_COLORS.accent,
                                fontSize:".62rem",padding:"3px 8px",borderRadius:12,cursor:"pointer",display:"flex",alignItems:"center",gap:4}},
                         v.charAt(0).toUpperCase()+v.slice(1)," ✕"))
                     ),
@@ -6624,7 +6624,7 @@ function App() {
                       )
                       , React.createElement('div', { className: "h-meta"}
                         , e.sets, "×", e.reps, isC||isF?" min":""
-                        , e.distanceMi?React.createElement('span', { style: {color:"#3498db",marginLeft:5}}, metric?miToKm(e.distanceMi)+" km":e.distanceMi+" mi"):""
+                        , e.distanceMi?React.createElement('span', { style: {color:UI_COLORS.accent,marginLeft:5}}, metric?miToKm(e.distanceMi)+" km":e.distanceMi+" mi"):""
                         , e.weightLbs?React.createElement('span', { style: {color:"#8a8478",marginLeft:5}}, metric?lbsToKg(e.weightLbs)+" kg":e.weightLbs+" lbs", e.weightPct&&e.weightPct!==100?React.createElement('span', { style: {color:"#e67e22"}}, " @" , e.weightPct, "%"):""):""
                         , e.hrZone?React.createElement('span', { style: {marginLeft:5,color:_optionalChain([HR_ZONES, 'access', _139 => _139[e.hrZone-1], 'optionalAccess', _140 => _140.color])}}, "Z", e.hrZone):""
                         , React.createElement('span', { style: {marginLeft:5,color:"#6a645a"}}, e.time, " · "  , e.date)
@@ -7261,9 +7261,9 @@ function App() {
               const STAT_META = {
                 STR:{label:"Strength",    icon:"💪", color:UI_COLORS.danger},
                 END:{label:"Endurance",   icon:"🔥", color:"#e67e22"},
-                DEX:{label:"Dexterity",   icon:"⚡", color:"#3498db"},
+                DEX:{label:"Dexterity",   icon:"⚡", color:UI_COLORS.accent},
                 CON:{label:"Constitution",icon:"🛡️", color:"#27ae60"},
-                INT:{label:"Intelligence",icon:"🔮", color:"#9b59b6"},
+                INT:{label:"Intelligence",icon:"🔮", color:UI_COLORS.accent},
                 CHA:{label:"Charisma",    icon:"✨", color:"#e91e8c"},
                 WIS:{label:"Wisdom",      icon:"🌿", color:"#1abc9c"},
                 VIT:{label:"Vitality",    icon:"❤️", color:UI_COLORS.danger},
@@ -8754,14 +8754,14 @@ function App() {
                     React.createElement('div', {style:{position:"relative",flex:1,zIndex:20}},
                       React.createElement('button', {
                         onClick:()=>setPickerOpenDrop(d=>d==="equip"?null:"equip"),
-                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerEquipFilter!=="all"?"#9b59b6":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?"#9b59b6":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
                       },
                         pickerEquipFilter==="all"?"Equipment":pickerEquipFilter.charAt(0).toUpperCase()+pickerEquipFilter.slice(1),
-                        React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerEquipFilter!=="all"?"#9b59b6":"#5a5650",transition:"transform .15s"}},"▼")
+                        React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#5a5650",transition:"transform .15s"}},"▼")
                       ),
                       pickerOpenDrop==="equip" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerEquipFilter("all");closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter==="all"?"#9b59b6":"#8a8478",background:pickerEquipFilter==="all"?"rgba(155,89,182,.12)":"transparent"}},"All Equipment"),
-                        PEQUIP_OPTS.map(e=>React.createElement('div',{key:e,onClick:()=>{setPickerEquipFilter(e);closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter===e?"#9b59b6":"#8a8478",background:pickerEquipFilter===e?"rgba(155,89,182,.12)":"transparent",textTransform:"capitalize"}},e))
+                        React.createElement('div',{onClick:()=>{setPickerEquipFilter("all");closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter==="all"?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter==="all"?"rgba(196,148,40,0.12)":"transparent"}},"All Equipment"),
+                        PEQUIP_OPTS.map(e=>React.createElement('div',{key:e,onClick:()=>{setPickerEquipFilter(e);closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter===e?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter===e?"rgba(196,148,40,0.12)":"transparent",textTransform:"capitalize"}},e))
                       )
                     )
                   )
@@ -9795,7 +9795,7 @@ function App() {
               , (d.sourcePlanName||d.sourceWorkoutName)&&(
                 React.createElement('div', { style: {fontSize:".65rem",color:"#8a8478",fontStyle:"italic",padding:"6px 10px",background:"rgba(45,42,36,.12)",borderRadius:7,border:"1px solid rgba(45,42,36,.2)"}}
                   , d.sourcePlanName&&React.createElement('span', null, "📋 From plan: "   , React.createElement('b', { style: {color:"#b4ac9e"}}, d.sourcePlanName))
-                  , d.sourceWorkoutName&&React.createElement('span', null, "💪 From workout: "   , React.createElement('b', { style: {color:"#3498db"}}, d.sourceWorkoutName))
+                  , d.sourceWorkoutName&&React.createElement('span', null, "💪 From workout: "   , React.createElement('b', { style: {color:UI_COLORS.accent}}, d.sourceWorkoutName))
                 )
               )
 

@@ -244,8 +244,8 @@ def main() -> None:
         ["P2", "Full Body and Cardio both #2C4564", "src/data/constants.js:1178", "Same purpose? Possibly intentional"],
         ["P2", "6 different gray tokens with no hierarchy", "Various", "#d4cec4 #b4ac9e #b0a898 #8a8478 #5a5650 #6a645a — needs scale"],
         ["FIXED", "Inline one-off colors (#FFE87C, #2ecc71, #e74c3c, #e05555, #2980b9, #f1c40f) tokenised", "src/data/constants.js UI_COLORS", "Migrated 75+ inline JSX style hex strings to UI_COLORS.{warning, success, danger, info, intermediate}; #e05555 consolidated into danger"],
-        ["P2", "Two fallback colors (#B0A090 and #B0A898)", "src/utils/xp.js:6,10", "Standardise to one"],
-        ["P2", "Masculine palette rollout incomplete", "Profile, Trends, Friends, Leaderboard, Landing, PlanWizard tabs", "Verify per-tab application"],
+        ["FIXED", "Two fallback colors consolidated to #B0A898", "src/utils/xp.js:6,10", "Both getMuscleColor and getTypeColor now fallback to silver palette token"],
+        ["FIXED", "Masculine palette rollout — CAT_ICON_COLORS + filter accents", "src/data/constants.js:15-17 + src/App.js + src/components/PlanWizard.js", "CAT_ICON_COLORS now mirrors TYPE_COLORS masculine values; bright filter accents (#9b59b6, #3498db) migrated to UI_COLORS.accent (brand gold #c49428). Categorical chart colors and HR-zone palette intentionally preserved."],
     ]
     write_sheet(wb, "Color_Issues", ["Severity", "Issue", "Location", "Notes / Resolution"], color_issues)
 
@@ -357,7 +357,7 @@ def main() -> None:
         ["P1", "TODO", "Populate 55 empty desc:'' exercises", "src/data/exercises.js"],
         ["P2", "TODO", "Spacing/typography token system", "Codebase-wide refactor"],
         ["P2", "TODO", "Dual-form catalog dedup", "src/data/exercises.js + migration"],
-        ["P2", "TODO", "Masculine palette rollout to remaining tabs", "Profile/Trends/Friends/Leaderboard/Landing/PlanWizard"],
+        ["P2", "FIXED", "Masculine palette rollout — CAT_ICON_COLORS + filter accents", "Profile/Library/PlanWizard now use UI_COLORS.accent for active states; xp.js fallback consolidated"],
         ["P2", "FIXED", "Reps schema standardisation + restSec field in PLAN_TEMPLATES", "src/data/constants.js — 244 values quoted, 194 restSec:null fields added"],
         ["P2", "FIXED", "Tokenise inline color one-offs", "src/data/constants.js UI_COLORS + 75+ migrated call-sites"],
         ["P2", "TODO", "Sweep remaining XP display sites to formatXP()", "src/App.js (~40+ remaining call sites)"],
