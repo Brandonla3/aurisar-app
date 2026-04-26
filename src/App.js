@@ -9,6 +9,7 @@ import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightL
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
 import { formatXP } from './utils/format';
+import { FS, R } from './utils/tokens';
 import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
@@ -238,22 +239,22 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
         )
         , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
         , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
-        , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${displayWt(ex.weightLbs, profile.units)}`:"")
+        , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:FS.sm,color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${displayWt(ex.weightLbs, profile.units)}`:"")
         , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const extraCount=(ex.extraRows||[]).length;const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null,null,null,extraCount);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,null,null,extraCount),0);return formatXP(b+r,{signed:true});})(), runBoostPct>0&&React.createElement('span', { style: {color:UI_COLORS.warning,marginLeft:2}}, "⚡"))
-        , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
+        , React.createElement('span', { style: {fontSize:FS.sm,color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
         , React.createElement('button', { type: "button", 'aria-label': `Remove ${exD.name}`, title: "Remove", className: "btn btn-danger btn-xs", onClick: e=>{e.stopPropagation();removeEx();}}, "✕")
       )
       , !collapsed&&exD.id!=="rest_day"&&React.createElement(React.Fragment, null
         , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
           , !noSetsEx&&React.createElement('div', { style: {flex:1}}
-            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
+            , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
             , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"5px 7px"}, type: "text", inputMode: "decimal",
               value: ex.sets===0||ex.sets===""?"":ex.sets||"", onChange: e=>updateField("sets",e.target.value)})
           )
           , (isC||isF) ? (
             React.createElement(React.Fragment, null
               , React.createElement('div', { style: {flex:1.6,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration (HH:MM)" )
+                , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Duration (HH:MM)" )
                 , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "numeric",
                   value: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):"") ,
                   onChange: e=>updateField("_durHHMM",e.target.value),
@@ -267,7 +268,7 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
                   placeholder: "00:00"})
               )
               , React.createElement('div', { style: {flex:0.9,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
+                , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
                 , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px",textAlign:"center"}, type: "number", min: "0", max: "59",
                   value: ex._durSecRaw!==undefined ? String(ex._durSecRaw).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
                   onChange: e=>{
@@ -281,7 +282,7 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
                   placeholder: "00"})
               )
               , React.createElement('div', { style: {flex:1.4,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , metric?"km":"mi", ")")
+                , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , metric?"km":"mi", ")")
                 , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal",
                   value: dispDist, placeholder: "0",
                   onChange: e=>{const v=e.target.value;const mi=v&&metric?kmToMi(v):v;updateField("distanceMi",mi||null);}})
@@ -290,13 +291,13 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
           ) : (
             React.createElement(React.Fragment, null
               , React.createElement('div', { style: {flex:1,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
+                , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
                 , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal",
                   value: ex.reps===0||ex.reps===""?"":ex.reps||"", onChange: e=>updateField("reps",e.target.value)})
               )
               , showW&&(
                 React.createElement('div', { style: {flex:1.2,minWidth:0}}
-                  , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, wUnit)
+                  , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, wUnit)
                   , React.createElement('input', { className: "wb-ex-inp", style: {width:"100%",padding:"4px 5px"}, type: "text", inputMode: "decimal", step: metric?"0.5":"2.5",
                     value: dispW, placeholder: "—",
                     onChange: e=>{const v=e.target.value;const lbs=v&&metric?kgToLbs(v):v;updateField("weightLbs",lbs||null);}})
@@ -312,13 +313,13 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
           React.createElement('div', { style: {marginBottom:6}}
             , React.createElement('div', { style: {display:"flex",gap:8}}
               , React.createElement('div', { style: {flex:1}}
-                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
+                , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:4,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
                 , React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—",
                   value: ex.incline||"",
                   onChange: e=>updateField("incline",e.target.value?parseFloat(e.target.value):null)})
               )
               , React.createElement('div', { style: {flex:1}}
-                , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
+                , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:4,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(0.5–15)"))
                 , React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—",
                   value: ex.speed||"",
                   onChange: e=>updateField("speed",e.target.value?parseFloat(e.target.value):null)})
@@ -327,31 +328,31 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
           )
         )
         , (ex.extraRows||[]).map((row,ri)=>(
-          React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
+          React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.md,alignItems:"center",flexWrap:"wrap"}}
             , React.createElement('span', { style: {fontSize:".58rem",color:"#9a8a78",flexShrink:0,minWidth:18}}, (isC||isF)?`I${ri+2}`:`S${ri+2}`)
             , (isC||isF) ? (React.createElement(React.Fragment, null
-              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1.5,minWidth:52,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1.5,minWidth:52,padding:"4px 5px",fontSize:FS.md}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
                 defaultValue: row.hhmm||"",
                 onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};updateField("extraRows",rr);}})
-              , React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", defaultValue: row.sec||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateField("extraRows",rr);}})
-              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: metric?"km":"mi", defaultValue: row.distanceMi||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateField("extraRows",rr);}})
-              , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateField("extraRows",rr);}})
-              , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:".7rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateField("extraRows",rr);}})
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:FS.md}, type: "number", min: "0", max: "59", placeholder: "Sec", defaultValue: row.sec||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateField("extraRows",rr);}})
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:FS.md}, type: "text", inputMode: "decimal", placeholder: metric?"km":"mi", defaultValue: row.distanceMi||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateField("extraRows",rr);}})
+              , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:FS.md}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateField("extraRows",rr);}})
+              , isTreadmill&&React.createElement('input', { className: "wb-ex-inp", style: {flex:0.8,minWidth:34,padding:"4px 5px",fontSize:FS.md}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateField("extraRows",rr);}})
             )) : (React.createElement(React.Fragment, null
-              , !noSetsEx&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateField("extraRows",rr);}})
-              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: "Reps", defaultValue: row.reps||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};updateField("extraRows",rr);}})
-              , showW&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:".7rem"}, type: "text", inputMode: "decimal", placeholder: wUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateField("extraRows",rr);}})
+              , !noSetsEx&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:FS.md}, type: "text", inputMode: "decimal", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateField("extraRows",rr);}})
+              , React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:40,padding:"4px 5px",fontSize:FS.md}, type: "text", inputMode: "decimal", placeholder: "Reps", defaultValue: row.reps||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};updateField("extraRows",rr);}})
+              , showW&&React.createElement('input', { className: "wb-ex-inp", style: {flex:1,minWidth:38,padding:"4px 5px",fontSize:FS.md}, type: "text", inputMode: "decimal", placeholder: wUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateField("extraRows",rr);}})
             ))
             , React.createElement('button', { className: "btn btn-danger btn-xs", style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateField("extraRows",rr);}}, "✕")
           )
         ))
-        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {width:"100%",marginTop:4,marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
+        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {width:"100%",marginTop:4,marginBottom:8,fontSize:FS.sm,color:"#8a8478",borderStyle:"dashed"},
           onClick: ()=>{const rr=[...(ex.extraRows||[]),(isC||isF)?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateField("extraRows",rr);}}, "＋ Add Row (e.g. "
               , (isC||isF)?"interval":"progressive weight", ")"
         )
         , showHR&&(
           React.createElement('div', null
-            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
+            , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
             , React.createElement('div', { className: "hr-zone-row"}
               , HR_ZONES.map(z=>{
                 const sel=ex.hrZone===z.z;
@@ -2391,14 +2392,14 @@ function App() {
     return React.createElement(React.Fragment, null
       , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:6}}
         , !_noSets&&React.createElement('div', {style:{flex:1}}
-          , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
+          , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
           , React.createElement('input', {className:"wb-ex-inp",style:{width:"100%",padding:"5px 7px"},type:"text",inputMode:"decimal",
             value:ex.sets===0||ex.sets===""?"":ex.sets||"", onChange:e=>updateWbEx(idx,"sets",e.target.value)})
         )
         , (_isC||_isF) ? (
           React.createElement(React.Fragment, null
             , React.createElement('div', {style:{flex:1.6,minWidth:0}}
-              , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Duration (HH:MM)")
+              , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Duration (HH:MM)")
               , React.createElement('input', {className:"wb-ex-inp",style:{width:"100%",padding:"4px 5px"},type:"text",inputMode:"numeric",
                 value:ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
                 onChange:e=>updateWbEx(idx,"_durHHMM",e.target.value),
@@ -2406,14 +2407,14 @@ function App() {
                 placeholder:"00:00"})
             )
             , React.createElement('div', {style:{flex:0.9,minWidth:0}}
-              , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
+              , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
               , React.createElement('input', {className:"wb-ex-inp",style:{width:"100%",padding:"4px 5px",textAlign:"center"},type:"number",min:"0",max:"59",
                 value:ex._durSecRaw!==undefined?String(ex._durSecRaw).padStart(2,"0"):(ex.durationSec?String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0"):""),
                 onChange:e=>{const v=e.target.value;updateWbEx(idx,"_durSecRaw",v);const h2=ex._durHHMM||(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:"");const s2=combineHHMMSec(h2,v);updateWbEx(idx,"durationSec",s2);if(s2)updateWbEx(idx,"reps",Math.max(1,Math.floor(s2/60)));},
                 placeholder:"00"})
             )
             , React.createElement('div', {style:{flex:1.4,minWidth:0}}
-              , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (",_dUnit,")")
+              , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (",_dUnit,")")
               , React.createElement('input', {className:"wb-ex-inp",style:{width:"100%",padding:"4px 5px"},type:"text",inputMode:"decimal",
                 value:_dispDist, onChange:e=>{const v=e.target.value;const mi=v&&_metric?kmToMi(v):v;updateWbEx(idx,"distanceMi",mi||null);},
                 placeholder:"0"})
@@ -2422,13 +2423,13 @@ function App() {
         ) : (
           React.createElement(React.Fragment, null
             , React.createElement('div', {style:{flex:1,minWidth:0}}
-              , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
+              , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
               , React.createElement('input', {className:"wb-ex-inp",style:{width:"100%",padding:"5px 7px"},type:"text",inputMode:"decimal",
                 value:ex.reps===0||ex.reps===""?"":ex.reps||"", onChange:e=>updateWbEx(idx,"reps",e.target.value)})
             )
             , _showW&&(
               React.createElement('div', {style:{flex:1.2,minWidth:0}}
-                , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Weight (",_wUnit,")")
+                , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Weight (",_wUnit,")")
                 , React.createElement('input', {className:"wb-ex-inp",style:{width:"100%",padding:"5px 7px"},type:"text",inputMode:"decimal",
                   value:_dispW, onChange:e=>{const v=e.target.value;const lbs=v&&_metric?kgToLbs(v):v;updateWbEx(idx,"weightLbs",lbs||null);},
                   placeholder:"—"})
@@ -2444,13 +2445,13 @@ function App() {
         React.createElement('div', {style:{marginBottom:6}}
           , React.createElement('div', {style:{display:"flex",gap:8}}
             , React.createElement('div', {style:{flex:1}}
-              , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Incline (0.5–15)")
+              , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Incline (0.5–15)")
               , React.createElement('input', {className:"inp",type:"number",min:"0.5",max:"15",step:"0.5",placeholder:"—",
                 style:{width:"100%",padding:"4px 5px"},value:ex.incline||"",
                 onChange:e=>updateWbEx(idx,"incline",e.target.value?parseFloat(e.target.value):null)})
             )
             , React.createElement('div', {style:{flex:1}}
-              , React.createElement('label', {style:{fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Speed (0.5–15)")
+              , React.createElement('label', {style:{fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Speed (0.5–15)")
               , React.createElement('input', {className:"inp",type:"number",min:"0.5",max:"15",step:"0.5",placeholder:"—",
                 style:{width:"100%",padding:"4px 5px"},value:ex.speed||"",
                 onChange:e=>updateWbEx(idx,"speed",e.target.value?parseFloat(e.target.value):null)})
@@ -2459,23 +2460,23 @@ function App() {
         )
       )
       , (ex.extraRows||[]).map((row,ri)=>(
-        React.createElement('div', {key:ri,style:{display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
+        React.createElement('div', {key:ri,style:{display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.md,alignItems:"center",flexWrap:"wrap"}}
           , React.createElement('span', {style:{fontSize:".52rem",color:"#9a8a78",flexShrink:0,minWidth:16}}, (_isC||_isF)?`I${ri+2}`:`S${ri+2}`)
           , (_isC||_isF) ? (React.createElement(React.Fragment, null
-            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1.5,minWidth:52,padding:"4px 5px",fontSize:".7rem"},type:"text",inputMode:"numeric",placeholder:"HH:MM",
+            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1.5,minWidth:52,padding:"4px 5px",fontSize:FS.md},type:"text",inputMode:"numeric",placeholder:"HH:MM",
               value:row.hhmm||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};updateWbEx(idx,"extraRows",rr);},
               onBlur:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};updateWbEx(idx,"extraRows",rr);}})
-            , React.createElement('input', {className:"wb-ex-inp",style:{flex:0.7,minWidth:36,padding:"4px 5px",fontSize:".7rem"},type:"number",min:"0",max:"59",placeholder:"Sec",value:row.sec||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateWbEx(idx,"extraRows",rr);}})
-            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"},type:"text",inputMode:"decimal",placeholder:_dUnit,value:row.distanceMi||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateWbEx(idx,"extraRows",rr);}})
+            , React.createElement('input', {className:"wb-ex-inp",style:{flex:0.7,minWidth:36,padding:"4px 5px",fontSize:FS.md},type:"number",min:"0",max:"59",placeholder:"Sec",value:row.sec||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};updateWbEx(idx,"extraRows",rr);}})
+            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:FS.md},type:"text",inputMode:"decimal",placeholder:_dUnit,value:row.distanceMi||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};updateWbEx(idx,"extraRows",rr);}})
           )) : (React.createElement(React.Fragment, null
-            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"},type:"text",inputMode:"decimal",placeholder:"Sets",value:row.sets||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateWbEx(idx,"extraRows",rr);}})
-            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"},type:"text",inputMode:"decimal",placeholder:"Reps",value:row.reps||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};updateWbEx(idx,"extraRows",rr);}})
-            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:".7rem"},type:"text",inputMode:"decimal",placeholder:_wUnit,value:row.weightLbs||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};updateWbEx(idx,"extraRows",rr);}})
+            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:FS.md},type:"text",inputMode:"decimal",placeholder:"Sets",value:row.sets||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateWbEx(idx,"extraRows",rr);}})
+            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:FS.md},type:"text",inputMode:"decimal",placeholder:"Reps",value:row.reps||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};updateWbEx(idx,"extraRows",rr);}})
+            , React.createElement('input', {className:"wb-ex-inp",style:{flex:1,minWidth:40,padding:"4px 5px",fontSize:FS.md},type:"text",inputMode:"decimal",placeholder:_wUnit,value:row.weightLbs||"",onChange:e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};updateWbEx(idx,"extraRows",rr);}})
           ))
           , React.createElement('button', {className:"btn btn-danger btn-xs",style:{padding:"2px 4px",flexShrink:0},onClick:()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateWbEx(idx,"extraRows",rr);}}, "✕")
         )
       ))
-      , React.createElement('button', {className:"btn btn-ghost btn-xs",style:{width:"100%",marginTop:4,marginBottom:4,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
+      , React.createElement('button', {className:"btn btn-ghost btn-xs",style:{width:"100%",marginTop:4,marginBottom:4,fontSize:FS.sm,color:"#8a8478",borderStyle:"dashed"},
         onClick:()=>{const rr=[...(ex.extraRows||[]),(_isC||_isF)?{hhmm:"",sec:"",distanceMi:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateWbEx(idx,"extraRows",rr);}},
         "＋ Add Row (e.g. ", (_isC||_isF)?"interval":"progressive weight", ")")
     );
@@ -2500,11 +2501,11 @@ function App() {
       React.createElement('div', {className:"ss-section-hdr",
         onClick:()=>setSsAccordion(prev=>({...prev,[sectionKey]:!prev[sectionKey]}))},
         React.createElement('div', {className:"ab-badge"}, label),
-        React.createElement('div', {style:{width:28,height:28,borderRadius:6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem"}}, exD.icon),
+        React.createElement('div', {style:{width:28,height:28,borderRadius:R.md,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem"}}, exD.icon),
         React.createElement('span', {style:{fontFamily:"'Cinzel',serif",fontSize:".66rem",color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}, exD.name),
         collapsed && React.createElement('span', {style:{fontSize:".55rem",color:"#5a5650"}}, summaryText),
-        React.createElement('span', {style:{fontSize:".6rem",fontWeight:700,color:"#b4ac9e",flexShrink:0}}, "+"+xpVal),
-        React.createElement('span', {style:{fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "▼")
+        React.createElement('span', {style:{fontSize:FS.sm,fontWeight:700,color:"#b4ac9e",flexShrink:0}}, "+"+xpVal),
+        React.createElement('span', {style:{fontSize:FS.sm,color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "▼")
       ),
       !collapsed && React.createElement('div', {className:"ss-section-body"},
         renderWbExFields(ex, idx, exD)
@@ -3007,7 +3008,7 @@ function App() {
         /* Shield icon */
         , React.createElement('div', { style: {fontSize:"2.4rem", marginBottom:12} }, "🛡️")
         , React.createElement('div', { style: {fontFamily:"'Cinzel Decorative',serif", fontSize:"1rem", color:"#d4cec4", letterSpacing:".08em", marginBottom:4, textAlign:"center"} }, "Verification Required")
-        , React.createElement('div', { style: {fontSize:".72rem", color:"#6a645a", marginBottom:24, textAlign:"center"} }, "Your account is protected with multi-factor authentication.")
+        , React.createElement('div', { style: {fontSize:FS.lg, color:"#6a645a", marginBottom:24, textAlign:"center"} }, "Your account is protected with multi-factor authentication.")
 
         , React.createElement('div', { style: {
           width:"100%",
@@ -3018,15 +3019,15 @@ function App() {
         }}
 
           /* Tab toggle: Authenticator / Recovery Code */
-          , React.createElement('div', { style: {display:"flex", gap:4, marginBottom:16, background:"rgba(45,42,36,.25)", borderRadius:8, padding:3} }
+          , React.createElement('div', { style: {display:"flex", gap:4, marginBottom:16, background:"rgba(45,42,36,.25)", borderRadius:R.lg, padding:3} }
             , React.createElement('div', { style: {
-                flex:1, textAlign:"center", padding:"7px 0", borderRadius:6, fontSize:".68rem", fontWeight:600, cursor:"pointer", transition:"all .15s",
+                flex:1, textAlign:"center", padding:"7px 0", borderRadius:R.md, fontSize:".68rem", fontWeight:600, cursor:"pointer", transition:"all .15s",
                 background: !mfaRecoveryMode ? "rgba(45,42,36,.5)" : "transparent",
                 color: !mfaRecoveryMode ? "#d4cec4" : "#5a5650",
                 border: !mfaRecoveryMode ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
               }, onClick: ()=>{setMfaRecoveryMode(false);setMfaChallengeMsg(null);} }, "Authenticator Code")
             , React.createElement('div', { style: {
-                flex:1, textAlign:"center", padding:"7px 0", borderRadius:6, fontSize:".68rem", fontWeight:600, cursor:"pointer", transition:"all .15s",
+                flex:1, textAlign:"center", padding:"7px 0", borderRadius:R.md, fontSize:".68rem", fontWeight:600, cursor:"pointer", transition:"all .15s",
                 background: mfaRecoveryMode ? "rgba(45,42,36,.5)" : "transparent",
                 color: mfaRecoveryMode ? "#d4cec4" : "#5a5650",
                 border: mfaRecoveryMode ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
@@ -3041,7 +3042,7 @@ function App() {
               onKeyDown: e=>{ if(e.key==="Enter") submitMfaChallenge(); } })
             , React.createElement('button', {
               style: {
-                width:"100%", padding:"11px", borderRadius:9, border:"none",
+                width:"100%", padding:"11px", borderRadius:R.xl, border:"none",
                 background: mfaChallengeLoading || mfaChallengeCode.length<6 ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
                 color: mfaChallengeLoading || mfaChallengeCode.length<6 ? "#5a5650" : "#0c0c0a",
                 fontFamily:"'Cinzel',serif", fontSize:".62rem", fontWeight:700, letterSpacing:".12em", cursor:"pointer"
@@ -3059,7 +3060,7 @@ function App() {
               onKeyDown: e=>{ if(e.key==="Enter") submitRecoveryCode(); } })
             , React.createElement('button', {
               style: {
-                width:"100%", padding:"11px", borderRadius:9, border:"none",
+                width:"100%", padding:"11px", borderRadius:R.xl, border:"none",
                 background: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
                 color: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "#5a5650" : "#0c0c0a",
                 fontFamily:"'Cinzel',serif", fontSize:".62rem", fontWeight:700, letterSpacing:".12em", cursor:"pointer"
@@ -3110,7 +3111,7 @@ function App() {
 
       /* ── Back to Home ── */
       , React.createElement('div', { style: {padding:"14px 20px 0", display:"flex", justifyContent:"flex-start"} }
-        , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer", letterSpacing:".04em"}, onClick: ()=>setScreen("landing") }, "\u2190 Back")
+        , React.createElement('span', { style: {fontSize:FS.lg, color:"#8a8478", cursor:"pointer", letterSpacing:".04em"}, onClick: ()=>setScreen("landing") }, "\u2190 Back")
       )
 
       /* ── Logo ── */
@@ -3161,11 +3162,11 @@ function App() {
 
           /* ── FORGOT PASSWORD SUB-SCREEN ── */
           , loginSubScreen==="forgot-pw" && React.createElement(React.Fragment, null
-            , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",lineHeight:1.6,marginBottom:14,textAlign:"center"} },
+            , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",lineHeight:1.6,marginBottom:14,textAlign:"center"} },
               "Enter the email address you used to create your account. We\u2019ll send you a link to reset your password."
             )
             , React.createElement('div', { style: {marginBottom:14} }
-              , React.createElement('label', { style: {fontSize:".6rem", color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", display:"block", marginBottom:5} }, "Email Address")
+              , React.createElement('label', { style: {fontSize:FS.sm, color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", display:"block", marginBottom:5} }, "Email Address")
               , React.createElement('input', {
                   className: "inp",
                   type: "email",
@@ -3173,7 +3174,7 @@ function App() {
                   style: {fontSize:".88rem", width:"100%", padding:"10px 13px",
                     background:"linear-gradient(145deg, rgba(32,30,26,.5), rgba(20,18,14,.35))",
                     border:"1px solid rgba(180,172,158,.08)",
-                    borderRadius:9, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
+                    borderRadius:R.xl, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
                     outline:"none", boxSizing:"border-box"},
                   onChange: e=>{setForgotPwEmail(e.target.value);setAuthMsg(null);},
                   placeholder: "you@example.com",
@@ -3182,7 +3183,7 @@ function App() {
             )
             , authMsg && React.createElement('div', { style: {fontSize:".8rem", color:authMsg.ok===true?UI_COLORS.success:UI_COLORS.danger, textAlign:"center", padding:"4px 0 10px", lineHeight:1.5} }, authMsg.text)
             , React.createElement('button', {
-                style: {width:"100%", padding:"12px", borderRadius:9, border:"none",
+                style: {width:"100%", padding:"12px", borderRadius:R.xl, border:"none",
                   background: (!forgotPwEmail.trim()||authLoading) ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
                   color: (!forgotPwEmail.trim()||authLoading) ? "#5a5650" : "#0c0c0a",
                   fontFamily:"'Cinzel',serif", fontSize:".65rem", fontWeight:700,
@@ -3191,10 +3192,10 @@ function App() {
                 onClick: sendPasswordReset
               }, authLoading ? "Sending\u2026" : "\uD83D\uDCE7 Send Reset Link")
             , React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.18)", marginTop:14, paddingTop:12, display:"flex", justifyContent:"space-between", alignItems:"center"} }
-              , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer"},
+              , React.createElement('span', { style: {fontSize:FS.lg, color:"#8a8478", cursor:"pointer"},
                   onClick: ()=>{setLoginSubScreen(null);setAuthMsg(null);setForgotPwEmail("");}
                 }, "\u2190 Back to Sign In")
-              , React.createElement('span', { style: {fontSize:".72rem", color:"#5a5650", cursor:"pointer"},
+              , React.createElement('span', { style: {fontSize:FS.lg, color:"#5a5650", cursor:"pointer"},
                   onClick: ()=>{setLoginSubScreen("forgot-username");setAuthMsg(null);setForgotLookupResult(null);setForgotPrivateId("");}
                 }, "Forgot your email?")
             )
@@ -3202,11 +3203,11 @@ function App() {
 
           /* ── FORGOT USERNAME SUB-SCREEN ── */
           , loginSubScreen==="forgot-username" && React.createElement(React.Fragment, null
-            , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",lineHeight:1.6,marginBottom:14,textAlign:"center"} },
+            , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",lineHeight:1.6,marginBottom:14,textAlign:"center"} },
               "Enter your ", React.createElement('strong',{style:{color:"#b4ac9e"}},"Private Account ID"), " to look up the email on your account."
             )
             , React.createElement('div', { style: {marginBottom:14} }
-              , React.createElement('label', { style: {fontSize:".6rem", color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", display:"block", marginBottom:5} }, "Private Account ID")
+              , React.createElement('label', { style: {fontSize:FS.sm, color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", display:"block", marginBottom:5} }, "Private Account ID")
               , React.createElement('input', {
                   className: "inp",
                   type: "text",
@@ -3214,7 +3215,7 @@ function App() {
                   style: {fontSize:".88rem", width:"100%", padding:"10px 13px",
                     background:"linear-gradient(145deg, rgba(32,30,26,.5), rgba(20,18,14,.35))",
                     border:"1px solid rgba(180,172,158,.08)",
-                    borderRadius:9, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
+                    borderRadius:R.xl, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
                     outline:"none", boxSizing:"border-box", letterSpacing:".06em"},
                   onChange: e=>{setForgotPrivateId(e.target.value);setForgotLookupResult(null);},
                   placeholder: "e.g. xP4mRk7bN2cQ",
@@ -3224,7 +3225,7 @@ function App() {
             , forgotLookupResult && React.createElement('div', { style: {
                 background: forgotLookupResult.found ? "rgba(46,204,113,.08)" : "rgba(231,76,60,.08)",
                 border: "1px solid " + (forgotLookupResult.found ? "rgba(46,204,113,.2)" : "rgba(231,76,60,.2)"),
-                borderRadius:9, padding:"12px 14px", marginBottom:14, textAlign:"center"
+                borderRadius:R.xl, padding:"12px 14px", marginBottom:14, textAlign:"center"
               }}
               , forgotLookupResult.found
                 ? React.createElement(React.Fragment, null,
@@ -3232,14 +3233,14 @@ function App() {
                     React.createElement('div', {style:{fontSize:".82rem",color:"#d4cec4",fontWeight:700,letterSpacing:".04em",fontFamily:"monospace"}}, forgotLookupResult.masked_email),
                     React.createElement('div', {style:{fontSize:".58rem",color:"#8a8478",marginTop:6}}, "Use this email on the password reset screen."),
                     React.createElement('button', {
-                      style:{marginTop:8,background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"8px 16px",borderRadius:8,fontSize:".68rem",cursor:"pointer",fontFamily:"'Inter',sans-serif"},
+                      style:{marginTop:8,background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"8px 16px",borderRadius:R.lg,fontSize:".68rem",cursor:"pointer",fontFamily:"'Inter',sans-serif"},
                       onClick:()=>{setLoginSubScreen("forgot-pw");setForgotPwEmail("");setAuthMsg(null);setForgotLookupResult(null);}
                     }, "\u2192 Go to Password Reset")
                   )
-                : React.createElement('div', {style:{fontSize:".72rem",color:UI_COLORS.danger}}, forgotLookupResult.error)
+                : React.createElement('div', {style:{fontSize:FS.lg,color:UI_COLORS.danger}}, forgotLookupResult.error)
             )
             , !forgotLookupResult?.found && React.createElement('button', {
-                style: {width:"100%", padding:"12px", borderRadius:9, border:"none",
+                style: {width:"100%", padding:"12px", borderRadius:R.xl, border:"none",
                   background: (!forgotPrivateId.trim()||authLoading) ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
                   color: (!forgotPrivateId.trim()||authLoading) ? "#5a5650" : "#0c0c0a",
                   fontFamily:"'Cinzel',serif", fontSize:".65rem", fontWeight:700,
@@ -3247,14 +3248,14 @@ function App() {
                 disabled: !forgotPrivateId.trim()||authLoading,
                 onClick: lookupByPrivateId
               }, authLoading ? "Looking up\u2026" : "\uD83D\uDD0D Look Up My Email")
-            , React.createElement('div', { style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:9,padding:"14px",marginTop:14,textAlign:"center"} }
+            , React.createElement('div', { style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:R.xl,padding:"14px",marginTop:14,textAlign:"center"} }
               , React.createElement('div', {style:{fontSize:".68rem",color:"#8a8478",marginBottom:4}}, "Can\u2019t remember your Private ID either?")
               , React.createElement('div', {style:{fontSize:".62rem",color:"#5a5650",lineHeight:1.5}},
                 "Contact us at ", React.createElement('span', {style:{color:UI_COLORS.info,fontWeight:600}}, "support@aurisargames.com"),
                 " and we\u2019ll help you recover your account.")
             )
             , React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.18)", marginTop:14, paddingTop:12} }
-              , React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer"},
+              , React.createElement('span', { style: {fontSize:FS.lg, color:"#8a8478", cursor:"pointer"},
                   onClick: ()=>{setLoginSubScreen("forgot-pw");setAuthMsg(null);setForgotLookupResult(null);setForgotPrivateId("");}
                 }, "\u2190 Back to Password Reset")
             )
@@ -3265,7 +3266,7 @@ function App() {
 
           /* Email */
           , React.createElement('div', { style: {marginBottom:10} }
-            , React.createElement('label', { style: {fontSize:".6rem", color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", display:"block", marginBottom:5} }, "Email Address")
+            , React.createElement('label', { style: {fontSize:FS.sm, color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", display:"block", marginBottom:5} }, "Email Address")
             , React.createElement('input', {
                 className: "inp",
                 type: "email",
@@ -3273,7 +3274,7 @@ function App() {
                 style: {fontSize:".88rem", width:"100%", padding:"10px 13px",
                   background:"linear-gradient(145deg, rgba(32,30,26,.5), rgba(20,18,14,.35))",
                   border:"1px solid rgba(180,172,158,.08)",
-                  borderRadius:9, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
+                  borderRadius:R.xl, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
                   outline:"none", boxSizing:"border-box"},
                 onChange: e=>{setAuthEmail(e.target.value);setAuthMsg(null);},
                 placeholder: "you@example.com",
@@ -3284,11 +3285,11 @@ function App() {
           /* Password */
           , React.createElement('div', { style: {marginBottom:13} }
             , React.createElement('div', { style: {display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5} }
-              , React.createElement('label', { style: {fontSize:".6rem", color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", margin:0} }
+              , React.createElement('label', { style: {fontSize:FS.sm, color:"#8a8478", letterSpacing:".08em", textTransform:"uppercase", margin:0} }
                 , authIsNew ? "Create Password" : "Password"
               )
               , React.createElement('span', {
-                  style: {fontSize:".6rem", color:"#5a5650", cursor:"pointer", letterSpacing:".04em"},
+                  style: {fontSize:FS.sm, color:"#5a5650", cursor:"pointer", letterSpacing:".04em"},
                   onClick: ()=>setShowAuthPw(v=>!v)
                 }, showAuthPw ? "Hide" : "Show")
             )
@@ -3299,7 +3300,7 @@ function App() {
                 style: {fontSize:".88rem", width:"100%", padding:"10px 13px",
                   background:"linear-gradient(145deg, rgba(32,30,26,.5), rgba(20,18,14,.35))",
                   border:"1px solid rgba(180,172,158,.08)",
-                  borderRadius:9, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
+                  borderRadius:R.xl, color:"#d4cec4", fontFamily:"'Inter',sans-serif",
                   outline:"none", boxSizing:"border-box"},
                 onChange: e=>setAuthPassword(e.target.value),
                 placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
@@ -3315,9 +3316,9 @@ function App() {
                 background: authRemember ? "rgba(45,42,36,.3)" : "transparent",
                 display:"flex", alignItems:"center", justifyContent:"center"
               }}
-              , authRemember && React.createElement('span', { style: {color:"#b4ac9e", fontSize:".72rem", lineHeight:1} }, "\u2713")
+              , authRemember && React.createElement('span', { style: {color:"#b4ac9e", fontSize:FS.lg, lineHeight:1} }, "\u2713")
             )
-            , React.createElement('span', { style: {fontSize:".72rem", color:"#5a5650", userSelect:"none"} }, "Remain logged in for 30 days")
+            , React.createElement('span', { style: {fontSize:FS.lg, color:"#5a5650", userSelect:"none"} }, "Remain logged in for 30 days")
           )
 
           /* Feedback message */
@@ -3328,7 +3329,7 @@ function App() {
           /* Submit */
           , React.createElement('button', {
               style: {
-                width:"100%", padding:"12px", borderRadius:9, border:"none",
+                width:"100%", padding:"12px", borderRadius:R.xl, border:"none",
                 background: (authLoading||!authEmail.trim()||!authPassword.trim())
                   ? "rgba(45,42,36,.3)"
                   : "linear-gradient(135deg, #c49428, #8a6010)",
@@ -3348,9 +3349,9 @@ function App() {
           /* Footer links */
           , React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.18)", marginTop:14, paddingTop:12, display:"flex", justifyContent:"space-between", alignItems:"center"} }
             , !authIsNew
-              ? React.createElement('span', { style: {fontSize:".72rem", color:"#b4ac9e", cursor:"pointer"}, onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setAuthPassword("");} }, "Create a Profile")
-              : React.createElement('span', { style: {fontSize:".72rem", color:"#8a8478", cursor:"pointer"}, onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setAuthPassword("");} }, "\u2190 Back to Sign In")
-            , !authIsNew && React.createElement('span', { style: {fontSize:".72rem", color:"#5a5650", cursor:"pointer"}, onClick: ()=>{setLoginSubScreen("forgot-pw");setAuthMsg(null);setForgotPwEmail("");} }, "Forgot password?")
+              ? React.createElement('span', { style: {fontSize:FS.lg, color:"#b4ac9e", cursor:"pointer"}, onClick: ()=>{setAuthIsNew(true);setAuthMsg(null);setAuthPassword("");} }, "Create a Profile")
+              : React.createElement('span', { style: {fontSize:FS.lg, color:"#8a8478", cursor:"pointer"}, onClick: ()=>{setAuthIsNew(false);setAuthMsg(null);setAuthPassword("");} }, "\u2190 Back to Sign In")
+            , !authIsNew && React.createElement('span', { style: {fontSize:FS.lg, color:"#5a5650", cursor:"pointer"}, onClick: ()=>{setLoginSubScreen("forgot-pw");setAuthMsg(null);setForgotPwEmail("");} }, "Forgot password?")
           )
           ) /* end loginSubScreen===null */
 
@@ -3541,7 +3542,7 @@ function App() {
             , React.createElement('h1', {className:"title",style:{fontSize:"clamp(1.3rem,4vw,1.9rem)"}}, "Current Routine")
             , React.createElement('p', {style:{color:"#6a645a",fontSize:".82rem",marginBottom:12}}, "How often do you work out today? Be honest — this calibrates your starting stats.")
             , [{val:"never",label:"Just getting started",sub:"Little to no workout history"},{val:"light",label:"1–2 times a week",sub:"Casual, inconsistent routine"},{val:"moderate",label:"3–4 times a week",sub:"Solid habit, building consistency"},{val:"dedicated",label:"5–6 times a week",sub:"Dedicated athlete"},{val:"elite",label:"Daily or twice a day",sub:"Elite training volume"}]
-              .map(o=>React.createElement('div',{key:o.val,style:radioSt(obFreq===o.val),onClick:()=>setObFreq(o.val)},React.createElement('div',null,React.createElement('div',{style:{fontSize:".82rem",fontWeight:600,color:obFreq===o.val?"#d4cec4":"#b4ac9e"}},o.label),React.createElement('div',{style:{fontSize:".72rem",color:"#5a5650",marginTop:2}},o.sub))))
+              .map(o=>React.createElement('div',{key:o.val,style:radioSt(obFreq===o.val),onClick:()=>setObFreq(o.val)},React.createElement('div',null,React.createElement('div',{style:{fontSize:".82rem",fontWeight:600,color:obFreq===o.val?"#d4cec4":"#b4ac9e"}},o.label),React.createElement('div',{style:{fontSize:FS.lg,color:"#5a5650",marginTop:2}},o.sub))))
             , React.createElement('div', {style:{display:"flex",gap:8,marginTop:6}}
               , React.createElement('button', {className:"btn btn-ghost",onClick:()=>setObStep(2)}, "← Back")
               , React.createElement('button', {className:"btn btn-gold",disabled:!obFreq,onClick:()=>setObStep(4)}, "Continue →")
@@ -3551,7 +3552,7 @@ function App() {
             , React.createElement('h1', {className:"title",style:{fontSize:"clamp(1.3rem,4vw,1.9rem)"}}, "Discipline Trait")
             , React.createElement('p', {style:{color:"#6a645a",fontSize:".82rem",marginBottom:12}}, "When do you usually work out? Timing unlocks hidden character traits.")
             , [{val:"earlymorning",label:"Early morning (before 7am)",sub:"⚡ Iron Discipline — +WIS +CON boost. One of the rarest traits."},{val:"morning",label:"Morning (7am–12pm)",sub:"☀️ Disciplined — +WIS boost"},{val:"afternoon",label:"Afternoon (12pm–5pm)",sub:"Balanced — no trait modifier"},{val:"evening",label:"Evening (5pm–9pm)",sub:"🌙 Night Owl — +VIT boost"},{val:"varies",label:"It varies / no routine yet",sub:"No trait — earn one as you build your routine"}]
-              .map(o=>React.createElement('div',{key:o.val,style:radioSt(obTiming===o.val),onClick:()=>setObTiming(o.val)},React.createElement('div',null,React.createElement('div',{style:{fontSize:".82rem",fontWeight:600,color:obTiming===o.val?"#d4cec4":"#b4ac9e"}},o.label),React.createElement('div',{style:{fontSize:".72rem",color:"#5a5650",marginTop:2}},o.sub))))
+              .map(o=>React.createElement('div',{key:o.val,style:radioSt(obTiming===o.val),onClick:()=>setObTiming(o.val)},React.createElement('div',null,React.createElement('div',{style:{fontSize:".82rem",fontWeight:600,color:obTiming===o.val?"#d4cec4":"#b4ac9e"}},o.label),React.createElement('div',{style:{fontSize:FS.lg,color:"#5a5650",marginTop:2}},o.sub))))
             , React.createElement('div', {style:{display:"flex",gap:8,marginTop:6}}
               , React.createElement('button', {className:"btn btn-ghost",onClick:()=>setObStep(3)}, "← Back")
               , React.createElement('button', {className:"btn btn-gold",disabled:!obTiming,onClick:()=>setObStep(5)}, "Continue →")
@@ -3573,7 +3574,7 @@ function App() {
             , React.createElement('h1', {className:"title",style:{fontSize:"clamp(1.3rem,4vw,1.9rem)"}}, "Training Style")
             , React.createElement('p', {style:{color:"#6a645a",fontSize:".82rem",marginBottom:12}}, "Your natural approach to fitness — this fine-tunes your class assignment.")
             , [{val:"heavy",label:"Heavy compound lifts",sub:"Squats, deadlifts, bench — I chase weight on the bar"},{val:"cardio",label:"Cardio & endurance",sub:"Running, cycling, swimming — I chase distance and time"},{val:"sculpt",label:"Sculpting & aesthetics",sub:"Isolation work and volume — I chase the look"},{val:"hiit",label:"HIIT & explosive power",sub:"Short intense bursts, circuits, functional fitness"},{val:"mindful",label:"Mindful movement",sub:"Yoga, mobility, breath work — mind-body connection"},{val:"sport",label:"Sport-specific training",sub:"I train to compete or perform — sport is the goal"},{val:"mixed",label:"I mix everything",sub:"No single focus — variety keeps me going"}]
-              .map(o=>React.createElement('div',{key:o.val,style:radioSt(obStyle===o.val),onClick:()=>setObStyle(o.val)},React.createElement('div',null,React.createElement('div',{style:{fontSize:".82rem",fontWeight:600,color:obStyle===o.val?"#d4cec4":"#b4ac9e"}},o.label),React.createElement('div',{style:{fontSize:".72rem",color:"#5a5650",marginTop:2}},o.sub))))
+              .map(o=>React.createElement('div',{key:o.val,style:radioSt(obStyle===o.val),onClick:()=>setObStyle(o.val)},React.createElement('div',null,React.createElement('div',{style:{fontSize:".82rem",fontWeight:600,color:obStyle===o.val?"#d4cec4":"#b4ac9e"}},o.label),React.createElement('div',{style:{fontSize:FS.lg,color:"#5a5650",marginTop:2}},o.sub))))
             , React.createElement('div', {style:{display:"flex",gap:8,marginTop:6}}
               , React.createElement('button', {className:"btn btn-ghost",onClick:()=>setObStep(5)}, "← Back")
               , React.createElement('button', {className:"btn btn-gold",disabled:!obStyle,onClick:handleOnboard}, "Forge My Character →")
@@ -3587,7 +3588,7 @@ function App() {
         const dc=CLASSES[detectedClass];
         return (
           React.createElement('div', { className: "screen", style: {"--cls-color":dc.color,"--cls-glow":dc.glow}}
-            , React.createElement('p', { style: {color:"#5a5650",fontSize:".7rem",letterSpacing:".14em",textTransform:"uppercase"}}, "The Fates have spoken…"   )
+            , React.createElement('p', { style: {color:"#5a5650",fontSize:FS.md,letterSpacing:".14em",textTransform:"uppercase"}}, "The Fates have spoken…"   )
             , React.createElement('div', { className: "reveal-card", style: {"--cls-color":dc.color,"--cls-glow":dc.glow}}
               , React.createElement('span', { className: "reveal-icon"}, dc.icon)
               , React.createElement('div', { className: "reveal-name"}, dc.name)
@@ -3739,11 +3740,11 @@ function App() {
                       onClick: ()=>{setRetroCheckInModal(true);setRetroDate("");}
                     }, "↺ Retro")
                   , React.createElement('button', {
-                      style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:6,cursor:"pointer",padding:"4px 8px"},
+                      style: {fontSize:".5rem",color:"#c49428",background:"transparent",border:"1px solid rgba(196,148,40,.2)",borderRadius:R.md,cursor:"pointer",padding:"4px 8px"},
                       onClick: ()=>setShowWNMockup(true)
                     }, "📲 Notification")
                   , React.createElement('button', {
-                      style: {padding:"7px 16px",borderRadius:8,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
+                      style: {padding:"7px 16px",borderRadius:R.lg,fontSize:".54rem",fontWeight:600,border:"1px solid rgba(180,172,158,.08)",background:"linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",color:"#d4cec4",cursor:"pointer",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",letterSpacing:".04em"},
                       disabled: profile.lastCheckIn===todayStr(),
                       onClick: doCheckIn
                     }, profile.lastCheckIn===todayStr() ? "✓ Checked In" : "Check In")
@@ -3813,7 +3814,7 @@ function App() {
                         , musclePickerOpen && (
                           React.createElement('div', { style: {position:"absolute",top:"110%",left:0,zIndex:20,background:"linear-gradient(145deg,#0c0c0a,#0c0c0a)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:10,minWidth:180,maxWidth:"calc(100vw - 24px)",boxShadow:"0 8px 32px rgba(0,0,0,.7)"} }
                             , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",marginBottom:7} }
-                              , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478",textTransform:"uppercase",letterSpacing:".08em"} }, "Muscle Group")
+                              , React.createElement('span', { style: {fontSize:FS.sm,color:"#8a8478",textTransform:"uppercase",letterSpacing:".08em"} }, "Muscle Group")
                               , React.createElement('span', { style: {fontSize:".65rem",color:"#b4ac9e",cursor:"pointer"}, onClick: ()=>{setExMuscleFilter("All");setMusclePickerOpen(false);} }, "Clear")
                             )
                             , ["chest","shoulder","bicep","tricep","legs","back","glutes","abs","calves","forearm","cardio"].map(mg=>
@@ -3825,7 +3826,7 @@ function App() {
                                 , React.createElement('div', { style: {width:14,height:14,borderRadius:3,border:`1.5px solid ${exMuscleFilter===mg?getMuscleColor(mg):"rgba(180,172,158,.08)"}`,background:exMuscleFilter===mg?"rgba(45,42,36,.3)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0} }
                                   , exMuscleFilter===mg && React.createElement('span', { style: {color:getMuscleColor(mg),fontSize:".55rem"} }, "✓")
                                 )
-                                , React.createElement('span', { style: {fontSize:".72rem",color:exMuscleFilter===mg?getMuscleColor(mg):"#8a8478",textTransform:"capitalize"} }, mg)
+                                , React.createElement('span', { style: {fontSize:FS.lg,color:exMuscleFilter===mg?getMuscleColor(mg):"#8a8478",textTransform:"capitalize"} }, mg)
                               )
                             )
                           )
@@ -4073,10 +4074,10 @@ function App() {
                       ),
                       libBrowseMode==="filtered" && React.createElement('button', {
                         onClick:()=>{ setLibSelectMode(m=>!m); setLibSelected(new Set()); },
-                        style:{flexShrink:0,padding:"6px 12px",borderRadius:8,border:"1px solid",
+                        style:{flexShrink:0,padding:"6px 12px",borderRadius:R.lg,border:"1px solid",
                                borderColor:libSelectMode?"#B0A898":"rgba(45,42,36,.3)",
                                background:libSelectMode?"rgba(45,42,36,.26)":"transparent",
-                               color:libSelectMode?"#B0A898":"#8a8478",fontSize:".7rem",fontWeight:libSelectMode?"700":"400",cursor:"pointer",whiteSpace:"nowrap"}
+                               color:libSelectMode?"#B0A898":"#8a8478",fontSize:FS.md,fontWeight:libSelectMode?"700":"400",cursor:"pointer",whiteSpace:"nowrap"}
                       }, libSelectMode?"✕ Cancel":"⊞ Select")
                     )
                     ),
@@ -4204,22 +4205,22 @@ function App() {
                       React.createElement('div', {style:{position:"relative",flex:"1 1 110px",zIndex:20}},
                         React.createElement('button', {
                           onClick:()=>setLibOpenDrop(libOpenDrop==="type"?null:"type"),
-                          style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:9,
+                          style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:R.xl,
                                  border:"1px solid "+(libTypeFilters.size>0?"#C4A044":"rgba(45,42,36,.3)"),
                                  background:"rgba(14,14,12,.95)",
                                  color:libTypeFilters.size>0?"#C4A044":"#8a8478",
-                                 fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                                 fontSize:FS.lg,textAlign:"left",cursor:"pointer",position:"relative"}
                         },
                           libTypeFilters.size>0?"Type ("+libTypeFilters.size+")":"Type",
                           React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
                             transform:"translateY(-50%) rotate("+(libOpenDrop==="type"?"180deg":"0deg")+")",
-                            color:libTypeFilters.size>0?"#C4A044":"#6a6050",fontSize:".6rem",
+                            color:libTypeFilters.size>0?"#C4A044":"#6a6050",fontSize:FS.sm,
                             transition:"transform .15s",lineHeight:1}},"▼")
                         ),
                         libOpenDrop==="type" && React.createElement('div', {
                           style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",
                                  background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.07)",
-                                 borderRadius:9,padding:"6px 4px",zIndex:21,
+                                 borderRadius:R.xl,padding:"6px 4px",zIndex:21,
                                  boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
                         },
                           TYPE_OPTS.map(val=>{
@@ -4229,7 +4230,7 @@ function App() {
                               key:val,
                               onClick:()=>toggleSet(setLibTypeFilters,val),
                               style:{display:"flex",alignItems:"center",gap:8,
-                                     padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                     padding:"6px 10px",borderRadius:R.md,cursor:"pointer",
                                      opacity:avail?1:0.35,
                                      background:sel?"rgba(45,42,36,.22)":"transparent"}
                             },
@@ -4238,8 +4239,8 @@ function App() {
                                 border:"1.5px solid "+(sel?getTypeColor(val):"rgba(180,172,158,.08)"),
                                 background:sel?"rgba(45,42,36,.32)":"transparent",
                                 display:"flex",alignItems:"center",justifyContent:"center"
-                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:getTypeColor(val),lineHeight:1}},"✓")),
-                              React.createElement('span',{style:{fontSize:".72rem",
+                              }}, sel && React.createElement('span',{style:{fontSize:FS.sm,color:getTypeColor(val),lineHeight:1}},"✓")),
+                              React.createElement('span',{style:{fontSize:FS.lg,
                                 color:sel?getTypeColor(val):avail?"#b4ac9e":"#5a5650",
                                 whiteSpace:"nowrap"}},
                                 TYPE_LABELS[val])
@@ -4252,22 +4253,22 @@ function App() {
                       React.createElement('div', {style:{position:"relative",flex:"1 1 110px",zIndex:20}},
                         React.createElement('button', {
                           onClick:()=>setLibOpenDrop(libOpenDrop==="muscle"?null:"muscle"),
-                          style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:9,
+                          style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:R.xl,
                                  border:"1px solid "+(libMuscleFilters.size>0?UI_COLORS.accent:"rgba(45,42,36,.3)"),
                                  background:"rgba(14,14,12,.95)",
                                  color:libMuscleFilters.size>0?"#7A8F8B":"#8a8478",
-                                 fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                                 fontSize:FS.lg,textAlign:"left",cursor:"pointer",position:"relative"}
                         },
                           libMuscleFilters.size>0?"Muscle ("+libMuscleFilters.size+")":"Muscle Group",
                           React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
                             transform:"translateY(-50%) rotate("+(libOpenDrop==="muscle"?"180deg":"0deg")+")",
-                            color:libMuscleFilters.size>0?"#7A8F8B":"#6a6050",fontSize:".6rem",
+                            color:libMuscleFilters.size>0?"#7A8F8B":"#6a6050",fontSize:FS.sm,
                             transition:"transform .15s",lineHeight:1}},"▼")
                         ),
                         libOpenDrop==="muscle" && React.createElement('div', {
                           style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",
                                  background:"rgba(16,14,10,.95)",border:"1px solid rgba(122,143,139,.25)",
-                                 borderRadius:9,padding:"6px 4px",zIndex:21,
+                                 borderRadius:R.xl,padding:"6px 4px",zIndex:21,
                                  boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
                         },
                           MUSCLE_OPTS.map(m=>{
@@ -4276,7 +4277,7 @@ function App() {
                               key:m,
                               onClick:()=>toggleSet(setLibMuscleFilters,m),
                               style:{display:"flex",alignItems:"center",gap:8,
-                                     padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                     padding:"6px 10px",borderRadius:R.md,cursor:"pointer",
                                      background:sel?"rgba(122,143,139,.12)":"transparent"}
                             },
                               React.createElement('div', {style:{
@@ -4284,8 +4285,8 @@ function App() {
                                 border:"1.5px solid "+(sel?"#7A8F8B":"rgba(122,143,139,.3)"),
                                 background:sel?"rgba(122,143,139,.25)":"transparent",
                                 display:"flex",alignItems:"center",justifyContent:"center"
-                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:UI_COLORS.accent,lineHeight:1}},"✓")),
-                              React.createElement('span',{style:{fontSize:".72rem",
+                              }}, sel && React.createElement('span',{style:{fontSize:FS.sm,color:UI_COLORS.accent,lineHeight:1}},"✓")),
+                              React.createElement('span',{style:{fontSize:FS.lg,
                                 color:sel?"#7A8F8B":"#b4ac9e",whiteSpace:"nowrap"}},
                                 m.charAt(0).toUpperCase()+m.slice(1).replace("_"," "))
                             );
@@ -4297,22 +4298,22 @@ function App() {
                       React.createElement('div', {style:{position:"relative",flex:"1 1 110px",zIndex:20}},
                         React.createElement('button', {
                           onClick:()=>setLibOpenDrop(libOpenDrop==="equip"?null:"equip"),
-                          style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:9,
+                          style:{width:"100%",padding:"7px 28px 7px 10px",borderRadius:R.xl,
                                  border:"1px solid "+(libEquipFilters.size>0?UI_COLORS.accent:"rgba(45,42,36,.3)"),
                                  background:"rgba(14,14,12,.95)",
                                  color:libEquipFilters.size>0?UI_COLORS.accent:"#8a8478",
-                                 fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                                 fontSize:FS.lg,textAlign:"left",cursor:"pointer",position:"relative"}
                         },
                           libEquipFilters.size>0?"Equip ("+libEquipFilters.size+")":"Equipment",
                           React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
                             transform:"translateY(-50%) rotate("+(libOpenDrop==="equip"?"180deg":"0deg")+")",
-                            color:libEquipFilters.size>0?UI_COLORS.accent:"#6a6050",fontSize:".6rem",
+                            color:libEquipFilters.size>0?UI_COLORS.accent:"#6a6050",fontSize:FS.sm,
                             transition:"transform .15s",lineHeight:1}},"▼")
                         ),
                         libOpenDrop==="equip" && React.createElement('div', {
                           style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",
                                  background:"rgba(16,14,10,.95)",border:"1px solid rgba(196,148,40,0.25)",
-                                 borderRadius:9,padding:"6px 4px",zIndex:21,
+                                 borderRadius:R.xl,padding:"6px 4px",zIndex:21,
                                  boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
                         },
                           EQUIP_OPTS.map(eq=>{
@@ -4321,7 +4322,7 @@ function App() {
                               key:eq,
                               onClick:()=>toggleSet(setLibEquipFilters,eq),
                               style:{display:"flex",alignItems:"center",gap:8,
-                                     padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                     padding:"6px 10px",borderRadius:R.md,cursor:"pointer",
                                      background:sel?"rgba(196,148,40,0.12)":"transparent"}
                             },
                               React.createElement('div', {style:{
@@ -4329,8 +4330,8 @@ function App() {
                                 border:"1.5px solid "+(sel?UI_COLORS.accent:"rgba(196,148,40,0.3)"),
                                 background:sel?"rgba(196,148,40,0.25)":"transparent",
                                 display:"flex",alignItems:"center",justifyContent:"center"
-                              }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:UI_COLORS.accent,lineHeight:1}},"✓")),
-                              React.createElement('span',{style:{fontSize:".72rem",
+                              }}, sel && React.createElement('span',{style:{fontSize:FS.sm,color:UI_COLORS.accent,lineHeight:1}},"✓")),
+                              React.createElement('span',{style:{fontSize:FS.lg,
                                 color:sel?UI_COLORS.accent:"#b4ac9e",whiteSpace:"nowrap"}},
                                 eq.charAt(0).toUpperCase()+eq.slice(1))
                             );
@@ -4371,7 +4372,7 @@ function App() {
                       style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,
                              padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}
                     },
-                      React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, libSelected.size+" selected"),
+                      React.createElement('span',{style:{fontSize:FS.lg,color:"#b4ac9e",fontWeight:"700"}}, libSelected.size+" selected"),
                       React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
                       React.createElement('button',{
                         onClick:()=>{
@@ -4379,7 +4380,7 @@ function App() {
                           setAddToWorkoutPicker({exercises:exs});
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:R.lg,fontSize:FS.md,fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       }, "➕ Existing"),
                       React.createElement('button',{
                         onClick:()=>{
@@ -4388,7 +4389,7 @@ function App() {
                           setWorkoutView("builder");setActiveTab("workouts");
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
-                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:R.lg,fontSize:FS.md,fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       }, "⚡ New Workout"),
                       React.createElement('button',{
                         onClick:()=>{
@@ -4398,7 +4399,7 @@ function App() {
                           setSpwName("Selected Exercises");setSpwIcon("📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                           setLibSelectMode(false);setLibSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:R.lg,fontSize:FS.md,fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       }, "📋 Plan")
                     )),
 
@@ -4437,7 +4438,7 @@ function App() {
                                 color: isSel ? "#d4cec4" : "#d4cec4",
                                 letterSpacing:".01em",
                               }}, ex.name),
-                              hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆"),
+                              hasPB && React.createElement('span',{style:{fontSize:FS.sm}}, "🏆"),
                             ),
                             React.createElement('div', {style:{
                               fontSize:".62rem", fontStyle:"italic", lineHeight:1.4,
@@ -4478,7 +4479,7 @@ function App() {
                       /* Load More / count info */
                       libFiltered.length > libVisibleCount && React.createElement('button', {
                         onClick:()=>setLibVisibleCount(c=>c+60),
-                        style:{alignSelf:"center",margin:"12px auto",padding:"8px 24px",borderRadius:8,
+                        style:{alignSelf:"center",margin:"12px auto",padding:"8px 24px",borderRadius:R.lg,
                                border:"1px solid rgba(180,172,158,.12)",background:"rgba(45,42,36,.3)",
                                color:"#b4ac9e",fontSize:".75rem",fontWeight:600,cursor:"pointer",letterSpacing:".02em"}
                       }, `Load More (${Math.min(libVisibleCount, libFiltered.length)} of ${libFiltered.length})`)
@@ -4499,24 +4500,24 @@ function App() {
                         React.createElement('div',{style:{marginBottom:10}},
                           React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}},
                             React.createElement('span',{style:{fontSize:"1rem",fontWeight:"700",color:"#e8e0d0"}}, libDetailEx.name),
-                            (profile.exercisePBs||{})[libDetailEx.id] && React.createElement('span',{style:{background:"rgba(180,172,158,.1)",color:"#b4ac9e",fontSize:".6rem",padding:"2px 7px",borderRadius:4,fontWeight:"700"}}, "🏆 PB")
+                            (profile.exercisePBs||{})[libDetailEx.id] && React.createElement('span',{style:{background:"rgba(180,172,158,.1)",color:"#b4ac9e",fontSize:FS.sm,padding:"2px 7px",borderRadius:4,fontWeight:"700"}}, "🏆 PB")
                           ),
                           React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}},
-                            React.createElement('span',{style:{fontSize:".7rem",color:getMuscleColor(libDetailEx.muscleGroup),fontStyle:"italic"}}, libDetailEx.muscleGroup?(libDetailEx.muscleGroup.charAt(0).toUpperCase()+libDetailEx.muscleGroup.slice(1)):""),
-                            libDetailEx.equipment && React.createElement('span',{style:{fontSize:".7rem",color:"#6a6050",fontStyle:"italic"}}, "· "+libDetailEx.equipment),
-                            libDetailEx.difficulty && React.createElement('span',{style:{fontSize:".7rem",fontWeight:700,color:libDetailEx.difficulty==="Advanced"?"#7A2838":libDetailEx.difficulty==="Beginner"?"#5A8A58":"#A8843C"}}, "· "+libDetailEx.difficulty),
-                            React.createElement('span',{style:{fontSize:".7rem",color:"#b4ac9e",fontWeight:"700"}}, "· "+libDetailEx.baseXP+" XP")
+                            React.createElement('span',{style:{fontSize:FS.md,color:getMuscleColor(libDetailEx.muscleGroup),fontStyle:"italic"}}, libDetailEx.muscleGroup?(libDetailEx.muscleGroup.charAt(0).toUpperCase()+libDetailEx.muscleGroup.slice(1)):""),
+                            libDetailEx.equipment && React.createElement('span',{style:{fontSize:FS.md,color:"#6a6050",fontStyle:"italic"}}, "· "+libDetailEx.equipment),
+                            libDetailEx.difficulty && React.createElement('span',{style:{fontSize:FS.md,fontWeight:700,color:libDetailEx.difficulty==="Advanced"?"#7A2838":libDetailEx.difficulty==="Beginner"?"#5A8A58":"#A8843C"}}, "· "+libDetailEx.difficulty),
+                            React.createElement('span',{style:{fontSize:FS.md,color:"#b4ac9e",fontWeight:"700"}}, "· "+libDetailEx.baseXP+" XP")
                           )
                         ),
                         libDetailEx.desc && React.createElement('p',{style:{fontSize:".78rem",color:"#8a8478",lineHeight:1.55,marginBottom:12}}, libDetailEx.desc),
-                        libDetailEx.pbType && React.createElement('div',{style:{background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.05)",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:".72rem",color:"#8a8478"}},
+                        libDetailEx.pbType && React.createElement('div',{style:{background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.05)",borderRadius:R.lg,padding:"8px 12px",marginBottom:12,fontSize:FS.lg,color:"#8a8478"}},
                           React.createElement('span',{style:{color:"#b4ac9e",fontWeight:"700"}}, "PB: "),
                           libDetailEx.pbType,
                           libDetailEx.pbTier==="Leaderboard" && React.createElement('span',{style:{marginLeft:8,color:"#b4ac9e",fontSize:".65rem"}},"🏆 Leaderboard")
                         ),
                         React.createElement('button',{
                           onClick:()=>setProfile(p=>({...p,favoriteExercises:(p.favoriteExercises||[]).includes(libDetailEx.id)?(p.favoriteExercises||[]).filter(i=>i!==libDetailEx.id):[...(p.favoriteExercises||[]),libDetailEx.id]})),
-                          style:{width:"100%",background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer"}
+                          style:{width:"100%",background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"11px",borderRadius:R.xl,fontWeight:"700",fontSize:".82rem",cursor:"pointer"}
                         }, (profile.favoriteExercises||[]).includes(libDetailEx.id)?"⭐ Saved to Favorites":"☆ Save to Favorites"),
                         React.createElement('div', {style:{display:"flex",gap:8,marginTop:8}},
                           libDetailEx.id!=="rest_day"&&React.createElement('button', {
@@ -4525,7 +4526,7 @@ function App() {
                               setAddToWorkoutPicker({exercises:[exEntry]});
                               setLibDetailEx(null);
                             },
-                            style:{flex:1,background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"10px",borderRadius:9,fontWeight:"600",fontSize:".72rem",cursor:"pointer",textAlign:"center"}
+                            style:{flex:1,background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"10px",borderRadius:R.xl,fontWeight:"600",fontSize:FS.lg,cursor:"pointer",textAlign:"center"}
                           }, "\uD83D\uDCAA Add to Workout"),
                           React.createElement('button', {
                             onClick:()=>{
@@ -4534,7 +4535,7 @@ function App() {
                               setSpwName(libDetailEx.name);setSpwIcon("\uD83D\uDCCB");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                               setLibDetailEx(null);
                             },
-                            style:{flex:1,background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"10px",borderRadius:9,fontWeight:"600",fontSize:".72rem",cursor:"pointer",textAlign:"center"}
+                            style:{flex:1,background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",color:"#b4ac9e",padding:"10px",borderRadius:R.xl,fontWeight:"600",fontSize:FS.lg,cursor:"pointer",textAlign:"center"}
                           }, "\uD83D\uDCCB Add to Plan")
                         ),
                         /* Edit & Complete Now */
@@ -4547,7 +4548,7 @@ function App() {
                             setLibDetailEx(null);
                             setActiveTab("workout");
                           },
-                          style:{width:"100%",marginTop:8,background:"linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",border:"1px solid rgba(41,128,185,.3)",color:UI_COLORS.info,padding:"11px",borderRadius:9,fontWeight:"700",fontSize:".82rem",cursor:"pointer",textAlign:"center"}
+                          style:{width:"100%",marginTop:8,background:"linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",border:"1px solid rgba(41,128,185,.3)",color:UI_COLORS.info,padding:"11px",borderRadius:R.xl,fontWeight:"700",fontSize:".82rem",cursor:"pointer",textAlign:"center"}
                         }, "\u2699 Configure")
                       )
                     )
@@ -4561,12 +4562,12 @@ function App() {
                       , React.createElement('div',{style:{fontSize:".65rem",color:"#4a4438",textTransform:"uppercase",letterSpacing:".1em"}},"Favorite Exercises")
                       , (profile.favoriteExercises||[]).length>0 && React.createElement('button',{
                         onClick:()=>{setFavSelectMode(!favSelectMode);setFavSelected(new Set());},
-                        style:{background:favSelectMode?"rgba(45,42,36,.3)":"transparent",border:"1px solid "+(favSelectMode?"rgba(180,172,158,.15)":"rgba(180,172,158,.06)"),color:favSelectMode?"#d4cec4":"#8a8478",fontSize:".6rem",padding:"4px 10px",borderRadius:6,cursor:"pointer"}
+                        style:{background:favSelectMode?"rgba(45,42,36,.3)":"transparent",border:"1px solid "+(favSelectMode?"rgba(180,172,158,.15)":"rgba(180,172,158,.06)"),color:favSelectMode?"#d4cec4":"#8a8478",fontSize:FS.sm,padding:"4px 10px",borderRadius:R.md,cursor:"pointer"}
                       }, favSelectMode?"✕ Cancel":"☐ Select")
                     )
                     /* Multi-select action bar */
                     , favSelectMode && favSelected.size>0 && React.createElement('div',{style:{background:"rgba(45,42,36,.2)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}
-                      , React.createElement('span',{style:{fontSize:".72rem",color:"#b4ac9e",fontWeight:"700"}}, favSelected.size+" selected")
+                      , React.createElement('span',{style:{fontSize:FS.lg,color:"#b4ac9e",fontWeight:"700"}}, favSelected.size+" selected")
                       , React.createElement('div',{style:{display:"flex",gap:8,justifyContent:"center"}},
                       React.createElement('button',{
                         onClick:()=>{
@@ -4575,7 +4576,7 @@ function App() {
                           setAddToWorkoutPicker({exercises:exs});
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                        style:{background:"rgba(45,42,36,.22)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:R.lg,fontSize:FS.md,fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       },"➕ Existing")
                       , React.createElement('button',{
                         onClick:()=>{
@@ -4585,7 +4586,7 @@ function App() {
                           setWorkoutView("builder");setActiveTab("workouts");
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                        style:{background:"linear-gradient(135deg,#5b2d8e,#7b1fa2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:R.lg,fontSize:FS.md,fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       },"⚡ New Workout")
                       , React.createElement('button',{
                         onClick:()=>{
@@ -4594,7 +4595,7 @@ function App() {
                           setSpwName("Selected Favorites");setSpwIcon("📋");setSpwDate("");setSpwMode("new");setSpwTargetPlanId(null);
                           setFavSelectMode(false);setFavSelected(new Set());
                         },
-                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:8,fontSize:".7rem",fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
+                        style:{background:"rgba(45,42,36,.26)",border:"1px solid rgba(180,172,158,.08)",color:"#b4ac9e",padding:"6px 12px",borderRadius:R.lg,fontSize:FS.md,fontWeight:"700",cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}
                       },"📋 Plan")
                     ))
                     , (profile.favoriteExercises||[]).length===0
@@ -4627,13 +4628,13 @@ function App() {
                                 favSelectMode && React.createElement('div',{style:{width:22,height:22,borderRadius:5,flexShrink:0,border:"1.5px solid "+(isSel?"rgba(180,172,158,.3)":"rgba(180,172,158,.08)"),background:isSel?"rgba(45,42,36,.35)":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}},
                                   isSel && React.createElement('span',{style:{color:"#b4ac9e",fontSize:".65rem"}},"✓")
                                 ),
-                                React.createElement('div',{style:{width:34,height:34,borderRadius:8,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},
+                                React.createElement('div',{style:{width:34,height:34,borderRadius:R.lg,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},
                                   React.createElement(ExIcon,{ex:ex,size:"1rem",color:"#b4ac9e"})
                                 ),
                                 React.createElement('div',{style:{flex:1,minWidth:0}},
                                   React.createElement('div',{style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:3}},
                                     React.createElement('span',{style:{fontSize:".83rem",fontWeight:600,color:"#d4cec4",letterSpacing:".01em"}}, ex.name),
-                                    hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆")
+                                    hasPB && React.createElement('span',{style:{fontSize:FS.sm}}, "🏆")
                                   ),
                                   React.createElement('div',{style:{fontSize:".62rem",fontStyle:"italic",lineHeight:1.4}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))
                                 ),
@@ -4677,14 +4678,14 @@ function App() {
                                   transition:"all .18s",
                                 }
                               },
-                                React.createElement('div',{style:{width:34,height:34,borderRadius:8,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},
+                                React.createElement('div',{style:{width:34,height:34,borderRadius:R.lg,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center"}},
                                   React.createElement(ExIcon,{ex:ex,size:"1rem",color:"#b4ac9e"})
                                 ),
                                 React.createElement('div',{style:{flex:1,minWidth:0}},
                                   React.createElement('div',{style:{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:3}},
                                     React.createElement('span',{style:{fontSize:".83rem",fontWeight:600,color:"#d4cec4",letterSpacing:".01em"}}, ex.name),
                                     React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:2}}, "custom"),
-                                    hasPB && React.createElement('span',{style:{fontSize:".6rem"}}, "🏆"),
+                                    hasPB && React.createElement('span',{style:{fontSize:FS.sm}}, "🏆"),
                                   ),
                                   React.createElement('div',{style:{fontSize:".62rem",fontStyle:"italic",lineHeight:1.4}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))
                                 ),
@@ -4716,7 +4717,7 @@ function App() {
                         )
                     , React.createElement('button',{
                         onClick:()=>openExEditor("create",null),
-                        style:{marginTop:10,width:"100%",background:"transparent",border:"1px dashed rgba(180,172,158,.08)",color:"#b4ac9e",borderRadius:9,padding:"10px",fontSize:".78rem",cursor:"pointer"}
+                        style:{marginTop:10,width:"100%",background:"transparent",border:"1px dashed rgba(180,172,158,.08)",color:"#b4ac9e",borderRadius:R.xl,padding:"10px",fontSize:".78rem",cursor:"pointer"}
                       },"＋ Create Custom Exercise")
                   )
                 )
@@ -4757,22 +4758,22 @@ function App() {
                     React.createElement('div', {style:{position:"relative",zIndex:20}},
                       React.createElement('button', {
                         onClick:()=>setWoLabelDropOpen(!woLabelDropOpen),
-                        style:{padding:"7px 28px 7px 10px",borderRadius:9,
+                        style:{padding:"7px 28px 7px 10px",borderRadius:R.xl,
                                border:"1px solid "+(woLabelFilters.size>0?"#C4A044":"rgba(45,42,36,.3)"),
                                background:"rgba(14,14,12,.95)",
                                color:woLabelFilters.size>0?"#C4A044":"#8a8478",
-                               fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                               fontSize:FS.lg,textAlign:"left",cursor:"pointer",position:"relative"}
                       },
                         woLabelFilters.size>0?"Labels ("+woLabelFilters.size+")":"Labels",
                         React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
                           transform:"translateY(-50%) rotate("+(woLabelDropOpen?"180deg":"0deg")+")",
-                          color:woLabelFilters.size>0?"#C4A044":"#6a6050",fontSize:".6rem",
+                          color:woLabelFilters.size>0?"#C4A044":"#6a6050",fontSize:FS.sm,
                           transition:"transform .15s",lineHeight:1}},"▼")
                       ),
                       woLabelDropOpen && React.createElement('div', {
                         style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:180,
                                background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.07)",
-                               borderRadius:9,padding:"6px 4px",zIndex:21,
+                               borderRadius:R.xl,padding:"6px 4px",zIndex:21,
                                boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
                       },
                         (profile.workoutLabels||[]).map(l=>{
@@ -4781,7 +4782,7 @@ function App() {
                             key:l,
                             onClick:()=>setWoLabelFilters(s=>{const n=new Set(s);n.has(l)?n.delete(l):n.add(l);return n;}),
                             style:{display:"flex",alignItems:"center",gap:8,
-                                   padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                   padding:"6px 10px",borderRadius:R.md,cursor:"pointer",
                                    background:sel?"rgba(196,160,68,.12)":"transparent"}
                           },
                             React.createElement('div', {style:{
@@ -4789,8 +4790,8 @@ function App() {
                               border:"1.5px solid "+(sel?"#C4A044":"rgba(180,172,158,.08)"),
                               background:sel?"rgba(196,160,68,.25)":"transparent",
                               display:"flex",alignItems:"center",justifyContent:"center"
-                            }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:"#C4A044",lineHeight:1}},"✓")),
-                            React.createElement('span',{style:{fontSize:".72rem",
+                            }}, sel && React.createElement('span',{style:{fontSize:FS.sm,color:"#C4A044",lineHeight:1}},"✓")),
+                            React.createElement('span',{style:{fontSize:FS.lg,
                               color:sel?"#C4A044":"#b4ac9e",whiteSpace:"nowrap"}},l)
                           );
                         }),
@@ -4808,7 +4809,7 @@ function App() {
                               }
                             },
                             placeholder:"+ New label…"}),
-                          React.createElement('button', {className:"btn btn-ghost btn-xs", style:{padding:"2px 6px",fontSize:".6rem"},
+                          React.createElement('button', {className:"btn btn-ghost btn-xs", style:{padding:"2px 6px",fontSize:FS.sm},
                             onClick:e=>{
                               e.stopPropagation();
                               const lbl=newLabelInput.trim(); if(!lbl) return;
@@ -4822,7 +4823,7 @@ function App() {
                     ),
                     woLabelFilters.size>0 && React.createElement('button', {
                       className:"btn btn-ghost btn-xs",
-                      style:{fontSize:".6rem",color:"#8a8478",alignSelf:"center"},
+                      style:{fontSize:FS.sm,color:"#8a8478",alignSelf:"center"},
                       onClick:()=>setWoLabelFilters(new Set())
                     },"Clear")
                   )
@@ -4858,12 +4859,12 @@ function App() {
                               , wo.desc
                               , wo.desc.length>60&&React.createElement('span', {
                                 className: `ex-collapse-btn ${collapsedWo.has(wo.id)?"open":""}`,
-                                style: {position:"absolute",top:0,right:0,fontSize:".6rem",padding:"0 2px"},
+                                style: {position:"absolute",top:0,right:0,fontSize:FS.sm,padding:"0 2px"},
                                 onClick: (e)=>{e.stopPropagation();setCollapsedWo(s=>{const n=new Set(s);n.has(wo.id)?n.delete(wo.id):n.add(wo.id);return n;});}
                               }, "▼")
                             )
                           )
-                          , React.createElement('div', { style: {display:"flex",gap:0,border:"1px solid rgba(180,172,158,.05)",borderRadius:9,overflow:"hidden",background:"rgba(45,42,36,.3)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",flexShrink:0}, onClick: e=>e.stopPropagation() }
+                          , React.createElement('div', { style: {display:"flex",gap:0,border:"1px solid rgba(180,172,158,.05)",borderRadius:R.xl,overflow:"hidden",background:"rgba(45,42,36,.3)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",flexShrink:0}, onClick: e=>e.stopPropagation() }
                             , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#5a5650",background:"transparent",border:"none",borderRight:"1px solid rgba(180,172,158,.06)",textTransform:"uppercase"}, title: "Copy", onClick: ()=>copyWorkout(wo)}, "\u2398 Copy")
                             , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#5a5650",background:"transparent",border:"none",borderRight:"1px solid rgba(180,172,158,.06)",textTransform:"uppercase"}, title: "Edit", onClick: ()=>initWorkoutBuilder(wo)}, "\u270E Edit")
                             , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:UI_COLORS.danger,background:"transparent",border:"none",textTransform:"uppercase"}, title: "Delete", onClick: ()=>setConfirmDelete({type:"workout",id:wo.id,name:wo.name,icon:wo.icon})}, "\u2715 Del")
@@ -4916,7 +4917,7 @@ function App() {
                                   )
                                   , wo.desc&&React.createElement('div', { className: "workout-desc recipe-desc-collapsed", style:{marginTop:3}}, wo.desc)
                                 )
-                                , React.createElement('div', { style: {display:"flex",gap:0,border:"1px solid rgba(180,172,158,.05)",borderRadius:9,overflow:"hidden",background:"rgba(45,42,36,.3)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",flexShrink:0}, onClick: e=>e.stopPropagation() }
+                                , React.createElement('div', { style: {display:"flex",gap:0,border:"1px solid rgba(180,172,158,.05)",borderRadius:R.xl,overflow:"hidden",background:"rgba(45,42,36,.3)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",flexShrink:0}, onClick: e=>e.stopPropagation() }
                                   , React.createElement('button', { style:{padding:"6px 10px",textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:".55rem",letterSpacing:".06em",cursor:"pointer",color:"#5a5650",background:"transparent",border:"none",borderRight:"1px solid rgba(180,172,158,.06)",textTransform:"uppercase"}, title: "Edit", onClick: ()=>{
                                     setWbName(wo.name); setWbIcon(wo.icon); setWbDesc(wo.desc||"");
                                     setWbExercises(wo.exercises.map(e=>({...e})));
@@ -5022,22 +5023,22 @@ function App() {
                     React.createElement('div', {style:{position:"relative",zIndex:20}},
                       React.createElement('button', {
                         onClick:()=>setRecipeCatDrop(!recipeCatDrop),
-                        style:{padding:"7px 28px 7px 10px",borderRadius:9,
+                        style:{padding:"7px 28px 7px 10px",borderRadius:R.xl,
                                border:"1px solid "+(recipeFilter.size>0?"#C4A044":"rgba(45,42,36,.3)"),
                                background:"rgba(14,14,12,.95)",
                                color:recipeFilter.size>0?"#C4A044":"#8a8478",
-                               fontSize:".72rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                               fontSize:FS.lg,textAlign:"left",cursor:"pointer",position:"relative"}
                       },
                         recipeFilter.size>0?"Category ("+recipeFilter.size+")":"Category",
                         React.createElement('span',{style:{position:"absolute",right:8,top:"50%",
                           transform:"translateY(-50%) rotate("+(recipeCatDrop?"180deg":"0deg")+")",
-                          color:recipeFilter.size>0?"#C4A044":"#6a6050",fontSize:".6rem",
+                          color:recipeFilter.size>0?"#C4A044":"#6a6050",fontSize:FS.sm,
                           transition:"transform .15s",lineHeight:1}},"▼")
                       ),
                       recipeCatDrop && React.createElement('div', {
                         style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:200,maxHeight:280,overflowY:"auto",
                                background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.07)",
-                               borderRadius:9,padding:"6px 4px",zIndex:21,
+                               borderRadius:R.xl,padding:"6px 4px",zIndex:21,
                                boxShadow:"0 8px 24px rgba(0,0,0,.6)"}
                       },
                         RECIPE_CATS.filter(c=>c!=="All").map(cat=>{
@@ -5046,7 +5047,7 @@ function App() {
                             key:cat,
                             onClick:()=>setRecipeFilter(s=>{const n=new Set(s);n.has(cat)?n.delete(cat):n.add(cat);return n;}),
                             style:{display:"flex",alignItems:"center",gap:8,
-                                   padding:"6px 10px",borderRadius:6,cursor:"pointer",
+                                   padding:"6px 10px",borderRadius:R.md,cursor:"pointer",
                                    background:sel?"rgba(196,160,68,.12)":"transparent"}
                           },
                             React.createElement('div', {style:{
@@ -5054,8 +5055,8 @@ function App() {
                               border:"1.5px solid "+(sel?"#C4A044":"rgba(180,172,158,.08)"),
                               background:sel?"rgba(196,160,68,.25)":"transparent",
                               display:"flex",alignItems:"center",justifyContent:"center"
-                            }}, sel && React.createElement('span',{style:{fontSize:".6rem",color:"#C4A044",lineHeight:1}},"✓")),
-                            React.createElement('span',{style:{fontSize:".72rem",
+                            }}, sel && React.createElement('span',{style:{fontSize:FS.sm,color:"#C4A044",lineHeight:1}},"✓")),
+                            React.createElement('span',{style:{fontSize:FS.lg,
                               color:sel?"#C4A044":"#b4ac9e",whiteSpace:"nowrap"}},cat)
                           );
                         })
@@ -5063,7 +5064,7 @@ function App() {
                     ),
                     recipeFilter.size>0 && React.createElement('button', {
                       className:"btn btn-ghost btn-xs",
-                      style:{fontSize:".6rem",color:"#8a8478",alignSelf:"center"},
+                      style:{fontSize:FS.sm,color:"#8a8478",alignSelf:"center"},
                       onClick:()=>setRecipeFilter(new Set())
                     },"Clear")
                   )
@@ -5094,17 +5095,17 @@ function App() {
                         , tpl.desc&&React.createElement('div', { style: {position:"relative",marginBottom:descExpanded?10:4,marginTop:6}}
                           , React.createElement('div', {
                             className: descExpanded?"":"recipe-desc-collapsed",
-                            style: {fontSize:".72rem",color:"#8a8478",fontStyle:"italic",lineHeight:1.5,whiteSpace:"pre-line",paddingRight:20}
+                            style: {fontSize:FS.lg,color:"#8a8478",fontStyle:"italic",lineHeight:1.5,whiteSpace:"pre-line",paddingRight:20}
                           }, tpl.desc)
                           , React.createElement('span', {
                             className: `ex-collapse-btn ${descExpanded?"open":""}`,
-                            style: {position:"absolute",top:0,right:0,fontSize:".7rem",padding:"0 4px",cursor:"pointer"},
+                            style: {position:"absolute",top:0,right:0,fontSize:FS.md,padding:"0 4px",cursor:"pointer"},
                             onClick: ()=>setExpandedRecipeDesc(s=>{const n=new Set(s);n.has(tpl.id)?n.delete(tpl.id):n.add(tpl.id);return n;})
                           }, "▼")
                         )
                         /* Exercise breakdown — collapsible, collapsed by default */
                         , React.createElement('div', {
-                          style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:8,padding:"8px 12px",marginBottom:12,cursor:"pointer"},
+                          style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:R.lg,padding:"8px 12px",marginBottom:12,cursor:"pointer"},
                           onClick: ()=>setExpandedRecipeEx(s=>{const n=new Set(s);n.has(tpl.id)?n.delete(tpl.id):n.add(tpl.id);return n;})
                         }
                           , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between"}}
@@ -5239,7 +5240,7 @@ function App() {
                     })
                     , React.createElement('div', { className: "div"})
                     , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"}}
-                      , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem"}, onClick: ()=>{
+                      , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:FS.sm}, onClick: ()=>{
                         openStatsPromptIfNeeded(wo, (woWithStats, _sr)=>{
                           setCompletionModal({workout:woWithStats, fromStats:_sr});setCompletionDate(todayStr());setCompletionAction("today");
                         });
@@ -5308,7 +5309,7 @@ function App() {
                             }
                           },
                           placeholder: "+ New label…", style: {width:100} })
-                        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 6px",fontSize:".6rem"},
+                        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 6px",fontSize:FS.sm},
                           onClick: ()=>{
                             const lbl=newLabelInput.trim(); if(!lbl) return;
                             if(!(profile.workoutLabels||[]).some(x=>x.toLowerCase()===lbl.toLowerCase())){
@@ -5597,9 +5598,9 @@ function App() {
                                 , React.createElement('span', { className: `plan-type-badge type-${plan.type}`}
                                   , plan.durCount&&plan.durCount>1?`${plan.durCount} ${plan.type}s`:plan.type
                                 )
-                                , React.createElement('span', { style: {marginLeft:6,fontSize:".6rem",color:"#8a8478"}}, plan.days.filter(d=>d.exercises.length>0).length, " active days"  )
-                                , plan.startDate&&React.createElement('span', { style: {marginLeft:6,fontSize:".6rem",color:"#8a8478"}}, "📅 " , new Date(plan.startDate+"T12:00:00").toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"}), plan.endDate?" → "+new Date(plan.endDate+"T12:00:00").toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"}):"")
-                                , !plan.startDate&&hasSched&&React.createElement('span', { style: {marginLeft:6,fontSize:".6rem",color:"#b4ac9e"}}, "📅 " , formatScheduledDate(plan.scheduledDate))
+                                , React.createElement('span', { style: {marginLeft:6,fontSize:FS.sm,color:"#8a8478"}}, plan.days.filter(d=>d.exercises.length>0).length, " active days"  )
+                                , plan.startDate&&React.createElement('span', { style: {marginLeft:6,fontSize:FS.sm,color:"#8a8478"}}, "📅 " , new Date(plan.startDate+"T12:00:00").toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"}), plan.endDate?" → "+new Date(plan.endDate+"T12:00:00").toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"}):"")
+                                , !plan.startDate&&hasSched&&React.createElement('span', { style: {marginLeft:6,fontSize:FS.sm,color:"#b4ac9e"}}, "📅 " , formatScheduledDate(plan.scheduledDate))
                               )
                             )
                             , React.createElement('div', { className: "plan-xp-badge"}, "⚡ " , planXP.toLocaleString())
@@ -5678,8 +5679,8 @@ function App() {
                                       })
                                       , allTplExIds.length>6&&React.createElement('span', { className: "workout-ex-pill"}, "+", allTplExIds.length-6, " more" )
                                     )
-                                    , tpl.description&&React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",fontStyle:"italic",marginBottom:12,lineHeight:1.6}}, tpl.description)
-                                    , React.createElement('div', { style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:8,padding:"8px 12px",marginBottom:12}}
+                                    , tpl.description&&React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",fontStyle:"italic",marginBottom:12,lineHeight:1.6}}, tpl.description)
+                                    , React.createElement('div', { style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(45,42,36,.18)",borderRadius:R.lg,padding:"8px 12px",marginBottom:12}}
                                       , tpl.days.map((day,di)=>(
                                         React.createElement('div', { key: di, style: {display:"flex",alignItems:"flex-start",gap:8,padding:"4px 0",borderBottom:di<tpl.days.length-1?"1px solid rgba(45,42,36,.15)":""}}
                                           , React.createElement('span', { style: {fontSize:".65rem",color:"#b4ac9e",minWidth:50,flexShrink:0,paddingTop:1}}, day.label||`Day ${di+1}`)
@@ -5830,18 +5831,18 @@ function App() {
                                       /* Sets + Reps/Duration + Weight */
                                       , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
                                         , !noSetsEx&&React.createElement('div', { style: {flex:1}}
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
+                                          , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
                                           , React.createElement('input', { className: "plan-ex-edit-inp", style: {width:"100%"}, type: "text", inputMode: "decimal",
                                             value: ex.sets===0||ex.sets===""?"":ex.sets||"", onChange: e=>updateDetailEx(vDayIdx,exI,"sets",e.target.value)})
                                         )
                                         , React.createElement('div', { style: {flex:1}}
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, isCardioEx?"Duration (min)":"Reps")
+                                          , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, isCardioEx?"Duration (min)":"Reps")
                                           , React.createElement('input', { className: "plan-ex-edit-inp", style: {width:"100%"}, type: "text", inputMode: "decimal",
                                             value: ex.reps===0||ex.reps===""?"":ex.reps||"", onChange: e=>updateDetailEx(vDayIdx,exI,"reps",e.target.value)})
                                         )
                                         , hasWeightEx&&(
                                           React.createElement('div', { style: {flex:1}}
-                                            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, wUnit)
+                                            , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, wUnit)
                                             , React.createElement('input', { className: "plan-ex-edit-inp", style: {width:"100%"}, type: "text", inputMode: "decimal", step: metric?"0.5":"2.5",
                                               value: inputWVal, placeholder: "—",
                                               onChange: e=>{const v=e.target.value;const lbs=v&&metric?kgToLbs(v):v;updateDetailEx(vDayIdx,exI,"weightLbs",lbs||null);}})
@@ -5854,7 +5855,7 @@ function App() {
                                       , hasWeightEx&&(
                                         React.createElement('div', { style: {marginBottom:6}}
                                           , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}
-                                            , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:0}}, "Weight Intensity" )
+                                            , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:0}}, "Weight Intensity" )
                                             , React.createElement('span', { style: {fontSize:".68rem",color:"#b4ac9e"}}, ex.weightPct||100, "%")
                                           )
                                           , React.createElement('input', { type: "range", className: "pct-slider", min: "0", max: "100", step: "5",
@@ -5867,7 +5868,7 @@ function App() {
                                       )
                                       , isCardioEx&&(
                                         React.createElement('div', { style: {marginBottom:6}}
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:3,display:"block"}}, "Distance (" , metric?"km":"mi", ") " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
+                                          , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:3,display:"block"}}, "Distance (" , metric?"km":"mi", ") " , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
                                           , React.createElement('input', { className: "plan-ex-edit-inp", style: {width:"100%"}, type: "text", inputMode: "decimal",
                                             value: inputDistVal, placeholder: "0",
                                             onChange: e=>{const v=e.target.value;const mi=v&&metric?kmToMi(v):v;updateDetailEx(vDayIdx,exI,"distanceMi",mi||null);}})
@@ -5875,7 +5876,7 @@ function App() {
                                       )
                                       , isCardioEx&&(
                                         React.createElement('div', null
-                                          , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
+                                          , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:".55rem"}}, "(optional)"))
                                           , React.createElement('div', { className: "hr-zone-row"}
                                             , HR_ZONES.map(z=>{
                                               const sel=ex.hrZone===z.z;
@@ -5906,7 +5907,7 @@ function App() {
                         const isUserPlan = (profile.plans||[]).some(p=>p.id===plan.id);
                         if(!isUserPlan) {
                           return React.createElement('div', {style:{background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.06)",borderRadius:10,padding:"14px",textAlign:"center"}},
-                            React.createElement('div', {style:{fontSize:".72rem",color:"#8a8478",marginBottom:8}}, "This is a recipe preview. Customize it to add it to your plans."),
+                            React.createElement('div', {style:{fontSize:FS.lg,color:"#8a8478",marginBottom:8}}, "This is a recipe preview. Customize it to add it to your plans."),
                             React.createElement('button', { className: "btn btn-gold", style: {width:"100%"}, onClick: ()=>initBuilderFromTemplate(plan,true) }, "\u270E Customize & Add to My Plans")
                           );
                         }
@@ -6075,7 +6076,7 @@ function App() {
                     React.createElement('div', { className: "cal-day-detail"}
                       , React.createElement('div', { className: "cal-day-hdr"}
                         , React.createElement('span', null, selLabel)
-                        , isSelToday && React.createElement('span', { style: {fontSize:".6rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "Today")
+                        , isSelToday && React.createElement('span', { style: {fontSize:FS.sm,color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "Today")
                       )
 
                       /* Scheduled items */
@@ -6144,7 +6145,7 @@ function App() {
                                   )
                                 )
                                 , React.createElement('div', { className: "log-group-xp" }, formatXP(groupXP,{prefix:"⚡ "}))
-                                , React.createElement('span', { style:{fontSize:".6rem",color:"#5a5650",flexShrink:0,transition:"transform .2s",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",marginLeft:6} }, "▾")
+                                , React.createElement('span', { style:{fontSize:FS.sm,color:"#5a5650",flexShrink:0,transition:"transform .2s",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",marginLeft:6} }, "▾")
                               )
                               , !collapsed && (()=>{
                                 // Consolidate entries by exId
@@ -6359,10 +6360,10 @@ function App() {
                 return React.createElement('div', {style:{position:"relative",flex:1}},
                   // Trigger chip
                   React.createElement('div', {
-                    style:{background:open?"rgba(45,42,36,.45)":"rgba(45,42,36,.2)",border:"1px solid "+(open?"rgba(180,172,158,.12)":"rgba(180,172,158,.06)"),borderRadius:8,padding:"7px 10px",fontSize:".6rem",fontWeight:600,color:noneSelected?"#5a5650":"#b4ac9e",cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all .15s",userSelect:"none"},
+                    style:{background:open?"rgba(45,42,36,.45)":"rgba(45,42,36,.2)",border:"1px solid "+(open?"rgba(180,172,158,.12)":"rgba(180,172,158,.06)"),borderRadius:R.lg,padding:"7px 10px",fontSize:FS.sm,fontWeight:600,color:noneSelected?"#5a5650":"#b4ac9e",cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all .15s",userSelect:"none"},
                     onClick:()=>{setOpen(!open);if(!open){setLbStateDropOpen(false);setLbCountryDropOpen(false);setOpen(true);}}
                   },
-                    React.createElement('span',{style:{fontSize:".7rem"}}, icon||"\uD83D\uDD0D"),
+                    React.createElement('span',{style:{fontSize:FS.md}}, icon||"\uD83D\uDD0D"),
                     React.createElement('span',{style:{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, chipLabel),
                     React.createElement('span',{style:{fontSize:".46rem",color:"#5a5650",flexShrink:0}}, open?"\u25B2":"\u25BC")
                   ),
@@ -6404,10 +6405,10 @@ function App() {
                 ),
 
                 /* Scope toggle: Friends / World */
-                React.createElement("div", {style:{display:"flex",gap:4,marginBottom:12,background:"rgba(45,42,36,.25)",borderRadius:8,padding:3}},
+                React.createElement("div", {style:{display:"flex",gap:4,marginBottom:12,background:"rgba(45,42,36,.25)",borderRadius:R.lg,padding:3}},
                   ["friends","world"].map(scope =>
                     React.createElement("div", {key:scope, style:{
-                      flex:1, textAlign:"center", padding:"8px 0", borderRadius:6, fontSize:".66rem", fontWeight:700, cursor:"pointer", transition:"all .15s", letterSpacing:".04em",
+                      flex:1, textAlign:"center", padding:"8px 0", borderRadius:R.md, fontSize:".66rem", fontWeight:700, cursor:"pointer", transition:"all .15s", letterSpacing:".04em",
                       background: lbScope===scope ? "rgba(45,42,36,.5)" : "transparent",
                       color: lbScope===scope ? "#d4cec4" : "#5a5650",
                       border: lbScope===scope ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
@@ -6429,9 +6430,9 @@ function App() {
                     style:{width:"100%",appearance:"none",WebkitAppearance:"none",
                            background:"rgba(14,14,12,.95)",
                            border:"1px solid "+tc,
-                           color:tc,borderRadius:9,
+                           color:tc,borderRadius:R.xl,
                            padding:"8px 28px 8px 12px",
-                           fontSize:".72rem",fontWeight:"700",cursor:"pointer"}
+                           fontSize:FS.lg,fontWeight:"700",cursor:"pointer"}
                   },
                     LB_FILTERS.map(function(f){
                       var ftc=TC[f.type]||"#b4ac9e";
@@ -6445,7 +6446,7 @@ function App() {
                 ),
 
                 /* Active filter description */
-                React.createElement("div", {style:{fontSize:".6rem",color:"#6a6050",marginBottom:12,
+                React.createElement("div", {style:{fontSize:FS.sm,color:"#6a6050",marginBottom:12,
                   paddingLeft:4,fontStyle:"italic"}}, af.desc),
 
                 /* Your standing card — Design 3 accent strip */
@@ -6542,11 +6543,11 @@ function App() {
                         /* Rank + medal */
                         React.createElement("div",{style:{display:"flex",alignItems:"center",gap:1,width:32,flexShrink:0,justifyContent:"center"}},
                           medal && React.createElement("span",{style:{fontSize:".78rem"}}, medal),
-                          React.createElement("span",{style:{fontSize:".72rem",fontWeight:"700",color:rankColor,fontFamily:"'Inter',sans-serif"}}, rank)
+                          React.createElement("span",{style:{fontSize:FS.lg,fontWeight:"700",color:rankColor,fontFamily:"'Inter',sans-serif"}}, rank)
                         ),
                         /* Name + class tag + subtitle */
                         React.createElement("div",{style:{flex:1,minWidth:0}},
-                          React.createElement("div",{style:{fontSize:".72rem",fontWeight:"700",color:isMe?"#d4cec4":"#b4ac9e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                          React.createElement("div",{style:{fontSize:FS.lg,fontWeight:"700",color:isMe?"#d4cec4":"#b4ac9e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
                             getRowName(row),
                             React.createElement("span",{style:{fontSize:".48rem",fontWeight:700,color:rowCls.color,marginLeft:5}}, rowCls.icon+" "+rowCls.name),
                             row.public_id && React.createElement("span",{style:{fontSize:".44rem",color:"#5a5650",marginLeft:4}}, "#"+row.public_id),
@@ -6790,7 +6791,7 @@ function App() {
                           , React.createElement('div', { className: "log-group-meta"}, "📅 " , first.date, " · "  , entries.length, " exercise" , entries.length!==1?"s":"")
                         )
                         , React.createElement('div', { className: "log-group-xp"}, formatXP(groupXP,{prefix:"⚡ "}) )
-                        , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".6rem",marginRight:2,flexShrink:0}, title: "Edit completed workout"  ,
+                        , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:FS.sm,marginRight:2,flexShrink:0}, title: "Edit completed workout"  ,
                           onClick: e=>{e.stopPropagation();
                             setRetroEditModal({
                               groupId:gid,
@@ -6802,7 +6803,7 @@ function App() {
                               sourceId:first.sourceWorkoutId,
                             });
                           }}, "\u270E")
-                        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:".6rem",marginRight:2,flexShrink:0,color:UI_COLORS.danger}, title: "Delete all entries",
+                        , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:FS.sm,marginRight:2,flexShrink:0,color:UI_COLORS.danger}, title: "Delete all entries",
                           onClick: e=>{e.stopPropagation();
                             const totalXP = entries.reduce((s,en)=>s+en.xp,0);
                             setConfirmDelete({
@@ -6891,7 +6892,7 @@ function App() {
                               , React.createElement('div', { className: "log-group-meta"}, "📅 " , first.date, " · "  , entries.length, " exercise" , entries.length!==1?"s":"")
                             )
                             , React.createElement('div', { className: "log-group-xp"}, formatXP(groupXP,{prefix:"⚡ "}) )
-                            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".6rem",marginRight:2,flexShrink:0}, title: "Edit completed plan"  ,
+                            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:FS.sm,marginRight:2,flexShrink:0}, title: "Edit completed plan"  ,
                               onClick: e=>{e.stopPropagation();
                                 setRetroEditModal({
                                   groupId:gid,
@@ -6903,7 +6904,7 @@ function App() {
                                   sourceId:first.sourcePlanId,
                                 });
                               }}, "\u270E")
-                            , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:".6rem",marginRight:2,flexShrink:0,color:UI_COLORS.danger}, title: "Delete all entries",
+                            , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:FS.sm,marginRight:2,flexShrink:0,color:UI_COLORS.danger}, title: "Delete all entries",
                               onClick: e=>{e.stopPropagation();
                                 const totalXP = entries.reduce((s,en)=>s+en.xp,0);
                                 setConfirmDelete({
@@ -6994,13 +6995,13 @@ function App() {
                               , React.createElement('div', { style: {fontSize:"1.2rem",flexShrink:0}}, itemIcon)
                               , React.createElement('div', { style: {flex:1,minWidth:0}}
                                 , React.createElement('div', { style: {fontSize:".78rem",color:"#d4cec4",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, itemName)
-                                , React.createElement('div', { style: {fontSize:".6rem",marginTop:2,display:"flex",gap:8}}
+                                , React.createElement('div', { style: {fontSize:FS.sm,marginTop:2,display:"flex",gap:8}}
                                   , React.createElement('span', { style: {color:"#8a8478",textTransform:"capitalize"}}, typeLabel, xpNote)
                                   , React.createElement('span', { style: {color:urgentColor}}, dl===0?"Expires today":dl===1?"1 day left":`${dl} days left`)
                                 )
                               )
                               , React.createElement('button', { className: "btn btn-gold btn-xs"  , style: {flexShrink:0,fontSize:".65rem"}, onClick: ()=>restoreItem(entry)}, "↩ Restore" )
-                              , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {flexShrink:0,fontSize:".6rem",color:UI_COLORS.danger,borderColor:"rgba(231,76,60,.25)"}, onClick: ()=>permanentDelete(entry)}, "✕")
+                              , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {flexShrink:0,fontSize:FS.sm,color:UI_COLORS.danger,borderColor:"rgba(231,76,60,.25)"}, onClick: ()=>permanentDelete(entry)}, "✕")
                             )
                           );
                         })
@@ -7026,7 +7027,7 @@ function App() {
                         /* Friend search */
                         , React.createElement('div', {className:"rpg-sec-header"}, React.createElement('div', {className:"rpg-sec-line rpg-sec-line-l"}), React.createElement('span', {className:"rpg-sec-title"}, "✦ Guild Search ✦"), React.createElement('div', {className:"rpg-sec-line rpg-sec-line-r"}))
                         , socialMsg&&(
-                          React.createElement('div', { style: {fontSize:".75rem",color:socialMsg.ok===true?UI_COLORS.success:socialMsg.ok===false?UI_COLORS.danger:"#b4ac9e",marginBottom:10,padding:"8px 12px",background:socialMsg.ok===true?"rgba(46,204,113,.06)":socialMsg.ok===false?"rgba(231,76,60,.06)":"rgba(45,42,36,.16)",border:`1px solid ${socialMsg.ok===true?"rgba(46,204,113,.2)":socialMsg.ok===false?"rgba(231,76,60,.2)":"rgba(45,42,36,.3)"}`,borderRadius:8,textAlign:"center"}}
+                          React.createElement('div', { style: {fontSize:".75rem",color:socialMsg.ok===true?UI_COLORS.success:socialMsg.ok===false?UI_COLORS.danger:"#b4ac9e",marginBottom:10,padding:"8px 12px",background:socialMsg.ok===true?"rgba(46,204,113,.06)":socialMsg.ok===false?"rgba(231,76,60,.06)":"rgba(45,42,36,.16)",border:`1px solid ${socialMsg.ok===true?"rgba(46,204,113,.2)":socialMsg.ok===false?"rgba(231,76,60,.2)":"rgba(45,42,36,.3)"}`,borderRadius:R.lg,textAlign:"center"}}
                             , socialMsg.text
                           )
                         )
@@ -7406,7 +7407,7 @@ function App() {
                 , charSubTab==="stats" && React.createElement('div', null
                   , React.createElement('div', {className:"char-section"}
                     , rune("Character Stats")
-                    , React.createElement('div',{style:{fontSize:".6rem",color:"#5a5650",fontStyle:"italic",textAlign:"center",marginBottom:10}},"Stats grow dynamically as you train — full calculation coming soon")
+                    , React.createElement('div',{style:{fontSize:FS.sm,color:"#5a5650",fontStyle:"italic",textAlign:"center",marginBottom:10}},"Stats grow dynamically as you train — full calculation coming soon")
                     , Object.entries(STAT_META).map(([key,meta])=>{
                       const val=charStats[key]||0, pct=Math.round((val/statMax)*100);
                       return React.createElement('div',{key,className:"char-stat-row"}
@@ -7452,8 +7453,8 @@ function App() {
                 , !profileComplete() && React.createElement('div', { style: {background:"rgba(231,76,60,.08)",border:"1px solid rgba(231,76,60,.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10} }
                   , React.createElement('span', {style:{fontSize:"1.1rem"}}, "\u26A0\uFE0F")
                   , React.createElement('div', {style:{flex:1}}
-                    , React.createElement('div', {style:{fontSize:".72rem",color:UI_COLORS.danger,fontWeight:700,marginBottom:2}}, "Profile Incomplete")
-                    , React.createElement('div', {style:{fontSize:".6rem",color:"#8a8478"}}, "State and Country are required for leaderboard rankings. Tap Edit to add them.")
+                    , React.createElement('div', {style:{fontSize:FS.lg,color:UI_COLORS.danger,fontWeight:700,marginBottom:2}}, "Profile Incomplete")
+                    , React.createElement('div', {style:{fontSize:FS.sm,color:"#8a8478"}}, "State and Country are required for leaderboard rankings. Tap Edit to add them.")
                   )
                   , React.createElement('button', {className:"btn btn-ghost btn-sm", style:{fontSize:".58rem",flexShrink:0}, onClick:()=>{setSecurityMode(false);setNotifMode(false);openEdit();}}, "Edit")
                 )
@@ -7532,7 +7533,7 @@ function App() {
                     , React.createElement('div', { className: "combat-chip"}, React.createElement('span', { className: "combat-chip-val"}, QUESTS.filter(q=>_optionalChain([profile, 'access', _167 => _167.quests, 'optionalAccess', _168 => _168[q.id], 'optionalAccess', _169 => _169.claimed])).length), React.createElement('span', { className: "combat-chip-lbl"}, "Quests"))
                     , profile.runningPB ? (
                       React.createElement('div', { className: "combat-chip", style: {borderColor:"rgba(255,232,124,.18)"}}
-                        , React.createElement('span', { className: "combat-chip-val", style: {color:UI_COLORS.warning,fontSize:".7rem"}}
+                        , React.createElement('span', { className: "combat-chip-val", style: {color:UI_COLORS.warning,fontSize:FS.md}}
                           , isMetric(profile.units)?parseFloat((profile.runningPB*1.60934).toFixed(2))+" /km":parseFloat(profile.runningPB.toFixed(2))+" /mi"
                         )
                         , React.createElement('span', { className: "combat-chip-lbl"}, "🏃 Run PB"  )
@@ -7572,10 +7573,10 @@ function App() {
 
                   const filterDrop = React.createElement('div', {style:{position:"relative",marginBottom:8}},
                     React.createElement('div', {
-                      style:{background:pbFilterOpen?"rgba(45,42,36,.45)":"rgba(45,42,36,.2)",border:"1px solid "+(pbFilterOpen?"rgba(180,172,158,.12)":"rgba(180,172,158,.06)"),borderRadius:8,padding:"7px 10px",fontSize:".6rem",fontWeight:600,color:effectiveSelected.length===0?"#5a5650":"#b4ac9e",cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all .15s",userSelect:"none"},
+                      style:{background:pbFilterOpen?"rgba(45,42,36,.45)":"rgba(45,42,36,.2)",border:"1px solid "+(pbFilterOpen?"rgba(180,172,158,.12)":"rgba(180,172,158,.06)"),borderRadius:R.lg,padding:"7px 10px",fontSize:FS.sm,fontWeight:600,color:effectiveSelected.length===0?"#5a5650":"#b4ac9e",cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all .15s",userSelect:"none"},
                       onClick:()=>setPbFilterOpen(!pbFilterOpen)
                     },
-                      React.createElement('span',{style:{fontSize:".7rem"}}, "🏆"),
+                      React.createElement('span',{style:{fontSize:FS.md}}, "🏆"),
                       React.createElement('span',{style:{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, chipLabel),
                       React.createElement('span',{style:{fontSize:".46rem",color:"#5a5650",flexShrink:0}}, pbFilterOpen?"▲":"▼")
                     ),
@@ -7591,7 +7592,7 @@ function App() {
                             onClick:()=>{const newSel = on ? effectiveSelected.filter(s=>s!==opt.id) : [...effectiveSelected, opt.id]; setPbSelectedFilters(newSel);}
                           },
                             React.createElement('span',{style:{width:15,height:15,borderRadius:3,border:"1.5px solid "+(on?"#b4ac9e":"rgba(180,172,158,.12)"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:".52rem",color:"#b4ac9e",flexShrink:0,background:on?"rgba(180,172,158,.08)":"transparent"}}, on?"✓":""),
-                            React.createElement('span',{style:{fontSize:".7rem",marginRight:4}}, opt.icon),
+                            React.createElement('span',{style:{fontSize:FS.md,marginRight:4}}, opt.icon),
                             opt.label
                           );
                         })
@@ -7629,7 +7630,7 @@ function App() {
                           }
                           return React.createElement('div', { key: exId, style: {display:"flex",alignItems:"center",gap:8,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)"} }
                             , React.createElement('span', { style: {fontSize:".9rem",flexShrink:0} }, icon)
-                            , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"} }, name)
+                            , React.createElement('span', { style: {fontSize:FS.md,color:"#b4ac9e",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"} }, name)
                             , React.createElement('span', { style: {fontSize:".68rem",color:"#b4ac9e",fontWeight:600,flexShrink:0,fontFamily:"'Inter',sans-serif"} }, "🏆 ", valDisp)
                           );
                         })
@@ -7652,7 +7653,7 @@ function App() {
                       ["🌍 Country", profile.country||"—"],
                     ].map(([label,val])=>(
                       React.createElement('div', { key: label, style: {display:"flex",alignItems:"baseline",gap:6,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)"}}
-                        , React.createElement('span', { style: {fontSize:".6rem",color:"#6a645a",width:72,flexShrink:0}}, label)
+                        , React.createElement('span', { style: {fontSize:FS.sm,color:"#6a645a",width:72,flexShrink:0}}, label)
                         , React.createElement('span', { style: {fontSize:".74rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, val)
                       )
                     ))
@@ -7665,19 +7666,19 @@ function App() {
                     , React.createElement('div', { className: "profile-rune-divider", style: {margin:"0 0 10px"} }, React.createElement('span', { className: "profile-rune-label" }, "⠿ About You ⠿"))
                     , profile.motto && React.createElement('div', { style: {fontSize:".76rem",color:"#b4ac9e",fontStyle:"italic",marginBottom:8,textAlign:"center"} }, `"${profile.motto}"`)
                     , profile.disciplineTrait && React.createElement('div', { style: {marginBottom:7} }
-                      , React.createElement('span', { style: {fontSize:".6rem",color:"#6a645a",display:"block",marginBottom:3} }, "Discipline Trait")
+                      , React.createElement('span', { style: {fontSize:FS.sm,color:"#6a645a",display:"block",marginBottom:3} }, "Discipline Trait")
                       , React.createElement('span', { className: "trait", style: {"--cls-color":cls.color,"--cls-glow":cls.glow} }, profile.disciplineTrait)
                     )
                     , profile.trainingStyle && React.createElement('div', { style: {display:"flex",alignItems:"baseline",gap:6,paddingBottom:5,borderBottom:"1px solid rgba(45,42,36,.15)",marginBottom:5} }
-                      , React.createElement('span', { style: {fontSize:".6rem",color:"#6a645a",width:90,flexShrink:0} }, "Training Style")
+                      , React.createElement('span', { style: {fontSize:FS.sm,color:"#6a645a",width:90,flexShrink:0} }, "Training Style")
                       , React.createElement('span', { style: {fontSize:".74rem",color:"#b4ac9e"} }, {heavy:"Heavy Compounds",cardio:"Cardio & Endurance",sculpt:"Sculpting & Aesthetics",hiit:"HIIT & Explosive",mindful:"Mindful Movement",sport:"Sport-Specific",mixed:"Mixed Training"}[profile.trainingStyle]||profile.trainingStyle)
                     )
                     , (profile.fitnessPriorities||[]).length>0 && React.createElement('div', { style: {marginBottom:5} }
-                      , React.createElement('div', { style: {fontSize:".6rem",color:"#6a645a",marginBottom:4} }, "Fitness Priorities")
+                      , React.createElement('div', { style: {fontSize:FS.sm,color:"#6a645a",marginBottom:4} }, "Fitness Priorities")
                       , React.createElement('div', null, (profile.fitnessPriorities||[]).map(p=>React.createElement('span',{key:p,className:"trait",style:{"--cls-color":"#5a5650","--cls-glow":"#8a8478",marginRight:4}},{be_strong:"💪 Being Strong",look_strong:"🪞 Looking Strong",feel_good:"🌿 Feeling Good",eat_right:"🥗 Eating Right",mental_clarity:"🧠 Mental Clarity",athletic_perf:"🏅 Athletic Perf",endurance:"🔥 Endurance",longevity:"🕊️ Longevity",competition:"🏆 Competition",social:"👥 Social",flexibility:"🤸 Mobility",weight_loss:"⚖️ Weight Mgmt"}[p]||p)))
                     )
                     , (profile.sportsBackground||[]).filter(s=>s!=="none").length>0 && React.createElement('div', null
-                      , React.createElement('div', { style: {fontSize:".6rem",color:"#6a645a",marginBottom:4} }, "Sports Background")
+                      , React.createElement('div', { style: {fontSize:FS.sm,color:"#6a645a",marginBottom:4} }, "Sports Background")
                       , React.createElement('div', null, (profile.sportsBackground||[]).filter(s=>s!=="none").map(s=>React.createElement('span',{key:s,className:"trait",style:{"--cls-color":"#3a3834","--cls-glow":"#6a645a",marginRight:4,fontSize:".65rem"}},s.charAt(0).toUpperCase()+s.slice(1))))
                     )
                   )
@@ -7758,7 +7759,7 @@ function App() {
                             , React.createElement('input', { className: "inp", type: "number", min: "0", max: "11", placeholder: "11", style: {width:"50%"}, value: draft.heightIn||"", onChange: e=>setDraft(d=>({...d,heightIn:e.target.value}))})
                           )
                         )
-                        , (()=>{const ph=(parseInt(draft.heightFt)||0)*12+(parseInt(draft.heightIn)||0);const pb=calcBMI(draft.weightLbs,ph);return pb?React.createElement('div', { style: {fontSize:".7rem",color:"#8a8478",fontStyle:"italic",marginTop:-6} }, "BMI: ", React.createElement('span', { style: {color:"#b4ac9e"} }, pb)):null;})()
+                        , (()=>{const ph=(parseInt(draft.heightFt)||0)*12+(parseInt(draft.heightIn)||0);const pb=calcBMI(draft.weightLbs,ph);return pb?React.createElement('div', { style: {fontSize:FS.md,color:"#8a8478",fontStyle:"italic",marginTop:-6} }, "BMI: ", React.createElement('span', { style: {color:"#b4ac9e"} }, pb)):null;})()
                       )
                     ) : (
                       React.createElement(React.Fragment, null
@@ -7769,10 +7770,10 @@ function App() {
                         , React.createElement('div', { className: "field" }, React.createElement('label', null, "Height (cm)")
                           , React.createElement('input', { className: "inp", type: "number", min: "100", max: "250", placeholder: "178", value: draft._dispHeightCm||"", onChange: e=>setDraft(d=>({...d,_dispHeightCm:e.target.value}))})
                         )
-                        , draft._dispWeight&&React.createElement('div', { style: {fontSize:".7rem",color:"#8a8478",fontStyle:"italic",marginTop:-6} }, draft._dispWeight, " kg = ", parseFloat(kgToLbs(draft._dispWeight)).toFixed(1), " lbs")
+                        , draft._dispWeight&&React.createElement('div', { style: {fontSize:FS.md,color:"#8a8478",fontStyle:"italic",marginTop:-6} }, draft._dispWeight, " kg = ", parseFloat(kgToLbs(draft._dispWeight)).toFixed(1), " lbs")
                       )
                     )
-                    , React.createElement('div', { style: {marginTop:10,padding:"9px 11px",background:"rgba(45,42,36,.18)",border:"1px solid rgba(180,172,158,.05)",borderRadius:9} }
+                    , React.createElement('div', { style: {marginTop:10,padding:"9px 11px",background:"rgba(45,42,36,.18)",border:"1px solid rgba(180,172,158,.05)",borderRadius:R.xl} }
                       , React.createElement('div', { style: {fontSize:".62rem",color:"#6a645a",marginBottom:7,letterSpacing:".04em",textTransform:"uppercase"} }, "Show on Hero Banner")
                       , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap"} }
                         , [{key:"weight",label:"Weight"},{key:"height",label:"Height"},{key:"bmi",label:"BMI"}].map(f=>{
@@ -7785,7 +7786,7 @@ function App() {
                           }, (on?"✓ ":"")+f.label);
                         })
                       )
-                      , React.createElement('div', { style: {fontSize:".6rem",color:"#3a3834",marginTop:5,fontStyle:"italic"} }, "Selected fields appear under your name in the main header")
+                      , React.createElement('div', { style: {fontSize:FS.sm,color:"#3a3834",marginTop:5,fontStyle:"italic"} }, "Selected fields appear under your name in the main header")
                     )
                     , React.createElement('div', { className: "field" }
                       , React.createElement('label', null, "Gender ", React.createElement('span', { style: {fontSize:".55rem",opacity:.6} }, "(optional)"))
@@ -7955,7 +7956,7 @@ function App() {
                         , React.createElement('input', { className: "inp", type: "email", value: newEmail, onChange: e=>setNewEmail(e.target.value), placeholder: "new@email.com",
                           onKeyDown: e=>{ if(e.key==="Enter") changeEmailAddress(); } })
                       )
-                      , emailMsg&&React.createElement('div', { style: {fontSize:".72rem",color:emailMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:6} }, emailMsg.text)
+                      , emailMsg&&React.createElement('div', { style: {fontSize:FS.lg,color:emailMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:R.md} }, emailMsg.text)
                       , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%"}, onClick: changeEmailAddress, disabled: !newEmail.trim() }, "📧 Update Email")
                     )
                   )
@@ -7984,7 +7985,7 @@ function App() {
                       , !mfaEnabled && !mfaEnrolling && !mfaRecoveryCodes && (
                         React.createElement('div', { style: {marginTop:10} }
                           , React.createElement('div', { style: {fontSize:".64rem",color:"#8a8478",marginBottom:10,fontStyle:"italic"} }, "Add an extra layer of protection to your account using an authenticator app.")
-                          , React.createElement('div', { style: {fontSize:".58rem",color:"#6a645a",marginBottom:12,background:"rgba(45,42,36,.15)",border:"1px solid rgba(45,42,36,.2)",borderRadius:8,padding:"8px 10px"} }
+                          , React.createElement('div', { style: {fontSize:".58rem",color:"#6a645a",marginBottom:12,background:"rgba(45,42,36,.15)",border:"1px solid rgba(45,42,36,.2)",borderRadius:R.lg,padding:"8px 10px"} }
                             , React.createElement('div', { style: {fontWeight:600,color:"#8a8478",marginBottom:4} }, "Compatible apps:")
                             , "Google Authenticator \u00b7 Authy \u00b7 1Password \u00b7 Microsoft Authenticator \u00b7 Duo \u00b7 Bitwarden \u00b7 Aegis \u00b7 or any TOTP-compatible app"
                           )
@@ -7999,7 +8000,7 @@ function App() {
                           , React.createElement('div', { style: {background:"#fff",borderRadius:10,padding:10,display:"inline-block"} }
                             , React.createElement('img', { src: mfaQR, alt: "MFA QR Code", style: {width:160,height:160,display:"block"} })
                           )
-                          , mfaSecret && React.createElement('div', { style: {fontSize:".56rem",color:"#6a645a",textAlign:"center",wordBreak:"break-all",background:"rgba(45,42,36,.2)",padding:"6px 10px",borderRadius:6,border:"1px solid rgba(45,42,36,.2)"} }
+                          , mfaSecret && React.createElement('div', { style: {fontSize:".56rem",color:"#6a645a",textAlign:"center",wordBreak:"break-all",background:"rgba(45,42,36,.2)",padding:"6px 10px",borderRadius:R.md,border:"1px solid rgba(45,42,36,.2)"} }
                             , "Manual key: ", React.createElement('span', { style: {color:"#b4ac9e",fontFamily:"monospace",letterSpacing:".04em"} }, mfaSecret)
                           )
                           , React.createElement('div', { className: "field", style: {width:"100%"} }
@@ -8018,7 +8019,7 @@ function App() {
                           , React.createElement('div', { style: {fontSize:".68rem",color:"#d4cec4",fontWeight:700,marginBottom:6} }, "\uD83D\uDD11 Recovery Codes")
                           , React.createElement('div', { style: {fontSize:".62rem",color:UI_COLORS.danger,marginBottom:10,fontWeight:600} }, "\u26A0 Save these codes now \u2014 they will NOT be shown again!")
                           , React.createElement('div', { style: {fontSize:".64rem",color:"#8a8478",marginBottom:10,fontStyle:"italic"} }, "If you lose access to your authenticator app, use one of these codes to log in. Each code can only be used once.")
-                          , React.createElement('div', { style: {background:"rgba(45,42,36,.25)",border:"1px solid rgba(45,42,36,.25)",borderRadius:8,padding:"10px 14px",fontFamily:"monospace",fontSize:".72rem",color:"#b4ac9e",lineHeight:2,letterSpacing:".05em",textAlign:"center"} }
+                          , React.createElement('div', { style: {background:"rgba(45,42,36,.25)",border:"1px solid rgba(45,42,36,.25)",borderRadius:R.lg,padding:"10px 14px",fontFamily:"monospace",fontSize:FS.lg,color:"#b4ac9e",lineHeight:2,letterSpacing:".05em",textAlign:"center"} }
                             , mfaRecoveryCodes.map((c,i)=>React.createElement('div', { key: i }, c))
                           )
                           , React.createElement('div', { style: {display:"flex",gap:6,marginTop:10} }
@@ -8043,13 +8044,13 @@ function App() {
                           , React.createElement('div', { style: {fontSize:".64rem",color:"#8a8478",marginBottom:10,fontStyle:"italic"} }, "MFA is active on your account. You\u2019ll need a verification code from your authenticator app each time you sign in.")
 
                           /* Recovery codes remaining */
-                          , React.createElement('div', { style: {background:"rgba(45,42,36,.15)",border:"1px solid rgba(45,42,36,.2)",borderRadius:8,padding:"10px 14px",marginBottom:10} }
+                          , React.createElement('div', { style: {background:"rgba(45,42,36,.15)",border:"1px solid rgba(45,42,36,.2)",borderRadius:R.lg,padding:"10px 14px",marginBottom:10} }
                             , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6} }
                               , React.createElement('span', { style: {fontSize:".64rem",color:"#8a8478",fontWeight:600} }, "\uD83D\uDD11 Recovery Codes")
                               , mfaCodesRemaining !== null && React.createElement('span', { style: {fontSize:".62rem",fontWeight:700,padding:"2px 8px",borderRadius:10,background:mfaCodesRemaining>3?"#1a2e1a":mfaCodesRemaining>0?"#2e2010":"#2e1515",color:mfaCodesRemaining>3?"#7ebf73":mfaCodesRemaining>0?"#d4943a":UI_COLORS.danger} }, mfaCodesRemaining+" remaining")
                             )
                             , mfaCodesRemaining !== null && mfaCodesRemaining <= 3 && React.createElement('div', { style: {fontSize:".58rem",color:mfaCodesRemaining===0?UI_COLORS.danger:"#d4943a",marginBottom:6} }, mfaCodesRemaining===0 ? "\u26A0 No recovery codes left! Regenerate now to avoid being locked out." : "\u26A0 Running low \u2014 consider regenerating your codes.")
-                            , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%",fontSize:".6rem"}, onClick: regenerateRecoveryCodes }, "\u21BB Regenerate Recovery Codes")
+                            , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%",fontSize:FS.sm}, onClick: regenerateRecoveryCodes }, "\u21BB Regenerate Recovery Codes")
                           )
 
                           /* Compatible apps reminder */
@@ -8072,14 +8073,14 @@ function App() {
                             , React.createElement('button', { className: "btn btn-danger", style: {width:"100%"}, onClick: confirmMfaDisableWithTotp, disabled: mfaUnenrolling || mfaDisableCode.length<6 }, mfaUnenrolling ? "Verifying\u2026" : "Confirm & Disable MFA")
                           )
 
-                          , mfaDisableMsg && React.createElement('div', { style: {fontSize:".72rem",color:mfaDisableMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:6,marginTop:4} }, mfaDisableMsg.text)
+                          , mfaDisableMsg && React.createElement('div', { style: {fontSize:FS.lg,color:mfaDisableMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:R.md,marginTop:4} }, mfaDisableMsg.text)
 
                           /* Cancel */
                           , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%",marginTop:6,color:"#8a8478"}, onClick: ()=>{setMfaDisableConfirm(false);setMfaDisableCode("");setMfaDisableMsg(null);} }, "Cancel")
                         )
                       )
 
-                      , mfaMsg&&React.createElement('div', { style: {fontSize:".72rem",color:mfaMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:6} }, mfaMsg.text)
+                      , mfaMsg&&React.createElement('div', { style: {fontSize:FS.lg,color:mfaMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:R.md} }, mfaMsg.text)
                     )
                   )
                 )
@@ -8108,13 +8109,13 @@ function App() {
                         React.createElement('div', { style: {marginTop:10} }
                           , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8} }
                             , React.createElement('div', null
-                              , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478",marginBottom:2} }, "Phone on file")
+                              , React.createElement('div', { style: {fontSize:FS.sm,color:"#8a8478",marginBottom:2} }, "Phone on file")
                               , React.createElement('div', { style: {fontSize:".78rem",color:"#b4ac9e",fontFamily:"monospace"} }, profile.phone)
                             )
                             , React.createElement('span', { style: {fontSize:".56rem",fontWeight:700,padding:"2px 8px",borderRadius:10,background:"#1a2e1a",color:"#7ebf73"} }, "\u2713 Saved")
                           )
                           , React.createElement('div', { style: {fontSize:".58rem",color:"#6a645a",marginBottom:8,fontStyle:"italic"} }, "On file for admin identity verification if you ever need account support.")
-                          , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%",fontSize:".6rem",color:UI_COLORS.danger,borderColor:"rgba(231,76,60,.2)"}, onClick: removePhone }, "Remove Phone")
+                          , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%",fontSize:FS.sm,color:UI_COLORS.danger,borderColor:"rgba(231,76,60,.2)"}, onClick: removePhone }, "Remove Phone")
                         )
                       )
 
@@ -8136,7 +8137,7 @@ function App() {
                         )
                       )
 
-                      , phoneMsg && React.createElement('div', { style: {fontSize:".72rem",color:phoneMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:6} }, phoneMsg.text)
+                      , phoneMsg && React.createElement('div', { style: {fontSize:FS.lg,color:phoneMsg.ok?UI_COLORS.success:UI_COLORS.danger,textAlign:"center",padding:"6px 8px",borderRadius:R.md} }, phoneMsg.text)
                     )
                   )
                 )
@@ -8171,7 +8172,7 @@ function App() {
                         , React.createElement('input', { className: "inp", type: showPwProfile?"text":"password", value: pwConfirm, onChange: e=>setPwConfirm(e.target.value), placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
                           onKeyDown: e=>{ if(e.key==="Enter") changePassword(); } })
                       )
-                      , pwMsg&&React.createElement('div', { style: {fontSize:".72rem",color:pwMsg.ok===true?UI_COLORS.success:pwMsg.ok===false?UI_COLORS.danger:"#b4ac9e",textAlign:"center",padding:"6px 8px",background:pwMsg.ok===null?"rgba(45,42,36,.16)":"transparent",borderRadius:6,border:pwMsg.ok===null?"1px solid rgba(180,172,158,.06)":"none"} }, pwMsg.text)
+                      , pwMsg&&React.createElement('div', { style: {fontSize:FS.lg,color:pwMsg.ok===true?UI_COLORS.success:pwMsg.ok===false?UI_COLORS.danger:"#b4ac9e",textAlign:"center",padding:"6px 8px",background:pwMsg.ok===null?"rgba(45,42,36,.16)":"transparent",borderRadius:R.md,border:pwMsg.ok===null?"1px solid rgba(180,172,158,.06)":"none"} }, pwMsg.text)
                       , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%"}, onClick: changePassword, disabled: !pwNew||!pwConfirm }, "🔑 Save Password")
                     )
                   )
@@ -8218,7 +8219,7 @@ function App() {
                         , React.createElement('span', { style: {fontSize:"1.1rem",flexShrink:0} }, item.icon)
                         , React.createElement('div', { style: {flex:1,minWidth:0} }
                           , React.createElement('div', { style: {fontSize:".76rem",color:"#d4cec4",fontWeight:600} }, item.label)
-                          , React.createElement('div', { style: {fontSize:".6rem",color:"#6a645a",marginTop:2} }, item.desc)
+                          , React.createElement('div', { style: {fontSize:FS.sm,color:"#6a645a",marginTop:2} }, item.desc)
                         )
                         /* Toggle switch */
                         , React.createElement('div', { style: {width:40,height:22,borderRadius:11,background:isOn?"rgba(46,204,113,.25)":"rgba(45,42,36,.35)",border:"1px solid "+(isOn?"rgba(46,204,113,.35)":"rgba(180,172,158,.08)"),position:"relative",transition:"all .2s",flexShrink:0} }
@@ -8347,7 +8348,7 @@ function App() {
 
                 /* Base XP */
                 , React.createElement('div', { className: "field"}
-                  , React.createElement('label', null, "Base XP per session "    , React.createElement('span', { style: {fontSize:".6rem",color:"#8a8478",fontStyle:"italic"}}, "— typical: 20–80"  ))
+                  , React.createElement('label', null, "Base XP per session "    , React.createElement('span', { style: {fontSize:FS.sm,color:"#8a8478",fontStyle:"italic"}}, "— typical: 20–80"  ))
                   , React.createElement('input', { className: "inp", type: "number", min: "1", max: "500", value: ed.baseXP||40,
                     onChange: e=>setEd({baseXP:parseInt(e.target.value)||1})})
                 )
@@ -8431,7 +8432,7 @@ function App() {
                           );
                         })
                       )
-                      , !profile.age&&React.createElement('div', { style: {fontSize:".6rem",color:"#6a645a",marginTop:3}}, "Set your age in Profile for accurate BPM ranges"        )
+                      , !profile.age&&React.createElement('div', { style: {fontSize:FS.sm,color:"#6a645a",marginTop:3}}, "Set your age in Profile for accurate BPM ranges"        )
                     )
                   )
                 )
@@ -8526,9 +8527,9 @@ function App() {
               , React.createElement('div', { className: "div"})
               , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}
                 , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"}}
-                  , React.createElement('span', { style: {fontSize:".7rem",color:"#5a5650"}}, "Base XP: "  , React.createElement('span', { style: {color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, detailEx.baseXP))
-                  , React.createElement('span', { style: {fontSize:".7rem",color:"#5a5650"}}, "Category: " , React.createElement('span', { style: {color:"#b4ac9e",textTransform:"capitalize"}}, detailEx.category))
-                  , cls&&React.createElement('span', { style: {fontSize:".7rem",color:"#5a5650"}}, "Mult: " , React.createElement('span', { style: {color:getMult(detailEx)>1.02?UI_COLORS.success:getMult(detailEx)<0.98?UI_COLORS.danger:"#b4ac9e"}}, Math.round(getMult(detailEx)*100), "%"))
+                  , React.createElement('span', { style: {fontSize:FS.md,color:"#5a5650"}}, "Base XP: "  , React.createElement('span', { style: {color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, detailEx.baseXP))
+                  , React.createElement('span', { style: {fontSize:FS.md,color:"#5a5650"}}, "Category: " , React.createElement('span', { style: {color:"#b4ac9e",textTransform:"capitalize"}}, detailEx.category))
+                  , cls&&React.createElement('span', { style: {fontSize:FS.md,color:"#5a5650"}}, "Mult: " , React.createElement('span', { style: {color:getMult(detailEx)>1.02?UI_COLORS.success:getMult(detailEx)<0.98?UI_COLORS.danger:"#b4ac9e"}}, Math.round(getMult(detailEx)*100), "%"))
                 )
 , React.createElement('div', null)
               )
@@ -8578,7 +8579,7 @@ function App() {
               )
 
               /* Mode toggle */
-              , React.createElement('div', { style: {display:"flex",borderRadius:9,overflow:"hidden",border:"1px solid rgba(180,172,158,.06)"}}
+              , React.createElement('div', { style: {display:"flex",borderRadius:R.xl,overflow:"hidden",border:"1px solid rgba(180,172,158,.06)"}}
                 , [["new","＋ New Plan"],["existing","Add to Existing"]].map(([m,lbl])=>(
                   React.createElement('button', { key: m, style: {flex:1,padding:"8px 4px",fontFamily:"'Inter',sans-serif",fontSize:".62rem",letterSpacing:".03em",cursor:"pointer",border:"none",borderRight:m==="new"?"1px solid rgba(180,172,158,.05)":"none",background:spwMode===m?"rgba(45,42,36,.3)":"rgba(45,42,36,.18)",color:spwMode===m?"#d4cec4":"#5a5650",transition:"all .18s"},
                     onClick: ()=>setSpwMode(m)}, lbl)
@@ -8618,10 +8619,10 @@ function App() {
                       onClick: ()=>setSpwTargetPlanId(pl.id)}
                       , React.createElement('span', { style: {fontSize:"1.3rem"}}, pl.icon)
                       , React.createElement('div', { style: {flex:1,minWidth:0}}
-                        , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".72rem",color:"#d4cec4"}}, pl.name)
-                        , React.createElement('div', { style: {fontSize:".6rem",color:"#5a5650"}}, pl.days.length, " day" , pl.days.length!==1?"s":"", " · "  , pl.days.reduce((s,d)=>s+d.exercises.length,0), " exercises" )
+                        , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:FS.lg,color:"#d4cec4"}}, pl.name)
+                        , React.createElement('div', { style: {fontSize:FS.sm,color:"#5a5650"}}, pl.days.length, " day" , pl.days.length!==1?"s":"", " · "  , pl.days.reduce((s,d)=>s+d.exercises.length,0), " exercises" )
                       )
-                      , React.createElement('div', { style: {width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".7rem",flexShrink:0,background:spwTargetPlanId===pl.id?"rgba(180,172,158,.25)":"transparent",color:spwTargetPlanId===pl.id?"#1a1200":"transparent"}}, "✓")
+                      , React.createElement('div', { style: {width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.md,flexShrink:0,background:spwTargetPlanId===pl.id?"rgba(180,172,158,.25)":"transparent",color:spwTargetPlanId===pl.id?"#1a1200":"transparent"}}, "✓")
                     )
                   ))
                 
@@ -8768,7 +8769,7 @@ function App() {
             , !pickerConfigOpen ? React.createElement(React.Fragment, null
               /* ── BROWSE VIEW — Charcoal Inset style ── */
               , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
-                , React.createElement('div', {style:{fontFamily:"'Inter',sans-serif",fontSize:".72rem",fontWeight:600,color:"#8a8478"}},
+                , React.createElement('div', {style:{fontFamily:"'Inter',sans-serif",fontSize:FS.lg,fontWeight:600,color:"#8a8478"}},
                     "Add to Workout", pickerSelected.length>0&&React.createElement('span',{style:{color:"#b4ac9e",marginLeft:6}},pickerSelected.length+" selected"))
                 , React.createElement('div', {style:{display:"flex",gap:6}},
                     pickerSelected.length>0&&React.createElement('button',{className:"btn btn-gold btn-xs",onClick:()=>setPickerConfigOpen(true)},"Configure & Add →"),
@@ -8796,42 +8797,42 @@ function App() {
                     React.createElement('div', {style:{position:"relative",flex:1,zIndex:20}},
                       React.createElement('button', {
                         onClick:()=>setPickerOpenDrop(d=>d==="muscle"?null:"muscle"),
-                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:R.lg,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
                       },
                         pickerMuscle==="All"?"Muscle":pickerMuscle.charAt(0).toUpperCase()+pickerMuscle.slice(1),
                         React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="muscle"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerMuscle!=="All"?"#b4ac9e":"#5a5650",transition:"transform .15s"}},"▼")
                       ),
-                      pickerOpenDrop==="muscle" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerMuscle("All");closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerMuscle==="All"?"#b4ac9e":"#8a8478",background:pickerMuscle==="All"?"rgba(45,42,36,.2)":"transparent"}},"All Muscles"),
-                        PMUSCLE_OPTS.map(m=>React.createElement('div',{key:m,onClick:()=>{setPickerMuscle(m);closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerMuscle===m?getMuscleColor(m):"#8a8478",background:pickerMuscle===m?"rgba(45,42,36,.2)":"transparent",textTransform:"capitalize"}},m))
+                      pickerOpenDrop==="muscle" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.lg,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
+                        React.createElement('div',{onClick:()=>{setPickerMuscle("All");closeDrops();},style:{padding:"6px 10px",fontSize:FS.lg,cursor:"pointer",borderRadius:5,color:pickerMuscle==="All"?"#b4ac9e":"#8a8478",background:pickerMuscle==="All"?"rgba(45,42,36,.2)":"transparent"}},"All Muscles"),
+                        PMUSCLE_OPTS.map(m=>React.createElement('div',{key:m,onClick:()=>{setPickerMuscle(m);closeDrops();},style:{padding:"6px 10px",fontSize:FS.lg,cursor:"pointer",borderRadius:5,color:pickerMuscle===m?getMuscleColor(m):"#8a8478",background:pickerMuscle===m?"rgba(45,42,36,.2)":"transparent",textTransform:"capitalize"}},m))
                       )
                     ),
                     /* Type */
                     React.createElement('div', {style:{position:"relative",flex:1,zIndex:20}},
                       React.createElement('button', {
                         onClick:()=>setPickerOpenDrop(d=>d==="type"?null:"type"),
-                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:R.lg,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
                       },
                         pickerTypeFilter==="all"?"Type":(PTYPE_LABELS[pickerTypeFilter]||pickerTypeFilter),
                         React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="type"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerTypeFilter!=="all"?"#d4cec4":"#5a5650",transition:"transform .15s"}},"▼")
                       ),
-                      pickerOpenDrop==="type" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerTypeFilter("all");closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerTypeFilter==="all"?"#d4cec4":"#8a8478",background:pickerTypeFilter==="all"?"rgba(45,42,36,.2)":"transparent"}},"All Types"),
-                        PTYPE_OPTS.map(t=>React.createElement('div',{key:t,onClick:()=>{setPickerTypeFilter(t);closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerTypeFilter===t?getTypeColor(t):"#8a8478",background:pickerTypeFilter===t?"rgba(45,42,36,.2)":"transparent"}},PTYPE_LABELS[t]))
+                      pickerOpenDrop==="type" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.lg,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
+                        React.createElement('div',{onClick:()=>{setPickerTypeFilter("all");closeDrops();},style:{padding:"6px 10px",fontSize:FS.lg,cursor:"pointer",borderRadius:5,color:pickerTypeFilter==="all"?"#d4cec4":"#8a8478",background:pickerTypeFilter==="all"?"rgba(45,42,36,.2)":"transparent"}},"All Types"),
+                        PTYPE_OPTS.map(t=>React.createElement('div',{key:t,onClick:()=>{setPickerTypeFilter(t);closeDrops();},style:{padding:"6px 10px",fontSize:FS.lg,cursor:"pointer",borderRadius:5,color:pickerTypeFilter===t?getTypeColor(t):"#8a8478",background:pickerTypeFilter===t?"rgba(45,42,36,.2)":"transparent"}},PTYPE_LABELS[t]))
                       )
                     ),
                     /* Equipment */
                     React.createElement('div', {style:{position:"relative",flex:1,zIndex:20}},
                       React.createElement('button', {
                         onClick:()=>setPickerOpenDrop(d=>d==="equip"?null:"equip"),
-                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:8,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
+                        style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:R.lg,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:".68rem",textAlign:"left",cursor:"pointer",position:"relative"}
                       },
                         pickerEquipFilter==="all"?"Equipment":pickerEquipFilter.charAt(0).toUpperCase()+pickerEquipFilter.slice(1),
                         React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip"?"180deg":"0deg")+")",fontSize:".55rem",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#5a5650",transition:"transform .15s"}},"▼")
                       ),
-                      pickerOpenDrop==="equip" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
-                        React.createElement('div',{onClick:()=>{setPickerEquipFilter("all");closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter==="all"?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter==="all"?"rgba(196,148,40,0.12)":"transparent"}},"All Equipment"),
-                        PEQUIP_OPTS.map(e=>React.createElement('div',{key:e,onClick:()=>{setPickerEquipFilter(e);closeDrops();},style:{padding:"6px 10px",fontSize:".72rem",cursor:"pointer",borderRadius:5,color:pickerEquipFilter===e?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter===e?"rgba(196,148,40,0.12)":"transparent",textTransform:"capitalize"}},e))
+                      pickerOpenDrop==="equip" && React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.lg,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
+                        React.createElement('div',{onClick:()=>{setPickerEquipFilter("all");closeDrops();},style:{padding:"6px 10px",fontSize:FS.lg,cursor:"pointer",borderRadius:5,color:pickerEquipFilter==="all"?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter==="all"?"rgba(196,148,40,0.12)":"transparent"}},"All Equipment"),
+                        PEQUIP_OPTS.map(e=>React.createElement('div',{key:e,onClick:()=>{setPickerEquipFilter(e);closeDrops();},style:{padding:"6px 10px",fontSize:FS.lg,cursor:"pointer",borderRadius:5,color:pickerEquipFilter===e?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter===e?"rgba(196,148,40,0.12)":"transparent",textTransform:"capitalize"}},e))
                       )
                     )
                   )
@@ -8880,7 +8881,7 @@ function App() {
                         React.createElement('div',{style:{flex:1,minWidth:0}},
                           React.createElement('div',{style:{fontSize:".8rem",fontWeight:600,color:sel?"#d4cec4":"#d4cec4",marginBottom:2}},
                             ex.name, ex.custom&&React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:4}},"custom")),
-                          React.createElement('div',{style:{fontSize:".6rem",fontStyle:"italic"}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))
+                          React.createElement('div',{style:{fontSize:FS.sm,fontStyle:"italic"}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," · "), ex.muscleGroup&&React.createElement('span',{style:{color:getMuscleColor(ex.muscleGroup)}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))
                         ),
                         React.createElement('div',{style:{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}},
                           React.createElement('span',{style:{fontSize:".63rem",fontWeight:700,color:"#b4ac9e"}},ex.baseXP+" XP"),
@@ -8965,23 +8966,23 @@ function App() {
                       React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"5px 7px",background:"rgba(45,42,36,.18)",borderRadius:5,alignItems:"center",flexWrap:"wrap"}}
                         , React.createElement('span', { style: {fontSize:".55rem",color:"#9a8a78",flexShrink:0,minWidth:16}}, isCardio?`I${ri+2}`:`S${ri+2}`)
                         , isCardio ? (React.createElement(React.Fragment, null
-                          , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:50,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
+                          , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:50,padding:"4px 7px",fontSize:FS.lg}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
                             value: row.hhmm||"",
                             onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);},
                             onBlur: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:36,padding:"4px 7px",fontSize:".72rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: dUnit, value: row.distanceMi||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:36,padding:"4px 7px",fontSize:FS.lg}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.lg}, type: "text", inputMode: "decimal", placeholder: dUnit, value: row.distanceMi||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:FS.lg}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:FS.lg}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
                         )) : (React.createElement(React.Fragment, null
-                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.lg}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.lg}, type: "text", inputMode: "decimal", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.lg}, type: "text", inputMode: "decimal", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
                         ))
                         , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 4px",flexShrink:0}, onClick: ()=>{const rr=(entry.extraRows||[]).filter((_,j)=>j!==ri);pickerUpdateEx(entry.exId,"extraRows",rr);}}, "✕")
                       )
                     ))
-                    , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
+                    , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,fontSize:FS.sm,color:"#8a8478",borderStyle:"dashed"},
                       onClick: ()=>{const rr=[...(entry.extraRows||[]),isCardio?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:"",reps:"",weightLbs:""}];pickerUpdateEx(entry.exId,"extraRows",rr);}}, "＋ Add Row (e.g. "
                           , isCardio?"interval":"progressive set", ")"
                     )
@@ -9001,11 +9002,11 @@ function App() {
               , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".84rem",color:"#d4cec4"}}, "📋 Add to Plan"   )
               , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setAddToPlanPicker(null)}, "✕")
             )
-            , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,padding:"10px 12px",borderRadius:9,background:"rgba(45,42,36,.18)",border:"1px solid rgba(180,172,158,.06)"}}
+            , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:9,padding:"10px 12px",borderRadius:R.xl,background:"rgba(45,42,36,.18)",border:"1px solid rgba(180,172,158,.06)"}}
               , React.createElement('span', { style: {fontSize:"1.4rem"}}, addToPlanPicker.workout.icon)
               , React.createElement('div', null
                 , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".76rem",color:"#d4cec4"}}, addToPlanPicker.workout.name)
-                , React.createElement('div', { style: {fontSize:".6rem",color:"#5a5650"}}, addToPlanPicker.workout.exercises.length, " exercises will be added as a new day"        )
+                , React.createElement('div', { style: {fontSize:FS.sm,color:"#5a5650"}}, addToPlanPicker.workout.exercises.length, " exercises will be added as a new day"        )
               )
             )
             , profile.plans.length===0
@@ -9014,10 +9015,10 @@ function App() {
                 React.createElement('div', { key: pl.id, className: "atp-plan-row", onClick: ()=>addWorkoutToPlan(addToPlanPicker.workout, pl.id)}
                   , React.createElement('span', { style: {fontSize:"1.3rem"}}, pl.icon)
                   , React.createElement('div', { style: {flex:1,minWidth:0}}
-                    , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".72rem",color:"#d4cec4"}}, pl.name)
-                    , React.createElement('div', { style: {fontSize:".6rem",color:"#5a5650"}}, pl.days.length, " day" , pl.days.length!==1?"s":"", " · currently "   , pl.days.reduce((s,d)=>s+d.exercises.length,0), " exercises" )
+                    , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:FS.lg,color:"#d4cec4"}}, pl.name)
+                    , React.createElement('div', { style: {fontSize:FS.sm,color:"#5a5650"}}, pl.days.length, " day" , pl.days.length!==1?"s":"", " · currently "   , pl.days.reduce((s,d)=>s+d.exercises.length,0), " exercises" )
                   )
-                  , React.createElement('span', { style: {fontSize:".7rem",color:"#b4ac9e"}}, "→")
+                  , React.createElement('span', { style: {fontSize:FS.md,color:"#b4ac9e"}}, "→")
                 )
               ))
             
@@ -9055,7 +9056,7 @@ function App() {
             )
             /* Recent history preview */
             , (profile.checkInHistory||[]).length>0&&(
-              React.createElement('div', { style: {fontSize:".6rem",color:"#5a5650"}}
+              React.createElement('div', { style: {fontSize:FS.sm,color:"#5a5650"}}
                 , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",letterSpacing:".06em",marginBottom:4}}, "Recent Check-Ins" )
                 , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:4}}
                   , [...(profile.checkInHistory||[])].sort().reverse().slice(0,14).map(d=>{
@@ -9159,29 +9160,29 @@ function App() {
                   /* Top row: Sets/Reps or Duration+Sec+Dist, then Weight */
                   , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,marginBottom:9,alignItems:"flex-end"}}
                     , !noSets&&!(isCardio||isFlex)&&React.createElement('div', { style: {flex:1}}
-                      , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
+                      , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
                       , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "20", value: sets, onChange: e=>setSets(e.target.value), placeholder: ""})
                     )
                     , isCardio||isFlex ? (React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {flex:2}}
-                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Duration (HH:MM)" )
+                        , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:3}}, "Duration (HH:MM)" )
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "text", inputMode: "numeric", value: exHHMM, onChange: e=>setExHHMM(e.target.value), onBlur: e=>{const norm=normalizeHHMM(e.target.value);setExHHMM(norm);const sec=combineHHMMSec(norm,exSec);if(sec) setReps(String(Math.max(1,Math.floor(sec/60))));}, placeholder: "00:00"})
                       )
                       , React.createElement('div', { style: {flex:1}}
-                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Seconds")
+                        , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:3}}, "Seconds")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "59", value: exSec, onChange: e=>{setExSec(e.target.value);const sec=combineHHMMSec(exHHMM,e.target.value);if(sec) setReps(String(Math.max(1,Math.floor(sec/60))));}, placeholder: "00"})
                       )
                       , showDist&&React.createElement('div', { style: {flex:1.5}}
-                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Dist (" , dUnit, ")")
+                        , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:3}}, "Dist (" , dUnit, ")")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "200", step: "0.1", value: distanceVal, onChange: e=>setDistanceVal(e.target.value), placeholder: metric?"0.0":"0.0"})
                       )
                     )) : (React.createElement(React.Fragment, null
                       , React.createElement('div', { style: {flex:1}}
-                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Reps")
+                        , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:3}}, "Reps")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "200", value: reps, onChange: e=>setReps(e.target.value), placeholder: ""})
                       )
                       , showWeight&&React.createElement('div', { style: {flex:1.5}}
-                        , React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:3}}, "Weight (" , wUnit, ")")
+                        , React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:3}}, "Weight (" , wUnit, ")")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "2000", step: metric?"0.5":"2.5", value: exWeight, onChange: e=>setExWeight(e.target.value), placeholder: metric?"60":"135"})
                       )
                     ))
@@ -9189,20 +9190,20 @@ function App() {
                   /* Extra rows */
                   , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9}}
                     , quickRows.map((row,ri)=>(
-                      React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:6,alignItems:"center",flexWrap:"wrap"}}
-                        , React.createElement('span', { style: {fontSize:".6rem",color:"#a09080",flexShrink:0,minWidth:18}}, isCardio||isFlex?`I${ri+2}`:`S${ri+2}`)
+                      React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.md,alignItems:"center",flexWrap:"wrap"}}
+                        , React.createElement('span', { style: {fontSize:FS.sm,color:"#a09080",flexShrink:0,minWidth:18}}, isCardio||isFlex?`I${ri+2}`:`S${ri+2}`)
                         , (isCardio||isFlex) ? (React.createElement(React.Fragment, null
-                          , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:52,padding:"4px 8px",fontSize:".72rem"}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
+                          , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:52,padding:"4px 8px",fontSize:FS.lg}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
                             defaultValue: row.hhmm||"",
                             onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};setQuickRows(rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:36,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0", max: "59", placeholder: "Sec", defaultValue: row.sec||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sec:e.target.value};setQuickRows(rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "text", inputMode: "decimal", placeholder: dUnit, defaultValue: row.dist||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],dist:e.target.value};setQuickRows(rr);}})
-                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],incline:e.target.value};setQuickRows(rr);}})
-                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],speed:e.target.value};setQuickRows(rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:36,padding:"4px 8px",fontSize:FS.lg}, type: "number", min: "0", max: "59", placeholder: "Sec", defaultValue: row.sec||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sec:e.target.value};setQuickRows(rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.lg}, type: "text", inputMode: "decimal", placeholder: dUnit, defaultValue: row.dist||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],dist:e.target.value};setQuickRows(rr);}})
+                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:FS.lg}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],incline:e.target.value};setQuickRows(rr);}})
+                          , isTreadmill&&React.createElement('input', { className: "inp", style: {flex:0.8,minWidth:34,padding:"4px 8px",fontSize:FS.lg}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],speed:e.target.value};setQuickRows(rr);}})
                         )) : (React.createElement(React.Fragment, null
-                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "1", max: "20", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sets:e.target.value};setQuickRows(rr);}})
-                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "1", max: "200", placeholder: "Reps", defaultValue: row.reps||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],reps:e.target.value};setQuickRows(rr);}})
-                          , showWeight&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:".72rem"}, type: "number", min: "0", placeholder: wUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],weightLbs:e.target.value};setQuickRows(rr);}})
+                          , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.lg}, type: "number", min: "1", max: "20", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],sets:e.target.value};setQuickRows(rr);}})
+                          , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.lg}, type: "number", min: "1", max: "200", placeholder: "Reps", defaultValue: row.reps||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],reps:e.target.value};setQuickRows(rr);}})
+                          , showWeight&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.lg}, type: "number", min: "0", placeholder: wUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...quickRows];rr[ri]={...rr[ri],weightLbs:e.target.value};setQuickRows(rr);}})
                         ))
                         , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>setQuickRows(quickRows.filter((_,j)=>j!==ri))}, "✕")
                       )
@@ -9218,13 +9219,13 @@ function App() {
                   /* Treadmill: Incline + Speed */
                   , ex.id!=="rest_day"&&isTreadmill&&(
                     React.createElement('div', { style: {display:"flex",gap:8,marginBottom:10}}
-                      , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Incline (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exIncline||"", onChange: e=>setExIncline(e.target.value?parseFloat(e.target.value):null)}))
-                      , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".6rem",color:"#b0a898",display:"block",marginBottom:4}}, "Speed (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exSpeed||"", onChange: e=>setExSpeed(e.target.value?parseFloat(e.target.value):null)}))
+                      , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:4}}, "Incline (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exIncline||"", onChange: e=>setExIncline(e.target.value?parseFloat(e.target.value):null)}))
+                      , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:FS.sm,color:"#b0a898",display:"block",marginBottom:4}}, "Speed (0.5–15)" ), React.createElement('input', { className: "inp", type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "—", value: exSpeed||"", onChange: e=>setExSpeed(e.target.value?parseFloat(e.target.value):null)}))
                     )
                   )
                   /* Add Row button */
                   , ex.id!=="rest_day"&&(isCardio||isFlex||showWeight)&&(
-                    React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginBottom:8,fontSize:".6rem",color:"#8a8478",borderStyle:"dashed"},
+                    React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginBottom:8,fontSize:FS.sm,color:"#8a8478",borderStyle:"dashed"},
                       onClick: ()=>setQuickRows([...quickRows,(isCardio||isFlex)?{hhmm:"",sec:"",dist:"",incline:"",speed:""}:{sets:sets||"",reps:reps||"",weightLbs:exWeight||""}])}, "＋ Add Row ("
                          , isCardio||isFlex?"e.g. interval":"progressive weight/sets", ")"
                     )
@@ -9259,7 +9260,7 @@ function App() {
                           );
                         })
                       )
-                      , hrZone&&React.createElement('div', { style: {fontSize:".7rem",color:"#8a8478",fontStyle:"italic",marginTop:5}}, HR_ZONES[hrZone-1].desc)
+                      , hrZone&&React.createElement('div', { style: {fontSize:FS.md,color:"#8a8478",fontStyle:"italic",marginTop:5}}, HR_ZONES[hrZone-1].desc)
                     )
                   )
                   /* Personal Best display */
@@ -9268,7 +9269,7 @@ function App() {
                     , React.createElement('span', null, "Current PB: ", isRunning&&pbDisp?pbDisp:exPBDisp4)
                   )
                   /* XP estimate */
-                  , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9,fontSize:".7rem",color:"#8a8478",fontStyle:"italic"}}, "Est. XP: "
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {marginBottom:9,fontSize:FS.md,color:"#8a8478",fontStyle:"italic"}}, "Est. XP: "
                       , React.createElement('span', { style: {color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, estXP)
                     , showHR&&hrZone&&React.createElement('span', { style: {color:"#e67e22",marginLeft:6}}, "Z", hrZone, " +" , ((hrZone-1)*4), "% XP" )
                     , showWeight&&effW>0&&React.createElement('span', { style: {color:UI_COLORS.success,marginLeft:6}}, "+", Math.round(Math.min(effW/500,0.3)*100), "% wt bonus"  )
@@ -9276,8 +9277,8 @@ function App() {
                   )
                   /* Primary action row */
                   , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
-                    , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:".6rem",padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
-                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".6rem",padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
+                    , React.createElement('button', { className: "btn btn-glass-yellow" , style: {flex:2,fontSize:FS.sm,padding:"8px 10px"}, onClick: logExercise}, "✓ Complete / Schedule" )
+                    , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:FS.sm,padding:"8px 6px"}, onClick: ()=>{ex.custom?openExEditor("edit",ex):openExEditor("copy",ex);setSelEx(null);}}, ex.custom?"✎ Edit":"📋 Copy")
                   )
                   /* Secondary actions — add to existing workout / plan */
                   , React.createElement('div', { style: {display:"flex",gap:6}}
@@ -9331,7 +9332,7 @@ function App() {
                     React.createElement('button', {className:"btn btn-ghost btn-sm", style:{padding:"4px 8px",fontSize:".75rem"},
                       onClick:()=>{ setStatsPromptModal(null); if(statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId){ setSelEx(statsPromptModal.wo._soloExId); } else if(!statsPromptModal.wo.soloEx){ setWorkoutView("builder"); setActiveTab("workouts"); } }
                     }, "← Back"),
-                    React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", "Review Battle Stats ", React.createElement('span',{style:{color:"#5a5650",fontWeight:"normal",fontSize:".72rem"}},"(Optional)"))
+                    React.createElement('div', {className:"stats-modal-title",style:{flex:1}}, "📊 ", "Review Battle Stats ", React.createElement('span',{style:{color:"#5a5650",fontWeight:"normal",fontSize:FS.lg}},"(Optional)"))
                   )
                 )
                 , React.createElement('button', { className: "btn btn-ghost btn-sm", onClick: ()=>setStatsPromptModal(null) }, "✕")
@@ -9372,7 +9373,7 @@ function App() {
                 React.createElement('div', { className: "stats-prompt-reusable",
                   onClick: ()=>setSpMakeReusable(v=>!v)}
                   , React.createElement('div', { style: {width:18,height:18,borderRadius:4,border:`2px solid ${spMakeReusable?"#b4ac9e":"rgba(180,172,158,.18)"}`,background:spMakeReusable?"#b4ac9e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}
-                    , spMakeReusable&&React.createElement('span', { style: {fontSize:".7rem",color:"#0c0c0a",fontWeight:"bold"}}, "✓")
+                    , spMakeReusable&&React.createElement('span', { style: {fontSize:FS.md,color:"#0c0c0a",fontWeight:"bold"}}, "✓")
                   )
                   , React.createElement('div', null
                     , React.createElement('div', { className: "stats-prompt-reusable-title"}, "💪 Also save as Reusable Workout"     )
@@ -9438,9 +9439,9 @@ function App() {
               , React.createElement('div', { style:{marginBottom:8} }
                 , calExDetailModal.entries.length>1 && React.createElement('div', { style:{fontSize:".58rem",color:"#5a5650",textTransform:"uppercase",letterSpacing:".08em",marginBottom:6} }, calExDetailModal.entries.length, " Sets / Rows")
                 , calExDetailModal.entries.map((e,i)=>
-                  React.createElement('div', { key:i, style:{background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:8,padding:"10px 12px",marginBottom:6} }
+                  React.createElement('div', { key:i, style:{background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:R.lg,padding:"10px 12px",marginBottom:6} }
                     , React.createElement('div', { style:{display:"flex",justifyContent:"space-between",alignItems:"center"} }
-                      , React.createElement('div', { style:{fontSize:".72rem",color:"#d4cec4",fontWeight:600} }
+                      , React.createElement('div', { style:{fontSize:FS.lg,color:"#d4cec4",fontWeight:600} }
                         , calExDetailModal.entries.length>1 ? "Set "+(i+1) : "Details"
                       )
                       , React.createElement('div', { style:{fontSize:".62rem",fontWeight:600,color:"#b4ac9e"} }, "+", e.xp, " XP")
@@ -9511,7 +9512,7 @@ function App() {
                     const exData = allExById[e.exId];
                     if(!exData) return null;
                     return (
-                      React.createElement('div', { key: i, style: {background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:8,padding:"10px 12px",marginBottom:6}}
+                      React.createElement('div', { key: i, style: {background:"rgba(45,42,36,.18)",border:"1px solid rgba(45,42,36,.2)",borderRadius:R.lg,padding:"10px 12px",marginBottom:6}}
                         , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:6}}
                           , React.createElement('span', { style: {fontSize:"1rem"}}, exData.icon)
                           , React.createElement('span', { style: {fontSize:".78rem",color:"#d4cec4",flex:1,fontWeight:600}}, exData.name)
@@ -9521,13 +9522,13 @@ function App() {
                         )
                         , React.createElement('div', { style: {display:"flex",gap:6}}
                           , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".58rem",color:"#b0a898",display:"block",marginBottom:3}}, "Sets")
-                            , React.createElement('input', { className: "inp", type: "number", min: "1", max: "20", value: e.sets||"", style: {padding:"4px 6px",fontSize:".72rem"},
+                            , React.createElement('input', { className: "inp", type: "number", min: "1", max: "20", value: e.sets||"", style: {padding:"4px 6px",fontSize:FS.lg},
                               onChange: ev=>{const v=ev.target.value;setRetroEditModal(prev=>({...prev,entries:prev.entries.map((r,j)=>j===i?{...r,sets:v}:r)}));}}))
                           , React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".58rem",color:"#b0a898",display:"block",marginBottom:3}}, "Reps/Min")
-                            , React.createElement('input', { className: "inp", type: "number", min: "1", max: "300", value: e.reps||"", style: {padding:"4px 6px",fontSize:".72rem"},
+                            , React.createElement('input', { className: "inp", type: "number", min: "1", max: "300", value: e.reps||"", style: {padding:"4px 6px",fontSize:FS.lg},
                               onChange: ev=>{const v=ev.target.value;setRetroEditModal(prev=>({...prev,entries:prev.entries.map((r,j)=>j===i?{...r,reps:v}:r)}));}}))
                           , !["cardio","flexibility"].includes(exData.category)&&React.createElement('div', { style: {flex:1}}, React.createElement('label', { style: {fontSize:".58rem",color:"#b0a898",display:"block",marginBottom:3}}, "Weight")
-                            , React.createElement('input', { className: "inp", type: "number", min: "0", max: "2000", value: e.weightLbs||"", style: {padding:"4px 6px",fontSize:".72rem"},
+                            , React.createElement('input', { className: "inp", type: "number", min: "0", max: "2000", value: e.weightLbs||"", style: {padding:"4px 6px",fontSize:FS.lg},
                               onChange: ev=>{const v=ev.target.value;setRetroEditModal(prev=>({...prev,entries:prev.entries.map((r,j)=>j===i?{...r,weightLbs:v||null}:r)}));}}))
                         )
                       )
@@ -9580,7 +9581,7 @@ function App() {
               , (profile.workouts||[]).filter(w=>!w.oneOff).length>0&&React.createElement(React.Fragment, null
                 , React.createElement('div', { style: {fontSize:".62rem",color:"#b4ac9e",textTransform:"uppercase",letterSpacing:".08em",marginBottom:6}}, "💪 Re-Usable Workouts"  )
                 , (profile.workouts||[]).filter(w=>!w.oneOff).map(wo=>(
-                  React.createElement('div', { key: wo.id, style: {display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,border:"1px solid rgba(45,42,36,.2)",marginBottom:6,cursor:"pointer",background:"rgba(45,42,36,.12)"},
+                  React.createElement('div', { key: wo.id, style: {display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:R.xl,border:"1px solid rgba(45,42,36,.2)",marginBottom:6,cursor:"pointer",background:"rgba(45,42,36,.12)"},
                     onClick: ()=>{
                       const merged = {...wo, exercises:[...wo.exercises, ...addToWorkoutPicker.exercises]};
                       setProfile(p=>({...p, workouts:(p.workouts||[]).map(w=>w.id===wo.id?merged:w)}));
@@ -9590,7 +9591,7 @@ function App() {
                     , React.createElement('span', { style: {fontSize:"1.3rem"}}, wo.icon)
                     , React.createElement('div', { style: {flex:1,minWidth:0}}
                       , React.createElement('div', { style: {fontSize:".78rem",color:"#d4cec4",fontWeight:600}}, wo.name)
-                      , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478"}}, wo.exercises.length, " exercises" )
+                      , React.createElement('div', { style: {fontSize:FS.sm,color:"#8a8478"}}, wo.exercises.length, " exercises" )
                     )
                     , React.createElement('span', { style: {fontSize:".65rem",color:"#b4ac9e"}}, "+ add →"  )
                   )
@@ -9612,7 +9613,7 @@ function App() {
                   , scheduled.map(g=>{
                     const wo = (profile.workouts||[]).find(w=>w.id===g.id) || {id:g.id,name:g.name,icon:g.icon,exercises:[],oneOff:true};
                     return (
-                      React.createElement('div', { key: g.id, style: {display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,border:"1px solid rgba(230,126,34,.15)",marginBottom:6,cursor:"pointer",background:"rgba(230,126,34,.04)"},
+                      React.createElement('div', { key: g.id, style: {display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:R.xl,border:"1px solid rgba(230,126,34,.15)",marginBottom:6,cursor:"pointer",background:"rgba(230,126,34,.04)"},
                         onClick: ()=>{
                           const merged = {...wo, exercises:[...wo.exercises, ...addToWorkoutPicker.exercises]};
                           setProfile(p=>({
@@ -9630,7 +9631,7 @@ function App() {
                         , React.createElement('span', { style: {fontSize:"1.3rem"}}, g.icon)
                         , React.createElement('div', { style: {flex:1,minWidth:0}}
                           , React.createElement('div', { style: {fontSize:".78rem",color:"#d4cec4",fontWeight:600}}, g.name)
-                          , React.createElement('div', { style: {fontSize:".6rem",color:"#8a8478"}}, "📅 " , formatScheduledDate(g.date))
+                          , React.createElement('div', { style: {fontSize:FS.sm,color:"#8a8478"}}, "📅 " , formatScheduledDate(g.date))
                         )
                         , React.createElement('span', { style: {fontSize:".65rem",color:"#e67e22"}}, "+ add →"  )
                       )
@@ -9664,7 +9665,7 @@ function App() {
                 , React.createElement('label', null, "Icon")
                 , React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap"}}
                   , ["⚡","💪","🔥","🏋️","🏃","⚔️","🧱","🦵","🤜"].map(ic=>(
-                    React.createElement('span', { key: ic, style: {fontSize:"1.4rem",cursor:"pointer",padding:4,borderRadius:6,background:oneOffModal.icon===ic?"rgba(45,42,36,.3)":"transparent",border:oneOffModal.icon===ic?"1px solid rgba(180,172,158,.08)":"1px solid transparent"},
+                    React.createElement('span', { key: ic, style: {fontSize:"1.4rem",cursor:"pointer",padding:4,borderRadius:R.md,background:oneOffModal.icon===ic?"rgba(45,42,36,.3)":"transparent",border:oneOffModal.icon===ic?"1px solid rgba(180,172,158,.08)":"1px solid transparent"},
                       onClick: ()=>setOneOffModal(m=>({...m,icon:ic}))}, ic)
                   ))
                 )
@@ -9736,7 +9737,7 @@ function App() {
                     , React.createElement('div', { className: "completion-option-title"}, "Completed Today" )
                     , React.createElement('div', { className: "completion-option-sub"}, new Date().toLocaleDateString([],{weekday:"long",month:"short",day:"numeric"}))
                   )
-                  , React.createElement('div', { style: {marginLeft:"auto",width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".7rem",background:completionAction==="today"?"rgba(180,172,158,.25)":"transparent",color:completionAction==="today"?"#1a1200":"transparent",flexShrink:0}}, "✓")
+                  , React.createElement('div', { style: {marginLeft:"auto",width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.md,background:completionAction==="today"?"rgba(180,172,158,.25)":"transparent",color:completionAction==="today"?"#1a1200":"transparent",flexShrink:0}}, "✓")
                 )
 
                 /* Option 2 — Completed on a past day */
@@ -9751,7 +9752,7 @@ function App() {
                         : "Log for a past date"
                     )
                   )
-                  , React.createElement('div', { style: {marginLeft:"auto",width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".7rem",background:inPickMode&&pickerValue?"rgba(180,172,158,.25)":"transparent",color:inPickMode&&pickerValue?"#1a1200":"transparent",flexShrink:0}}, "✓")
+                  , React.createElement('div', { style: {marginLeft:"auto",width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.md,background:inPickMode&&pickerValue?"rgba(180,172,158,.25)":"transparent",color:inPickMode&&pickerValue?"#1a1200":"transparent",flexShrink:0}}, "✓")
                 )
                 , inPickMode&&(
                   React.createElement('div', { style: {paddingLeft:8}}
@@ -9778,7 +9779,7 @@ function App() {
                         : "Add to calendar for a future date"
                     )
                   )
-                  , React.createElement('div', { style: {marginLeft:"auto",width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".7rem",background:inScheduleMode&&scheduleWoDate?"rgba(180,172,158,.25)":"transparent",color:inScheduleMode&&scheduleWoDate?"#1a1200":"transparent",flexShrink:0}}, "✓")
+                  , React.createElement('div', { style: {marginLeft:"auto",width:18,height:18,border:"1.5px solid rgba(180,172,158,.08)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.md,background:inScheduleMode&&scheduleWoDate?"rgba(180,172,158,.25)":"transparent",color:inScheduleMode&&scheduleWoDate?"#1a1200":"transparent",flexShrink:0}}, "✓")
                 )
                 , inScheduleMode&&(
                   React.createElement('div', { style: {paddingLeft:8}}
@@ -9943,10 +9944,10 @@ function App() {
               )
 
               /* XP preview */
-              , React.createElement('div', { style: {background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.06)",borderRadius:9,padding:"9px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-                , React.createElement('div', { style: {fontSize:".7rem",color:"#5a5650"}}, "New XP for this entry"    )
+              , React.createElement('div', { style: {background:"rgba(45,42,36,.16)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.xl,padding:"9px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}
+                , React.createElement('div', { style: {fontSize:FS.md,color:"#5a5650"}}, "New XP for this entry"    )
                 , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8}}
-                  , xpDiff!==0&&React.createElement('div', { style: {fontSize:".7rem",color:xpDiff>0?UI_COLORS.success:UI_COLORS.danger}}, xpDiff>0?"+":"", xpDiff, " XP" )
+                  , xpDiff!==0&&React.createElement('div', { style: {fontSize:FS.md,color:xpDiff>0?UI_COLORS.success:UI_COLORS.danger}}, xpDiff>0?"+":"", xpDiff, " XP" )
                   , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:"1rem",color:"#b4ac9e"}}, "⚡ " , previewXP)
                 )
               )
@@ -10053,7 +10054,7 @@ function App() {
                     , React.createElement('div', { style: {fontSize:".68rem",color:"#8a8478",marginBottom:8,lineHeight:1.5}}, "Travel to their location for "
                            , React.createElement('strong', { style: {color:"#b4ac9e"}}, "+10% XP boost"  ), " on all workouts this week."
                     )
-                    , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%",fontSize:".72rem"},
+                    , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%",fontSize:FS.lg},
                       onClick: ()=>{
                         const ws=(()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d.toISOString().slice(0,10);})();
                         setProfile(p=>({...p,travelBoost:{friendId:mapTooltip.id,friendName:mapTooltip.name,weekStart:ws}}));
@@ -10075,7 +10076,7 @@ function App() {
 
             /* Legend */
             , React.createElement('div', { style: {width:"100%",maxWidth:420,marginTop:12,flexShrink:0}}
-              , React.createElement('div', { style: {fontSize:".6rem",color:"#5a5650",marginBottom:6,letterSpacing:".06em",textTransform:"uppercase"}}, "Your Journey" )
+              , React.createElement('div', { style: {fontSize:FS.sm,color:"#5a5650",marginBottom:6,letterSpacing:".06em",textTransform:"uppercase"}}, "Your Journey" )
               , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5}}
                 , MAP_REGIONS.map((r,i)=>{
                   const isVisited=i<=myPos.regionIdx, isCurrent=i===myPos.regionIdx;
@@ -10083,10 +10084,10 @@ function App() {
                     React.createElement('div', { key: r.id, style: {display:"flex",alignItems:"center",gap:5,padding:"4px 8px",
                       background:isCurrent?"rgba(45,42,36,.2)":"rgba(45,42,36,.12)",
                       border:`1px solid ${isCurrent?"rgba(180,172,158,.15)":isVisited?"rgba(45,42,36,.22)":"rgba(45,42,36,.18)"}`,
-                      borderRadius:6,opacity:isVisited?1:.4}}
-                      , React.createElement('span', { style: {fontSize:".72rem"}}, r.icon)
+                      borderRadius:R.md,opacity:isVisited?1:.4}}
+                      , React.createElement('span', { style: {fontSize:FS.lg}}, r.icon)
                       , React.createElement('div', null
-                        , React.createElement('div', { style: {fontSize:".6rem",color:isCurrent?"#b4ac9e":isVisited?"#d4cec4":"#5a6060",lineHeight:1.2}}
+                        , React.createElement('div', { style: {fontSize:FS.sm,color:isCurrent?"#b4ac9e":isVisited?"#d4cec4":"#5a6060",lineHeight:1.2}}
                           , r.name, isCurrent&&React.createElement('span', { style: {color:"#b4ac9e",marginLeft:4}}, "◀")
                         )
                         , React.createElement('div', { style: {fontSize:".52rem",color:isCurrent?"#b4ac9e":isVisited?"#8a8478":"#3a4040",lineHeight:1.2}}
@@ -10103,10 +10104,10 @@ function App() {
             , travelActive&&(
               React.createElement('div', { style: {width:"100%",maxWidth:420,marginTop:10,padding:"10px 14px",background:"rgba(46,204,113,.06)",border:"1px solid rgba(46,204,113,.2)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}
                 , React.createElement('div', null
-                  , React.createElement('div', { style: {fontSize:".72rem",color:UI_COLORS.success}}, "⚡ Travel Boost Active"   )
+                  , React.createElement('div', { style: {fontSize:FS.lg,color:UI_COLORS.success}}, "⚡ Travel Boost Active"   )
                   , React.createElement('div', { style: {fontSize:".62rem",color:"#8a8478",marginTop:2}}, "With " , React.createElement('strong', { style: {color:"#d4cec4"}}, profile.travelBoost.friendName), " · +10% XP all workouts this week"       )
                 )
-                , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".6rem",color:UI_COLORS.danger,borderColor:"rgba(231,76,60,.3)"},
+                , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:FS.sm,color:UI_COLORS.danger,borderColor:"rgba(231,76,60,.3)"},
                   onClick: ()=>{setProfile(p=>({...p,travelBoost:null}));showToast("Travel ended.");}}, "End")
               )
             )
@@ -10127,13 +10128,13 @@ function App() {
               )
               , shareModal.step==="pick-type"&&(
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",marginBottom:12}}, "What would you like to share?"     )
+                  , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",marginBottom:12}}, "What would you like to share?"     )
                   , React.createElement('div', { style: {display:"flex",gap:8}}
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".72rem"},
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:FS.lg},
                       onClick: ()=>setShareModal({...shareModal,step:"pick-workout"})}, "💪 A Workout"
 
                     )
-                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:".72rem"},
+                    , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1,fontSize:FS.lg},
                       onClick: ()=>setShareModal({...shareModal,step:"pick-exercise"})}, "⚡ A Custom Exercise"
 
                     )
@@ -10142,7 +10143,7 @@ function App() {
               )
               , shareModal.step==="pick-workout"&&(
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",marginBottom:10}}, "Choose a workout to share:"    )
+                  , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",marginBottom:10}}, "Choose a workout to share:"    )
                   , (profile.workouts||[]).length===0&&React.createElement('div', { className: "empty"}, "No workouts saved yet."   )
                   , (profile.workouts||[]).map(wo=>(
                     React.createElement('div', { key: wo.id, style: {display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid rgba(45,42,36,.15)",cursor:"pointer"},
@@ -10160,7 +10161,7 @@ function App() {
               )
               , shareModal.step==="pick-exercise"&&(
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",marginBottom:10}}, "Choose a custom exercise to share:"     )
+                  , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",marginBottom:10}}, "Choose a custom exercise to share:"     )
                   , (profile.customExercises||[]).length===0&&React.createElement('div', { className: "empty"}, "No custom exercises yet."   )
                   , (profile.customExercises||[]).map(ex=>(
                     React.createElement('div', { key: ex.id, style: {display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid rgba(45,42,36,.15)",cursor:"pointer"},
@@ -10196,7 +10197,7 @@ function App() {
                     key: t,
                     onClick: ()=>setFeedbackType(t),
                     style: {
-                      flex:1, padding:"6px 0", borderRadius:8, fontSize:".72rem", fontWeight:600,
+                      flex:1, padding:"6px 0", borderRadius:R.lg, fontSize:FS.lg, fontWeight:600,
                       border: feedbackType===t ? "1.5px solid #c9a84c" : "1.5px solid #3a342c",
                       background: feedbackType===t ? "#2a2318" : "transparent",
                       color: feedbackType===t ? "#c9a84c" : "#8a8478",
@@ -10210,7 +10211,7 @@ function App() {
                   React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
                     , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "📬")
                     , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Help request received!")
-                    , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478",lineHeight:1.6,maxWidth:280,margin:"0 auto"}},
+                    , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478",lineHeight:1.6,maxWidth:280,margin:"0 auto"}},
                       "You\u2019ll receive an email from Support@aurisargames.com upon review that will ask for your 12-character Private User ID to verify your identity.")
                     , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
                   )
@@ -10218,7 +10219,7 @@ function App() {
                   React.createElement('div', { style: {textAlign:"center",padding:"24px 0"}}
                     , React.createElement('div', { style: {fontSize:"2rem",marginBottom:10}}, "⚡")
                     , React.createElement('div', { style: {fontFamily:"'Inter',sans-serif",fontSize:".88rem",color:"#b4ac9e",marginBottom:6}}, "Feedback received!" )
-                    , React.createElement('div', { style: {fontSize:".72rem",color:"#8a8478"}}, "Thanks for helping forge Aurisar into something legendary.")
+                    , React.createElement('div', { style: {fontSize:FS.lg,color:"#8a8478"}}, "Thanks for helping forge Aurisar into something legendary.")
                     , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {marginTop:16}, onClick: ()=>setFeedbackOpen(false)}, "Close")
                   )
                 )
