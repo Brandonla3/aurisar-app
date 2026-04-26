@@ -307,17 +307,17 @@ def main() -> None:
 
     # ── Dual-form duplicates ─────────────────────────────────────────
     dual_rows = [
-        ["dumbbell-lunges", "Dumbbell Lunges", "ymove", "exercises.js:5012", "P2"],
-        ["dumbbell_lunge", "Dumbbell Lunge", "canonical", "exercises.js:19406", "P2"],
+        ["dumbbell-lunges", "Dumbbell Lunges", "ymove", "alias (hidden from picker)", "FIXED"],
+        ["dumbbell_lunge", "Dumbbell Lunge", "canonical", "shown in picker", "FIXED"],
         ["", "", "", "", ""],
-        ["dumbbell-floor-chest-press", "Dumbbell floor chest press", "ymove", "exercises.js:4921", "P2"],
-        ["dumbbell_floor_press", "Dumbbell Floor Press", "canonical", "exercises.js:19402", "P2"],
+        ["dumbbell-floor-chest-press", "Dumbbell floor chest press", "ymove", "alias (hidden from picker)", "FIXED"],
+        ["dumbbell_floor_press", "Dumbbell Floor Press", "canonical", "shown in picker", "FIXED"],
         ["", "", "", "", ""],
-        ["hammer_curls", "Hammer Curls", "free-exercise-db", "exercises.js:6975", "P2"],
-        ["hammer_curl", "Hammer Curl", "canonical", "exercises.js:19414", "P2"],
+        ["hammer_curls", "Hammer Curls", "free-exercise-db", "alias (hidden from picker)", "FIXED"],
+        ["hammer_curl", "Hammer Curl", "canonical", "shown in picker", "FIXED"],
         ["", "", "", "", ""],
-        ["standing_calf_raises", "Standing Calf Raises", "free-exercise-db", "exercises.js:16751", "P2"],
-        ["standing_calf_raise", "Standing Calf Raise", "canonical", "exercises.js:19458", "P2"],
+        ["standing_calf_raises", "Standing Calf Raises", "free-exercise-db", "alias (hidden from picker)", "FIXED"],
+        ["standing_calf_raise", "Standing Calf Raise", "canonical", "shown in picker", "FIXED"],
     ]
     write_sheet(
         wb,
@@ -358,7 +358,7 @@ def main() -> None:
         ["P1", "FIXED", "Unit-spacing display sites + helper docs", "src/App.js:118, 2299; src/utils/units.js:16"],
         ["P1", "FIXED", "Populate empty/truncated exercise descriptions", "src/data/exercises.js — 72 empty entries synthesised + 1,051 truncated entries trimmed cleanly"],
         ["P2", "PARTIAL", "Spacing/typography token system introduced + top values migrated", "src/utils/tokens.js (new) — 329 highest-frequency values migrated; remaining stragglers tracked"],
-        ["P2", "TODO", "Dual-form catalog dedup", "src/data/exercises.js + migration"],
+        ["P2", "FIXED", "Dual-form catalog dedup via alias flag (no user-data migration needed)", "src/data/exercises.js — 4 legacy entries marked alias:true; src/App.js splits picker (filtered) vs lookup (unfiltered)"],
         ["P2", "FIXED", "Masculine palette rollout — CAT_ICON_COLORS + filter accents", "Profile/Library/PlanWizard now use UI_COLORS.accent for active states; xp.js fallback consolidated"],
         ["P2", "FIXED", "Reps schema standardisation + restSec field in PLAN_TEMPLATES", "src/data/constants.js — 244 values quoted, 194 restSec:null fields added"],
         ["P2", "FIXED", "Tokenise inline color one-offs", "src/data/constants.js UI_COLORS + 75+ migrated call-sites"],
