@@ -218,8 +218,8 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
         background:"transparent",cursor:"pointer",borderRadius:0,padding:"0",transition:"all .2s",marginLeft:-4,marginRight:-4},
         onClick:()=>toggleCollapse()}
         , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
-          , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();reorder(i-1);}}, "▲")
-          , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===exCount-1?.3:1}, disabled: i===exCount-1, onClick: e=>{e.stopPropagation();reorder(i+1);}}, "▼")
+          , React.createElement('button', { type: "button", 'aria-label': `Move ${exD.name} up`, title: "Move up", className: "btn btn-ghost btn-xs", style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();reorder(i-1);}}, "▲")
+          , React.createElement('button', { type: "button", 'aria-label': `Move ${exD.name} down`, title: "Move down", className: "btn btn-ghost btn-xs", style: {padding:"2px 5px",fontSize:".65rem",lineHeight:1,minWidth:0,opacity:i===exCount-1?.3:1}, disabled: i===exCount-1, onClick: e=>{e.stopPropagation();reorder(i+1);}}, "▼")
         )
         , ex.supersetWith==null && exCount>=2 && React.createElement('div', {
             style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
@@ -229,7 +229,7 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
             React.createElement('div', {className:`ss-cb ${ssChecked.has(i)?"on":""}`}),
             React.createElement('span', {style:{fontSize:".55rem",color:ssChecked.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
           )
-        , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
+        , React.createElement('span', { 'aria-hidden': "true", style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
         , React.createElement('div', { className: "builder-ex-orb", style: {"--mg-color":mgColor} }, React.createElement(ExIcon, {ex:exD, size:".95rem", color:"#d4cec4"}))
         , React.createElement('div', { className: "builder-ex-name-styled"}
           , exD.name
@@ -241,7 +241,7 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
         , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${displayWt(ex.weightLbs, profile.units)}`:"")
         , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const extraCount=(ex.extraRows||[]).length;const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null,null,null,extraCount);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,null,null,extraCount),0);return formatXP(b+r,{signed:true});})(), runBoostPct>0&&React.createElement('span', { style: {color:UI_COLORS.warning,marginLeft:2}}, "⚡"))
         , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
-        , React.createElement('button', { className: "btn btn-danger btn-xs", onClick: e=>{e.stopPropagation();removeEx();}}, "✕")
+        , React.createElement('button', { type: "button", 'aria-label': `Remove ${exD.name}`, title: "Remove", className: "btn btn-danger btn-xs", onClick: e=>{e.stopPropagation();removeEx();}}, "✕")
       )
       , !collapsed&&exD.id!=="rest_day"&&React.createElement(React.Fragment, null
         , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:6}}
@@ -781,6 +781,27 @@ function App() {
     return ()=>{ subscription.unsubscribe(); clearTimeout(fallback); };
   },[]);
   useEffect(()=>{ if(screen==="main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id])||null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email])||null); },[profile,screen,isPreviewMode]);
+
+  // Global ESC handler for modal dismissal. Closes the topmost open modal in
+  // priority order so keyboard users can back out of any overlay without
+  // hunting for the ✕ button.
+  useEffect(()=>{
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (confirmDelete) { setConfirmDelete(null); return; }
+      if (oneOffModal)   { setOneOffModal(null); return; }
+      if (savePlanWizard){ setSavePlanWizard(null); return; }
+      if (saveWorkoutWizard) { setSaveWorkoutWizard(null); return; }
+      if (completionModal) { setCompletionModal(null); return; }
+      if (retroEditModal)  { setRetroEditModal(null); return; }
+      if (logEditModal)    { setLogEditModal(null); return; }
+      if (statsPromptModal){ setStatsPromptModal(null); return; }
+      if (showWNMockup)    { setShowWNMockup(false); return; }
+      if (mapOpen)         { setMapOpen(false); return; }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  },[confirmDelete,oneOffModal,savePlanWizard,saveWorkoutWizard,completionModal,retroEditModal,logEditModal,statsPromptModal,showWNMockup,mapOpen]);
   useEffect(()=>{
     if(screen!=="intro"){ setBootStep(0); return; }
     setBootStep(0);
@@ -816,7 +837,8 @@ function App() {
     return ()=>window.removeEventListener("beforeunload", handleUnload);
   },[]);
 
-  const showToast = (msg,dur=2800) => { setToast(msg); setTimeout(()=>setToast(null),dur); };
+  // 4s gives mobile users enough time to read; previously 2.8s was too brief.
+  const showToast = (msg,dur=4000) => { setToast(msg); setTimeout(()=>setToast(null),dur); };
 
   // Keep notifPrefsRef in sync so realtime handler avoids stale closure
   useEffect(() => { notifPrefsRef.current = profile.notificationPrefs || {}; }, [profile.notificationPrefs]);
@@ -1535,12 +1557,15 @@ function App() {
   }
 
   function guardRecoveryCodes(callback) {
-    if(mfaRecoveryCodes) {
-      const ok = window.confirm("You have unsaved recovery codes!\n\nIf you haven't copied or downloaded them, you won't be able to see them again.\n\nLeave anyway?");
-      if(!ok) return;
-      setMfaRecoveryCodes(null);
-    }
-    callback();
+    if(!mfaRecoveryCodes) { callback(); return; }
+    setConfirmDelete({
+      icon: "🔑",
+      title: "Leave without saving codes?",
+      body: "You have unsaved recovery codes. If you haven't copied or downloaded them, you won't be able to see them again.",
+      confirmLabel: "Leave anyway",
+      cancelLabel: "Stay here",
+      onConfirm: () => { setMfaRecoveryCodes(null); callback(); },
+    });
   }
 
   // Block browser tab close / refresh while recovery codes are showing
@@ -3339,7 +3364,7 @@ function App() {
       , React.createElement('div', { className: "bg"})
       , PARTICLES.map(p=>React.createElement('div', { key: p.id, className: "pt", style: {left:`${p.x}%`,bottom:`${Math.random()*100}%`,width:p.size,height:p.size,"--dur":`${p.duration}s`,"--dly":`${p.delay}s`}}))
       , xpFlash && React.createElement('div', { className: "xp-flash"}, formatXP(xpFlash.amount,{signed:true}), xpFlash.mult>1.02?" ⚡":"")
-      , toast    && React.createElement('div', { className: "toast"}, toast)
+      , toast    && React.createElement('div', { className: "toast", role: "status", 'aria-live': "polite", 'aria-atomic': "true", onClick: ()=>setToast(null)}, toast)
       , friendExBanner && React.createElement('div', { className: "friend-ex-banner", key: friendExBanner.key, onClick: () => setFriendExBanner(null) }
         , React.createElement('div', { className: "friend-ex-banner-icon" }, friendExBanner.exerciseIcon || "\uD83D\uDCAA")
         , React.createElement('div', { className: "friend-ex-banner-text" }
@@ -5744,7 +5769,7 @@ function App() {
                                   React.createElement(React.Fragment, null
                                     /* Header */
                                     , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6,marginBottom:collapsed?0:7}}
-                                      , React.createElement('span', { style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
+                                      , React.createElement('span', { 'aria-hidden': "true", style: {cursor:"grab",color:"#5a5650",fontSize:".9rem",flexShrink:0}}, "⠿")
                                       , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:1,flexShrink:0}}
 
                                       )
@@ -6749,12 +6774,19 @@ function App() {
                         , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:".6rem",marginRight:2,flexShrink:0,color:UI_COLORS.danger}, title: "Delete all entries",
                           onClick: e=>{e.stopPropagation();
                             const totalXP = entries.reduce((s,en)=>s+en.xp,0);
-                            if(!window.confirm(`Delete entire "${first.sourceWorkoutName}" session? (${entries.length} exercises, ${formatXP(-totalXP,{signed:true})})`)) return;
-                            const idxSet = new Set(entries.map(en=>en._idx));
-                            const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
-                            const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
-                            setProfile(p=>({...p, xp:Math.max(0,p.xp-totalXP), log:newLog, exercisePBs:calcExercisePBs(newLog), deletedItems:[...(p.deletedItems||[]),...deletedEntries]}));
-                            showToast("Workout session deleted. "+formatXP(-totalXP,{signed:true}));
+                            setConfirmDelete({
+                              icon: first.sourceWorkoutIcon || "💪",
+                              title: "Delete workout session?",
+                              body: `Delete entire "${first.sourceWorkoutName}" session — ${entries.length} exercises, ${formatXP(-totalXP,{signed:true})}. This cannot be undone.`,
+                              confirmLabel: "🗑 Delete session",
+                              onConfirm: () => {
+                                const idxSet = new Set(entries.map(en=>en._idx));
+                                const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
+                                const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
+                                setProfile(p=>({...p, xp:Math.max(0,p.xp-totalXP), log:newLog, exercisePBs:calcExercisePBs(newLog), deletedItems:[...(p.deletedItems||[]),...deletedEntries]}));
+                                showToast("Workout session deleted. "+formatXP(-totalXP,{signed:true}));
+                              },
+                            });
                           }}, "\uD83D\uDDD1")
                         , React.createElement('svg', { width: "13", height: "13", viewBox: "0 0 14 14"   , fill: "none", style: {flexShrink:0,transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
                           , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg5", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
@@ -6843,12 +6875,19 @@ function App() {
                             , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:".6rem",marginRight:2,flexShrink:0,color:UI_COLORS.danger}, title: "Delete all entries",
                               onClick: e=>{e.stopPropagation();
                                 const totalXP = entries.reduce((s,en)=>s+en.xp,0);
-                                if(!window.confirm(`Delete entire "${first.sourcePlanName}" session? (${entries.length} exercises, ${formatXP(-totalXP,{signed:true})})`)) return;
-                                const idxSet = new Set(entries.map(en=>en._idx));
-                                const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
-                                const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
-                                setProfile(p=>({...p, xp:Math.max(0,p.xp-totalXP), log:newLog, exercisePBs:calcExercisePBs(newLog), deletedItems:[...(p.deletedItems||[]),...deletedEntries]}));
-                                showToast("Plan session deleted. "+formatXP(-totalXP,{signed:true}));
+                                setConfirmDelete({
+                                  icon: first.sourcePlanIcon || "📋",
+                                  title: "Delete plan session?",
+                                  body: `Delete entire "${first.sourcePlanName}" session — ${entries.length} exercises, ${formatXP(-totalXP,{signed:true})}. This cannot be undone.`,
+                                  confirmLabel: "🗑 Delete session",
+                                  onConfirm: () => {
+                                    const idxSet = new Set(entries.map(en=>en._idx));
+                                    const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
+                                    const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
+                                    setProfile(p=>({...p, xp:Math.max(0,p.xp-totalXP), log:newLog, exercisePBs:calcExercisePBs(newLog), deletedItems:[...(p.deletedItems||[]),...deletedEntries]}));
+                                    showToast("Plan session deleted. "+formatXP(-totalXP,{signed:true}));
+                                  },
+                                });
                               }}, "\uD83D\uDDD1")
                             , React.createElement('svg', { width: "13", height: "13", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {flexShrink:0,transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
                                           , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg5", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
@@ -8469,7 +8508,7 @@ function App() {
 
       /* ══ SAVE-TO-PLAN WIZARD ════════════════════ */
       , savePlanWizard && (
-        React.createElement('div', { className: "spw-backdrop", onClick: ()=>setSavePlanWizard(null)}
+        React.createElement('div', { className: "spw-backdrop", onClick: ()=>setSavePlanWizard(null), role: "dialog", 'aria-modal': "true", 'aria-label': "Save plan"}
           , React.createElement('div', { className: "spw-sheet", onClick: e=>e.stopPropagation()}
             , React.createElement('div', { className: "spw-hdr"}
               , React.createElement('div', null
@@ -9630,7 +9669,7 @@ function App() {
         const inScheduleMode = completionAction==="schedule";
         const pickerValue = (inPickMode && completionDate!=="pick") ? completionDate : "";
         return (
-          React.createElement('div', { className: "completion-backdrop", onClick: ()=>{setCompletionModal(null);setCompletionAction("today");setScheduleWoDate("");}}
+          React.createElement('div', { className: "completion-backdrop", onClick: ()=>{setCompletionModal(null);setCompletionAction("today");setScheduleWoDate("");}, role: "dialog", 'aria-modal': "true", 'aria-label': "Workout completion"}
             , React.createElement('div', { className: "completion-sheet", onClick: e=>e.stopPropagation(), style: {"--mg-color":woMgColor}}
               /* Header */
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8} }
@@ -9894,41 +9933,50 @@ function App() {
       })()
 
       /* ══ CONFIRM DELETE MODAL ════════════════════ */
-      , confirmDelete && (
-        React.createElement('div', { className: "cdel-backdrop", onClick: ()=>setConfirmDelete(null)}
+      , confirmDelete && (()=>{
+        // Support either type-based dispatch (existing pattern) or a generic
+        // {title, body, onConfirm, confirmLabel, cancelLabel} payload so
+        // window.confirm() can be replaced consistently.
+        const cd = confirmDelete;
+        const isGeneric = typeof cd.onConfirm === 'function';
+        const titleText = cd.title || (
+          cd.type==="plan"?"Delete Plan?":
+          cd.type==="workout"?"Delete Workout?":
+          cd.type==="exercise"?"Delete Exercise?":
+          cd.type==="logEntry"?"Delete Log Entry?":
+          cd.type==="char"?"Delete Character?":
+          "Are you sure?"
+        );
+        const bodyEl = cd.body
+          ? (typeof cd.body === 'string' ? React.createElement('span', null, cd.body) : cd.body)
+          : (cd.type==="char"
+              ? "This will permanently erase all your XP, battle log, plans, and workouts. This cannot be undone."
+              : cd.type==="logEntry"
+              ? React.createElement('span', null, "Remove " , React.createElement('span', { className: "cdel-name"}, cd.name), " from your log? "    , cd.xp&&React.createElement('span', null, "This will deduct "   , cd.xp, " XP." ))
+              : React.createElement('span', null, "Are you sure you want to delete "       , React.createElement('span', { className: "cdel-name"}, cd.name), "? This cannot be undone."    )
+            );
+        return React.createElement('div', { className: "cdel-backdrop", onClick: ()=>setConfirmDelete(null), role: "dialog", 'aria-modal': "true", 'aria-labelledby': "cdel-title"}
           , React.createElement('div', { className: "cdel-sheet", onClick: e=>e.stopPropagation()}
-            , React.createElement('div', { className: "cdel-icon"}, confirmDelete.icon)
-            , React.createElement('div', { className: "cdel-title"}, "Delete " , 
-              confirmDelete.type==="plan"?"Plan":
-              confirmDelete.type==="workout"?"Workout":
-              confirmDelete.type==="exercise"?"Exercise":
-              confirmDelete.type==="logEntry"?"Log Entry":
-              "Character"
-            , "?")
-            , React.createElement('div', { className: "cdel-body"}
-              , confirmDelete.type==="char"
-                ? "This will permanently erase all your XP, battle log, plans, and workouts. This cannot be undone."
-                : confirmDelete.type==="logEntry"
-                ? React.createElement('span', null, "Remove " , React.createElement('span', { className: "cdel-name"}, confirmDelete.name), " from your log? "    , confirmDelete.xp&&React.createElement('span', null, "This will deduct "   , confirmDelete.xp, " XP." ))
-                : React.createElement('span', null, "Are you sure you want to delete "       , React.createElement('span', { className: "cdel-name"}, confirmDelete.name), "? This cannot be undone."    )
-              
-            )
-            , confirmDelete.warning&&React.createElement('div', { className: "cdel-warning"}, confirmDelete.warning)
+            , React.createElement('div', { className: "cdel-icon", 'aria-hidden': "true"}, cd.icon)
+            , React.createElement('div', { id: "cdel-title", className: "cdel-title"}, titleText)
+            , React.createElement('div', { className: "cdel-body"}, bodyEl)
+            , cd.warning&&React.createElement('div', { className: "cdel-warning"}, cd.warning)
             , React.createElement('div', { style: {display:"flex",gap:8}}
-              , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setConfirmDelete(null)}, "Cancel")
+              , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setConfirmDelete(null)}, cd.cancelLabel || "Cancel")
               , React.createElement('button', { className: "btn btn-danger" , style: {flex:1}, onClick: ()=>{
-                const {type,id} = confirmDelete;
                 setConfirmDelete(null);
+                if (isGeneric) { cd.onConfirm(); return; }
+                const {type,id} = cd;
                 if(type==="plan")      _doDeletePlan(id);
                 else if(type==="workout")   _doDeleteWorkout(id);
                 else if(type==="exercise")  _doDeleteCustomEx(id);
                 else if(type==="logEntry")  _doDeleteLogEntry(id);
                 else if(type==="char")      _doResetChar();
-              }}, "🗑 Delete" )
+              }}, cd.confirmLabel || "🗑 Delete")
             )
           )
-        )
-      )
+        );
+      })()
 
       /* ══ MAP OVERLAY ═════════════════════════════ */
       , mapOpen&&(()=>{

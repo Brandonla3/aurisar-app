@@ -2,6 +2,15 @@
     @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600&family=Inter:wght@400;500;600;700&display=swap');
     
     *{box-sizing:border-box;margin:0;padding:0}
+
+    /* Visible focus rings for keyboard users only — :focus-visible matches
+       only when focus arrived via keyboard, so mouse/touch focus stays
+       outline-free. Uses --cls-color when set so the ring picks up the
+       user's class accent. */
+    :focus{outline:none}
+    :focus-visible{outline:2px solid var(--cls-color,#c49428);outline-offset:2px;border-radius:4px}
+    .builder-ex-row:focus-visible{outline:2px solid var(--cls-color,#c49428);outline-offset:2px}
+
     :root{--bottom-nav-h:calc(58px + env(safe-area-inset-bottom,0px))}
     html{font-size:17.333px}
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
@@ -39,8 +48,23 @@
     .btn-green{background:rgba(46,204,113,.12);color:#2ecc71;border:1px solid rgba(46,204,113,.28)}
     .btn-green:hover{background:rgba(46,204,113,.22)}
     .btn:disabled{opacity:.3;cursor:not-allowed;transform:none!important}
-    .btn-sm{padding:5px 11px;font-size:.6rem}
-    .btn-xs{padding:3px 8px;font-size:.55rem}
+    .btn-sm{padding:7px 13px;font-size:.66rem}
+    .btn-xs{padding:5px 10px;font-size:.6rem}
+
+    /* Touch-only hit-area extension. Visual size of small buttons is kept
+       compact so the dense mobile HUD stays usable, but on touch devices a
+       transparent ::before stretches the tappable area toward the WCAG 2.5.5
+       44x44 target. Visual layout is unaffected because the pseudo is
+       absolutely positioned and centered on the host. */
+    @media (hover: none) and (pointer: coarse) {
+      .btn-xs, .btn-sm, .tab, .preview-pin-go { position: relative; }
+      .btn-xs::before, .btn-sm::before, .tab::before, .preview-pin-go::before {
+        content: ""; position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        min-width: 44px; min-height: 44px;
+        pointer-events: auto;
+      }
+    }
     /* HUD */
     .hud{position:relative;z-index:2;width:100%;max-width:520px;margin:0 auto;padding:12px;min-height:100vh;display:flex;flex-direction:column}
     .hud-top{display:flex;align-items:center;gap:11px;padding:12px 14px;background:linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.25));border:1px solid rgba(180,172,158,.06);border-radius:12px;margin-bottom:11px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
