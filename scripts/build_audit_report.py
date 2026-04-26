@@ -251,7 +251,8 @@ def main() -> None:
 
     # ── Typography ───────────────────────────────────────────────────
     typo_rows = [
-        ["P2", "20+ distinct font sizes (0.52, 0.55, 0.58, 0.6, 0.62, 0.63, 0.65, 0.68, 0.72, 0.78, 0.8, 0.82, 0.93rem...)", "Throughout app.css and inline styles", "Consolidate to 8-10 tokens"],
+        ["FIXED", "Token system introduced (FS scale)", "src/utils/tokens.js (new)", "8-step rem-based font-size scale (xxs→xxl). Top 3 inline values (.6rem, .72rem, .7rem) migrated — 240 sites."],
+        ["P2", "Remaining font-size stragglers (.52, .55, .58, .65, .68, .8, .9rem etc)", "Throughout JSX inline styles", "Follow-up sweep — pattern established, just mechanical"],
         ["P2", "Letter-spacing variants (0.02–0.32em)", "Throughout", "No system documented"],
         ["P2", "Line-height variants (1, 1.1, 1.15, 1.6, 1.65, 1.7)", "Throughout", "No system documented"],
         ["P2", "Font families: Cinzel, Cinzel Decorative, Inter, system-ui", "src/styles/*.css", "Mostly intentional but mixed by use case"],
@@ -260,8 +261,9 @@ def main() -> None:
 
     # ── Spacing / BorderRadius ───────────────────────────────────────
     spacing_rows = [
-        ["P2", "No spacing token system — hardcoded px throughout", "App.js inline styles", "Adopt 4px-based scale (4,8,12,16,24,32)"],
-        ["P2", "BorderRadius values 3,4,5,6,8,12,100", "Throughout", "Standardise to {4,6,8,9999}"],
+        ["FIXED", "Token system introduced (R + S scales)", "src/utils/tokens.js (new)", "Border-radius scale (sm→full) and 4px-based spacing scale (s2→s32). Top 3 borderRadius values (9, 8, 6) migrated — 89 sites."],
+        ["P2", "Remaining borderRadius stragglers (3,4,5,7,10,12,16)", "Throughout JSX inline styles", "Follow-up sweep — pattern established"],
+        ["P2", "Hardcoded gap/padding/margin px values", "Throughout JSX inline styles", "Migrate using tokens.S — follow-up sweep"],
         ["P2", "Mix of px-string and unitless React style values", "Throughout", "Pick one convention"],
         ["P2", "Negative margins for overlap (marginTop:-16, marginTop:-14)", "src/styles/landing.css:241,251", "Acceptable but document"],
     ]
@@ -355,7 +357,7 @@ def main() -> None:
         ["P1", "PARTIAL", "formatXP() helper introduced; ~8 high-traffic sites migrated", "src/utils/format.js + src/App.js (sweep remaining sites)"],
         ["P1", "FIXED", "Unit-spacing display sites + helper docs", "src/App.js:118, 2299; src/utils/units.js:16"],
         ["P1", "FIXED", "Populate empty/truncated exercise descriptions", "src/data/exercises.js — 72 empty entries synthesised + 1,051 truncated entries trimmed cleanly"],
-        ["P2", "TODO", "Spacing/typography token system", "Codebase-wide refactor"],
+        ["P2", "PARTIAL", "Spacing/typography token system introduced + top values migrated", "src/utils/tokens.js (new) — 329 highest-frequency values migrated; remaining stragglers tracked"],
         ["P2", "TODO", "Dual-form catalog dedup", "src/data/exercises.js + migration"],
         ["P2", "FIXED", "Masculine palette rollout — CAT_ICON_COLORS + filter accents", "Profile/Library/PlanWizard now use UI_COLORS.accent for active states; xp.js fallback consolidated"],
         ["P2", "FIXED", "Reps schema standardisation + restSec field in PLAN_TEMPLATES", "src/data/constants.js — 244 values quoted, 194 restSec:null fields added"],
