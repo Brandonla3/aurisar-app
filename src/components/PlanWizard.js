@@ -5,7 +5,7 @@ import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } fr
 import { normalizeHHMM, combineHHMMSec, secToHHMMSplit } from '../utils/time';
 import { _optionalChain, uid, clone } from '../utils/helpers';
 import { NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, UI_COLORS } from '../data/constants';
-import { FS, R } from '../utils/tokens';
+import { FS, R, S } from '../utils/tokens';
 import { CLASSES } from '../data/exercises';
 import { ExIcon } from './ExIcon';
 
@@ -54,43 +54,43 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
 
   return (
     React.createElement('div', { className: "builder-ex-row",
-      style: {flexDirection:"column",alignItems:"stretch",gap:0,"--cat-color":catColorPlan}}
+      style: {flexDirection:"column",alignItems:"stretch",gap:S.s0,"--cat-color":catColorPlan}}
       /* Header row */
       , React.createElement(React.Fragment, null
-        , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:4,marginBottom:collapsed?0:8,cursor:"pointer"},
+        , React.createElement('div', { className:"wb-ex-hdr", style: {display:"flex",alignItems:"center",gap:S.s4,marginBottom:collapsed?0:8,cursor:"pointer"},
             onClick:toggleCollapse}
-          , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
-            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();moveUp();}}, "\u25B2")
-            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 5px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===planExCount-1?.3:1}, disabled: i===planExCount-1, onClick: e=>{e.stopPropagation();moveDown();}}, "\u25BC")
+          , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:S.s2,flexShrink:0}}
+            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===0?.3:1}, disabled: i===0, onClick: e=>{e.stopPropagation();moveUp();}}, "\u25B2")
+            , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===planExCount-1?.3:1}, disabled: i===planExCount-1, onClick: e=>{e.stopPropagation();moveDown();}}, "\u25BC")
           )
           , ex.supersetWith==null && planExCount>=2 && React.createElement('div', {
-              style:{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0},
+              style:{display:"flex",alignItems:"center",gap:S.s4,cursor:"pointer",flexShrink:0},
               title:"Select for superset",
               onClick:e=>{e.stopPropagation();setSsCheckedPlan(prev=>{const n=new Set(prev);if(n.has(i))n.delete(i);else{if(n.size>=2){const oldest=[...n][0];n.delete(oldest);}n.add(i);}return n;});}
             },
               React.createElement('div', {className:`ss-cb ${ssCheckedPlan.has(i)?"on":""}`}),
               React.createElement('span', {style:{fontSize:FS.fs55,color:ssCheckedPlan.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}, "Superset")
             )
-          , exData.custom&&React.createElement('div', { className: "ex-edit-btn", style: {position:"static",marginRight:2}, onClick: e=>{e.stopPropagation();onOpenExEditor("edit",exData);}}, "\u270E")
+          , exData.custom&&React.createElement('div', { className: "ex-edit-btn", style: {position:"static",marginRight:S.s2}, onClick: e=>{e.stopPropagation();onOpenExEditor("edit",exData);}}, "\u270E")
           , React.createElement('div', { className: "builder-ex-orb", style: {"--cat-color":catColorPlan} }, exData.icon)
           , React.createElement('span', { className: "builder-ex-name-styled", style: {flex:1} }, exData.name)
           , (isRunningEx&&pbDisp||exPBDisp3)&&React.createElement('span', { style: {fontSize:FS.fs58,color:"#b4ac9e",flexShrink:0} }, "\uD83C\uDFC6 ", isRunningEx&&pbDisp?pbDisp:exPBDisp3)
           , collapsed&&exData.id!=="rest_day"&&React.createElement('span', { style: {fontSize:FS.fs60,color:"#5a5650"}}, noSetsEx?"":ex.sets+"\u00D7", ex.reps, ex.weightLbs?` \u00B7 ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:"")
           , React.createElement('span', { style: {fontSize:FS.fs63,color:"#b4ac9e",minWidth:36,textAlign:"right"}}, "+"+(xp||0).toLocaleString())
           , React.createElement('span', { style: {fontSize:FS.fs60,color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "\u25BC")
-          , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:2}, onClick: e=>{e.stopPropagation();removeEx();}}, "\u2715")
+          , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {marginLeft:S.s2}, onClick: e=>{e.stopPropagation();removeEx();}}, "\u2715")
         )
         , !collapsed&&exData.id!=="rest_day"&&React.createElement(React.Fragment, null
           /* Top row: Sets+Reps+Weight or Duration+Sec+Dist */
-          , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:6}}
+          , React.createElement('div', { style: {display:"flex",gap:S.s6,marginBottom:S.s6}}
             , !noSetsEx&&!hasDur&&React.createElement('div', { style: {flex:1,minWidth:0}}
-              , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Sets")
+              , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Sets")
               , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
                 defaultValue: ex.sets===0||ex.sets===""?"":ex.sets, onBlur: e=>updateField("sets",e.target.value)})
             )
             , hasDur ? (React.createElement(React.Fragment, null
               , React.createElement('div', { style: {flex:1.6,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Duration")
+                , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Duration")
                 , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "numeric",
                   defaultValue: ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
                   onBlur: e=>{
@@ -104,7 +104,7 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                   placeholder: "00:00"})
               )
               , React.createElement('div', { style: {flex:0.8,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Sec")
+                , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Sec")
                 , React.createElement('input', { className: "builder-ex-input", style: {width:"100%",textAlign:"center"}, type: "number", min: "0", max: "59",
                   defaultValue: ex._durSec!==undefined ? String(ex._durSec).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : ""),
                   onBlur: e=>{
@@ -117,7 +117,7 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                   placeholder: "00"})
               )
               , React.createElement('div', { style: {flex:1.2,minWidth:0}}
-                , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (" , bMetric?"km":"mi", ")")
+                , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Dist (" , bMetric?"km":"mi", ")")
                 , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
                   defaultValue: dispDist, placeholder: "0",
                   onBlur: e=>{const v=e.target.value;const mi=v&&bMetric?kmToMi(v):v;updateField("distanceMi",mi||null);}})
@@ -125,13 +125,13 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             )) : (
               React.createElement(React.Fragment, null
                 , React.createElement('div', { style: {flex:1,minWidth:0}}
-                  , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Reps")
+                  , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Reps")
                   , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal",
                     defaultValue: dispReps===0||dispReps===""?"":dispReps, onBlur: e=>updateField("reps",e.target.value)})
                 )
                 , hasWeight&&(
                   React.createElement('div', { style: {flex:1.2,minWidth:0}}
-                    , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, bWUnit)
+                    , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, bWUnit)
                     , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "text", inputMode: "decimal", step: bMetric?"0.5":"2.5",
                       defaultValue: dispW, placeholder: "\u2014",
                       onBlur: e=>{const v=e.target.value;const lbs=v&&bMetric?kgToLbs(v):v;updateField("weightLbs",lbs||null);}})
@@ -141,18 +141,18 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             )
           )
           , isRunningEx&&runBoostPct>0&&(
-            React.createElement('div', { style: {fontSize:FS.fs65,color:UI_COLORS.warning,marginBottom:5}}, "\u26A1 +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
+            React.createElement('div', { style: {fontSize:FS.fs65,color:UI_COLORS.warning,marginBottom:S.s6}}, "\u26A1 +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
           )
           /* Treadmill controls */
           , hasDur&&exData.hasTreadmill&&(
-            React.createElement('div', { style: {marginBottom:6}}
-              , React.createElement('div', { style: {display:"flex",gap:8}}
+            React.createElement('div', { style: {marginBottom:S.s6}}
+              , React.createElement('div', { style: {display:"flex",gap:S.s8}}
                 , React.createElement('div', { style: {flex:1}}
-                  , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:FS.fs55}}, "(0.5\u201315)"))
+                  , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Incline " , React.createElement('span', { style: {opacity:.6,fontSize:FS.fs55}}, "(0.5\u201315)"))
                   , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "\u2014", defaultValue: ex.incline||"", onBlur: e=>updateField("incline",e.target.value?parseFloat(e.target.value):null)})
                 )
                 , React.createElement('div', { style: {flex:1}}
-                  , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:FS.fs55}}, "(0.5\u201315)"))
+                  , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Speed " , React.createElement('span', { style: {opacity:.6,fontSize:FS.fs55}}, "(0.5\u201315)"))
                   , React.createElement('input', { className: "builder-ex-input", style: {width:"100%"}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "\u2014", defaultValue: ex.speed||"", onBlur: e=>updateField("speed",e.target.value?parseFloat(e.target.value):null)})
                 )
               )
@@ -160,7 +160,7 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
           )
           /* Extra interval/set rows */
           , (ex.extraRows||[]).map((row,ri)=>(
-            React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginTop:4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.r6,alignItems:"center",flexWrap:"wrap"}}
+            React.createElement('div', { key: ri, style: {display:"flex",gap:S.s4,marginTop:S.s4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.r6,alignItems:"center",flexWrap:"wrap"}}
               , React.createElement('span', { style: {fontSize:FS.fs58,color:"#9a8a78",flexShrink:0,minWidth:18}}, hasDur?`I${ri+2}`:`S${ri+2}`)
               , !hasDur&&!noSetsEx&&React.createElement('input', { className: "builder-ex-input", style: {flex:1,minWidth:40,fontSize:FS.fs70}, type: "text", inputMode: "decimal", placeholder: "Sets", defaultValue: row.sets||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateField("extraRows",rr);}})
               , React.createElement('input', { className: "builder-ex-input", style: {flex:1.5,minWidth:52,fontSize:FS.fs70}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
@@ -171,17 +171,17 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
               , hasDur&&exData.hasTreadmill&&React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:FS.fs70}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", defaultValue: row.incline||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateField("extraRows",rr);}})
               , hasDur&&exData.hasTreadmill&&React.createElement('input', { className: "builder-ex-input", style: {flex:0.8,minWidth:34,fontSize:FS.fs70}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", defaultValue: row.speed||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateField("extraRows",rr);}})
               , hasWeight&&React.createElement('input', { className: "builder-ex-input", style: {flex:1,minWidth:38,fontSize:FS.fs70}, type: "text", inputMode: "decimal", placeholder: bWUnit, defaultValue: row.weightLbs||"", onBlur: e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateField("extraRows",rr);}})
-              , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 5px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateFieldNow("extraRows",rr);}}, "\u2715")
+              , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 6px",flexShrink:0}, onClick: ()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateFieldNow("extraRows",rr);}}, "\u2715")
             )
           ))
-          , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,marginBottom:8,fontSize:FS.fs60,color:"#8a8478",borderStyle:"dashed"},
+          , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:S.s4,marginBottom:S.s8,fontSize:FS.fs60,color:"#8a8478",borderStyle:"dashed"},
             onClick: ()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateFieldNow("extraRows",rr);}}, "\uFF0B Add Row (e.g. "
                 , hasDur?"interval":"progressive weight", ")"
           )
           /* Avg HR Zone -- last for cardio */
           , hasDur&&(
             React.createElement('div', null
-              , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:FS.fs55}}, "(optional)"))
+              , React.createElement('label', { style: {fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Avg Heart Rate Zone "    , React.createElement('span', { style: {opacity:.6,fontSize:FS.fs55}}, "(optional)"))
               , React.createElement('div', { className: "hr-zone-row"}
                 , HR_ZONES.map(z=>{
                   const sel=ex.hrZone===z.z;
@@ -196,7 +196,7 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                   );
                 })
               )
-              , ex.hrZone&&React.createElement('div', { style: {fontSize:FS.fs65,color:"#8a8478",fontStyle:"italic",marginTop:4}}, HR_ZONES[ex.hrZone-1].desc)
+              , ex.hrZone&&React.createElement('div', { style: {fontSize:FS.fs65,color:"#8a8478",fontStyle:"italic",marginTop:S.s4}}, HR_ZONES[ex.hrZone-1].desc)
             )
           )
         )
@@ -400,22 +400,22 @@ function PlanWizard(props) {
         React.createElement('span', {style:{fontSize:FS.fs60,color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}, "\u25BC")
       ),
       !collapsed && exData.id!=="rest_day" && React.createElement('div', {className:"ss-section-body"},
-        React.createElement('div', {style:{display:"flex",gap:6,marginBottom:6}},
+        React.createElement('div', {style:{display:"flex",gap:S.s6,marginBottom:S.s6}},
           !_noSets&&!_hasDur&&React.createElement('div', {style:{flex:1,minWidth:0}},
-            React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Sets"),
+            React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Sets"),
             React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
               defaultValue:ex.sets===0||ex.sets===""?"":ex.sets, onBlur:e=>updateExInDay(dayIdx,exIdx,"sets",e.target.value)})
           ),
           _hasDur ? (React.createElement(React.Fragment, null,
             React.createElement('div', {style:{flex:1.6,minWidth:0}},
-              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Duration"),
+              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Duration"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"numeric",
                 defaultValue:ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):""),
                 onBlur:e=>{const n=normalizeHHMM(e.target.value);const s=combineHHMMSec(n,ex._durSec||"");const batch={_durHHMM:n||undefined,durationSec:s};if(s){batch.reps=Math.max(1,Math.floor(s/60));batch.durationMin=s/60;}updateExInDayBatch(dayIdx,exIdx,batch);},
                 placeholder:"00:00"})
             ),
             React.createElement('div', {style:{flex:1,minWidth:0}},
-              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Dist (",_dU,")"),
+              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Dist (",_dU,")"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
                 defaultValue:ex.distanceMi?(_m?String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)):String(ex.distanceMi)):"",
                 onBlur:e=>{const v=e.target.value;const mi=v&&_m?kmToMi(v):v;updateExInDay(dayIdx,exIdx,"distanceMi",mi||null);},
@@ -423,12 +423,12 @@ function PlanWizard(props) {
             )
           )) : (React.createElement(React.Fragment, null,
             React.createElement('div', {style:{flex:1,minWidth:0}},
-              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Reps"),
+              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Reps"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
                 defaultValue:ex.reps===0||ex.reps===""?"":ex.reps, onBlur:e=>updateExInDay(dayIdx,exIdx,"reps",e.target.value)})
             ),
             _hasW&&React.createElement('div', {style:{flex:1.2,minWidth:0}},
-              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:3,display:"block"}}, "Weight (",_wU,")"),
+              React.createElement('label', {style:{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}, "Weight (",_wU,")"),
               React.createElement('input', {className:"builder-ex-input",style:{width:"100%"},type:"text",inputMode:"decimal",
                 defaultValue:ex.weightLbs!=null&&ex.weightLbs!==""?(_m?lbsToKg(ex.weightLbs):String(ex.weightLbs)):"",
                 onBlur:e=>{const v=e.target.value;const lbs=v&&_m?kgToLbs(v):v;updateExInDay(dayIdx,exIdx,"weightLbs",lbs||null);},
@@ -503,7 +503,7 @@ function PlanWizard(props) {
       , React.createElement('div', { className: "field"}, React.createElement('label', null, "Plan Name" ), React.createElement('input', { className: "inp", value: bName, onChange: e=>setBName(e.target.value), placeholder: "Name your plan\u2026"  }))
       , React.createElement('div', { className: "field"}
         , React.createElement('label', null, "Level " , React.createElement('span', { style: {fontSize:FS.fs55,opacity:.6}}, "(optional)"))
-        , React.createElement('div', { style: {display:"flex",gap:6}}
+        , React.createElement('div', { style: {display:"flex",gap:S.s6}}
           , ["Beginner","Intermediate","Expert"].map(lvl=>(
             React.createElement('button', { key: lvl, className: "btn btn-ghost btn-xs"  ,
               style: {flex:1,fontSize:FS.fs62,
@@ -573,7 +573,7 @@ function PlanWizard(props) {
             , React.createElement('option', { value: "year"}, "Year", bDurCount>1?"s":"")
           )
         )
-        , React.createElement('div', { style: {fontSize:FS.fs62,color:"#5a5650",marginTop:4,fontStyle:"italic"}}
+        , React.createElement('div', { style: {fontSize:FS.fs62,color:"#5a5650",marginTop:S.s4,fontStyle:"italic"}}
           , bDurCount===1?"Single "+bType+" plan":`${bDurCount}-${bType} program`
         )
       )
@@ -625,7 +625,7 @@ function PlanWizard(props) {
         )
       )
       , bStartDate&&bEndDate&&(
-        React.createElement('div', { style: {fontSize:FS.fs65,color:"#b4ac9e",marginTop:-8,marginBottom:4,fontStyle:"italic"}}, "\uD83D\uDCC5 "
+        React.createElement('div', { style: {fontSize:FS.fs65,color:"#b4ac9e",marginTop:S.sNeg8,marginBottom:S.s4,fontStyle:"italic"}}, "\uD83D\uDCC5 "
            , (()=>{
             const s=new Date(bStartDate+"T12:00:00");
             const e=new Date(bEndDate+"T12:00:00");
@@ -645,7 +645,7 @@ function PlanWizard(props) {
           onClick: ()=>{setPlanWizardOpen(true);setWizardWeekIdx(0);}},
           bEditId ? "\u270E Edit Plan" : "\u2694 Create Plan"
       )
-      , React.createElement('div', { style: {fontSize:FS.fs58,color:"#5a5650",textAlign:"center",marginTop:6,fontStyle:"italic"}},
+      , React.createElement('div', { style: {fontSize:FS.fs58,color:"#5a5650",textAlign:"center",marginTop:S.s6,fontStyle:"italic"}},
           bEditId ? "Open the plan wizard to edit days and exercises" : "Open the plan wizard to add days and exercises"
       )
       /* Action buttons -- only for existing plans in user's collection */
@@ -654,7 +654,7 @@ function PlanWizard(props) {
         if(!plan) return null;
         return React.createElement(React.Fragment, null
           , React.createElement('div', { className: "div", style: {margin:"8px 0"}})
-          , React.createElement('div', { style: {display:"flex",gap:7}}
+          , React.createElement('div', { style: {display:"flex",gap:S.s8}}
             , React.createElement('button', { className: `plan-sched-btn ${plan.scheduledDate?"plan-sched-active":""}`,
               style: {flex:1,padding:"8px 12px",textAlign:"center"},
               onClick: ()=>onSchedulePlan(plan)}
@@ -662,7 +662,7 @@ function PlanWizard(props) {
             )
             , plan.custom&&React.createElement('button', { className: "btn btn-danger btn-sm"  , style: {flex:1}, onClick: ()=>{onDeletePlan(plan.id);onClose();}}, "\uD83D\uDDD1 Delete" )
           )
-          , plan.custom&&React.createElement('button', { className: "btn btn-glass" , style: {width:"100%",marginTop:7}, onClick: ()=>onStartPlanWorkout(plan)}, "\uD83D\uDCCB Mark Plan Complete"   )
+          , plan.custom&&React.createElement('button', { className: "btn btn-glass" , style: {width:"100%",marginTop:S.s8}, onClick: ()=>onStartPlanWorkout(plan)}, "\uD83D\uDCCB Mark Plan Complete"   )
         );
       })()
     )
@@ -721,9 +721,9 @@ function PlanWizard(props) {
                   className: `wizard-day-tab ${bDayIdx===globalIdx?"on":""}`,
                   onClick: ()=>setBDayIdx(globalIdx)
                 }
-                  , reorderMode && weekDays.length>1 && React.createElement('span', { style: {display:"flex",flexDirection:"column",gap:0,flexShrink:0}},
-                    React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"1px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===0?.3:1}, disabled: wi===0, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx-1);}}, "\u25C0"),
-                    React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"1px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===weekDays.length-1?.3:1}, disabled: wi===weekDays.length-1, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx+1);}}, "\u25B6")
+                  , reorderMode && weekDays.length>1 && React.createElement('span', { style: {display:"flex",flexDirection:"column",gap:S.s0,flexShrink:0}},
+                    React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===0?.3:1}, disabled: wi===0, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx-1);}}, "\u25C0"),
+                    React.createElement('button', { className: "btn btn-ghost btn-xs", style: {padding:"2px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===weekDays.length-1?.3:1}, disabled: wi===weekDays.length-1, onClick: e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx+1);}}, "\u25B6")
                   )
                   , React.createElement('span', null, d.label||`Day ${globalIdx+1}`)
                   , hasExercises
@@ -739,7 +739,7 @@ function PlanWizard(props) {
           })()
 
           /* Multi-week: duplicate week + week XP info */
-          , bDays.length > 7 && React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
+          , bDays.length > 7 && React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s8}}
             , React.createElement('span', { style: {fontSize:FS.fs62,color:"#8a8478"}}
               , "Week ", wizardWeekIdx+1, " \u00B7 "
               , (()=>{const wDays=bDays.slice(wizardWeekIdx*7,wizardWeekIdx*7+7);return wDays.filter(d=>d.exercises.length>0).length;})(), " active days"
@@ -753,7 +753,7 @@ function PlanWizard(props) {
             , React.createElement('div', { className: "wizard-day-hdr" }
               , React.createElement('input', { key: "dlbl_"+bDayIdx, className: "inp", defaultValue: _optionalChain([bDays, 'access', _4 => _4[bDayIdx], 'optionalAccess', _5 => _5.label])||"", onBlur: e=>updateDayLabel(bDayIdx,e.target.value), placeholder: "Day label\u2026" , style: {flex:1,padding:"8px 12px",fontSize:FS.fs82}})
               , React.createElement('span', { style: {fontSize:FS.fs72,color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}, "\u26A1 " , wizardDayXPs[bDayIdx]||0)
-              , bDays.length>1 && React.createElement('button', { className: "btn btn-danger btn-xs", style: {marginLeft:6,padding:"4px 8px",fontSize:FS.fs60}, onClick: ()=>removeDayFromBuilder(bDayIdx)}, "\uD83D\uDDD1 Delete Day")
+              , bDays.length>1 && React.createElement('button', { className: "btn btn-danger btn-xs", style: {marginLeft:S.s6,padding:"4px 8px",fontSize:FS.fs60}, onClick: ()=>removeDayFromBuilder(bDayIdx)}, "\uD83D\uDDD1 Delete Day")
             )
             /* Optional day-level stats */
             , React.createElement('div', { key: "dstats_"+bDayIdx, className: "wizard-day-stats" }
@@ -774,7 +774,7 @@ function PlanWizard(props) {
                 defaultValue: _optionalChain([bDays, 'access', _18 => _18[bDayIdx], 'optionalAccess', _19 => _19.totalCal])||"",
                 onBlur: e=>startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}));})})
             )
-            , React.createElement('div', { style: {display:"flex",gap:6,marginBottom:8}}
+            , React.createElement('div', { style: {display:"flex",gap:S.s6,marginBottom:S.s8}}
               , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setExPickerOpen(true)}, "\uFF0B Add Exercise"  )
               , React.createElement('button', { className: "btn btn-ghost btn-sm"  , style: {flex:1}, onClick: ()=>setBWoPickerOpen(true)}, "\uD83D\uDCAA Add Workout"  )
             )
@@ -793,8 +793,8 @@ function PlanWizard(props) {
                 const xpB = wizardExXPs[planPartnerIdx]||0;
                 return React.createElement('div', {key:i, className:"ss-accordion"},
                   React.createElement('div', {className:"ss-accordion-hdr"},
-                    React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:2,flexShrink:0}},
-                      React.createElement('button', {className:"btn btn-ghost btn-xs",style:{padding:"2px 5px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:Math.min(i,planPartnerIdx)===0?.3:1},
+                    React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:S.s2,flexShrink:0}},
+                      React.createElement('button', {className:"btn btn-ghost btn-xs",style:{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:Math.min(i,planPartnerIdx)===0?.3:1},
                         onClick:e=>{e.stopPropagation();
                           const minI=Math.min(i,planPartnerIdx);
                           if(minI<=0) return;
@@ -803,7 +803,7 @@ function PlanWizard(props) {
                             return {...d,exercises:exs.map(e=>{if(e.supersetWith===minI-1)return{...e,supersetWith:minI+1};if(e.supersetWith===minI)return{...e,supersetWith:minI-1};if(e.supersetWith===minI+1)return{...e,supersetWith:minI};return e;})};
                           }));});
                         }}, "\u25B2"),
-                      React.createElement('button', {className:"btn btn-ghost btn-xs",style:{padding:"2px 5px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:Math.max(i,planPartnerIdx)>=((_optionalChain([bDays, 'access', _22 => _22[bDayIdx], 'optionalAccess', _23 => _23.exercises, 'access', _24 => _24.length])||1)-1)?.3:1},
+                      React.createElement('button', {className:"btn btn-ghost btn-xs",style:{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:Math.max(i,planPartnerIdx)>=((_optionalChain([bDays, 'access', _22 => _22[bDayIdx], 'optionalAccess', _23 => _23.exercises, 'access', _24 => _24.length])||1)-1)?.3:1},
                         onClick:e=>{e.stopPropagation();
                           const maxI=Math.max(i,planPartnerIdx); const minI=Math.min(i,planPartnerIdx);
                           const len=(_optionalChain([bDays, 'access', _25 => _25[bDayIdx], 'optionalAccess', _26 => _26.exercises, 'access', _27 => _27.length])||0);
@@ -826,7 +826,7 @@ function PlanWizard(props) {
               }
               return (
                 React.createElement(React.Fragment, {key:bDayIdx+'_'+i+'_'+ex.exId},
-                i===minSsCheckedPlan && ssCheckedPlan.size>0 && React.createElement('div',{className:"ss-action-bar",style:{marginBottom:8}},
+                i===minSsCheckedPlan && ssCheckedPlan.size>0 && React.createElement('div',{className:"ss-action-bar",style:{marginBottom:S.s8}},
                   React.createElement('span',{className:"ss-action-text"}, ssCheckedPlan.size+" selected"),
                   ssCheckedPlan.size===2 && React.createElement('button',{className:"ss-action-btn",onClick:()=>{
                     const [a,b]=[...ssCheckedPlan]; planGroupSuperset(bDayIdx,a,b);
@@ -845,7 +845,7 @@ function PlanWizard(props) {
                 })
               ));
             });})()
-            , bEditId && React.createElement('button', { className:"btn btn-glass-yellow", style:{width:"100%",marginTop:8},
+            , bEditId && React.createElement('button', { className:"btn btn-glass-yellow", style:{width:"100%",marginTop:S.s8},
               onClick:()=>{
                 const plan=(profile.plans||[]).find(p=>p.id===bEditId); if(!plan) return;
                 const currentDay=bDays[bDayIdx]; if(!currentDay) return;
@@ -868,12 +868,12 @@ function PlanWizard(props) {
     , bWoPickerOpen && createPortal(
       React.createElement('div', { className: "ex-picker-backdrop", onClick: e=>{e.stopPropagation();setBWoPickerOpen(false);}}
         , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation()}
-          , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
-            , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Add Workout to Day"   )
+          , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}
+            , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:S.s0}}, "Add Workout to Day"   )
             , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setBWoPickerOpen(false)}, "\u2715")
           )
           , profile.workouts&&profile.workouts.length>0 ? profile.workouts.map(wo=>(
-            React.createElement('div', { key: wo.id, className: "ex-pick-item", style: {marginBottom:6,flexDirection:"column",alignItems:"flex-start",gap:4},
+            React.createElement('div', { key: wo.id, className: "ex-pick-item", style: {marginBottom:S.s6,flexDirection:"column",alignItems:"flex-start",gap:S.s4},
               onClick: ()=>{
                 const newExs = wo.exercises.map(e=>({
                   exId:e.exId, sets:e.sets||3, reps:e.reps||10,
@@ -884,7 +884,7 @@ function PlanWizard(props) {
                 setBWoPickerOpen(false);
                 showToast(wo.icon+" "+wo.name+" exercises added!");
               }}
-              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,width:"100%"}}
+              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:S.s8,width:"100%"}}
                 , React.createElement('span', { style: {fontSize:"1.3rem"}}, wo.icon)
                 , React.createElement('div', { style: {flex:1}}
                   , React.createElement('div', { className: "ex-pick-name"}, wo.name)
@@ -905,17 +905,17 @@ function PlanWizard(props) {
         , React.createElement('div', { className: "ex-picker-sheet", onClick: e=>e.stopPropagation(), style: {maxHeight:"85vh"}}
           , !pickerConfigOpen ? React.createElement(React.Fragment, null
                           /* -- BROWSE VIEW -- */
-            , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
+            , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}
               , React.createElement('div', {style:{fontFamily:"'Inter',sans-serif",fontSize:FS.fs72,fontWeight:600,color:"#8a8478"}},
-                  "Add to Plan", pickerSelected.length>0&&React.createElement('span',{style:{color:"#b4ac9e",marginLeft:6}},pickerSelected.length+" selected"))
-              , React.createElement('div', {style:{display:"flex",gap:6}},
+                  "Add to Plan", pickerSelected.length>0&&React.createElement('span',{style:{color:"#b4ac9e",marginLeft:S.s6}},pickerSelected.length+" selected"))
+              , React.createElement('div', {style:{display:"flex",gap:S.s6}},
                   pickerSelected.length>0&&React.createElement('button',{className:"btn btn-gold btn-xs",onClick:()=>setPickerConfigOpen(true)},"Configure & Add \u2192"),
                   React.createElement('button',{className:"btn btn-ghost btn-xs",onClick:()=>{closePicker();if(onOpenExEditor)onOpenExEditor("create",null);}},"\u2726 New Custom"),
                   React.createElement('button',{className:"btn btn-ghost btn-sm",onClick:closePicker},"\u2715")
               )
             )
-            , React.createElement('div', {style:{marginBottom:8}},
-              React.createElement('input', {className:"inp",style:{width:"100%",padding:"7px 11px",fontSize:FS.fs82},
+            , React.createElement('div', {style:{marginBottom:S.s8}},
+              React.createElement('input', {className:"inp",style:{width:"100%",padding:"8px 12px",fontSize:FS.fs82},
                 placeholder:"Search exercises\u2026", ref:pickerSearchRef,
                 onChange:e=>debouncedSetSearch(e.target.value), autoFocus:true})
             )
@@ -925,30 +925,30 @@ function PlanWizard(props) {
               const PEQUIP_OPTS2=["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
               const PMUSCLE_OPTS2=["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","cardio"];
               const closeDrops2=()=>setPickerOpenDrop(null);
-              return React.createElement('div',{style:{position:"relative",marginBottom:10}},
+              return React.createElement('div',{style:{position:"relative",marginBottom:S.s10}},
                 pickerOpenDrop&&React.createElement('div',{onClick:closeDrops2,style:{position:"fixed",inset:0,zIndex:19}}),
-                React.createElement('div',{style:{display:"flex",gap:7}},
+                React.createElement('div',{style:{display:"flex",gap:S.s8}},
                   React.createElement('div',{style:{position:"relative",flex:1,zIndex:20}},
-                    React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="muscle2"?null:"muscle2"),style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:R.r8,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}},
+                    React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="muscle2"?null:"muscle2"),style:{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}},
                       pickerMuscle==="All"?"Muscle":pickerMuscle.charAt(0).toUpperCase()+pickerMuscle.slice(1),
                       React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="muscle2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerMuscle!=="All"?"#b4ac9e":"#5a5650",transition:"transform .15s"}},"\u25BC")),
-                    pickerOpenDrop==="muscle2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
+                    pickerOpenDrop==="muscle2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
                       React.createElement('div',{onClick:()=>{setPickerMuscle("All");closeDrops2();},style:{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerMuscle==="All"?"#b4ac9e":"#8a8478",background:pickerMuscle==="All"?"rgba(45,42,36,.2)":"transparent"}},"All Muscles"),
                       PMUSCLE_OPTS2.map(m=>React.createElement('div',{key:m,onClick:()=>{setPickerMuscle(m);closeDrops2();},style:{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerMuscle===m?getMuscleColor(m):"#8a8478",background:pickerMuscle===m?"rgba(45,42,36,.2)":"transparent",textTransform:"capitalize"}},m)))
                   ),
                   React.createElement('div',{style:{position:"relative",flex:1,zIndex:20}},
-                    React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="type2"?null:"type2"),style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:R.r8,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}},
+                    React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="type2"?null:"type2"),style:{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}},
                       pickerTypeFilter==="all"?"Type":(PTYPE_LABELS2[pickerTypeFilter]||pickerTypeFilter),
                       React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="type2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerTypeFilter!=="all"?"#d4cec4":"#5a5650",transition:"transform .15s"}},"\u25BC")),
-                    pickerOpenDrop==="type2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
+                    pickerOpenDrop==="type2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
                       React.createElement('div',{onClick:()=>{setPickerTypeFilter("all");closeDrops2();},style:{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerTypeFilter==="all"?"#d4cec4":"#8a8478",background:pickerTypeFilter==="all"?"rgba(45,42,36,.2)":"transparent"}},"All Types"),
                       PTYPE_OPTS2.map(t=>React.createElement('div',{key:t,onClick:()=>{setPickerTypeFilter(t);closeDrops2();},style:{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerTypeFilter===t?getTypeColor(t):"#8a8478",background:pickerTypeFilter===t?"rgba(45,42,36,.2)":"transparent"}},PTYPE_LABELS2[t])))
                   ),
                   React.createElement('div',{style:{position:"relative",flex:1,zIndex:20}},
-                    React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="equip2"?null:"equip2"),style:{width:"100%",padding:"6px 24px 6px 9px",borderRadius:R.r8,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}},
+                    React.createElement('button',{onClick:()=>setPickerOpenDrop(d=>d==="equip2"?null:"equip2"),style:{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}},
                       pickerEquipFilter==="all"?"Equipment":pickerEquipFilter.charAt(0).toUpperCase()+pickerEquipFilter.slice(1),
                       React.createElement('span',{style:{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#5a5650",transition:"transform .15s"}},"\u25BC")),
-                    pickerOpenDrop==="equip2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"5px 3px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
+                    pickerOpenDrop==="equip2"&&React.createElement('div',{style:{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}},
                       React.createElement('div',{onClick:()=>{setPickerEquipFilter("all");closeDrops2();},style:{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerEquipFilter==="all"?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter==="all"?"rgba(196,148,40,0.12)":"transparent"}},"All Equipment"),
                       PEQUIP_OPTS2.map(e=>React.createElement('div',{key:e,onClick:()=>{setPickerEquipFilter(e);closeDrops2();},style:{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerEquipFilter===e?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter===e?"rgba(196,148,40,0.12)":"transparent",textTransform:"capitalize"}},e)))
                   )
@@ -962,9 +962,9 @@ function PlanWizard(props) {
               const selIds=new Set(pickerSelected.map(e=>e.exId));
               const visible=filtered.slice(0,80);
               return React.createElement(React.Fragment,null,
-                React.createElement('div',{style:{fontSize:FS.fs62,color:"#5a5650",marginBottom:6,textAlign:"right"}},
+                React.createElement('div',{style:{fontSize:FS.fs62,color:"#5a5650",marginBottom:S.s6,textAlign:"right"}},
                   (q||pickerMuscle!=="All"||pickerTypeFilter!=="all"||pickerEquipFilter!=="all")?filtered.length+" match"+(filtered.length!==1?"es":""):"Showing 80 of "+filtered.length+" \u00B7 search or filter"),
-                React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:6}},
+                React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:S.s6}},
                   visible.map(ex=>{
                     const sel=selIds.has(ex.id);
                     const diffLabel=ex.difficulty||(ex.baseXP>=60?"Advanced":ex.baseXP>=45?"Intermediate":"Beginner");
@@ -974,11 +974,11 @@ function PlanWizard(props) {
                     return React.createElement('div',{key:ex.id,className:"picker-ex-row"+(sel?" sel":""),style:{"--mg-color":exMgColor},onClick:()=>pickerToggleEx(ex.id)},
                       React.createElement('div',{className:"picker-ex-orb"},React.createElement(ExIcon,{ex:ex,size:".95rem",color:"#d4cec4"})),
                       React.createElement('div',{style:{flex:1,minWidth:0}},
-                        React.createElement('div',{style:{fontFamily:"'Cinzel',serif",fontSize:FS.fs80,fontWeight:600,color:"#d4cec4",marginBottom:2,letterSpacing:".01em"}},ex.name,ex.custom&&React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:4}},"custom")),
+                        React.createElement('div',{style:{fontFamily:"'Cinzel',serif",fontSize:FS.fs80,fontWeight:600,color:"#d4cec4",marginBottom:S.s2,letterSpacing:".01em"}},ex.name,ex.custom&&React.createElement('span',{className:"custom-ex-badge",style:{marginLeft:S.s4}},"custom")),
                         React.createElement('div',{style:{fontSize:FS.fs60,fontStyle:"italic"}}, ex.category&&React.createElement('span',{style:{color:getTypeColor(ex.category)}},ex.category.charAt(0).toUpperCase()+ex.category.slice(1)), ex.category&&ex.muscleGroup&&React.createElement('span',{style:{color:"#5a5650"}}," \u00B7 "), ex.muscleGroup&&React.createElement('span',{style:{color:exMgColor}},ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)))),
-                      React.createElement('div',{style:{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}},
+                      React.createElement('div',{style:{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:S.s4}},
                         React.createElement('span',{style:{fontFamily:"'Cinzel',serif",fontSize:FS.fs63,fontWeight:700,color:"#d4cec4",letterSpacing:".04em"}},ex.baseXP+" XP"),
-                        React.createElement('span',{style:{fontSize:FS.fs56,fontWeight:700,color:diffColor,background:diffBg,padding:"1px 6px",borderRadius:R.r3,letterSpacing:".04em"}},diffLabel))
+                        React.createElement('span',{style:{fontSize:FS.fs56,fontWeight:700,color:diffColor,background:diffBg,padding:"2px 6px",borderRadius:R.r3,letterSpacing:".04em"}},diffLabel))
                     );
                   })
                 )
@@ -986,9 +986,9 @@ function PlanWizard(props) {
             })()
           ) : React.createElement(React.Fragment, null
             /* -- CONFIG VIEW -- */
-            , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
+            , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}
               , React.createElement('button', { className: "btn btn-ghost btn-sm"  , onClick: ()=>setPickerConfigOpen(false)}, "\u2190 Back" )
-              , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:0}}, "Configure " , pickerSelected.length, " Exercise" , pickerSelected.length!==1?"s":"")
+              , React.createElement('div', { className: "sec", style: {margin:0,border:"none",padding:S.s0}}, "Configure " , pickerSelected.length, " Exercise" , pickerSelected.length!==1?"s":"")
               , React.createElement('button', { className: "btn btn-gold btn-sm"  , onClick: commitPickerToPlan}, "Add to Plan \u2713"   )
             )
             , pickerSelected.map((entry,idx)=>{
@@ -1000,21 +1000,21 @@ function PlanWizard(props) {
               const wUnit=weightLabel(profile.units);
               const dUnit=distLabel(profile.units);
               return (
-                React.createElement('div', { key: entry.exId, style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(180,172,158,.05)",borderRadius:R.r10,padding:"10px 12px",marginBottom:8}}
-                  , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8}}
+                React.createElement('div', { key: entry.exId, style: {background:"rgba(45,42,36,.12)",border:"1px solid rgba(180,172,158,.05)",borderRadius:R.r10,padding:"10px 12px",marginBottom:S.s8}}
+                  , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:S.s8,marginBottom:S.s8}}
                     , React.createElement('span', { style: {fontSize:"1.1rem"}}, ex.icon)
                     , React.createElement('span', { style: {fontSize:FS.fs82,color:"#d4cec4",flex:1}}, ex.name)
                     , React.createElement('span', { style: {fontSize:FS.fs65,cursor:"pointer",color:UI_COLORS.danger}, onClick: ()=>setPickerSelected(p=>p.filter(e=>e.exId!==entry.exId))}, "\u2715")
                   )
                   /* Top row -- category-specific */
                   , ex.id==="rest_day" ? React.createElement('div', {style:{fontSize:FS.fs72,color:"#8a8478",fontStyle:"italic",padding:"6px 0"}}, "🛌 No configuration needed") : null
-                  , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}
-                    , !noSets&&!isCardio&&React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
+                  , ex.id!=="rest_day"&&React.createElement('div', { style: {display:"flex",gap:S.s6,flexWrap:"wrap",marginBottom:S.s6}}
+                    , !noSets&&!isCardio&&React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:S.s0}}
                       , React.createElement('label', null, "Sets")
                       , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric", value: entry.sets||"", onChange: e=>pickerUpdateEx(entry.exId,"sets",e.target.value), placeholder: "3"})
                     )
                     , isCardio ? (React.createElement(React.Fragment, null
-                      , React.createElement('div', { className: "field", style: {flex:1.6,minWidth:70,marginBottom:0}}
+                      , React.createElement('div', { className: "field", style: {flex:1.6,minWidth:70,marginBottom:S.s0}}
                         , React.createElement('label', null, "Duration (HH:MM)" )
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric",
                           value: entry._durHHMM||"",
@@ -1022,23 +1022,23 @@ function PlanWizard(props) {
                           onBlur: e=>{const n=normalizeHHMM(e.target.value);pickerUpdateEx(entry.exId,"_durHHMM",n);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(n,entry._durSec||"")/60))));},
                           placeholder: "00:00"})
                       )
-                      , React.createElement('div', { className: "field", style: {flex:0.8,minWidth:50,marginBottom:0}}
+                      , React.createElement('div', { className: "field", style: {flex:0.8,minWidth:50,marginBottom:S.s0}}
                         , React.createElement('label', null, "Seconds")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px",textAlign:"center"}, type: "number", min: "0", max: "59",
                           value: entry._durSec||"",
                           onChange: e=>{pickerUpdateEx(entry.exId,"_durSec",e.target.value);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(entry._durHHMM||"",e.target.value)/60))));},
                           placeholder: "00"})
                       )
-                      , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
+                      , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:S.s0}}
                         , React.createElement('label', null, "Dist (" , dUnit, ")")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "decimal", value: entry.distanceMi||"", onChange: e=>pickerUpdateEx(entry.exId,"distanceMi",e.target.value), placeholder: "0"})
                       )
                     )) : (React.createElement(React.Fragment, null
-                      , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
+                      , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:S.s0}}
                         , React.createElement('label', null, "Reps")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "numeric", value: entry.reps||"", onChange: e=>pickerUpdateEx(entry.exId,"reps",e.target.value), placeholder: "10"})
                       )
-                      , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:0}}
+                      , React.createElement('div', { className: "field", style: {flex:1,minWidth:60,marginBottom:S.s0}}
                         , React.createElement('label', null, "Weight (" , wUnit, ")")
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "text", inputMode: "decimal", value: entry.weightLbs||"", onChange: e=>pickerUpdateEx(entry.exId,"weightLbs",e.target.value), placeholder: "0"})
                       )
@@ -1046,12 +1046,12 @@ function PlanWizard(props) {
                   )
                   /* Treadmill: Incline + Speed */
                   , ex.id!=="rest_day"&&isTreadEx&&(
-                    React.createElement('div', { style: {display:"flex",gap:6,marginBottom:6}}
-                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
+                    React.createElement('div', { style: {display:"flex",gap:S.s6,marginBottom:S.s6}}
+                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:S.s0}}
                         , React.createElement('label', null, "Incline (0.5\u201315)" )
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "number", min: "0.5", max: "15", step: "0.5", value: entry.incline||"", onChange: e=>pickerUpdateEx(entry.exId,"incline",e.target.value?parseFloat(e.target.value):null), placeholder: "\u2014"})
                       )
-                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:0}}
+                      , React.createElement('div', { className: "field", style: {flex:1,marginBottom:S.s0}}
                         , React.createElement('label', null, "Speed (0.5\u201315)" )
                         , React.createElement('input', { className: "inp", style: {padding:"6px 8px"}, type: "number", min: "0.5", max: "15", step: "0.5", value: entry.speed||"", onChange: e=>pickerUpdateEx(entry.exId,"speed",e.target.value?parseFloat(e.target.value):null), placeholder: "\u2014"})
                       )
@@ -1059,26 +1059,26 @@ function PlanWizard(props) {
                   )
                   /* +Add Row */
                   , ex.id!=="rest_day"&&(entry.extraRows||[]).map((row,ri)=>(
-                    React.createElement('div', { key: ri, style: {display:"flex",gap:4,marginBottom:4,padding:"5px 7px",background:"rgba(45,42,36,.18)",borderRadius:R.r5,alignItems:"center",flexWrap:"wrap"}}
+                    React.createElement('div', { key: ri, style: {display:"flex",gap:S.s4,marginBottom:S.s4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.r5,alignItems:"center",flexWrap:"wrap"}}
                       , React.createElement('span', { style: {fontSize:FS.fs55,color:"#9a8a78",flexShrink:0,minWidth:16}}, isCardio?`I${ri+2}`:`S${ri+2}`)
                       , isCardio ? (React.createElement(React.Fragment, null
-                        , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:50,padding:"4px 7px",fontSize:FS.fs72}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
+                        , React.createElement('input', { className: "inp", style: {flex:1.5,minWidth:50,padding:"4px 8px",fontSize:FS.fs72}, type: "text", inputMode: "numeric", placeholder: "HH:MM",
                           value: row.hhmm||"",
                           onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);},
                           onBlur: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        , React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:36,padding:"4px 7px",fontSize:FS.fs72}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: distLabel(profile.units), value: row.distanceMi||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:FS.fs72}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 7px",fontSize:FS.fs72}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:36,padding:"4px 8px",fontSize:FS.fs72}, type: "number", min: "0", max: "59", placeholder: "Sec", value: row.sec||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: distLabel(profile.units), value: row.distanceMi||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 8px",fontSize:FS.fs72}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Inc", value: row.incline||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , isTreadEx&&React.createElement('input', { className: "inp", style: {flex:0.7,minWidth:34,padding:"4px 8px",fontSize:FS.fs72}, type: "number", min: "0.5", max: "15", step: "0.5", placeholder: "Spd", value: row.speed||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
                       )) : (React.createElement(React.Fragment, null
-                        , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
-                        , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 7px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , !noSets&&React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: "Sets", value: row.sets||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: "Reps", value: row.reps||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
+                        , React.createElement('input', { className: "inp", style: {flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}, type: "text", inputMode: "decimal", placeholder: wUnit, value: row.weightLbs||"", onChange: e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}})
                       ))
                       , React.createElement('button', { className: "btn btn-danger btn-xs"  , style: {padding:"2px 4px",flexShrink:0}, onClick: ()=>{const rr=(entry.extraRows||[]).filter((_,j)=>j!==ri);pickerUpdateEx(entry.exId,"extraRows",rr);}}, "\u2715")
                     )
                   ))
-                  , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:4,fontSize:FS.fs60,color:"#8a8478",borderStyle:"dashed"},
+                  , ex.id!=="rest_day"&&React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {width:"100%",marginTop:S.s4,fontSize:FS.fs60,color:"#8a8478",borderStyle:"dashed"},
                     onClick: ()=>{const rr=[...(entry.extraRows||[]),isCardio?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:"",reps:"",weightLbs:""}];pickerUpdateEx(entry.exId,"extraRows",rr);}}, "\uFF0B Add Row (e.g. "
                         , isCardio?"interval":"progressive set", ")"
                   )
