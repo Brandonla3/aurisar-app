@@ -4,7 +4,7 @@ import { calcExXP, calcDayXP, getMuscleColor, getTypeColor, hrRange } from '../u
 import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } from '../utils/units';
 import { normalizeHHMM, combineHHMMSec, secToHHMMSplit } from '../utils/time';
 import { _optionalChain, uid, clone } from '../utils/helpers';
-import { NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../data/constants';
+import { NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, UI_COLORS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 import { ExIcon } from './ExIcon';
 
@@ -140,7 +140,7 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             )
           )
           , isRunningEx&&runBoostPct>0&&(
-            React.createElement('div', { style: {fontSize:".65rem",color:"#FFE87C",marginBottom:5}}, "\u26A1 +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
+            React.createElement('div', { style: {fontSize:".65rem",color:UI_COLORS.warning,marginBottom:5}}, "\u26A1 +" , runBoostPct, "% pace bonus"  , runBoostPct===20?" (sub-8 mi!)":"")
           )
           /* Treadmill controls */
           , hasDur&&exData.hasTreadmill&&(
@@ -1003,7 +1003,7 @@ function PlanWizard(props) {
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8}}
                     , React.createElement('span', { style: {fontSize:"1.1rem"}}, ex.icon)
                     , React.createElement('span', { style: {fontSize:".82rem",color:"#d4cec4",flex:1}}, ex.name)
-                    , React.createElement('span', { style: {fontSize:".65rem",cursor:"pointer",color:"#e74c3c"}, onClick: ()=>setPickerSelected(p=>p.filter(e=>e.exId!==entry.exId))}, "\u2715")
+                    , React.createElement('span', { style: {fontSize:".65rem",cursor:"pointer",color:UI_COLORS.danger}, onClick: ()=>setPickerSelected(p=>p.filter(e=>e.exId!==entry.exId))}, "\u2715")
                   )
                   /* Top row -- category-specific */
                   , ex.id==="rest_day" ? React.createElement('div', {style:{fontSize:".72rem",color:"#8a8478",fontStyle:"italic",padding:"6px 0"}}, "🛌 No configuration needed") : null

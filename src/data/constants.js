@@ -1183,6 +1183,16 @@ const TYPE_COLORS = {
   calisthenics:"#8A7858", plyometric:"#8A7858", isometric:"#8A7858", functional:"#8A7858",
   stretching:"#B0A898", warmup:"#B0A898", cooldown:"#B0A898"
 };
+// Canonical UI semantic colors. Use these in inline JSX styles instead of raw hex.
+// CSS files (app.css, landing.css) keep their hex values — the stylesheet IS the
+// tokenization layer for class-based styling.
+const UI_COLORS = {
+  success:      "#2ecc71", // positive actions, beginner difficulty, cardio category
+  danger:       "#e74c3c", // destructive actions, advanced difficulty, strength category
+  warning:      "#FFE87C", // pace boost highlight, accent emphasis
+  info:         "#2980b9", // informational text, message UI fallback
+  intermediate: "#f1c40f", // intermediate difficulty
+};
 const MUSCLE_META = {
   chest:    { emoji:"💪", label:"Chest",    icon:"game-icons:chest-armor" },
   back:     { emoji:"🏋️", label:"Back",     icon:"game-icons:muscle-up" },
@@ -1257,6 +1267,7 @@ export {
   MUSCLE_COLORS,
   MUSCLE_META,
   TYPE_COLORS,
+  UI_COLORS,
   MAP_REGIONS,
   MAP_POINTS,
 };

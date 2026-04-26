@@ -227,12 +227,12 @@ def main() -> None:
         ["#3D343F", "shoulder, flexibility, yoga", "Steel plum", "src/data/constants.js:1175-1180"],
         ["#6B2A2A", "bicep, strength (NEW)", "Burgundy iron", "src/data/constants.js:1176, 1181 (FIXED)"],
         ["#5C5C2E", "legs", "Tactical olive", "src/data/constants.js:1177"],
-        ["#FFE87C", "pace bonus highlight", "One-off, not tokenised", "src/App.js:118"],
-        ["#2ecc71", "success / beginner", "Green, used in multiple places", "src/App.js:23, 2884, 2995"],
-        ["#e74c3c", "error / advanced", "Red, used in multiple places", "src/App.js:23, 2884, 2995"],
-        ["#e05555", "profile warning", "One-off red variant", "src/App.js:7257"],
-        ["#2980b9", "info text", "One-off blue, not tokenised", "src/App.js:3065"],
-        ["#f1c40f", "intermediate difficulty", "Yellow", "src/App.js:23"],
+        ["#FFE87C", "UI_COLORS.warning", "Pace bonus highlight, accent emphasis (tokenised)", "src/data/constants.js"],
+        ["#2ecc71", "UI_COLORS.success", "Green: positive, beginner, cardio (tokenised)", "src/data/constants.js"],
+        ["#e74c3c", "UI_COLORS.danger", "Red: destructive, advanced, strength (tokenised)", "src/data/constants.js"],
+        ["(removed)", "—", "#e05555 consolidated into UI_COLORS.danger", "Was a near-duplicate of #e74c3c"],
+        ["#2980b9", "UI_COLORS.info", "Info text, message UI fallback (tokenised)", "src/data/constants.js"],
+        ["#f1c40f", "UI_COLORS.intermediate", "Intermediate difficulty (tokenised)", "src/data/constants.js"],
     ]
     write_sheet(wb, "Color_Palette_Inventory", ["Color", "Token / Use", "Purpose / Note", "Locations"], palette_rows)
 
@@ -243,7 +243,7 @@ def main() -> None:
         ["P2", "Chest and Tricep both #8B5A2B", "src/data/constants.js:1176-1177", "Triceps should differ; flagged for design decision"],
         ["P2", "Full Body and Cardio both #2C4564", "src/data/constants.js:1178", "Same purpose? Possibly intentional"],
         ["P2", "6 different gray tokens with no hierarchy", "Various", "#d4cec4 #b4ac9e #b0a898 #8a8478 #5a5650 #6a645a — needs scale"],
-        ["P2", "Untokenised one-offs (#FFE87C, #2ecc71, #e74c3c, #e05555, #2980b9)", "src/App.js multiple", "Should be moved to a tokens module"],
+        ["FIXED", "Inline one-off colors (#FFE87C, #2ecc71, #e74c3c, #e05555, #2980b9, #f1c40f) tokenised", "src/data/constants.js UI_COLORS", "Migrated 75+ inline JSX style hex strings to UI_COLORS.{warning, success, danger, info, intermediate}; #e05555 consolidated into danger"],
         ["P2", "Two fallback colors (#B0A090 and #B0A898)", "src/utils/xp.js:6,10", "Standardise to one"],
         ["P2", "Masculine palette rollout incomplete", "Profile, Trends, Friends, Leaderboard, Landing, PlanWizard tabs", "Verify per-tab application"],
     ]
@@ -359,7 +359,7 @@ def main() -> None:
         ["P2", "TODO", "Dual-form catalog dedup", "src/data/exercises.js + migration"],
         ["P2", "TODO", "Masculine palette rollout to remaining tabs", "Profile/Trends/Friends/Leaderboard/Landing/PlanWizard"],
         ["P2", "TODO", "Reps schema standardisation in PLAN_TEMPLATES", "src/data/constants.js:1014-1083"],
-        ["P2", "TODO", "Tokenise inline color one-offs", "src/App.js multiple"],
+        ["P2", "FIXED", "Tokenise inline color one-offs", "src/data/constants.js UI_COLORS + 75+ migrated call-sites"],
         ["P2", "TODO", "Sweep remaining XP display sites to formatXP()", "src/App.js (~40+ remaining call sites)"],
     ]
     write_sheet(wb, "Recommendations", ["Severity", "Status", "Item", "Files / Notes"], recs)
