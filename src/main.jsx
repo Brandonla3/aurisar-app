@@ -4,5 +4,7 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  React.createElement(ErrorBoundary, null, React.createElement(App))
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
 );

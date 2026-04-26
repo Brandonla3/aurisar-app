@@ -64,18 +64,20 @@ class ErrorBoundary extends React.Component {
     };
     const btnGold = { ...btn, background: 'linear-gradient(135deg,#c49428,#8a6010)', color: '#fff', borderColor: '#c49428' };
 
-    return React.createElement('div', { style: wrap, role: 'alert', 'aria-live': 'assertive' },
-      React.createElement('div', { style: card },
-        React.createElement('div', { style: h }, 'Something broke.'),
-        React.createElement('div', { style: p },
-          'Aurisar hit an unexpected error. Your saved data is safe — try reloading or going back to the home screen.'
-        ),
-        error?.message && React.createElement('pre', { style: pre }, String(error.message)),
-        React.createElement('div', { style: btnRow },
-          React.createElement('button', { type: 'button', style: btn, onClick: this.reset }, 'Try again'),
-          React.createElement('button', { type: 'button', style: btnGold, onClick: this.reload }, 'Reload')
-        )
-      )
+    return (
+      <div style={wrap} role="alert" aria-live="assertive">
+        <div style={card}>
+          <div style={h}>Something broke.</div>
+          <div style={p}>
+            Aurisar hit an unexpected error. Your saved data is safe — try reloading or going back to the home screen.
+          </div>
+          {error?.message && <pre style={pre}>{String(error.message)}</pre>}
+          <div style={btnRow}>
+            <button type="button" style={btn} onClick={this.reset}>Try again</button>
+            <button type="button" style={btnGold} onClick={this.reload}>Reload</button>
+          </div>
+        </div>
+      </div>
     );
   }
 }

@@ -441,10 +441,12 @@ function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePr
     };
   }, []);
 
-  return React.createElement('div', {
-    ref: mountRef,
-    style:{width:'100%', height:420, borderRadius:12, overflow:'hidden', background:'#0a0804', cursor:'grab'}
-  });
+  return (
+    <div
+      ref={mountRef}
+      style={{ width: '100%', height: 420, borderRadius: 12, overflow: 'hidden', background: '#0a0804', cursor: 'grab' }}
+    />
+  );
 }
 
 export { AvatarPreview3D };
