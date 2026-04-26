@@ -1177,8 +1177,9 @@ const MUSCLE_COLORS = {
   tricep:"#8B5A2B",  legs:"#5C5C2E",   glutes:"#4F4318",   abs:"#2A4347",
   calves:"#494C56",  forearm:"#4A5560", full_body:"#2C4564", cardio:"#2C4564"
 };
+// Pulled from MUSCLE_COLORS palette so each type is visually distinct.
 const TYPE_COLORS = {
-  strength:"#C4A044", cardio:"#C4A044", flexibility:"#C4A044", yoga:"#C4A044",
+  strength:"#6B2A2A", cardio:"#2C4564", flexibility:"#3D343F", yoga:"#3D343F",
   calisthenics:"#8A7858", plyometric:"#8A7858", isometric:"#8A7858", functional:"#8A7858",
   stretching:"#B0A898", warmup:"#B0A898", cooldown:"#B0A898"
 };

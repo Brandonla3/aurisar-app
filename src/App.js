@@ -8,6 +8,7 @@ import { loadSave, doSave } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
+import { formatXP } from './utils/format';
 import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
@@ -114,8 +115,8 @@ const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, 
         )
         , ex.supersetWith && React.createElement('span', {className:"ss-badge"}, "SS")
         , (isRunningEx&&pbDisp||exPBDisp)&&React.createElement('span', { style: {fontSize:".58rem",color:"#b4ac9e",flexShrink:0} }, "🏆 ", isRunningEx&&pbDisp?pbDisp:exPBDisp)
-        , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${metric?lbsToKg(ex.weightLbs):ex.weightLbs}${wUnit}`:"")
-        , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);const t=(isC&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);return "+"+t.toLocaleString();})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
+        , collapsed&&exD.id!=="rest_day"&&React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650"}}, noSetsEx?"":ex.sets+"×", ex.reps, ex.weightLbs?` · ${displayWt(ex.weightLbs, profile.units)}`:"")
+        , React.createElement('span', { style: {fontSize:".63rem",color:"#b4ac9e",flexShrink:0}}, (()=>{const extraCount=(ex.extraRows||[]).length;const b=calcExXP(ex.exId,noSetsEx?1:ex.sets,ex.reps,profile.chosenClass,allExById,distMiVal||null,null,null,extraCount);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,null,null,extraCount),0);return formatXP(b+r,{signed:true});})(), runBoostPct>0&&React.createElement('span', { style: {color:"#FFE87C",marginLeft:2}}, "⚡"))
         , React.createElement('span', { style: {fontSize:".6rem",color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}, "▼")
         , React.createElement('button', { className: "btn btn-danger btn-xs", onClick: e=>{e.stopPropagation();removeEx();}}, "✕")
       )
@@ -1703,11 +1704,10 @@ function App() {
   const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
 
   const wbTotalXP = useMemo(()=>wbExercises.reduce((s,ex)=>{
-    const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";
-    const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
-    const r=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
-    const t=(_isCardio&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);
-    return s+t;
+    const extraCount=(ex.extraRows||[]).length;
+    const b=calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById,null,null,null,extraCount);
+    const r=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,null,null,extraCount),0);
+    return s+(b+r);
   },0),[wbExercises,profile.chosenClass,allExById]);
 
   // Auto-update quest completion state when log or streak changes
@@ -1873,14 +1873,8 @@ function App() {
     const distMi = rawDist>0 ? (metric ? parseFloat(kmToMi(rawDist)) : rawDist) : null;
     const isCardioEx = ex.category==="cardio";
     const canHaveZone = isCardioEx;
-    const zoneBonus = canHaveZone && hrZone ? 1 + (hrZone-1)*0.04 : 1;
-    const weightBonus = effectiveW>0 ? 1 + Math.min(effectiveW/500, 0.3) : 1;
-    const distBonus = distMi ? 1 + Math.min(distMi*0.05, 0.5) : 1;
-    // Running pace boost: +5% if both duration+dist provided, +20% if sub-8 min/mile
-    const durationMin = rv;
-    const runPace = (ex.id===RUNNING_EX_ID && distMi && durationMin) ? durationMin/distMi : null;
-    const paceBonus = runPace ? (runPace<=8 ? 1.20 : 1.05) : 1;
-    const earned=Math.round(ex.baseXP*mult*(1+(rv*sv-1)*0.05)*zoneBonus*weightBonus*distBonus*paceBonus);
+    const runPace = (ex.id===RUNNING_EX_ID && distMi && rv) ? rv/distMi : null;
+    const earned = calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi||null, effectiveW||null, canHaveZone?hrZone:null);
     // Apply 10% travel boost if active this week
     const weekStart = ()=>{ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
     const travelActive = profile.travelBoost && profile.travelBoost.weekStart === weekStart();
@@ -1970,7 +1964,7 @@ function App() {
     const sv = noSetsEx ? 1 : (ex.defaultSets != null ? ex.defaultSets : 3);
     const rv = ex.defaultReps != null ? ex.defaultReps : 10;
     const mult = getMult(ex);
-    const earned = Math.round(ex.baseXP * mult * (1 + (rv * sv - 1) * 0.05));
+    const earned = calcExXP(ex.id, sv, rv, profile.chosenClass, allExById);
     const weekStart = () => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
     const travelActive = profile.travelBoost && profile.travelBoost.weekStart === weekStart();
     const myRegionIdx = getRegionIdx(xpToLevel(profile.xp));
@@ -2302,8 +2296,8 @@ function App() {
     const _isRunning = exD.id===RUNNING_EX_ID;
     const _runPace = (_isRunning&&_distMiVal>0&&_durMin>0)?_durMin/_distMiVal:null;
     const _runBoost = _runPace?(_runPace<=8?20:5):0;
-    const xpVal = (()=>{const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null),0);return (_isC&&(ex.extraRows||[]).length>0)?Math.round((b+r)*1.25):(b+r);})();
-    const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_metric?lbsToKg(ex.weightLbs):ex.weightLbs}${_wUnit}`:"");
+    const xpVal = (()=>{const extraCount=(ex.extraRows||[]).length;const b=calcExXP(ex.exId,_noSets?1:ex.sets,ex.reps,profile.chosenClass,allExById,_distMiVal||null,ex.weightLbs||null,null,extraCount);const r=(ex.extraRows||[]).reduce((s,row)=>s+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,ex.weightLbs||null,null,extraCount),0);return b+r;})();
+    const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${displayWt(ex.weightLbs, profile.units)}`:"");
     return React.createElement('div', {className:"ss-section"},
       React.createElement('div', {className:"ss-section-hdr",
         onClick:()=>setSsAccordion(prev=>({...prev,[sectionKey]:!prev[sectionKey]}))},
@@ -2444,9 +2438,9 @@ function App() {
       const isC = exData.category==="cardio"; const isF = exData.category==="flexibility";
       // Build all rows: main row + extra rows
       const allRows = [{sets:ex.sets||3, reps:ex.reps||10, weightLbs:ex.weightLbs||null},...(ex.extraRows||[])];
+      const extraCount = (ex.extraRows||[]).length;
       return allRows.map(row=>{
-        const baseXp = calcExXP(ex.exId, row.sets||3, row.reps||10, profile.chosenClass, allExById);
-        const xp = (isC&&(ex.extraRows||[]).length>0) ? Math.round(baseXp * 1.25) : baseXp;
+        const xp = calcExXP(ex.exId, row.sets||3, row.reps||10, profile.chosenClass, allExById, null, null, null, extraCount);
         return {
           exId:ex.exId, exercise:exData.name, icon:exData.icon, xp,
           mult:getMult(exData), sets:parseInt(row.sets)||3, reps:parseInt(row.reps)||10,
@@ -2503,7 +2497,7 @@ function App() {
     const label = dateStr===todayStr()?"today":displayDate;
     const reusableNote = wo.makeReusable ? " · Saved to Re-Usable tab!" : "";
     const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
-    showToast(wo.icon+" "+wo.name+" completed "+label+"! +"+totalXP.toLocaleString()+" XP ⚡"+reusableNote+ciSuffix);
+    showToast(wo.icon+" "+wo.name+" completed "+label+"! "+formatXP(totalXP,{signed:true})+" ⚡"+reusableNote+ciSuffix);
   }
 
   function scheduleWorkoutForDate() {
@@ -2529,15 +2523,11 @@ function App() {
   }
   function calcEntryXP(entry) {
     const ex = allExById[entry.exId]; if(!ex) return entry.xp;
-    const mult = getMult(ex);
     const rv = parseInt(entry.reps)||1, sv = parseInt(entry.sets)||1;
     const effectiveW = parseFloat(entry.weightLbs)||0;
     const distMi = entry.distanceMi||null;
     const isCardio = ex.category==="cardio";
-    const zoneBonus = isCardio && entry.hrZone ? 1+(entry.hrZone-1)*0.04 : 1;
-    const weightBonus = effectiveW>0 ? 1+Math.min(effectiveW/500,0.3) : 1;
-    const distBonus = distMi ? 1+Math.min(distMi*0.05,0.5) : 1;
-    return Math.round(ex.baseXP*mult*(1+(rv*sv-1)*0.05)*zoneBonus*weightBonus*distBonus);
+    return calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi, effectiveW||null, isCardio?(entry.hrZone||null):null);
   }
   function openLogEdit(idx) {
     const entry = profile.log[idx];
@@ -4541,14 +4531,10 @@ function App() {
               const wUnit  = weightLabel(profile.units);
               const allW   = profile.workouts||[];
               const calcWorkoutXP = (wo) => (wo.exercises||[]).reduce((s,ex)=>{
-                const _exD=allExById[ex.exId];const _isCardio=_exD&&_exD.category==="cardio";const _hasRows=(ex.extraRows||[]).length>0;
-                const base = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById);
-                const rowsXP = (ex.extraRows||[]).reduce((rs,row)=>{
-                  const rb=calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById);
-                  return rs+(_isCardio&&_hasRows?Math.round(rb*1.25):rb);
-                },0);
-                const xp = _isCardio&&_hasRows ? Math.round(base*1.25) : base;
-                return s+xp+rowsXP;
+                const extraCount=(ex.extraRows||[]).length;
+                const base = calcExXP(ex.exId,ex.sets||3,ex.reps||10,profile.chosenClass,allExById,null,null,null,extraCount);
+                const rowsXP = (ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById,null,null,null,extraCount),0);
+                return s+base+rowsXP;
               },0);
 
               // ── LIST ───────────────────────────────
@@ -4667,7 +4653,7 @@ function App() {
                             , React.createElement('div', { className: "workout-name"}, wo.name)
                             , React.createElement('div', { className: "workout-meta"}
                               , React.createElement('span', { className: "workout-tag"}, exCount, " exercise" , exCount!==1?"s":"")
-                              , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
+                              , React.createElement('span', { className: "workout-tag"}, formatXP(xp,{prefix:"⚡ "}) )
                               , (wo.labels||[]).map(l=>React.createElement('span', {key:l, className:"wo-label-chip", style:{pointerEvents:"none",marginLeft:2}}, l))
                             )
                             , wo.desc&&React.createElement('div', { className: `workout-desc ${collapsedWo.has(wo.id)?"":"recipe-desc-collapsed"}`, style:{marginTop:3,position:"relative",paddingRight:wo.desc.length>60?16:0}, title: wo.desc}
@@ -4900,7 +4886,7 @@ function App() {
                               , tpl.category&&React.createElement('span', { className: "wo-cat-pill"}, tpl.category)
                               , tpl.difficulty&&React.createElement('span', { className: diffCls}, tpl.difficulty)
                               , React.createElement('span', { className: "workout-tag"}, tpl.exercises.length, " ex")
-                              , React.createElement('span', { className: "workout-tag"}, "⚡ " , xp.toLocaleString(), " XP" )
+                              , React.createElement('span', { className: "workout-tag"}, formatXP(xp,{prefix:"⚡ "}) )
                               , tpl.durationMin&&React.createElement('span', { className: "workout-tag"}, "⏱ " , tpl.durationMin, "min" )
                               , tpl.equipment&&React.createElement('span', { className: "workout-tag"}, EQUIP_ICONS[tpl.equipment]||"", " " , tpl.equipment)
                             )
@@ -5465,7 +5451,7 @@ function App() {
                                     )
                                     , React.createElement('div', { className: "workout-meta"}
                                       , React.createElement('span', { className: "workout-tag"}, activeDays.length, " active day"  , activeDays.length!==1?"s":"")
-                                      , React.createElement('span', { className: "workout-tag"}, "⚡ " , tplXP.toLocaleString(), " XP" )
+                                      , React.createElement('span', { className: "workout-tag"}, formatXP(tplXP,{prefix:"⚡ "}) )
                                       , React.createElement('span', { className: `plan-type-badge type-${tpl.type}`, style: {marginLeft:4}}, tpl.durCount&&tpl.durCount>1?`${tpl.durCount} ${tpl.type}s`:tpl.type)
                                       , isRec&&React.createElement('span', { style: {fontSize:".56rem",color:_optionalChain([cls, 'optionalAccess', _95 => _95.color]),marginLeft:4}}, "✦ " , _optionalChain([cls, 'optionalAccess', _96 => _96.name]))
                                     )
@@ -5959,7 +5945,7 @@ function App() {
                                     , gStats.activeCal>0 && React.createElement('span', null, "⚡ ", gStats.activeCal, " active")
                                   )
                                 )
-                                , React.createElement('div', { className: "log-group-xp" }, "⚡ ", groupXP.toLocaleString(), " XP")
+                                , React.createElement('div', { className: "log-group-xp" }, formatXP(groupXP,{prefix:"⚡ "}))
                                 , React.createElement('span', { style:{fontSize:".6rem",color:"#5a5650",flexShrink:0,transition:"transform .2s",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",marginLeft:6} }, "▾")
                               )
                               , !collapsed && (()=>{
@@ -6143,7 +6129,7 @@ function App() {
               };
               const fmtVal = (id,v) => {
                 if(!v) return "---";
-                if(id==="overall_xp"||id==="weekly_xp") return v.toLocaleString()+" XP";
+                if(id==="overall_xp"||id==="weekly_xp") return formatXP(v);
                 if(id.includes("_1rm"))  return v+" lbs";
                 if(id.includes("_reps")) return v+" reps";
                 if(id==="run_pace")      return v.toFixed(2)+"/mi";
@@ -6426,7 +6412,7 @@ function App() {
                         , React.createElement('div', { style: {flex:1}}
                           , React.createElement('div', { className: "quest-name"}, q.name)
                           , React.createElement('div', { className: "quest-desc"}, q.desc)
-                          , React.createElement('div', { className: "quest-reward"}, "⚡ +" , q.xp.toLocaleString(), " XP reward"  )
+                          , React.createElement('div', { className: "quest-reward"}, formatXP(q.xp,{signed:true,prefix:"⚡ "}), " reward"  )
                         )
                         , React.createElement('button', { className: "btn btn-gold btn-sm"  , onClick: ()=>claimQuestReward(q.id)}, "Claim!")
                       )
@@ -6626,7 +6612,7 @@ function App() {
                             const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
                             const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
                             setProfile(p=>({...p, xp:Math.max(0,p.xp-totalXP), log:newLog, exercisePBs:calcExercisePBs(newLog), deletedItems:[...(p.deletedItems||[]),...deletedEntries]}));
-                            showToast("Workout session deleted. -"+totalXP.toLocaleString()+" XP");
+                            showToast("Workout session deleted. "+formatXP(-totalXP,{signed:true}));
                           }}, "\uD83D\uDDD1")
                         , React.createElement('svg', { width: "13", height: "13", viewBox: "0 0 14 14"   , fill: "none", style: {flexShrink:0,transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
                           , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg5", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
@@ -6720,7 +6706,7 @@ function App() {
                                 const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
                                 const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
                                 setProfile(p=>({...p, xp:Math.max(0,p.xp-totalXP), log:newLog, exercisePBs:calcExercisePBs(newLog), deletedItems:[...(p.deletedItems||[]),...deletedEntries]}));
-                                showToast("Plan session deleted. -"+totalXP.toLocaleString()+" XP");
+                                showToast("Plan session deleted. "+formatXP(-totalXP,{signed:true}));
                               }}, "\uD83D\uDDD1")
                             , React.createElement('svg', { width: "13", height: "13", viewBox: "0 0 14 14"   , fill: "none", xmlns: "http://www.w3.org/2000/svg", style: {flexShrink:0,transition:"transform .22s ease",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}
                                           , React.createElement('defs', null, React.createElement('linearGradient', { id: "cg5", x1: "0", y1: "0", x2: "0", y2: "1"}, React.createElement('stop', { offset: "0%", stopColor: "#b4ac9e"}), React.createElement('stop', { offset: "100%", stopColor: "#7a4e1a"})))
@@ -8931,18 +8917,15 @@ function App() {
         const estXP=(()=>{
           const sv=noSets?1:(parseInt(sets)||0);
           const rv=isCardio||isFlex ? Math.max(1,Math.floor(combineHHMMSec(exHHMM,exSec)/60)||parseInt(reps)||1) : (parseInt(reps)||0);
-          const baseXP=calcExXP(ex.id,sv,rv,profile.chosenClass,allExById,distMi||null);
-          const zb=showHR&&hrZone?1+(hrZone-1)*0.04:1;
-          const wb=effW>0?1+Math.min(effW/500,0.3):1;
-          const pb=1+(runBoostPct/100);
-          const intBoost=(isCardio&&quickRows.length>0)?1.25:1;
-          // Add XP from extra rows
+          const extraCount=quickRows.length;
+          const hrZ=showHR?hrZone:null;
+          const baseXP=calcExXP(ex.id,sv,rv,profile.chosenClass,allExById,distMi||null,effW||null,hrZ,extraCount);
           const rowsXP=quickRows.reduce((s,row)=>{
             const rs=noSets?1:(parseInt(row.sets)||sv);
             const rr=isCardio||isFlex?(Math.max(1,Math.floor(combineHHMMSec(row.hhmm||"",row.sec||"")/60))||rv):(parseInt(row.reps)||rv);
-            return s+Math.round(calcExXP(ex.id,rs,rr,profile.chosenClass,allExById,parseFloat(row.dist)||distMi||null)*zb*wb*pb*intBoost);
+            return s+calcExXP(ex.id,rs,rr,profile.chosenClass,allExById,parseFloat(row.dist)||distMi||null,effW||null,hrZ,extraCount);
           },0);
-          return (Math.round(baseXP*zb*wb*pb*intBoost)+rowsXP).toLocaleString();
+          return (baseXP+rowsXP).toLocaleString();
         })();
         try { return (
           React.createElement('div', { style: {position:"fixed",inset:0,background:"rgba(0,0,0,.78)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
