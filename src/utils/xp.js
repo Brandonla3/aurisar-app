@@ -107,7 +107,8 @@ const detectClass = bio => {
   return detectClassFromAnswers(sports, priorities, style);
 };
 
-function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi,weightLbs,hrZone) {
+// extraRows: number of cardio interval rows beyond the first; any value > 0 awards a flat 1.25x.
+function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi,weightLbs,hrZone,extraRows) {
   const ex=(exLookup||EX_BY_ID)[exId]||EX_BY_ID[exId]; if(!ex) return 0;
   // Prefer per-exercise class multiplier from xpClassMap, fall back to category bonus
   const mult = (ex.xpClassMap && classKey && ex.xpClassMap[classKey])
@@ -119,7 +120,8 @@ function calcExXP(exId,sets,reps,classKey,exLookup,distanceMi,weightLbs,hrZone) 
   const paceBonus = runPace ? (runPace<=8 ? 1.20 : 1.05) : 1;
   const weightBonus = ex.tracksWeight && weightLbs ? 1+Math.min(weightLbs/500,0.3) : 1;
   const zoneBonus = hrZone ? 1+(hrZone-1)*0.04 : 1;
-  return Math.round(ex.baseXP*mult*(1+(s*r-1)*0.05)*distBonus*paceBonus*weightBonus*zoneBonus);
+  const intervalBonus = (ex.category==="cardio" && (parseInt(extraRows)||0)>0) ? 1.25 : 1;
+  return Math.round(ex.baseXP*mult*(1+(s*r-1)*0.05)*distBonus*paceBonus*weightBonus*zoneBonus*intervalBonus);
 }
 
 function calcPlanXP(plan,classKey,exLookup) {
