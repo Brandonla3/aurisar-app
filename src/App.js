@@ -477,7 +477,6 @@ function App() {
   const [notifMode,setNotifMode] = useState(false);
   // Friend exercise banner notification
   const [friendExBanner, setFriendExBanner] = useState(null);
-  const friendLogLengthsRef = React.useRef({});
   const friendBannerTimerRef = React.useRef(null);
   const notifPrefsRef = React.useRef(null);
   // Personal Bests filter
@@ -1372,43 +1371,75 @@ function App() {
     return () => { sb.removeChannel(channel); };
   }, [authUser?.id, msgActiveChannel?.channel_id]);
 
-  // Realtime subscription for friend exercise completions (in-app banner)
+  // Phase 3b: emit a friend_exercise_events row whenever the user adds a new
+  // entry to their log. Friends receive these via realtime (RLS-scoped to
+  // accepted friends only). Replaces the old "stream the whole profile.data
+  // jsonb to every authenticated user" pattern.
+  const lastSeenLogLenRef = React.useRef(null);
+  const lastSeenPBsRef    = React.useRef(null);
   useEffect(() => {
-    if(!authUser || friends.length === 0) return;
-    const friendIds = friends.map(f => f.id);
-    // Snapshot current log lengths so only genuinely new entries trigger banners
-    friends.forEach(f => {
-      if(friendLogLengthsRef.current[f.id] === undefined)
-        friendLogLengthsRef.current[f.id] = (f.log || []).length;
-    });
-    const channel = sb.channel('friend-exercise-realtime')
+    if (!authUser || isPreviewMode) return;
+    const currentLog = profile.log || [];
+    const currentPBs = profile.exercisePBs || {};
+    if (lastSeenLogLenRef.current === null) {
+      lastSeenLogLenRef.current = currentLog.length;
+      lastSeenPBsRef.current    = currentPBs;
+      return;
+    }
+    const prevLen = lastSeenLogLenRef.current;
+    const newLen  = currentLog.length;
+    if (newLen > prevLen) {
+      const newEntries = currentLog.slice(0, newLen - prevLen);
+      const prevPBs = lastSeenPBsRef.current || {};
+      for (const entry of newEntries) {
+        const exId = entry?.exId;
+        if (!exId || exId === 'rest_day') continue;
+        const prevPB = prevPBs[exId];
+        const curPB  = currentPBs[exId];
+        const isPB   = !!(curPB && (!prevPB || curPB.value !== prevPB.value));
+        sb.from('friend_exercise_events').insert({
+          user_id:       authUser.id,
+          exercise_name: entry.exercise || null,
+          exercise_id:   exId,
+          exercise_icon: entry.icon || null,
+          is_pb:         isPB,
+          pb_value:      isPB ? (curPB?.value ?? null) : null,
+          pb_type:       isPB ? (curPB?.type  ?? null) : null,
+        }).then(({error}) => {
+          if (error) console.warn('friend_exercise_events insert failed:', error.message);
+        });
+      }
+    }
+    lastSeenLogLenRef.current = newLen;
+    lastSeenPBsRef.current    = currentPBs;
+  }, [profile.log, profile.exercisePBs, authUser?.id, isPreviewMode]);
+
+  // Reset emit-tracker on auth change so the next session starts from baseline.
+  useEffect(() => {
+    lastSeenLogLenRef.current = null;
+    lastSeenPBsRef.current    = null;
+  }, [authUser?.id]);
+
+  // Realtime subscription for friend exercise completions (in-app banner).
+  // Listens on friend_exercise_events. RLS scopes payloads to accepted friends.
+  useEffect(() => {
+    if(!authUser) return;
+    const channel = sb.channel('friend-exercise-events')
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event:  'INSERT',
         schema: 'public',
-        table: 'profiles',
+        table:  'friend_exercise_events',
       }, payload => {
-        const fId = payload.new.id;
-        if(!friendIds.includes(fId)) return; // not a friend
-        const fData = payload.new.data;
-        if(!fData || !fData.log || fData.log.length === 0) return;
-        const prevLen = friendLogLengthsRef.current[fId] || 0;
-        const newLen = fData.log.length;
-        if(newLen <= prevLen) { friendLogLengthsRef.current[fId] = newLen; return; }
-        friendLogLengthsRef.current[fId] = newLen;
-        // Check notification preference via ref (avoids stale closure)
-        if(notifPrefsRef.current && notifPrefsRef.current.friendExercise === false) return;
-        // New exercise logged — latest entry is at index 0
-        const latest = fData.log[0];
-        const friendName = fData.playerName || "A friend";
-        const exId = latest.exId;
-        let pbInfo = null;
-        if(LEADERBOARD_PB_IDS.has(exId) && fData.exercisePBs && fData.exercisePBs[exId]) {
-          pbInfo = fData.exercisePBs[exId];
-        }
+        const ev = payload.new;
+        if (!ev || ev.user_id === authUser.id) return;
+        if (notifPrefsRef.current && notifPrefsRef.current.friendExercise === false) return;
+        const friend = friends.find(f => f.id === ev.user_id);
+        const friendName = friend?.playerName || "A friend";
+        const pbInfo = ev.is_pb ? { type: ev.pb_type, value: ev.pb_value } : null;
         showFriendExBanner({
           friendName,
-          exerciseName: latest.exercise || exId || "an exercise",
-          exerciseIcon: latest.icon || "\uD83D\uDCAA",
+          exerciseName: ev.exercise_name || ev.exercise_id || "an exercise",
+          exerciseIcon: ev.exercise_icon || "💪",
           pbInfo,
         });
       })
