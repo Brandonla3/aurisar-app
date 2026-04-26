@@ -1,0 +1,5 @@
+Contact: mailto:support@aurisargames.com
+Expires: 2027-04-26T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://aurisargames.com/.well-known/security.txt
+Policy: https://aurisargames.com/security-policy

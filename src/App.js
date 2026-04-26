@@ -62,6 +62,78 @@ import { LandingPage } from './components/LandingPage';
 
 const PREVIEW_PIN = "1234";
 
+// Canonical production URL used as the password-reset redirect target.
+// Must exactly match an entry in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+const RESET_PASSWORD_REDIRECT = "https://aurisargames.com";
+
+// Password policy. NIST SP 800-63B rev.4: 8+ chars min; we require 10 because
+// we don't enforce composition rules. HIBP k-anonymity check rejects passwords
+// known to have leaked in public breaches (https://haveibeenpwned.com/API/v3#PwnedPasswords).
+const PASSWORD_MIN_LENGTH = 10;
+const PASSWORD_MAX_LENGTH = 72; // Supabase / bcrypt limit
+
+async function _sha1Hex(input) {
+  const buf = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-1", buf);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+async function isPasswordBreached(password) {
+  // Send only the first 5 chars of the SHA-1 prefix; HIBP returns all matching
+  // suffixes. The full hash never leaves the browser.
+  try {
+    const sha1 = await _sha1Hex(password);
+    const prefix = sha1.slice(0, 5);
+    const suffix = sha1.slice(5);
+    const res = await fetch("https://api.pwnedpasswords.com/range/" + prefix, {
+      headers: { "Add-Padding": "true" },
+    });
+    if (!res.ok) return false; // fail-open if HIBP is unreachable
+    const text = await res.text();
+    return text.split("\n").some(line => line.split(":")[0].trim() === suffix);
+  } catch { return false; }
+}
+
+// MFA recovery code helpers. Codes are 80 bits of CSPRNG entropy encoded in
+// Crockford-style base32 (no I/L/O/U to avoid confusion). Hashing happens
+// server-side via the `store_mfa_recovery_codes` RPC, which is responsible
+// for salted/slow hashing — DO NOT pre-hash on the client (it adds nothing
+// over TLS and locks salts to the client).
+const _BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+function _base32Encode(bytes) {
+  let bits = 0, value = 0, out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i];
+    bits += 8;
+    while (bits >= 5) {
+      out += _BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += _BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  return out;
+}
+function generateRecoveryCode() {
+  // 10 bytes = 80 bits of entropy → 16 base32 chars; chunked as XXXX-XXXX-XXXX-XXXX.
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  const enc = _base32Encode(bytes);
+  return enc.slice(0,4) + "-" + enc.slice(4,8) + "-" + enc.slice(8,12) + "-" + enc.slice(12,16);
+}
+
+async function validatePasswordPolicy(password) {
+  if (!password || password.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, msg: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` };
+  }
+  if (password.length > PASSWORD_MAX_LENGTH) {
+    return { ok: false, msg: `Password is too long (max ${PASSWORD_MAX_LENGTH} characters).` };
+  }
+  if (await isPasswordBreached(password)) {
+    return { ok: false, msg: "That password has appeared in a public data breach. Please choose a different one." };
+  }
+  return { ok: true };
+}
+
 const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, allExById, metric, wUnit, setWbExercises, setCollapsedWbEx, setSsChecked, ssChecked, exCount, openExEditor }) {
   function updateField(field, val) { setWbExercises(exs=>exs.map((e,j)=>j!==i?e:{...e,[field]:val})); }
   function removeEx() { setWbExercises(exs=>{const updated=exs.map((e,j)=>{if(j===i)return null;if(e.supersetWith===i)return{...e,supersetWith:null};if(e.supersetWith!=null&&e.supersetWith>i)return{...e,supersetWith:e.supersetWith-1};return e;}).filter(Boolean);return updated;}); }
@@ -721,10 +793,28 @@ function App() {
     if(!authEmail.trim()||!authPassword.trim()) return;
     setAuthLoading(true); setAuthMsg(null);
     if(authIsNew) {
+      // Enforce password policy (length + breached-password check) before
+      // sending to Supabase, both to protect users and to keep error responses
+      // generic (Supabase echoes specific failure modes that aid enumeration).
+      const policy = await validatePasswordPolicy(authPassword);
+      if(!policy.ok) {
+        setAuthLoading(false);
+        setAuthMsg({ok:false, text:policy.msg});
+        return;
+      }
       const {data:signUpData, error} = await sb.auth.signUp({email:authEmail.trim(), password:authPassword});
       if(error) {
         setAuthLoading(false);
-        setAuthMsg({ok:false, text:"Error: "+error.message});
+        // Map specific failure modes to safe copy; do not echo Supabase's raw
+        // error string (it can disclose "User already registered" etc.).
+        const msg = (error.message||"").toLowerCase();
+        if(msg.includes("already")) {
+          setAuthMsg({ok:true, text:"✓ If that email is available, an account has been created. Check your inbox to confirm."});
+        } else if(msg.includes("password")) {
+          setAuthMsg({ok:false, text:"Password doesn't meet the requirements. Use at least 10 characters."});
+        } else {
+          setAuthMsg({ok:false, text:"Sign-up failed. Please try again."});
+        }
         return;
       }
       // If email confirmation is disabled, a session is returned immediately — use it
@@ -751,9 +841,9 @@ function App() {
       const {error} = await sb.auth.signInWithPassword({email:authEmail.trim(), password:authPassword});
       setAuthLoading(false);
       if(error) {
-        setAuthMsg({ok:false, text:error.message.includes("Email not confirmed")
-          ? "Please check your email and click the confirmation link first."
-          : "Error: "+error.message});
+        // Generic message — never disclose whether the email exists or whether
+        // it just hasn't been confirmed (account-enumeration defence).
+        setAuthMsg({ok:false, text:"Sign-in failed. Check your email and password, or confirm your email if you just signed up."});
       } else {
         if(!authRemember) sessionStorage.setItem("ilf_no_persist","1");
         else sessionStorage.removeItem("ilf_no_persist");
@@ -795,10 +885,10 @@ function App() {
   async function sendPasswordReset() {
     if(!forgotPwEmail.trim()) { setAuthMsg({ok:false, text:"Enter your email address."}); return; }
     setAuthLoading(true); setAuthMsg(null);
-    const {error} = await sb.auth.resetPasswordForEmail(forgotPwEmail.trim(), {redirectTo:window.location.href});
+    // Fire-and-forget: never reveal whether the email exists.
+    await sb.auth.resetPasswordForEmail(forgotPwEmail.trim(), {redirectTo:RESET_PASSWORD_REDIRECT}).catch(()=>{});
     setAuthLoading(false);
-    if(error) setAuthMsg({ok:false, text:"Error: "+error.message});
-    else setAuthMsg({ok:true, text:"\u2713 Password reset link sent! Check your email."});
+    setAuthMsg({ok:true, text:"\u2713 If an account exists for that email, a reset link has been sent. Check your inbox."});
   }
 
   async function lookupByPrivateId() {
@@ -814,11 +904,13 @@ function App() {
 
   async function changePassword() {
     if(!pwNew.trim()) { setPwMsg({ok:false, text:"Enter a new password."}); return; }
-    if(pwNew.length < 6) { setPwMsg({ok:false, text:"Password must be at least 6 characters."}); return; }
     if(pwNew !== pwConfirm) { setPwMsg({ok:false, text:"Passwords don't match."}); return; }
+    setPwMsg({ok:null, text:"Checking password…"});
+    const policy = await validatePasswordPolicy(pwNew);
+    if(!policy.ok) { setPwMsg({ok:false, text:policy.msg}); return; }
     setPwMsg(null);
     const {error} = await sb.auth.updateUser({password:pwNew});
-    if(error) setPwMsg({ok:false, text:"Error: "+error.message});
+    if(error) setPwMsg({ok:false, text:"Could not update password. Please try again."});
     else {
       setPwMsg({ok:true, text:"✓ Password updated!"});
       setPwNew("");
@@ -880,22 +972,15 @@ function App() {
       if(vErr) { setMfaMsg({ok:false, text:"Verification failed — check the code and try again."}); return; }
 
       // Generate 10 recovery codes
-      const codes = [];
-      const hashes = [];
-      for(let i=0; i<10; i++){
-        const raw = Array.from(crypto.getRandomValues(new Uint8Array(6)))
-          .map(b=>b.toString(16).padStart(2,"0")).join("").toUpperCase();
-        const code = raw.slice(0,4)+"-"+raw.slice(4,8)+"-"+raw.slice(8,12);
-        codes.push(code);
-        // SHA-256 hash
-        const enc = new TextEncoder().encode(code);
-        const hashBuf = await crypto.subtle.digest("SHA-256", enc);
-        const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-        hashes.push(hashHex);
-      }
-
-      // Store hashes via RPC
-      await sb.rpc("store_mfa_recovery_codes", {code_hashes: hashes});
+      // Generate 10 × 80-bit recovery codes (was 48-bit). Server-side bcrypt /
+      // argon2 hashing is the proper next step (security audit M-5 server) —
+      // until that ships, we keep the existing client-side SHA-256 contract.
+      const codes = Array.from({length: 10}, () => generateRecoveryCode());
+      const hashes = await Promise.all(codes.map(async code => {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+      }));
+      await sb.rpc("store_mfa_recovery_codes", { code_hashes: hashes });
 
       setMfaEnabled(true);
       setMfaEnrolling(false);
@@ -1094,19 +1179,12 @@ function App() {
   async function regenerateRecoveryCodes() {
     setMfaMsg(null);
     try {
-      const codes = [];
-      const hashes = [];
-      for(let i=0; i<10; i++){
-        const raw = Array.from(crypto.getRandomValues(new Uint8Array(6)))
-          .map(b=>b.toString(16).padStart(2,"0")).join("").toUpperCase();
-        const code = raw.slice(0,4)+"-"+raw.slice(4,8)+"-"+raw.slice(8,12);
-        codes.push(code);
-        const enc = new TextEncoder().encode(code);
-        const hashBuf = await crypto.subtle.digest("SHA-256", enc);
-        const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-        hashes.push(hashHex);
-      }
-      await sb.rpc("store_mfa_recovery_codes", {code_hashes: hashes});
+      const codes = Array.from({length: 10}, () => generateRecoveryCode());
+      const hashes = await Promise.all(codes.map(async code => {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+      }));
+      await sb.rpc("store_mfa_recovery_codes", { code_hashes: hashes });
       setMfaRecoveryCodes(codes);
       setMfaCodesRemaining(10);
       setMfaMsg({ok:true, text:"✓ New recovery codes generated. Save them — they won't be shown again."});
@@ -1635,7 +1713,12 @@ function App() {
   }
 
   async function signOut() {
+    const prevUserId = _optionalChain([authUser, 'optionalAccess', _signOut1 => _signOut1.id]);
     await sb.auth.signOut();
+    // Wipe locally-cached PII so a shared device can't leak data to the next user.
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    if(prevUserId) { try { localStorage.removeItem("aurisar_ob_draft_"+prevUserId); } catch(e) {} }
+    try { sessionStorage.removeItem("ilf_no_persist"); } catch(e) {}
     setAuthUser(null);
     setProfile(EMPTY_PROFILE);
     // Clear all social state so next user starts fresh

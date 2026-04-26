@@ -2,6 +2,16 @@ node_modules
 build
 dist
 .env
-.env.local
+.env.*
+!.env.example
 *.log
 .DS_Store
+.netlify/
+.idea/
+.vscode/
+*.pem
+*.key
+*.p12
+coverage/
+.cache/
+.vite/
