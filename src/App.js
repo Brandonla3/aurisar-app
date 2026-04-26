@@ -1006,15 +1006,11 @@ function App() {
       if(vErr) { setMfaMsg({ok:false, text:"Verification failed — check the code and try again."}); return; }
 
       // Generate 10 recovery codes
-      // Generate 10 × 80-bit recovery codes (was 48-bit). Server-side bcrypt /
-      // argon2 hashing is the proper next step (security audit M-5 server) —
-      // until that ships, we keep the existing client-side SHA-256 contract.
+      // Generate 10 × 80-bit recovery codes. Server-side bcrypt hashing is in
+      // place (scripts/security/04-mfa-recovery-bcrypt.sql) — send plaintext
+      // and let the RPC bcrypt them with a per-row salt.
       const codes = Array.from({length: 10}, () => generateRecoveryCode());
-      const hashes = await Promise.all(codes.map(async code => {
-        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
-        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-      }));
-      await sb.rpc("store_mfa_recovery_codes", { code_hashes: hashes });
+      await sb.rpc("store_mfa_recovery_codes", { code_plaintexts: codes });
 
       setMfaEnabled(true);
       setMfaEnrolling(false);
@@ -1084,7 +1080,7 @@ function App() {
     try {
       const {error} = await sb.auth.mfa.unenroll({factorId:mfaFactorId});
       if(error) { setMfaDisableMsg({ok:false, text:"Error: "+error.message}); setMfaUnenrolling(false); return; }
-      await sb.rpc("store_mfa_recovery_codes", {code_hashes: []});
+      await sb.rpc("store_mfa_recovery_codes", { code_plaintexts: [] });
       setMfaEnabled(false);
       setMfaFactorId(null);
       setMfaRecoveryCodes(null);
@@ -1214,11 +1210,7 @@ function App() {
     setMfaMsg(null);
     try {
       const codes = Array.from({length: 10}, () => generateRecoveryCode());
-      const hashes = await Promise.all(codes.map(async code => {
-        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
-        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-      }));
-      await sb.rpc("store_mfa_recovery_codes", { code_hashes: hashes });
+      await sb.rpc("store_mfa_recovery_codes", { code_plaintexts: codes });
       setMfaRecoveryCodes(codes);
       setMfaCodesRemaining(10);
       setMfaMsg({ok:true, text:"✓ New recovery codes generated. Save them — they won't be shown again."});
@@ -1552,16 +1544,21 @@ function App() {
       const fRows = [...(sentAccepted||[]), ...(receivedAccepted||[])];
       if(fRows.length>0) {
         const friendIds = fRows.map(r=>r.from_user_id===authUser.id?r.to_user_id:r.from_user_id);
-        const {data:pRows} = await sb.from("profiles").select("id,data").in("id",friendIds);
+        // Use SECURITY DEFINER RPC that returns ONLY safe columns (no `log`,
+        // no `exercisePBs`, no real name) for accepted friends or pending
+        // requests in either direction. See scripts/security/06-extend-friend-rpc.sql.
+        const {data:pRows} = await sb.rpc("get_friend_profiles_safe", { p_user_ids: friendIds });
         const enriched = friendIds.map(fid=>{
           const pRow = (pRows||[]).find(p=>p.id===fid);
           const reqRow = fRows.find(r=>r.from_user_id===fid||r.to_user_id===fid);
           return {
             id: fid,
-            playerName: _optionalChain([pRow, 'optionalAccess', _36 => _36.data, 'optionalAccess', _37 => _37.playerName])||"Unknown Warrior",
-            chosenClass: _optionalChain([pRow, 'optionalAccess', _38 => _38.data, 'optionalAccess', _39 => _39.chosenClass])||null,
-            xp: _optionalChain([pRow, 'optionalAccess', _40 => _40.data, 'optionalAccess', _41 => _41.xp])||0,
-            log: _optionalChain([pRow, 'optionalAccess', _42 => _42.data, 'optionalAccess', _43 => _43.log])||[],
+            playerName: _optionalChain([pRow, 'optionalAccess', _36 => _36.player_name])||"Unknown Warrior",
+            chosenClass: _optionalChain([pRow, 'optionalAccess', _38 => _38.chosen_class])||null,
+            xp: _optionalChain([pRow, 'optionalAccess', _40 => _40.xp])||0,
+            // log + exercisePBs intentionally omitted — peers shouldn't see them.
+            // Recent-activity card and PB banner are deferred to Phase 3b
+            // (friend_exercise_events table).
             _reqId: _optionalChain([reqRow, 'optionalAccess', _44 => _44.id])||null,
           };
         });
@@ -1575,10 +1572,10 @@ function App() {
         .eq("status","pending");
       if(rRows && rRows.length>0) {
         const senderIds = rRows.map(r=>r.from_user_id);
-        const {data:pRows2} = await sb.from("profiles").select("id,data").in("id",senderIds);
+        const {data:pRows2} = await sb.rpc("get_friend_profiles_safe", { p_user_ids: senderIds });
         const enriched2 = (rRows||[]).map(r=>{
           const p=(pRows2||[]).find(x=>x.id===r.from_user_id);
-          return {reqId:r.id,userId:r.from_user_id,playerName:_optionalChain([p, 'optionalAccess', _45 => _45.data, 'optionalAccess', _46 => _46.playerName])||"Unknown Warrior"};
+          return {reqId:r.id,userId:r.from_user_id,playerName:_optionalChain([p, 'optionalAccess', _46 => _46.player_name])||"Unknown Warrior"};
         });
         setFriendRequests(enriched2);
       } else { setFriendRequests([]); }
@@ -1590,10 +1587,10 @@ function App() {
         .eq("status","pending");
       if(oRows && oRows.length>0) {
         const recipientIds = oRows.map(r=>r.to_user_id);
-        const {data:pRows3} = await sb.from("profiles").select("id,data").in("id",recipientIds);
+        const {data:pRows3} = await sb.rpc("get_friend_profiles_safe", { p_user_ids: recipientIds });
         const enriched3 = oRows.map(r=>{
           const p=(pRows3||[]).find(x=>x.id===r.to_user_id);
-          return {reqId:r.id, userId:r.to_user_id, playerName:_optionalChain([p, 'optionalAccess', _47 => _47.data, 'optionalAccess', _48 => _48.playerName])||"Unknown Warrior"};
+          return {reqId:r.id, userId:r.to_user_id, playerName:_optionalChain([p, 'optionalAccess', _48 => _48.player_name])||"Unknown Warrior"};
         });
         setOutgoingRequests(enriched3);
       } else { setOutgoingRequests([]); }
@@ -1710,11 +1707,14 @@ function App() {
         .eq("to_user_id", authUser.id)
         .eq("status","pending");
       if(data && data.length>0) {
-        const senderIds=[...new Set(data.map(d=>d.from_user_id))];
-        const {data:pRows} = await sb.from("profiles").select("id,data").in("id",senderIds);
+        // Use the share-trust path (not friend-trust): a non-friend can share
+        // with you, and we still need to render their name. The RPC scopes by
+        // share IDs you've actually received.
+        const shareIds = data.map(d=>d.id);
+        const {data:pRows} = await sb.rpc("get_share_sender_profiles", { p_share_ids: shareIds });
         const enriched = data.map(s=>({
           ...s,
-          senderName:_optionalChain([(pRows||[]), 'access', _50 => _50.find, 'call', _51 => _51(p=>p.id===s.from_user_id), 'optionalAccess', _52 => _52.data, 'optionalAccess', _53 => _53.playerName])||"A warrior",
+          senderName:_optionalChain([(pRows||[]), 'access', _50 => _50.find, 'call', _51 => _51(p=>p.id===s.from_user_id), 'optionalAccess', _53 => _53.player_name])||"A warrior",
           parsedItem: (() => { try { return JSON.parse(s.item_data); } catch(e){ return null; } })(),
         }));
         setIncomingShares(enriched);
