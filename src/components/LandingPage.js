@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import '../styles/landing.css';
 import heroBg from '../assets/hero.png';
 import flameLogo from '../assets/flame-logo-transparent.svg';
+import { UI_COLORS } from '../data/constants';
 
 /* ═══════════════════════════════════════════════════════════════
    Aurisar Fitness — RPG Hero Landing Page
@@ -34,8 +35,8 @@ function SwordSVG() {
       strokeWidth: '0.5'
     }),
     // Crossguard gems
-    React.createElement('circle', { cx: '10', cy: '52.5', r: '1.5', fill: '#e74c3c', opacity: '0.7' }),
-    React.createElement('circle', { cx: '30', cy: '52.5', r: '1.5', fill: '#e74c3c', opacity: '0.7' }),
+    React.createElement('circle', { cx: '10', cy: '52.5', r: '1.5', fill: UI_COLORS.danger, opacity: '0.7' }),
+    React.createElement('circle', { cx: '30', cy: '52.5', r: '1.5', fill: UI_COLORS.danger, opacity: '0.7' }),
     // Grip
     React.createElement('rect', {
       x: '16', y: '55', width: '8', height: '20', rx: '2',

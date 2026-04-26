@@ -1,5 +1,5 @@
 import React from 'react';
-import { MAP_REGIONS, MAP_POINTS } from '../data/constants';
+import { MAP_REGIONS, MAP_POINTS, UI_COLORS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 
 function getRegionIdx(level) {
@@ -156,7 +156,7 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
           /* Friends */
           , friendPositions.map(f=>{ const fCls=f.chosenClass?CLASSES[f.chosenClass]:null,traveling=travelActive&&(profile?.travelBoost?.friendId)===f.id; return (
             React.createElement('g', { key: f.id, style: {cursor:"pointer"}, onClick: e=>onFriendClick(e,f,fCls) }
-              , React.createElement('circle', { cx: f.mapX, cy: f.mapY, r: traveling?10:8, fill: traveling?"#2ecc71":(fCls?.color)||"#b4ac9e", stroke: "rgba(255,255,255,.8)", strokeWidth: "1.5", opacity: ".9" })
+              , React.createElement('circle', { cx: f.mapX, cy: f.mapY, r: traveling?10:8, fill: traveling?UI_COLORS.success:(fCls?.color)||"#b4ac9e", stroke: "rgba(255,255,255,.8)", strokeWidth: "1.5", opacity: ".9" })
               , React.createElement('text', { x: f.mapX, y: f.mapY+4, textAnchor: "middle", fontSize: "8", fill: "white" }, (fCls?.icon)||"⚔️")
               /* Friend name — was 5.5 → now 8 */
               , React.createElement('text', { x: f.mapX, y: f.mapY-14, textAnchor: "middle", fontSize: "8", fill: "#d4cec4", fontFamily: "'Inter'" }, (f.playerName||"?").split(" ")[0])
