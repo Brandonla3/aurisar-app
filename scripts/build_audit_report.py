@@ -261,8 +261,7 @@ def main() -> None:
     # ── Spacing / BorderRadius ───────────────────────────────────────
     spacing_rows = [
         ["FIXED", "BorderRadius fully tokenised", "src/utils/tokens.js R scale", "All 105 inline borderRadius values across App.js + PlanWizard.js now reference R.rN tokens (one per unique px value, plus semantic aliases)."],
-        ["FIXED", "Spacing scale defined (S)", "src/utils/tokens.js S scale", "19 numeric tokens covering 0–32 px values seen in the codebase. Migration of gap/padding/margin call-sites is a separate follow-up."],
-        ["P2", "Hardcoded gap/padding/margin px values", "Throughout JSX inline styles", "Migrate using tokens.S — needs scale-snapping policy first"],
+        ["FIXED", "Spacing fully tokenised — Option B snap policy applied", "src/utils/tokens.js S scale + App.js + PlanWizard.js", "1,119 inline gap/padding/margin sites migrated; 291 off-by-1 values snapped to nearest even (e.g. 5→6, 7→8); 828 pure renames. Final scale is even-step 0,2,4,…,32 plus negative overlap tokens."],
         ["P2", "Mix of px-string and unitless React style values", "Throughout", "Pick one convention"],
         ["P2", "Negative margins for overlap (marginTop:-16, marginTop:-14)", "src/styles/landing.css:241,251", "Acceptable but document"],
     ]

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Spacing Snap Policy — Before / After Preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  /* ── Aurisar masculine palette (matches src/data/constants.js) ── */
+  :root {
+    --bg:        #0c0c0a;
+    --text:      #d4cec4;
+    --text-dim:  #b4ac9e;
+    --text-mute: #8a8478;
+    --text-low:  #5a5650;
+    --label:     #b0a898;
+    --line:      rgba(180,172,158,.08);
+    --line-2:    rgba(180,172,158,.15);
+    --card-bg:   rgba(45,42,36,.18);
+    --input-bg:  rgba(14,14,12,.6);
+    --gold:      #c49428;
+    --gold-soft: rgba(196,148,40,0.15);
+    --warning:   #FFE87C;
+    --strength:  #6B2A2A;   /* burgundy iron */
+    --legs:      #5C5C2E;   /* tactical olive */
+    --diff-old:  rgba(231,76,60,.10);
+    --diff-old-line: rgba(231,76,60,.55);
+    --diff-new:  rgba(46,204,113,.10);
+    --diff-new-line: rgba(46,204,113,.55);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 28px 64px; }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 1.55rem;
+    letter-spacing: .04em;
+    margin: 0 0 6px;
+    color: var(--text);
+  }
+  .lede {
+    font-size: .95rem;
+    color: var(--text-mute);
+    margin: 0 0 24px;
+    line-height: 1.5;
+    max-width: 700px;
+  }
+
+  .panes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 880px) { .panes { grid-template-columns: 1fr; } }
+
+  .pane h2 {
+    font-family: 'Cinzel', serif;
+    font-size: .95rem;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+    color: var(--text-dim);
+  }
+  .pane .pane-tag {
+    display: inline-block;
+    font-size: .6rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    border: 1px solid var(--line-2);
+    background: var(--card-bg);
+    color: var(--text-mute);
+    margin-bottom: 14px;
+  }
+  .pane.before .pane-tag { color: #e58a7e; border-color: var(--diff-old-line); background: var(--diff-old); }
+  .pane.after  .pane-tag { color: #6dd58a; border-color: var(--diff-new-line); background: var(--diff-new); }
+
+  /* ── The mock workout-exercise card ── */
+  .card {
+    background: linear-gradient(160deg, rgba(38,35,29,.6), rgba(28,26,20,.5));
+    border: 1px solid var(--line-2);
+    border-radius: 9px;            /* R.xl */
+    overflow: hidden;
+  }
+  .card .header {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  /* Exact gap/padding tokens are written inline so the diff overlays stay accurate */
+  .reorder-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .reorder {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    font-size: .65rem;
+    line-height: 1;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .drag-handle {
+    color: var(--text-low);
+    font-size: .9rem;
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+  .ex-orb {
+    width: 26px; height: 26px;
+    flex-shrink: 0;
+    border-radius: 6px;            /* R.md */
+    background: var(--legs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .82rem;
+    border: 1px solid var(--line-2);
+  }
+  .ex-name {
+    flex: 1;
+    min-width: 0;
+    color: var(--text);
+    font-family: 'Cinzel', serif;
+    font-size: .72rem;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .custom-badge {
+    font-size: .55rem;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+  }
+  .edit-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--line-2);
+    color: var(--text-mute);
+    font-size: .55rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .pb-display {
+    font-size: .58rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .reps-preview {
+    font-size: .6rem;
+    color: var(--text-low);
+  }
+  .xp-preview {
+    font-size: .63rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .xp-preview .ember { color: var(--warning); margin-left: 2px; }
+  .collapse-arrow {
+    font-size: .6rem;
+    color: var(--text-low);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .delete-btn {
+    background: rgba(180,30,30,.1);
+    color: #e74c3c;
+    border: 1px solid rgba(180,30,30,.25);
+    font-size: .55rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .body { padding: 8px 10px 10px; border-top: 1px solid var(--line); }
+  .row {
+    display: flex;
+  }
+  .field { flex: 1; }
+  .field label {
+    display: block;
+    font-size: .6rem;
+    color: var(--label);
+  }
+  .field input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--line-2);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: .7rem;
+    font-family: inherit;
+  }
+  .extra-rows-banner {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text-mute);
+    font-size: .58rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+
+  /* ── Diff highlighting: wrap any value with .diff and add data-old / data-new ── */
+  .diff {
+    position: relative;
+    background: var(--diff-new);
+    outline: 1px dashed var(--diff-new-line);
+    border-radius: 3px;
+    padding: 0 2px;
+    margin: 0 -2px;
+  }
+  .pane.before .diff {
+    background: var(--diff-old);
+    outline-color: var(--diff-old-line);
+  }
+  /* Tooltip showing the snapped value */
+  .diff[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1815;
+    color: var(--text);
+    font-family: 'Inter', monospace;
+    font-size: .6rem;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* ── Legend / snap-rule list ── */
+  .legend {
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+    margin-top: 12px;
+  }
+  .legend h2 {
+    font-family: 'Cinzel', serif;
+    font-size: .9rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+  }
+  table.snaps {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  table.snaps th, table.snaps td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+  }
+  table.snaps th {
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    background: rgba(45,42,36,.4);
+  }
+  table.snaps tr:last-child td { border-bottom: none; }
+  table.snaps td.before-cell { color: #e58a7e; font-family: 'Inter', monospace; }
+  table.snaps td.after-cell  { color: #6dd58a; font-family: 'Inter', monospace; }
+  table.snaps td.delta { color: var(--text-mute); font-family: monospace; }
+
+  .footer {
+    margin-top: 28px;
+    font-size: .8rem;
+    color: var(--text-mute);
+    line-height: 1.6;
+  }
+  .footer code {
+    font-family: 'Inter', monospace;
+    background: var(--card-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Spacing Snap Policy — Before / After</h1>
+<p class="lede">
+  Same Aurisar workout-exercise card rendered with current values on the left, with Option B (snap off-by-1 fine-tuning to the nearest even value) on the right. Hover any highlighted value to see what gets renamed. Negative-margin overlap effects, evens (4, 6, 8, 10, 12) and intentional zeros are unchanged.
+</p>
+
+<div class="panes">
+
+  <!-- ─────────────────── BEFORE ─────────────────── -->
+  <div class="pane before">
+    <h2>Before</h2>
+    <span class="pane-tag">Current values · 7 distinct</span>
+
+    <div class="card">
+      <!-- Header row: gap:5 (snaps), padding:"4px 7px" (snaps to 4px 8px) -->
+      <div class="header" style="gap: 5px; padding: 4px 7px; margin-bottom: 3px;">
+        <div class="reorder-col">
+          <button class="reorder" style="padding: 1px 5px;">▲</button>
+          <button class="reorder" style="padding: 1px 5px;">▼</button>
+        </div>
+        <span class="drag-handle">⠿</span>
+        <div class="ex-orb">🦵</div>
+        <div class="ex-name">Dumbbell Lunge</div>
+        <span class="custom-badge" style="margin-left: 3px;">custom</span>
+        <button class="edit-btn" style="padding: 1px 5px; margin-left: 5px;">✎ edit</button>
+        <span class="pb-display" style="margin-left: auto;">🏆 1RM: 95 lbs</span>
+        <span class="reps-preview" style="margin-left: 5px;">3× 10</span>
+        <span class="xp-preview" style="margin-left: 5px;">+45 XP <span class="ember">⚡</span></span>
+        <span class="collapse-arrow" style="margin-left: 5px;">▼</span>
+        <button class="delete-btn" style="padding: 1px 5px; margin-left: 3px;">✕</button>
+      </div>
+
+      <div class="body">
+        <!-- Sets/Reps/Weight row: gap:7 (snaps), marginBottom:5 (snaps) -->
+        <div class="row" style="gap: 7px; margin-bottom: 5px;">
+          <div class="field">
+            <label style="margin-bottom: 3px;">Sets</label>
+            <input value="3" style="padding: 5px 7px;" />
+          </div>
+          <div class="field">
+            <label style="margin-bottom: 3px;">Reps</label>
+            <input value="10" style="padding: 5px 7px;" />
+          </div>
+          <div class="field">
+            <label style="margin-bottom: 3px;">Weight (lbs)</label>
+            <input value="95" style="padding: 5px 7px;" />
+          </div>
+        </div>
+        <!-- Extra rows banner: padding:"4px 5px", margin-top:5px -->
+        <div class="extra-rows-banner" style="padding: 4px 5px; margin-top: 5px;">
+          + Add Row
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:.7rem; color: var(--text-mute); margin-top: 14px;">
+      <strong style="color:#e58a7e;">7 off-by-1 values</strong> in this single card:
+      <code>gap:5</code> · <code>gap:7</code> · <code>marginBottom:3</code> ×4 · <code>marginBottom:5</code> · <code>padding:"1px 5px"</code> ×3 · <code>padding:"4px 5px"</code> · <code>padding:"4px 7px"</code> · <code>padding:"5px 7px"</code> ×3 · <code>marginLeft:3</code> · <code>marginLeft:5</code> ×3
+    </p>
+  </div>
+
+  <!-- ─────────────────── AFTER ─────────────────── -->
+  <div class="pane after">
+    <h2>After</h2>
+    <span class="pane-tag">Option B · 4 distinct evens</span>
+
+    <div class="card">
+      <div class="header" style="gap: 6px; padding: 4px 8px; margin-bottom: 4px;">
+        <div class="reorder-col">
+          <button class="reorder" style="padding: 2px 6px;">▲</button>
+          <button class="reorder" style="padding: 2px 6px;">▼</button>
+        </div>
+        <span class="drag-handle">⠿</span>
+        <div class="ex-orb">🦵</div>
+        <div class="ex-name">Dumbbell Lunge</div>
+        <span class="custom-badge" style="margin-left: 4px;">custom</span>
+        <button class="edit-btn" style="padding: 2px 6px; margin-left: 6px;">✎ edit</button>
+        <span class="pb-display" style="margin-left: auto;">🏆 1RM: 95 lbs</span>
+        <span class="reps-preview" style="margin-left: 6px;">3× 10</span>
+        <span class="xp-preview" style="margin-left: 6px;">+45 XP <span class="ember">⚡</span></span>
+        <span class="collapse-arrow" style="margin-left: 6px;">▼</span>
+        <button class="delete-btn" style="padding: 2px 6px; margin-left: 4px;">✕</button>
+      </div>
+
+      <div class="body">
+        <div class="row" style="gap: 8px; margin-bottom: 6px;">
+          <div class="field">
+            <label style="margin-bottom: 4px;">Sets</label>
+            <input value="3" style="padding: 6px 8px;" />
+          </div>
+          <div class="field">
+            <label style="margin-bottom: 4px;">Reps</label>
+            <input value="10" style="padding: 6px 8px;" />
+          </div>
+          <div class="field">
+            <label style="margin-bottom: 4px;">Weight (lbs)</label>
+            <input value="95" style="padding: 6px 8px;" />
+          </div>
+        </div>
+        <div class="extra-rows-banner" style="padding: 4px 6px; margin-top: 6px;">
+          + Add Row
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:.7rem; color: var(--text-mute); margin-top: 14px;">
+      Off-by-1 values gone. Now uses only the canonical even-step scale: <code>4</code> · <code>6</code> · <code>8</code> with the existing <code>S.s4</code> · <code>S.s6</code> · <code>S.s8</code> tokens.
+    </p>
+  </div>
+
+</div>
+
+<!-- ─────────────────── SNAP RULE TABLE ─────────────────── -->
+<div class="legend">
+  <h2>Snap rules applied in this card</h2>
+
+  <table class="snaps">
+    <thead>
+      <tr>
+        <th>Property</th>
+        <th>Before</th>
+        <th>After</th>
+        <th>Δ</th>
+        <th>Token</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Header gap</td>      <td class="before-cell">5</td>           <td class="after-cell">6</td>           <td class="delta">+1px</td>  <td><code>S.s6</code></td></tr>
+      <tr><td>Header padding</td>  <td class="before-cell">"4px 7px"</td>   <td class="after-cell">"4px 8px"</td>   <td class="delta">+1px</td>  <td><code>S.s4</code> + <code>S.s8</code></td></tr>
+      <tr><td>Header margin-bottom</td><td class="before-cell">3</td>       <td class="after-cell">4</td>           <td class="delta">+1px</td>  <td><code>S.s4</code></td></tr>
+      <tr><td>Reorder button padding</td><td class="before-cell">"1px 5px"</td><td class="after-cell">"2px 6px"</td><td class="delta">+1px each</td><td><code>S.s2</code> + <code>S.s6</code></td></tr>
+      <tr><td>Edit / X / badge margin-left</td><td class="before-cell">3, 5</td><td class="after-cell">4, 6</td>    <td class="delta">+1px</td>  <td><code>S.s4</code> / <code>S.s6</code></td></tr>
+      <tr><td>Body row gap</td>    <td class="before-cell">7</td>           <td class="after-cell">8</td>           <td class="delta">+1px</td>  <td><code>S.s8</code></td></tr>
+      <tr><td>Body row margin-bottom</td><td class="before-cell">5</td>     <td class="after-cell">6</td>           <td class="delta">+1px</td>  <td><code>S.s6</code></td></tr>
+      <tr><td>Input padding</td>   <td class="before-cell">"5px 7px"</td>   <td class="after-cell">"6px 8px"</td>   <td class="delta">+1px each</td><td><code>S.s6</code> + <code>S.s8</code></td></tr>
+      <tr><td>Field-label margin-bottom</td><td class="before-cell">3</td>  <td class="after-cell">4</td>           <td class="delta">+1px</td>  <td><code>S.s4</code></td></tr>
+      <tr><td>Extra-rows padding</td><td class="before-cell">"4px 5px"</td> <td class="after-cell">"4px 6px"</td>   <td class="delta">+1px</td>  <td><code>S.s4</code> + <code>S.s6</code></td></tr>
+      <tr><td>Extra-rows margin-top</td><td class="before-cell">5</td>      <td class="after-cell">6</td>           <td class="delta">+1px</td>  <td><code>S.s6</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <p>
+    All deltas in this card are <strong>+1px</strong>. Visually, the right side reads as <em>slightly more spacious</em> than the left — the kind of difference you'd only notice if you stacked them side-by-side, which is exactly what this preview does.
+  </p>
+  <p>
+    The card's even-numbered values (the orb size, the <code>border-radius:9</code> on the card, <code>marginLeft:auto</code> on the PB display) are left untouched and continue to use existing tokens (<code>R.xl</code>, etc.).
+  </p>
+  <p>
+    Pair this preview with <code>docs/spacing-snap-policy.md</code> to vote on Option A / B / C.
+  </p>
+</div>
+
+</div>
+</body>
+</html>

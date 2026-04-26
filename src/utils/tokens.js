@@ -94,28 +94,33 @@ const R = {
 };
 
 // ── Spacing ──────────────────────────────────────────────────────────────────
-// Unitless — React inline styles interpret as px. Numeric tokens preserve every
-// unique value seen in the codebase.
+// Unitless — React inline styles interpret as px. After the Option B snap
+// migration, the canonical scale is even-step (2,4,6,8,10,12,14,16,18,20,24,
+// 28,32). Off-by-1 values from the original codebase (1,3,5,7,9,11,13) snap
+// to the nearest even token. Negative tokens (sNeg4/6/8) preserve intentional
+// overlap effects.
+//
+// Snap rules applied in the migration PR (kept here for future reference):
+//   1  → s2  | 3 → s4 | 5 → s6  | 7 → s8 | 9 → s8 | 11 → s12 | 13 → s14
 const S = {
   s0:  0,
-  s1:  1,
   s2:  2,
-  s3:  3,
   s4:  4,
-  s5:  5,
   s6:  6,
-  s7:  7,
   s8:  8,
-  s9:  9,
   s10: 10,
-  s11: 11,
   s12: 12,
   s14: 14,
   s16: 16,
+  s18: 18,
   s20: 20,
   s24: 24,
   s28: 28,
   s32: 32,
+  // Negative — kept distinct for intentional overlap (hero text, etc.)
+  sNeg4: -4,
+  sNeg6: -6,
+  sNeg8: -8,
 };
 
 const TOKENS = { FS, R, S };
