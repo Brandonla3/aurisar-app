@@ -21,9 +21,11 @@ function getExIconColor(ex) {
 
 function ExIcon({ ex, size = "1.15rem", color, style = {} }) {
   if (ex && ex.custom) {
-    return React.createElement('span', {
-      style: { fontSize: size, lineHeight: 1, display: "block", ...style }
-    }, ex.icon || "💪");
+    return (
+      <span style={{ fontSize: size, lineHeight: 1, display: "block", ...style }}>
+        {ex.icon || "💪"}
+      </span>
+    );
   }
   const iconName = getExIconName(ex);
   const fill = color || getExIconColor(ex);
@@ -32,10 +34,16 @@ function ExIcon({ ex, size = "1.15rem", color, style = {} }) {
   const src = `https://api.iconify.design/${iconPath}.svg?color=${encodedColor}`;
   const pxSize = typeof size === "string" && size.endsWith("rem")
     ? (parseFloat(size) * 16) + "px" : size;
-  return React.createElement('img', {
-    src, alt: "", width: pxSize, height: pxSize, loading: "lazy",
-    style: { display: "block", flexShrink: 0, ...style },
-  });
+  return (
+    <img
+      src={src}
+      alt=""
+      width={pxSize}
+      height={pxSize}
+      loading="lazy"
+      style={{ display: "block", flexShrink: 0, ...style }}
+    />
+  );
 }
 
 export { getExIconName, getExIconColor, ExIcon };
