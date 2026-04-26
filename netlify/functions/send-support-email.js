@@ -1,3 +1,5 @@
+import { verifyTurnstile } from "./_lib/turnstile.js";
+
 // Escape every HTML special character. Do not use a partial substitution
 // (e.g. only `<` / `>`) — `&`, `"`, `'`, `/` all matter for safe HTML output.
 function escapeHtml(str) {
@@ -79,7 +81,16 @@ export default async (req) => {
       status: 400, headers: { "Content-Type": "application/json" },
     });
   }
-  const { type, message, email, accountId } = body || {};
+  const { type, message, email, accountId, turnstileToken } = body || {};
+
+  // Bot defence (Cloudflare Turnstile). Skips silently if TURNSTILE_SECRET_KEY
+  // is not configured — see netlify/functions/_lib/turnstile.js.
+  const ts = await verifyTurnstile(turnstileToken, ip);
+  if (!ts.ok) {
+    return new Response(JSON.stringify({ error: "Bot challenge failed" }), {
+      status: 403, headers: { "Content-Type": "application/json" },
+    });
+  }
 
   if (!type || !message || !ALLOWED_TYPES.has(type)) {
     return new Response(JSON.stringify({ error: "Missing or invalid fields" }), {

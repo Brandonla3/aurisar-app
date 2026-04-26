@@ -89,6 +89,12 @@ const PREVIEW_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ALLOW_PREVIEW === 'true';
 const PREVIEW_PIN = import.meta.env.VITE_PREVIEW_PIN || '1234';
 
+// Cloudflare Turnstile site key — loaded from build env. Empty string means
+// the widget renders nothing and the support form sends no token; the matching
+// Netlify functions skip verification when their TURNSTILE_SECRET_KEY env var
+// is also unset. Setting both env vars activates bot defence end-to-end.
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+
 // Allowed origins for the password-reset redirect target. Each must also be
 // listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
 // Picking the redirect dynamically lets the netlify.app preview / local dev
@@ -413,7 +419,41 @@ function App() {
   const [toast,setToast]     = useState(null);
   const [showWNMockup,setShowWNMockup] = useState(false);
   const [feedbackOpen,setFeedbackOpen] = useState(false);
+
+  // Mount the Cloudflare Turnstile widget when the support modal opens.
+  // The api.js loaded in index.html exposes window.turnstile; we render via
+  // its JS API so we can capture the token in React state. Skips entirely
+  // when VITE_TURNSTILE_SITE_KEY is empty (keeps dev / pre-Cloudflare-setup
+  // working).
+  useEffect(() => {
+    if (!feedbackOpen || !TURNSTILE_SITE_KEY) return;
+    setTurnstileToken("");
+    const t = window.turnstile;
+    const container = turnstileContainerRef.current;
+    if (!t || !container) return;
+    try {
+      const id = t.render(container, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token) => setTurnstileToken(token),
+        "error-callback": () => setTurnstileToken(""),
+        "expired-callback": () => setTurnstileToken(""),
+        theme: "dark",
+      });
+      turnstileWidgetIdRef.current = id;
+    } catch { /* api.js still loading — skip */ }
+    return () => {
+      const id = turnstileWidgetIdRef.current;
+      if (id != null && window.turnstile) {
+        try { window.turnstile.remove(id); } catch { /* ignore */ }
+      }
+      turnstileWidgetIdRef.current = null;
+      setTurnstileToken("");
+    };
+  }, [feedbackOpen]);
   const [feedbackText,setFeedbackText] = useState("");
+  const [turnstileToken,setTurnstileToken] = useState("");
+  const turnstileWidgetIdRef = React.useRef(null);
+  const turnstileContainerRef = React.useRef(null);
   const [feedbackType,setFeedbackType] = useState("idea"); // "idea"|"bug"|"help"
   const [feedbackSent,setFeedbackSent] = useState(false);
   const [feedbackEmail,setFeedbackEmail] = useState("");
@@ -500,6 +540,11 @@ function App() {
   const [mfaUnenrolling,setMfaUnenrolling] = useState(false);
   const [mfaRecoveryCodes,setMfaRecoveryCodes] = useState(null); // array of plaintext codes shown once
   const [mfaCodesRemaining,setMfaCodesRemaining] = useState(null);
+  // True when the user still has SHA-256-hashed recovery codes (the pre-bcrypt
+  // format). Polled via the SECURITY DEFINER RPC `has_legacy_mfa_recovery_codes`
+  // (scripts/security/09-mfa-legacy-detect-rpc.sql) and used to render an
+  // in-app nudge to regenerate.
+  const [mfaHasLegacyCodes,setMfaHasLegacyCodes] = useState(false);
   const [mfaRecoveryMode,setMfaRecoveryMode] = useState(false); // on login challenge screen
   const [mfaRecoveryInput,setMfaRecoveryInput] = useState("");
   // MFA disable verification
@@ -635,6 +680,12 @@ function App() {
   const [logSubTab,setLogSubTab] = useState("exercises"); // "exercises"|"workouts"|"plans"|"social"
   // ── Social / Friends ──────────────────────────────────────────────
   const [friends,setFriends]             = useState([]);
+  // Map of friend user_id → most recent friend_exercise_events row. Populated
+  // by `loadSocialData` via the get_recent_friend_events RPC. Used to render
+  // the "Latest: 💪 Squats" line on each friend card. Empty when the RPC is
+  // unavailable (e.g. before script 11 has been applied) — card just shows
+  // "No workouts logged yet".
+  const [friendRecentEvents,setFriendRecentEvents] = useState({});
   const [friendRequests,setFriendRequests] = useState([]);
   const [outgoingRequests,setOutgoingRequests] = useState([]); // pending requests I sent
   const [socialLoading,setSocialLoading] = useState(false);
@@ -1030,6 +1081,12 @@ function App() {
       // Fetch remaining recovery codes
       const {data:countData} = await sb.rpc("count_recovery_codes_remaining");
       if(typeof countData === "number") setMfaCodesRemaining(countData);
+      // Detect SHA-256 legacy codes (pre-bcrypt). Soft-fail: if the RPC is
+      // missing because 09 hasn't been applied yet, treat as no-legacy.
+      try {
+        const {data:legacy} = await sb.rpc("has_legacy_mfa_recovery_codes");
+        setMfaHasLegacyCodes(legacy === true);
+      } catch { setMfaHasLegacyCodes(false); }
     } catch(e) { console.warn("MFA check error:", e); }
   }
 
@@ -1646,7 +1703,19 @@ function App() {
           };
         });
         setFriends(enriched);
-      } else { setFriends([]); }
+        // Load most-recent exercise event per friend (best-effort — soft-fail
+        // when the RPC isn't deployed yet).
+        try {
+          const {data:recentRows} = await sb.rpc("get_recent_friend_events", { p_limit_per_friend: 1 });
+          if (Array.isArray(recentRows)) {
+            const map = {};
+            for (const ev of recentRows) {
+              if (!map[ev.user_id]) map[ev.user_id] = ev;
+            }
+            setFriendRecentEvents(map);
+          }
+        } catch { setFriendRecentEvents({}); }
+      } else { setFriends([]); setFriendRecentEvents({}); }
       // Incoming pending requests
       const {data:rRows} = await sb
         .from("friend_requests")
@@ -7019,13 +7088,6 @@ function App() {
 
             , activeTab==="social"&&(()=>{
                     const levelFor = xp => { const t=buildXPTable(100); let lv=1; for(let i=1;i<t.length;i++){if(xp>=t[i])lv=i+1;else break;} return lv; };
-                    const recentWorkout = log => {
-                      if(!log||!log.length) return null;
-                      const entry = log[0];
-                      return entry.sourcePlanName
-                        ? `${entry.sourcePlanIcon||"📋"} ${entry.sourcePlanName}`
-                        : `${entry.icon||"💪"} ${entry.exercise}`;
-                    };
                     return (
                       React.createElement('div', null
                         /* Friend search */
@@ -7155,7 +7217,15 @@ function App() {
                         , friends.map(f=>{
                           const fCls = f.chosenClass?CLASSES[f.chosenClass]:null;
                           const fLevel = levelFor(f.xp||0);
-                          const recent = recentWorkout(f.log);
+                          // Phase 4 (script 11): build "Latest" line from
+                          // friend_exercise_events RPC result. Falls back to
+                          // null when no event has been recorded yet (banner
+                          // hides "Latest:" line and shows "No workouts logged
+                          // yet" — same UX as before).
+                          const recentEv = friendRecentEvents[f.id];
+                          const recent = recentEv
+                            ? `${recentEv.exercise_icon || "💪"} ${recentEv.exercise_name || recentEv.exercise_id}`
+                            : null;
                           return (
                             React.createElement('div', { key: f.id, className: "friend-card"}
                               , React.createElement('div', { className: "friend-card-top"}
@@ -8054,6 +8124,7 @@ function App() {
                               , mfaCodesRemaining !== null && React.createElement('span', { style: {fontSize:".62rem",fontWeight:700,padding:"2px 8px",borderRadius:10,background:mfaCodesRemaining>3?"#1a2e1a":mfaCodesRemaining>0?"#2e2010":"#2e1515",color:mfaCodesRemaining>3?"#7ebf73":mfaCodesRemaining>0?"#d4943a":UI_COLORS.danger} }, mfaCodesRemaining+" remaining")
                             )
                             , mfaCodesRemaining !== null && mfaCodesRemaining <= 3 && React.createElement('div', { style: {fontSize:".58rem",color:mfaCodesRemaining===0?UI_COLORS.danger:"#d4943a",marginBottom:6} }, mfaCodesRemaining===0 ? "\u26A0 No recovery codes left! Regenerate now to avoid being locked out." : "\u26A0 Running low \u2014 consider regenerating your codes.")
+                            , mfaHasLegacyCodes && React.createElement('div', { style: {fontSize:".58rem",color:"#d4943a",marginBottom:6} }, "\u26A0 Your recovery codes use a legacy hash format. Regenerate them for stronger protection \u2014 your old codes still work until you do.")
                             , React.createElement('button', { className: "btn btn-ghost btn-sm", style: {width:"100%",fontSize:FS.sm}, onClick: regenerateRecoveryCodes }, "\u21BB Regenerate Recovery Codes")
                           )
 
@@ -10251,13 +10322,19 @@ function App() {
                       value: feedbackText,
                       onChange: e=>setFeedbackText(e.target.value)})
                   )
+                  // Cloudflare Turnstile widget (skipped if site key not set).
+                  , TURNSTILE_SITE_KEY && React.createElement('div', {
+                      ref: turnstileContainerRef,
+                      style: {marginBottom: 12, display: "flex", justifyContent: "center"},
+                    })
                   , React.createElement('button', { className: "btn btn-gold" , style: {width:"100%"},
-                    disabled: !feedbackText.trim(),
+                    disabled: !feedbackText.trim() || (TURNSTILE_SITE_KEY && !turnstileToken),
                     onClick: async()=>{
                       const msg = feedbackText.trim();
                       const type = feedbackType;
                       const email = feedbackEmail.trim();
                       const acctId = feedbackAccountId.trim();
+                      const tsToken = turnstileToken;
                       // Show success immediately (optimistic UI)
                       setFeedbackSent(true);
                       if (type === "help") setHelpConfirmShown(true);
@@ -10280,7 +10357,7 @@ function App() {
                         await fetch("/api/send-support-email", {
                           method: "POST",
                           headers: {"Content-Type":"application/json"},
-                          body: JSON.stringify({ type, message: msg, email, accountId: acctId }),
+                          body: JSON.stringify({ type, message: msg, email, accountId: acctId, turnstileToken: tsToken }),
                         });
                       } catch(e) {
                         console.log("Support email failed:", e);
@@ -10291,7 +10368,7 @@ function App() {
                           await fetch("/api/create-github-issue", {
                             method: "POST",
                             headers: {"Content-Type":"application/json"},
-                            body: JSON.stringify({ type, message: msg, email, accountId: acctId }),
+                            body: JSON.stringify({ type, message: msg, email, accountId: acctId, turnstileToken: tsToken }),
                           });
                         } catch(e) {
                           console.log("GitHub issue creation failed:", e);
