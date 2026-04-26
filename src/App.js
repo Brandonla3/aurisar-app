@@ -62,15 +62,38 @@ import { LandingPage } from './components/LandingPage';
 
 const PREVIEW_PIN = "1234";
 
-// Canonical production URL used as the password-reset redirect target.
-// Must exactly match an entry in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
-const RESET_PASSWORD_REDIRECT = "https://aurisargames.com";
+// Allowed origins for the password-reset redirect target. Each must also be
+// listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+// Picking the redirect dynamically lets the netlify.app preview / local dev
+// receive their own reset links instead of bouncing to the apex.
+const ALLOWED_RESET_ORIGINS = [
+  "https://aurisargames.com",
+  "https://aurisargames.netlify.app",
+  "http://localhost:5173",
+];
+function getResetRedirect() {
+  try {
+    const o = window.location.origin;
+    if (ALLOWED_RESET_ORIGINS.includes(o)) return o;
+  } catch (_e) {}
+  return "https://aurisargames.com"; // canonical fallback
+}
 
-// Password policy. NIST SP 800-63B rev.4: 8+ chars min; we require 10 because
-// we don't enforce composition rules. HIBP k-anonymity check rejects passwords
-// known to have leaked in public breaches (https://haveibeenpwned.com/API/v3#PwnedPasswords).
-const PASSWORD_MIN_LENGTH = 10;
+// Password policy. 8+ chars (NIST SP 800-63B rev.4 minimum) plus a 3-of-4
+// composition rule (lower / upper / digit / symbol) and a HIBP k-anonymity
+// breached-password check. Industry parity with MyFitnessPal / Peloton.
+const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 72; // Supabase / bcrypt limit
+const PASSWORD_REQUIRED_CLASSES = 3; // out of 4
+
+function _passwordCharClassesPresent(pw) {
+  let n = 0;
+  if (/[a-z]/.test(pw)) n++;
+  if (/[A-Z]/.test(pw)) n++;
+  if (/[0-9]/.test(pw)) n++;
+  if (/[^A-Za-z0-9]/.test(pw)) n++;
+  return n;
+}
 
 async function _sha1Hex(input) {
   const buf = new TextEncoder().encode(input);
@@ -127,6 +150,9 @@ async function validatePasswordPolicy(password) {
   }
   if (password.length > PASSWORD_MAX_LENGTH) {
     return { ok: false, msg: `Password is too long (max ${PASSWORD_MAX_LENGTH} characters).` };
+  }
+  if (_passwordCharClassesPresent(password) < PASSWORD_REQUIRED_CLASSES) {
+    return { ok: false, msg: "Password must include at least 3 of: lowercase, uppercase, number, symbol." };
   }
   if (await isPasswordBreached(password)) {
     return { ok: false, msg: "That password has appeared in a public data breach. Please choose a different one." };
@@ -811,7 +837,7 @@ function App() {
         if(msg.includes("already")) {
           setAuthMsg({ok:true, text:"✓ If that email is available, an account has been created. Check your inbox to confirm."});
         } else if(msg.includes("password")) {
-          setAuthMsg({ok:false, text:"Password doesn't meet the requirements. Use at least 10 characters."});
+          setAuthMsg({ok:false, text:"Password doesn't meet the requirements. Use at least 8 characters with 3 of: lowercase, uppercase, number, symbol."});
         } else {
           setAuthMsg({ok:false, text:"Sign-up failed. Please try again."});
         }
@@ -824,7 +850,15 @@ function App() {
         const saved = await loadSave(signUpData.session.user.id);
         setAuthUser(signUpData.session.user);
         setAuthLoading(false);
-        fetch("/api/send-welcome-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:signUpData.session.user.email})}).catch(()=>{});
+        // Bearer-auth: the function verifies the email matches the session user.
+        fetch("/api/send-welcome-email",{
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json",
+            "Authorization":"Bearer "+signUpData.session.access_token,
+          },
+          body:JSON.stringify({email:signUpData.session.user.email}),
+        }).catch(()=>{});
         if(_optionalChain([saved, 'optionalAccess', _33 => _33.chosenClass])){
           ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
           setScreen("main");
@@ -886,7 +920,7 @@ function App() {
     if(!forgotPwEmail.trim()) { setAuthMsg({ok:false, text:"Enter your email address."}); return; }
     setAuthLoading(true); setAuthMsg(null);
     // Fire-and-forget: never reveal whether the email exists.
-    await sb.auth.resetPasswordForEmail(forgotPwEmail.trim(), {redirectTo:RESET_PASSWORD_REDIRECT}).catch(()=>{});
+    await sb.auth.resetPasswordForEmail(forgotPwEmail.trim(), {redirectTo:getResetRedirect()}).catch(()=>{});
     setAuthLoading(false);
     setAuthMsg({ok:true, text:"\u2713 If an account exists for that email, a reset link has been sent. Check your inbox."});
   }

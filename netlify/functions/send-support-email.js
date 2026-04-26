@@ -14,10 +14,63 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_TYPES = new Set(["bug", "idea", "help"]);
 const MAX_MESSAGE_LEN = 4000;
 const MAX_FIELD_LEN = 200;
+const ALLOWED_ORIGINS = new Set([
+  "https://aurisargames.com",
+  "https://www.aurisargames.com",
+  "https://aurisargames.netlify.app",
+  "http://localhost:5173",
+]);
+
+function denyOrigin(origin) {
+  // Browser-driven calls must come from a known origin. Server-to-server
+  // callers (no Origin header) bypass this — for those, the strict body
+  // validation + the Supabase rate-limit RPC is the perimeter.
+  if (!origin) return false;
+  return !ALLOWED_ORIGINS.has(origin);
+}
+
+async function checkRateLimit(ip) {
+  // Calls the SECURITY DEFINER RPC `check_anon_rate_limit` defined in
+  // scripts/security/05-anon-rate-limit.sql. Default policy: 5 requests per
+  // 15 minutes per (kind, ip). Failing open (returning true) on transport
+  // errors keeps support-email working if Supabase is briefly unreachable.
+  const url  = process.env.SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anon) return true;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/check_anon_rate_limit`, {
+      method: "POST",
+      headers: {
+        apikey: anon,
+        Authorization: `Bearer ${anon}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_kind: "support_email", p_ip: ip || "" }),
+    });
+    if (!res.ok) return true;
+    const ok = await res.json();
+    return Boolean(ok);
+  } catch {
+    return true;
+  }
+}
 
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
+  }
+  if (denyOrigin(req.headers.get("origin"))) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403, headers: { "Content-Type": "application/json" },
+    });
+  }
+  const ip = req.headers.get("x-nf-client-connection-ip")
+          || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+          || "";
+  if (!(await checkRateLimit(ip))) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429, headers: { "Content-Type": "application/json" },
+    });
   }
 
   let body;
