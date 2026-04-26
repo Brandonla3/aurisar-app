@@ -54,14 +54,39 @@ function getWorkoutMgColor(wo, exById, mgColors){
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
-import { AvatarPreview3D } from './components/AvatarPreview3D';
-import { TrendsTab, DEFAULT_CHART_ORDER } from './components/TrendsTab';
-import PlanWizard from './components/PlanWizard';
-import WorkoutNotificationMockup from './components/WorkoutNotificationMockup';
-import loginBg from './assets/login-bg.png';
-import { LandingPage } from './components/LandingPage';
+// Heavy / route-scoped components are lazy-loaded so first paint doesn't pay for
+// recharts (~150KB), three.js (~600KB), or the landing page assets.
+const TrendsTab = React.lazy(() =>
+  import('./components/TrendsTab').then(m => ({ default: m.TrendsTab }))
+);
+const PlanWizard = React.lazy(() => import('./components/PlanWizard'));
+const WorkoutNotificationMockup = React.lazy(() => import('./components/WorkoutNotificationMockup'));
+const LandingPage = React.lazy(() =>
+  import('./components/LandingPage').then(m => ({ default: m.LandingPage }))
+);
+// Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
+// import the TrendsTab module (which would drag recharts into the main chunk)
+// just to read this constant. Keep in sync with TrendsTab.js.
+const DEFAULT_CHART_ORDER = ["dow","sets","muscleFreq","volume","consistency","topEx"];
 
-const PREVIEW_PIN = "1234";
+// Tiny Suspense fallback for lazy-loaded screens. Matches the dark theme so
+// it doesn't flash a white box during chunk fetch.
+const LazyFallback = React.createElement('div', {
+  style: {
+    minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: '#5a5650', fontSize: '.75rem', letterSpacing: '.18em', textTransform: 'uppercase',
+  },
+  role: 'status', 'aria-live': 'polite', 'aria-label': 'Loading',
+}, 'Loading…');
+const lazyMount = (el) => React.createElement(React.Suspense, { fallback: LazyFallback }, el);
+import loginBg from './assets/login-bg.png';
+
+// Preview mode is dev-only by default. To enable in a non-dev build (e.g. staging),
+// set VITE_ALLOW_PREVIEW=true and VITE_PREVIEW_PIN at build time. PREVIEW_PIN
+// resolves at build time so the constant is dropped from production bundles.
+const PREVIEW_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ALLOW_PREVIEW === 'true';
+const PREVIEW_PIN = import.meta.env.VITE_PREVIEW_PIN || '1234';
 
 const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, allExById, metric, wUnit, setWbExercises, setCollapsedWbEx, setSsChecked, ssChecked, exCount, openExEditor }) {
   function updateField(field, val) { setWbExercises(exs=>exs.map((e,j)=>j!==i?e:{...e,[field]:val})); }
@@ -2894,10 +2919,10 @@ function App() {
   );
 
   /* ══ LANDING PAGE ═══════════════════════════════════════════ */
-  if(screen==="landing") return React.createElement(LandingPage, {
+  if(screen==="landing") return lazyMount(React.createElement(LandingPage, {
     onLogin: () => { setAuthIsNew(false); setScreen("login"); },
     onSignUp: () => { setAuthIsNew(true); setScreen("login"); }
-  });
+  }));
 
   if(screen==="login") return (
     React.createElement('div', { style: {
@@ -3156,8 +3181,8 @@ function App() {
           )
           ) /* end loginSubScreen===null */
 
-/* Preview mode — PIN-gated dev access */
-          , React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.12)", marginTop:6, paddingTop:10, textAlign:"center"} }
+/* Preview mode — PIN-gated dev access (stripped from production builds via PREVIEW_ENABLED) */
+          , PREVIEW_ENABLED && React.createElement('div', { style: {borderTop:"1px solid rgba(45,42,36,.12)", marginTop:6, paddingTop:10, textAlign:"center"} }
             , !showPreviewPin && React.createElement('span', {
                 style: {fontSize:".55rem", color:"#3a3630", cursor:"pointer", fontStyle:"italic", letterSpacing:".03em"},
                 onClick: ()=>{
@@ -3205,7 +3230,7 @@ function App() {
           , friendExBanner.pbInfo && React.createElement('div', { className: "friend-ex-banner-pb" }, formatFriendPB(friendExBanner.pbInfo))
         )
       )
-      , showWNMockup && React.createElement(WorkoutNotificationMockup, { onClose: ()=>setShowWNMockup(false) })
+      , showWNMockup && lazyMount(React.createElement(WorkoutNotificationMockup, { onClose: ()=>setShowWNMockup(false) }))
 
       /* ══ INTRO ══════════════════════════════════ */
       , screen==="intro" && (
@@ -5737,7 +5762,7 @@ function App() {
                   );
                 })()
 
-                , planView==="builder" && React.createElement(PlanWizard, {
+                , planView==="builder" && lazyMount(React.createElement(PlanWizard, {
                   editPlan: wizardEditPlan,
                   templatePlan: wizardTemplatePlan,
                   profile: profile,
@@ -5751,7 +5776,7 @@ function App() {
                   onSchedulePlan: openSchedulePlan,
                   onOpenExEditor: openExEditor,
                   showToast: showToast,
-                })
+                }))
               ) /* close plans tab React.createElement(React.Fragment) */
             ) /* close activeTab==="plans" && () */
 
@@ -6739,7 +6764,7 @@ function App() {
                   , logSubTab==="exercises"&&React.createElement(ExercisesTab,null)
                   , logSubTab==="workouts"&&React.createElement(WorkoutsTab,null)
                   , logSubTab==="plans"&&React.createElement(PlansTab,null)
-                  , logSubTab==="trends"&&React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order})),workouts:profile.workouts,plans:profile.plans})
+                  , logSubTab==="trends"&&lazyMount(React.createElement(TrendsTab,{log:profile.log,allExById:allExById,clsColor:cls.color,units:profile.units,chartOrder:profile.chartOrder||DEFAULT_CHART_ORDER,onChartOrderChange:(order)=>setProfile(p=>({...p,chartOrder:order})),workouts:profile.workouts,plans:profile.plans}))
                   , logSubTab==="deleted"&&(()=>{
                     const now = new Date();
                     const active = (profile.deletedItems||[])

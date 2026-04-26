@@ -1,13 +1,30 @@
 import React from 'react';
-import * as THREE from 'three';
+import {
+  WebGLRenderer, PCFSoftShadowMap, ACESFilmicToneMapping, SRGBColorSpace,
+  Scene, Color, FogExp2, PerspectiveCamera,
+  AmbientLight, DirectionalLight,
+  MeshPhysicalMaterial,
+  Group, Mesh, Box3, Vector3,
+  BoxGeometry, CylinderGeometry, SphereGeometry, CircleGeometry, TorusGeometry,
+} from 'three';
+
+// Local namespace alias — keeps the rest of the file's `T.X` syntax stable
+// while using named imports for proper tree-shaking.
+const T = {
+  WebGLRenderer, PCFSoftShadowMap, ACESFilmicToneMapping,
+  Scene, Color, FogExp2, PerspectiveCamera,
+  AmbientLight, DirectionalLight,
+  MeshPhysicalMaterial,
+  Group, Mesh, Box3, Vector3,
+  BoxGeometry, CylinderGeometry, SphereGeometry, CircleGeometry, TorusGeometry,
+};
 
 function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePreset, clsColor, clsKey}) {
   const mountRef = React.useRef(null);
 
   React.useEffect(()=>{
     const el = mountRef.current;
-    if(!el || !window.THREE) return;
-    const T = window.THREE;
+    if(!el) return;
     const W = el.clientWidth || 320;
     const H = 420;
 
@@ -19,7 +36,7 @@ function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePr
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.toneMapping = T.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
-    renderer.outputEncoding = T.sRGBEncoding;
+    renderer.outputColorSpace = SRGBColorSpace;
     el.appendChild(renderer.domElement);
 
     // ── Scene ────────────────────────────────────────────────────
