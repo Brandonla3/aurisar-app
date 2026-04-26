@@ -327,18 +327,18 @@ def main() -> None:
     # ── Plan templates ───────────────────────────────────────────────
     plan_rows = [
         [
-            "P2",
-            "reps schema is unstable across templates",
-            "Numeric (reps:8) in ppl/cardio_week/monk_week/hiit_blast/full_body_day/morning_routine; quoted ('6-12','30s','45-60s','AMRAP') in dumbbell_8wk",
-            "src/data/constants.js:1014-1083",
-            "Pick one schema (recommend strings) and migrate",
+            "FIXED",
+            "reps and sets unified to string schema across all PLAN_TEMPLATES",
+            "Was: numeric (reps:8) in 6 templates; mixed (sets:3 numeric, reps:'6-12' string) in dumbbell_8wk",
+            "src/data/constants.js PLAN_TEMPLATES",
+            "All 244 sets/reps values now string-quoted; accommodates ranges (6-12), time (30s), special (AMRAP)",
         ],
         [
-            "P2",
-            "No rest-period field in template exercise objects",
-            "Schema gap — every template",
+            "FIXED",
+            "restSec:null field added to every exercise object",
+            "Schema gap closed — 194 exercise entries updated",
             "src/data/constants.js PLAN_TEMPLATES",
-            "Add restSec field",
+            "Field is null until plan UI exposes a rest-timer input",
         ],
         ["FIXED", "Workout descriptions remain consistent", "Tone, length, punctuation all good", "src/data/constants.js WORKOUT_TEMPLATES", "Reference example for other content work"],
     ]
@@ -358,7 +358,7 @@ def main() -> None:
         ["P2", "TODO", "Spacing/typography token system", "Codebase-wide refactor"],
         ["P2", "TODO", "Dual-form catalog dedup", "src/data/exercises.js + migration"],
         ["P2", "TODO", "Masculine palette rollout to remaining tabs", "Profile/Trends/Friends/Leaderboard/Landing/PlanWizard"],
-        ["P2", "TODO", "Reps schema standardisation in PLAN_TEMPLATES", "src/data/constants.js:1014-1083"],
+        ["P2", "FIXED", "Reps schema standardisation + restSec field in PLAN_TEMPLATES", "src/data/constants.js — 244 values quoted, 194 restSec:null fields added"],
         ["P2", "FIXED", "Tokenise inline color one-offs", "src/data/constants.js UI_COLORS + 75+ migrated call-sites"],
         ["P2", "TODO", "Sweep remaining XP display sites to formatXP()", "src/App.js (~40+ remaining call sites)"],
     ]
