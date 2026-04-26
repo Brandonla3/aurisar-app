@@ -12,8 +12,10 @@ const EX_BY_ID = Object.fromEntries(EXERCISES.map(e=>[e.id,e]));
 // ═══════════════════════════════════════════════════════════════════
 
 // MUSCLE_COLORS defined in color section below — referenced by getExIconColor
+// Masculine palette — mirrors TYPE_COLORS (locked Apr 2026). Endurance maps to
+// gunmetal-steel since TYPE_COLORS doesn't include it.
 const CAT_ICON_COLORS = {
-  strength:"#e05555", cardio:"#2ecc71", flexibility:"#9b59b6", endurance:"#3498db",
+  strength:"#6B2A2A", cardio:"#2C4564", flexibility:"#3D343F", endurance:"#4A5560",
 };
 
 const NAME_ICON_MAP = [
@@ -1192,6 +1194,8 @@ const UI_COLORS = {
   warning:      "#FFE87C", // pace boost highlight, accent emphasis
   info:         "#2980b9", // informational text, message UI fallback
   intermediate: "#f1c40f", // intermediate difficulty
+  accent:       "#c49428", // brand gold — active filter/state, CTA highlight
+  fallback:     "#B0A898", // canonical neutral fallback (silver) — replaces stray #B0A090
 };
 const MUSCLE_META = {
   chest:    { emoji:"💪", label:"Chest",    icon:"game-icons:chest-armor" },
