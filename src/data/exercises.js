@@ -4927,7 +4927,7 @@ const EXERCISES = [
     tracksWeight:true, tracksDistance:false, tracksInclineSpeed:false, resistanceLevel:false,
     pbType:"Heaviest Weight", pbTier:"Personal", primaryPBMetric:"Heaviest weight used in any set (lbs)", markAsPB:true,
     xpInputFormula:"Sets x Reps x Weight", supersetEligible:true, intervalEligible:false,
-    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1},
+    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1,alias:true},
     tips:[], images:[],
   },
   {
@@ -5018,7 +5018,7 @@ const EXERCISES = [
     tracksWeight:true, tracksDistance:false, tracksInclineSpeed:false, resistanceLevel:false,
     pbType:"Heaviest Weight", pbTier:"Personal", primaryPBMetric:"Heaviest weight used in any set (lbs)", markAsPB:true,
     xpInputFormula:"Sets x Reps x Weight", supersetEligible:true, intervalEligible:false,
-    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1},
+    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1,alias:true},
     tips:[], images:[],
   },
   {
@@ -6981,7 +6981,7 @@ const EXERCISES = [
     tracksWeight:true, tracksDistance:false, tracksInclineSpeed:false, resistanceLevel:false,
     pbType:"Heaviest Weight", pbTier:"Personal", primaryPBMetric:"Heaviest weight used in any set (lbs)", markAsPB:true,
     xpInputFormula:"Sets x Reps x Weight", supersetEligible:true, intervalEligible:false,
-    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1},
+    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1,alias:true},
     tips:[], images:[],
   },
   {
@@ -16757,7 +16757,7 @@ const EXERCISES = [
     tracksWeight:true, tracksDistance:false, tracksInclineSpeed:false, resistanceLevel:false,
     pbType:"Heaviest Weight", pbTier:"Personal", primaryPBMetric:"Heaviest weight used in any set (lbs)", markAsPB:true,
     xpInputFormula:"Sets x Reps x Weight", supersetEligible:true, intervalEligible:false,
-    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1},
+    xpClassMap:{warrior:1.12,gladiator:1.08,warden:0.94,phantom:1.1,tempest:0.9,warlord:1.04,druid:0.9,oracle:0.94,titan:1.15,striker:1.06,alchemist:1,alias:true},
     tips:[], images:[],
   },
   {

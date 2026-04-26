@@ -1899,8 +1899,12 @@ function App() {
 
   // Merged exercise list (built-in + custom) — memoized to avoid rebuilding on every render
   const _customExRef = profile.customExercises;
-  const allExercises = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef, _exReady]);
-  const allExById = useMemo(()=>Object.fromEntries(allExercises.map(e=>[e.id,e])), [allExercises]);
+  // _allExercisesIncludingAliases keeps duplicate-form imports (e.g. dumbbell-lunges)
+  // so user logs that reference legacy IDs still resolve via allExById. The picker-
+  // facing allExercises filters them out so each exercise appears once.
+  const _allExercisesIncludingAliases = useMemo(()=>[...EXERCISES, ...(_customExRef||[])].filter(e=>e&&e.id&&e.name), [_customExRef, _exReady]);
+  const allExById = useMemo(()=>Object.fromEntries(_allExercisesIncludingAliases.map(e=>[e.id,e])), [_allExercisesIncludingAliases]);
+  const allExercises = useMemo(()=>_allExercisesIncludingAliases.filter(e=>!e.alias), [_allExercisesIncludingAliases]);
 
   const wbTotalXP = useMemo(()=>wbExercises.reduce((s,ex)=>{
     const extraCount=(ex.extraRows||[]).length;
