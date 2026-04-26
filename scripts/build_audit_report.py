@@ -289,12 +289,12 @@ def main() -> None:
     # ── Exercise catalog ─────────────────────────────────────────────
     cat_rows = [
         [
-            "P1",
-            f"{n_empty} exercises with empty desc:\"\"",
-            "src/data/exercises.js",
-            "Populate or strip empty field",
+            "FIXED",
+            "Empty desc:\"\" populated with synthesised one-liners",
+            "src/data/exercises.js — 72 entries (55 originally empty + 17 with no usable sentence after trimming)",
+            "Format: '{Name} is a {category} exercise that targets {muscleGroup} using a {equipment}.'",
         ],
-        ["P1", "Truncated descriptions ending mid-word ('of', 'f')", "src/data/exercises.js (sample: atlas stone, sled push, EZ bar tricep extension)", "Re-import or hand-edit affected entries"],
+        ["FIXED", "Truncated descriptions trimmed to last full sentence", "src/data/exercises.js — 1,051 entries had imported source data cut mid-word", "Heuristic trim back to last '.' / '!' / '?' followed by space; entries with no usable sentence were synthesised in pass 2"],
         ["P2", "Exact-name duplicates: 'High Knees', 'Incline Barbell Press', 'Jump Rope'", "src/data/exercises.js", "Dedupe — needs migration plan for user logs"],
         ["P2", "Mixed-case exercise names (e.g. 'Bear plank ankle taps into jumps')", "src/data/exercises.js (~30 entries)", "Apply Title Case sweep"],
         ["P2", "50+ Bench Press variants with inconsistent suffixes", "src/data/exercises.js", "Standardise modifier convention"],
@@ -354,7 +354,7 @@ def main() -> None:
         ["P0", "FIXED", "Drifted XP formulas (missing bonuses)", "src/App.js:1882, 1972, 2532"],
         ["P1", "PARTIAL", "formatXP() helper introduced; ~8 high-traffic sites migrated", "src/utils/format.js + src/App.js (sweep remaining sites)"],
         ["P1", "FIXED", "Unit-spacing display sites + helper docs", "src/App.js:118, 2299; src/utils/units.js:16"],
-        ["P1", "TODO", "Populate 55 empty desc:'' exercises", "src/data/exercises.js"],
+        ["P1", "FIXED", "Populate empty/truncated exercise descriptions", "src/data/exercises.js — 72 empty entries synthesised + 1,051 truncated entries trimmed cleanly"],
         ["P2", "TODO", "Spacing/typography token system", "Codebase-wide refactor"],
         ["P2", "TODO", "Dual-form catalog dedup", "src/data/exercises.js + migration"],
         ["P2", "FIXED", "Masculine palette rollout — CAT_ICON_COLORS + filter accents", "Profile/Library/PlanWizard now use UI_COLORS.accent for active states; xp.js fallback consolidated"],
