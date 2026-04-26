@@ -88,6 +88,104 @@ const PREVIEW_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ALLOW_PREVIEW === 'true';
 const PREVIEW_PIN = import.meta.env.VITE_PREVIEW_PIN || '1234';
 
+// Allowed origins for the password-reset redirect target. Each must also be
+// listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+// Picking the redirect dynamically lets the netlify.app preview / local dev
+// receive their own reset links instead of bouncing to the apex.
+const ALLOWED_RESET_ORIGINS = [
+  "https://aurisargames.com",
+  "https://aurisargames.netlify.app",
+  "http://localhost:5173",
+];
+function getResetRedirect() {
+  try {
+    const o = window.location.origin;
+    if (ALLOWED_RESET_ORIGINS.includes(o)) return o;
+  } catch (_e) {}
+  return "https://aurisargames.com"; // canonical fallback
+}
+
+// Password policy. 8+ chars (NIST SP 800-63B rev.4 minimum) plus a 3-of-4
+// composition rule (lower / upper / digit / symbol) and a HIBP k-anonymity
+// breached-password check. Industry parity with MyFitnessPal / Peloton.
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 72; // Supabase / bcrypt limit
+const PASSWORD_REQUIRED_CLASSES = 3; // out of 4
+
+function _passwordCharClassesPresent(pw) {
+  let n = 0;
+  if (/[a-z]/.test(pw)) n++;
+  if (/[A-Z]/.test(pw)) n++;
+  if (/[0-9]/.test(pw)) n++;
+  if (/[^A-Za-z0-9]/.test(pw)) n++;
+  return n;
+}
+
+async function _sha1Hex(input) {
+  const buf = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-1", buf);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+async function isPasswordBreached(password) {
+  // Send only the first 5 chars of the SHA-1 prefix; HIBP returns all matching
+  // suffixes. The full hash never leaves the browser.
+  try {
+    const sha1 = await _sha1Hex(password);
+    const prefix = sha1.slice(0, 5);
+    const suffix = sha1.slice(5);
+    const res = await fetch("https://api.pwnedpasswords.com/range/" + prefix, {
+      headers: { "Add-Padding": "true" },
+    });
+    if (!res.ok) return false; // fail-open if HIBP is unreachable
+    const text = await res.text();
+    return text.split("\n").some(line => line.split(":")[0].trim() === suffix);
+  } catch { return false; }
+}
+
+// MFA recovery code helpers. Codes are 80 bits of CSPRNG entropy encoded in
+// Crockford-style base32 (no I/L/O/U to avoid confusion). Hashing happens
+// server-side via the `store_mfa_recovery_codes` RPC, which is responsible
+// for salted/slow hashing — DO NOT pre-hash on the client (it adds nothing
+// over TLS and locks salts to the client).
+const _BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+function _base32Encode(bytes) {
+  let bits = 0, value = 0, out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i];
+    bits += 8;
+    while (bits >= 5) {
+      out += _BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += _BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  return out;
+}
+function generateRecoveryCode() {
+  // 10 bytes = 80 bits of entropy → 16 base32 chars; chunked as XXXX-XXXX-XXXX-XXXX.
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  const enc = _base32Encode(bytes);
+  return enc.slice(0,4) + "-" + enc.slice(4,8) + "-" + enc.slice(8,12) + "-" + enc.slice(12,16);
+}
+
+async function validatePasswordPolicy(password) {
+  if (!password || password.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, msg: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` };
+  }
+  if (password.length > PASSWORD_MAX_LENGTH) {
+    return { ok: false, msg: `Password is too long (max ${PASSWORD_MAX_LENGTH} characters).` };
+  }
+  if (_passwordCharClassesPresent(password) < PASSWORD_REQUIRED_CLASSES) {
+    return { ok: false, msg: "Password must include at least 3 of: lowercase, uppercase, number, symbol." };
+  }
+  if (await isPasswordBreached(password)) {
+    return { ok: false, msg: "That password has appeared in a public data breach. Please choose a different one." };
+  }
+  return { ok: true };
+}
+
 const WbExCard = React.memo(function WbExCard({ ex, i, exD, collapsed, profile, allExById, metric, wUnit, setWbExercises, setCollapsedWbEx, setSsChecked, ssChecked, exCount, openExEditor }) {
   function updateField(field, val) { setWbExercises(exs=>exs.map((e,j)=>j!==i?e:{...e,[field]:val})); }
   function removeEx() { setWbExercises(exs=>{const updated=exs.map((e,j)=>{if(j===i)return null;if(e.supersetWith===i)return{...e,supersetWith:null};if(e.supersetWith!=null&&e.supersetWith>i)return{...e,supersetWith:e.supersetWith-1};return e;}).filter(Boolean);return updated;}); }
@@ -747,10 +845,28 @@ function App() {
     if(!authEmail.trim()||!authPassword.trim()) return;
     setAuthLoading(true); setAuthMsg(null);
     if(authIsNew) {
+      // Enforce password policy (length + breached-password check) before
+      // sending to Supabase, both to protect users and to keep error responses
+      // generic (Supabase echoes specific failure modes that aid enumeration).
+      const policy = await validatePasswordPolicy(authPassword);
+      if(!policy.ok) {
+        setAuthLoading(false);
+        setAuthMsg({ok:false, text:policy.msg});
+        return;
+      }
       const {data:signUpData, error} = await sb.auth.signUp({email:authEmail.trim(), password:authPassword});
       if(error) {
         setAuthLoading(false);
-        setAuthMsg({ok:false, text:"Error: "+error.message});
+        // Map specific failure modes to safe copy; do not echo Supabase's raw
+        // error string (it can disclose "User already registered" etc.).
+        const msg = (error.message||"").toLowerCase();
+        if(msg.includes("already")) {
+          setAuthMsg({ok:true, text:"✓ If that email is available, an account has been created. Check your inbox to confirm."});
+        } else if(msg.includes("password")) {
+          setAuthMsg({ok:false, text:"Password doesn't meet the requirements. Use at least 8 characters with 3 of: lowercase, uppercase, number, symbol."});
+        } else {
+          setAuthMsg({ok:false, text:"Sign-up failed. Please try again."});
+        }
         return;
       }
       // If email confirmation is disabled, a session is returned immediately — use it
@@ -760,7 +876,15 @@ function App() {
         const saved = await loadSave(signUpData.session.user.id);
         setAuthUser(signUpData.session.user);
         setAuthLoading(false);
-        fetch("/api/send-welcome-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:signUpData.session.user.email})}).catch(()=>{});
+        // Bearer-auth: the function verifies the email matches the session user.
+        fetch("/api/send-welcome-email",{
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json",
+            "Authorization":"Bearer "+signUpData.session.access_token,
+          },
+          body:JSON.stringify({email:signUpData.session.user.email}),
+        }).catch(()=>{});
         if(_optionalChain([saved, 'optionalAccess', _33 => _33.chosenClass])){
           ((_s)=>setProfile({..._s,exercisePBs:Object.keys(_s.exercisePBs||{}).length>0?_s.exercisePBs:calcExercisePBs(_s.log||[])}))(ensureRestDay({...EMPTY_PROFILE,...saved,plans:saved.plans||[],quests:saved.quests||{},customExercises:saved.customExercises||[],scheduledWorkouts:saved.scheduledWorkouts||[],workouts:saved.workouts||[],checkInHistory:saved.checkInHistory||[]}));
           setScreen("main");
@@ -777,9 +901,9 @@ function App() {
       const {error} = await sb.auth.signInWithPassword({email:authEmail.trim(), password:authPassword});
       setAuthLoading(false);
       if(error) {
-        setAuthMsg({ok:false, text:error.message.includes("Email not confirmed")
-          ? "Please check your email and click the confirmation link first."
-          : "Error: "+error.message});
+        // Generic message — never disclose whether the email exists or whether
+        // it just hasn't been confirmed (account-enumeration defence).
+        setAuthMsg({ok:false, text:"Sign-in failed. Check your email and password, or confirm your email if you just signed up."});
       } else {
         if(!authRemember) sessionStorage.setItem("ilf_no_persist","1");
         else sessionStorage.removeItem("ilf_no_persist");
@@ -821,10 +945,10 @@ function App() {
   async function sendPasswordReset() {
     if(!forgotPwEmail.trim()) { setAuthMsg({ok:false, text:"Enter your email address."}); return; }
     setAuthLoading(true); setAuthMsg(null);
-    const {error} = await sb.auth.resetPasswordForEmail(forgotPwEmail.trim(), {redirectTo:window.location.href});
+    // Fire-and-forget: never reveal whether the email exists.
+    await sb.auth.resetPasswordForEmail(forgotPwEmail.trim(), {redirectTo:getResetRedirect()}).catch(()=>{});
     setAuthLoading(false);
-    if(error) setAuthMsg({ok:false, text:"Error: "+error.message});
-    else setAuthMsg({ok:true, text:"\u2713 Password reset link sent! Check your email."});
+    setAuthMsg({ok:true, text:"\u2713 If an account exists for that email, a reset link has been sent. Check your inbox."});
   }
 
   async function lookupByPrivateId() {
@@ -840,11 +964,13 @@ function App() {
 
   async function changePassword() {
     if(!pwNew.trim()) { setPwMsg({ok:false, text:"Enter a new password."}); return; }
-    if(pwNew.length < 6) { setPwMsg({ok:false, text:"Password must be at least 6 characters."}); return; }
     if(pwNew !== pwConfirm) { setPwMsg({ok:false, text:"Passwords don't match."}); return; }
+    setPwMsg({ok:null, text:"Checking password…"});
+    const policy = await validatePasswordPolicy(pwNew);
+    if(!policy.ok) { setPwMsg({ok:false, text:policy.msg}); return; }
     setPwMsg(null);
     const {error} = await sb.auth.updateUser({password:pwNew});
-    if(error) setPwMsg({ok:false, text:"Error: "+error.message});
+    if(error) setPwMsg({ok:false, text:"Could not update password. Please try again."});
     else {
       setPwMsg({ok:true, text:"✓ Password updated!"});
       setPwNew("");
@@ -906,22 +1032,11 @@ function App() {
       if(vErr) { setMfaMsg({ok:false, text:"Verification failed — check the code and try again."}); return; }
 
       // Generate 10 recovery codes
-      const codes = [];
-      const hashes = [];
-      for(let i=0; i<10; i++){
-        const raw = Array.from(crypto.getRandomValues(new Uint8Array(6)))
-          .map(b=>b.toString(16).padStart(2,"0")).join("").toUpperCase();
-        const code = raw.slice(0,4)+"-"+raw.slice(4,8)+"-"+raw.slice(8,12);
-        codes.push(code);
-        // SHA-256 hash
-        const enc = new TextEncoder().encode(code);
-        const hashBuf = await crypto.subtle.digest("SHA-256", enc);
-        const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-        hashes.push(hashHex);
-      }
-
-      // Store hashes via RPC
-      await sb.rpc("store_mfa_recovery_codes", {code_hashes: hashes});
+      // Generate 10 × 80-bit recovery codes. Server-side bcrypt hashing is in
+      // place (scripts/security/04-mfa-recovery-bcrypt.sql) — send plaintext
+      // and let the RPC bcrypt them with a per-row salt.
+      const codes = Array.from({length: 10}, () => generateRecoveryCode());
+      await sb.rpc("store_mfa_recovery_codes", { code_plaintexts: codes });
 
       setMfaEnabled(true);
       setMfaEnrolling(false);
@@ -991,7 +1106,7 @@ function App() {
     try {
       const {error} = await sb.auth.mfa.unenroll({factorId:mfaFactorId});
       if(error) { setMfaDisableMsg({ok:false, text:"Error: "+error.message}); setMfaUnenrolling(false); return; }
-      await sb.rpc("store_mfa_recovery_codes", {code_hashes: []});
+      await sb.rpc("store_mfa_recovery_codes", { code_plaintexts: [] });
       setMfaEnabled(false);
       setMfaFactorId(null);
       setMfaRecoveryCodes(null);
@@ -1120,19 +1235,8 @@ function App() {
   async function regenerateRecoveryCodes() {
     setMfaMsg(null);
     try {
-      const codes = [];
-      const hashes = [];
-      for(let i=0; i<10; i++){
-        const raw = Array.from(crypto.getRandomValues(new Uint8Array(6)))
-          .map(b=>b.toString(16).padStart(2,"0")).join("").toUpperCase();
-        const code = raw.slice(0,4)+"-"+raw.slice(4,8)+"-"+raw.slice(8,12);
-        codes.push(code);
-        const enc = new TextEncoder().encode(code);
-        const hashBuf = await crypto.subtle.digest("SHA-256", enc);
-        const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-        hashes.push(hashHex);
-      }
-      await sb.rpc("store_mfa_recovery_codes", {code_hashes: hashes});
+      const codes = Array.from({length: 10}, () => generateRecoveryCode());
+      await sb.rpc("store_mfa_recovery_codes", { code_plaintexts: codes });
       setMfaRecoveryCodes(codes);
       setMfaCodesRemaining(10);
       setMfaMsg({ok:true, text:"✓ New recovery codes generated. Save them — they won't be shown again."});
@@ -1466,16 +1570,21 @@ function App() {
       const fRows = [...(sentAccepted||[]), ...(receivedAccepted||[])];
       if(fRows.length>0) {
         const friendIds = fRows.map(r=>r.from_user_id===authUser.id?r.to_user_id:r.from_user_id);
-        const {data:pRows} = await sb.from("profiles").select("id,data").in("id",friendIds);
+        // Use SECURITY DEFINER RPC that returns ONLY safe columns (no `log`,
+        // no `exercisePBs`, no real name) for accepted friends or pending
+        // requests in either direction. See scripts/security/06-extend-friend-rpc.sql.
+        const {data:pRows} = await sb.rpc("get_friend_profiles_safe", { p_user_ids: friendIds });
         const enriched = friendIds.map(fid=>{
           const pRow = (pRows||[]).find(p=>p.id===fid);
           const reqRow = fRows.find(r=>r.from_user_id===fid||r.to_user_id===fid);
           return {
             id: fid,
-            playerName: _optionalChain([pRow, 'optionalAccess', _36 => _36.data, 'optionalAccess', _37 => _37.playerName])||"Unknown Warrior",
-            chosenClass: _optionalChain([pRow, 'optionalAccess', _38 => _38.data, 'optionalAccess', _39 => _39.chosenClass])||null,
-            xp: _optionalChain([pRow, 'optionalAccess', _40 => _40.data, 'optionalAccess', _41 => _41.xp])||0,
-            log: _optionalChain([pRow, 'optionalAccess', _42 => _42.data, 'optionalAccess', _43 => _43.log])||[],
+            playerName: _optionalChain([pRow, 'optionalAccess', _36 => _36.player_name])||"Unknown Warrior",
+            chosenClass: _optionalChain([pRow, 'optionalAccess', _38 => _38.chosen_class])||null,
+            xp: _optionalChain([pRow, 'optionalAccess', _40 => _40.xp])||0,
+            // log + exercisePBs intentionally omitted — peers shouldn't see them.
+            // Recent-activity card and PB banner are deferred to Phase 3b
+            // (friend_exercise_events table).
             _reqId: _optionalChain([reqRow, 'optionalAccess', _44 => _44.id])||null,
           };
         });
@@ -1489,10 +1598,10 @@ function App() {
         .eq("status","pending");
       if(rRows && rRows.length>0) {
         const senderIds = rRows.map(r=>r.from_user_id);
-        const {data:pRows2} = await sb.from("profiles").select("id,data").in("id",senderIds);
+        const {data:pRows2} = await sb.rpc("get_friend_profiles_safe", { p_user_ids: senderIds });
         const enriched2 = (rRows||[]).map(r=>{
           const p=(pRows2||[]).find(x=>x.id===r.from_user_id);
-          return {reqId:r.id,userId:r.from_user_id,playerName:_optionalChain([p, 'optionalAccess', _45 => _45.data, 'optionalAccess', _46 => _46.playerName])||"Unknown Warrior"};
+          return {reqId:r.id,userId:r.from_user_id,playerName:_optionalChain([p, 'optionalAccess', _46 => _46.player_name])||"Unknown Warrior"};
         });
         setFriendRequests(enriched2);
       } else { setFriendRequests([]); }
@@ -1504,10 +1613,10 @@ function App() {
         .eq("status","pending");
       if(oRows && oRows.length>0) {
         const recipientIds = oRows.map(r=>r.to_user_id);
-        const {data:pRows3} = await sb.from("profiles").select("id,data").in("id",recipientIds);
+        const {data:pRows3} = await sb.rpc("get_friend_profiles_safe", { p_user_ids: recipientIds });
         const enriched3 = oRows.map(r=>{
           const p=(pRows3||[]).find(x=>x.id===r.to_user_id);
-          return {reqId:r.id, userId:r.to_user_id, playerName:_optionalChain([p, 'optionalAccess', _47 => _47.data, 'optionalAccess', _48 => _48.playerName])||"Unknown Warrior"};
+          return {reqId:r.id, userId:r.to_user_id, playerName:_optionalChain([p, 'optionalAccess', _48 => _48.player_name])||"Unknown Warrior"};
         });
         setOutgoingRequests(enriched3);
       } else { setOutgoingRequests([]); }
@@ -1624,11 +1733,14 @@ function App() {
         .eq("to_user_id", authUser.id)
         .eq("status","pending");
       if(data && data.length>0) {
-        const senderIds=[...new Set(data.map(d=>d.from_user_id))];
-        const {data:pRows} = await sb.from("profiles").select("id,data").in("id",senderIds);
+        // Use the share-trust path (not friend-trust): a non-friend can share
+        // with you, and we still need to render their name. The RPC scopes by
+        // share IDs you've actually received.
+        const shareIds = data.map(d=>d.id);
+        const {data:pRows} = await sb.rpc("get_share_sender_profiles", { p_share_ids: shareIds });
         const enriched = data.map(s=>({
           ...s,
-          senderName:_optionalChain([(pRows||[]), 'access', _50 => _50.find, 'call', _51 => _51(p=>p.id===s.from_user_id), 'optionalAccess', _52 => _52.data, 'optionalAccess', _53 => _53.playerName])||"A warrior",
+          senderName:_optionalChain([(pRows||[]), 'access', _50 => _50.find, 'call', _51 => _51(p=>p.id===s.from_user_id), 'optionalAccess', _53 => _53.player_name])||"A warrior",
           parsedItem: (() => { try { return JSON.parse(s.item_data); } catch(e){ return null; } })(),
         }));
         setIncomingShares(enriched);
@@ -1661,7 +1773,12 @@ function App() {
   }
 
   async function signOut() {
+    const prevUserId = _optionalChain([authUser, 'optionalAccess', _signOut1 => _signOut1.id]);
     await sb.auth.signOut();
+    // Wipe locally-cached PII so a shared device can't leak data to the next user.
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    if(prevUserId) { try { localStorage.removeItem("aurisar_ob_draft_"+prevUserId); } catch(e) {} }
+    try { sessionStorage.removeItem("ilf_no_persist"); } catch(e) {}
     setAuthUser(null);
     setProfile(EMPTY_PROFILE);
     // Clear all social state so next user starts fresh

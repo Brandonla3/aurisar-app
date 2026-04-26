@@ -24,6 +24,15 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Catch any future external link that omits rel="noopener noreferrer".
+      // Using a lightweight regex rule (no extra plugin dependency).
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='target'][value.value='_blank']",
+          message: 'Add rel="noopener noreferrer" to any target="_blank" link, or use a helper that includes it.',
+        },
+      ],
     },
   },
 ])
