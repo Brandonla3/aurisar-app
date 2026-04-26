@@ -1,35 +1,33 @@
 -- =============================================================================
 -- M-5 (server) — Migrate MFA recovery codes to bcrypt-hashed storage
 -- =============================================================================
--- Current state (per the audit):
---   * Client SHA-256 hashes the plaintext recovery code and sends the hex
---     digest as `code_hashes` to `store_mfa_recovery_codes`.
---   * Verification (`use_mfa_recovery_code`) hashes the user-supplied code
---     and compares. Unsalted SHA-256 → 80-bit (post Phase-1) keyspace is
---     brute-forceable if the DB ever leaks.
+-- v2 corrections (2026-04-26):
+--   - matched_id is uuid (mfa_recovery_codes.id is uuid, not bigint)
+--   - the table has BOTH `used` boolean and `used_at` timestamptz; consume
+--     marks BOTH so existing app reads of `used` keep working
+--   - the row filter for "still valid" is `used = false AND used_at IS NULL`
+--     (match either flag for safety)
 --
--- This migration moves the trust boundary to the server: the client sends
--- PLAINTEXT codes (still over TLS), the server bcrypt-hashes them with a
--- per-row salt before insert, and `use_mfa_recovery_code` does a constant-
--- time bcrypt compare. Old rows (SHA-256 hex) are still verifiable via a
--- legacy fallback so existing users aren't locked out.
---
--- Requires the `pgcrypto` extension (Supabase ships with it enabled).
+-- Strategy:
+--   * Client sends PLAINTEXT codes via the new `store_mfa_recovery_codes`
+--     signature (`code_plaintexts text[]`).
+--   * The server bcrypt-hashes each code (cost 12 ≈ 250 ms) before insert
+--     and tags algo='bcrypt'.
+--   * Verification (`use_mfa_recovery_code`) tries bcrypt rows first, then
+--     falls back to legacy unsalted SHA-256 hex rows so existing recovery
+--     codes still verify.
 -- =============================================================================
 
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 1. Schema additions to `mfa_recovery_codes` (assumes the existing table is
---    `public.mfa_recovery_codes` with columns user_id uuid, code_hash text,
---    used_at timestamptz). Add an algorithm marker so we can tell legacy
---    SHA-256 rows from bcrypt rows during the cutover window.
+-- 1. Add an algorithm marker so we can tell legacy SHA-256 rows from bcrypt.
 ALTER TABLE public.mfa_recovery_codes
   ADD COLUMN IF NOT EXISTS algo text NOT NULL DEFAULT 'sha256';
 
 -- 2. New writer: accepts plaintext codes and bcrypt-hashes them server-side.
---    Replaces the existing `store_mfa_recovery_codes(code_hashes text[])`.
+DROP FUNCTION IF EXISTS public.store_mfa_recovery_codes(text[]);
 CREATE OR REPLACE FUNCTION public.store_mfa_recovery_codes(
   code_plaintexts text[]
 )
@@ -45,7 +43,7 @@ BEGIN
     RAISE EXCEPTION 'unauthenticated';
   END IF;
 
-  -- Always wipe existing codes for this user — regenerate is full-replace.
+  -- Regenerate is full-replace.
   DELETE FROM public.mfa_recovery_codes WHERE user_id = auth.uid();
 
   IF code_plaintexts IS NULL OR cardinality(code_plaintexts) = 0 THEN
@@ -53,20 +51,21 @@ BEGIN
   END IF;
 
   FOREACH c IN ARRAY code_plaintexts LOOP
-    INSERT INTO public.mfa_recovery_codes (user_id, code_hash, algo, used_at)
+    INSERT INTO public.mfa_recovery_codes (user_id, code_hash, algo, used, used_at)
     VALUES (
       auth.uid(),
-      crypt(c, gen_salt('bf', 12)),  -- bcrypt cost 12 ≈ 250 ms on a small CPU
+      crypt(c, gen_salt('bf', 12)),
       'bcrypt',
+      false,
       NULL
     );
   END LOOP;
 END
 $$;
 
--- Keep the legacy signature (`code_hashes text[]`) callable for one release,
--- so a stale client doesn't 500 in the middle of a deploy. The legacy entry
--- stores the hash as the previous SHA-256 hex with `algo='sha256'`.
+-- Keep the legacy signature callable for one release so a stale client that
+-- sends pre-hashed SHA-256 doesn't 500.
+DROP FUNCTION IF EXISTS public.store_mfa_recovery_codes_legacy(text[]);
 CREATE OR REPLACE FUNCTION public.store_mfa_recovery_codes_legacy(
   code_hashes text[]
 )
@@ -86,20 +85,21 @@ BEGIN
     RETURN;
   END IF;
   FOREACH h IN ARRAY code_hashes LOOP
-    INSERT INTO public.mfa_recovery_codes (user_id, code_hash, algo)
-    VALUES (auth.uid(), h, 'sha256');
+    INSERT INTO public.mfa_recovery_codes (user_id, code_hash, algo, used, used_at)
+    VALUES (auth.uid(), h, 'sha256', false, NULL);
   END LOOP;
 END
 $$;
 
-REVOKE ALL ON FUNCTION public.store_mfa_recovery_codes(text[])         FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.store_mfa_recovery_codes_legacy(text[])  FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.store_mfa_recovery_codes(text[])        TO authenticated;
-GRANT EXECUTE ON FUNCTION public.store_mfa_recovery_codes_legacy(text[]) TO authenticated;
+REVOKE ALL    ON FUNCTION public.store_mfa_recovery_codes(text[])         FROM PUBLIC;
+REVOKE ALL    ON FUNCTION public.store_mfa_recovery_codes_legacy(text[])  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.store_mfa_recovery_codes(text[])           TO authenticated;
+GRANT EXECUTE ON FUNCTION public.store_mfa_recovery_codes_legacy(text[])    TO authenticated;
 
 -- 3. Updated verifier: accepts plaintext, tries bcrypt rows first, then falls
---    back to legacy SHA-256 (uppercased, hex). Marks the row used and
---    unenrolls the TOTP factor on success.
+--    back to legacy SHA-256 hex. Marks BOTH `used = true` AND `used_at = now()`
+--    so existing app code that filters on either flag still works.
+DROP FUNCTION IF EXISTS public.use_mfa_recovery_code(text);
 CREATE OR REPLACE FUNCTION public.use_mfa_recovery_code(
   code_plaintext text
 )
@@ -109,8 +109,8 @@ SECURITY DEFINER
 SET search_path = public, extensions, auth
 AS $$
 DECLARE
-  matched_id  bigint;
-  legacy_hex  text;
+  matched_id uuid;
+  legacy_hex text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'unauthenticated';
@@ -120,17 +120,20 @@ BEGIN
   SELECT id INTO matched_id
   FROM public.mfa_recovery_codes
   WHERE user_id = auth.uid()
+    AND used = false
     AND used_at IS NULL
     AND algo = 'bcrypt'
     AND code_hash = crypt(code_plaintext, code_hash)
   LIMIT 1;
 
   IF matched_id IS NULL THEN
-    -- Legacy SHA-256 fallback (matches Phase-1 client format: hex lowercase).
+    -- Legacy SHA-256 fallback (matches Phase-1 client format: hex lowercase
+    -- of the uppercase plaintext).
     legacy_hex := encode(digest(upper(code_plaintext), 'sha256'), 'hex');
     SELECT id INTO matched_id
     FROM public.mfa_recovery_codes
     WHERE user_id = auth.uid()
+      AND used = false
       AND used_at IS NULL
       AND algo = 'sha256'
       AND code_hash = legacy_hex
@@ -142,25 +145,27 @@ BEGIN
   END IF;
 
   UPDATE public.mfa_recovery_codes
-     SET used_at = now()
+     SET used    = true,
+         used_at = now()
    WHERE id = matched_id;
 
   -- Recovery-code success unenrolls the user's TOTP factor (matches existing
   -- behaviour) — the user can re-enroll afterwards.
   PERFORM auth.mfa_unenroll(f.id)
   FROM auth.mfa_factors f
-  WHERE f.user_id = auth.uid()
+  WHERE f.user_id    = auth.uid()
     AND f.factor_type = 'totp'
-    AND f.status = 'verified';
+    AND f.status      = 'verified';
 
   RETURN true;
 END
 $$;
 
-REVOKE ALL ON FUNCTION public.use_mfa_recovery_code(text) FROM PUBLIC;
+REVOKE ALL    ON FUNCTION public.use_mfa_recovery_code(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.use_mfa_recovery_code(text) TO authenticated;
 
--- 4. Read-only counter (already exists, but rebuild defensively).
+-- 4. Read-only counter — defensive rebuild matching the new dual-flag filter.
+DROP FUNCTION IF EXISTS public.count_recovery_codes_remaining();
 CREATE OR REPLACE FUNCTION public.count_recovery_codes_remaining()
 RETURNS int
 LANGUAGE sql
@@ -169,18 +174,29 @@ SET search_path = public
 AS $$
   SELECT count(*)::int
   FROM public.mfa_recovery_codes
-  WHERE user_id = auth.uid() AND used_at IS NULL;
+  WHERE user_id = auth.uid()
+    AND used     = false
+    AND used_at IS NULL;
 $$;
-REVOKE ALL ON FUNCTION public.count_recovery_codes_remaining() FROM PUBLIC;
+REVOKE ALL    ON FUNCTION public.count_recovery_codes_remaining() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.count_recovery_codes_remaining() TO authenticated;
 
 COMMIT;
 
 -- =============================================================================
--- After this migration, the client should send PLAINTEXT codes. The Phase-1
--- client still pre-hashes with SHA-256 — that's fine because the legacy
--- function (`store_mfa_recovery_codes_legacy`) still accepts hash arrays.
--- Phase 3 client migration: have App.js call `store_mfa_recovery_codes`
--- (note: NEW signature) with the plaintext codes array instead of the
--- pre-hashed list. Until that ships, things keep working.
+-- Smoke tests after applying:
+-- =============================================================================
+-- Algo column exists?
+--   SELECT column_name, data_type FROM information_schema.columns
+--   WHERE table_schema='public' AND table_name='mfa_recovery_codes' AND column_name='algo';
+--
+-- Functions present with the new signatures?
+--   SELECT proname, pg_get_function_identity_arguments(oid) AS args
+--   FROM pg_proc WHERE proname IN
+--     ('store_mfa_recovery_codes','use_mfa_recovery_code','count_recovery_codes_remaining',
+--      'store_mfa_recovery_codes_legacy');
+--
+-- A live-user check (paste into the SQL Editor while signed in as the user):
+--   SELECT public.count_recovery_codes_remaining();
+--   → returns 0..10 (whatever the user has).
 -- =============================================================================
