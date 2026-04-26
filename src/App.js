@@ -1871,7 +1871,7 @@ function App() {
     setProfile(p=>({...p,xp:p.xp+q.xp,quests:newQuests}));
     setXpFlash({amount:q.xp,mult:1});
     setTimeout(()=>setXpFlash(null),2200);
-    showToast(`Quest complete! +${q.xp.toLocaleString()} XP ✦`);
+    showToast(`Quest complete! ${formatXP(q.xp,{signed:true})} ✦`);
   }
 
   function claimManualQuest(qId) {
@@ -2867,7 +2867,7 @@ function App() {
     }
   }
   function savePlanEdits(plan){ setProfile(p=>({...p,plans:p.plans.map(pl=>pl.id===plan.id?plan:pl)})); setActivePlan(plan); showToast("Plan saved! ✦"); }
-  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); let _ciResult={checkInApplied:false,checkInXP:0,checkInStreak:0}; setProfile(p=>{const base={...p,xp:p.xp+totalXP,log:newLog,quests:newQuests};const ci=applyAutoCheckIn(base,todayStr());_ciResult=ci;return ci.profile;}); const ciSuffix=_ciResult.checkInApplied?` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥`:""; setXpFlash({amount:totalXP+_ciResult.checkInXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! +${totalXP.toLocaleString()} XP claimed!`+ciSuffix); }
+  function startPlanWorkout(plan){ const batchId=uid(); let totalXP=0; const entries=[]; plan.days.forEach(day=>{ day.exercises.forEach(ex=>{ const exData=allExById[ex.exId]; if(!exData) return; const earned=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById,null,ex.weightLbs||null,null); totalXP+=earned; entries.push({exercise:exData.name,icon:exData.icon,xp:earned,mult:getMult(exData),reps:parseInt(ex.reps)||1,sets:parseInt(ex.sets)||1,weightLbs:ex.weightLbs||null,weightPct:100,hrZone:null,distanceMi:null,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString(),dateKey:todayStr(),exId:ex.exId,sourcePlanId:plan.id,sourcePlanName:plan.name,sourcePlanIcon:plan.icon,sourceGroupId:batchId,sourceTotalCal:day.totalCal||null,sourceActiveCal:day.activeCal||null,sourceDurationSec:day.durationMin||null}); }); }); const newLog=[...entries,...profile.log]; const newQuests={...(profile.quests||{})}; QUESTS.filter(q=>q.auto&&!_optionalChain([newQuests, 'access', _71 => _71[q.id], 'optionalAccess', _72 => _72.completed])).forEach(q=>{ if(checkQuestCompletion(q,newLog,profile.checkInStreak)) newQuests[q.id]={completed:true,completedAt:todayStr(),claimed:false}; }); let _ciResult={checkInApplied:false,checkInXP:0,checkInStreak:0}; setProfile(p=>{const base={...p,xp:p.xp+totalXP,log:newLog,quests:newQuests};const ci=applyAutoCheckIn(base,todayStr());_ciResult=ci;return ci.profile;}); const ciSuffix=_ciResult.checkInApplied?` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥`:""; setXpFlash({amount:totalXP+_ciResult.checkInXP,mult:1}); setTimeout(()=>setXpFlash(null),2500); setPlanView("list"); setActivePlan(null); showToast(`Plan complete! ${formatXP(totalXP,{signed:true})} claimed!`+ciSuffix); }
 
   const rootStyle = {"--cls-color":_optionalChain([cls, 'optionalAccess', _73 => _73.color])||"#b4ac9e","--cls-glow":_optionalChain([cls, 'optionalAccess', _74 => _74.glow])||"#9b59b6"};
 
@@ -3338,7 +3338,7 @@ function App() {
       , React.createElement('style', null, CSS)
       , React.createElement('div', { className: "bg"})
       , PARTICLES.map(p=>React.createElement('div', { key: p.id, className: "pt", style: {left:`${p.x}%`,bottom:`${Math.random()*100}%`,width:p.size,height:p.size,"--dur":`${p.duration}s`,"--dly":`${p.delay}s`}}))
-      , xpFlash && React.createElement('div', { className: "xp-flash"}, "+", xpFlash.amount.toLocaleString(), " XP" , xpFlash.mult>1.02?" ⚡":"")
+      , xpFlash && React.createElement('div', { className: "xp-flash"}, formatXP(xpFlash.amount,{signed:true}), xpFlash.mult>1.02?" ⚡":"")
       , toast    && React.createElement('div', { className: "toast"}, toast)
       , friendExBanner && React.createElement('div', { className: "friend-ex-banner", key: friendExBanner.key, onClick: () => setFriendExBanner(null) }
         , React.createElement('div', { className: "friend-ex-banner-icon" }, friendExBanner.exerciseIcon || "\uD83D\uDCAA")
@@ -3591,7 +3591,7 @@ function App() {
                 , React.createElement('div', { className: "xp-fill", style: {width:`${Math.min(progress,100)}%`} })
               )
               , React.createElement('div', { className: "xp-lbl" }
-                , React.createElement('span', null, (profile.xp-curXP).toLocaleString(), " / ", (nxtXP-curXP).toLocaleString(), " XP")
+                , React.createElement('span', null, (profile.xp-curXP).toLocaleString(), " / ", formatXP(nxtXP-curXP))
                 , React.createElement('span', null, "→ Lv ", level+1)
               )
             )
@@ -4854,7 +4854,7 @@ function App() {
                                   , React.createElement('div', { className: "workout-name"}, g.name)
                                   , React.createElement('div', { className: "workout-meta"}
                                     , React.createElement('span', { className: "workout-tag"}, g.items.length, " exercise" , g.items.length!==1?"s":"")
-                                    , React.createElement('span', { className: "workout-tag"}, "\u26A1 " , xp.toLocaleString(), " XP" )
+                                    , React.createElement('span', { className: "workout-tag"}, formatXP(xp,{prefix:"⚡ "}) )
                                     , React.createElement('span', { className: `upcoming-badge ${badgeCls}`, style: {marginLeft:4}}, badgeTxt)
                                     , (wo.labels||[]).map(l=>React.createElement('span', {key:l, className:"wo-label-chip", style:{pointerEvents:"none",marginLeft:2}}, l))
                                   )
@@ -5298,7 +5298,7 @@ function App() {
                   , React.createElement('div', { style: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}
                     , React.createElement('label', null, "(", wbExercises.length, " exercise", wbExercises.length!==1?"s":"", ")"
                       , wbExercises.length>0&&React.createElement('span', { style: {marginLeft:8,fontSize:".65rem",color:"#b4ac9e",fontFamily:"'Inter',sans-serif"}}, "⚡ "
-                         , wbTotalXP.toLocaleString(), " XP total"
+                         , formatXP(wbTotalXP), " total"
                       )
                     )
                     , React.createElement('div', { style: {display:"flex",gap:6}}
@@ -5350,7 +5350,7 @@ function App() {
                               onClick:e=>{e.stopPropagation();reorderSupersetPair(i,partnerIdx,"down");}}, "▼")
                           ),
                           React.createElement('span', {className:"ss-accordion-hdr-title"}, "🔗 Superset"),
-                          React.createElement('span', {className:"ss-accordion-xp"}, totalXP.toLocaleString()+" XP total"),
+                          React.createElement('span', {className:"ss-accordion-xp"}, formatXP(totalXP)+" total"),
                           React.createElement('button', {className:"ss-accordion-ungroup",
                             onClick:()=>setWbExercises(exs=>exs.map((x,xi)=>xi===i?{...x,supersetWith:null}:xi===partnerIdx?{...x,supersetWith:null}:x))
                           }, "✕ Ungroup")
@@ -6581,7 +6581,7 @@ function App() {
                           , React.createElement('div', { className: "quest-name"}, q.name)
                           , React.createElement('div', { className: "quest-desc"}, q.desc)
                           , progressText&&!isDone&&React.createElement('div', { style: {fontSize:".65rem",color:"#5a5650",marginTop:4}}, "Progress: " , progressText)
-                          , React.createElement('div', { className: "quest-reward"}, isClaimed?"✓ Claimed":"⚡", " " , isClaimed?"":"+", "  "  , q.xp.toLocaleString(), " XP" )
+                          , React.createElement('div', { className: "quest-reward"}, isClaimed?"✓ Claimed "+formatXP(q.xp):formatXP(q.xp,{signed:true,prefix:"⚡ "}) )
                         )
                         , React.createElement('div', { className: "quest-status"}
                           , isClaimed?React.createElement('div', { className: "quest-check claimed-check" }, "✓"):
@@ -6666,7 +6666,7 @@ function App() {
                             , React.createElement('span', { className: "log-group-icon"}, "📅")
                             , React.createElement('div', { style: {flex:1,minWidth:0}}
                               , React.createElement('div', { className: "log-group-name"}, displayDate)
-                              , React.createElement('div', { className: "log-group-meta"}, entries.length, " exercise" , entries.length!==1?"s":"", " · ⚡ "   , groupXP.toLocaleString(), " XP" )
+                              , React.createElement('div', { className: "log-group-meta"}, entries.length, " exercise" , entries.length!==1?"s":"", " · ", formatXP(groupXP,{prefix:"⚡ "}) )
                             )
                             , !collapsed&&(
                               React.createElement('div', { style: {display:"flex",gap:5,marginRight:6}, onClick: e=>e.stopPropagation()}
@@ -6733,7 +6733,7 @@ function App() {
                           )
                           , React.createElement('div', { className: "log-group-meta"}, "📅 " , first.date, " · "  , entries.length, " exercise" , entries.length!==1?"s":"")
                         )
-                        , React.createElement('div', { className: "log-group-xp"}, "⚡ " , groupXP.toLocaleString(), " XP" )
+                        , React.createElement('div', { className: "log-group-xp"}, formatXP(groupXP,{prefix:"⚡ "}) )
                         , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".6rem",marginRight:2,flexShrink:0}, title: "Edit completed workout"  ,
                           onClick: e=>{e.stopPropagation();
                             setRetroEditModal({
@@ -6749,7 +6749,7 @@ function App() {
                         , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:".6rem",marginRight:2,flexShrink:0,color:"#e74c3c"}, title: "Delete all entries",
                           onClick: e=>{e.stopPropagation();
                             const totalXP = entries.reduce((s,en)=>s+en.xp,0);
-                            if(!window.confirm(`Delete entire "${first.sourceWorkoutName}" session? (${entries.length} exercises, -${totalXP.toLocaleString()} XP)`)) return;
+                            if(!window.confirm(`Delete entire "${first.sourceWorkoutName}" session? (${entries.length} exercises, ${formatXP(-totalXP,{signed:true})})`)) return;
                             const idxSet = new Set(entries.map(en=>en._idx));
                             const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
                             const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
@@ -6827,7 +6827,7 @@ function App() {
                               , React.createElement('div', { className: "log-group-name"}, first.sourcePlanName)
                               , React.createElement('div', { className: "log-group-meta"}, "📅 " , first.date, " · "  , entries.length, " exercise" , entries.length!==1?"s":"")
                             )
-                            , React.createElement('div', { className: "log-group-xp"}, "⚡ " , groupXP.toLocaleString(), " XP" )
+                            , React.createElement('div', { className: "log-group-xp"}, formatXP(groupXP,{prefix:"⚡ "}) )
                             , React.createElement('button', { className: "btn btn-ghost btn-xs"  , style: {fontSize:".6rem",marginRight:2,flexShrink:0}, title: "Edit completed plan"  ,
                               onClick: e=>{e.stopPropagation();
                                 setRetroEditModal({
@@ -6843,7 +6843,7 @@ function App() {
                             , React.createElement('button', { className: "btn btn-ghost btn-xs", style: {fontSize:".6rem",marginRight:2,flexShrink:0,color:"#e74c3c"}, title: "Delete all entries",
                               onClick: e=>{e.stopPropagation();
                                 const totalXP = entries.reduce((s,en)=>s+en.xp,0);
-                                if(!window.confirm(`Delete entire "${first.sourcePlanName}" session? (${entries.length} exercises, -${totalXP.toLocaleString()} XP)`)) return;
+                                if(!window.confirm(`Delete entire "${first.sourcePlanName}" session? (${entries.length} exercises, ${formatXP(-totalXP,{signed:true})})`)) return;
                                 const idxSet = new Set(entries.map(en=>en._idx));
                                 const deletedEntries = entries.map(en=>({id:uid(),type:"logEntry",item:{...en},deletedAt:new Date().toISOString()}));
                                 const newLog = profile.log.filter((_,i)=>!idxSet.has(i));
@@ -6869,7 +6869,7 @@ function App() {
 
               return (
                 React.createElement(React.Fragment, null
-                  , React.createElement('div', { className: "sec"}, "Battle Record — "   , profile.log.length, " sessions · "   , profile.xp.toLocaleString(), " total XP"  )
+                  , React.createElement('div', { className: "sec"}, "Battle Record — "   , profile.log.length, " sessions · ", formatXP(profile.xp), " total"  )
                   , React.createElement('div', { className: "log-subtab-bar"}
                     , [["exercises","⚔️ Exercises"],["workouts","💪 Workouts"],["plans","📋 Plans"],["trends","📊 Trends"],["deleted","🗑 Deleted"]].map(([t,l])=>(
                       React.createElement('button', { key: t, className: `log-subtab-btn ${logSubTab===t?"on":""}`,
@@ -7100,7 +7100,7 @@ function App() {
                                   , React.createElement('div', { className: "friend-meta"}
                                     , React.createElement('span', { style: {color:_optionalChain([fCls, 'optionalAccess', _165 => _165.color])||"#b4ac9e"}}, _optionalChain([fCls, 'optionalAccess', _166 => _166.name])||"Unknown")
                                     , " · ", "Level " , fLevel
-                                    , " · ", React.createElement('span', { style: {color:"#b4ac9e"}}, "⚡ " , (f.xp||0).toLocaleString(), " XP" )
+                                    , " · ", React.createElement('span', { style: {color:"#b4ac9e"}}, formatXP(f.xp||0,{prefix:"⚡ "}) )
                                   )
                                 )
                               )
@@ -9651,7 +9651,7 @@ function App() {
                 , React.createElement('span', { className: "completion-wo-icon"}, wo.icon)
                 , React.createElement('div', null
                   , React.createElement('div', { className: "completion-wo-name"}, wo.name)
-                  , React.createElement('div', { className: "completion-wo-sub"}, wo.exercises.length, " exercises · ⚡ "    , xp.toLocaleString(), " XP" )
+                  , React.createElement('div', { className: "completion-wo-sub"}, wo.exercises.length, " exercises · ", formatXP(xp,{prefix:"⚡ "}) )
                 )
               )
 
