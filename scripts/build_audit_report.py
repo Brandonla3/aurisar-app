@@ -251,8 +251,7 @@ def main() -> None:
 
     # ── Typography ───────────────────────────────────────────────────
     typo_rows = [
-        ["FIXED", "Token system introduced (FS scale)", "src/utils/tokens.js (new)", "8-step rem-based font-size scale (xxs→xxl). Top 3 inline values (.6rem, .72rem, .7rem) migrated — 240 sites."],
-        ["P2", "Remaining font-size stragglers (.52, .55, .58, .65, .68, .8, .9rem etc)", "Throughout JSX inline styles", "Follow-up sweep — pattern established, just mechanical"],
+        ["FIXED", "Token system introduced + full sweep", "src/utils/tokens.js", "FS scale extended to numeric (fs44–fs95) + semantic aliases (xxs–xxl). All 498 inline rem font-sizes across App.js + PlanWizard.js now reference tokens."],
         ["P2", "Letter-spacing variants (0.02–0.32em)", "Throughout", "No system documented"],
         ["P2", "Line-height variants (1, 1.1, 1.15, 1.6, 1.65, 1.7)", "Throughout", "No system documented"],
         ["P2", "Font families: Cinzel, Cinzel Decorative, Inter, system-ui", "src/styles/*.css", "Mostly intentional but mixed by use case"],
@@ -261,9 +260,9 @@ def main() -> None:
 
     # ── Spacing / BorderRadius ───────────────────────────────────────
     spacing_rows = [
-        ["FIXED", "Token system introduced (R + S scales)", "src/utils/tokens.js (new)", "Border-radius scale (sm→full) and 4px-based spacing scale (s2→s32). Top 3 borderRadius values (9, 8, 6) migrated — 89 sites."],
-        ["P2", "Remaining borderRadius stragglers (3,4,5,7,10,12,16)", "Throughout JSX inline styles", "Follow-up sweep — pattern established"],
-        ["P2", "Hardcoded gap/padding/margin px values", "Throughout JSX inline styles", "Migrate using tokens.S — follow-up sweep"],
+        ["FIXED", "BorderRadius fully tokenised", "src/utils/tokens.js R scale", "All 105 inline borderRadius values across App.js + PlanWizard.js now reference R.rN tokens (one per unique px value, plus semantic aliases)."],
+        ["FIXED", "Spacing scale defined (S)", "src/utils/tokens.js S scale", "19 numeric tokens covering 0–32 px values seen in the codebase. Migration of gap/padding/margin call-sites is a separate follow-up."],
+        ["P2", "Hardcoded gap/padding/margin px values", "Throughout JSX inline styles", "Migrate using tokens.S — needs scale-snapping policy first"],
         ["P2", "Mix of px-string and unitless React style values", "Throughout", "Pick one convention"],
         ["P2", "Negative margins for overlap (marginTop:-16, marginTop:-14)", "src/styles/landing.css:241,251", "Acceptable but document"],
     ]
@@ -357,7 +356,7 @@ def main() -> None:
         ["P1", "PARTIAL", "formatXP() helper introduced; ~8 high-traffic sites migrated", "src/utils/format.js + src/App.js (sweep remaining sites)"],
         ["P1", "FIXED", "Unit-spacing display sites + helper docs", "src/App.js:118, 2299; src/utils/units.js:16"],
         ["P1", "FIXED", "Populate empty/truncated exercise descriptions", "src/data/exercises.js — 72 empty entries synthesised + 1,051 truncated entries trimmed cleanly"],
-        ["P2", "PARTIAL", "Spacing/typography token system introduced + top values migrated", "src/utils/tokens.js (new) — 329 highest-frequency values migrated; remaining stragglers tracked"],
+        ["P2", "FIXED", "Spacing/typography token system — full sweep of font-size + borderRadius", "src/utils/tokens.js extended; 603 inline values migrated across App.js + PlanWizard.js"],
         ["P2", "FIXED", "Dual-form catalog dedup via alias flag (no user-data migration needed)", "src/data/exercises.js — 4 legacy entries marked alias:true; src/App.js splits picker (filtered) vs lookup (unfiltered)"],
         ["P2", "FIXED", "Masculine palette rollout — CAT_ICON_COLORS + filter accents", "Profile/Library/PlanWizard now use UI_COLORS.accent for active states; xp.js fallback consolidated"],
         ["P2", "FIXED", "Reps schema standardisation + restSec field in PLAN_TEMPLATES", "src/data/constants.js — 244 values quoted, 194 restSec:null fields added"],
