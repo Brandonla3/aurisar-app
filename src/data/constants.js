@@ -1146,7 +1146,21 @@ const EMPTY_PROFILE = {
     reviewBattleStats:true,
     friendExercise:true,
   },
+  // Phone number for MFA. Set during phone-OTP enrollment (App.jsx:verifyPhone),
+  // cleared by removePhone(). Was previously persisted without being declared
+  // in EMPTY_PROFILE; surfaced by the item 5c audit.
+  phone: null,
+  phoneVerified: false,
 };
+
+// Canonical set of keys that may appear on `profile`. Computed from
+// EMPTY_PROFILE plus `email`, which is added inside doSave() for Supabase
+// row identification but not part of the local profile shape.
+//
+// Used by the dev-only profile audit in src/utils/storage.js — warns when
+// setProfile would persist a key not in this set, catching future
+// UI-state-leaks-into-profile bugs the moment they're written.
+const PROFILE_KEYS = Object.freeze(new Set([...Object.keys(EMPTY_PROFILE), 'email']));
 
 // ── Heart Rate Zones ─────────────────────────────────────────────
 // Ensures Rest Day is a default favorite and migrates away from customExercises
@@ -1265,6 +1279,7 @@ export {
   PARTICLES,
   STORAGE_KEY,
   EMPTY_PROFILE,
+  PROFILE_KEYS,
   NO_SETS_EX_IDS,
   RUNNING_EX_ID,
   HR_ZONES,
