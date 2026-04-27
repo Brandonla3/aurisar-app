@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { List } from 'react-window';
 import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, UI_COLORS, MAP_REGIONS } from './data/constants';
@@ -118,6 +119,44 @@ const LazyFallback = <div style={{
   textTransform: 'uppercase'
 }} role={'status'} aria-live={'polite'} aria-label={'Loading'}>{"Loading…"}</div>;
 const lazyMount = el => <React.Suspense fallback={LazyFallback}>{el}</React.Suspense>;
+
+// ── Virtualized workout-builder picker row (item 4: react-window) ─────────
+// Module-level so its identity is stable across App renders; react-window
+// only re-renders rows when `rowProps` change. Rendered by the wbExPicker
+// modal's <List/>. Styling matches the inline version this replaced; small
+// differences vs PlanWizard.jsx's PickerRow are intentional (this picker
+// shows XP in #b4ac9e instead of #d4cec4).
+const WbExPickerRow = React.memo(function WbExPickerRow({ ariaAttributes, index, style, exercises, selIds, onToggle }) {
+  const ex = exercises[index];
+  if (!ex) return null;
+  const sel = selIds.has(ex.id);
+  const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
+  const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
+  const diffBg    = diffLabel === "Advanced" ? "#2e1515" : diffLabel === "Beginner" ? "#1a2e1a" : "#2e2010";
+  const exMgColor = getMuscleColor(ex.muscleGroup);
+  return (
+    <div style={{ ...style, paddingTop: 4, paddingBottom: 4 }} {...ariaAttributes}>
+      <div className={"picker-ex-row" + (sel ? " sel" : "")} onClick={() => onToggle(ex.id)} style={{ "--mg-color": exMgColor }}>
+        <div className="picker-ex-orb"><ExIcon ex={ex} size=".95rem" color="#d4cec4" /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: FS.fs80, fontWeight: 600, color: "#d4cec4", marginBottom: S.s2 }}>
+            {ex.name}{ex.custom && <span className="custom-ex-badge" style={{ marginLeft: S.s4 }}>custom</span>}
+          </div>
+          <div style={{ fontSize: FS.sm, fontStyle: "italic" }}>
+            {ex.category && <span style={{ color: getTypeColor(ex.category) }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}
+            {ex.category && ex.muscleGroup && <span style={{ color: "#8a8478" }}>{" · "}</span>}
+            {ex.muscleGroup && <span style={{ color: getMuscleColor(ex.muscleGroup) }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}
+          </div>
+        </div>
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: S.s4 }}>
+          <span style={{ fontSize: FS.fs63, fontWeight: 700, color: "#b4ac9e" }}>{ex.baseXP + " XP"}</span>
+          <span style={{ fontSize: FS.fs56, fontWeight: 700, color: diffColor, background: diffBg, padding: "2px 6px", borderRadius: R.r3, letterSpacing: ".04em" }}>{diffLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 import loginBg from './assets/login-bg.png';
 
 // Preview mode is dev-only by default. To enable in a non-dev build (e.g. staging),
@@ -14741,65 +14780,23 @@ function App() {
               padding: "20px 0"
             }}>{"No exercises found."}</div>;
             const selIds = new Set(pickerSelected.map(e => e.exId));
-            const visible = filtered.slice(0, 80);
-            const clsData = profile.chosenClass ? CLASSES[profile.chosenClass] : null;
             return <><div style={{
                 fontSize: FS.fs62,
                 color: "#8a8478",
                 marginBottom: S.s6,
                 textAlign: "right"
-              }}>{q || pickerMuscle !== "All" || pickerTypeFilter !== "all" || pickerEquipFilter !== "all" ? filtered.length + " match" + (filtered.length !== 1 ? "es" : "") : "Showing 80 of " + filtered.length + " · search or filter"}</div><div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: S.s6
-              }}>{visible.map(ex => {
-                  const sel = selIds.has(ex.id);
-                  const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
-                  const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
-                  const diffBg = diffLabel === "Advanced" ? "#2e1515" : diffLabel === "Beginner" ? "#1a2e1a" : "#2e2010";
-                  const subParts = [ex.category ? ex.category.charAt(0).toUpperCase() + ex.category.slice(1) : null, ex.muscleGroup ? ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1) : null].filter(Boolean).join(" · ");
-                  const exMgColor = getMuscleColor(ex.muscleGroup);
-                  return <div key={ex.id} className={`picker-ex-row${sel ? " sel" : ""}`} onClick={() => pickerToggleEx(ex.id)} style={{
-                    "--mg-color": exMgColor
-                  }}><div className={"picker-ex-orb"}><ExIcon ex={ex} size={".95rem"} color={"#d4cec4"} /></div><div style={{
-                      flex: 1,
-                      minWidth: 0
-                    }}><div style={{
-                        fontSize: FS.fs80,
-                        fontWeight: 600,
-                        color: sel ? "#d4cec4" : "#d4cec4",
-                        marginBottom: S.s2
-                      }}>{ex.name}{ex.custom && <span className={"custom-ex-badge"} style={{
-                          marginLeft: S.s4
-                        }}>{"custom"}</span>}</div><div style={{
-                        fontSize: FS.sm,
-                        fontStyle: "italic"
-                      }}>{ex.category && <span style={{
-                          color: getTypeColor(ex.category)
-                        }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}{ex.category && ex.muscleGroup && <span style={{
-                          color: "#8a8478"
-                        }}>{" · "}</span>}{ex.muscleGroup && <span style={{
-                          color: getMuscleColor(ex.muscleGroup)
-                        }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}</div></div><div style={{
-                      flexShrink: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: S.s4
-                    }}><span style={{
-                        fontSize: FS.fs63,
-                        fontWeight: 700,
-                        color: "#b4ac9e"
-                      }}>{ex.baseXP + " XP"}</span><span style={{
-                        fontSize: FS.fs56,
-                        fontWeight: 700,
-                        color: diffColor,
-                        background: diffBg,
-                        padding: "2px 6px",
-                        borderRadius: R.r3,
-                        letterSpacing: ".04em"
-                      }}>{diffLabel}</span></div></div>;
-                })}</div></>;
+              }}>{filtered.length + " match" + (filtered.length !== 1 ? "es" : "")}</div>
+              {/* Virtualized: rowHeight 60px = .picker-ex-row content (~52px) + 8px slot
+                  padding. Previous slice(0,80) cap removed — users can scroll the full
+                  filtered list without the explicit limit. See WbExPickerRow at module
+                  scope for the row component. */}
+              <List
+                rowCount={filtered.length}
+                rowHeight={60}
+                rowComponent={WbExPickerRow}
+                rowProps={{ exercises: filtered, selIds, onToggle: pickerToggleEx }}
+                style={{ height: 'min(60vh, 480px)', width: '100%' }}
+              /></>;
           })()}</> : <><div style={{
             display: "flex",
             alignItems: "center",
