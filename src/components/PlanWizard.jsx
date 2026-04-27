@@ -77,9 +77,9 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
         <div className="builder-ex-orb" style={{"--cat-color":catColorPlan}}>{exData.icon}</div>
         <span className="builder-ex-name-styled" style={{flex:1}}>{exData.name}</span>
         {(isRunningEx&&pbDisp||exPBDisp3) && <span style={{fontSize:FS.fs58,color:"#b4ac9e",flexShrink:0}}>{"🏆 "}{isRunningEx&&pbDisp?pbDisp:exPBDisp3}</span>}
-        {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs60,color:"#5a5650"}}>{noSetsEx?"":ex.sets+"×"}{ex.reps}{ex.weightLbs?` · ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:""}</span>}
+        {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs60,color:"#8a8478"}}>{noSetsEx?"":ex.sets+"×"}{ex.reps}{ex.weightLbs?` · ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:""}</span>}
         <span style={{fontSize:FS.fs63,color:"#b4ac9e",minWidth:36,textAlign:"right"}}>{"+"+(xp||0).toLocaleString()}</span>
-        <span style={{fontSize:FS.fs60,color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}>{"▼"}</span>
+        <span style={{fontSize:FS.fs60,color:"#8a8478",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}>{"▼"}</span>
         <button className="btn btn-danger btn-xs" style={{marginLeft:S.s2}} onClick={e=>{e.stopPropagation();removeEx();}}>{"✕"}</button>
       </div>
       {!collapsed && exData.id!=="rest_day" && (
@@ -196,8 +196,8 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                     <div key={z.z} className={`hr-zone-btn ${sel?"sel":""}`}
                       style={{"--zc":z.color,borderColor:sel?z.color:"rgba(45,42,36,.2)",background:sel?`${z.color}22`:"rgba(45,42,36,.12)"}}
                       onClick={()=>updateField("hrZone",sel?null:z.z)}>
-                      <span className="hz-name" style={{color:sel?z.color:"#5a5650"}}>{"Z"}{z.z}{" "}{z.name}</span>
-                      <span className="hz-bpm" style={{color:sel?z.color:"#6a645a"}}>{range.lo}{"–"}{range.hi}</span>
+                      <span className="hz-name" style={{color:sel?z.color:"#8a8478"}}>{"Z"}{z.z}{" "}{z.name}</span>
+                      <span className="hz-bpm" style={{color:sel?z.color:"#8a8478"}}>{range.lo}{"–"}{range.hi}</span>
                     </div>
                   );
                 })}
@@ -405,9 +405,9 @@ function PlanWizard(props) {
           <div className="ab-badge">{label}</div>
           <div style={{width:28,height:28,borderRadius:R.r6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.fs80}}>{exData.icon}</div>
           <span style={{fontFamily:"'Cinzel',serif",fontSize:FS.fs66,color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}>{exData.name}</span>
-          {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs55,color:"#5a5650"}}>{summaryText}</span>}
+          {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs55,color:"#8a8478"}}>{summaryText}</span>}
           <span style={{fontSize:FS.fs60,fontWeight:700,color:"#b4ac9e",flexShrink:0}}>{"+"+xpVal}</span>
-          <span style={{fontSize:FS.fs60,color:"#5a5650",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}>{"▼"}</span>
+          <span style={{fontSize:FS.fs60,color:"#8a8478",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}>{"▼"}</span>
         </div>
         {!collapsed && exData.id!=="rest_day" && (
           <div className="ss-section-body">
@@ -597,7 +597,7 @@ function PlanWizard(props) {
                 <option value="year">Year{bDurCount>1?"s":""}</option>
               </select>
             </div>
-            <div style={{fontSize:FS.fs62,color:"#5a5650",marginTop:S.s4,fontStyle:"italic"}}>
+            <div style={{fontSize:FS.fs62,color:"#8a8478",marginTop:S.s4,fontStyle:"italic"}}>
               {bDurCount===1?"Single "+bType+" plan":`${bDurCount}-${bType} program`}
             </div>
           </div>
@@ -671,7 +671,7 @@ function PlanWizard(props) {
             onClick={()=>{setPlanWizardOpen(true);setWizardWeekIdx(0);}}>
             {bEditId ? "✎ Edit Plan" : "⚔ Create Plan"}
           </button>
-          <div style={{fontSize:FS.fs58,color:"#5a5650",textAlign:"center",marginTop:S.s6,fontStyle:"italic"}}>
+          <div style={{fontSize:FS.fs58,color:"#8a8478",textAlign:"center",marginTop:S.s6,fontStyle:"italic"}}>
             {bEditId ? "Open the plan wizard to edit days and exercises" : "Open the plan wizard to add days and exercises"}
           </div>
           {/* Action buttons -- only for existing plans in user's collection */}
@@ -979,7 +979,7 @@ function PlanWizard(props) {
                         <div style={{position:"relative",flex:1,zIndex:20}}>
                           <button onClick={()=>setPickerOpenDrop(d=>d==="muscle2"?null:"muscle2")} style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}}>
                             {pickerMuscle==="All"?"Muscle":pickerMuscle.charAt(0).toUpperCase()+pickerMuscle.slice(1)}
-                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="muscle2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerMuscle!=="All"?"#b4ac9e":"#5a5650",transition:"transform .15s"}}>{"▼"}</span>
+                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="muscle2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",transition:"transform .15s"}}>{"▼"}</span>
                           </button>
                           {pickerOpenDrop==="muscle2" && (
                             <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}}>
@@ -993,7 +993,7 @@ function PlanWizard(props) {
                         <div style={{position:"relative",flex:1,zIndex:20}}>
                           <button onClick={()=>setPickerOpenDrop(d=>d==="type2"?null:"type2")} style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}}>
                             {pickerTypeFilter==="all"?"Type":(PTYPE_LABELS2[pickerTypeFilter]||pickerTypeFilter)}
-                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="type2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerTypeFilter!=="all"?"#d4cec4":"#5a5650",transition:"transform .15s"}}>{"▼"}</span>
+                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="type2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",transition:"transform .15s"}}>{"▼"}</span>
                           </button>
                           {pickerOpenDrop==="type2" && (
                             <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}}>
@@ -1007,7 +1007,7 @@ function PlanWizard(props) {
                         <div style={{position:"relative",flex:1,zIndex:20}}>
                           <button onClick={()=>setPickerOpenDrop(d=>d==="equip2"?null:"equip2")} style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}}>
                             {pickerEquipFilter==="all"?"Equipment":pickerEquipFilter.charAt(0).toUpperCase()+pickerEquipFilter.slice(1)}
-                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#5a5650",transition:"transform .15s"}}>{"▼"}</span>
+                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",transition:"transform .15s"}}>{"▼"}</span>
                           </button>
                           {pickerOpenDrop==="equip2" && (
                             <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}}>
@@ -1030,7 +1030,7 @@ function PlanWizard(props) {
                   const visible=filtered.slice(0,80);
                   return (
                     <>
-                      <div style={{fontSize:FS.fs62,color:"#5a5650",marginBottom:S.s6,textAlign:"right"}}>
+                      <div style={{fontSize:FS.fs62,color:"#8a8478",marginBottom:S.s6,textAlign:"right"}}>
                         {(q||pickerMuscle!=="All"||pickerTypeFilter!=="all"||pickerEquipFilter!=="all")?filtered.length+" match"+(filtered.length!==1?"es":""):"Showing 80 of "+filtered.length+" · search or filter"}
                       </div>
                       <div style={{display:"flex",flexDirection:"column",gap:S.s6}}>
@@ -1047,7 +1047,7 @@ function PlanWizard(props) {
                                 <div style={{fontFamily:"'Cinzel',serif",fontSize:FS.fs80,fontWeight:600,color:"#d4cec4",marginBottom:S.s2,letterSpacing:".01em"}}>{ex.name}{ex.custom && <span className="custom-ex-badge" style={{marginLeft:S.s4}}>custom</span>}</div>
                                 <div style={{fontSize:FS.fs60,fontStyle:"italic"}}>
                                   {ex.category && <span style={{color:getTypeColor(ex.category)}}>{ex.category.charAt(0).toUpperCase()+ex.category.slice(1)}</span>}
-                                  {ex.category && ex.muscleGroup && <span style={{color:"#5a5650"}}>{" · "}</span>}
+                                  {ex.category && ex.muscleGroup && <span style={{color:"#8a8478"}}>{" · "}</span>}
                                   {ex.muscleGroup && <span style={{color:exMgColor}}>{ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)}</span>}
                                 </div>
                               </div>
