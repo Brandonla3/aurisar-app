@@ -12302,16 +12302,19 @@ function App() {
             label: "Off-hand",
             hint: "DEX / CON"
           }];
+          // `profile.equipment` is read but never written via setProfile —
+          // it's intentionally a write-once-via-rewards / read-only-from-app
+          // shape that doesn't yet have a setter. Surfaced by the item 5c
+          // audit for follow-up; keeping the read here works because
+          // `profile.equipment ?? {}` falls back cleanly when undefined.
+          // The previously-defined `setAv` helper alongside this was unused
+          // dead code and has been removed.
           const equipment = profile.equipment || {};
           const isStyleUnlocked = s => {
             if (s.unlockRace && profile.avatarRace !== s.unlockRace) return false;
             if (s.unlockDrop) return false;
             return level >= (s.unlockLevel || 1);
           };
-          const setAv = (field, val) => setProfile(p => ({
-            ...p,
-            [field]: val
-          }));
           /* btn styling now via .char-sub-btn / .char-sub-btn.sel */
           const rune = label => <div className={"profile-rune-divider"} style={{
             margin: "0 0 10px"
