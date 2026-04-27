@@ -22,7 +22,7 @@
     .subtitle{font-size:1.05rem;color:#8a8478;text-align:center;font-style:italic;letter-spacing:.15em;text-transform:uppercase}
     .orn{font-size:1.1rem;color:rgba(180,172,158,.12);letter-spacing:.2em}
     .card{background:linear-gradient(145deg,rgba(45,42,36,.15),rgba(45,42,36,.08));border:1px solid rgba(180,172,158,.06);border-radius:12px;padding:22px;width:100%;max-width:480px;backdrop-filter:blur(8px);box-shadow:0 8px 40px rgba(0,0,0,.6),inset 0 1px 0 rgba(180,172,158,.03)}
-    label{font-size:.76rem;color:#8a8478;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:4px}
+    label,.field-label{font-size:.76rem;color:#8a8478;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:4px}
     .inp{width:100%;background:linear-gradient(145deg,rgba(45,42,36,.3),rgba(32,30,26,.18));border:1px solid rgba(180,172,158,.05);border-radius:8px;padding:9px 13px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.93rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);outline:none;transition:border-color .2s,box-shadow .2s}
     select.inp{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%238a8478' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
     select.inp option{background:#1a1a16;color:#d4cec4;padding:8px}
@@ -694,7 +694,7 @@
     .builder-wrap{background:linear-gradient(145deg,rgba(45,42,36,.45),rgba(32,30,26,.28));border:1px solid rgba(180,172,158,.05);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:13px;box-shadow:0 8px 40px rgba(0,0,0,.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
     .builder-wrap::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.06),transparent);margin:-18px -18px 0;border-radius:14px 14px 0 0}
     .builder-section-title{font-family:'Cinzel',serif;font-size:.58rem;color:rgba(180,172,158,.35);letter-spacing:.18em;text-transform:uppercase;margin-bottom:2px}
-    label{font-family:'Cinzel',serif;font-size:.56rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:5px}
+    label,.field-label{font-family:'Cinzel',serif;font-size:.56rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:5px}
 
     /* ── Exercise rows in builder — themed by muscle group --mg-color ── */
     .wb-ex-row{

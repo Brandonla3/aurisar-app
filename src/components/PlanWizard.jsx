@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useTransition, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { calcExXP, calcDayXP, getMuscleColor, getTypeColor, hrRange } from '../utils/xp';
 import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } from '../utils/units';
@@ -29,6 +29,9 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
   function toggleCollapse() { setCollapsedPlanEx(s=>({...s,[`${bDayIdx}_${i}`]:!s[`${bDayIdx}_${i}`]})); }
   function moveUp() { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i-1,0,m);return{...d,exercises:exs};}));}); }
   function moveDown() { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i+1,0,m);return{...d,exercises:exs};}));}); }
+
+  // Stable id base for htmlFor/id pairing (jsx-a11y/label-has-associated-control)
+  const cardId = useId();
 
   const isCardioEx = exData.category==="cardio";
   const isFlexEx   = exData.category==="flexibility";
@@ -85,16 +88,16 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
           <div style={{display:"flex",gap:S.s6,marginBottom:S.s6}}>
             {!noSetsEx && !hasDur && (
               <div style={{flex:1,minWidth:0}}>
-                <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Sets</label>
-                <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
+                <label htmlFor={`${cardId}-sets`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Sets</label>
+                <input id={`${cardId}-sets`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                   defaultValue={ex.sets===0||ex.sets===""?"":ex.sets} onBlur={e=>updateField("sets",e.target.value)} />
               </div>
             )}
             {hasDur ? (
               <>
                 <div style={{flex:1.6,minWidth:0}}>
-                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Duration</label>
-                  <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="numeric"
+                  <label htmlFor={`${cardId}-dur`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Duration</label>
+                  <input id={`${cardId}-dur`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="numeric"
                     defaultValue={ex._durHHMM!==undefined ? ex._durHHMM : (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps?"00:"+String(ex.reps).padStart(2,"0"):"")}
                     onBlur={e=>{
                       const norm=normalizeHHMM(e.target.value);
@@ -107,8 +110,8 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                     placeholder="00:00" />
                 </div>
                 <div style={{flex:0.8,minWidth:0}}>
-                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Sec</label>
-                  <input className="builder-ex-input" style={{width:"100%",textAlign:"center"}} type="number" min="0" max="59"
+                  <label htmlFor={`${cardId}-sec`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Sec</label>
+                  <input id={`${cardId}-sec`} className="builder-ex-input" style={{width:"100%",textAlign:"center"}} type="number" min="0" max="59"
                     defaultValue={ex._durSec!==undefined ? String(ex._durSec).padStart(2,"0") : (ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2,"0") : "")}
                     onBlur={e=>{
                       const v=e.target.value;
@@ -129,8 +132,8 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             ) : (
               <>
                 <div style={{flex:1,minWidth:0}}>
-                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Reps</label>
-                  <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
+                  <label htmlFor={`${cardId}-reps`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Reps</label>
+                  <input id={`${cardId}-reps`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                     defaultValue={dispReps===0||dispReps===""?"":dispReps} onBlur={e=>updateField("reps",e.target.value)} />
                 </div>
                 {hasWeight && (
@@ -182,8 +185,9 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             onClick={()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateFieldNow("extraRows",rr);}}>{"＋ Add Row (e.g. "}{hasDur?"interval":"progressive weight"}{")"}</button>
           {/* Avg HR Zone -- last for cardio */}
           {hasDur && (
-            <div>
-              <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Avg Heart Rate Zone <span style={{opacity:.6,fontSize:FS.fs55}}>(optional)</span></label>
+            <div role="group" aria-labelledby={`${cardId}-hr`}>
+              {/* Not a <label> — the HR zones below are a custom widget, not a single form control */}
+              <div id={`${cardId}-hr`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Avg Heart Rate Zone <span style={{opacity:.6,fontSize:FS.fs55}}>(optional)</span></div>
               <div className="hr-zone-row">
                 {HR_ZONES.map(z=>{
                   const sel=ex.hrZone===z.z;
@@ -209,6 +213,9 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
 
 function PlanWizard(props) {
   const { editPlan, templatePlan, profile, allExercises, allExById, onSave, onClose, onCompleteDayStart, onStartPlanWorkout, onDeletePlan, onSchedulePlan, onOpenExEditor, showToast } = props;
+
+  // Stable id base for htmlFor/id pairing (jsx-a11y/label-has-associated-control)
+  const formId = useId();
 
   const [isPending, startTransition] = useTransition();
 
@@ -407,23 +414,23 @@ function PlanWizard(props) {
             <div style={{display:"flex",gap:S.s6,marginBottom:S.s6}}>
               {!_noSets && !_hasDur && (
                 <div style={{flex:1,minWidth:0}}>
-                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Sets</label>
-                  <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
+                  <label htmlFor={`${sectionKey}-sets`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Sets</label>
+                  <input id={`${sectionKey}-sets`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                     defaultValue={ex.sets===0||ex.sets===""?"":ex.sets} onBlur={e=>updateExInDay(dayIdx,exIdx,"sets",e.target.value)} />
                 </div>
               )}
               {_hasDur ? (
                 <>
                   <div style={{flex:1.6,minWidth:0}}>
-                    <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Duration</label>
-                    <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="numeric"
+                    <label htmlFor={`${sectionKey}-dur`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Duration</label>
+                    <input id={`${sectionKey}-dur`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="numeric"
                       defaultValue={ex._durHHMM!==undefined?ex._durHHMM:(ex.durationSec?secToHHMMSplit(ex.durationSec).hhmm:ex.reps?"00:"+String(ex.reps).padStart(2,"0"):"")}
                       onBlur={e=>{const n=normalizeHHMM(e.target.value);const s=combineHHMMSec(n,ex._durSec||"");const batch={_durHHMM:n||undefined,durationSec:s};if(s){batch.reps=Math.max(1,Math.floor(s/60));batch.durationMin=s/60;}updateExInDayBatch(dayIdx,exIdx,batch);}}
                       placeholder="00:00" />
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Dist ({_dU})</label>
-                    <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
+                    <label htmlFor={`${sectionKey}-dist`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Dist ({_dU})</label>
+                    <input id={`${sectionKey}-dist`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                       defaultValue={ex.distanceMi?(_m?String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)):String(ex.distanceMi)):""}
                       onBlur={e=>{const v=e.target.value;const mi=v&&_m?kmToMi(v):v;updateExInDay(dayIdx,exIdx,"distanceMi",mi||null);}}
                       placeholder="0" />
@@ -432,14 +439,14 @@ function PlanWizard(props) {
               ) : (
                 <>
                   <div style={{flex:1,minWidth:0}}>
-                    <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Reps</label>
-                    <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
+                    <label htmlFor={`${sectionKey}-reps`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Reps</label>
+                    <input id={`${sectionKey}-reps`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                       defaultValue={ex.reps===0||ex.reps===""?"":ex.reps} onBlur={e=>updateExInDay(dayIdx,exIdx,"reps",e.target.value)} />
                   </div>
                   {_hasW && (
                     <div style={{flex:1.2,minWidth:0}}>
-                      <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Weight ({_wU})</label>
-                      <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
+                      <label htmlFor={`${sectionKey}-weight`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Weight ({_wU})</label>
+                      <input id={`${sectionKey}-weight`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                         defaultValue={ex.weightLbs!=null&&ex.weightLbs!==""?(_m?lbsToKg(ex.weightLbs):String(ex.weightLbs)):""}
                         onBlur={e=>{const v=e.target.value;const lbs=v&&_m?kgToLbs(v):v;updateExInDay(dayIdx,exIdx,"weightLbs",lbs||null);}}
                         placeholder={"—"} />
@@ -517,12 +524,12 @@ function PlanWizard(props) {
       )}
       {!planWizardOpen && (
         <div className="builder-wrap">
-          <div className="field"><label>Plan Name</label><input className="inp" value={bName} onChange={e=>setBName(e.target.value)} placeholder={"Name your plan…"} /></div>
+          <div className="field"><label htmlFor={`${formId}-name`}>Plan Name</label><input id={`${formId}-name`} className="inp" value={bName} onChange={e=>setBName(e.target.value)} placeholder={"Name your plan…"} /></div>
           <div className="field">
-            <label>Level <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
+            <label htmlFor={`${formId}-level-0`}>Level <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
             <div style={{display:"flex",gap:S.s6}}>
-              {["Beginner","Intermediate","Expert"].map(lvl=>(
-                <button key={lvl} className="btn btn-ghost btn-xs"
+              {["Beginner","Intermediate","Expert"].map((lvl,lvlIdx)=>(
+                <button key={lvl} id={lvlIdx===0?`${formId}-level-0`:undefined} className="btn btn-ghost btn-xs"
                   style={{flex:1,fontSize:FS.fs62,
                     border:bLevel===lvl?`1px solid ${lvl==="Beginner"?"#5A8A58":lvl==="Intermediate"?"#A8843C":"#7A2838"}`:"",
                     color:bLevel===lvl?(lvl==="Beginner"?"#5A8A58":lvl==="Intermediate"?"#A8843C":"#7A2838"):"",
@@ -536,9 +543,9 @@ function PlanWizard(props) {
 
           {/* Duration Type + Count */}
           <div className="field">
-            <label>Duration</label>
+            <label htmlFor={`${formId}-dur-count`}>Duration</label>
             <div className="dur-row">
-              <select className="dur-count-sel" value={bDurCount}
+              <select id={`${formId}-dur-count`} className="dur-count-sel" value={bDurCount}
                 onChange={e=>{
                   const newCount=parseInt(e.target.value);
                   setBDurCount(newCount);
@@ -598,8 +605,8 @@ function PlanWizard(props) {
           {/* Start / End Dates */}
           <div className="plan-date-row">
             <div className="field">
-              <label>Start Date <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
-              <input className="inp" type="date" value={bStartDate}
+              <label htmlFor={`${formId}-start-date`}>Start Date <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
+              <input id={`${formId}-start-date`} className="inp" type="date" value={bStartDate}
                 onChange={e=>{
                   setBStartDate(e.target.value);
                   if(e.target.value && !bEndDate) {
@@ -614,8 +621,8 @@ function PlanWizard(props) {
                 }} />
             </div>
             <div className="field">
-              <label>End Date <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
-              <input className="inp" type="date" value={bEndDate}
+              <label htmlFor={`${formId}-end-date`}>End Date <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
+              <input id={`${formId}-end-date`} className="inp" type="date" value={bEndDate}
                 min={(()=>{
                   if(!bStartDate) return undefined;
                   const d = new Date(bStartDate+"T12:00:00");
@@ -649,7 +656,11 @@ function PlanWizard(props) {
               return s.toLocaleDateString([],{month:"short",day:"numeric"})+" → "+e.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})+" ("+days+" day"+(days!==1?"s":"")+")"
             })()}</div>
           )}
-          <div className="field"><label>Icon</label>
+          <div className="field" role="group" aria-labelledby={`${formId}-icon`}>
+            {/* Not a <label> — the icon options below are a custom radio group of
+                 non-input elements, so a labelable association isn't possible.
+                 Keeping the same visual style via the .field-label class. */}
+            <span id={`${formId}-icon`} className="field-label">Icon</span>
             <div className="icon-row">{ICONS.map(ic=><div key={ic} className={`icon-opt ${bIcon===ic?"sel":""}`} onClick={()=>setBIcon(ic)}>{ic}</div>)}</div>
           </div>
           <div className="xp-projection">
@@ -1081,41 +1092,41 @@ function PlanWizard(props) {
                         <div style={{display:"flex",gap:S.s6,flexWrap:"wrap",marginBottom:S.s6}}>
                           {!noSets && !isCardio && (
                             <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                              <label>Sets</label>
-                              <input className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric" value={entry.sets||""} onChange={e=>pickerUpdateEx(entry.exId,"sets",e.target.value)} placeholder="3" />
+                              <label htmlFor={`pc-${entry.exId}-sets`}>Sets</label>
+                              <input id={`pc-${entry.exId}-sets`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric" value={entry.sets||""} onChange={e=>pickerUpdateEx(entry.exId,"sets",e.target.value)} placeholder="3" />
                             </div>
                           )}
                           {isCardio ? (
                             <>
                               <div className="field" style={{flex:1.6,minWidth:70,marginBottom:S.s0}}>
-                                <label>Duration (HH:MM)</label>
-                                <input className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric"
+                                <label htmlFor={`pc-${entry.exId}-dur`}>Duration (HH:MM)</label>
+                                <input id={`pc-${entry.exId}-dur`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric"
                                   value={entry._durHHMM||""}
                                   onChange={e=>pickerUpdateEx(entry.exId,"_durHHMM",e.target.value)}
                                   onBlur={e=>{const n=normalizeHHMM(e.target.value);pickerUpdateEx(entry.exId,"_durHHMM",n);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(n,entry._durSec||"")/60))));}}
                                   placeholder="00:00" />
                               </div>
                               <div className="field" style={{flex:0.8,minWidth:50,marginBottom:S.s0}}>
-                                <label>Seconds</label>
-                                <input className="inp" style={{padding:"6px 8px",textAlign:"center"}} type="number" min="0" max="59"
+                                <label htmlFor={`pc-${entry.exId}-sec`}>Seconds</label>
+                                <input id={`pc-${entry.exId}-sec`} className="inp" style={{padding:"6px 8px",textAlign:"center"}} type="number" min="0" max="59"
                                   value={entry._durSec||""}
                                   onChange={e=>{pickerUpdateEx(entry.exId,"_durSec",e.target.value);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(entry._durHHMM||"",e.target.value)/60))));}}
                                   placeholder="00" />
                               </div>
                               <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                                <label>Dist ({dUnit})</label>
-                                <input className="inp" style={{padding:"6px 8px"}} type="text" inputMode="decimal" value={entry.distanceMi||""} onChange={e=>pickerUpdateEx(entry.exId,"distanceMi",e.target.value)} placeholder="0" />
+                                <label htmlFor={`pc-${entry.exId}-dist`}>Dist ({dUnit})</label>
+                                <input id={`pc-${entry.exId}-dist`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="decimal" value={entry.distanceMi||""} onChange={e=>pickerUpdateEx(entry.exId,"distanceMi",e.target.value)} placeholder="0" />
                               </div>
                             </>
                           ) : (
                             <>
                               <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                                <label>Reps</label>
-                                <input className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric" value={entry.reps||""} onChange={e=>pickerUpdateEx(entry.exId,"reps",e.target.value)} placeholder="10" />
+                                <label htmlFor={`pc-${entry.exId}-reps`}>Reps</label>
+                                <input id={`pc-${entry.exId}-reps`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric" value={entry.reps||""} onChange={e=>pickerUpdateEx(entry.exId,"reps",e.target.value)} placeholder="10" />
                               </div>
                               <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                                <label>Weight ({wUnit})</label>
-                                <input className="inp" style={{padding:"6px 8px"}} type="text" inputMode="decimal" value={entry.weightLbs||""} onChange={e=>pickerUpdateEx(entry.exId,"weightLbs",e.target.value)} placeholder="0" />
+                                <label htmlFor={`pc-${entry.exId}-weight`}>Weight ({wUnit})</label>
+                                <input id={`pc-${entry.exId}-weight`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="decimal" value={entry.weightLbs||""} onChange={e=>pickerUpdateEx(entry.exId,"weightLbs",e.target.value)} placeholder="0" />
                               </div>
                             </>
                           )}
