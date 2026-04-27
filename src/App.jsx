@@ -15,6 +15,7 @@ import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
 import { useModalLifecycle } from './utils/useModalLifecycle';
+import { useUiState } from './state/useUiState';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -757,6 +758,24 @@ const WbExCard = React.memo(function WbExCard({
         }}>{HR_ZONES[ex.hrZone - 1].desc}</div>}</div>}</>}</>;
 });
 function App() {
+  // ── Modal / dialog UI state — extracted to ./state/useUiState (item 5a)
+  const ui = useUiState();
+  const {
+    exEditorOpen, setExEditorOpen, exEditorDraft, setExEditorDraft, exEditorMode, setExEditorMode, detailEx, setDetailEx,
+    detailImgIdx, setDetailImgIdx, savePlanWizard, setSavePlanWizard, spwName, setSpwName, spwIcon, setSpwIcon,
+    spwDate, setSpwDate, spwSelected, setSpwSelected, spwMode, setSpwMode, spwTargetPlanId, setSpwTargetPlanId,
+    schedulePicker, setSchedulePicker, spDate, setSpDate, spNotes, setSpNotes, saveWorkoutWizard, setSaveWorkoutWizard,
+    swwName, setSwwName, swwIcon, setSwwIcon, swwSelected, setSwwSelected, wbExPickerOpen, setWbExPickerOpen,
+    addToPlanPicker, setAddToPlanPicker, addToWorkoutPicker, setAddToWorkoutPicker, retroCheckInModal, setRetroCheckInModal, retroDate, setRetroDate,
+    retroEditModal, setRetroEditModal, statsPromptModal, setStatsPromptModal, spDuration, setSpDuration, spDurSec, setSpDurSec,
+    spActiveCal, setSpActiveCal, spTotalCal, setSpTotalCal, spMakeReusable, setSpMakeReusable, calExDetailModal, setCalExDetailModal,
+    oneOffModal, setOneOffModal, completionModal, setCompletionModal, completionDate, setCompletionDate, completionAction, setCompletionAction,
+    scheduleWoDate, setScheduleWoDate, logEditModal, setLogEditModal, logEditDraft, setLogEditDraft, confirmDelete, setConfirmDelete,
+    shareModal, setShareModal, feedbackOpen, setFeedbackOpen, feedbackText, setFeedbackText, feedbackType, setFeedbackType,
+    feedbackSent, setFeedbackSent, feedbackEmail, setFeedbackEmail, feedbackAccountId, setFeedbackAccountId, helpConfirmShown, setHelpConfirmShown,
+    turnstileToken, setTurnstileToken, mapOpen, setMapOpen, mapTooltip, setMapTooltip, navMenuOpen, setNavMenuOpen,
+    showWNMockup, setShowWNMockup, toast, setToast, friendExBanner, setFriendExBanner, xpFlash, setXpFlash,
+  } = ui;
   const [screen, setScreen] = useState("loading");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authUser, setAuthUser] = useState(null);
@@ -787,13 +806,6 @@ function App() {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [detectedClass, setDetectedClass] = useState(null);
   const [activeTab, setActiveTab] = useState("workout");
-  const [xpFlash, setXpFlash] = useState(null);
-  const [mapOpen, setMapOpen] = useState(false);
-  const [navMenuOpen, setNavMenuOpen] = useState(false);
-  const [mapTooltip, setMapTooltip] = useState(null); // {name, x, y, info}
-  const [toast, setToast] = useState(null);
-  const [showWNMockup, setShowWNMockup] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // Mount the Cloudflare Turnstile widget when the support modal opens.
   // The api.js loaded in index.html exposes window.turnstile; we render via
@@ -827,15 +839,8 @@ function App() {
       setTurnstileToken("");
     };
   }, [feedbackOpen]);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileWidgetIdRef = React.useRef(null);
   const turnstileContainerRef = React.useRef(null);
-  const [feedbackType, setFeedbackType] = useState("idea"); // "idea"|"bug"|"help"
-  const [feedbackSent, setFeedbackSent] = useState(false);
-  const [feedbackEmail, setFeedbackEmail] = useState("");
-  const [feedbackAccountId, setFeedbackAccountId] = useState("");
-  const [helpConfirmShown, setHelpConfirmShown] = useState(false);
   // Quick log
   const [selEx, setSelEx] = useState(null);
   const [sets, setSets] = useState("");
@@ -886,14 +891,11 @@ function App() {
   // Plan intensity (shared slider for detail + builder)
 
   // Exercise detail modal
-  const [detailEx, setDetailEx] = useState(null);
-  const [detailImgIdx, setDetailImgIdx] = useState(0);
   // Profile edit
   const [editMode, setEditMode] = useState(false);
   const [securityMode, setSecurityMode] = useState(false);
   const [notifMode, setNotifMode] = useState(false);
   // Friend exercise banner notification
-  const [friendExBanner, setFriendExBanner] = useState(null);
   const friendBannerTimerRef = React.useRef(null);
   const notifPrefsRef = React.useRef(null);
   // Personal Bests filter
@@ -1011,19 +1013,8 @@ function App() {
   });
   const [calSelDate, setCalSelDate] = useState(todayStr());
   // Exercise editor
-  const [exEditorOpen, setExEditorOpen] = useState(false);
-  const [exEditorDraft, setExEditorDraft] = useState({});
-  const [exEditorMode, setExEditorMode] = useState("create"); // "create"|"edit"|"copy"
   // Save-as-Plan wizard (from history)
-  const [savePlanWizard, setSavePlanWizard] = useState(null); // null | {entries, label}
-  const [spwName, setSpwName] = useState("");
-  const [spwIcon, setSpwIcon] = useState("📋");
-  const [spwDate, setSpwDate] = useState(""); // YYYY-MM-DD
-  const [spwSelected, setSpwSelected] = useState([]); // array of _idx selected
   // Schedule picker (for existing plans or exercises)
-  const [schedulePicker, setSchedulePicker] = useState(null); // null | {type:"plan",plan} | {type:"ex",exId,name,icon}
-  const [spDate, setSpDate] = useState("");
-  const [spNotes, setSpNotes] = useState("");
   // Workouts tab
   const [workoutView, setWorkoutView] = useState("list"); // "list"|"detail"|"builder"|"templates"
   const [activeWorkout, setActiveWorkout] = useState(null);
@@ -1032,12 +1023,9 @@ function App() {
   const [wbDesc, setWbDesc] = useState("");
   const [wbExercises, setWbExercises] = useState([]); // [{exId,sets,reps,weightLbs,durationMin,...}]
   // wbExCompleted removed — Mark Complete feature removed from builder UX
-  const [wbExPickerOpen, setWbExPickerOpen] = useState(false);
   const [wbEditId, setWbEditId] = useState(null); // id of workout being edited
   const [wbCopySource, setWbCopySource] = useState(null);
   const [wbIsOneOff, setWbIsOneOff] = useState(false); // true when building a one-off workout
-  const [addToPlanPicker, setAddToPlanPicker] = useState(null);
-  const [addToWorkoutPicker, setAddToWorkoutPicker] = useState(null); // {exercises} — pick existing workout
   const [pendingSoloRemoveId, setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
   const [workoutSubTab, setWorkoutSubTab] = useState("reusable"); // "reusable"|"oneoff"
   const [collapsedWo, setCollapsedWo] = useState(new Set());
@@ -1045,18 +1033,11 @@ function App() {
   const [expandedRecipeEx, setExpandedRecipeEx] = useState(new Set()); // which recipe exercise lists are expanded
   const [recipeFilter, setRecipeFilter] = useState(() => new Set(["Bodyweight"])); // multi-select category filter
   const [recipeCatDrop, setRecipeCatDrop] = useState(false); // category dropdown open
-  const [oneOffModal, setOneOffModal] = useState(null); // {exercises, name, icon} — naming step
   // Workout-level optional stats (builder)
   const [wbDuration, setWbDuration] = useState(""); // HH:MM string
   const [wbDurSec, setWbDurSec] = useState(""); // 0-59 seconds
   const [wbActiveCal, setWbActiveCal] = useState(""); // active calories
   const [wbTotalCal, setWbTotalCal] = useState(""); // total calories
-  const [statsPromptModal, setStatsPromptModal] = useState(null);
-  const [spDuration, setSpDuration] = useState(""); // HH:MM
-  const [spDurSec, setSpDurSec] = useState(""); // seconds
-  const [spActiveCal, setSpActiveCal] = useState("");
-  const [spTotalCal, setSpTotalCal] = useState("");
-  const [spMakeReusable, setSpMakeReusable] = useState(false);
   const [bootStep, setBootStep] = useState(0);
   // Workout label filter & builder
   const [woLabelFilters, setWoLabelFilters] = useState(() => new Set());
@@ -1064,13 +1045,7 @@ function App() {
   const [wbLabels, setWbLabels] = useState([]); // labels for workout being built/edited
   const [newLabelInput, setNewLabelInput] = useState("");
   // Workout completion modal
-  const [completionModal, setCompletionModal] = useState(null); // null | {workout}
-  const [retroEditModal, setRetroEditModal] = useState(null); // {groupId, entries, dateKey, sourceType, sourceName, sourceIcon, sourceId}
-  const [completionDate, setCompletionDate] = useState(""); // YYYY-MM-DD
-  const [completionAction, setCompletionAction] = useState("today"); // "today"|"past"|"schedule"
-  const [scheduleWoDate, setScheduleWoDate] = useState(""); // future date for scheduling
   // In-app confirm delete (replaces window.confirm which fails in sandbox)
-  const [confirmDelete, setConfirmDelete] = useState(null); // null | {type:"plan"|"workout"|"exercise"|"char"|"logEntry", id, name, icon}
   // Log tab sub-tabs
   const [logSubTab, setLogSubTab] = useState("exercises"); // "exercises"|"workouts"|"plans"|"social"
   // ── Social / Friends ──────────────────────────────────────────────
@@ -1085,7 +1060,6 @@ function App() {
   const [outgoingRequests, setOutgoingRequests] = useState([]); // pending requests I sent
   const [socialLoading, setSocialLoading] = useState(false);
   // Sharing
-  const [shareModal, setShareModal] = useState(null); // {type:"workout"|"exercise", item, friendId?, friendName?}
   const [incomingShares, setIncomingShares] = useState([]); // pending shares received
   const [socialMsg, setSocialMsg] = useState(null);
   const [friendSearch, setFriendSearch] = useState("");
@@ -1145,21 +1119,10 @@ function App() {
     };
   }
   // Log entry editor
-  const [logEditModal, setLogEditModal] = useState(null); // null | {idx}
-  const [logEditDraft, setLogEditDraft] = useState(null); // copy of the entry being edited
   // Calendar exercise read-only detail modal
-  const [calExDetailModal, setCalExDetailModal] = useState(null);
   // Retro check-in modal
-  const [retroCheckInModal, setRetroCheckInModal] = useState(false);
-  const [retroDate, setRetroDate] = useState("");
   // Save-as-Workout wizard (from history)
-  const [saveWorkoutWizard, setSaveWorkoutWizard] = useState(null); // null | {entries,label}
-  const [swwName, setSwwName] = useState("");
-  const [swwIcon, setSwwIcon] = useState("💪");
-  const [swwSelected, setSwwSelected] = useState([]);
   // Save-to-Plan wizard mode: "new" | "existing"
-  const [spwMode, setSpwMode] = useState("new"); // within savePlanWizard
-  const [spwTargetPlanId, setSpwTargetPlanId] = useState(null);
 
   // Load Supabase exercises on startup; useExercises() triggers re-render when done
   const _exReady = useExercises();
