@@ -5,7 +5,7 @@ import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, UI_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
-import { loadSave, doSave } from './utils/storage';
+import { loadSave, doSave, setPreviewMode } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
@@ -1378,6 +1378,7 @@ function App() {
 
       // When user clicks a password reset link, direct them to Security tab
       if (_event === "PASSWORD_RECOVERY") {
+        setIsPreviewMode(false); // arriving via password reset is a real auth — exit preview
         setAuthUser(user);
         const saved = await loadSave(_optionalChain([user, 'optionalAccess', _23 => _23.id]) || null);
         if (_optionalChain([saved, 'optionalAccess', _24 => _24.chosenClass])) {
@@ -1415,10 +1416,16 @@ function App() {
 
       // Explicit sign-out — always go to login
       if (_event === "SIGNED_OUT") {
+        setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
         setScreen("landing");
         return;
       }
+      // Sign-in (or any other auth event with a real user) implicitly exits
+      // preview mode. Without this, a user who clicked "Preview Mode" before
+      // signing in would stay flagged as preview forever, silently dropping
+      // every workout save until the next page reload.
+      setIsPreviewMode(false);
       setAuthUser(user);
       const saved = await loadSave(_optionalChain([user, 'optionalAccess', _25 => _25.id]) || null);
       if (_optionalChain([saved, 'optionalAccess', _26 => _26.chosenClass])) {
@@ -1454,6 +1461,7 @@ function App() {
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
+        setIsPreviewMode(false); // a fresh page load with a session is never preview
         setAuthUser(user);
         checkMfaStatus();
         try {
@@ -1489,6 +1497,12 @@ function App() {
       clearTimeout(fallback);
     };
   }, []);
+  // Mirror isPreviewMode into the storage layer so EVERY save path (this
+  // useEffect AND every explicit doSave call site) is gated by the same
+  // flag. Without this, an explicit doSave() in preview mode would write
+  // demo data to the real signed-in user's Supabase row — that's the bug
+  // that lost ~2 weeks of real workout history in April 2026.
+  useEffect(() => { setPreviewMode(isPreviewMode); }, [isPreviewMode]);
   useEffect(() => {
     if (screen === "main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id]) || null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email]) || null);
   }, [profile, screen, isPreviewMode]);
@@ -3334,6 +3348,7 @@ function App() {
     try {
       sessionStorage.removeItem("ilf_no_persist");
     } catch (e) {}
+    setIsPreviewMode(false); // signing out always exits preview mode
     setAuthUser(null);
     setProfile(EMPTY_PROFILE);
     // Clear all social state so next user starts fresh
@@ -7217,6 +7232,7 @@ function App() {
           icon: "🚪",
           label: "Exit Preview",
           action: () => {
+            setIsPreviewMode(false); // exit preview mode so future saves persist
             setScreen("landing");
             setProfile(EMPTY_PROFILE);
             setNavMenuOpen(false);

@@ -40,6 +40,16 @@ async function loadSave(userId) {
   try { const r=localStorage.getItem(STORAGE_KEY); return r?JSON.parse(r):null; } catch(e) { return null; }
 }
 
+// ── Preview-mode gate ──────────────────────────────────────────────────
+// Single source of truth for "are we in demo mode right now?". Gating at
+// the storage layer (rather than each call site) is the only safe place
+// because there are 7+ explicit doSave() call sites in App.js — any one
+// of them forgetting to check the flag would leak preview data into the
+// real Supabase row (which is exactly the bug that caused real user data
+// loss in mid-April 2026).
+let _previewMode = false;
+function setPreviewMode(v) { _previewMode = !!v; }
+
 // ── Coalesced remote save ──────────────────────────────────────────────
 // localStorage writes stay eager (cheap, sync, safe on tab close).
 // Supabase upserts are debounced to 500ms so rapid profile mutations
@@ -58,7 +68,14 @@ async function _flush() {
   _pending = null;
   // Chain after any in-flight write so we never interleave upserts.
   _inFlight = (async () => {
-    try { await sb.from("profiles").upsert(payload); } catch(e) { /* swallowed; localStorage is the safety net */ }
+    try {
+      const { error } = await sb.from("profiles").upsert(payload);
+      // Surface the error so silent RLS / schema / network failures don't
+      // hide for weeks. localStorage is still the safety net.
+      if (error) console.warn("[storage] profile upsert failed:", error.message || error);
+    } catch(e) {
+      console.warn("[storage] profile upsert threw:", (e && e.message) || e);
+    }
   })();
   try { await _inFlight; } finally { _inFlight = null; }
   // If another save was queued while we were flushing, drain it.
@@ -72,6 +89,12 @@ async function flushSave() {
 }
 
 async function doSave(data, userId, userEmail) {
+  // Hard-stop: never persist anything while in preview mode. This guards
+  // BOTH localStorage and the Supabase upsert, so explicit doSave() callers
+  // (profile edit, scheduling, name visibility, class pick, etc.) can no
+  // longer leak demo "Test Majiq" data into the real signed-in user's row.
+  // Must run BEFORE the audit so preview data doesn't pollute the dev log.
+  if (_previewMode) return;
   _auditProfileShape(data);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
   if (!userId) return;
@@ -89,4 +112,4 @@ if (typeof window !== 'undefined') {
   window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide(); });
 }
 
-export { loadSave, doSave, flushSave };
+export { loadSave, doSave, flushSave, setPreviewMode };
