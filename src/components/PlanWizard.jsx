@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { List } from 'react-window';
 import { useModalLifecycle } from '../utils/useModalLifecycle';
 import { calcExXP, calcDayXP, getMuscleColor, getTypeColor, hrRange } from '../utils/xp';
 import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } from '../utils/units';
@@ -21,6 +22,45 @@ function formatScheduledDate(dateStr) {
 }
 
 function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); }; }
+
+// ── Virtualized picker row (item 4: react-window) ──────────────────────────
+// Module-level so the component identity is stable across PlanWizard renders;
+// react-window only re-renders rows when `rowProps` change.
+const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, exercises, selIds, onToggle }) {
+  const ex = exercises[index];
+  if (!ex) return null;
+  const sel = selIds.has(ex.id);
+  const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
+  const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
+  const diffBg    = diffLabel === "Advanced" ? "#2e1515" : diffLabel === "Beginner" ? "#1a2e1a" : "#2e2010";
+  const exMgColor = getMuscleColor(ex.muscleGroup);
+  // The outer wrapper gets react-window's positioning style and the listitem
+  // ARIA. The inner div is the visually-styled .picker-ex-row from CSS.
+  // 4px top + 4px bottom padding bakes the inter-row gap into the slot
+  // (the gap-based flex column was 6px gap; 8px here is close enough and
+  // simpler than a wrapper margin).
+  return (
+    <div style={{...style, paddingTop:4, paddingBottom:4}} {...ariaAttributes}>
+      <div className={"picker-ex-row" + (sel ? " sel" : "")} style={{"--mg-color":exMgColor}} onClick={() => onToggle(ex.id)}>
+        <div className="picker-ex-orb"><ExIcon ex={ex} size=".95rem" color="#d4cec4" /></div>
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{fontFamily:"'Cinzel',serif", fontSize:FS.fs80, fontWeight:600, color:"#d4cec4", marginBottom:S.s2, letterSpacing:".01em"}}>
+            {ex.name}{ex.custom && <span className="custom-ex-badge" style={{marginLeft:S.s4}}>custom</span>}
+          </div>
+          <div style={{fontSize:FS.fs60, fontStyle:"italic"}}>
+            {ex.category && <span style={{color:getTypeColor(ex.category)}}>{ex.category.charAt(0).toUpperCase()+ex.category.slice(1)}</span>}
+            {ex.category && ex.muscleGroup && <span style={{color:"#8a8478"}}>{" · "}</span>}
+            {ex.muscleGroup && <span style={{color:exMgColor}}>{ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)}</span>}
+          </div>
+        </div>
+        <div style={{flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:S.s4}}>
+          <span style={{fontFamily:"'Cinzel',serif", fontSize:FS.fs63, fontWeight:700, color:"#d4cec4", letterSpacing:".04em"}}>{ex.baseXP + " XP"}</span>
+          <span style={{fontSize:FS.fs56, fontWeight:700, color:diffColor, background:diffBg, padding:"2px 6px", borderRadius:R.r3, letterSpacing:".04em"}}>{diffLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, collapsed, profile, allExById, setBDays, setCollapsedPlanEx, ssCheckedPlan, setSsCheckedPlan, planExCount, onOpenExEditor }) {
   function updateField(field, val) { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>di!==bDayIdx?d:{...d,exercises:d.exercises.map((e,j)=>j!==i?e:{...e,[field]:val})}));}); }
@@ -1036,40 +1076,23 @@ function PlanWizard(props) {
                 {(()=>{
                   const filtered=filteredExercises;
                   if(filtered.length===0) return <div className="empty" style={{padding:"20px 0"}}>No exercises found.</div>;
-                  const q=pickerSearch.trim();
                   const selIds=new Set(pickerSelected.map(e=>e.exId));
-                  const visible=filtered.slice(0,80);
                   return (
                     <>
                       <div style={{fontSize:FS.fs62,color:"#8a8478",marginBottom:S.s6,textAlign:"right"}}>
-                        {(q||pickerMuscle!=="All"||pickerTypeFilter!=="all"||pickerEquipFilter!=="all")?filtered.length+" match"+(filtered.length!==1?"es":""):"Showing 80 of "+filtered.length+" · search or filter"}
+                        {filtered.length+" match"+(filtered.length!==1?"es":"")}
                       </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:S.s6}}>
-                        {visible.map(ex=>{
-                          const sel=selIds.has(ex.id);
-                          const diffLabel=ex.difficulty||(ex.baseXP>=60?"Advanced":ex.baseXP>=45?"Intermediate":"Beginner");
-                          const diffColor=diffLabel==="Advanced"?"#7A2838":diffLabel==="Beginner"?"#5A8A58":"#A8843C";
-                          const diffBg=diffLabel==="Advanced"?"#2e1515":diffLabel==="Beginner"?"#1a2e1a":"#2e2010";
-                          const exMgColor=getMuscleColor(ex.muscleGroup);
-                          return (
-                            <div key={ex.id} className={"picker-ex-row"+(sel?" sel":"")} style={{"--mg-color":exMgColor}} onClick={()=>pickerToggleEx(ex.id)}>
-                              <div className="picker-ex-orb"><ExIcon ex={ex} size=".95rem" color="#d4cec4" /></div>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontFamily:"'Cinzel',serif",fontSize:FS.fs80,fontWeight:600,color:"#d4cec4",marginBottom:S.s2,letterSpacing:".01em"}}>{ex.name}{ex.custom && <span className="custom-ex-badge" style={{marginLeft:S.s4}}>custom</span>}</div>
-                                <div style={{fontSize:FS.fs60,fontStyle:"italic"}}>
-                                  {ex.category && <span style={{color:getTypeColor(ex.category)}}>{ex.category.charAt(0).toUpperCase()+ex.category.slice(1)}</span>}
-                                  {ex.category && ex.muscleGroup && <span style={{color:"#8a8478"}}>{" · "}</span>}
-                                  {ex.muscleGroup && <span style={{color:exMgColor}}>{ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)}</span>}
-                                </div>
-                              </div>
-                              <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:S.s4}}>
-                                <span style={{fontFamily:"'Cinzel',serif",fontSize:FS.fs63,fontWeight:700,color:"#d4cec4",letterSpacing:".04em"}}>{ex.baseXP+" XP"}</span>
-                                <span style={{fontSize:FS.fs56,fontWeight:700,color:diffColor,background:diffBg,padding:"2px 6px",borderRadius:R.r3,letterSpacing:".04em"}}>{diffLabel}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {/* Virtualized: rowHeight 60px = .picker-ex-row content (~52px) + 8px slot padding.
+                          height: min(60vh, 480px) keeps the list inside the modal sheet without
+                          overflowing on small screens. The previous slice(0,80) cap is gone —
+                          users can scroll through all matches. */}
+                      <List
+                        rowCount={filtered.length}
+                        rowHeight={60}
+                        rowComponent={PickerRow}
+                        rowProps={{ exercises: filtered, selIds, onToggle: pickerToggleEx }}
+                        style={{ height: 'min(60vh, 480px)', width: '100%' }}
+                      />
                     </>
                   );
                 })()}
