@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalLifecycle } from '../utils/useModalLifecycle';
 import { calcExXP, calcDayXP, getMuscleColor, getTypeColor, hrRange } from '../utils/xp';
 import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } from '../utils/units';
 import { normalizeHHMM, combineHHMMSec, secToHHMMSplit } from '../utils/time';
@@ -296,6 +297,16 @@ function PlanWizard(props) {
     else { document.body.style.overflow = ''; }
     return () => { document.body.style.overflow = ''; };
   }, [planWizardOpen]);
+
+  // ── Modal accessibility lifecycle (item 3 of post-Sprint-3 a11y plan) ──
+  // Three nested modals in this component: the plan wizard itself, the
+  // workout picker, and the exercise picker. Each gets inert / ESC / focus
+  // restoration via useModalLifecycle. The exercise picker's close handler
+  // delegates to the existing closePicker() function (which also resets
+  // the search/filter/selection state on dismiss).
+  useModalLifecycle(planWizardOpen, () => setPlanWizardOpen(false));
+  useModalLifecycle(bWoPickerOpen, () => setBWoPickerOpen(false));
+  useModalLifecycle(exPickerOpen, () => closePicker());
 
   // ── Class multiplier helper ──
   const clsKey = profile.chosenClass;
