@@ -1,5 +1,26 @@
 import { sb } from './supabase';
-import { STORAGE_KEY } from '../data/constants';
+import { STORAGE_KEY, PROFILE_KEYS } from '../data/constants';
+
+// ── Dev-only profile schema audit (item 5c) ────────────────────────────────
+// The plan's item 5c was to verify that no UI-only state has accidentally
+// leaked into the persisted profile. The audit found none, but we still
+// want a guardrail so future regressions are caught the moment they're
+// written. This logger runs in dev only — strictly observational, never
+// strips keys (avoids data-loss risk if a real new field is added without
+// updating PROFILE_KEYS first).
+const _warnedKeys = new Set();
+function _auditProfileShape(data) {
+  if (!import.meta.env.DEV || !data || typeof data !== 'object') return;
+  for (const k of Object.keys(data)) {
+    if (PROFILE_KEYS.has(k) || _warnedKeys.has(k)) continue;
+    _warnedKeys.add(k);
+    console.warn(
+      `[profile-audit] doSave: key "${k}" is being persisted but is not in PROFILE_KEYS. ` +
+      `If it's legitimate profile data, add it to EMPTY_PROFILE in src/data/constants.js. ` +
+      `If it's UI state that leaked in, move the setProfile call to local component state.`
+    );
+  }
+}
 
 async function loadSave(userId) {
   if(userId) {
@@ -72,7 +93,9 @@ async function doSave(data, userId, userEmail) {
   // BOTH localStorage and the Supabase upsert, so explicit doSave() callers
   // (profile edit, scheduling, name visibility, class pick, etc.) can no
   // longer leak demo "Test Majiq" data into the real signed-in user's row.
+  // Must run BEFORE the audit so preview data doesn't pollute the dev log.
   if (_previewMode) return;
+  _auditProfileShape(data);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
   if (!userId) return;
   const saveData = userEmail ? {...data, email: userEmail.toLowerCase()} : data;
