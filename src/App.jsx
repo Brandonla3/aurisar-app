@@ -13,6 +13,7 @@ import { FS, R, S } from './utils/tokens';
 import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
+import { useModalLifecycle } from './utils/useModalLifecycle';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -1126,6 +1127,37 @@ function App() {
   useEffect(() => {
     loadExercises();
   }, []);
+
+  // ── Modal accessibility lifecycle (item 3 of post-Sprint-3 a11y plan) ──
+  // For each modal portal in this component, useModalLifecycle handles:
+  //   - inert on #root while the modal is open (background non-interactive,
+  //     hidden from screen readers)
+  //   - Escape-key dismiss
+  //   - Restore focus to the element that opened the modal
+  // The hook stacks correctly when nested modals open (e.g. picker → config).
+  useModalLifecycle(!!exEditorOpen, () => setExEditorOpen(false));
+  useModalLifecycle(detailEx != null, () => setDetailEx(null));
+  useModalLifecycle(savePlanWizard != null, () => setSavePlanWizard(null));
+  useModalLifecycle(schedulePicker != null, () => setSchedulePicker(null));
+  useModalLifecycle(saveWorkoutWizard != null, () => setSaveWorkoutWizard(null));
+  useModalLifecycle(!!wbExPickerOpen, () => setWbExPickerOpen(false));
+  useModalLifecycle(addToPlanPicker != null, () => setAddToPlanPicker(null));
+  useModalLifecycle(!!retroCheckInModal, () => setRetroCheckInModal(false));
+  useModalLifecycle(statsPromptModal != null, () => setStatsPromptModal(null));
+  useModalLifecycle(calExDetailModal != null, () => setCalExDetailModal(null));
+  useModalLifecycle(retroEditModal != null, () => setRetroEditModal(null));
+  useModalLifecycle(addToWorkoutPicker != null, () => setAddToWorkoutPicker(null));
+  useModalLifecycle(oneOffModal != null, () => setOneOffModal(null));
+  useModalLifecycle(completionModal != null, () => {
+    setCompletionModal(null);
+    setCompletionAction("today");
+    setScheduleWoDate("");
+  });
+  useModalLifecycle(logEditModal != null, () => setLogEditModal(null));
+  useModalLifecycle(confirmDelete != null, () => setConfirmDelete(null));
+  useModalLifecycle(shareModal != null, () => setShareModal(null));
+  useModalLifecycle(!!feedbackOpen, () => setFeedbackOpen(false));
+
   useEffect(() => {
     // Listen for auth state changes (login, logout, magic link click)
     const {
@@ -14058,7 +14090,7 @@ function App() {
         const wUnit = weightLabel(profile.units);
         const dUnit = distLabel(profile.units);
         const age = profile.age || 30;
-        return <div className={"ex-editor-backdrop"} onClick={() => setExEditorOpen(false)}><div className={"ex-editor-sheet"} onClick={e => e.stopPropagation()} style={{
+        return createPortal(<div className={"ex-editor-backdrop"} onClick={() => setExEditorOpen(false)}><div className={"ex-editor-sheet"} onClick={e => e.stopPropagation()} style={{
             "--mg-color": getMuscleColor(ed.muscleGroup || "chest")
           }}><div className={"ex-editor-hdr"}><div><div className={"ex-editor-title"}>{exEditorMode === "edit" ? "✎ Edit Technique" : exEditorMode === "copy" ? "⎘ Copy Technique" : "⚔ Forge Technique"}</div><div className={"ex-editor-subtitle"}>{exEditorMode === "edit" ? "Sharpen your custom technique" : "Forge a new technique for your grimoire"}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setExEditorOpen(false)}>{"✕"}</button></div><div className={"ex-editor-body"}>{exEditorMode !== "edit" && <div className={"field"}><label>{"Start from existing exercise (optional)"}</label><select className={"inp"} style={{
                   appearance: "auto",
@@ -14245,14 +14277,14 @@ function App() {
                 marginTop: S.s8,
                 padding: "10px",
                 fontSize: FS.fs78
-              }} onClick={() => deleteCustomEx(ed.id)}>{"🗑 Delete Exercise"}</button>}</div></div></div>;
+              }} onClick={() => deleteCustomEx(ed.id)}>{"🗑 Delete Exercise"}</button>}</div></div></div>, document.body);
       } catch (e) {
         console.error("Exercise editor render error:", e);
         return null;
       }
     })(), document.body)
 
-    /* ══ EXERCISE DETAIL MODAL ══════════════════ */}{detailEx && <div className={"modal-backdrop"} onClick={() => setDetailEx(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()}><div className={"modal-img-row"}>{detailEx.images.map((src, i) => <img key={i} src={`${src}?w=420&h=260&fit=crop&q=80`} alt={detailEx.name} className={"modal-img"} onError={e => {
+    /* ══ EXERCISE DETAIL MODAL ══════════════════ */}{detailEx && createPortal(<div className={"modal-backdrop"} onClick={() => setDetailEx(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()}><div className={"modal-img-row"}>{detailEx.images.map((src, i) => <img key={i} src={`${src}?w=420&h=260&fit=crop&q=80`} alt={detailEx.name} className={"modal-img"} onError={e => {
             e.target.style.display = "none";
             e.target.nextSibling && (e.target.nextSibling.style.display = "flex");
           }} />)
@@ -14291,9 +14323,9 @@ function App() {
                 color: "#8a8478"
               }}>{"Mult: "}<span style={{
                   color: getMult(detailEx) > 1.02 ? UI_COLORS.success : getMult(detailEx) < 0.98 ? UI_COLORS.danger : "#b4ac9e"
-                }}>{Math.round(getMult(detailEx) * 100)}{"%"}</span></span>}</div><div /></div></div></div></div>
+                }}>{Math.round(getMult(detailEx) * 100)}{"%"}</span></span>}</div><div /></div></div></div></div>, document.body)
 
-    /* ══ SAVE-TO-PLAN WIZARD ════════════════════ */}{savePlanWizard && <div className={"spw-backdrop"} onClick={() => setSavePlanWizard(null)} role={"dialog"} aria-modal={"true"} aria-label={"Save plan"}><div className={"spw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"📋 Save To Plan"}</div><div style={{
+    /* ══ SAVE-TO-PLAN WIZARD ════════════════════ */}{savePlanWizard && createPortal(<div className={"spw-backdrop"} onClick={e => { if (e.target === e.currentTarget) setSavePlanWizard(null); }}><div className={"spw-sheet"} role={"dialog"} aria-modal={"true"} aria-label={"Save plan"}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"📋 Save To Plan"}</div><div style={{
               fontSize: FS.fs65,
               color: "#8a8478",
               marginTop: S.s2
@@ -14387,9 +14419,9 @@ function App() {
               flex: 1
             }} onClick={() => setSavePlanWizard(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={confirmSavePlanWizard}>{spwMode === "existing" ? "📋 Add to Plan" : "💾 Save New Plan"}{spwMode === "new" && spwDate ? " & Schedule" : ""}</button></div></div></div></div>
+            }} onClick={confirmSavePlanWizard}>{spwMode === "existing" ? "📋 Add to Plan" : "💾 Save New Plan"}{spwMode === "new" && spwDate ? " & Schedule" : ""}</button></div></div></div></div>, document.body)
 
-    /* ══ SCHEDULE PICKER ════════════════════════ */}{schedulePicker && <div className={"sched-backdrop"} onClick={() => setSchedulePicker(null)}><div className={"sched-sheet"} onClick={e => e.stopPropagation()}><div style={{
+    /* ══ SCHEDULE PICKER ════════════════════════ */}{schedulePicker && createPortal(<div className={"sched-backdrop"} onClick={() => setSchedulePicker(null)}><div className={"sched-sheet"} onClick={e => e.stopPropagation()}><div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between"
@@ -14428,9 +14460,9 @@ function App() {
             flex: 1
           }} onClick={() => setSchedulePicker(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
             flex: 2
-          }} onClick={confirmSchedule}>{"📅 Schedule"}</button></div></div></div>
+          }} onClick={confirmSchedule}>{"📅 Schedule"}</button></div></div></div>, document.body)
 
-    /* ══ SAVE-AS-WORKOUT WIZARD ═════════════════ */}{saveWorkoutWizard && <div className={"saw-backdrop"} onClick={() => setSaveWorkoutWizard(null)}><div className={"saw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"💪 Save As Workout"}</div><div style={{
+    /* ══ SAVE-AS-WORKOUT WIZARD ═════════════════ */}{saveWorkoutWizard && createPortal(<div className={"saw-backdrop"} onClick={() => setSaveWorkoutWizard(null)}><div className={"saw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"💪 Save As Workout"}</div><div style={{
               fontSize: FS.fs65,
               color: "#8a8478",
               marginTop: S.s2
@@ -14464,9 +14496,9 @@ function App() {
               flex: 1
             }} onClick={() => setSaveWorkoutWizard(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>
+            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>, document.body)
 
-    /* ══ WORKOUT EXERCISE PICKER ═════════════════ */}{wbExPickerOpen && <div className={"ex-picker-backdrop"} onClick={e => {
+    /* ══ WORKOUT EXERCISE PICKER ═════════════════ */}{wbExPickerOpen && createPortal(<div className={"ex-picker-backdrop"} onClick={e => {
       e.stopPropagation();
       if (!pickerConfigOpen) closePicker();
     }}><div className={"ex-picker-sheet"} onClick={e => e.stopPropagation()} style={{
@@ -15013,9 +15045,9 @@ function App() {
                 }];
                 pickerUpdateEx(entry.exId, "extraRows", rr);
               }}>{"＋ Add Row (e.g. "}{isCardio ? "interval" : "progressive set"}{")"}</button></div>;
-          })}</>}</div></div>
+          })}</>}</div></div>, document.body)
 
-    /* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && <div className={"atp-backdrop"} onClick={() => setAddToPlanPicker(null)}><div className={"atp-sheet"} onClick={e => e.stopPropagation()}><div style={{
+    /* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && createPortal(<div className={"atp-backdrop"} onClick={() => setAddToPlanPicker(null)}><div className={"atp-sheet"} onClick={e => e.stopPropagation()}><div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between"
@@ -15059,9 +15091,9 @@ function App() {
             color: "#b4ac9e"
           }}>{"→"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
           width: "100%"
-        }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></div>
+        }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></div>, document.body)
 
-    /* ══ RETRO CHECK-IN MODAL ════════════════════ */}{retroCheckInModal && <div className={"cdel-backdrop"} onClick={() => setRetroCheckInModal(false)}><div className={"cdel-sheet"} style={{
+    /* ══ RETRO CHECK-IN MODAL ════════════════════ */}{retroCheckInModal && createPortal(<div className={"cdel-backdrop"} onClick={() => setRetroCheckInModal(false)}><div className={"cdel-sheet"} style={{
         borderColor: "rgba(180,172,158,.08)",
         background: "linear-gradient(160deg,#0c0c0a,#0c0c0a)"
       }} onClick={e => e.stopPropagation()}><div className={"cdel-icon"}>{"🔥"}</div><div className={"cdel-title"}>{"Retro Check-In"}</div><div className={"cdel-body"}>{"Forgot to check in? Log a past gym visit here. Each day awards +125 XP and updates your streak."}</div><div className={"field"} style={{
@@ -15115,7 +15147,7 @@ function App() {
             flex: 1
           }} onClick={() => setRetroCheckInModal(false)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
             flex: 2
-          }} disabled={!retroDate || (profile.checkInHistory || []).includes(retroDate)} onClick={doRetroCheckIn}>{"🔥 Log Check-In"}</button></div></div></div>
+          }} disabled={!retroDate || (profile.checkInHistory || []).includes(retroDate)} onClick={doRetroCheckIn}>{"🔥 Log Check-In"}</button></div></div></div>, document.body)
 
     /* ══ WORKOUT COMPLETION MODAL ════════════════ */
     /* ══ ONE-OFF NAMING MODAL ════════════════════ */
@@ -15712,7 +15744,7 @@ function App() {
               setSpDurSec("");
             }}>{"✓ Save & Complete"}</button></div></div></div></div>, document.body)
 
-    /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */}{calExDetailModal && <div className={"modal-backdrop"} onClick={() => setCalExDetailModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */}{calExDetailModal && createPortal(<div className={"modal-backdrop"} onClick={() => setCalExDetailModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -15830,7 +15862,7 @@ function App() {
               fontSize: FS.fs75,
               fontWeight: 700,
               color: "#b4ac9e"
-            }}>{"Total: +"}{calExDetailModal.entries.reduce((s, e) => s + e.xp, 0)}{" XP"}</div></div></div></div></div>
+            }}>{"Total: +"}{calExDetailModal.entries.reduce((s, e) => s + e.xp, 0)}{" XP"}</div></div></div></div></div>, document.body)
 
     /* ══ RETRO EDIT MODAL ═══════════════════════ */}{retroEditModal && (() => {
       const rem = retroEditModal;
@@ -15855,7 +15887,7 @@ function App() {
         activeCal: _optionalChain([rem, 'access', _173 => _173.entries, 'access', _174 => _174[0], 'optionalAccess', _175 => _175.activeCal]) || null,
         totalCal: _optionalChain([rem, 'access', _176 => _176.entries, 'access', _177 => _177[0], 'optionalAccess', _178 => _178.totalCal]) || null
       };
-      return <div className={"modal-backdrop"} onClick={() => setRetroEditModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+      return createPortal(<div className={"modal-backdrop"} onClick={() => setRetroEditModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
           borderRadius: R.r16,
           padding: S.s0,
           maxHeight: "85vh",
@@ -16007,10 +16039,10 @@ function App() {
                 }));
                 setRetroEditModal(null);
                 showToast("✓ Workout log updated!");
-              }}>{"✓ Save Changes"}</button></div></div></div></div>;
+              }}>{"✓ Save Changes"}</button></div></div></div></div>, document.body);
     })()
 
-    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && <div className={"modal-backdrop"} onClick={() => setAddToWorkoutPicker(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && createPortal(<div className={"modal-backdrop"} onClick={() => setAddToWorkoutPicker(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0,
         maxHeight: "80vh",
@@ -16145,7 +16177,7 @@ function App() {
                     color: "#e67e22"
                   }}>{"+ add →"}</span></div>;
               })}</>;
-          })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></div></div>}{oneOffModal && <div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+          })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></div></div>, document.body)}{oneOffModal && createPortal(<div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -16201,7 +16233,7 @@ function App() {
             setCompletionDate(todayStr());
             setCompletionAction("today");
             setOneOffModal(null);
-          }}>{"Next: Log or Schedule →"}</button></div></div></div>}{completionModal && (() => {
+          }}>{"Next: Log or Schedule →"}</button></div></div></div>, document.body)}{completionModal && (() => {
       const wo = completionModal.workout;
       const xp = wo.exercises.reduce((s, ex) => s + calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById), 0);
       // Pick the dominant muscle group from the workout's first valid exercise as the theme color
@@ -16212,11 +16244,12 @@ function App() {
       const inPickMode = completionAction === "past";
       const inScheduleMode = completionAction === "schedule";
       const pickerValue = inPickMode && completionDate !== "pick" ? completionDate : "";
-      return <div className={"completion-backdrop"} onClick={() => {
+      return createPortal(<div className={"completion-backdrop"} onClick={e => {
+        if (e.target !== e.currentTarget) return;
         setCompletionModal(null);
         setCompletionAction("today");
         setScheduleWoDate("");
-      }} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"}><div className={"completion-sheet"} onClick={e => e.stopPropagation()} style={{
+      }}><div className={"completion-sheet"} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"} style={{
           "--mg-color": woMgColor
         }}><div style={{
             display: "flex",
@@ -16382,7 +16415,7 @@ function App() {
               } else {
                 scheduleWorkoutForDate();
               }
-            }}>{"📅 Schedule Workout"}</button>}</div></div></div>;
+            }}>{"📅 Schedule Workout"}</button>}</div></div></div>, document.body);
     })()
 
     /* ══ LOG ENTRY EDIT MODAL ════════════════════ */}{logEditModal && logEditDraft && (() => {
@@ -16402,7 +16435,7 @@ function App() {
       const dUnit = distLabel(profile.units);
       const previewXP = calcEntryXP(d);
       const xpDiff = previewXP - (_optionalChain([profile, 'access', _182 => _182.log, 'access', _183 => _183[logEditModal.idx], 'optionalAccess', _184 => _184.xp]) || 0);
-      return <div className={"ledit-backdrop"} onClick={() => setLogEditModal(null)}><div className={"ledit-sheet"} onClick={e => e.stopPropagation()}><div style={{
+      return createPortal(<div className={"ledit-backdrop"} onClick={() => setLogEditModal(null)}><div className={"ledit-sheet"} onClick={e => e.stopPropagation()}><div style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between"
@@ -16508,7 +16541,7 @@ function App() {
               flex: 1
             }} onClick={() => setLogEditModal(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={saveLogEdit}>{"✦ Save Changes"}</button></div></div></div>;
+            }} onClick={saveLogEdit}>{"✦ Save Changes"}</button></div></div></div>, document.body);
     })()
 
     /* ══ CONFIRM DELETE MODAL ════════════════════ */}{confirmDelete && (() => {
@@ -16519,7 +16552,7 @@ function App() {
       const isGeneric = typeof cd.onConfirm === 'function';
       const titleText = cd.title || (cd.type === "plan" ? "Delete Plan?" : cd.type === "workout" ? "Delete Workout?" : cd.type === "exercise" ? "Delete Exercise?" : cd.type === "logEntry" ? "Delete Log Entry?" : cd.type === "char" ? "Delete Character?" : "Are you sure?");
       const bodyEl = cd.body ? typeof cd.body === 'string' ? <span>{cd.body}</span> : cd.body : cd.type === "char" ? "This will permanently erase all your XP, battle log, plans, and workouts. This cannot be undone." : cd.type === "logEntry" ? <span>{"Remove "}<span className={"cdel-name"}>{cd.name}</span>{" from your log? "}{cd.xp && <span>{"This will deduct "}{cd.xp}{" XP."}</span>}</span> : <span>{"Are you sure you want to delete "}<span className={"cdel-name"}>{cd.name}</span>{"? This cannot be undone."}</span>;
-      return <div className={"cdel-backdrop"} onClick={() => setConfirmDelete(null)} role={"dialog"} aria-modal={"true"} aria-labelledby={"cdel-title"}><div className={"cdel-sheet"} onClick={e => e.stopPropagation()}><div className={"cdel-icon"} aria-hidden={"true"}>{cd.icon}</div><div id={"cdel-title"} className={"cdel-title"}>{titleText}</div><div className={"cdel-body"}>{bodyEl}</div>{cd.warning && <div className={"cdel-warning"}>{cd.warning}</div>}<div style={{
+      return createPortal(<div className={"cdel-backdrop"} onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(null); }}><div className={"cdel-sheet"} role={"dialog"} aria-modal={"true"} aria-labelledby={"cdel-title"}><div className={"cdel-icon"} aria-hidden={"true"}>{cd.icon}</div><div id={"cdel-title"} className={"cdel-title"}>{titleText}</div><div className={"cdel-body"}>{bodyEl}</div>{cd.warning && <div className={"cdel-warning"}>{cd.warning}</div>}<div style={{
             display: "flex",
             gap: S.s8
           }}><button className={"btn btn-ghost btn-sm"} style={{
@@ -16537,7 +16570,7 @@ function App() {
                 id
               } = cd;
               if (type === "plan") _doDeletePlan(id);else if (type === "workout") _doDeleteWorkout(id);else if (type === "exercise") _doDeleteCustomEx(id);else if (type === "logEntry") _doDeleteLogEntry(id);else if (type === "char") _doResetChar();
-            }}>{cd.confirmLabel || "🗑 Delete"}</button></div></div></div>;
+            }}>{cd.confirmLabel || "🗑 Delete"}</button></div></div></div>, document.body);
     })()
 
     /* ══ MAP OVERLAY ═════════════════════════════ */}{mapOpen && (() => {
@@ -16735,7 +16768,7 @@ function App() {
           }}>{"End"}</button></div>}</div>;
     })()
 
-    /* ══ SHARE MODAL ═════════════════════════════ */}{shareModal && <div className={"modal-backdrop"} onClick={() => setShareModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ SHARE MODAL ═════════════════════════════ */}{shareModal && createPortal(<div className={"modal-backdrop"} onClick={() => setShareModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -16828,9 +16861,9 @@ function App() {
             }} onClick={() => setShareModal({
               ...shareModal,
               step: "pick-type"
-            })}>{"← Back"}</button></>}</div></div></div>
+            })}>{"← Back"}</button></>}</div></div></div>, document.body)
 
-    /* ══ FEEDBACK MODAL ══════════════════════════ */}{feedbackOpen && <div className={"modal-backdrop"} onClick={() => setFeedbackOpen(false)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ FEEDBACK MODAL ══════════════════════════ */}{feedbackOpen && createPortal(<div className={"modal-backdrop"} onClick={() => setFeedbackOpen(false)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -16967,6 +17000,6 @@ function App() {
                   console.log("GitHub issue creation failed:", e);
                 }
               }
-            }}>{"Submit"}</button></>}</div></div></div>}</div>;
+            }}>{"Submit"}</button></>}</div></div></div>, document.body)}</div>;
 }
 export default App;
