@@ -111,7 +111,7 @@ const LazyFallback = <div style={{
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#5a5650',
+  color: '#8a8478',
   fontSize: '.75rem',
   letterSpacing: '.18em',
   textTransform: 'uppercase'
@@ -388,7 +388,7 @@ const WbExCard = React.memo(function WbExCard({
           userSelect: "none"
         }}>{"Superset"}</span></div>}<span aria-hidden={"true"} style={{
         cursor: "grab",
-        color: "#5a5650",
+        color: "#8a8478",
         fontSize: FS.fs90,
         flexShrink: 0
       }}>{"⠿"}</span><div className={"builder-ex-orb"} style={{
@@ -408,7 +408,7 @@ const WbExCard = React.memo(function WbExCard({
         flexShrink: 0
       }}>{"🏆 "}{isRunningEx && pbDisp ? pbDisp : exPBDisp}</span>}{collapsed && exD.id !== "rest_day" && <span style={{
         fontSize: FS.sm,
-        color: "#5a5650"
+        color: "#8a8478"
       }}>{noSetsEx ? "" : ex.sets + "×"}{ex.reps}{ex.weightLbs ? ` · ${displayWt(ex.weightLbs, profile.units)}` : ""}</span>}<span style={{
         fontSize: FS.fs63,
         color: "#b4ac9e",
@@ -425,7 +425,7 @@ const WbExCard = React.memo(function WbExCard({
           marginLeft: S.s2
         }}>{"⚡"}</span>}</span><span style={{
         fontSize: FS.sm,
-        color: "#5a5650",
+        color: "#8a8478",
         transition: "transform .2s",
         transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
         flexShrink: 0,
@@ -705,9 +705,9 @@ const WbExCard = React.memo(function WbExCard({
               borderColor: sel ? z.color : "rgba(45,42,36,.2)",
               background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
             }} onClick={() => updateField("hrZone", sel ? null : z.z)}><span className={"hz-name"} style={{
-                color: sel ? z.color : "#5a5650"
+                color: sel ? z.color : "#8a8478"
               }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                color: sel ? z.color : "#6a645a"
+                color: sel ? z.color : "#8a8478"
               }}>{range.lo}{"–"}{range.hi}</span></div>;
           })}</div>{ex.hrZone && <div style={{
           fontSize: FS.fs65,
@@ -4428,7 +4428,7 @@ function App() {
           minWidth: 0
         }}>{exD.name}</span>{collapsed && <span style={{
           fontSize: FS.fs55,
-          color: "#5a5650"
+          color: "#8a8478"
         }}>{summaryText}</span>}<span style={{
           fontSize: FS.sm,
           fontWeight: 700,
@@ -4436,7 +4436,7 @@ function App() {
           flexShrink: 0
         }}>{"+" + xpVal}</span><span style={{
           fontSize: FS.sm,
-          color: "#5a5650",
+          color: "#8a8478",
           transition: "transform .2s",
           transform: collapsed ? "rotate(0deg)" : "rotate(180deg)"
         }}>{"▼"}</span></div>{!collapsed && <div className={"ss-section-body"}>{renderWbExFields(ex, idx, exD)}</div>}</div>;
@@ -5678,7 +5678,7 @@ function App() {
     alignItems: "center",
     justifyContent: "center"
   }}><span style={{
-      color: "#5a5650",
+      color: "#8a8478",
       fontFamily: "serif",
       fontStyle: "italic"
     }}>{"Loading your legend…"}</span></div>;
@@ -5707,7 +5707,7 @@ function App() {
         textAlign: "center"
       }}>{"Verification Required"}</div><div style={{
         fontSize: FS.lg,
-        color: "#6a645a",
+        color: "#8a8478",
         marginBottom: S.s24,
         textAlign: "center"
       }}>{"Your account is protected with multi-factor authentication."}</div><div style={{
@@ -5735,7 +5735,7 @@ function App() {
             cursor: "pointer",
             transition: "all .15s",
             background: !mfaRecoveryMode ? "rgba(45,42,36,.5)" : "transparent",
-            color: !mfaRecoveryMode ? "#d4cec4" : "#5a5650",
+            color: !mfaRecoveryMode ? "#d4cec4" : "#8a8478",
             border: !mfaRecoveryMode ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
           }} onClick={() => {
             setMfaRecoveryMode(false);
@@ -5750,7 +5750,7 @@ function App() {
             cursor: "pointer",
             transition: "all .15s",
             background: mfaRecoveryMode ? "rgba(45,42,36,.5)" : "transparent",
-            color: mfaRecoveryMode ? "#d4cec4" : "#5a5650",
+            color: mfaRecoveryMode ? "#d4cec4" : "#8a8478",
             border: mfaRecoveryMode ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
           }} onClick={() => {
             setMfaRecoveryMode(true);
@@ -5776,7 +5776,7 @@ function App() {
             borderRadius: R.xl,
             border: "none",
             background: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-            color: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "#5a5650" : "#0c0c0a",
+            color: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "#8a8478" : "#0c0c0a",
             fontFamily: "'Cinzel',serif",
             fontSize: FS.fs62,
             fontWeight: 700,
@@ -5804,7 +5804,7 @@ function App() {
             borderRadius: R.xl,
             border: "none",
             background: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-            color: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "#5a5650" : "#0c0c0a",
+            color: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "#8a8478" : "#0c0c0a",
             fontFamily: "'Cinzel',serif",
             fontSize: FS.fs62,
             fontWeight: 700,
@@ -5822,7 +5822,7 @@ function App() {
         textAlign: "center"
       }}><span style={{
           fontSize: FS.fs68,
-          color: "#5a5650",
+          color: "#8a8478",
           cursor: "pointer"
         }} onClick={async () => {
           await sb.auth.signOut();
@@ -5835,11 +5835,11 @@ function App() {
           setScreen("landing");
         }}>{"← Back to Sign In"}</span><div style={{
           fontSize: FS.fs56,
-          color: "#3a3834",
+          color: "#8a8478",
           marginTop: S.s8
         }}>{"Lost your authenticator AND recovery codes?"}</div><div style={{
           fontSize: FS.fs56,
-          color: "#5a5650"
+          color: "#8a8478"
         }}>{"Contact support for an admin-assisted reset."}</div></div></div></div>;
 
   /* ══ LANDING PAGE ═══════════════════════════════════════════ */
@@ -5900,7 +5900,7 @@ function App() {
           textAlign: "center",
           fontSize: FS.fs78,
           lineHeight: 1.65,
-          color: "#6a645a",
+          color: "#8a8478",
           maxWidth: 260,
           margin: "0 auto 12px"
         }}>{"Every rep. Every step. Every drop of sweat earns you glory."}</p>
@@ -5980,7 +5980,7 @@ function App() {
               borderRadius: R.xl,
               border: "none",
               background: !forgotPwEmail.trim() || authLoading ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-              color: !forgotPwEmail.trim() || authLoading ? "#5a5650" : "#0c0c0a",
+              color: !forgotPwEmail.trim() || authLoading ? "#8a8478" : "#0c0c0a",
               fontFamily: "'Cinzel',serif",
               fontSize: FS.fs65,
               fontWeight: 700,
@@ -6005,7 +6005,7 @@ function App() {
                 setForgotPwEmail("");
               }}>{"← Back to Sign In"}</span><span style={{
                 fontSize: FS.lg,
-                color: "#5a5650",
+                color: "#8a8478",
                 cursor: "pointer"
               }} onClick={() => {
                 setLoginSubScreen("forgot-username");
@@ -6093,7 +6093,7 @@ function App() {
               borderRadius: R.xl,
               border: "none",
               background: !forgotPrivateId.trim() || authLoading ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-              color: !forgotPrivateId.trim() || authLoading ? "#5a5650" : "#0c0c0a",
+              color: !forgotPrivateId.trim() || authLoading ? "#8a8478" : "#0c0c0a",
               fontFamily: "'Cinzel',serif",
               fontSize: FS.fs65,
               fontWeight: 700,
@@ -6114,7 +6114,7 @@ function App() {
                 marginBottom: S.s4
               }}>{"Can’t remember your Private ID either?"}</div><div style={{
                 fontSize: FS.fs62,
-                color: "#5a5650",
+                color: "#8a8478",
                 lineHeight: 1.5
               }}>{"Contact us at "}<span style={{
                   color: UI_COLORS.info,
@@ -6176,7 +6176,7 @@ function App() {
                   margin: 0
                 }}>{authIsNew ? "Create Password" : "Password"}</label><span style={{
                   fontSize: FS.sm,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   cursor: "pointer",
                   letterSpacing: ".04em"
                 }} onClick={() => setShowAuthPw(v => !v)}>{showAuthPw ? "Hide" : "Show"}</span></div><input className={"inp"} type={showAuthPw ? "text" : "password"} value={authPassword} style={{
@@ -6217,7 +6217,7 @@ function App() {
                   lineHeight: 1
                 }}>{"✓"}</span>}</div><span style={{
                 fontSize: FS.lg,
-                color: "#5a5650",
+                color: "#8a8478",
                 userSelect: "none"
               }}>{"Remain logged in for 30 days"}</span></div>
 
@@ -6235,7 +6235,7 @@ function App() {
               borderRadius: R.xl,
               border: "none",
               background: authLoading || !authEmail.trim() || !authPassword.trim() ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-              color: authLoading || !authEmail.trim() || !authPassword.trim() ? "#5a5650" : "#0c0c0a",
+              color: authLoading || !authEmail.trim() || !authPassword.trim() ? "#8a8478" : "#0c0c0a",
               fontFamily: "'Cinzel',serif",
               fontSize: FS.fs65,
               fontWeight: 700,
@@ -6271,7 +6271,7 @@ function App() {
                 setAuthPassword("");
               }}>{"← Back to Sign In"}</span>}{!authIsNew && <span style={{
                 fontSize: FS.lg,
-                color: "#5a5650",
+                color: "#8a8478",
                 cursor: "pointer"
               }} onClick={() => {
                 setLoginSubScreen("forgot-pw");
@@ -6286,7 +6286,7 @@ function App() {
             textAlign: "center"
           }}>{!showPreviewPin && <span style={{
               fontSize: FS.fs55,
-              color: "#3a3630",
+              color: "#8a8478",
               cursor: "pointer",
               fontStyle: "italic",
               letterSpacing: ".03em"
@@ -6300,7 +6300,7 @@ function App() {
               }
             }}>{"👁 Preview Mode"}</span>}{showPreviewPin && <div><div style={{
                 fontSize: FS.fs55,
-                color: "#5a5650",
+                color: "#8a8478",
                 marginBottom: S.s6
               }}>{"Enter dev PIN"}</div><div className={"preview-pin-wrap"}><input className={"preview-pin-inp"} type={"password"} maxLength={8} value={previewPinInput} onChange={e => {
                   setPreviewPinInput(e.target.value);
@@ -6325,7 +6325,7 @@ function App() {
                 marginTop: S.s4
               }}>{"Wrong PIN"}</div>}<span style={{
                 fontSize: FS.fs50,
-                color: "#3a3630",
+                color: "#8a8478",
                 cursor: "pointer",
                 display: "inline-block",
                 marginTop: S.s6
@@ -6334,7 +6334,7 @@ function App() {
                 setPreviewPinError(false);
               }}>{"Cancel"}</span></div>}{!showPreviewPin && <div style={{
               fontSize: FS.fs50,
-              color: "#2e2c28",
+              color: "#8a8478",
               marginTop: S.s2
             }}>{"Dev access only"}</div>}</div>}</div></div></div></div>;
   return <div className={"root"} style={rootStyle}><style>{CSS}</style><div className={"bg"} />{PARTICLES.map(p => <div key={p.id} className={"pt"} style={{
@@ -6384,7 +6384,7 @@ function App() {
             setScreen("onboard");
           }}>{"Resume"}</button><span style={{
             fontSize: FS.fs58,
-            color: "#3a3834",
+            color: "#8a8478",
             cursor: "pointer",
             alignSelf: "center",
             padding: "4px 6px"
@@ -6565,7 +6565,7 @@ function App() {
             transition: "width .3s"
           }} /></div><div style={{
           fontSize: FS.fs62,
-          color: "#5a5650",
+          color: "#8a8478",
           letterSpacing: ".14em",
           textTransform: "uppercase",
           marginBottom: S.s6
@@ -6617,7 +6617,7 @@ function App() {
                 }}>{["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Mexico", "Brazil", "India", "Japan", "South Korea", "Philippines", "Other"].map(c => <option key={c} value={c}>{c}</option>)}</select></div></div><button className={"btn btn-gold"} disabled={!obName.trim() || !obFirstName.trim() || !obLastName.trim() || !obState || !obCountry} onClick={() => setObStep(2)}>{"Continue →"}</button></div></div>}{obStep === 2 && <div><h1 className={"title"} style={{
             fontSize: "clamp(1.3rem,4vw,1.9rem)"
           }}>{"Athletic History"}</h1><p style={{
-            color: "#6a645a",
+            color: "#8a8478",
             fontSize: FS.fs82,
             marginBottom: S.s12
           }}>{"Select all sports you've played — past or present. This is your strongest class signal."}</p><div style={{
@@ -6628,7 +6628,7 @@ function App() {
           }}><button className={"btn btn-ghost"} onClick={() => setObStep(1)}>{"← Back"}</button><button className={"btn btn-gold"} onClick={() => setObStep(3)}>{"Continue →"}</button></div></div>}{obStep === 3 && <div><h1 className={"title"} style={{
             fontSize: "clamp(1.3rem,4vw,1.9rem)"
           }}>{"Current Routine"}</h1><p style={{
-            color: "#6a645a",
+            color: "#8a8478",
             fontSize: FS.fs82,
             marginBottom: S.s12
           }}>{"How often do you work out today? Be honest — this calibrates your starting stats."}</p>{[{
@@ -6657,7 +6657,7 @@ function App() {
                 color: obFreq === o.val ? "#d4cec4" : "#b4ac9e"
               }}>{o.label}</div><div style={{
                 fontSize: FS.lg,
-                color: "#5a5650",
+                color: "#8a8478",
                 marginTop: S.s2
               }}>{o.sub}</div></div></div>)}<div style={{
             display: "flex",
@@ -6666,7 +6666,7 @@ function App() {
           }}><button className={"btn btn-ghost"} onClick={() => setObStep(2)}>{"← Back"}</button><button className={"btn btn-gold"} disabled={!obFreq} onClick={() => setObStep(4)}>{"Continue →"}</button></div></div>}{obStep === 4 && <div><h1 className={"title"} style={{
             fontSize: "clamp(1.3rem,4vw,1.9rem)"
           }}>{"Discipline Trait"}</h1><p style={{
-            color: "#6a645a",
+            color: "#8a8478",
             fontSize: FS.fs82,
             marginBottom: S.s12
           }}>{"When do you usually work out? Timing unlocks hidden character traits."}</p>{[{
@@ -6695,7 +6695,7 @@ function App() {
                 color: obTiming === o.val ? "#d4cec4" : "#b4ac9e"
               }}>{o.label}</div><div style={{
                 fontSize: FS.lg,
-                color: "#5a5650",
+                color: "#8a8478",
                 marginTop: S.s2
               }}>{o.sub}</div></div></div>)}<div style={{
             display: "flex",
@@ -6704,14 +6704,14 @@ function App() {
           }}><button className={"btn btn-ghost"} onClick={() => setObStep(3)}>{"← Back"}</button><button className={"btn btn-gold"} disabled={!obTiming} onClick={() => setObStep(5)}>{"Continue →"}</button></div></div>}{obStep === 5 && <div><h1 className={"title"} style={{
             fontSize: "clamp(1.3rem,4vw,1.9rem)"
           }}>{"Fitness Identity"}</h1><p style={{
-            color: "#6a645a",
+            color: "#8a8478",
             fontSize: FS.fs82,
             marginBottom: S.s12
           }}>{"Pick up to 3 that best describe your mindset. These shape your stat affinity."}</p><div style={{
             marginBottom: S.s12
           }}>{OB_PRIORITIES.map(p => <span key={p.val} style={chipSt(obPriorities.includes(p.val))} onClick={() => togglePri(p.val)}>{p.label}</span>)}<div style={{
               fontSize: FS.fs68,
-              color: "#5a5650",
+              color: "#8a8478",
               marginTop: S.s6,
               fontStyle: "italic"
             }}>{`${obPriorities.length}/3 selected`}</div></div><div style={{
@@ -6720,7 +6720,7 @@ function App() {
           }}><button className={"btn btn-ghost"} onClick={() => setObStep(4)}>{"← Back"}</button><button className={"btn btn-gold"} onClick={() => setObStep(6)}>{"Continue →"}</button></div></div>}{obStep === 6 && <div><h1 className={"title"} style={{
             fontSize: "clamp(1.3rem,4vw,1.9rem)"
           }}>{"Training Style"}</h1><p style={{
-            color: "#6a645a",
+            color: "#8a8478",
             fontSize: FS.fs82,
             marginBottom: S.s12
           }}>{"Your natural approach to fitness — this fine-tunes your class assignment."}</p>{[{
@@ -6757,7 +6757,7 @@ function App() {
                 color: obStyle === o.val ? "#d4cec4" : "#b4ac9e"
               }}>{o.label}</div><div style={{
                 fontSize: FS.lg,
-                color: "#5a5650",
+                color: "#8a8478",
                 marginTop: S.s2
               }}>{o.sub}</div></div></div>)}<div style={{
             display: "flex",
@@ -6772,7 +6772,7 @@ function App() {
         "--cls-color": dc.color,
         "--cls-glow": dc.glow
       }}><p style={{
-          color: "#5a5650",
+          color: "#8a8478",
           fontSize: FS.md,
           letterSpacing: ".14em",
           textTransform: "uppercase"
@@ -6801,7 +6801,7 @@ function App() {
     /* ══ CLASS PICK ═════════════════════════════ */}{screen === "classPick" && <div className={"screen"}><h1 className={"title"} style={{
         fontSize: "clamp(1.2rem,4vw,1.7rem)"
       }}>{"Choose Your Path"}</h1><p style={{
-        color: "#5a5650",
+        color: "#8a8478",
         fontSize: FS.fs75,
         marginBottom: S.s12,
         textAlign: "center"
@@ -6826,11 +6826,11 @@ function App() {
             color: c.glow
           }}>{c.name}</div>{c.locked && <div style={{
             fontSize: FS.fs58,
-            color: "#5a5650",
+            color: "#8a8478",
             marginTop: S.s2
           }}>{"🔒 Coming Soon"}</div>}{!c.locked && <div style={{
             fontSize: FS.fs74,
-            color: "#5a5650",
+            color: "#8a8478",
             marginTop: S.s4,
             lineHeight: 1.4
           }}>{c.description}</div>}</div>)}</div><button className={"btn btn-gold"} disabled={!profile.chosenClass} onClick={() => confirmClass(profile.chosenClass)}>{"Confirm Class"}</button></div>
@@ -6866,7 +6866,7 @@ function App() {
             textAlign: "right"
           }}><div className={"hud-lv"}>{level}</div><div className={"hud-lv-lbl"}>{"Level"}</div><div style={{
               fontSize: FS.fs48,
-              color: "#4a4438",
+              color: "#8a8478",
               textAlign: "right",
               marginTop: S.s2,
               letterSpacing: ".03em",
@@ -6972,7 +6972,7 @@ function App() {
 
       /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises", "mdi:dumbbell"], ["workouts", "Workouts", "mdi:weight-lifter"], ["calendar", "Calendar", "mdi:calendar-blank"], ["character", "Character", "game-icons:crossed-swords"], ["social", "Guild", "game-icons:tribal-pendant"]].map(([t, l, iconName]) => {
             const isOn = activeTab === t;
-            const tabColor = isOn ? "#d4cec4" : "#6a6050";
+            const tabColor = isOn ? "#d4cec4" : "#8a8478";
             const iconPath = iconName.replace(":", "/");
             const iconSrc = `https://api.iconify.design/${iconPath}.svg?color=${encodeURIComponent(tabColor)}`;
             return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
@@ -7003,7 +7003,7 @@ function App() {
               flex: 1
             }} /><button style={{
               fontSize: FS.fs50,
-              color: "#5a5650",
+              color: "#8a8478",
               background: "transparent",
               border: "none",
               cursor: "pointer",
@@ -7516,10 +7516,10 @@ function App() {
                               fontWeight: 500
                             }}>{mgLabel}</span>}{mgLabel && diffCls && <span style={{
                               fontSize: FS.fs45,
-                              color: "#3a3834"
+                              color: "#8a8478"
                             }}>{"·"}</span>}{diffCls && <span className={"lib-diff-badge " + diffCls}>{ex.difficulty}</span>}<span style={{
                               fontSize: FS.fs50,
-                              color: "#6a6050",
+                              color: "#8a8478",
                               fontWeight: 600
                             }}>{(ex.baseXP || 0) + " XP"}</span></div></div>;
                       })}</div></div></div>)}</div>}{/* ═══ FILTERED VIEW ═══ */
@@ -7569,7 +7569,7 @@ function App() {
                         right: 8,
                         top: "50%",
                         transform: "translateY(-50%) rotate(" + (libOpenDrop === "type" ? "180deg" : "0deg") + ")",
-                        color: libTypeFilters.size > 0 ? "#C4A044" : "#6a6050",
+                        color: libTypeFilters.size > 0 ? "#C4A044" : "#8a8478",
                         fontSize: FS.sm,
                         transition: "transform .15s",
                         lineHeight: 1
@@ -7612,7 +7612,7 @@ function App() {
                               lineHeight: 1
                             }}>{"✓"}</span>}</div><span style={{
                             fontSize: FS.lg,
-                            color: sel ? getTypeColor(val) : avail ? "#b4ac9e" : "#5a5650",
+                            color: sel ? getTypeColor(val) : avail ? "#b4ac9e" : "#8a8478",
                             whiteSpace: "nowrap"
                           }}>{TYPE_LABELS[val]}</span></div>;
                       })}</div>}</div> /* ── Muscle dropdown ── */
@@ -7636,7 +7636,7 @@ function App() {
                         right: 8,
                         top: "50%",
                         transform: "translateY(-50%) rotate(" + (libOpenDrop === "muscle" ? "180deg" : "0deg") + ")",
-                        color: libMuscleFilters.size > 0 ? "#7A8F8B" : "#6a6050",
+                        color: libMuscleFilters.size > 0 ? "#7A8F8B" : "#8a8478",
                         fontSize: FS.sm,
                         transition: "transform .15s",
                         lineHeight: 1
@@ -7701,7 +7701,7 @@ function App() {
                         right: 8,
                         top: "50%",
                         transform: "translateY(-50%) rotate(" + (libOpenDrop === "equip" ? "180deg" : "0deg") + ")",
-                        color: libEquipFilters.size > 0 ? UI_COLORS.accent : "#6a6050",
+                        color: libEquipFilters.size > 0 ? UI_COLORS.accent : "#8a8478",
                         fontSize: FS.sm,
                         transition: "transform .15s",
                         lineHeight: 1
@@ -7792,7 +7792,7 @@ function App() {
                   marginBottom: S.s8
                 }}><div style={{
                     fontSize: FS.fs68,
-                    color: "#4a4438"
+                    color: "#8a8478"
                   }}>{libFiltered.length + " exercises"}</div>{hasFilters && <button onClick={clearAll} style={{
                     background: "transparent",
                     border: "none",
@@ -7963,11 +7963,11 @@ function App() {
                         }}>{ex.category && <span style={{
                             color: getTypeColor(ex.category)
                           }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}{ex.category && ex.muscleGroup && <span style={{
-                            color: "#5a5650"
+                            color: "#8a8478"
                           }}>{" · "}</span>}{ex.muscleGroup && <span style={{
                             color: getMuscleColor(ex.muscleGroup)
                           }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}{ex.equipment && ex.equipment !== "bodyweight" && <span style={{
-                            color: "#5a5650"
+                            color: "#8a8478"
                           }}>{" · "}</span>}{ex.equipment && ex.equipment !== "bodyweight" && <span style={{
                             color: "#8a8478"
                           }}>{ex.equipment}</span>}</div></div> /* Right */
@@ -7995,7 +7995,7 @@ function App() {
                         }}>{diffLabel}</span> : null}{!libSelectMode && <button style={{
                           background: "transparent",
                           border: "none",
-                          color: isFav ? "#d4cec4" : "#3a3834",
+                          color: isFav ? "#d4cec4" : "#8a8478",
                           fontSize: FS.fs90,
                           cursor: "pointer",
                           padding: S.s0,
@@ -8081,7 +8081,7 @@ function App() {
                         fontStyle: "italic"
                       }}>{libDetailEx.muscleGroup ? libDetailEx.muscleGroup.charAt(0).toUpperCase() + libDetailEx.muscleGroup.slice(1) : ""}</span>{libDetailEx.equipment && <span style={{
                         fontSize: FS.md,
-                        color: "#6a6050",
+                        color: "#8a8478",
                         fontStyle: "italic"
                       }}>{"· " + libDetailEx.equipment}</span>}{libDetailEx.difficulty && <span style={{
                         fontSize: FS.md,
@@ -8219,7 +8219,7 @@ function App() {
                 marginBottom: S.s10
               }}><div style={{
                   fontSize: FS.fs65,
-                  color: "#4a4438",
+                  color: "#8a8478",
                   textTransform: "uppercase",
                   letterSpacing: ".1em"
                 }}>{"Favorite Exercises"}</div>{(profile.favoriteExercises || []).length > 0 && <button onClick={() => {
@@ -8429,7 +8429,7 @@ function App() {
                       }}>{ex.category && <span style={{
                           color: getTypeColor(ex.category)
                         }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}{ex.category && ex.muscleGroup && <span style={{
-                          color: "#5a5650"
+                          color: "#8a8478"
                         }}>{" · "}</span>}{ex.muscleGroup && <span style={{
                           color: getMuscleColor(ex.muscleGroup)
                         }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}</div></div>{!favSelectMode && <div style={{
@@ -8468,7 +8468,7 @@ function App() {
               marginTop: S.s8
             }}><div style={{
                 fontSize: FS.fs65,
-                color: "#4a4438",
+                color: "#8a8478",
                 textTransform: "uppercase",
                 letterSpacing: ".1em",
                 marginBottom: S.s10
@@ -8532,7 +8532,7 @@ function App() {
                       }}>{ex.category && <span style={{
                           color: getTypeColor(ex.category)
                         }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}{ex.category && ex.muscleGroup && <span style={{
-                          color: "#5a5650"
+                          color: "#8a8478"
                         }}>{" · "}</span>}{ex.muscleGroup && <span style={{
                           color: getMuscleColor(ex.muscleGroup)
                         }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}</div></div><div style={{
@@ -8592,7 +8592,7 @@ function App() {
                         }} style={{
                           background: "transparent",
                           border: "none",
-                          color: isFav ? "#d4cec4" : "#3a3834",
+                          color: isFav ? "#d4cec4" : "#8a8478",
                           fontSize: FS.fs90,
                           cursor: "pointer",
                           padding: S.s0,
@@ -8671,7 +8671,7 @@ function App() {
                     right: 8,
                     top: "50%",
                     transform: "translateY(-50%) rotate(" + (woLabelDropOpen ? "180deg" : "0deg") + ")",
-                    color: woLabelFilters.size > 0 ? "#C4A044" : "#6a6050",
+                    color: woLabelFilters.size > 0 ? "#C4A044" : "#8a8478",
                     fontSize: FS.sm,
                     transition: "transform .15s",
                     lineHeight: 1
@@ -8811,7 +8811,7 @@ function App() {
                         fontSize: FS.fs55,
                         letterSpacing: ".06em",
                         cursor: "pointer",
-                        color: "#5a5650",
+                        color: "#8a8478",
                         background: "transparent",
                         border: "none",
                         borderRight: "1px solid rgba(180,172,158,.06)",
@@ -8823,7 +8823,7 @@ function App() {
                         fontSize: FS.fs55,
                         letterSpacing: ".06em",
                         cursor: "pointer",
-                        color: "#5a5650",
+                        color: "#8a8478",
                         background: "transparent",
                         border: "none",
                         borderRight: "1px solid rgba(180,172,158,.06)",
@@ -8932,7 +8932,7 @@ function App() {
                           fontSize: FS.fs55,
                           letterSpacing: ".06em",
                           cursor: "pointer",
-                          color: "#5a5650",
+                          color: "#8a8478",
                           background: "transparent",
                           border: "none",
                           borderRight: "1px solid rgba(180,172,158,.06)",
@@ -9129,7 +9129,7 @@ function App() {
                         right: 8,
                         top: "50%",
                         transform: "translateY(-50%) rotate(" + (recipeCatDrop ? "180deg" : "0deg") + ")",
-                        color: recipeFilter.size > 0 ? "#C4A044" : "#6a6050",
+                        color: recipeFilter.size > 0 ? "#C4A044" : "#8a8478",
                         fontSize: FS.sm,
                         transition: "transform .15s",
                         lineHeight: 1
@@ -9473,11 +9473,11 @@ function App() {
                     width: 36,
                     height: 36
                   }} onClick={() => setWbIcon(ic)}>{ic}</div>)}</div></div><div className={"field"}><label>{"Description "}<span style={{
-                    color: "#5a5650",
+                    color: "#8a8478",
                     fontWeight: "normal"
                   }}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div></div>
             /* Labels panel */<div className={"wb-section"}><div className={"wb-section-hdr"}><span className={"wb-section-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{
-                  color: "#5a5650",
+                  color: "#8a8478",
                   fontWeight: "normal",
                   letterSpacing: ".05em",
                   marginLeft: S.s6,
@@ -9521,7 +9521,7 @@ function App() {
                     setNewLabelInput("");
                   }}>{"+"}</button></span></div></div>
             /* Stats panel: Duration / Calories */<div className={"wb-section"}><div className={"wb-section-hdr"}><span className={"wb-section-hdr-icon"}>{"⏱"}</span>{"Session Stats"}<span style={{
-                  color: "#5a5650",
+                  color: "#8a8478",
                   fontWeight: "normal",
                   letterSpacing: ".05em",
                   marginLeft: S.s6,
@@ -9530,7 +9530,7 @@ function App() {
                   flex: 1.5,
                   marginBottom: S.s0
                 }}><label>{"Duration "}<span style={{
-                      color: "#5a5650",
+                      color: "#8a8478",
                       fontWeight: "normal"
                     }}>{"(HH:MM)"}</span></label><input className={"inp"} type={"text"} inputMode={"numeric"} value={wbDuration} onChange={e => setWbDuration(e.target.value)} onBlur={e => setWbDuration(normalizeHHMM(e.target.value))} placeholder={"00:00"} /></div><div className={"field"} style={{
                   flex: 0.8,
@@ -9834,7 +9834,7 @@ function App() {
                   const badgeCls = days === 0 ? "badge-today" : days <= 3 ? "badge-soon" : "badge-future";
                   const badgeTxt = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d away`;
                   return <div key={item.id} className={"upcoming-card"}><div className={"upcoming-icon"}>{item.icon}</div><div className={"upcoming-info"}><div className={"upcoming-name"}>{item.name}</div><div className={"upcoming-date"}>{formatScheduledDate(item.date)}{item.notes ? <span style={{
-                          color: "#6a645a",
+                          color: "#8a8478",
                           marginLeft: S.s6
                         }}>{item.notes}</span> : ""}</div></div><span className={`upcoming-badge ${badgeCls}`}>{badgeTxt}</span><div style={{
                       fontSize: FS.fs65,
@@ -10011,7 +10011,7 @@ function App() {
                               color: "#8a8478",
                               flex: 1
                             }}>{day.exercises.length === 0 ? <span style={{
-                                color: "#6a645a",
+                                color: "#8a8478",
                                 fontStyle: "italic"
                               }}>{"Rest"}</span> : day.exercises.map((e, ei) => {
                                 const exD = allExById[e.exId];
@@ -10082,7 +10082,7 @@ function App() {
                         verticalAlign: "middle"
                       }}>{plan.durCount > 1 ? `${plan.durCount} ${plan.type}s` : plan.type}</span></span>}</div>{(plan.startDate || plan.endDate) && <div style={{
                     fontSize: FS.fs63,
-                    color: "#5a5650",
+                    color: "#8a8478",
                     marginTop: S.s4
                   }}>{plan.startDate && <span>{"📅 "}{new Date(plan.startDate + "T12:00:00").toLocaleDateString([], {
                         month: "short",
@@ -10099,7 +10099,7 @@ function App() {
                       const e = new Date(plan.endDate + "T12:00:00");
                       const days = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
                       return <span style={{
-                        color: "#5a5650",
+                        color: "#8a8478",
                         marginLeft: S.s4
                       }}>{"("}{days}{" day"}{days !== 1 ? "s" : ""}{")"}</span>;
                     })()}</div>}</div><div className={"xp-proj-value"}>{"⚡ "}{totalXP.toLocaleString()}</div></div><div className={"day-tab-row"}>{plan.days.map((d, i) => <div key={i} className={`day-tab ${vDayIdx === i ? "on" : ""} ${d.exercises.length === 0 ? "rest-day" : ""}`} onClick={() => setVDayIdx(i)}>{d.label}</div>)}</div>{currentDay.exercises.length > 0 && <div className={"day-xp-row"}><span className={"day-xp-label"}>{currentDay.label}{" projected XP"}</span><span className={"day-xp-value"}>{"⚡ "}{dayXP}</span></div>}{!plan.custom && <div style={{
@@ -10169,7 +10169,7 @@ function App() {
                         marginBottom: collapsed ? 0 : 7
                       }}><span aria-hidden={"true"} style={{
                           cursor: "grab",
-                          color: "#5a5650",
+                          color: "#8a8478",
                           fontSize: FS.fs90,
                           flexShrink: 0
                         }}>{"⠿"}</span><div style={{
@@ -10269,7 +10269,7 @@ function App() {
                             display: "flex",
                             justifyContent: "space-between",
                             fontSize: FS.fs55,
-                            color: "#6a645a",
+                            color: "#8a8478",
                             marginTop: S.s2
                           }}><span>{"50% Deload"}</span><span>{"100% Normal"}</span><span>{"200% Max"}</span></div></div>}{isCardioEx && <div style={{
                           marginBottom: S.s6
@@ -10303,9 +10303,9 @@ function App() {
                                 borderColor: sel ? z.color : "rgba(45,42,36,.2)",
                                 background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
                               }} onClick={() => updateDetailEx(vDayIdx, exI, "hrZone", sel ? null : z.z)}><span className={"hz-name"} style={{
-                                  color: sel ? z.color : "#5a5650"
+                                  color: sel ? z.color : "#8a8478"
                                 }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                                  color: sel ? z.color : "#6a645a"
+                                  color: sel ? z.color : "#8a8478"
                                 }}>{range.lo}{"–"}{range.hi}</span></div>;
                             })}</div>{ex.hrZone && <div style={{
                             fontSize: FS.fs65,
@@ -10529,7 +10529,7 @@ function App() {
               /* Scheduled items */{selSched.length > 0 && <><div style={{
                   fontFamily: "'Inter',sans-serif",
                   fontSize: FS.fs54,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   letterSpacing: ".1em",
                   textTransform: "uppercase",
                   marginBottom: S.s6
@@ -10561,7 +10561,7 @@ function App() {
                 return <><div style={{
                     fontFamily: "'Inter',sans-serif",
                     fontSize: FS.fs54,
-                    color: "#5a5650",
+                    color: "#8a8478",
                     letterSpacing: ".1em",
                     textTransform: "uppercase",
                     marginBottom: S.s6,
@@ -10590,7 +10590,7 @@ function App() {
                           minWidth: 0
                         }}><div className={"log-group-name"}>{label}</div><div className={"log-group-meta"}>{uniqueExCount}{" exercise"}{uniqueExCount !== 1 ? "s" : ""}{" · "}{first.time}</div>{hasStats && <div style={{
                             fontSize: FS.fs50,
-                            color: "#6a645a",
+                            color: "#8a8478",
                             marginTop: S.s2,
                             display: "flex",
                             gap: S.s8
@@ -10598,7 +10598,7 @@ function App() {
                             prefix: "⚡ "
                           })}</div><span style={{
                           fontSize: FS.sm,
-                          color: "#5a5650",
+                          color: "#8a8478",
                           flexShrink: 0,
                           transition: "transform .2s",
                           transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
@@ -10677,10 +10677,10 @@ function App() {
                             marginLeft: S.s6
                           }}>{isMetric(profile.units) ? miToKm(e.distanceMi) + " km" : e.distanceMi + " mi"}</span> : ""}<span style={{
                             marginLeft: S.s6,
-                            color: "#6a645a"
+                            color: "#8a8478"
                           }}>{e.time}</span></div>{uHasStats && <div style={{
                           fontSize: FS.fs50,
-                          color: "#6a645a",
+                          color: "#8a8478",
                           marginTop: S.s2,
                           display: "flex",
                           gap: S.s8
@@ -10894,7 +10894,7 @@ function App() {
                 padding: "8px 10px",
                 fontSize: FS.sm,
                 fontWeight: 600,
-                color: noneSelected ? "#5a5650" : "#b4ac9e",
+                color: noneSelected ? "#8a8478" : "#b4ac9e",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -10917,7 +10917,7 @@ function App() {
                   whiteSpace: "nowrap"
                 }}>{chipLabel}</span><span style={{
                   fontSize: FS.fs46,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   flexShrink: 0
                 }}>{open ? "\u25B2" : "\u25BC"}</span></div>{
               // Dropdown overlay
@@ -10970,7 +10970,7 @@ function App() {
                       background: on ? "rgba(180,172,158,.07)" : "transparent",
                       transition: "background .1s",
                       fontSize: FS.fs62,
-                      color: on ? "#d4cec4" : "#6a645a"
+                      color: on ? "#d4cec4" : "#8a8478"
                     }} onClick={() => {
                       setSelected(on ? selected.filter(s => s !== opt) : [...selected, opt]);
                     }}><span style={{
@@ -11021,7 +11021,7 @@ function App() {
                 transition: "all .15s",
                 letterSpacing: ".04em",
                 background: lbScope === scope ? "rgba(45,42,36,.5)" : "transparent",
-                color: lbScope === scope ? "#d4cec4" : "#5a5650",
+                color: lbScope === scope ? "#d4cec4" : "#8a8478",
                 border: lbScope === scope ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
               }} onClick={() => setLbScope(scope)}>{scope === "friends" ? "\uD83D\uDC65 Friends" : "\uD83C\uDF0D World"}</div>)}</div>{/* Filter row: State + Country multi-selects (World only) */
             lbScope === "world" && <div style={{
@@ -11064,7 +11064,7 @@ function App() {
               }}>{"▼"}</span></div> /* Active filter description */
             <div style={{
               fontSize: FS.sm,
-              color: "#6a6050",
+              color: "#8a8478",
               marginBottom: S.s12,
               paddingLeft: 4,
               fontStyle: "italic"
@@ -11121,11 +11121,11 @@ function App() {
                       marginLeft: S.s6
                     }}>{cls.icon + " " + cls.name}</span>{myPublicId && <span style={{
                       fontSize: FS.fs44,
-                      color: "#5a5650",
+                      color: "#8a8478",
                       marginLeft: S.s4
                     }}>{"#" + myPublicId}</span>}<span style={{
                       fontSize: FS.fs50,
-                      color: "#5a5650",
+                      color: "#8a8478",
                       marginLeft: S.s4
                     }}>{"you"}</span></div><div style={{
                     display: "flex",
@@ -11134,7 +11134,7 @@ function App() {
                     flexWrap: "wrap"
                   }}><span style={{
                       fontSize: FS.fs56,
-                      color: "#6a645a"
+                      color: "#8a8478"
                     }}>{"Lv." + xpToLevel(profile.xp || 0)}{profile.state || profile.country ? " \u00b7 " : ""}{profile.state ? profile.state : ""}{profile.country ? (profile.state ? ", " : "") + (profile.country === "United States" ? "US" : profile.country === "United Kingdom" ? "UK" : profile.country === "Canada" ? "CA" : profile.country === "Australia" ? "AU" : profile.country === "Germany" ? "DE" : profile.country === "France" ? "FR" : profile.country === "Mexico" ? "MX" : profile.country === "Brazil" ? "BR" : profile.country === "India" ? "IN" : profile.country === "Japan" ? "JP" : profile.country === "South Korea" ? "KR" : profile.country === "Philippines" ? "PH" : profile.country || "") : ""}{profile.gym ? " \u00b7 " + profile.gym : ""}{profile.checkInStreak > 0 ? " \u00b7 \uD83D\uDD25" + profile.checkInStreak : ""}</span>{lbScope === "friends" && authUser && lbWorldRanks[authUser.id] && <span style={{
                       fontSize: FS.fs46,
                       fontWeight: 700,
@@ -11152,7 +11152,7 @@ function App() {
                     color: tc
                   }}>{fmtVal(lbFilter, myVal)}</div><div style={{
                     fontSize: FS.fs50,
-                    color: "#4a4438",
+                    color: "#8a8478",
                     marginTop: S.s2
                   }}>{af.label}</div></div></div></div>} /* Leaderboard list */
             <div style={{
@@ -11170,13 +11170,13 @@ function App() {
               }}><span style={{
                   width: 36,
                   fontSize: FS.fs52,
-                  color: "#4a4438",
+                  color: "#8a8478",
                   textTransform: "uppercase",
                   letterSpacing: ".08em"
                 }}>{"#"}</span><span style={{
                   flex: 1,
                   fontSize: FS.fs52,
-                  color: "#4a4438",
+                  color: "#8a8478",
                   textTransform: "uppercase",
                   letterSpacing: ".08em"
                 }}>{"Player"}</span><span style={{
@@ -11199,14 +11199,14 @@ function App() {
                   margin: "0 auto 8px"
                 }} /><div style={{
                   fontSize: FS.fs62,
-                  color: "#5a5650"
+                  color: "#8a8478"
                 }}>{"Loading rankings…"}</div></div>}{/* Player rows — Design 3: accent strip + medals */
               !lbLoading && sorted.map(function (row, idx) {
                 var rank = idx + 1;
                 var val = getRowVal(row, lbFilter);
                 var rowCls = row.chosen_class ? CLASSES[row.chosen_class] || CLASSES.warrior : CLASSES.warrior;
                 var isMe = row.is_me;
-                var rankColor = rank === 1 ? "#c49428" : rank === 2 ? "#8a8478" : rank === 3 ? "#7a5230" : "#4a4438";
+                var rankColor = rank === 1 ? "#c49428" : rank === 2 ? "#8a8478" : rank === 3 ? "#7a5230" : "#8a8478";
                 var medal = rank === 1 ? "\uD83E\uDD47" : rank === 2 ? "\uD83E\uDD48" : rank === 3 ? "\uD83E\uDD49" : null;
                 var worldRank = lbScope === "friends" ? lbWorldRanks[row.user_id] : null;
                 var countryCode = row.country === "United States" ? "US" : row.country === "United Kingdom" ? "UK" : row.country === "Canada" ? "CA" : row.country === "Australia" ? "AU" : row.country === "Germany" ? "DE" : row.country === "France" ? "FR" : row.country === "Mexico" ? "MX" : row.country === "Brazil" ? "BR" : row.country === "India" ? "IN" : row.country === "Japan" ? "JP" : row.country === "South Korea" ? "KR" : row.country === "Philippines" ? "PH" : row.country || "";
@@ -11261,11 +11261,11 @@ function App() {
                           marginLeft: S.s6
                         }}>{rowCls.icon + " " + rowCls.name}</span>{row.public_id && <span style={{
                           fontSize: FS.fs44,
-                          color: "#5a5650",
+                          color: "#8a8478",
                           marginLeft: S.s4
                         }}>{"#" + row.public_id}</span>}{isMe && <span style={{
                           fontSize: FS.fs48,
-                          color: "#5a5650",
+                          color: "#8a8478",
                           marginLeft: S.s4
                         }}>{"you"}</span>}</div><div style={{
                         display: "flex",
@@ -11274,7 +11274,7 @@ function App() {
                         flexWrap: "wrap"
                       }}><span style={{
                           fontSize: FS.fs52,
-                          color: "#6a645a"
+                          color: "#8a8478"
                         }}>{"Lv." + row.level}{loc ? " \u00b7 " + loc : ""}{row.gym ? " \u00b7 " + row.gym : ""}{row.streak > 0 ? " \u00b7 \uD83D\uDD25" + row.streak : ""}</span>{worldRank && <span style={{
                           fontSize: FS.fs46,
                           fontWeight: 700,
@@ -11290,11 +11290,11 @@ function App() {
                     }}><div style={{
                         fontSize: FS.fs78,
                         fontWeight: "700",
-                        color: val ? tc : "#3a3834",
+                        color: val ? tc : "#8a8478",
                         fontFamily: "'Inter',sans-serif"
                       }}>{fmtVal(lbFilter, val)}</div><div style={{
                         fontSize: FS.fs44,
-                        color: "#4a4438",
+                        color: "#8a8478",
                         marginTop: S.s2
                       }}>{af.label}</div></div></div></div>;
               })}{/* Empty state */
@@ -11302,14 +11302,14 @@ function App() {
                 padding: "24px 14px",
                 textAlign: "center",
                 fontSize: FS.fs66,
-                color: "#5a5650",
+                color: "#8a8478",
                 fontStyle: "italic"
               }}>{lbScope === "friends" ? "No friends to rank yet. Add friends in the Guild tab!" : "No warriors found matching your filters."}</div>}{/* Player count footer */
               !lbLoading && sorted.length > 0 && <div style={{
                 padding: "8px 14px",
                 textAlign: "center",
                 fontSize: FS.fs56,
-                color: "#3a3834",
+                color: "#8a8478",
                 fontStyle: "italic",
                 borderTop: "1px solid rgba(45,42,36,.12)"
               }}>{sorted.length + " warrior" + (sorted.length !== 1 ? "s" : "") + " ranked" + (lbStateFilters.length || lbCountryFilters.length ? " (filtered)" : "")}</div>}</div></div>;
@@ -11351,7 +11351,7 @@ function App() {
                   flex: 1
                 }}><div className={"quest-name"}>{q.name}</div><div className={"quest-desc"}>{q.desc}</div>{progressText && !isDone && <div style={{
                     fontSize: FS.fs65,
-                    color: "#5a5650",
+                    color: "#8a8478",
                     marginTop: S.s4
                   }}>{"Progress: "}{progressText}</div>}<div className={"quest-reward"}>{isClaimed ? "✓ Claimed " + formatXP(q.xp) : formatXP(q.xp, {
                       signed: true,
@@ -11416,7 +11416,7 @@ function App() {
                     color: _optionalChain([HR_ZONES, 'access', _139 => _139[e.hrZone - 1], 'optionalAccess', _140 => _140.color])
                   }}>{"Z"}{e.hrZone}</span> : ""}<span style={{
                     marginLeft: S.s6,
-                    color: "#6a645a"
+                    color: "#8a8478"
                   }}>{e.time}{" · "}{e.date}</span></div></div><div style={{
                 display: "flex",
                 alignItems: "center",
@@ -11686,7 +11686,7 @@ function App() {
           }
           return <><div className={"sec"}>{"Battle Record — "}{profile.log.length}{" sessions · "}{formatXP(profile.xp)}{" total"}</div><div className={"log-subtab-bar"}>{[["exercises", "⚔️ Exercises"], ["workouts", "💪 Workouts"], ["plans", "📋 Plans"], ["trends", "📊 Trends"], ["deleted", "🗑 Deleted"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${logSubTab === t ? "on" : ""}`} onClick={() => setLogSubTab(t)}>{l}{t === "deleted" && (profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length > 0 && <span style={{
                   marginLeft: S.s4,
-                  background: "#6a645a",
+                  background: "#8a8478",
                   color: "#fff",
                   borderRadius: "50%",
                   width: 14,
@@ -11848,7 +11848,7 @@ function App() {
                       flex: 1
                     }}><div className={"friend-name"}>{u.playerName || "Unnamed Warrior"}{u.publicId && <span style={{
                           fontSize: FS.fs58,
-                          color: "#6a645a",
+                          color: "#8a8478",
                           fontWeight: 400,
                           marginLeft: S.s6
                         }}>{"#" + u.publicId}</span>}</div><div className={"friend-meta"}>{_optionalChain([uCls, 'optionalAccess', _156 => _156.name]) || "Unknown"}{friendSearchResult.matchType === "account_id" ? " · Found by Account ID" : " · Found by email"}</div></div>{!ex && <button className={"btn btn-gold btn-xs"} onClick={() => sendFriendRequest(u.id)}>{"+ Add"}</button>}{_optionalChain([ex, 'optionalAccess', _157 => _157.status]) === "pending" && <div style={{
@@ -11912,7 +11912,7 @@ function App() {
                       marginTop: S.s2
                     }}>{s.senderName}{" shared a "}{s.type}{" with you"}</div></div></div>{_optionalChain([s, 'access', _161 => _161.parsedItem, 'optionalAccess', _162 => _162.desc]) && <div style={{
                   fontSize: FS.fs65,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   fontStyle: "italic",
                   paddingLeft: 28
                 }}>{s.parsedItem.desc.slice(0, 80)}{s.parsedItem.desc.length > 80 ? "…" : ""}</div>}<div style={{
@@ -11995,7 +11995,7 @@ function App() {
                           friendName: f.playerName || "this warrior"
                         })}>{"⇪ Share"}</button><button className={"btn btn-ghost btn-xs"} style={{
                           fontSize: FS.fs55,
-                          color: "#5a5650",
+                          color: "#8a8478",
                           padding: "2px 6px"
                         }} onClick={() => removeFriend(f._reqId)}>{"Remove"}</button></div></div><div className={"friend-meta"}><span style={{
                         color: _optionalChain([fCls, 'optionalAccess', _165 => _165.color]) || "#b4ac9e"
@@ -12004,10 +12004,10 @@ function App() {
                       }}>{formatXP(f.xp || 0, {
                           prefix: "⚡ "
                         })}</span></div></div></div>{recent && <div className={"friend-recent"}><span style={{
-                    color: "#5a5650",
+                    color: "#8a8478",
                     marginRight: S.s6
                   }}>{"Latest:"}</span>{recent}</div>}{!recent && <div className={"friend-recent"} style={{
-                  color: "#6a645a",
+                  color: "#8a8478",
                   fontStyle: "italic"
                 }}>{"No workouts logged yet"}</div>}</div>;
             })}</div>;
@@ -12031,7 +12031,7 @@ function App() {
                   marginBottom: S.s6
                 }}>{"No conversations yet"}</div><div style={{
                   fontSize: FS.fs62,
-                  color: "#5a5650"
+                  color: "#8a8478"
                 }}>{"Tap "}<span style={{
                     color: UI_COLORS.info
                   }}>{"💬 Chat"}</span>{" on a friend’s card in the Guild tab to start a conversation."}</div></div>}{msgConversations.map(conv => {
@@ -12056,8 +12056,8 @@ function App() {
                 }}>
                   // Avatar
                   <div className={"msg-avatar"} style={{
-                    background: (otherCls ? otherCls.color : "#5a5650") + "18",
-                    border: "1px solid " + (otherCls ? otherCls.color : "#5a5650") + "44"
+                    background: (otherCls ? otherCls.color : "#8a8478") + "18",
+                    border: "1px solid " + (otherCls ? otherCls.color : "#8a8478") + "44"
                   }}>{otherCls ? <ClassIcon classKey={other.chosen_class} size={18} color={otherCls.color} /> : "\uD83D\uDCAC"}</div>
                   // Name + last message
                   <div style={{
@@ -12075,11 +12075,11 @@ function App() {
                         whiteSpace: "nowrap"
                       }}>{other ? other.player_name : conv.name || "Chat"}</span><span style={{
                         fontSize: FS.fs52,
-                        color: "#5a5650",
+                        color: "#8a8478",
                         flexShrink: 0
                       }}>{timeAgo}</span></div>{lastMsg && <div className={`msg-conv-preview${unread > 0 ? " unread" : ""}`}>{lastMsg.sender_id === authUser?.id ? "You: " : ""}{lastMsg.content}</div>}{!lastMsg && <div style={{
                       fontSize: FS.fs62,
-                      color: "#3a3834",
+                      color: "#8a8478",
                       fontStyle: "italic",
                       marginTop: S.s2
                     }}>{"No messages yet"}</div>}</div>{
@@ -12116,8 +12116,8 @@ function App() {
                 height: 30,
                 borderRadius: "50%",
                 flexShrink: 0,
-                background: (otherCls ? otherCls.color : "#5a5650") + "18",
-                border: "1.5px solid " + (otherCls ? otherCls.color : "#5a5650") + "44",
+                background: (otherCls ? otherCls.color : "#8a8478") + "18",
+                border: "1.5px solid " + (otherCls ? otherCls.color : "#8a8478") + "44",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -12131,7 +12131,7 @@ function App() {
                   color: "#d4cec4"
                 }}>{other ? other.player_name : "Chat"}</div>{other && <div style={{
                   fontSize: FS.fs52,
-                  color: "#6a645a"
+                  color: "#8a8478"
                 }}>{otherCls ? otherCls.name : "Unknown"}{" · Lv."}{other.level || 1}{other.public_id ? " \u00b7 #" + other.public_id : ""}</div>}</div></div>
             // Messages area
             <div ref={msgScrollRef} style={{
@@ -12157,12 +12157,12 @@ function App() {
                   margin: "0 auto 6px"
                 }} /><div style={{
                   fontSize: FS.fs58,
-                  color: "#5a5650"
+                  color: "#8a8478"
                 }}>{"Loading…"}</div></div>}{!msgLoading && msgMessages.length === 0 && <div style={{
                 textAlign: "center",
                 padding: "30px 0",
                 fontSize: FS.fs68,
-                color: "#5a5650",
+                color: "#8a8478",
                 fontStyle: "italic"
               }}>{"No messages yet. Say hello!"}</div>}{!msgLoading && msgMessages.map(msg => {
                 const isMine = msg.is_mine;
@@ -12185,7 +12185,7 @@ function App() {
                   alignSelf: isMine ? "flex-end" : "flex-start"
                 }}>{!isMine && <div style={{
                     fontSize: FS.fs48,
-                    color: "#5a5650",
+                    color: "#8a8478",
                     marginBottom: S.s2,
                     marginLeft: S.s4
                   }}>{msg.sender_name}</div>}<div className={`msg-bubble ${isMine ? "own" : "other"}`}>{msg.content}</div><div className={"msg-timestamp"} style={{
@@ -12331,7 +12331,7 @@ function App() {
                     minWidth: 0
                   }}><div className={"profile-name"}>{profile.playerName}{myPublicId && <span style={{
                         fontSize: FS.fs58,
-                        color: "#6a645a",
+                        color: "#8a8478",
                         fontWeight: 400,
                         marginLeft: S.s8,
                         letterSpacing: ".03em"
@@ -12385,14 +12385,14 @@ function App() {
                     textTransform: "uppercase"
                   }}>{"Coming Soon"}</span></div><div style={{
                   fontSize: FS.fs76,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   lineHeight: 1.7,
                   maxWidth: 260,
                   margin: "0 auto"
                 }}>{"Full 3D avatar customization is under development. Your character will come to life with Unreal Engine integration."}</div></div></div>
             /* ══ STATS SUB-TAB ════════════════════════════ */}{charSubTab === "stats" && <div><div className={"char-section"}>{rune("Character Stats")}<div style={{
                   fontSize: FS.sm,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   fontStyle: "italic",
                   textAlign: "center",
                   marginBottom: S.s10
@@ -12429,11 +12429,11 @@ function App() {
                       }}><div className={"char-equip-label"} style={{
                           fontWeight: 600
                         }}>{slot.label}</div><div className={"char-equip-name"} style={{
-                          color: item ? "#b4ac9e" : "#3a3834"
+                          color: item ? "#b4ac9e" : "#8a8478"
                         }}>{item || slot.hint}</div></div></div>;
                   })}</div><div style={{
                   fontSize: FS.fs62,
-                  color: "#3a3834",
+                  color: "#8a8478",
                   fontStyle: "italic",
                   textAlign: "center",
                   marginTop: S.s8
@@ -12517,7 +12517,7 @@ function App() {
               transition: "all .15s",
               background: active ? color || "rgba(180,172,158,.12)" : "rgba(45,42,36,.15)",
               border: "1px solid " + (active ? "rgba(180,172,158,.15)" : "rgba(45,42,36,.2)"),
-              color: active ? "#d4cec4" : "#3a3834"
+              color: active ? "#d4cec4" : "#8a8478"
             });
             const ToggleRow = ({
               label,
@@ -12537,11 +12537,11 @@ function App() {
                   minWidth: 0
                 }}><div style={{
                     fontSize: FS.fs56,
-                    color: "#6a645a",
+                    color: "#8a8478",
                     marginBottom: S.s2
                   }}>{label}</div><div style={{
                     fontSize: FS.fs78,
-                    color: isHidden ? "#3a3834" : "#d4cec4",
+                    color: isHidden ? "#8a8478" : "#d4cec4",
                     fontWeight: 600,
                     fontStyle: isHidden ? "italic" : "normal"
                   }}>{isHidden ? "Hidden" : value || "Not set"}</div></div><div style={{
@@ -12557,7 +12557,7 @@ function App() {
                 marginBottom: S.s6
               }}><span style={{
                   fontSize: FS.fs62,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   fontFamily: "'Inter',monospace",
                   letterSpacing: ".04em"
                 }}>{"Account ID: "}<span style={{
@@ -12585,7 +12585,7 @@ function App() {
                 justifyContent: "center",
                 marginTop: S.s8,
                 fontSize: FS.fs48,
-                color: "#5a5650"
+                color: "#8a8478"
               }}><span>{"App = Profile & Social"}</span><span>{"·"}</span><span>{"Game = Leaderboard & Quests"}</span><span>{"·"}</span><span>{"Hide = Not shown"}</span></div></div>;
           })()
 
@@ -12597,7 +12597,7 @@ function App() {
                   color: UI_COLORS.warning,
                   fontSize: FS.md
                 }}>{isMetric(profile.units) ? parseFloat((profile.runningPB * 1.60934).toFixed(2)) + " /km" : parseFloat(profile.runningPB.toFixed(2)) + " /mi"}</span><span className={"combat-chip-lbl"}>{"🏃 Run PB"}</span></div> : <div className={"combat-chip"}><span className={"combat-chip-val"} style={{
-                  color: "#3a3834"
+                  color: "#8a8478"
                 }}>{"—"}</span><span className={"combat-chip-lbl"}>{"Run PB"}</span></div>}</div></div>
 
           /* ── PERSONAL BESTS ── */{(() => {
@@ -12637,7 +12637,7 @@ function App() {
                 padding: "8px 10px",
                 fontSize: FS.sm,
                 fontWeight: 600,
-                color: effectiveSelected.length === 0 ? "#5a5650" : "#b4ac9e",
+                color: effectiveSelected.length === 0 ? "#8a8478" : "#b4ac9e",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -12653,7 +12653,7 @@ function App() {
                   whiteSpace: "nowrap"
                 }}>{chipLabel}</span><span style={{
                   fontSize: FS.fs46,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   flexShrink: 0
                 }}>{pbFilterOpen ? "▲" : "▼"}</span></div>{pbFilterOpen && <div style={{
                 position: "absolute",
@@ -12700,7 +12700,7 @@ function App() {
                       background: on ? "rgba(180,172,158,.07)" : "transparent",
                       transition: "background .1s",
                       fontSize: FS.fs62,
-                      color: on ? "#d4cec4" : "#6a645a"
+                      color: on ? "#d4cec4" : "#8a8478"
                     }} onClick={() => {
                       const newSel = on ? effectiveSelected.filter(s => s !== opt.id) : [...effectiveSelected, opt.id];
                       setPbSelectedFilters(newSel);
@@ -12737,7 +12737,7 @@ function App() {
               }}><span className={"profile-rune-label"}>{"⠿ Personal Bests ⠿"}</span></div>{filterDrop}{visibleEntries.length === 0 ? <div style={{
                 textAlign: "center",
                 fontSize: FS.fs62,
-                color: "#5a5650",
+                color: "#8a8478",
                 padding: "10px 0"
               }}>{"Use the filter above to select which Personal Bests to display."}</div> : <div style={{
                 display: "flex",
@@ -12803,7 +12803,7 @@ function App() {
                 borderBottom: "1px solid rgba(45,42,36,.15)"
               }}><span style={{
                   fontSize: FS.sm,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   width: 72,
                   flexShrink: 0
                 }}>{label}</span><span style={{
@@ -12824,7 +12824,7 @@ function App() {
               marginBottom: S.s8
             }}><span style={{
                 fontSize: FS.sm,
-                color: "#6a645a",
+                color: "#8a8478",
                 display: "block",
                 marginBottom: S.s4
               }}>{"Discipline Trait"}</span><span className={"trait"} style={{
@@ -12839,7 +12839,7 @@ function App() {
               marginBottom: S.s6
             }}><span style={{
                 fontSize: FS.sm,
-                color: "#6a645a",
+                color: "#8a8478",
                 width: 90,
                 flexShrink: 0
               }}>{"Training Style"}</span><span style={{
@@ -12857,10 +12857,10 @@ function App() {
               marginBottom: S.s6
             }}><div style={{
                 fontSize: FS.sm,
-                color: "#6a645a",
+                color: "#8a8478",
                 marginBottom: S.s4
               }}>{"Fitness Priorities"}</div><div>{(profile.fitnessPriorities || []).map(p => <span key={p} className={"trait"} style={{
-                  "--cls-color": "#5a5650",
+                  "--cls-color": "#8a8478",
                   "--cls-glow": "#8a8478",
                   marginRight: S.s4
                 }}>{{
@@ -12878,11 +12878,11 @@ function App() {
                     weight_loss: "⚖️ Weight Mgmt"
                   }[p] || p}</span>)}</div></div>}{(profile.sportsBackground || []).filter(s => s !== "none").length > 0 && <div><div style={{
                 fontSize: FS.sm,
-                color: "#6a645a",
+                color: "#8a8478",
                 marginBottom: S.s4
               }}>{"Sports Background"}</div><div>{(profile.sportsBackground || []).filter(s => s !== "none").map(s => <span key={s} className={"trait"} style={{
-                  "--cls-color": "#3a3834",
-                  "--cls-glow": "#6a645a",
+                  "--cls-color": "#8a8478",
+                  "--cls-glow": "#8a8478",
                   marginRight: S.s4,
                   fontSize: FS.fs65
                 }}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>)}</div></div>}</div> : null}</div>
@@ -13029,7 +13029,7 @@ function App() {
                 borderRadius: R.xl
               }}><div style={{
                   fontSize: FS.fs62,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s8,
                   letterSpacing: ".04em",
                   textTransform: "uppercase"
@@ -13059,7 +13059,7 @@ function App() {
                     }))}>{(on ? "✓ " : "") + f.label}</button>;
                   })}</div><div style={{
                   fontSize: FS.sm,
-                  color: "#3a3834",
+                  color: "#8a8478",
                   marginTop: S.s6,
                   fontStyle: "italic"
                 }}>{"Selected fields appear under your name in the main header"}</div></div><div className={"field"}><label>{"Gender "}<span style={{
@@ -13297,7 +13297,7 @@ function App() {
                 minWidth: 0
               }}><div style={{
                   fontSize: FS.fs58,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s2
                 }}>{"Email"}</div><div style={{
                   display: "flex",
@@ -13342,7 +13342,7 @@ function App() {
               marginBottom: S.s8
             }}><div><div style={{
                   fontSize: FS.fs58,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s2
                 }}>{"Public Account ID"}</div><div style={{
                   fontSize: FS.fs82,
@@ -13356,7 +13356,7 @@ function App() {
                 alignItems: "center"
               }}><span style={{
                   fontSize: FS.fs52,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   fontStyle: "italic"
                 }}>{"Share to add friends"}</span>{myPublicId && <span style={{
                   fontSize: FS.fs58,
@@ -13375,11 +13375,11 @@ function App() {
               justifyContent: "space-between"
             }}><div><div style={{
                   fontSize: FS.fs58,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s2
                 }}>{"Private Account ID"}</div><div style={{
                   fontSize: FS.fs76,
-                  color: showPrivateId ? "#b4ac9e" : "#5a5650",
+                  color: showPrivateId ? "#b4ac9e" : "#8a8478",
                   fontFamily: "'Inter',monospace",
                   letterSpacing: ".04em"
                 }}>{showPrivateId ? myPrivateId || "\u2026" : "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}</div></div><div style={{
@@ -13388,7 +13388,7 @@ function App() {
                 alignItems: "center"
               }}><span style={{
                   fontSize: FS.fs52,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   fontStyle: "italic"
                 }}>{"For account recovery only"}</span><span style={{
                   fontSize: FS.fs58,
@@ -13508,7 +13508,7 @@ function App() {
                   fontStyle: "italic"
                 }}>{"Add an extra layer of protection to your account using an authenticator app."}</div><div style={{
                   fontSize: FS.fs58,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s12,
                   background: "rgba(45,42,36,.15)",
                   border: "1px solid rgba(45,42,36,.2)",
@@ -13544,7 +13544,7 @@ function App() {
                     display: "block"
                   }} /></div>{mfaSecret && <div style={{
                   fontSize: FS.fs56,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   textAlign: "center",
                   wordBreak: "break-all",
                   background: "rgba(45,42,36,.2)",
@@ -13679,7 +13679,7 @@ function App() {
 
                 /* Compatible apps reminder */<div style={{
                   fontSize: FS.fs56,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   marginBottom: S.s12,
                   fontStyle: "italic"
                 }}>{"Works with: Google Authenticator · Authy · 1Password · Microsoft Authenticator · and any TOTP app"}</div><button className={"btn btn-danger"} style={{
@@ -13805,7 +13805,7 @@ function App() {
                     color: "#7ebf73"
                   }}>{"✓ Saved"}</span></div><div style={{
                   fontSize: FS.fs58,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s8,
                   fontStyle: "italic"
                 }}>{"On file for admin identity verification if you ever need account support."}</div><button className={"btn btn-ghost btn-sm"} style={{
@@ -14012,7 +14012,7 @@ function App() {
                       fontWeight: 600
                     }}>{item.label}</div><div style={{
                       fontSize: FS.sm,
-                      color: "#6a645a",
+                      color: "#8a8478",
                       marginTop: S.s2
                     }}>{item.desc}</div></div>
                   /* Toggle switch */<div style={{
@@ -14028,7 +14028,7 @@ function App() {
                       width: 16,
                       height: 16,
                       borderRadius: "50%",
-                      background: isOn ? UI_COLORS.success : "#5a5650",
+                      background: isOn ? UI_COLORS.success : "#8a8478",
                       position: "absolute",
                       top: 2,
                       left: isOn ? 21 : 2,
@@ -14038,7 +14038,7 @@ function App() {
               })}</div>;
           })()}<div style={{
             fontSize: FS.fs56,
-            color: "#5a5650",
+            color: "#8a8478",
             marginTop: S.s16,
             fontStyle: "italic",
             textAlign: "center"
@@ -14140,7 +14140,7 @@ function App() {
 
               /* ── Default Workout Values ───────────────── */<div className={"ex-editor-section"}><div className={"ex-editor-section-title"}>{"Default Values When Logging"}</div><div style={{
                   fontSize: FS.fs63,
-                  color: "#5a5650",
+                  color: "#8a8478",
                   marginTop: S.sNeg6,
                   fontStyle: "italic"
                 }}>{"Pre-filled each time you log this exercise"}</div>
@@ -14171,7 +14171,7 @@ function App() {
                       display: "flex",
                       justifyContent: "space-between",
                       fontSize: FS.fs56,
-                      color: "#6a645a",
+                      color: "#8a8478",
                       marginTop: S.s2
                     }}><span>{"50% Deload"}</span><span>{"100% Normal"}</span><span>{"200% Max"}</span></div></div></>
 
@@ -14193,13 +14193,13 @@ function App() {
                       }} onClick={() => setEd({
                         defaultHrZone: sel ? null : z.z
                       })}><span className={"hz-name"} style={{
-                          color: sel ? z.color : "#5a5650"
+                          color: sel ? z.color : "#8a8478"
                         }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                          color: sel ? z.color : "#6a645a"
+                          color: sel ? z.color : "#8a8478"
                         }}>{range.lo}{"–"}{range.hi}</span></div>;
                     })}</div>{!profile.age && <div style={{
                     fontSize: FS.sm,
-                    color: "#6a645a",
+                    color: "#8a8478",
                     marginTop: S.s4
                   }}>{"Set your age in Profile for accurate BPM ranges"}</div>}</div>}</div>
 
@@ -14276,26 +14276,26 @@ function App() {
               flexWrap: "wrap"
             }}><span style={{
                 fontSize: FS.md,
-                color: "#5a5650"
+                color: "#8a8478"
               }}>{"Base XP: "}<span style={{
                   color: "#b4ac9e",
                   fontFamily: "'Inter',sans-serif"
                 }}>{detailEx.baseXP}</span></span><span style={{
                 fontSize: FS.md,
-                color: "#5a5650"
+                color: "#8a8478"
               }}>{"Category: "}<span style={{
                   color: "#b4ac9e",
                   textTransform: "capitalize"
                 }}>{detailEx.category}</span></span>{cls && <span style={{
                 fontSize: FS.md,
-                color: "#5a5650"
+                color: "#8a8478"
               }}>{"Mult: "}<span style={{
                   color: getMult(detailEx) > 1.02 ? UI_COLORS.success : getMult(detailEx) < 0.98 ? UI_COLORS.danger : "#b4ac9e"
                 }}>{Math.round(getMult(detailEx) * 100)}{"%"}</span></span>}</div><div /></div></div></div></div>
 
     /* ══ SAVE-TO-PLAN WIZARD ════════════════════ */}{savePlanWizard && <div className={"spw-backdrop"} onClick={() => setSavePlanWizard(null)} role={"dialog"} aria-modal={"true"} aria-label={"Save plan"}><div className={"spw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"📋 Save To Plan"}</div><div style={{
               fontSize: FS.fs65,
-              color: "#5a5650",
+              color: "#8a8478",
               marginTop: S.s2
             }}>{"Select exercises, then create a new plan or add to an existing one."}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setSavePlanWizard(null)}>{"✕"}</button></div><div className={"spw-body"}><div><div style={{
               display: "flex",
@@ -14328,7 +14328,7 @@ function App() {
               border: "none",
               borderRight: m === "new" ? "1px solid rgba(180,172,158,.05)" : "none",
               background: spwMode === m ? "rgba(45,42,36,.3)" : "rgba(45,42,36,.18)",
-              color: spwMode === m ? "#d4cec4" : "#5a5650",
+              color: spwMode === m ? "#d4cec4" : "#8a8478",
               transition: "all .18s"
             }} onClick={() => setSpwMode(m)}>{lbl}</button>)}</div>
 
@@ -14340,7 +14340,7 @@ function App() {
                   width: 36,
                   height: 36
                 }} onClick={() => setSpwIcon(ic)}>{ic}</div>)}</div></div><div className={"field"}><label>{"Schedule for a Future Date "}<span style={{
-                  color: "#5a5650",
+                  color: "#8a8478",
                   fontWeight: "normal"
                 }}>{"(optional)"}</span></label><input className={"inp"} type={"date"} min={todayStr()} value={spwDate} onChange={e => setSpwDate(e.target.value)} />{spwDate && <div style={{
                 fontSize: FS.fs65,
@@ -14367,7 +14367,7 @@ function App() {
                   color: "#d4cec4"
                 }}>{pl.name}</div><div style={{
                   fontSize: FS.sm,
-                  color: "#5a5650"
+                  color: "#8a8478"
                 }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" · "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><div style={{
                 width: 18,
                 height: 18,
@@ -14407,7 +14407,7 @@ function App() {
             })()}{" — "}{formatScheduledDate(spDate)}</div>}</div>
 
         /* Notes */<div className={"field"}><label>{"Notes "}<span style={{
-              color: "#5a5650",
+              color: "#8a8478",
               fontWeight: "normal"
             }}>{"(optional)"}</span></label><input className={"inp"} value={spNotes} onChange={e => setSpNotes(e.target.value)} placeholder={"e.g. Morning session, skip leg day…"} /></div>
 
@@ -14432,7 +14432,7 @@ function App() {
 
     /* ══ SAVE-AS-WORKOUT WIZARD ═════════════════ */}{saveWorkoutWizard && <div className={"saw-backdrop"} onClick={() => setSaveWorkoutWizard(null)}><div className={"saw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"💪 Save As Workout"}</div><div style={{
               fontSize: FS.fs65,
-              color: "#5a5650",
+              color: "#8a8478",
               marginTop: S.s2
             }}>{"Select exercises and save as a reusable workout."}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setSaveWorkoutWizard(null)}>{"✕"}</button></div><div className={"spw-body"}><div><div style={{
               display: "flex",
@@ -14544,7 +14544,7 @@ function App() {
                       top: "50%",
                       transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "muscle" ? "180deg" : "0deg") + ")",
                       fontSize: FS.fs55,
-                      color: pickerMuscle !== "All" ? "#b4ac9e" : "#5a5650",
+                      color: pickerMuscle !== "All" ? "#b4ac9e" : "#8a8478",
                       transition: "transform .15s"
                     }}>{"▼"}</span></button>{pickerOpenDrop === "muscle" && <div style={{
                     position: "absolute",
@@ -14600,7 +14600,7 @@ function App() {
                       top: "50%",
                       transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "type" ? "180deg" : "0deg") + ")",
                       fontSize: FS.fs55,
-                      color: pickerTypeFilter !== "all" ? "#d4cec4" : "#5a5650",
+                      color: pickerTypeFilter !== "all" ? "#d4cec4" : "#8a8478",
                       transition: "transform .15s"
                     }}>{"▼"}</span></button>{pickerOpenDrop === "type" && <div style={{
                     position: "absolute",
@@ -14655,7 +14655,7 @@ function App() {
                       top: "50%",
                       transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "equip" ? "180deg" : "0deg") + ")",
                       fontSize: FS.fs55,
-                      color: pickerEquipFilter !== "all" ? UI_COLORS.accent : "#5a5650",
+                      color: pickerEquipFilter !== "all" ? UI_COLORS.accent : "#8a8478",
                       transition: "transform .15s"
                     }}>{"▼"}</span></button>{pickerOpenDrop === "equip" && <div style={{
                     position: "absolute",
@@ -14713,7 +14713,7 @@ function App() {
             const clsData = profile.chosenClass ? CLASSES[profile.chosenClass] : null;
             return <><div style={{
                 fontSize: FS.fs62,
-                color: "#5a5650",
+                color: "#8a8478",
                 marginBottom: S.s6,
                 textAlign: "right"
               }}>{q || pickerMuscle !== "All" || pickerTypeFilter !== "all" || pickerEquipFilter !== "all" ? filtered.length + " match" + (filtered.length !== 1 ? "es" : "") : "Showing 80 of " + filtered.length + " · search or filter"}</div><div style={{
@@ -14745,7 +14745,7 @@ function App() {
                       }}>{ex.category && <span style={{
                           color: getTypeColor(ex.category)
                         }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}{ex.category && ex.muscleGroup && <span style={{
-                          color: "#5a5650"
+                          color: "#8a8478"
                         }}>{" · "}</span>}{ex.muscleGroup && <span style={{
                           color: getMuscleColor(ex.muscleGroup)
                         }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}</div></div><div style={{
@@ -15039,7 +15039,7 @@ function App() {
               color: "#d4cec4"
             }}>{addToPlanPicker.workout.name}</div><div style={{
               fontSize: FS.sm,
-              color: "#5a5650"
+              color: "#8a8478"
             }}>{addToPlanPicker.workout.exercises.length}{" exercises will be added as a new day"}</div></div></div>{profile.plans.length === 0 ? <div className={"empty"} style={{
           padding: "14px 0"
         }}>{"No plans yet. Create a plan first in the Plans tab."}</div> : profile.plans.map(pl => <div key={pl.id} className={"atp-plan-row"} onClick={() => addWorkoutToPlan(addToPlanPicker.workout, pl.id)}><span style={{
@@ -15053,7 +15053,7 @@ function App() {
               color: "#d4cec4"
             }}>{pl.name}</div><div style={{
               fontSize: FS.sm,
-              color: "#5a5650"
+              color: "#8a8478"
             }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" · currently "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><span style={{
             fontSize: FS.md,
             color: "#b4ac9e"
@@ -15086,7 +15086,7 @@ function App() {
           })()}</div>
         /* Recent history preview */{(profile.checkInHistory || []).length > 0 && <div style={{
           fontSize: FS.sm,
-          color: "#5a5650"
+          color: "#8a8478"
         }}><div style={{
             fontFamily: "'Inter',sans-serif",
             letterSpacing: ".06em",
@@ -15103,7 +15103,7 @@ function App() {
                 borderRadius: R.r4,
                 background: isToday ? "rgba(45,42,36,.26)" : "rgba(45,42,36,.15)",
                 border: `1px solid ${isToday ? "rgba(180,172,158,.08)" : "rgba(180,172,158,.06)"}`,
-                color: isToday ? "#d4cec4" : "#5a5650"
+                color: isToday ? "#d4cec4" : "#8a8478"
               }}>{date.toLocaleDateString([], {
                   month: "short",
                   day: "numeric"
@@ -15417,7 +15417,7 @@ function App() {
                     }} onClick={() => setQuickRows(quickRows.filter((_, j) => j !== ri))}>{"✕"}</button></div>)}</div>
                 /* Distance bonus info (field is now in top row) */}{ex.id !== "rest_day" && showDist && rawDist > 0 && <div style={{
                   fontSize: FS.fs62,
-                  color: "#6a645a",
+                  color: "#8a8478",
                   marginBottom: S.s6,
                   marginTop: S.sNeg4
                 }}>{metric ? `${rawDist} km = ${parseFloat(kmToMi(rawDist)).toFixed(2)} mi` : `${rawDist} mi = ${parseFloat(miToKm(rawDist)).toFixed(2)} km`}<span style={{
@@ -15477,7 +15477,7 @@ function App() {
                     display: "flex",
                     justifyContent: "space-between",
                     fontSize: FS.fs58,
-                    color: "#6a645a",
+                    color: "#8a8478",
                     marginTop: S.s2
                   }}><span>{"50% Deload"}</span><span>{"100% Normal"}</span><span>{"200% Max"}</span></div></div>
                 /* Avg HR Zone — last */}{ex.id !== "rest_day" && showHR && <div style={{
@@ -15490,9 +15490,9 @@ function App() {
                         borderColor: sel ? z.color : "rgba(45,42,36,.2)",
                         background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
                       }} onClick={() => setHrZone(sel ? null : z.z)}><span className={"hz-name"} style={{
-                          color: sel ? z.color : "#5a5650"
+                          color: sel ? z.color : "#8a8478"
                         }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                          color: sel ? z.color : "#6a645a"
+                          color: sel ? z.color : "#8a8478"
                         }}>{range.lo}{"–"}{range.hi}</span></div>;
                     })}</div>{hrZone && <div style={{
                     fontSize: FS.md,
@@ -15645,7 +15645,7 @@ function App() {
                 }}>{"← Back"}</button><div className={"stats-modal-title"} style={{
                   flex: 1
                 }}>{"📊 "}{"Review Battle Stats "}<span style={{
-                    color: "#5a5650",
+                    color: "#8a8478",
                     fontWeight: "normal",
                     fontSize: FS.lg
                   }}>{"(Optional)"}</span></div></div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setStatsPromptModal(null)}>{"✕"}</button></div><div className={"stats-modal-subtitle"} style={{
@@ -15657,7 +15657,7 @@ function App() {
               flex: 1.5,
               marginBottom: S.s0
             }}><label>{"Duration "}<span style={{
-                  color: "#5a5650",
+                  color: "#8a8478",
                   fontWeight: "normal"
                 }}>{"(HH:MM)"}</span></label><input className={"inp"} type={"text"} inputMode={"numeric"} placeholder={"00:00"} value={spDuration} onChange={e => setSpDuration(e.target.value)} onBlur={e => setSpDuration(normalizeHHMM(e.target.value))} /></div><div className={"field"} style={{
               flex: 0.8,
@@ -15763,7 +15763,7 @@ function App() {
             marginBottom: S.s8
           }}>{calExDetailModal.entries.length > 1 && <div style={{
               fontSize: FS.fs58,
-              color: "#5a5650",
+              color: "#8a8478",
               textTransform: "uppercase",
               letterSpacing: ".08em",
               marginBottom: S.s6
@@ -15794,32 +15794,32 @@ function App() {
                   fontSize: FS.fs62,
                   color: "#8a8478"
                 }}><span style={{
-                    color: "#5a5650"
+                    color: "#8a8478"
                   }}>{"Sets: "}</span>{e.sets}</div><div style={{
                   fontSize: FS.fs62,
                   color: "#8a8478"
                 }}><span style={{
-                    color: "#5a5650"
+                    color: "#8a8478"
                   }}>{"Reps: "}</span>{e.reps}</div>{e.weightLbs && <div style={{
                   fontSize: FS.fs62,
                   color: "#8a8478"
                 }}><span style={{
-                    color: "#5a5650"
+                    color: "#8a8478"
                   }}>{"Weight: "}</span>{isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs"}</div>}{e.distanceMi && <div style={{
                   fontSize: FS.fs62,
                   color: "#8a8478"
                 }}><span style={{
-                    color: "#5a5650"
+                    color: "#8a8478"
                   }}>{"Distance: "}</span>{isMetric(profile.units) ? miToKm(e.distanceMi) + " km" : e.distanceMi + " mi"}</div>}{e.hrZone && <div style={{
                   fontSize: FS.fs62,
                   color: "#8a8478"
                 }}><span style={{
-                    color: "#5a5650"
+                    color: "#8a8478"
                   }}>{"HR Zone: "}</span>{e.hrZone}</div>}{e.seconds && <div style={{
                   fontSize: FS.fs62,
                   color: "#8a8478"
                 }}><span style={{
-                    color: "#5a5650"
+                    color: "#8a8478"
                   }}>{"Seconds: "}</span>{e.seconds}</div>}</div></div>)}</div>
           /* Total XP */<div style={{
             display: "flex",
@@ -16412,7 +16412,7 @@ function App() {
                 color: "#d4cec4"
               }}>{"✎ Edit Log Entry"}</div><div style={{
                 fontSize: FS.fs65,
-                color: "#5a5650",
+                color: "#8a8478",
                 marginTop: S.s2
               }}>{d.icon}{" "}{d.exercise}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setLogEditModal(null)}>{"✕"}</button></div>
 
@@ -16481,7 +16481,7 @@ function App() {
             justifyContent: "space-between"
           }}><div style={{
               fontSize: FS.md,
-              color: "#5a5650"
+              color: "#8a8478"
             }}>{"New XP for this entry"}</div><div style={{
               display: "flex",
               alignItems: "center",
@@ -16665,7 +16665,7 @@ function App() {
           flexShrink: 0
         }}><div style={{
             fontSize: FS.sm,
-            color: "#5a5650",
+            color: "#8a8478",
             marginBottom: S.s6,
             letterSpacing: ".06em",
             textTransform: "uppercase"

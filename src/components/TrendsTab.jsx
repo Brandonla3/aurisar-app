@@ -337,7 +337,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
       <div style={{ ...CARD_STYLE, textAlign: "center", padding: "40px 20px" }}>
         <div style={{ fontSize: "2rem", marginBottom: 10 }}>📊</div>
         <div style={{ fontSize: ".78rem", color: "#8a8478", fontWeight: 600 }}>No workout data yet</div>
-        <div style={{ fontSize: ".62rem", color: "#5a5650", marginTop: 6 }}>
+        <div style={{ fontSize: ".62rem", color: "#8a8478", marginTop: 6 }}>
           Log some exercises to see your trends and analytics here.
         </div>
       </div>
@@ -429,7 +429,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
           <BarChart data={dowData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
             <XAxis dataKey="day" tick={{ fill: "#8a8478", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#5a5650", fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip content={<DarkTooltip suffix={metricLabel(heatMetric)} />} />
             <Bar dataKey={heatMetric} radius={[4, 4, 0, 0]}>
               {dowData.map((entry, i) => (
@@ -460,13 +460,13 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
             <BarChart data={setsData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
               <XAxis dataKey="label" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#5a5650", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Bar dataKey="avgSets" name="Avg Sets/Session" fill="#c49428" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ fontSize: ".62rem", color: "#5a5650", padding: "20px 0", textAlign: "center" }}>
+          <div style={{ fontSize: ".62rem", color: "#8a8478", padding: "20px 0", textAlign: "center" }}>
             No session data in this range.
           </div>
         )}
@@ -484,7 +484,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
           <ResponsiveContainer width="100%" height={Math.max(160, muscleFreqData.length * 32)}>
             <BarChart data={muscleFreqData} layout="vertical" margin={{ top: 5, right: 15, bottom: 5, left: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
-              <XAxis type="number" tick={{ fill: "#5a5650", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis type="number" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="name" tick={{ fill: "#8a8478", fontSize: 11 }} axisLine={false} tickLine={false} width={70} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Bar dataKey="avgPerWeek" name="Avg/Week" radius={[0, 4, 4, 0]}>
@@ -495,7 +495,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ fontSize: ".62rem", color: "#5a5650", padding: "20px 0", textAlign: "center" }}>
+          <div style={{ fontSize: ".62rem", color: "#8a8478", padding: "20px 0", textAlign: "center" }}>
             No muscle group data in this range.
           </div>
         )}
@@ -531,7 +531,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
             <BarChart data={volOverTimeData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
               <XAxis dataKey="label" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#5a5650", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               {volMuscleKeys.map(mk => (
                 <Bar
@@ -546,7 +546,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ fontSize: ".62rem", color: "#5a5650", padding: "20px 0", textAlign: "center" }}>
+          <div style={{ fontSize: ".62rem", color: "#8a8478", padding: "20px 0", textAlign: "center" }}>
             No weighted exercise data in this range.
           </div>
         )}
@@ -565,7 +565,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
           <AreaChart data={consistencyData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
             <XAxis dataKey="label" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#5a5650", fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={TOOLTIP_STYLE} />
             <Area
               type="monotone" dataKey="sessions" name="Sessions"
@@ -594,7 +594,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
                 borderBottom: i < topExData.length - 1 ? "1px solid rgba(180,172,158,.04)" : "none",
               }}
             >
-              <span style={{ fontSize: ".7rem", color: "#5a5650", width: 18, textAlign: "right", flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
+              <span style={{ fontSize: ".7rem", color: "#8a8478", width: 18, textAlign: "right", flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
               <span style={{ fontSize: ".85rem", flexShrink: 0 }}>{ex.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: ".65rem", color: "#d4cec4", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -606,7 +606,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: ".62rem", color: "#b4ac9e", fontWeight: 700 }}>{ex.count + "×"}</div>
-                <div style={{ fontSize: ".48rem", color: "#5a5650" }}>{"+" + ex.xp + " XP"}</div>
+                <div style={{ fontSize: ".48rem", color: "#8a8478" }}>{"+" + ex.xp + " XP"}</div>
               </div>
             </div>
           );
