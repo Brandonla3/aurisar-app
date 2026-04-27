@@ -16,6 +16,7 @@ import { ensureRestDay } from './utils/ensureRestDay';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
 import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
+import { useAuthState } from './state/useAuthState';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -776,34 +777,29 @@ function App() {
     turnstileToken, setTurnstileToken, mapOpen, setMapOpen, mapTooltip, setMapTooltip, navMenuOpen, setNavMenuOpen,
     showWNMockup, setShowWNMockup, toast, setToast, friendExBanner, setFriendExBanner, xpFlash, setXpFlash,
   } = ui;
+  // ── Auth flow state — extracted to ./state/useAuthState (item 5b)
+  const auth = useAuthState();
+  const {
+    authEmail, setAuthEmail, authPassword, setAuthPassword, showAuthPw, setShowAuthPw, authIsNew, setAuthIsNew,
+    authRemember, setAuthRemember, authLoading, setAuthLoading, authMsg, setAuthMsg, loginSubScreen, setLoginSubScreen,
+    forgotPwEmail, setForgotPwEmail, forgotPrivateId, setForgotPrivateId, forgotLookupResult, setForgotLookupResult, showPreviewPin, setShowPreviewPin,
+    previewPinInput, setPreviewPinInput, previewPinError, setPreviewPinError, isPreviewMode, setIsPreviewMode, showPwProfile, setShowPwProfile,
+    pwPanelOpen, setPwPanelOpen, pwNew, setPwNew, pwConfirm, setPwConfirm, pwMsg, setPwMsg,
+    emailPanelOpen, setEmailPanelOpen, newEmail, setNewEmail, emailMsg, setEmailMsg, showEmail, setShowEmail,
+    myPublicId, setMyPublicId, myPrivateId, setMyPrivateId, showPrivateId, setShowPrivateId, mfaPanelOpen, setMfaPanelOpen,
+    mfaEnrolling, setMfaEnrolling, mfaQR, setMfaQR, mfaSecret, setMfaSecret, mfaFactorId, setMfaFactorId,
+    mfaCode, setMfaCode, mfaMsg, setMfaMsg, mfaEnabled, setMfaEnabled, mfaUnenrolling, setMfaUnenrolling,
+    mfaRecoveryCodes, setMfaRecoveryCodes, mfaCodesRemaining, setMfaCodesRemaining, mfaHasLegacyCodes, setMfaHasLegacyCodes, mfaRecoveryMode, setMfaRecoveryMode,
+    mfaRecoveryInput, setMfaRecoveryInput, mfaDisableConfirm, setMfaDisableConfirm, mfaDisableCode, setMfaDisableCode, mfaDisableMethod, setMfaDisableMethod,
+    mfaDisableMsg, setMfaDisableMsg, mfaChallengeScreen, setMfaChallengeScreen, mfaChallengeCode, setMfaChallengeCode, mfaChallengeMsg, setMfaChallengeMsg,
+    mfaChallengeLoading, setMfaChallengeLoading, mfaChallengeFactorId, setMfaChallengeFactorId, phonePanelOpen, setPhonePanelOpen, phoneInput, setPhoneInput,
+    phoneOtpSent, setPhoneOtpSent, phoneOtpCode, setPhoneOtpCode, phoneMsg, setPhoneMsg,
+  } = auth;
+
   const [screen, setScreen] = useState("loading");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authUser, setAuthUser] = useState(null);
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [showAuthPw, setShowAuthPw] = useState(false);
-  const [showPwProfile, setShowPwProfile] = useState(false);
-  const [pwPanelOpen, setPwPanelOpen] = useState(false);
-  const [showEmail, setShowEmail] = useState(false);
-  const [myPublicId, setMyPublicId] = useState(null);
-  const [myPrivateId, setMyPrivateId] = useState(null);
-  const [showPrivateId, setShowPrivateId] = useState(false);
-  const [authIsNew, setAuthIsNew] = useState(false);
-  const [authRemember, setAuthRemember] = useState(true);
-  const [pwNew, setPwNew] = useState("");
-  const [pwConfirm, setPwConfirm] = useState("");
-  const [pwMsg, setPwMsg] = useState(null);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authMsg, setAuthMsg] = useState(null);
-  const [loginSubScreen, setLoginSubScreen] = useState(null); // null | "forgot-pw" | "forgot-username"
-  const [forgotPwEmail, setForgotPwEmail] = useState("");
-  const [forgotPrivateId, setForgotPrivateId] = useState("");
-  const [forgotLookupResult, setForgotLookupResult] = useState(null); // null | {found, masked_email, error}
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
-  const [showPreviewPin, setShowPreviewPin] = useState(false);
-  const [previewPinInput, setPreviewPinInput] = useState("");
-  const [previewPinError, setPreviewPinError] = useState(false);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [detectedClass, setDetectedClass] = useState(null);
   const [activeTab, setActiveTab] = useState("workout");
 
@@ -903,45 +899,14 @@ function App() {
   const [pbFilterOpen, setPbFilterOpen] = useState(false);
   const [pbSelectedFilters, setPbSelectedFilters] = useState(null);
   // Email change
-  const [emailPanelOpen, setEmailPanelOpen] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [emailMsg, setEmailMsg] = useState(null);
   // MFA
-  const [mfaPanelOpen, setMfaPanelOpen] = useState(false);
-  const [mfaEnrolling, setMfaEnrolling] = useState(false);
-  const [mfaQR, setMfaQR] = useState(null);
-  const [mfaSecret, setMfaSecret] = useState(null);
-  const [mfaFactorId, setMfaFactorId] = useState(null);
-  const [mfaCode, setMfaCode] = useState("");
-  const [mfaMsg, setMfaMsg] = useState(null);
-  const [mfaEnabled, setMfaEnabled] = useState(false);
-  const [mfaUnenrolling, setMfaUnenrolling] = useState(false);
-  const [mfaRecoveryCodes, setMfaRecoveryCodes] = useState(null); // array of plaintext codes shown once
-  const [mfaCodesRemaining, setMfaCodesRemaining] = useState(null);
   // True when the user still has SHA-256-hashed recovery codes (the pre-bcrypt
   // format). Polled via the SECURITY DEFINER RPC `has_legacy_mfa_recovery_codes`
   // (scripts/security/09-mfa-legacy-detect-rpc.sql) and used to render an
   // in-app nudge to regenerate.
-  const [mfaHasLegacyCodes, setMfaHasLegacyCodes] = useState(false);
-  const [mfaRecoveryMode, setMfaRecoveryMode] = useState(false); // on login challenge screen
-  const [mfaRecoveryInput, setMfaRecoveryInput] = useState("");
   // MFA disable verification
-  const [mfaDisableConfirm, setMfaDisableConfirm] = useState(false);
-  const [mfaDisableCode, setMfaDisableCode] = useState("");
-  const [mfaDisableMethod, setMfaDisableMethod] = useState("totp"); // 'totp' | 'phone'
-  const [mfaDisableMsg, setMfaDisableMsg] = useState(null);
   // Phone number
-  const [phonePanelOpen, setPhonePanelOpen] = useState(false);
-  const [phoneInput, setPhoneInput] = useState("");
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [phoneOtpCode, setPhoneOtpCode] = useState("");
-  const [phoneMsg, setPhoneMsg] = useState(null);
   // MFA login challenge
-  const [mfaChallengeScreen, setMfaChallengeScreen] = useState(false);
-  const [mfaChallengeCode, setMfaChallengeCode] = useState("");
-  const [mfaChallengeMsg, setMfaChallengeMsg] = useState(null);
-  const [mfaChallengeLoading, setMfaChallengeLoading] = useState(false);
-  const [mfaChallengeFactorId, setMfaChallengeFactorId] = useState(null);
   const [draft, setDraft] = useState({});
   // Onboarding
   const [obName, setObName] = useState("");
