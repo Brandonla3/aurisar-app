@@ -114,8 +114,11 @@ export function LandingPage({ onLogin, onSignUp }) {
       {/* ═══════════ TOP NAVBAR ═══════════ */}
       <header className="landing-topbar">
         <div className="landing-topbar-brand">
-          <span className="landing-topbar-logo">Aurisar</span>
-          <span className="landing-topbar-sub">Games</span>
+          <img src={flameLogo} alt="Aurisar logo" className="landing-topbar-logo-img" />
+          <div className="landing-topbar-brand-text">
+            <span className="landing-topbar-logo">Aurisar</span>
+            <span className="landing-topbar-sub">Games</span>
+          </div>
         </div>
         <div className="landing-topbar-actions">
           <button className="landing-topbar-btn" onClick={onLogin}>Login</button>

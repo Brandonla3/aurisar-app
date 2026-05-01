@@ -46,8 +46,22 @@
 
 .landing-topbar-brand {
   display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-topbar-logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 0 16px rgba(196,148,40,.22);
+}
+
+.landing-topbar-brand-text {
+  display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
 }
 
 .landing-topbar-logo {
