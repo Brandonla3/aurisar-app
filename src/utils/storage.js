@@ -112,4 +112,30 @@ if (typeof window !== 'undefined') {
   window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide(); });
 }
 
-export { loadSave, doSave, flushSave, setPreviewMode };
+// ── Admin flags loader ─────────────────────────────────────────────────
+// Fetches is_admin and disabled_at for a given user ID. These are separate
+// top-level columns on profiles (NOT inside the `data` JSONB), so they
+// cannot be modified through the normal doSave() path.
+//
+// Called at session start in App.jsx to:
+//   - Gate the admin nav link (is_admin)
+//   - Kick disabled users before they reach the main screen (disabled_at)
+async function loadAdminFlags(userId) {
+  if (!userId) return { is_admin: false, disabled_at: null };
+  try {
+    const { data, error } = await sb
+      .from("profiles")
+      .select("is_admin, disabled_at")
+      .eq("id", userId)
+      .single();
+    if (error) return { is_admin: false, disabled_at: null };
+    return {
+      is_admin:    data?.is_admin    ?? false,
+      disabled_at: data?.disabled_at ?? null,
+    };
+  } catch {
+    return { is_admin: false, disabled_at: null };
+  }
+}
+
+export { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags };
