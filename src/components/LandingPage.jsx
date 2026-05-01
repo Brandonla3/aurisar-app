@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import '../styles/landing.css';
 import heroBg from '../assets/hero.png';
 import flameLogo from '../assets/flame-logo-transparent.svg';
+import aurisarLogo from '../assets/aurisar-logo.png';
 import { UI_COLORS } from '../data/constants';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -114,6 +115,7 @@ export function LandingPage({ onLogin, onSignUp }) {
       {/* ═══════════ TOP NAVBAR ═══════════ */}
       <header className="landing-topbar">
         <div className="landing-topbar-brand">
+          <img src={aurisarLogo} alt="Aurisar" className="landing-topbar-mark" />
           <span className="landing-topbar-logo">Aurisar</span>
           <span className="landing-topbar-sub">Games</span>
         </div>
