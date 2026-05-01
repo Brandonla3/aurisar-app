@@ -5,7 +5,7 @@ import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, UI_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
-import { loadSave, doSave, setPreviewMode } from './utils/storage';
+import { loadSave, doSave, setPreviewMode, loadAdminFlags } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
@@ -103,6 +103,7 @@ const WorkoutNotificationMockup = React.lazy(() => import('./components/WorkoutN
 const LandingPage = React.lazy(() => import('./components/LandingPage').then(m => ({
   default: m.LandingPage
 })));
+const AdminPage = React.lazy(() => import('./components/AdminPage'));
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
 // import the TrendsTab module (which would drag recharts into the main chunk)
 // just to read this constant. Keep in sync with TrendsTab.js.
@@ -1039,6 +1040,7 @@ function App() {
   const [screen, setScreen] = useState("loading");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authUser, setAuthUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false); // set from profiles.is_admin column on login
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
   const [detectedClass, setDetectedClass] = useState(null);
   const [activeTab, setActiveTab] = useState("workout");
@@ -1380,6 +1382,14 @@ function App() {
       if (_event === "PASSWORD_RECOVERY") {
         setIsPreviewMode(false); // arriving via password reset is a real auth — exit preview
         setAuthUser(user);
+        const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _23a => _23a.id]) || null);
+        if (adminFlags.disabled_at) {
+          await sb.auth.signOut();
+          setAuthMsg("Your account has been disabled. Contact support.");
+          setScreen("login");
+          return;
+        }
+        setIsAdmin(adminFlags.is_admin);
         const saved = await loadSave(_optionalChain([user, 'optionalAccess', _23 => _23.id]) || null);
         if (_optionalChain([saved, 'optionalAccess', _24 => _24.chosenClass])) {
           (_s => setProfile({
@@ -1418,6 +1428,7 @@ function App() {
       if (_event === "SIGNED_OUT") {
         setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
+        setIsAdmin(false);
         setScreen("landing");
         return;
       }
@@ -1427,6 +1438,16 @@ function App() {
       // every workout save until the next page reload.
       setIsPreviewMode(false);
       setAuthUser(user);
+      {
+        const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _25a => _25a.id]) || null);
+        if (adminFlags.disabled_at) {
+          await sb.auth.signOut();
+          setAuthMsg("Your account has been disabled. Contact support.");
+          setScreen("login");
+          return;
+        }
+        setIsAdmin(adminFlags.is_admin);
+      }
       const saved = await loadSave(_optionalChain([user, 'optionalAccess', _25 => _25.id]) || null);
       if (_optionalChain([saved, 'optionalAccess', _26 => _26.chosenClass])) {
         (_s => setProfile({
@@ -1465,6 +1486,14 @@ function App() {
         setAuthUser(user);
         checkMfaStatus();
         try {
+          const adminFlags = await loadAdminFlags(user.id);
+          if (adminFlags.disabled_at) {
+            await sb.auth.signOut();
+            setAuthMsg("Your account has been disabled. Contact support.");
+            setScreen("login");
+            return;
+          }
+          setIsAdmin(adminFlags.is_admin);
           const saved = await loadSave(user.id);
           if (_optionalChain([saved, 'optionalAccess', _27 => _27.chosenClass])) {
             (_s => setProfile({
@@ -6099,6 +6128,11 @@ function App() {
           color: "#8a8478"
         }}>{"Contact support for an admin-assisted reset."}</div></div></div></div>;
 
+  /* ══ ADMIN PANEL ════════════════════════════════════════════ */
+  if (screen === "admin" && authUser && isAdmin) return lazyMount(
+    <AdminPage authUser={authUser} onBack={() => setScreen("main")} />
+  );
+
   /* ══ LANDING PAGE ═══════════════════════════════════════════ */
   if (screen === "landing") return lazyMount(<LandingPage onLogin={() => {
     setAuthIsNew(false);
@@ -7207,6 +7241,14 @@ function App() {
         },
         // Map feature hidden — re-enable when ready
         // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
+        isAdmin && {
+          icon: "🛡️",
+          label: "Admin",
+          action: () => {
+            setScreen("admin");
+            setNavMenuOpen(false);
+          }
+        },
         {
           icon: "🛟",
           label: "Support",
