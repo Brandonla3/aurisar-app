@@ -46,8 +46,15 @@
 
 .landing-topbar-brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
+}
+
+.landing-topbar-mark {
+  height: 32px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.4));
 }
 
 .landing-topbar-logo {
@@ -820,6 +827,7 @@
   .landing-topbar-logo { font-size: 1rem; }
   .landing-topbar-sub { font-size: 0.6rem; }
   .landing-topbar-btn { font-size: 0.72rem; padding: 6px 12px; }
+  .landing-topbar-mark { height: 26px; }
   .landing-features {
     grid-template-columns: 1fr;
     gap: 18px;
