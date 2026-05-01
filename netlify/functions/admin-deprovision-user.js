@@ -43,11 +43,28 @@ export default async (req) => {
     return json({ error: "Failed to deprovision user" }, 500);
   }
 
-  // 2. Sign out all of the user's sessions so the kick takes immediate effect
-  const { error: signOutErr } = await supabase.auth.admin.signOut(userId, "others");
-  if (signOutErr) {
-    // Non-fatal — the disabled_at check on login will catch them on next load
-    console.warn("[admin-deprovision] signOut warning:", signOutErr.message);
+  // 2. Invalidate all of the user's active sessions via the GoTrue admin REST endpoint.
+  // The JS SDK's supabase.auth.admin.signOut() takes a JWT string (the user's active
+  // token), not a user UUID — so we call the underlying REST endpoint directly instead.
+  // DELETE /auth/v1/admin/users/{id}/sessions deletes all sessions for the given user ID.
+  try {
+    const logoutRes = await fetch(
+      `${process.env.SUPABASE_URL}/auth/v1/admin/users/${userId}/sessions`,
+      {
+        method: "DELETE",
+        headers: {
+          apikey:        process.env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    if (!logoutRes.ok) {
+      // Non-fatal: disabled_at check in loadAdminFlags blocks re-auth on any
+      // future page load. Existing sessions expire on their own JWT TTL (~1 hr).
+      console.warn("[admin-deprovision] session delete returned", logoutRes.status);
+    }
+  } catch (e) {
+    console.warn("[admin-deprovision] session delete threw:", e?.message);
   }
 
   console.log(`[admin-deprovision] User ${userId} deprovisioned by admin ${adminUser.id}`);

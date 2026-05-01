@@ -66,15 +66,19 @@ export default async (req) => {
   }
 
   // ── Specific factor: list factors then delete matching ones
-  const { data: factors, error: listErr } = await supabase.auth.admin.mfa.listFactors({ userId });
+  // listFactors returns { data: { all: Factor[], totp: Factor[], phone: Factor[] } }.
+  // Use data.all — the flat list of every enrolled factor — and filter by factor_type.
+  // (factors.webAuthn doesn't exist; webauthn factors have factor_type = 'webauthn'
+  //  and only appear in factors.all.)
+  const { data: factorsData, error: listErr } = await supabase.auth.admin.mfa.listFactors({ userId });
   if (listErr) {
     console.error("[admin-reset-mfa] listFactors error:", listErr.message);
     return json({ error: "Failed to list MFA factors" }, 500);
   }
 
   const targetTypes = FACTOR_TYPE_MAP[factor];
-  const toDelete = (factors?.totp || []).concat(factors?.phone || []).concat(factors?.webAuthn || [])
-    .filter(f => targetTypes.includes(f.factor_type));
+  const allFactors = factorsData?.all ?? [];
+  const toDelete = allFactors.filter(f => targetTypes.includes(f.factor_type));
 
   if (toDelete.length === 0) {
     return json({ ok: true, userId, factor, deleted: 0, message: "No matching factors found" });

@@ -27,15 +27,13 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS is_admin    boolean      NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS disabled_at timestamptz           DEFAULT NULL;
 
--- Explicitly block authenticated users from writing these columns via RLS.
--- The existing RLS from migration 03 only allows users to UPDATE their own
--- profile's `data` column; adding these columns won't widen that.
--- Belt-and-suspenders: create a check policy that prevents setting is_admin
--- to true or clearing disabled_at via the normal client path.
--- NOTE: In Supabase, authenticated JWT role cannot call ALTER TABLE, but it
---       CAN call UPDATE if there's a permissive RLS policy without column
---       restriction. We rely on migration 03's policy covering only `data`.
---       If you ever add a broader UPDATE policy, add WITH CHECK (is_admin = old.is_admin).
+-- Column-level privilege lock: revoke UPDATE on these two columns from the
+-- `authenticated` role entirely. This is the correct defence-in-depth layer:
+-- even if a future RLS policy is too broad (e.g. "users can update their own
+-- row" without column restrictions), authenticated users still cannot write
+-- is_admin or disabled_at through the PostgREST / Supabase client.
+-- service_role bypasses column-level grants, so Netlify functions are unaffected.
+REVOKE UPDATE (is_admin, disabled_at) ON public.profiles FROM authenticated;
 
 -- ── 2. invites table ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.invites (
