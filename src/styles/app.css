@@ -1563,7 +1563,7 @@
     }
 
     /* Stage */
-    .au-stage{position:relative;width:100%;min-height:100%;background:var(--au-bg-deep);overflow:hidden}
+    .au-stage{position:relative;width:100%;min-height:100%;background:var(--au-bg-deep);overflow:hidden;color:var(--au-text)}
 
     /* Ambient layers */
     .au-ambient{position:absolute;inset:0;pointer-events:none;overflow:hidden}

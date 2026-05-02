@@ -1,56 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import aurisarLogo from '../assets/aurisar-logo.png';
-
-// ─── Module-level live counter store (survives remounts) ──────────────────────
-const _auCounterStore = {};
-function _ensureCounterStore(key, baseline, intervalMs) {
-  if (!_auCounterStore[key]) {
-    const s = { value: baseline, subs: new Set() };
-    _auCounterStore[key] = s;
-    s.timer = setInterval(() => {
-      s.value += Math.ceil(Math.random() * 3);
-      const now = performance.now();
-      s.subs.forEach(fn => fn(s.value, now));
-    }, intervalMs);
-  }
-  return _auCounterStore[key];
-}
-
-function LiveCounter({ baseline = 487, intervalMs = 4200, cacheKey = 'default' }) {
-  const store = useMemo(() => _ensureCounterStore(cacheKey, baseline, intervalMs), [cacheKey]);
-  const [n, setN] = useState(store.value);
-  const [pulseAt, setPulseAt] = useState(0);
-
-  useEffect(() => {
-    const onTick = (v, p) => { setN(v); setPulseAt(p); };
-    store.subs.add(onTick);
-    setN(store.value);
-    return () => store.subs.delete(onTick);
-  }, [store]);
-
-  const pulse = pulseAt && (performance.now() - pulseAt) < 700;
-
-  useEffect(() => {
-    if (!pulseAt) return;
-    const id = setTimeout(() => setPulseAt(p => p), 720);
-    return () => clearTimeout(id);
-  }, [pulseAt]);
-
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
-      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{n.toLocaleString()}</span>
-      <span aria-hidden="true" style={{
-        width: 6, height: 6, borderRadius: 999,
-        background: 'var(--au-accent)',
-        boxShadow: pulse ? '0 0 0 6px var(--au-accent-glow)' : '0 0 0 0 transparent',
-        transition: 'box-shadow 0.7s ease-out',
-        alignSelf: 'center',
-        display: 'inline-block',
-        flexShrink: 0,
-      }} />
-    </span>
-  );
-}
 
 // ─── Ambient particles + vignette + grain ─────────────────────────────────────
 function Ambient({ animated = true, density = 28 }) {
@@ -210,7 +159,6 @@ export default function LoginScreen({
       <header style={{
         position: 'relative', zIndex: 3,
         padding: '24px 40px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <button
           onClick={onBack}
@@ -219,15 +167,6 @@ export default function LoginScreen({
         >
           ← Back
         </button>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          color: 'var(--au-text-dim)',
-          fontFamily: 'var(--au-font-mono)',
-          fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase',
-        }}>
-          <img src={aurisarLogo} alt="" width={20} height={20} style={{ objectFit: 'contain', opacity: 0.85 }} />
-          Aurisar Games
-        </div>
       </header>
 
       {/* ── Main two-column content ── */}
@@ -247,27 +186,6 @@ export default function LoginScreen({
             <p className="au-creed" style={{ fontSize: 15, maxWidth: '40ch', marginBottom: 28 }}>
               Sign in to resume your saga — your streak, your training plan, and your guild stand ready.
             </p>
-            <div style={{
-              display: 'flex', gap: 28,
-              paddingTop: 22,
-              borderTop: '1px solid var(--au-hairline)',
-            }}>
-              <div>
-                <div style={{
-                  fontFamily: 'var(--au-font-display)',
-                  fontSize: 26, color: 'var(--au-accent)', letterSpacing: 2,
-                }}>
-                  <LiveCounter baseline={487} intervalMs={4200} cacheKey="login-workouts" />
-                </div>
-                <div style={{
-                  fontFamily: 'var(--au-font-mono)',
-                  fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase',
-                  color: 'var(--au-text-faint)', marginTop: 4, maxWidth: '24ch',
-                }}>
-                  Workouts Completed By Users This Week
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* RIGHT — floating form card */}
