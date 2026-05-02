@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle } from 'react';
 import { PLAN_TEMPLATES, HR_ZONES, NO_SETS_EX_IDS, RUNNING_EX_ID, UI_COLORS, QUESTS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 import { _optionalChain, uid, todayStr } from '../utils/helpers';
@@ -205,6 +205,38 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
   const wUnit = weightLabel(profile.units);
   const clsKey = profile.chosenClass;
 
+  const scheduledExItems = useMemo(() => {
+    const swAll = profile.scheduledWorkouts || [];
+    return swAll
+      .filter(s => !s.sourceWorkoutId)
+      .map(s => {
+        const ex = allExById[s.exId];
+        return { kind: "ex", id: s.id, exId: s.exId, icon: ex ? ex.icon : "💪", name: ex ? ex.name : "Exercise", date: s.scheduledDate, notes: s.notes };
+      })
+      .filter(s => s.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [profile.scheduledWorkouts, allExById]);
+
+  const planXPMap = useMemo(
+    () => Object.fromEntries(profile.plans.map(p => [p.id, calcPlanXP(p, clsKey, allExById)])),
+    [profile.plans, clsKey, allExById]
+  );
+
+  const templateXPMap = useMemo(
+    () => Object.fromEntries(PLAN_TEMPLATES.map(t => [t.id, calcPlanXP(t, clsKey, allExById)])),
+    [clsKey, allExById]
+  );
+
+  const detailCurrentDay = activePlan ? activePlan.days[detailDayIdx] || activePlan.days[0] : null;
+  const detailTotalXP = useMemo(
+    () => activePlan ? calcPlanXP(activePlan, clsKey, allExById) : 0,
+    [activePlan, clsKey, allExById]
+  );
+  const detailDayXP = useMemo(
+    () => detailCurrentDay ? calcDayXP(detailCurrentDay, clsKey, allExById) : 0,
+    [detailCurrentDay, clsKey, allExById]
+  );
+
   return <>
     {planView === "list" && <>
       <div style={{ display: "flex", alignItems: "center", marginBottom: S.s8 }}>
@@ -233,47 +265,34 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
       </div>
 
       {/* Upcoming scheduled exercises */}
-      {(() => {
-        const swAll = profile.scheduledWorkouts || [];
-        if (swAll.length === 0) return null;
-        const allItems = swAll
-          .filter(s => !s.sourceWorkoutId)
-          .map(s => {
-            const ex = allExById[s.exId];
-            return { kind: "ex", id: s.id, exId: s.exId, icon: ex ? ex.icon : "💪", name: ex ? ex.name : "Exercise", date: s.scheduledDate, notes: s.notes };
-          })
-          .filter(s => s.date)
-          .sort((a, b) => a.date.localeCompare(b.date));
-        if (allItems.length === 0) return null;
-        return <div className={"upcoming-section"}>
-          <div className={"sec"} style={{ marginBottom: S.s8 }}>{"📅 Scheduled Exercises"}</div>
-          {allItems.map(item => {
-            const days = daysUntil(item.date);
-            const badgeCls = days === 0 ? "badge-today" : days <= 3 ? "badge-soon" : "badge-future";
-            const badgeTxt = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d away`;
-            return <div key={item.id} className={"upcoming-card"}>
-              <div className={"upcoming-icon"}>{item.icon}</div>
-              <div className={"upcoming-info"}>
-                <div className={"upcoming-name"}>{item.name}</div>
-                <div className={"upcoming-date"}>
-                  {formatScheduledDate(item.date)}
-                  {item.notes ? <span style={{ color: "#8a8478", marginLeft: S.s6 }}>{item.notes}</span> : ""}
-                </div>
+      {scheduledExItems.length > 0 && <div className={"upcoming-section"}>
+        <div className={"sec"} style={{ marginBottom: S.s8 }}>{"📅 Scheduled Exercises"}</div>
+        {scheduledExItems.map(item => {
+          const days = daysUntil(item.date);
+          const badgeCls = days === 0 ? "badge-today" : days <= 3 ? "badge-soon" : "badge-future";
+          const badgeTxt = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d away`;
+          return <div key={item.id} className={"upcoming-card"}>
+            <div className={"upcoming-icon"}>{item.icon}</div>
+            <div className={"upcoming-info"}>
+              <div className={"upcoming-name"}>{item.name}</div>
+              <div className={"upcoming-date"}>
+                {formatScheduledDate(item.date)}
+                {item.notes ? <span style={{ color: "#8a8478", marginLeft: S.s6 }}>{item.notes}</span> : ""}
               </div>
-              <span className={`upcoming-badge ${badgeCls}`}>{badgeTxt}</span>
-              <div style={{ fontSize: FS.fs65, color: "#b4ac9e", cursor: "pointer", padding: "4px 6px", borderRadius: R.r4 }}
-                onClick={e => { e.stopPropagation(); onScheduleEx(item.exId || item.id, item.id); }}>{"✎"}</div>
-              <div className={"upcoming-del"} onClick={e => { e.stopPropagation(); onRemoveScheduledWorkout(item.id); }}>{"✕"}</div>
-            </div>;
-          })}
-          <div className={"div"} style={{ margin: "6px 0" }} />
-        </div>;
-      })()}
+            </div>
+            <span className={`upcoming-badge ${badgeCls}`}>{badgeTxt}</span>
+            <div style={{ fontSize: FS.fs65, color: "#b4ac9e", cursor: "pointer", padding: "4px 6px", borderRadius: R.r4 }}
+              onClick={e => { e.stopPropagation(); onScheduleEx(item.exId || item.id, item.id); }}>{"✎"}</div>
+            <div className={"upcoming-del"} onClick={e => { e.stopPropagation(); onRemoveScheduledWorkout(item.id); }}>{"✕"}</div>
+          </div>;
+        })}
+        <div className={"div"} style={{ margin: "6px 0" }} />
+      </div>}
 
       {profile.plans.length === 0 && <div className={"empty"}>{"No plans yet."}<br />{"Create one or browse recipes."}</div>}
 
       {profile.plans.map(plan => {
-        const planXP = calcPlanXP(plan, clsKey, allExById);
+        const planXP = planXPMap[plan.id];
         const hasSched = !!plan.scheduledDate;
         const daysN = hasSched ? daysUntil(plan.scheduledDate) : null;
         return <div key={plan.id} className={"plan-card"} style={{ "--pc": cls && cls.color || "#b4ac9e" }}>
@@ -322,7 +341,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
             const isCollapsed = !!collapsedTpls[tpl.id];
             const isRec = tpl.bestFor.includes(clsKey);
             const activeDays = tpl.days.filter(d => d.exercises.length > 0);
-            const tplXP = calcPlanXP(tpl, clsKey, allExById);
+            const tplXP = templateXPMap[tpl.id];
             return <div key={tpl.id} className={"workout-card"} style={{ marginBottom: S.s10 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: S.s10, cursor: "pointer" }}
                 onClick={() => setCollapsedTpls(s => ({ ...s, [tpl.id]: !s[tpl.id] }))}>
@@ -383,9 +402,9 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     {planView === "detail" && activePlan && (() => {
       const plan = activePlan;
       const [vDayIdx, setVDayIdx] = [detailDayIdx, setDetailDayIdx];
-      const totalXP = calcPlanXP(plan, clsKey, allExById);
-      const currentDay = plan.days[vDayIdx] || plan.days[0];
-      const dayXP = calcDayXP(currentDay, clsKey, allExById);
+      const totalXP = detailTotalXP;
+      const currentDay = detailCurrentDay;
+      const dayXP = detailDayXP;
       function updateDetailEx(dayI, exI, field, val) {
         const newDays = plan.days.map((d, di) => di !== dayI ? d : {
           ...d,
