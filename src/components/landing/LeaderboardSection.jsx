@@ -204,6 +204,9 @@ export function LeaderboardSection() {
 
   return (
     <section id="leaderboard" className="landing-section landing-lb-section">
+      <span className="landing-lb-example-tag" aria-hidden="true">
+        <span className="landing-lb-live-dot" /> Example
+      </span>
       <div className="landing-section-eyebrow">— The Ladder</div>
       <h2 className="landing-section-title">Live global rankings</h2>
       <div className="landing-divider" />
@@ -327,7 +330,6 @@ export function LeaderboardSection() {
 
           <div className="landing-lb-footer-note">
             {filteredRows.length} {filteredRows.length === 1 ? 'warrior' : 'warriors'} ranked (filtered)
-            <span className="landing-lb-live"><span className="landing-lb-live-dot" /> Live</span>
           </div>
         </div>
       </div>

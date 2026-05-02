@@ -1749,7 +1749,24 @@
   background: rgba(0,0,0,.3);
   border-top: 1px solid rgba(196,148,40,.1);
 }
-.landing-lb-live { display: inline-flex; align-items: center; gap: 6px; color: var(--gold-light); }
+.landing-lb-example-tag {
+  position: absolute;
+  top: 28px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid rgba(196, 148, 40, .35);
+  font-family: var(--font-display);
+  font-size: .62rem;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  z-index: 6;
+}
 .landing-lb-live-dot {
   width: 6px;
   height: 6px;
