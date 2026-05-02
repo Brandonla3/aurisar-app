@@ -878,6 +878,45 @@
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
   font-family: var(--font-body);
+  background: #050403;
+  position: relative;
+  isolation: isolate;
+}
+/* Fixed atmospheric backdrop — extends the hero's dark mood across the whole page */
+.landing-cinematic::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,148,40,.06) 0%, transparent 55%),
+    linear-gradient(180deg, #07060a 0%, #0a0807 40%, #050403 100%);
+  pointer-events: none;
+}
+/* Fixed bronze grain across the whole page */
+.landing-cinematic::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(rgba(196,148,40,.04) 1px, transparent 1.2px);
+  background-size: 3px 3px;
+  mix-blend-mode: overlay;
+  opacity: .45;
+  pointer-events: none;
+}
+/* Per-section backgrounds become transparent so the global atmosphere shows through */
+.landing-cinematic .landing-primer,
+.landing-cinematic .landing-classes-section,
+.landing-cinematic .landing-lb-section,
+.landing-cinematic .landing-footer {
+  background: transparent;
+}
+/* Soft horizontal divider rules between sections (replaces the hard gradient seams) */
+.landing-cinematic .landing-primer,
+.landing-cinematic .landing-classes-section,
+.landing-cinematic .landing-lb-section {
+  border-top: 1px solid rgba(196,148,40,.06);
 }
 
 /* ── Topbar overrides ── */

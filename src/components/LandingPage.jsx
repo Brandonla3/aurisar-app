@@ -8,13 +8,6 @@ import { LeaderboardSection } from './landing/LeaderboardSection.jsx';
    Aurisar — Cinematic Monolith Landing
    ═══════════════════════════════════════════════════════════════ */
 
-const HERO_PILLARS = [
-  { num: 'I', head: 'Real Workouts', sub: 'Real Results' },
-  { num: 'II', head: 'Earn XP', sub: 'Level Up' },
-  { num: 'III', head: 'Build Discipline', sub: 'Unlock Potential' },
-  { num: 'IV', head: 'Join the Order', sub: 'Forge Together' },
-];
-
 const PRIMER_STATS = [
   { num: '1,500+', label: 'Exercises' },
   { num: '11', label: 'Classes' },
@@ -143,17 +136,6 @@ function HeroMonolith({ onLogin, onSignUp }) {
         </div>
       </div>
 
-      <div className="landing-hm-pillars">
-        {HERO_PILLARS.map((p) => (
-          <div key={p.num} className="landing-hm-pillar">
-            <span className="landing-hm-pillar-num">{p.num}</span>
-            <div className="landing-hm-pillar-body">
-              <div className="landing-hm-pillar-head">{p.head}</div>
-              <div className="landing-hm-pillar-sub">{p.sub}</div>
-            </div>
-          </div>
-        ))}
-      </div>
     </section>
   );
 }
