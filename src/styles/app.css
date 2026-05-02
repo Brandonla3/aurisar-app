@@ -862,8 +862,22 @@
     .wb-section-hdr-icon{font-size:.78rem;opacity:.85}
     .wb-section .field{margin-bottom:0}
     .wb-section .field+.field{margin-top:9px}
-    .wb-stats-row{display:flex;gap:8px;flex-wrap:wrap}
-    .wb-stats-row .field{flex:1;min-width:80px}
+    .wb-stats-row{display:flex;gap:6px;align-items:flex-start}
+    .wb-stats-row .field{flex:1;min-width:0}
+    .wb-stats-row .field label{font-size:.6rem;white-space:nowrap}
+    .wb-stats-row .inp{font-size:.82rem;padding:7px 8px;text-align:center}
+    .req-star{color:#e05252;font-style:normal;margin-left:2px}
+    .wb-identity-row .inp{margin-top:0}
+    .wb-section-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.12),transparent);margin:11px 0}
+    .wb-sub-hdr{font-family:'Cinzel',serif;font-size:.58rem;color:rgba(196,160,68,.75);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+    .wb-sub-hdr-icon{font-size:.72rem;opacity:.8}
+    .wb-identity-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+    .wb-identity-row .inp{flex:1;min-width:0}
+    .wb-icon-btn{width:42px;height:42px;border-radius:9px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.35rem;flex-shrink:0;transition:background .2s,border-color .2s;position:relative}
+    .wb-icon-btn:hover{background:rgba(45,42,36,.4);border-color:rgba(180,172,158,.2)}
+    .wb-icon-btn-caret{position:absolute;bottom:2px;right:3px;font-size:.42rem;color:rgba(180,172,158,.55);line-height:1}
+    .wb-icon-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;padding:10px;background:rgba(14,14,12,.55);border-radius:9px;border:1px solid rgba(180,172,158,.07)}
+    .wb-dur-hint{font-size:.6rem;color:#8a8478;margin-top:3px;font-style:italic;text-align:center}
 
     /* ── Plan Wizard Full-Screen Overlay ── */
     .plan-wizard-backdrop{position:fixed;inset:0;background:rgba(12,12,10,.97);z-index:9000;display:flex;flex-direction:column;align-items:center;overflow:hidden}

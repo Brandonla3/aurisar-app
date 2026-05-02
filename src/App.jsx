@@ -1227,6 +1227,7 @@ function App() {
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [wbName, setWbName] = useState("");
   const [wbIcon, setWbIcon] = useState("💪");
+  const [wbIconPickerOpen, setWbIconPickerOpen] = useState(false);
   const [wbDesc, setWbDesc] = useState("");
   const [wbExercises, setWbExercises] = useState([]); // [{exId,sets,reps,weightLbs,durationMin,...}]
   // wbExCompleted removed — Mark Complete feature removed from builder UX
@@ -4188,6 +4189,7 @@ function App() {
 
   // Workout builder helpers
   function initWorkoutBuilder(base) {
+    setWbIconPickerOpen(false);
     if (base) {
       setWbName(base.name);
       setWbIcon(base.icon);
@@ -4200,8 +4202,9 @@ function App() {
         hhmm: "",
         sec: ""
       };
-      setWbDuration(split.hhmm);
-      setWbDurSec(split.sec !== 0 && split.sec !== "" ? String(split.sec) : "");
+      const hasSec = split.sec && split.sec !== 0 && split.sec !== "";
+      setWbDuration(hasSec ? `${split.hhmm}:${String(split.sec).padStart(2,"0")}` : (split.hhmm || ""));
+      setWbDurSec("");
       setWbActiveCal(base.activeCal || "");
       setWbTotalCal(base.totalCal || "");
       setWbLabels(base.labels || []);
@@ -9368,36 +9371,8 @@ function App() {
                 minWidth: 0
               }}><div className={"builder-nav-title"}>{wbIsOneOff ? wbEditId ? "✎ Edit One-Off" : "⚡ New One-Off Workout" : wbEditId ? "✎ Edit Workout" : wbCopySource ? "⎘ Copy Workout" : "⚔ New Workout"}</div>{wbCopySource && <div className={"builder-nav-sub"}>{"Forging from: "}{wbCopySource}</div>}</div></div>
             {
-              /* Identity panel: Name + Icon + Description */
-            }<div className={"wb-section"}><div className={"wb-section-hdr"}><span className={"wb-section-hdr-icon"}>{"✦"}</span>{"Identity"}</div><div className={"field"}><label>{"Workout Name"}</label><input className={"inp"} value={wbName} onChange={e => setWbName(e.target.value)} placeholder={"e.g. Morning Push Day…"} /></div><div className={"field"}><label>{"Icon"}</label><div className={"icon-row"} style={{
-                  flexWrap: "wrap",
-                  gap: S.s6
-                }}>{["💪", "🏋️", "🔥", "⚔️", "🏃", "🚴", "🧘", "⚡", "🎯", "🛡️", "🏆", "🌟", "💥", "🗡️", "🥊", "🤸", "🏊", "🎽", "🦵", "🦾"].map(ic => <div key={ic} className={`icon-opt ${wbIcon === ic ? "sel" : ""}`} style={{
-                    fontSize: "1.2rem",
-                    width: 36,
-                    height: 36
-                  }} onClick={() => setWbIcon(ic)}>{ic}</div>)}</div></div><div className={"field"}><label>{"Description "}<span style={{
-                    color: "#8a8478",
-                    fontWeight: "normal"
-                  }}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div></div>
-            {
-              /* Labels panel */
-            }<div className={"wb-section"}><div className={"wb-section-hdr"}><span className={"wb-section-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{
-                  color: "#8a8478",
-                  fontWeight: "normal",
-                  letterSpacing: ".05em",
-                  marginLeft: S.s6,
-                  textTransform: "none"
-                }}>{"(optional)"}</span></div><div style={{
-                display: "flex",
-                gap: S.s6,
-                flexWrap: "wrap",
-                alignItems: "center"
-              }}>{(profile.workoutLabels || []).map(l => <span key={l} className={"wo-label-chip" + (wbLabels.includes(l) ? " sel" : "")} onClick={() => setWbLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}>{l}</span>)}<span style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: S.s4
-                }}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onKeyDown={e => {
+              /* Combined Identity + Labels + Session Stats panel */
+            }<div className={"wb-section"}><div className={"field"}><label>{"Name "}<span className={"req-star"}>{"*"}</span></label><div className={"wb-identity-row"}><div className={"wb-icon-btn"} title={"Change icon"} onClick={() => setWbIconPickerOpen(v => !v)}>{wbIcon}<span className={"wb-icon-btn-caret"}>{"▾"}</span></div><input className={"inp"} value={wbName} onChange={e => setWbName(e.target.value)} placeholder={"e.g. Morning Push Day…"} /></div></div>{wbIconPickerOpen && <div className={"wb-icon-picker"}>{["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾","🏅","🥇","⛹️","🤼","🧗","🤾","🎿","🏄","⛷️","🚣","🏹","🏇","🌿","🫀","🦴","💨","🌊","🏔️","🌄","🐉","🦅","🔱","☀️","🌙","🌪️","💫","🎖️","⚒️","🧱","🥋"].map(ic => <div key={ic} className={`icon-opt ${wbIcon === ic ? "sel" : ""}`} onClick={() => { setWbIcon(ic); setWbIconPickerOpen(false); }}>{ic}</div>)}</div>}<div className={"field"} style={{marginTop: S.s8}}><label>{"Description "}<span style={{color:"#8a8478",fontWeight:"normal",textTransform:"none"}}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div><div className={"wb-section-divider"} /><div className={"wb-sub-hdr"}><span className={"wb-sub-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{color:"#8a8478",fontWeight:"normal",letterSpacing:".05em",marginLeft:S.s6,textTransform:"none"}}>{"(optional)"}</span></div><div style={{display:"flex",gap:S.s6,flexWrap:"wrap",alignItems:"center"}}>{(profile.workoutLabels || []).map(l => <span key={l} className={"wo-label-chip" + (wbLabels.includes(l) ? " sel" : "")} onClick={() => setWbLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}>{l}</span>)}<span style={{display:"inline-flex",alignItems:"center",gap:S.s4}}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onKeyDown={e => {
                     if (e.key === "Enter" && newLabelInput.trim()) {
                       const lbl = newLabelInput.trim();
                       if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
@@ -9409,12 +9384,7 @@ function App() {
                       if (!wbLabels.includes(lbl)) setWbLabels(prev => [...prev, lbl]);
                       setNewLabelInput("");
                     }
-                  }} placeholder={"+ New label…"} style={{
-                    width: 100
-                  }} /><button className={"btn btn-ghost btn-xs"} style={{
-                    padding: "2px 6px",
-                    fontSize: FS.sm
-                  }} onClick={() => {
+                  }} placeholder={"+ New label…"} style={{width: 100}} /><button className={"btn btn-ghost btn-xs"} style={{padding:"2px 6px",fontSize:FS.sm}} onClick={() => {
                     const lbl = newLabelInput.trim();
                     if (!lbl) return;
                     if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
@@ -9425,31 +9395,20 @@ function App() {
                     }
                     if (!wbLabels.includes(lbl)) setWbLabels(prev => [...prev, lbl]);
                     setNewLabelInput("");
-                  }}>{"+"}</button></span></div></div>
-            {
-              /* Stats panel: Duration / Calories */
-            }<div className={"wb-section"}><div className={"wb-section-hdr"}><span className={"wb-section-hdr-icon"}>{"⏱"}</span>{"Session Stats"}<span style={{
-                  color: "#8a8478",
-                  fontWeight: "normal",
-                  letterSpacing: ".05em",
-                  marginLeft: S.s6,
-                  textTransform: "none"
-                }}>{"(optional)"}</span></div><div className={"wb-stats-row"}><div className={"field"} style={{
-                  flex: 1.5,
-                  marginBottom: S.s0
-                }}><label>{"Duration "}<span style={{
-                      color: "#8a8478",
-                      fontWeight: "normal"
-                    }}>{"(HH:MM)"}</span></label><input className={"inp"} type={"text"} inputMode={"numeric"} value={wbDuration} onChange={e => setWbDuration(e.target.value)} onBlur={e => setWbDuration(normalizeHHMM(e.target.value))} placeholder={"00:00"} /></div><div className={"field"} style={{
-                  flex: 0.8,
-                  marginBottom: S.s0
-                }}><label>{"Seconds"}</label><input className={"inp"} type={"number"} min={"0"} max={"59"} value={wbDurSec} onChange={e => setWbDurSec(e.target.value)} placeholder={"0"} /></div><div className={"field"} style={{
-                  flex: 1,
-                  marginBottom: S.s0
-                }}><label>{"Active Cal"}</label><input className={"inp"} type={"number"} min={"0"} max={"9999"} value={wbActiveCal} onChange={e => setWbActiveCal(e.target.value)} placeholder={"e.g. 320"} /></div><div className={"field"} style={{
-                  flex: 1,
-                  marginBottom: S.s0
-                }}><label>{"Total Cal"}</label><input className={"inp"} type={"number"} min={"0"} max={"9999"} value={wbTotalCal} onChange={e => setWbTotalCal(e.target.value)} placeholder={"e.g. 450"} /></div></div></div>
+                  }}>{"+"}</button></span></div><div className={"wb-section-divider"} /><div className={"wb-sub-hdr"}><span className={"wb-sub-hdr-icon"}>{"⏱"}</span>{"Session Stats"}<span style={{color:"#8a8478",fontWeight:"normal",letterSpacing:".05em",marginLeft:S.s6,textTransform:"none"}}>{"(optional)"}</span></div><div className={"wb-stats-row"}><div className={"field"} style={{flex:2,marginBottom:S.s0}}><label>{"Duration"}</label><input className={"inp"} type={"text"} inputMode={"numeric"} value={wbDuration} onChange={e => setWbDuration(e.target.value)} onBlur={e => {
+                  const val = e.target.value.trim();
+                  if (!val) { setWbDuration(""); setWbDurSec(""); return; }
+                  const hms = val.match(/^(\d+):(\d{1,2}):(\d{1,2})$/);
+                  if (hms) {
+                    const h = Number(hms[1]), m = Number(hms[2]), s = Number(hms[3]);
+                    const ss = Math.min(s, 59);
+                    setWbDuration(`${String(h + Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}:${String(ss).padStart(2,"0")}`);
+                    setWbDurSec("");
+                  } else {
+                    setWbDuration(normalizeHHMM(val));
+                    setWbDurSec("");
+                  }
+                }} placeholder={"HH:MM or HH:MM:SS"} style={{textAlign:"center"}} /><div className={"wb-dur-hint"}>{"90 = 1h30m · include :SS for seconds"}</div></div><div className={"field"} style={{flex:1.3,marginBottom:S.s0}}><label>{"Active Cal"}</label><input className={"inp"} type={"number"} min={"0"} max={"9999"} value={wbActiveCal} onChange={e => setWbActiveCal(e.target.value)} placeholder={"320"} /></div><div className={"field"} style={{flex:1.3,marginBottom:S.s0}}><label>{"Total Cal"}</label><input className={"inp"} type={"number"} min={"0"} max={"9999"} value={wbTotalCal} onChange={e => setWbTotalCal(e.target.value)} placeholder={"450"} /></div></div></div>
             {
               /* Exercise list */
             }<div className={"wo-section-hdr"} style={{
