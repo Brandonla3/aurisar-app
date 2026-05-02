@@ -42,12 +42,13 @@ function secToHHMMSplit(totalSec) {
   return {hhmm:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, sec:ss||""};
 }
 
-// Parse "HH:MM" or plain number (minutes) to seconds
+// Parse "HH:MM", "HH:MM:SS", or plain number (minutes) to seconds
 function HHMMToSec(str) {
   if(!str||!String(str).trim()) return 0;
   const t=String(str).trim();
   if(/^\d+$/.test(t)) return parseInt(t)*60;
-  if(/^\d+:\d+$/.test(t)){const[h,m]=t.split(":").map(Number);return h*3600+m*60;}
+  if(/^\d+:\d{1,2}:\d{1,2}$/.test(t)){const[h,m,s]=t.split(":").map(Number);return h*3600+m*60+Math.min(s,59);}
+  if(/^\d+:\d{1,2}$/.test(t)){const[h,m]=t.split(":").map(Number);return h*3600+m*60;}
   return 0;
 }
 

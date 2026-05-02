@@ -862,10 +862,12 @@
     .wb-section-hdr-icon{font-size:.78rem;opacity:.85}
     .wb-section .field{margin-bottom:0}
     .wb-section .field+.field{margin-top:9px}
-    .wb-stats-row{display:flex;gap:6px}
+    .wb-stats-row{display:flex;gap:6px;align-items:flex-start}
     .wb-stats-row .field{flex:1;min-width:0}
     .wb-stats-row .field label{font-size:.6rem;white-space:nowrap}
     .wb-stats-row .inp{font-size:.82rem;padding:7px 8px;text-align:center}
+    .req-star{color:#e05252;font-style:normal;margin-left:2px}
+    .wb-identity-row .inp{margin-top:0}
     .wb-section-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.12),transparent);margin:11px 0}
     .wb-sub-hdr{font-family:'Cinzel',serif;font-size:.58rem;color:rgba(196,160,68,.75);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:5px}
     .wb-sub-hdr-icon{font-size:.72rem;opacity:.8}
