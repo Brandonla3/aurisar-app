@@ -886,8 +886,9 @@
   background: linear-gradient(to bottom, rgba(8,7,10,.85) 0%, rgba(8,7,10,.35) 60%, rgba(8,7,10,0) 100%);
   border-bottom: none;
 }
-.landing-topbar-spacer { flex: 0 0 auto; min-width: 80px; }
-.landing-topbar-links { display: flex; gap: 28px; align-items: center; }
+.landing-cinematic .landing-topbar-spacer { flex: 1 1 0; min-width: 0; }
+.landing-cinematic .landing-topbar-actions { flex: 1 1 0; justify-content: flex-end; }
+.landing-topbar-links { display: flex; gap: 28px; align-items: center; flex: 0 0 auto; }
 .landing-topbar-link {
   font-family: var(--font-display);
   font-weight: 500;
@@ -916,14 +917,16 @@
   color: var(--silver);
 }
 .landing-cinematic .landing-topbar-btn-accent {
-  background: linear-gradient(180deg, var(--gold-light), var(--gold));
-  border-color: var(--gold-light);
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  border-color: rgba(196,148,40,.6);
   color: #1a1208;
   font-weight: 600;
-  box-shadow: 0 0 18px rgba(196,148,40,.25), inset 0 1px 0 rgba(255,255,255,.25);
+  box-shadow: 0 0 14px rgba(196,148,40,.18), inset 0 1px 0 rgba(255,255,255,.15);
 }
 .landing-cinematic .landing-topbar-btn-accent:hover {
-  box-shadow: 0 0 26px rgba(196,148,40,.4), inset 0 1px 0 rgba(255,255,255,.35);
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  border-color: var(--gold-light);
+  box-shadow: 0 0 22px rgba(196,148,40,.32), inset 0 1px 0 rgba(255,255,255,.25);
 }
 
 /* ── Hero monolith ── */
@@ -1176,7 +1179,7 @@
   min-width: 28px;
 }
 .landing-hm-pillar-head {
-  font-family: var(--font-display); font-weight: 600;
+  font-family: var(--font-display); font-weight: 400;
   font-size: .86rem; letter-spacing: .18em;
   color: #e8ddc4; text-transform: uppercase;
 }

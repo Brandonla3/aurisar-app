@@ -182,6 +182,11 @@ export function LandingPage({ onLogin, onSignUp }) {
     if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
   }, []);
 
+  const scrollToId = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const scrollTo = (ref) => {
     if (ref.current) ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -194,6 +199,9 @@ export function LandingPage({ onLogin, onSignUp }) {
         <nav className="landing-topbar-links" aria-label="Page sections">
           <button className="landing-topbar-link" onClick={() => scrollTo(primerRef)}>
             About
+          </button>
+          <button className="landing-topbar-link" onClick={() => scrollToId('classes')}>
+            Classes
           </button>
           <button className="landing-topbar-link" onClick={() => scrollTo(lbRef)}>
             Leaderboards
