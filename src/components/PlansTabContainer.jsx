@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useImperativeHandle } from 'react';
 import { PLAN_TEMPLATES, HR_ZONES, NO_SETS_EX_IDS, RUNNING_EX_ID, UI_COLORS, QUESTS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 import { _optionalChain, uid, todayStr } from '../utils/helpers';
@@ -37,6 +37,39 @@ function daysUntil(dateStr) {
     return Math.round((then - now) / 86400000);
   } catch (e) { return null; }
 }
+
+const PlanCard = React.memo(function PlanCard({ plan, planXP, clsColor, onOpen, onSchedule }) {
+  const hasSched = !!plan.scheduledDate;
+  return <div className={"plan-card"} style={{ "--pc": clsColor }}>
+    <div className={"plan-card-top"} onClick={() => onOpen(plan, true)}>
+      <div className={"plan-icon"}>{plan.icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: S.s6, marginBottom: S.s2 }}>
+          <div className={"plan-name"} style={{ flex: 1 }}>{plan.name}</div>
+          {plan.level && <span className={`plan-level-badge ${plan.level.toLowerCase()}`} style={{ flexShrink: 0 }}>{plan.level}</span>}
+        </div>
+        <div className={"plan-meta"}>
+          <span className={`plan-type-badge type-${plan.type}`}>{plan.durCount && plan.durCount > 1 ? `${plan.durCount} ${plan.type}s` : plan.type}</span>
+          <span style={{ marginLeft: S.s6, fontSize: FS.sm, color: "#8a8478" }}>{plan.days.filter(d => d.exercises.length > 0).length}{" active days"}</span>
+          {plan.startDate && <span style={{ marginLeft: S.s6, fontSize: FS.sm, color: "#8a8478" }}>
+            {"📅 "}{new Date(plan.startDate + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+            {plan.endDate ? " → " + new Date(plan.endDate + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : ""}
+          </span>}
+          {!plan.startDate && hasSched && <span style={{ marginLeft: S.s6, fontSize: FS.sm, color: "#b4ac9e" }}>{"📅 "}{formatScheduledDate(plan.scheduledDate)}</span>}
+        </div>
+      </div>
+      <div className={"plan-xp-badge"}>{"⚡ "}{planXP.toLocaleString()}</div>
+    </div>
+    {plan.description && <div className={"plan-desc"} onClick={() => onOpen(plan, true)}>{plan.description}</div>}
+    <div style={{ display: "flex", gap: S.s8, marginTop: S.s8, paddingTop: 7, borderTop: "1px solid rgba(45,42,36,.18)" }}>
+      <button className={`plan-sched-btn ${hasSched ? "plan-sched-active" : ""}`} onClick={e => { e.stopPropagation(); onSchedule(plan); }}>
+        {hasSched ? "📅 " + formatScheduledDate(plan.scheduledDate) : "📅 Schedule"}
+      </button>
+      <div style={{ flex: 1 }} />
+      <button className={"btn btn-ghost btn-xs"} onClick={e => { e.stopPropagation(); onOpen(plan, true); }}>{"View →"}</button>
+    </div>
+  </div>;
+});
 
 const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer(props, ref) {
   const {
@@ -109,7 +142,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     setPlanView("builder");
   }
 
-  function initBuilderFromTemplate(tpl, customize = false) {
+  const initBuilderFromTemplate = useCallback(function(tpl, customize = false) {
     if (customize) {
       setWizardEditPlan(tpl.custom ? tpl : null);
       setWizardTemplatePlan(tpl.custom ? null : { ...tpl, customize: true });
@@ -118,7 +151,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
       setPlanView("detail");
       setActivePlan(tpl);
     }
-  }
+  }, []); // deps are all state setters — permanently stable
 
   useEffect(() => {
     if (!pendingOpen) return;
@@ -291,40 +324,16 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
 
       {profile.plans.length === 0 && <div className={"empty"}>{"No plans yet."}<br />{"Create one or browse recipes."}</div>}
 
-      {profile.plans.map(plan => {
-        const planXP = planXPMap[plan.id];
-        const hasSched = !!plan.scheduledDate;
-        const daysN = hasSched ? daysUntil(plan.scheduledDate) : null;
-        return <div key={plan.id} className={"plan-card"} style={{ "--pc": cls && cls.color || "#b4ac9e" }}>
-          <div className={"plan-card-top"} onClick={() => { initBuilderFromTemplate(plan, true); }}>
-            <div className={"plan-icon"}>{plan.icon}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: S.s6, marginBottom: S.s2 }}>
-                <div className={"plan-name"} style={{ flex: 1 }}>{plan.name}</div>
-                {plan.level && <span className={`plan-level-badge ${plan.level.toLowerCase()}`} style={{ flexShrink: 0 }}>{plan.level}</span>}
-              </div>
-              <div className={"plan-meta"}>
-                <span className={`plan-type-badge type-${plan.type}`}>{plan.durCount && plan.durCount > 1 ? `${plan.durCount} ${plan.type}s` : plan.type}</span>
-                <span style={{ marginLeft: S.s6, fontSize: FS.sm, color: "#8a8478" }}>{plan.days.filter(d => d.exercises.length > 0).length}{" active days"}</span>
-                {plan.startDate && <span style={{ marginLeft: S.s6, fontSize: FS.sm, color: "#8a8478" }}>
-                  {"📅 "}{new Date(plan.startDate + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
-                  {plan.endDate ? " → " + new Date(plan.endDate + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : ""}
-                </span>}
-                {!plan.startDate && hasSched && <span style={{ marginLeft: S.s6, fontSize: FS.sm, color: "#b4ac9e" }}>{"📅 "}{formatScheduledDate(plan.scheduledDate)}</span>}
-              </div>
-            </div>
-            <div className={"plan-xp-badge"}>{"⚡ "}{planXP.toLocaleString()}</div>
-          </div>
-          {plan.description && <div className={"plan-desc"} onClick={() => { initBuilderFromTemplate(plan, true); }}>{plan.description}</div>}
-          <div style={{ display: "flex", gap: S.s8, marginTop: S.s8, paddingTop: 7, borderTop: "1px solid rgba(45,42,36,.18)" }}>
-            <button className={`plan-sched-btn ${hasSched ? "plan-sched-active" : ""}`} onClick={e => { e.stopPropagation(); onSchedulePlan(plan); }}>
-              {hasSched ? "📅 " + formatScheduledDate(plan.scheduledDate) : "📅 Schedule"}
-            </button>
-            <div style={{ flex: 1 }} />
-            <button className={"btn btn-ghost btn-xs"} onClick={e => { e.stopPropagation(); initBuilderFromTemplate(plan, true); }}>{"View →"}</button>
-          </div>
-        </div>;
-      })}
+      {profile.plans.map(plan =>
+        <PlanCard
+          key={plan.id}
+          plan={plan}
+          planXP={planXPMap[plan.id]}
+          clsColor={cls && cls.color || "#b4ac9e"}
+          onOpen={initBuilderFromTemplate}
+          onSchedule={onSchedulePlan}
+        />
+      )}
     </>}
 
     {planView === "recipe-pick" && <>
