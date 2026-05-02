@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useTransition, useEffect, useRef, useId } from 'react';
+import React, { useState, useReducer, useMemo, useCallback, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import { useModalLifecycle } from '../utils/useModalLifecycle';
@@ -6,6 +6,7 @@ import { calcExXP, calcDayXP, getMuscleColor, getTypeColor, hrRange } from '../u
 import { isMetric, weightLabel, distLabel, lbsToKg, kgToLbs, miToKm, kmToMi } from '../utils/units';
 import { normalizeHHMM, combineHHMMSec, secToHHMMSplit } from '../utils/time';
 import { _optionalChain, uid, clone } from '../utils/helpers';
+import { bDaysReducer, initBDays, A } from './planWizardReducer';
 import { NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, UI_COLORS } from '../data/constants';
 import { FS, R, S } from '../utils/tokens';
 import { CLASSES } from '../data/exercises';
@@ -68,14 +69,14 @@ const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, 
   );
 });
 
-const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, collapsed, profile, allExById, setBDays, setCollapsedPlanEx, ssCheckedPlan, setSsCheckedPlan, planExCount, onOpenExEditor }) {
-  function updateField(field, val) { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>di!==bDayIdx?d:{...d,exercises:d.exercises.map((e,j)=>j!==i?e:{...e,[field]:val})}));}); }
-  function updateFieldBatch(fields) { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>di!==bDayIdx?d:{...d,exercises:d.exercises.map((e,j)=>j!==i?e:{...e,...fields})}));}); }
-  function updateFieldNow(field, val) { setBDays(days=>days.map((d,di)=>di!==bDayIdx?d:{...d,exercises:d.exercises.map((e,j)=>j!==i?e:{...e,[field]:val})})); }
-  function removeEx() { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>di!==bDayIdx?d:{...d,exercises:d.exercises.filter((_,j)=>j!==i)}));}); }
+const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, collapsed, profile, allExById, dispatch, setCollapsedPlanEx, ssCheckedPlan, setSsCheckedPlan, planExCount, onOpenExEditor }) {
+  function updateField(field, val) { React.startTransition(()=>{ dispatch({ type: A.UPDATE_EX_FIELD, dayIdx: bDayIdx, exIdx: i, field, val }); }); }
+  function updateFieldBatch(fields) { React.startTransition(()=>{ dispatch({ type: A.UPDATE_EX_FIELD_BATCH, dayIdx: bDayIdx, exIdx: i, fields }); }); }
+  function updateFieldNow(field, val) { dispatch({ type: A.UPDATE_EX_FIELD, dayIdx: bDayIdx, exIdx: i, field, val }); }
+  function removeEx() { React.startTransition(()=>{ dispatch({ type: A.REMOVE_EX, dayIdx: bDayIdx, exIdx: i }); }); }
   function toggleCollapse() { setCollapsedPlanEx(s=>({...s,[`${bDayIdx}_${i}`]:!s[`${bDayIdx}_${i}`]})); }
-  function moveUp() { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i-1,0,m);return{...d,exercises:exs};}));}); }
-  function moveDown() { React.startTransition(()=>{setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];const[m]=exs.splice(i,1);exs.splice(i+1,0,m);return{...d,exercises:exs};}));}); }
+  function moveUp() { React.startTransition(()=>{ dispatch({ type: A.MOVE_EX, dayIdx: bDayIdx, fromIdx: i, toIdx: i - 1 }); }); }
+  function moveDown() { React.startTransition(()=>{ dispatch({ type: A.MOVE_EX, dayIdx: bDayIdx, fromIdx: i, toIdx: i + 1 }); }); }
 
   // Stable id base for htmlFor/id pairing (jsx-a11y/label-has-associated-control)
   const cardId = useId();
@@ -307,11 +308,7 @@ function PlanWizard(props) {
     if(templatePlan) return templatePlan.icon || "⚔️";
     return "⚔️";
   });
-  const [bDays, setBDays] = useState(() => {
-    if(editPlan) return clone(editPlan.days);
-    if(templatePlan) return clone(templatePlan.days);
-    return Array.from({length:7},(_,i)=>({label:`Day ${i+1}`,exercises:[]}));
-  });
+  const [bDays, dispatch] = useReducer(bDaysReducer, { editPlan, templatePlan }, initBDays);
   const [bDayIdx, setBDayIdx] = useState(0);
 
   // ── Wizard/UI state ──
@@ -393,59 +390,45 @@ function PlanWizard(props) {
   function togglePlanEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedPlanEx(s=>({...s,[k]:!s[k]})); }
   function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
 
-  function addDayToBuilder(){ startTransition(()=>{ setBDays(d=>[...d,{label:`Day ${d.length+1}`,exercises:[]}]); setBDayIdx(bDays.length); }); }
-  function removeDayFromBuilder(idx){ startTransition(()=>{ const nd=bDays.filter((_,i)=>i!==idx); setBDays(nd); setBDayIdx(Math.min(bDayIdx,nd.length-1)); }); }
-  function reorderDay(fromIdx,toIdx){ if(fromIdx===toIdx) return; startTransition(()=>{ const nd=[...bDays]; const [moved]=nd.splice(fromIdx,1); nd.splice(toIdx,0,moved); setBDays(nd); setBDayIdx(toIdx); }); }
+  function addDayToBuilder(){ startTransition(()=>{ dispatch({ type: A.ADD_DAY }); setBDayIdx(bDays.length); }); }
+  function removeDayFromBuilder(idx){ startTransition(()=>{ dispatch({ type: A.REMOVE_DAY, dayIdx: idx }); setBDayIdx(Math.min(bDayIdx, bDays.length - 2)); }); }
+  function reorderDay(fromIdx,toIdx){ if(fromIdx===toIdx) return; startTransition(()=>{ dispatch({ type: A.MOVE_DAY, fromIdx, toIdx }); setBDayIdx(toIdx); }); }
 
   function duplicateWeek(weekIdx){
     const start=weekIdx*7; const end=Math.min(start+7,bDays.length);
     const weekDays=bDays.slice(start,end);
     const base=bDays.length;
     const copies=weekDays.map((d,i)=>({...d,label:`Day ${base+i+1}`,exercises:d.exercises.map(e=>({...e}))}));
-    startTransition(()=>{setBDays(d=>[...d,...copies]);});
+    startTransition(()=>{ dispatch({ type: A.ADD_DAYS, days: copies }); });
     showToast(`Week ${weekIdx+1} duplicated!`);
   }
 
   function reorderWeek(fromWeek,toWeek){
     if(fromWeek===toWeek) return;
-    const weeks=[]; const days=[...bDays];
-    for(let i=0;i<days.length;i+=7) weeks.push(days.slice(i,i+7));
-    const [moved]=weeks.splice(fromWeek,1); weeks.splice(toWeek,0,moved);
-    const reordered=weeks.flat().map((d,i)=>({...d,label:`Day ${i+1}`}));
-    startTransition(()=>{ setBDays(reordered); setBDayIdx(toWeek*7); });
+    startTransition(()=>{ dispatch({ type: A.REORDER_WEEKS, fromWeek, toWeek }); setBDayIdx(toWeek*7); });
   }
 
-  function reorderPlanEx(dayIdx,fromIdx,toIdx){ if(fromIdx===toIdx) return; startTransition(()=>{setBDays(days=>days.map((d,i)=>{ if(i!==dayIdx) return d; const exs=[...d.exercises]; const [m]=exs.splice(fromIdx,1); exs.splice(toIdx,0,m); return {...d,exercises:exs}; }));}); }
+  function reorderPlanEx(dayIdx,fromIdx,toIdx){ if(fromIdx===toIdx) return; startTransition(()=>{ dispatch({ type: A.MOVE_EX, dayIdx, fromIdx, toIdx }); }); }
 
-  function addExToDay(exId){ const exd=allExById[exId]||{}; startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,{exId,sets:(exd.defaultSets!=null?exd.defaultSets:3),reps:(exd.defaultReps!=null?exd.defaultReps:10),weightLbs:exd.defaultWeightLbs||null,durationMin:exd.defaultDurationMin||null,distanceMi:exd.defaultDistanceMi||null,hrZone:exd.defaultHrZone||null,weightPct:exd.defaultWeightPct||100}]}));}); setExPickerOpen(false); }
+  function addExToDay(exId){ const exd=allExById[exId]||{}; startTransition(()=>{ dispatch({ type: A.ADD_EXERCISES, dayIdx: bDayIdx, exercises: [{exId,sets:(exd.defaultSets!=null?exd.defaultSets:3),reps:(exd.defaultReps!=null?exd.defaultReps:10),weightLbs:exd.defaultWeightLbs||null,durationMin:exd.defaultDurationMin||null,distanceMi:exd.defaultDistanceMi||null,hrZone:exd.defaultHrZone||null,weightPct:exd.defaultWeightPct||100}] }); }); setExPickerOpen(false); }
 
-  function removeExFromDay(di,ei){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.filter((_,j)=>j!==ei)}));}); }
+  function removeExFromDay(di,ei){ startTransition(()=>{ dispatch({ type: A.REMOVE_EX, dayIdx: di, exIdx: ei }); }); }
 
-  function updateExInDay(di,ei,field,val){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})}));}); }
+  function updateExInDay(di,ei,field,val){ startTransition(()=>{ dispatch({ type: A.UPDATE_EX_FIELD, dayIdx: di, exIdx: ei, field, val }); }); }
   // Direct (non-deferred) version for add/delete row — gives instant visual feedback
-  function updateExInDayNow(di,ei,field,val){ setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,[field]:val})})); }
+  function updateExInDayNow(di,ei,field,val){ dispatch({ type: A.UPDATE_EX_FIELD, dayIdx: di, exIdx: ei, field, val }); }
 
-  function updateExInDayBatch(di,ei,fields){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==di?d:{...d,exercises:d.exercises.map((e,j)=>j!==ei?e:{...e,...fields})}));}); }
+  function updateExInDayBatch(di,ei,fields){ startTransition(()=>{ dispatch({ type: A.UPDATE_EX_FIELD_BATCH, dayIdx: di, exIdx: ei, fields }); }); }
 
-  function updateDayLabel(idx,val){ startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==idx?d:{...d,label:val}));}); }
+  function updateDayLabel(idx,val){ startTransition(()=>{ dispatch({ type: A.UPDATE_DAY_LABEL, dayIdx: idx, val }); }); }
 
   function planGroupSuperset(dayIdx, idxA, idxB) {
-    startTransition(()=>{setBDays(days => days.map((d,di) => {
-      if(di!==dayIdx) return d;
-      return {...d, exercises: d.exercises.map((e,ei) =>
-        ei===idxA ? {...e, supersetWith:idxB} : ei===idxB ? {...e, supersetWith:idxA} : e
-      )};
-    }));});
+    startTransition(()=>{ dispatch({ type: A.GROUP_SUPERSET, dayIdx, idxA, idxB }); });
     setSsCheckedPlan(new Set());
   }
 
   function planUngroupSuperset(dayIdx, idxA, idxB) {
-    startTransition(()=>{setBDays(days => days.map((d,di) => {
-      if(di!==dayIdx) return d;
-      return {...d, exercises: d.exercises.map((e,ei) =>
-        ei===idxA ? {...e, supersetWith:null} : ei===idxB ? {...e, supersetWith:null} : e
-      )};
-    }));});
+    startTransition(()=>{ dispatch({ type: A.UNGROUP_SUPERSET, dayIdx, idxA, idxB }); });
   }
 
   function renderPlanSsSection(ex, dayIdx, exIdx, exData, label, sectionKey) {
@@ -584,7 +567,8 @@ function PlanWizard(props) {
 
   function commitPickerToPlan() {
     if(pickerSelected.length===0) return;
-    startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,...pickerSelected.map(e=>({exId:e.exId,sets:e.sets||"",reps:e.reps||"",weightLbs:e.weightLbs||null,durationMin:e.durationMin||null,distanceMi:e.distanceMi||null,hrZone:e.hrZone||null,weightPct:e.weightPct||100}))]}));});
+    const exercises = pickerSelected.map(e=>({exId:e.exId,sets:e.sets||"",reps:e.reps||"",weightLbs:e.weightLbs||null,durationMin:e.durationMin||null,distanceMi:e.distanceMi||null,hrZone:e.hrZone||null,weightPct:e.weightPct||100}));
+    startTransition(()=>{ dispatch({ type: A.ADD_EXERCISES, dayIdx: bDayIdx, exercises }); });
     closePicker();
   }
 
@@ -630,7 +614,7 @@ function PlanWizard(props) {
                   const totalDays=bType==="day"?newCount:bType==="week"?newCount*7:bType==="month"?newCount*28:newCount*52*7;
                   if(totalDays>7&&totalDays>bDays.length){
                     const extra=Array.from({length:totalDays-bDays.length},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
-                    startTransition(()=>{setBDays(d=>[...d,...extra]);});
+                    startTransition(()=>{ dispatch({ type: A.ADD_DAYS, days: extra }); });
                   }
                   if(bStartDate){
                     const d=new Date(bStartDate+"T12:00:00");
@@ -658,7 +642,7 @@ function PlanWizard(props) {
                   const totalDays=t==="day"?newCount:t==="week"?newCount*7:t==="month"?newCount*28:newCount*52*7;
                   if(totalDays>7&&totalDays>bDays.length){
                     const extra=Array.from({length:totalDays-bDays.length},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
-                    startTransition(()=>{setBDays(d=>[...d,...extra]);});
+                    startTransition(()=>{ dispatch({ type: A.ADD_DAYS, days: extra }); });
                   }
                   if(bStartDate){
                     const d=new Date(bStartDate+"T12:00:00");
@@ -810,7 +794,7 @@ function PlanWizard(props) {
                   <div className="wizard-week-tab" style={{color:"#b4ac9e",borderStyle:"dashed",borderColor:"rgba(180,172,158,.12)"}}
                     onClick={()=>{
                       const newDays = Array.from({length:7},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
-                      startTransition(()=>{setBDays(d=>[...d,...newDays]);});
+                      startTransition(()=>{ dispatch({ type: A.ADD_DAYS, days: newDays }); });
                       setWizardWeekIdx(Math.ceil((bDays.length+7)/7)-1);
                     }}>{"＋ Week"}</div>
                 </div>
@@ -877,19 +861,19 @@ function PlanWizard(props) {
                 <input className="inp" type="text" inputMode="numeric" placeholder="Duration HH:MM"
                   style={{flex:1.5,fontSize:FS.fs68,padding:"6px 10px"}}
                   defaultValue={_optionalChain([bDays, 'access', _6 => _6[bDayIdx], 'optionalAccess', _7 => _7._durHHMM])!==undefined ? bDays[bDayIdx]._durHHMM : (_optionalChain([bDays, 'access', _8 => _8[bDayIdx], 'optionalAccess', _9 => _9.durationSec]) ? secToHHMMSplit(bDays[bDayIdx].durationSec).hhmm : "")}
-                  onBlur={e=>{const norm=normalizeHHMM(e.target.value);const sec=combineHHMMSec(norm,_optionalChain([bDays, 'access', _10 => _10[bDayIdx], 'optionalAccess', _11 => _11._durSec])||"");startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durHHMM:sec?norm:undefined,durationMin:sec?sec/60:null}));});}} />
+                  onBlur={e=>{const norm=normalizeHHMM(e.target.value);const sec=combineHHMMSec(norm,_optionalChain([bDays, 'access', _10 => _10[bDayIdx], 'optionalAccess', _11 => _11._durSec])||"");startTransition(()=>{ dispatch({ type: A.UPDATE_DAY_FIELD, dayIdx: bDayIdx, fields: {durationSec:sec,_durHHMM:sec?norm:undefined,durationMin:sec?sec/60:null} }); });}} />
                 <input className="inp" type="number" min="0" max="59" placeholder="Sec (0-59)"
                   style={{flex:0.8,fontSize:FS.fs68,padding:"6px 10px"}}
                   defaultValue={_optionalChain([bDays, 'access', _12 => _12[bDayIdx], 'optionalAccess', _13 => _13._durSec])||""}
-                  onBlur={e=>{const sec=combineHHMMSec(_optionalChain([bDays, 'access', _14 => _14[bDayIdx], 'optionalAccess', _15 => _15._durHHMM])||"",e.target.value);startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,durationSec:sec,_durSec:undefined,durationMin:sec?sec/60:null}));});}} />
+                  onBlur={e=>{const sec=combineHHMMSec(_optionalChain([bDays, 'access', _14 => _14[bDayIdx], 'optionalAccess', _15 => _15._durHHMM])||"",e.target.value);startTransition(()=>{ dispatch({ type: A.UPDATE_DAY_FIELD, dayIdx: bDayIdx, fields: {durationSec:sec,_durSec:undefined,durationMin:sec?sec/60:null} }); });}} />
                 <input className="inp" type="number" min="0" max="9999" placeholder="Active Cal"
                   style={{flex:1,fontSize:FS.fs68,padding:"6px 10px"}}
                   defaultValue={_optionalChain([bDays, 'access', _16 => _16[bDayIdx], 'optionalAccess', _17 => _17.activeCal])||""}
-                  onBlur={e=>startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,activeCal:e.target.value||null}));})} />
+                  onBlur={e=>startTransition(()=>{ dispatch({ type: A.UPDATE_DAY_FIELD, dayIdx: bDayIdx, fields: {activeCal:e.target.value||null} }); })} />
                 <input className="inp" type="number" min="0" max="9999" placeholder="Total Cal"
                   style={{flex:1,fontSize:FS.fs68,padding:"6px 10px"}}
                   defaultValue={_optionalChain([bDays, 'access', _18 => _18[bDayIdx], 'optionalAccess', _19 => _19.totalCal])||""}
-                  onBlur={e=>startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,totalCal:e.target.value||null}));})} />
+                  onBlur={e=>startTransition(()=>{ dispatch({ type: A.UPDATE_DAY_FIELD, dayIdx: bDayIdx, fields: {totalCal:e.target.value||null} }); })} />
               </div>
               <div style={{display:"flex",gap:S.s6,marginBottom:S.s8}}>
                 <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setExPickerOpen(true)}>{"＋ Add Exercise"}</button>
@@ -916,20 +900,14 @@ function PlanWizard(props) {
                             onClick={e=>{e.stopPropagation();
                               const minI=Math.min(i,planPartnerIdx);
                               if(minI<=0) return;
-                              startTransition(()=>{setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];
-                                const above=exs[minI-1]; exs[minI-1]=exs[minI]; exs[minI]=exs[minI+1]; exs[minI+1]=above;
-                                return {...d,exercises:exs.map(e=>{if(e.supersetWith===minI-1)return{...e,supersetWith:minI+1};if(e.supersetWith===minI)return{...e,supersetWith:minI-1};if(e.supersetWith===minI+1)return{...e,supersetWith:minI};return e;})};
-                              }));});
+                              startTransition(()=>{ dispatch({ type: A.MOVE_SUPERSET_UP, dayIdx: bDayIdx, minI }); });
                             }}>{"▲"}</button>
                           <button className="btn btn-ghost btn-xs" style={{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:Math.max(i,planPartnerIdx)>=((_optionalChain([bDays, 'access', _22 => _22[bDayIdx], 'optionalAccess', _23 => _23.exercises, 'access', _24 => _24.length])||1)-1)?.3:1}}
                             onClick={e=>{e.stopPropagation();
                               const maxI=Math.max(i,planPartnerIdx); const minI=Math.min(i,planPartnerIdx);
                               const len=(_optionalChain([bDays, 'access', _25 => _25[bDayIdx], 'optionalAccess', _26 => _26.exercises, 'access', _27 => _27.length])||0);
                               if(maxI>=len-1) return;
-                              startTransition(()=>{setBDays(days=>days.map((d,di)=>{if(di!==bDayIdx)return d;const exs=[...d.exercises];
-                                const below=exs[maxI+1]; exs[maxI+1]=exs[maxI]; exs[maxI]=exs[minI]; exs[minI]=below;
-                                return {...d,exercises:exs.map(e=>{if(e.supersetWith===minI)return{...e,supersetWith:minI+1};if(e.supersetWith===minI+1)return{...e,supersetWith:minI+2};if(e.supersetWith===maxI+1)return{...e,supersetWith:minI};return e;})};
-                              }));});
+                              startTransition(()=>{ dispatch({ type: A.MOVE_SUPERSET_DOWN, dayIdx: bDayIdx, minI, maxI }); });
                             }}>{"▼"}</button>
                         </div>
                         <span className="ss-accordion-hdr-title">{"🔗 Superset"}</span>
@@ -958,7 +936,7 @@ function PlanWizard(props) {
                       xp={wizardExXPs[i]||0}
                       collapsed={!!collapsedPlanEx[bDayIdx+'_'+i]}
                       profile={planExCardProfile} allExById={allExById}
-                      setBDays={setBDays} setCollapsedPlanEx={setCollapsedPlanEx}
+                      dispatch={dispatch} setCollapsedPlanEx={setCollapsedPlanEx}
                       ssCheckedPlan={ssCheckedPlan} setSsCheckedPlan={setSsCheckedPlan}
                       planExCount={planExs.filter(e=>!e.supersetWith).length}
                       onOpenExEditor={onOpenExEditor}
@@ -1002,7 +980,7 @@ function PlanWizard(props) {
                     weightLbs:e.weightLbs||null, durationMin:e.durationMin||null,
                     distanceMi:null, hrZone:null, weightPct:100,
                   }));
-                  startTransition(()=>{setBDays(days=>days.map((d,i)=>i!==bDayIdx?d:{...d,exercises:[...d.exercises,...newExs]}));});
+                  startTransition(()=>{ dispatch({ type: A.ADD_EXERCISES, dayIdx: bDayIdx, exercises: newExs }); });
                   setBWoPickerOpen(false);
                   showToast(wo.icon+" "+wo.name+" exercises added!");
                 }}>
