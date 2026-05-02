@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useTransition, useEffect, useRef, useId } from 'react';
+import React, { useState, useMemo, useCallback, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import { useModalLifecycle } from '../utils/useModalLifecycle';
@@ -26,6 +26,12 @@ function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id =
 // ── Virtualized picker row (item 4: react-window) ──────────────────────────
 // Module-level so the component identity is stable across PlanWizard renders;
 // react-window only re-renders rows when `rowProps` change.
+const PICKER_ROW_NAME_STYLE  = { fontFamily: "'Cinzel',serif", fontSize: FS.fs80, fontWeight: 600, color: "#d4cec4", marginBottom: S.s2, letterSpacing: ".01em" };
+const PICKER_ROW_META_STYLE  = { fontSize: FS.fs60, fontStyle: "italic" };
+const PICKER_ROW_RIGHT_COL   = { flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: S.s4 };
+const PICKER_ROW_XP_STYLE    = { fontFamily: "'Cinzel',serif", fontSize: FS.fs63, fontWeight: 700, color: "#d4cec4", letterSpacing: ".04em" };
+const PICKER_ROW_NAME_INNER  = { flex: 1, minWidth: 0 };
+
 const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, exercises, selIds, onToggle }) {
   const ex = exercises[index];
   if (!ex) return null;
@@ -43,18 +49,18 @@ const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, 
     <div style={{...style, paddingTop:4, paddingBottom:4}} {...ariaAttributes}>
       <div className={"picker-ex-row" + (sel ? " sel" : "")} style={{"--mg-color":exMgColor}} onClick={() => onToggle(ex.id)}>
         <div className="picker-ex-orb"><ExIcon ex={ex} size=".95rem" color="#d4cec4" /></div>
-        <div style={{flex:1, minWidth:0}}>
-          <div style={{fontFamily:"'Cinzel',serif", fontSize:FS.fs80, fontWeight:600, color:"#d4cec4", marginBottom:S.s2, letterSpacing:".01em"}}>
+        <div style={PICKER_ROW_NAME_INNER}>
+          <div style={PICKER_ROW_NAME_STYLE}>
             {ex.name}{ex.custom && <span className="custom-ex-badge" style={{marginLeft:S.s4}}>custom</span>}
           </div>
-          <div style={{fontSize:FS.fs60, fontStyle:"italic"}}>
+          <div style={PICKER_ROW_META_STYLE}>
             {ex.category && <span style={{color:getTypeColor(ex.category)}}>{ex.category.charAt(0).toUpperCase()+ex.category.slice(1)}</span>}
             {ex.category && ex.muscleGroup && <span style={{color:"#8a8478"}}>{" · "}</span>}
             {ex.muscleGroup && <span style={{color:exMgColor}}>{ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)}</span>}
           </div>
         </div>
-        <div style={{flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:S.s4}}>
-          <span style={{fontFamily:"'Cinzel',serif", fontSize:FS.fs63, fontWeight:700, color:"#d4cec4", letterSpacing:".04em"}}>{ex.baseXP + " XP"}</span>
+        <div style={PICKER_ROW_RIGHT_COL}>
+          <span style={PICKER_ROW_XP_STYLE}>{ex.baseXP + " XP"}</span>
           <span style={{fontSize:FS.fs56, fontWeight:700, color:diffColor, background:diffBg, padding:"2px 6px", borderRadius:R.r3, letterSpacing:".04em"}}>{diffLabel}</span>
         </div>
       </div>
@@ -543,13 +549,34 @@ function PlanWizard(props) {
     setPickerSelected([]); setPickerConfigOpen(false);
   }
 
-  function pickerToggleEx(exId) {
+  const pickerToggleEx = useCallback((exId) => {
     setPickerSelected(prev => {
       const exists = prev.find(e=>e.exId===exId);
       if(exists) return prev.filter(e=>e.exId!==exId);
       return [...prev, {exId, sets:"3", reps:"10", weightLbs:"", weightPct:100, durationMin:"", distanceMi:"", hrZone:null}];
     });
-  }
+  }, []);
+
+  // Stable selection set + rowProps so memoized PickerRow only re-renders when
+  // the user toggles selection or the filter changes.
+  const pickerSelIds = useMemo(() => new Set(pickerSelected.map(e=>e.exId)), [pickerSelected]);
+  const pickerRowProps = useMemo(
+    () => ({ exercises: filteredExercises, selIds: pickerSelIds, onToggle: pickerToggleEx }),
+    [filteredExercises, pickerSelIds, pickerToggleEx]
+  );
+
+  // PlanExCard reads only these four fields from `profile`. Memoizing a slim
+  // object keeps the memo'd card stable across unrelated profile updates
+  // (gold, name, avatar, plans, etc.).
+  const planExCardProfile = useMemo(
+    () => ({
+      units: profile.units,
+      age: profile.age,
+      runningPB: profile.runningPB,
+      exercisePBs: profile.exercisePBs,
+    }),
+    [profile.units, profile.age, profile.runningPB, profile.exercisePBs]
+  );
 
   function pickerUpdateEx(exId, field, val) {
     setPickerSelected(prev=>prev.map(e=>e.exId===exId?{...e,[field]:val}:e));
@@ -930,7 +957,7 @@ function PlanWizard(props) {
                       ex={ex} i={i} exData={exData} bDayIdx={bDayIdx}
                       xp={wizardExXPs[i]||0}
                       collapsed={!!collapsedPlanEx[bDayIdx+'_'+i]}
-                      profile={profile} allExById={allExById}
+                      profile={planExCardProfile} allExById={allExById}
                       setBDays={setBDays} setCollapsedPlanEx={setCollapsedPlanEx}
                       ssCheckedPlan={ssCheckedPlan} setSsCheckedPlan={setSsCheckedPlan}
                       planExCount={planExs.filter(e=>!e.supersetWith).length}
@@ -1074,23 +1101,21 @@ function PlanWizard(props) {
                   );
                 })()}
                 {(()=>{
-                  const filtered=filteredExercises;
-                  if(filtered.length===0) return <div className="empty" style={{padding:"20px 0"}}>No exercises found.</div>;
-                  const selIds=new Set(pickerSelected.map(e=>e.exId));
+                  if(filteredExercises.length===0) return <div className="empty" style={{padding:"20px 0"}}>No exercises found.</div>;
                   return (
                     <>
                       <div style={{fontSize:FS.fs62,color:"#8a8478",marginBottom:S.s6,textAlign:"right"}}>
-                        {filtered.length+" match"+(filtered.length!==1?"es":"")}
+                        {filteredExercises.length+" match"+(filteredExercises.length!==1?"es":"")}
                       </div>
                       {/* Virtualized: rowHeight 60px = .picker-ex-row content (~52px) + 8px slot padding.
                           height: min(60vh, 480px) keeps the list inside the modal sheet without
                           overflowing on small screens. The previous slice(0,80) cap is gone —
                           users can scroll through all matches. */}
                       <List
-                        rowCount={filtered.length}
+                        rowCount={filteredExercises.length}
                         rowHeight={60}
                         rowComponent={PickerRow}
-                        rowProps={{ exercises: filtered, selIds, onToggle: pickerToggleEx }}
+                        rowProps={pickerRowProps}
                         style={{ height: 'min(60vh, 480px)', width: '100%' }}
                       />
                     </>
