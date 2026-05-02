@@ -1,4 +1,4 @@
-import React, { useState, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useImperativeHandle } from 'react';
 import { PLAN_TEMPLATES, HR_ZONES, NO_SETS_EX_IDS, RUNNING_EX_ID, UI_COLORS, QUESTS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 import { _optionalChain, uid, todayStr } from '../utils/helpers';
@@ -47,6 +47,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     onSchedulePlan, onScheduleEx, onRemoveScheduledWorkout,
     onStatsPrompt, onOpenExEditor,
     setXpFlash, applyAutoCheckIn,
+    pendingOpen, onPendingOpenDone,
   } = props;
 
   const [planView, setPlanView] = useState("list");
@@ -118,6 +119,12 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
       setActivePlan(tpl);
     }
   }
+
+  useEffect(() => {
+    if (!pendingOpen) return;
+    initBuilderFromTemplate(pendingOpen.plan, pendingOpen.isEdit);
+    onPendingOpenDone();
+  }, [pendingOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handlePlanWizardSave(planData) {
     if (planData.isEdit) {

@@ -1159,6 +1159,7 @@ function App() {
   const [charSubTab, setCharSubTab] = useState("avatar");
   const [bodyTypeLocked, setBodyTypeLocked] = useState(false);
   const plansContainerRef = useRef(null);
+  const [plansPendingOpen, setPlansPendingOpen] = useState(null);
   const [dragWbExIdx, setDragWbExIdx] = useState(null);
   const [ssChecked, setSsChecked] = useState(() => new Set()); // indices checked for superset grouping
   const [ssAccordion, setSsAccordion] = useState({}); // collapse state for superset accordion sections in workout builder
@@ -9452,7 +9453,7 @@ function App() {
           return null;
         })()
 
-        /* ── PLANS TAB ───────────────────────── */}{activeTab === "plans" && <PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} />
+        /* ── PLANS TAB ───────────────────────── */}{activeTab === "plans" && <PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} />
 
         /* ── CALENDAR TAB ────────────────────── */}{activeTab === "calendar" && (() => {
           const {
@@ -9633,7 +9634,7 @@ function App() {
                   }}><div className={"cal-event-name"}>{ev.name}</div>{ev.notes && <div className={"cal-event-sub"}>{ev.notes}</div>}<div className={"cal-event-sub"}>{ev.kind === "plan" ? "Workout Plan" : "Exercise"}</div></div>{ev.kind === "plan" && <button className={"cal-sched-btn"} onClick={() => {
                     const pl = profile.plans.find(p => p.id === ev.planId);
                     if (pl) {
-                      plansContainerRef.current?.openBuilder(pl, true);
+                      setPlansPendingOpen({ plan: pl, isEdit: true });
                       setActiveTab("plans");
                     }
                   }}>{"View →"}</button>}<div className={"upcoming-del"} onClick={() => {
