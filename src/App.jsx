@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import './styles/app.css';
@@ -5124,14 +5124,11 @@ function App() {
   }
 
   // ── Schedule picker helpers ──────────────────────────────────
-  function openSchedulePlan(plan) {
-    setSchedulePicker({
-      type: "plan",
-      plan
-    });
+  const openSchedulePlan = useCallback(function openSchedulePlan(plan) {
+    setSchedulePicker({ type: "plan", plan });
     setSpDate(plan.scheduledDate || "");
     setSpNotes(plan.scheduleNotes || "");
-  }
+  }, []);
   function openScheduleEx(exId, existingId) {
     const ex = allExById[exId];
     if (!ex) return;
@@ -9453,7 +9450,7 @@ function App() {
           return null;
         })()
 
-        /* ── PLANS TAB ───────────────────────── */}{activeTab === "plans" && <PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} />
+        /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} /></div>
 
         /* ── CALENDAR TAB ────────────────────── */}{activeTab === "calendar" && (() => {
           const {
