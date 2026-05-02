@@ -416,19 +416,7 @@ const WbExCard = React.memo(function WbExCard({
   const runPace = isRunningEx && distMiVal > 0 && durationMin > 0 ? durationMin / distMiVal : null;
   const runBoostPct = runPace ? runPace <= 8 ? 20 : 5 : 0;
   const mgColor = getMuscleColor(exD.muscleGroup);
-  return <><div className={"wb-ex-hdr"} style={{
-      display: "flex",
-      alignItems: "center",
-      gap: S.s6,
-      marginBottom: collapsed ? 0 : 8,
-      background: "transparent",
-      cursor: "pointer",
-      borderRadius: R.r0,
-      padding: "0",
-      transition: "all .2s",
-      marginLeft: S.sNeg4,
-      marginRight: S.sNeg4
-    }} onClick={() => toggleCollapse()}><div style={{
+  return <><div className={"wb-ex-hdr"} onClick={() => toggleCollapse()}><div style={{
         display: "flex",
         flexDirection: "column",
         gap: S.s2,
@@ -523,7 +511,7 @@ const WbExCard = React.memo(function WbExCard({
       }}>{"▼"}</span><button type={"button"} aria-label={`Remove ${exD.name}`} title={"Remove"} className={"btn btn-danger btn-xs"} onClick={e => {
         e.stopPropagation();
         removeEx();
-      }}>{"✕"}</button></div>{!collapsed && exD.id !== "rest_day" && <><div style={{
+      }}>{"✕"}</button></div>{!collapsed && exD.id !== "rest_day" && <div className={"wb-ex-body"}><div style={{
         display: "flex",
         gap: S.s8,
         marginBottom: S.s6
@@ -804,7 +792,7 @@ const WbExCard = React.memo(function WbExCard({
           color: "#8a8478",
           fontStyle: "italic",
           marginTop: S.s4
-        }}>{HR_ZONES[ex.hrZone - 1].desc}</div>}</div>}</>}</>;
+        }}>{HR_ZONES[ex.hrZone - 1].desc}</div>}</div>}</div>}</>;
 });
 function App() {
   // ── Modal / dialog UI state — extracted to ./state/useUiState (item 5a)
@@ -10517,7 +10505,7 @@ function App() {
                               totalCal: gStats.totalCal,
                               activeCal: gStats.activeCal,
                               durationSec: gStats.durationSec
-                            })}><span className={"h-icon"}>{ef.icon}</span><div style={{
+                            })}><div className={"h-entry-hdr"}><span className={"h-icon"}>{ef.icon}</span><div style={{
                                 flex: 1,
                                 minWidth: 0
                               }}><div className={"h-name"} style={{
@@ -10537,7 +10525,7 @@ function App() {
                                     background: "rgba(180,172,158,.08)",
                                     padding: "2px 6px",
                                     borderRadius: R.r3
-                                  }}>{exEntries.length}{" sets"}</span>}</div></div><div className={"h-xp"}>{"+"}{exXP}{" XP"}</div></div>;
+                                  }}>{exEntries.length}{" sets"}</span>}</div></div><div className={"h-xp"}>{"+"}{exXP}{" XP"}</div></div></div>;
                           })}</div>;
                       })()}</div>;
                   })
@@ -11300,7 +11288,7 @@ function App() {
             const exMgColor = getMuscleColor(exData && exData.muscleGroup);
             return <div className={"h-entry"} style={{
               "--mg-color": exMgColor
-            }}><span className={"h-icon"}>{e.icon}</span><div style={{
+            }}><div className={"h-entry-hdr"}><span className={"h-icon"}>{e.icon}</span><div style={{
                 flex: 1,
                 minWidth: 0
               }}><div className={"h-name"}>{e.exercise}{isSuperset && <span style={{
@@ -11324,7 +11312,14 @@ function App() {
                     color: "#e67e22",
                     border: "1px solid rgba(230,126,34,.3)",
                     verticalAlign: "middle"
-                  }}>{"⚡ "}{e.sourceWorkoutName}</span>}</div><div className={"h-meta"}>{e.sets}{"×"}{e.reps}{isC || isF ? " min" : ""}{e.distanceMi ? <span style={{
+                  }}>{"⚡ "}{e.sourceWorkoutName}</span>}</div></div><div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: S.s6,
+                flexShrink: 0
+              }}><div className={"h-xp"}>{"+"}{e.xp}{" XP"}</div><button className={"btn btn-ghost btn-xs"} title={"Edit entry"} onClick={() => openLogEdit(e._idx)}>{"✎"}</button><button className={"btn btn-danger btn-xs"} title={"Delete entry"} style={{
+                  padding: "2px 6px"
+                }} onClick={() => deleteLogEntryByIdx(e._idx)}>{"✕"}</button></div></div><div className={"h-entry-body"}><div className={"h-meta"}>{e.sets}{"×"}{e.reps}{isC || isF ? " min" : ""}{e.distanceMi ? <span style={{
                     color: UI_COLORS.accent,
                     marginLeft: S.s6
                   }}>{metric ? miToKm(e.distanceMi) + " km" : e.distanceMi + " mi"}</span> : ""}{e.weightLbs ? <span style={{
@@ -11338,14 +11333,7 @@ function App() {
                   }}>{"Z"}{e.hrZone}</span> : ""}<span style={{
                     marginLeft: S.s6,
                     color: "#8a8478"
-                  }}>{e.time}{" · "}{e.date}</span></div></div><div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s6,
-                flexShrink: 0
-              }}><div className={"h-xp"}>{"+"}{e.xp}{" XP"}</div><button className={"btn btn-ghost btn-xs"} title={"Edit entry"} onClick={() => openLogEdit(e._idx)}>{"✎"}</button><button className={"btn btn-danger btn-xs"} title={"Delete entry"} style={{
-                  padding: "2px 6px"
-                }} onClick={() => deleteLogEntryByIdx(e._idx)}>{"✕"}</button></div></div>;
+                  }}>{e.time}{" · "}{e.date}</span></div></div></div>;
           }
 
           // ── EXERCISES sub-tab ────────────────────────────────────────
