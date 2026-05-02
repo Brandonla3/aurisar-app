@@ -78,6 +78,7 @@ const LB_PLAYERS_BY_FILTER = {
 
 const US_STATES = ['All States', 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'];
 const COUNTRIES = ['All Countries', 'United States'];
+const COUNTRY_CODE = { 'United States': 'US' };
 
 function Medal({ rank }) {
   const colors =
@@ -180,6 +181,10 @@ export function LeaderboardSection() {
     let rows = allRows.slice();
     if (scope === 'friends') rows = rows.filter((r) => r.friend);
     if (stateF !== 'All States') rows = rows.filter((r) => r.state === stateF);
+    if (country !== 'All Countries') {
+      const code = COUNTRY_CODE[country];
+      if (code) rows = rows.filter((r) => r.country === code);
+    }
     return rows;
   }, [scope, stateF, country, allRows]);
 
