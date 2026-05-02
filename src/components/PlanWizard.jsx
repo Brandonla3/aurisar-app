@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useTransition, useEffect, useRef, useId } from 'react';
+import React, { useState, useMemo, useCallback, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import { useModalLifecycle } from '../utils/useModalLifecycle';
@@ -12,6 +12,11 @@ import { CLASSES } from '../data/exercises';
 import { ExIcon } from './ExIcon';
 
 const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
+
+const PICKER_NAME_STYLE  = { fontFamily:"'Cinzel',serif", fontSize:FS.fs80, fontWeight:600, color:"#d4cec4", marginBottom:S.s2, letterSpacing:".01em" };
+const PICKER_CAT_STYLE   = { fontSize:FS.fs60, fontStyle:"italic" };
+const PICKER_STATS_STYLE = { flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:S.s4 };
+const PICKER_XP_STYLE    = { fontFamily:"'Cinzel',serif", fontSize:FS.fs63, fontWeight:700, color:"#d4cec4", letterSpacing:".04em" };
 
 function formatScheduledDate(dateStr) {
   if(!dateStr) return "";
@@ -44,17 +49,17 @@ const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, 
       <div className={"picker-ex-row" + (sel ? " sel" : "")} style={{"--mg-color":exMgColor}} onClick={() => onToggle(ex.id)}>
         <div className="picker-ex-orb"><ExIcon ex={ex} size=".95rem" color="#d4cec4" /></div>
         <div style={{flex:1, minWidth:0}}>
-          <div style={{fontFamily:"'Cinzel',serif", fontSize:FS.fs80, fontWeight:600, color:"#d4cec4", marginBottom:S.s2, letterSpacing:".01em"}}>
+          <div style={PICKER_NAME_STYLE}>
             {ex.name}{ex.custom && <span className="custom-ex-badge" style={{marginLeft:S.s4}}>custom</span>}
           </div>
-          <div style={{fontSize:FS.fs60, fontStyle:"italic"}}>
+          <div style={PICKER_CAT_STYLE}>
             {ex.category && <span style={{color:getTypeColor(ex.category)}}>{ex.category.charAt(0).toUpperCase()+ex.category.slice(1)}</span>}
             {ex.category && ex.muscleGroup && <span style={{color:"#8a8478"}}>{" · "}</span>}
             {ex.muscleGroup && <span style={{color:exMgColor}}>{ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)}</span>}
           </div>
         </div>
-        <div style={{flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:S.s4}}>
-          <span style={{fontFamily:"'Cinzel',serif", fontSize:FS.fs63, fontWeight:700, color:"#d4cec4", letterSpacing:".04em"}}>{ex.baseXP + " XP"}</span>
+        <div style={PICKER_STATS_STYLE}>
+          <span style={PICKER_XP_STYLE}>{ex.baseXP + " XP"}</span>
           <span style={{fontSize:FS.fs56, fontWeight:700, color:diffColor, background:diffBg, padding:"2px 6px", borderRadius:R.r3, letterSpacing:".04em"}}>{diffLabel}</span>
         </div>
       </div>
@@ -383,6 +388,21 @@ function PlanWizard(props) {
     });
   },[pickerSearch,pickerMuscle,pickerTypeFilter,pickerEquipFilter,allExercises]);
 
+  const selIds = useMemo(
+    () => new Set(pickerSelected.map(e => e.exId)),
+    [pickerSelected]
+  );
+
+  const rowProps = useMemo(
+    () => ({ exercises: filteredExercises, selIds, onToggle: pickerToggleEx }),
+    [filteredExercises, selIds, pickerToggleEx]
+  );
+
+  const slimProfile = useMemo(
+    () => ({ units: profile.units, age: profile.age, runningPB: profile.runningPB, exercisePBs: profile.exercisePBs }),
+    [profile.units, profile.age, profile.runningPB, profile.exercisePBs]
+  );
+
   // ── Functions ──
   function togglePlanEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedPlanEx(s=>({...s,[k]:!s[k]})); }
   function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
@@ -543,13 +563,13 @@ function PlanWizard(props) {
     setPickerSelected([]); setPickerConfigOpen(false);
   }
 
-  function pickerToggleEx(exId) {
+  const pickerToggleEx = useCallback(function pickerToggleEx(exId) {
     setPickerSelected(prev => {
       const exists = prev.find(e=>e.exId===exId);
       if(exists) return prev.filter(e=>e.exId!==exId);
       return [...prev, {exId, sets:"3", reps:"10", weightLbs:"", weightPct:100, durationMin:"", distanceMi:"", hrZone:null}];
     });
-  }
+  }, []);
 
   function pickerUpdateEx(exId, field, val) {
     setPickerSelected(prev=>prev.map(e=>e.exId===exId?{...e,[field]:val}:e));
@@ -930,7 +950,7 @@ function PlanWizard(props) {
                       ex={ex} i={i} exData={exData} bDayIdx={bDayIdx}
                       xp={wizardExXPs[i]||0}
                       collapsed={!!collapsedPlanEx[bDayIdx+'_'+i]}
-                      profile={profile} allExById={allExById}
+                      profile={slimProfile} allExById={allExById}
                       setBDays={setBDays} setCollapsedPlanEx={setCollapsedPlanEx}
                       ssCheckedPlan={ssCheckedPlan} setSsCheckedPlan={setSsCheckedPlan}
                       planExCount={planExs.filter(e=>!e.supersetWith).length}
@@ -1076,7 +1096,6 @@ function PlanWizard(props) {
                 {(()=>{
                   const filtered=filteredExercises;
                   if(filtered.length===0) return <div className="empty" style={{padding:"20px 0"}}>No exercises found.</div>;
-                  const selIds=new Set(pickerSelected.map(e=>e.exId));
                   return (
                     <>
                       <div style={{fontSize:FS.fs62,color:"#8a8478",marginBottom:S.s6,textAlign:"right"}}>
@@ -1090,7 +1109,7 @@ function PlanWizard(props) {
                         rowCount={filtered.length}
                         rowHeight={60}
                         rowComponent={PickerRow}
-                        rowProps={{ exercises: filtered, selIds, onToggle: pickerToggleEx }}
+                        rowProps={rowProps}
                         style={{ height: 'min(60vh, 480px)', width: '100%' }}
                       />
                     </>
