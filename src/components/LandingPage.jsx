@@ -99,10 +99,10 @@ function HeroMonolith({ onLogin, onSignUp }) {
             <span className="landing-hm-cta-corner landing-hm-cta-corner-tr" />
             <span className="landing-hm-cta-corner landing-hm-cta-corner-bl" />
             <span className="landing-hm-cta-corner landing-hm-cta-corner-br" />
-            <span className="landing-hm-cta-label">BEGIN YOUR LEGEND</span>
+            <span className="landing-hm-cta-label">SIGN UP</span>
           </button>
           <button className="landing-hm-cta landing-hm-cta-ghost" onClick={onLogin}>
-            <span className="landing-hm-cta-label">RETURN TO BATTLE</span>
+            <span className="landing-hm-cta-label">LOG IN</span>
             <span className="landing-hm-cta-arrow">→</span>
           </button>
         </div>
@@ -174,14 +174,7 @@ export function LandingPage({ onLogin, onSignUp }) {
             Leaderboards
           </button>
         </nav>
-        <div className="landing-topbar-actions">
-          <button className="landing-topbar-btn" onClick={onLogin}>
-            Login
-          </button>
-          <button className="landing-topbar-btn landing-topbar-btn-accent" onClick={onSignUp}>
-            Sign Up
-          </button>
-        </div>
+        <div className="landing-topbar-spacer" />
       </header>
 
       {/* ═══════════ HERO ═══════════ */}
