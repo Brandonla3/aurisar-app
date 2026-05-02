@@ -905,6 +905,21 @@
   opacity: .45;
   pointer-events: none;
 }
+/* Global drifting bronze dust — viewport-fixed container so embers persist while scrolling */
+.landing-cinematic .landing-global-dust {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* Inside the global dust container, embers anchor to the viewport and rise to the top */
+.landing-cinematic .landing-global-dust .landing-hm-dust {
+  position: absolute;
+  bottom: -20px;
+  left: var(--left);
+}
+
 /* Per-section backgrounds become transparent so the global atmosphere shows through */
 .landing-cinematic .landing-primer,
 .landing-cinematic .landing-classes-section,

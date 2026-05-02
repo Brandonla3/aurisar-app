@@ -40,19 +40,6 @@ function HeroMonolith({ onLogin, onSignUp }) {
     return () => clearInterval(id);
   }, []);
 
-  const dust = useMemo(
-    () =>
-      Array.from({ length: 18 }, () => ({
-        left: Math.random() * 100 + '%',
-        size: 1 + Math.random() * 2 + 'px',
-        dur: 10 + Math.random() * 14 + 's',
-        delay: Math.random() * 18 + 's',
-        drift: (Math.random() - 0.5) * 60 + 'px',
-        o: 0.25 + Math.random() * 0.5,
-      })),
-    [],
-  );
-
   const dateStr = now
     .toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' })
     .toUpperCase();
@@ -85,21 +72,6 @@ function HeroMonolith({ onLogin, onSignUp }) {
         <div className="landing-hm-mark-halo" />
         <img src={aurisarMark3D} alt="" className="landing-hm-mark-img" />
       </div>
-
-      {dust.map((p, i) => (
-        <span
-          key={i}
-          className="landing-hm-dust"
-          style={{
-            '--left': p.left,
-            '--size': p.size,
-            '--dur': p.dur,
-            '--delay': p.delay,
-            '--drift': p.drift,
-            '--o': p.o,
-          }}
-        />
-      ))}
 
       <div className="landing-hm-content">
         <div className="landing-hm-meta">
@@ -144,6 +116,19 @@ export function LandingPage({ onLogin, onSignUp }) {
   const primerRef = useRef(null);
   const lbRef = useRef(null);
   const revealRefs = useRef([]);
+
+  const globalDust = useMemo(
+    () =>
+      Array.from({ length: 18 }, () => ({
+        left: Math.random() * 100 + '%',
+        size: 1 + Math.random() * 2 + 'px',
+        dur: 10 + Math.random() * 14 + 's',
+        delay: Math.random() * 18 + 's',
+        drift: (Math.random() - 0.5) * 60 + 'px',
+        o: 0.25 + Math.random() * 0.5,
+      })),
+    [],
+  );
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -267,6 +252,24 @@ export function LandingPage({ onLogin, onSignUp }) {
 
       {/* ═══════════ FOOTER ═══════════ */}
       <footer className="landing-footer">© 2026 Aurisar Games. All rights reserved.</footer>
+
+      {/* Global drifting bronze embers — viewport-fixed so they float across the whole page */}
+      <div className="landing-global-dust" aria-hidden="true">
+        {globalDust.map((p, i) => (
+          <span
+            key={i}
+            className="landing-hm-dust"
+            style={{
+              '--left': p.left,
+              '--size': p.size,
+              '--dur': p.dur,
+              '--delay': p.delay,
+              '--drift': p.drift,
+              '--o': p.o,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
