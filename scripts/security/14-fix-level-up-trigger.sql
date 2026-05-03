@@ -1,24 +1,29 @@
 -- =============================================================================
--- 14 — Fix two broken profile UPDATE triggers that silently blocked all saves
+-- 14 — Fix three broken profile trigger functions after migration 12
 -- =============================================================================
--- Two trigger functions were broken after migration 12 (security_hardening_12),
--- causing every sb.from("profiles").upsert() from the app to fail silently.
--- doSave() catches the Postgres error and only console.warns, so users saw
--- no error but their workouts, XP, and profile changes never reached Supabase.
+-- Migration 12 (security_hardening_12) set search_path='' on several trigger
+-- functions and dropped get_resend_key(). This broke three functions called
+-- during profile upserts, causing every sb.from("profiles").upsert() from
+-- the app to fail silently (doSave() catches errors with console.warn only).
 --
--- Bug 1: notify_friend_level_up() called get_resend_key() which was DROPPED
--- in migration 12. Any profile UPDATE where XP increased enough to cross a
--- level boundary would fail with:
+-- Bug 1 — notify_friend_level_up(): called get_resend_key() which was DROPPED
+-- in migration 12. Any profile UPDATE where XP crossed a level boundary failed:
 --   ERROR: function get_resend_key() does not exist
--- Fix: remove the http_post email block. Level-up detection is preserved;
--- email notification will be re-wired via a Vault secret in a follow-up.
+-- Fix: remove the http_post email block. Level-up detection preserved for a
+-- future Vault-backed re-implementation.
 --
--- Bug 2: backup_profile_on_update() had SET search_path='' applied by
--- migration 12's security hardening, but its body still used the unqualified
--- table name "profile_backups" instead of "public.profile_backups". Every
--- profile UPDATE triggered:
+-- Bug 2 — backup_profile_on_update(): had SET search_path='' applied but still
+-- used unqualified "profile_backups". Every profile UPDATE triggered:
 --   ERROR: relation "profile_backups" does not exist
--- Fix: qualify all table references with the public schema.
+-- Fix: qualify all table references as public.profile_backups.
+--
+-- Bug 3 — trigger_set_profile_ids(): had SET search_path='' applied but still
+-- called generate_public_id() and generate_private_id() without schema prefix,
+-- and referenced "profiles" unqualified. This trigger fires on every INSERT
+-- attempt in an upsert (including the INSERT→conflict→UPDATE path), so it
+-- blocked ALL profile upserts with:
+--   ERROR: function generate_public_id() does not exist
+-- Fix: qualify all function calls and table references with public.
 -- =============================================================================
 
 -- ── 1. Fix notify_friend_level_up ───────────────────────────────────────────
@@ -94,6 +99,42 @@ BEGIN
         ORDER BY date_trunc('month', backed_up_at), backed_up_at DESC
       ) m
     );
+
+  RETURN NEW;
+END;
+$$;
+
+-- ── 3. Fix trigger_set_profile_ids ──────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.trigger_set_profile_ids()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  new_public TEXT;
+  new_private TEXT;
+  attempts INT := 0;
+BEGIN
+  IF NEW.public_id IS NULL THEN
+    LOOP
+      new_public := public.generate_public_id();
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE public_id = new_public);
+      attempts := attempts + 1;
+      IF attempts > 50 THEN RAISE EXCEPTION 'Could not generate unique public_id'; END IF;
+    END LOOP;
+    NEW.public_id := new_public;
+  END IF;
+
+  IF NEW.private_id IS NULL THEN
+    LOOP
+      new_private := public.generate_private_id();
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE private_id = new_private);
+      attempts := attempts + 1;
+      IF attempts > 100 THEN RAISE EXCEPTION 'Could not generate unique private_id'; END IF;
+    END LOOP;
+    NEW.private_id := new_private;
+  END IF;
 
   RETURN NEW;
 END;
