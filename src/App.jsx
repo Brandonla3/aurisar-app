@@ -5983,7 +5983,7 @@ function App() {
   );
   return <div className={"root"} style={rootStyle}><style>{CSS}</style><div className={"bg"} />{PARTICLES.map(p => <div key={p.id} className={"pt"} style={{
       left: `${p.x}%`,
-      bottom: `${Math.random() * 100}%`,
+      bottom: `${p.bottom}%`,
       width: p.size,
       height: p.size,
       "--dur": `${p.duration}s`,

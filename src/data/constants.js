@@ -1106,7 +1106,7 @@ const KEYWORD_CLASS_MAP = [
   { keywords:["hiit","crossfit","interval","explosive","intense","adrenaline","extreme"], class:"berserker" },
 ];
 
-const PARTICLES = Array.from({length:14},(_,i)=>({id:i,x:Math.random()*100,delay:Math.random()*5,duration:6+Math.random()*6,size:2+Math.random()*3}));
+const PARTICLES = Array.from({length:14},(_,i)=>({id:i,x:Math.random()*100,bottom:Math.random()*100,delay:Math.random()*5,duration:6+Math.random()*6,size:2+Math.random()*3}));
 const STORAGE_KEY = "iron-glory-v3";
 
 const EMPTY_PROFILE = {
