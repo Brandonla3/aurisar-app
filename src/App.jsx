@@ -5,7 +5,7 @@ import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, UI_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
-import { loadSave, doSave, setPreviewMode, loadAdminFlags } from './utils/storage';
+import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './utils/storage';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
@@ -3336,6 +3336,10 @@ function App() {
   }
   async function signOut() {
     const prevUserId = _optionalChain([authUser, 'optionalAccess', _signOut1 => _signOut1.id]);
+    // Flush any debounced profile writes BEFORE invalidating auth — otherwise
+    // a queued Supabase upsert lands as an unauthenticated request and a
+    // queued localStorage write would rewrite the cache after the wipe below.
+    try { await flushSave(); } catch { /* noop */ }
     await sb.auth.signOut();
     // Wipe locally-cached PII so a shared device can't leak data to the next user.
     try {
