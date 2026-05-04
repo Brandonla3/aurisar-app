@@ -38,10 +38,15 @@ Tick each box as the corresponding PR merges. Each remediation should reference 
 - [x] **6. Continue App.jsx decomposition** _(incremental — multiple PRs)_
   - [x] Workout completion flow (links to #3) — PR [#118](https://github.com/Brandonla3/aurisar-app/pull/118)
   - [x] Exercise library / search / filter (links to #5) — PRs [#121](https://github.com/Brandonla3/aurisar-app/pull/121) [#122](https://github.com/Brandonla3/aurisar-app/pull/122) [#123](https://github.com/Brandonla3/aurisar-app/pull/123)
+  - [x] MessagesTab — PR [#124](https://github.com/Brandonla3/aurisar-app/pull/124)
+  - [x] HistoryTab — PR [#125](https://github.com/Brandonla3/aurisar-app/pull/125)
+  - [x] CharacterTab + QuestsTab — PR [#126](https://github.com/Brandonla3/aurisar-app/pull/126)
+  - [x] GuildTab — PR [#127](https://github.com/Brandonla3/aurisar-app/pull/127)
+  - [x] WorkoutsTab — PR [#128](https://github.com/Brandonla3/aurisar-app/pull/128)
   - [ ] Shell / layout pieces: HUD, nav, background, toast, XP flash
-  - [ ] History / profile / social / messages
-  - [ ] Quests / calendar
-  - PRs: [#118](https://github.com/Brandonla3/aurisar-app/pull/118), [#121](https://github.com/Brandonla3/aurisar-app/pull/121), [#122](https://github.com/Brandonla3/aurisar-app/pull/122), [#123](https://github.com/Brandonla3/aurisar-app/pull/123) — ongoing
+  - [ ] Calendar tab
+  - [ ] Profile / ProfileEdit
+  - PRs: [#118](https://github.com/Brandonla3/aurisar-app/pull/118), [#121](https://github.com/Brandonla3/aurisar-app/pull/121)–[#128](https://github.com/Brandonla3/aurisar-app/pull/128) — ongoing
 
 **Already landed (prior to this audit):**
 
@@ -63,7 +68,7 @@ Users are seeing general sluggishness across the app, including:
 
 The source audit suggests the performance issues are not caused by one isolated bug. They come from a combination of broad React re-renders, expensive synchronous work, mobile GPU-heavy CSS, repeated full-list calculations, and a very large top-level `App.jsx` that owns too many responsibilities.
 
-`src/App.jsx` was **16,204 lines** at audit time. Currently **15,168 lines** (−1,036).
+`src/App.jsx` was **16,204 lines** at audit time. Currently **12,219 lines** (−3,985) after PRs #121–#128.
 
 ---
 
