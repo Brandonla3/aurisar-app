@@ -2,9 +2,12 @@ import React, { memo } from 'react';
 import { calcBMI, xpToLevel } from '../../utils/xp';
 import { isMetric, lbsToKg, kgToLbs, ftInToCm, cmToFtIn } from '../../utils/units';
 import { S, R, FS } from '../../utils/tokens';
-import { UI_COLORS } from '../../data/constants';
+import { UI_COLORS, QUESTS, EX_BY_ID } from '../../data/constants';
+import { _optionalChain } from '../../utils/helpers';
 import { CLASSES } from '../../data/exercises';
 import { ClassIcon } from '../../components/ClassIcon';
+
+const LEADERBOARD_PB_IDS = new Set(["bench", "bench_press", "squat", "barbell_back_squat", "deadlift", "barbell_deadlift", "overhead_press", "ohp", "pull_up", "pullups", "push_up", "pushups", "running", "treadmill_run", "run"]);
 
 /**
  * Profile tab — extracted from the four inline JSX blocks in App.jsx as part
