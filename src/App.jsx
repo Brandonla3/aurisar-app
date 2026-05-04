@@ -450,26 +450,40 @@ function App() {
   const [activeTab, setActiveTab] = useState("workout");
 
   // Mount the Cloudflare Turnstile widget when the support modal opens.
-  // The api.js loaded in index.html exposes window.turnstile; we render via
-  // its JS API so we can capture the token in React state. Skips entirely
-  // when VITE_TURNSTILE_SITE_KEY is empty (keeps dev / pre-Cloudflare-setup
-  // working).
+  // api.js is injected lazily on first open — NOT loaded in index.html —
+  // so it never runs during the login flow and can't trigger a CSP eval
+  // violation there. Skips entirely when TURNSTILE_SITE_KEY is empty.
   useEffect(() => {
     if (!feedbackOpen || !TURNSTILE_SITE_KEY) return;
     setTurnstileToken("");
-    const t = window.turnstile;
-    const container = turnstileContainerRef.current;
-    if (!t || !container) return;
-    try {
-      const id = t.render(container, {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: token => setTurnstileToken(token),
-        "error-callback": () => setTurnstileToken(""),
-        "expired-callback": () => setTurnstileToken(""),
-        theme: "dark"
-      });
-      turnstileWidgetIdRef.current = id;
-    } catch {/* api.js still loading — skip */}
+    function mount() {
+      const t = window.turnstile;
+      const container = turnstileContainerRef.current;
+      if (!t || !container) return;
+      try {
+        const id = t.render(container, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: token => setTurnstileToken(token),
+          "error-callback": () => setTurnstileToken(""),
+          "expired-callback": () => setTurnstileToken(""),
+          theme: "dark"
+        });
+        turnstileWidgetIdRef.current = id;
+      } catch {/* ignore */}
+    }
+    if (window.turnstile) {
+      mount();
+    } else {
+      let s = document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]');
+      if (!s) {
+        s = document.createElement('script');
+        s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
+      }
+      s.addEventListener('load', mount, { once: true });
+    }
     return () => {
       const id = turnstileWidgetIdRef.current;
       if (id != null && window.turnstile) {
