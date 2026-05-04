@@ -50,16 +50,31 @@ async function loadSave(userId) {
 let _previewMode = false;
 function setPreviewMode(v) { _previewMode = !!v; }
 
-// ── Coalesced remote save ──────────────────────────────────────────────
-// localStorage writes stay eager (cheap, sync, safe on tab close).
-// Supabase upserts are debounced to 500ms so rapid profile mutations
-// (e.g. typing in the onboarding form, logging consecutive sets) coalesce
-// into one network round-trip. flushSave() forces an immediate flush —
-// callers can use it before sign-out or other critical transitions.
-const SUPABASE_DEBOUNCE_MS = 500;
+// ── Coalesced persistence ──────────────────────────────────────────────
+// Both localStorage and Supabase writes are debounced. Pre-finding-#4 the
+// localStorage write was eager — comment claimed it was "cheap, sync, safe
+// on tab close", but JSON.stringify of a profile with a long log can take
+// noticeable time on the main thread, and every workout completion /
+// favorite / edit / schedule pays that cost. Same 500ms cadence as
+// Supabase keeps the design simple: one pagehide flush handles both.
+// flushSave() forces an immediate flush — callers (sign-out, etc.) use it
+// before critical transitions.
+const SAVE_DEBOUNCE_MS = 500;
+
+let _pendingLocal = null;   // latest profile waiting to be written locally
+let _localTimerId = null;
+
 let _pending = null;        // latest payload waiting to be sent
 let _timerId = null;
 let _inFlight = null;       // promise of the currently-running upsert
+
+function _flushLocal() {
+  _localTimerId = null;
+  if (_pendingLocal == null) return;
+  const data = _pendingLocal;
+  _pendingLocal = null;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* noop */ }
+}
 
 async function _flush() {
   _timerId = null;
@@ -83,6 +98,11 @@ async function _flush() {
 }
 
 async function flushSave() {
+  // Local first — synchronous and cheap. If the page reloads while the
+  // Supabase upsert is in flight, loadSave() can still recover the latest
+  // profile from localStorage.
+  if (_localTimerId) { clearTimeout(_localTimerId); _localTimerId = null; }
+  _flushLocal();
   if (_timerId) { clearTimeout(_timerId); _timerId = null; }
   await _flush();
   if (_inFlight) await _inFlight;
@@ -96,18 +116,22 @@ async function doSave(data, userId, userEmail) {
   // Must run BEFORE the audit so preview data doesn't pollute the dev log.
   if (_previewMode) return;
   _auditProfileShape(data);
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+  // Debounced local write — coalesces rapid mutations into one
+  // JSON.stringify per ~500ms instead of one per call.
+  _pendingLocal = data;
+  if (_localTimerId) clearTimeout(_localTimerId);
+  _localTimerId = setTimeout(_flushLocal, SAVE_DEBOUNCE_MS);
   if (!userId) return;
   const saveData = userEmail ? {...data, email: userEmail.toLowerCase()} : data;
   _pending = { id: userId, data: saveData, updated_at: new Date().toISOString() };
   if (_timerId) clearTimeout(_timerId);
-  _timerId = setTimeout(_flush, SUPABASE_DEBOUNCE_MS);
+  _timerId = setTimeout(_flush, SAVE_DEBOUNCE_MS);
 }
 
 // Best-effort flush on tab hide / unload so users don't lose the last
 // ~500ms of edits if they close the tab right after a change.
 if (typeof window !== 'undefined') {
-  const onHide = () => { if (_pending) flushSave(); };
+  const onHide = () => { flushSave(); };
   window.addEventListener('pagehide', onHide);
   window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide(); });
 }
