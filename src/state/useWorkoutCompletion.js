@@ -8,16 +8,30 @@ const MARK_START = 'workout-completion:start';
 const MARK_END = 'workout-completion:end';
 const MEASURE = 'workout-completion';
 
+// Yield to the browser so the urgent modal-close render commits and paints
+// before the heavy entries/XP/log compute runs. requestIdleCallback is the
+// audit's preferred primitive (it lets the browser pick a quiet moment) and
+// setTimeout(0) is the Safari fallback. Either way the heavy work runs in a
+// new task, after the urgent setCompletionModal(null) frame has already
+// painted — `startTransition` alone can't do this because its callback body
+// still runs synchronously inside the click handler.
+const scheduleAfterPaint = typeof requestIdleCallback === 'function'
+  ? (cb) => requestIdleCallback(cb, { timeout: 200 })
+  : (cb) => setTimeout(cb, 0);
+
 /**
  * Workout-completion handler for finding #3 in docs/performance-audit.md.
  *
- * Two changes versus the original inline function in App.jsx:
- *   1. Modal-close + completion-form resets fire FIRST, before any compute
- *      or profile mutation. They commit as urgent updates so React paints the
- *      closed modal before doing the big setProfile re-render.
- *   2. The compute + setProfile + xpFlash + toast block runs inside
- *      startTransition so React can interrupt the App-wide re-render if the
- *      user taps something else.
+ * Three-layer responsiveness strategy:
+ *   1. Urgent: setCompletionModal(null) + completion-form resets fire
+ *      synchronously in the click handler so React queues them as urgent
+ *      updates and the modal-close frame paints first.
+ *   2. After-paint: the entries/XP/log/quests compute runs inside
+ *      requestIdleCallback (setTimeout(0) fallback) so it lands in a NEW
+ *      task — the modal-close paint has already happened by then.
+ *   3. Transition: the resulting setProfile/setXpFlash/showToast cluster
+ *      runs inside startTransition so the App-wide re-render driven by the
+ *      new profile is interruptible if the user taps something else.
  *
  * Adds a performance.measure span ("workout-completion") so before/after
  * commit time is queryable from PerformanceObserver / the Performance panel.
@@ -40,15 +54,16 @@ export function useWorkoutCompletion({
     const action = completionAction;
     const pickedDate = completionDate;
 
-    // Instant feedback: close the modal and reset the completion form. These
-    // are urgent (outside startTransition) so React commits them before the
-    // heavier setProfile work below.
+    // Layer 1 — urgent: close the modal and reset the completion form. These
+    // commit and paint before the heavy work runs (deferred below).
     setCompletionModal(null);
     setCompletionDate("");
     setCompletionAction("today");
     setScheduleWoDate("");
 
-    startTransition(() => {
+    // Layer 2 — after-paint: schedule the heavy compute in a new task so the
+    // modal-close frame can flush first.
+    scheduleAfterPaint(() => {
       try { performance.mark(MARK_START); } catch { /* noop */ }
 
       const dateStr = action === "past" && pickedDate && pickedDate !== "pick" ? pickedDate : todayStr();
@@ -132,38 +147,43 @@ export function useWorkoutCompletion({
         });
       }
 
+      // Layer 3 — transition: the App re-render driven by the new profile
+      // is interruptible. xpFlash + toast are queued in the same transition
+      // so they batch with the profile update.
       let _ciResult = {
         checkInApplied: false,
         checkInXP: 0,
         checkInStreak: 0
       };
-      setProfile(p => {
-        const base = {
-          ...p,
-          xp: p.xp + totalXP,
-          log: newLog,
-          quests: newQuests,
-          workouts: newWorkouts,
-          scheduledWorkouts: wo.oneOff ? (p.scheduledWorkouts || []).filter(sw => sw.sourceWorkoutId !== wo.id) : p.scheduledWorkouts || []
-        };
-        const ci = applyAutoCheckIn(base, dateStr);
-        _ciResult = ci;
-        return ci.profile;
+      startTransition(() => {
+        setProfile(p => {
+          const base = {
+            ...p,
+            xp: p.xp + totalXP,
+            log: newLog,
+            quests: newQuests,
+            workouts: newWorkouts,
+            scheduledWorkouts: wo.oneOff ? (p.scheduledWorkouts || []).filter(sw => sw.sourceWorkoutId !== wo.id) : p.scheduledWorkouts || []
+          };
+          const ci = applyAutoCheckIn(base, dateStr);
+          _ciResult = ci;
+          return ci.profile;
+        });
+        setXpFlash({
+          amount: totalXP + _ciResult.checkInXP,
+          mult: 1
+        });
+        setTimeout(() => setXpFlash(null), 2500);
+        if (wo.makeReusable) {
+          setWorkoutSubTab("reusable");
+        }
+        const label = dateStr === todayStr() ? "today" : displayDate;
+        const reusableNote = wo.makeReusable ? " · Saved to Re-Usable tab!" : "";
+        const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
+        showToast(wo.icon + " " + wo.name + " completed " + label + "! " + formatXP(totalXP, {
+          signed: true
+        }) + " ⚡" + reusableNote + ciSuffix);
       });
-      setXpFlash({
-        amount: totalXP + _ciResult.checkInXP,
-        mult: 1
-      });
-      setTimeout(() => setXpFlash(null), 2500);
-      if (wo.makeReusable) {
-        setWorkoutSubTab("reusable");
-      }
-      const label = dateStr === todayStr() ? "today" : displayDate;
-      const reusableNote = wo.makeReusable ? " · Saved to Re-Usable tab!" : "";
-      const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
-      showToast(wo.icon + " " + wo.name + " completed " + label + "! " + formatXP(totalXP, {
-        signed: true
-      }) + " ⚡" + reusableNote + ciSuffix);
 
       try {
         performance.mark(MARK_END);
