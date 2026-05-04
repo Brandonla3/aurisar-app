@@ -18,6 +18,7 @@ import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseL
 import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
+import { useExerciseFilters } from './features/exercises/useExerciseFilters';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -90,32 +91,6 @@ function getWorkoutMgColor(wo, exById, mgColors) {
     }
   }
   return top && mgColors[top] || "#B0A090";
-}
-
-// ── Library tab — Finding #5 hoisted helpers ──
-// LIB_ALL_* and libMatchesFilters were previously created inside the IIFE
-// that renders the library tab, meaning they were recreated on every App
-// render. Hoisting to module scope plus lifting the derived computations to
-// App-body useMemos (grimoireFiltered, libFiltered, the available* triple,
-// libMuscleCountsByGroup, libMuscleCardData, libDiscoverRows) lets the
-// heavy filter work only run when its actual deps change.
-const LIB_ALL_MUSCLE_OPTS = ["chest", "back", "shoulder", "bicep", "tricep", "legs", "glutes", "abs", "calves", "forearm", "full_body", "cardio"];
-const LIB_ALL_EQUIP_OPTS = ["barbell", "dumbbell", "kettlebell", "cable", "machine", "bodyweight", "band"];
-function libMatchesFilters(ex, tF, mF, eF) {
-  if (tF.size > 0) {
-    const types = (ex.exerciseType || "").toLowerCase();
-    const cat = (ex.category || "").toLowerCase();
-    if (![...tF].some(t => types.includes(t) || cat === t)) return false;
-  }
-  if (mF.size > 0) {
-    const mg = (ex.muscleGroup || "").toLowerCase().trim();
-    if (!mF.has(mg)) return false;
-  }
-  if (eF.size > 0) {
-    const eq = (ex.equipment || "bodyweight").toLowerCase().trim();
-    if (!eF.has(eq)) return false;
-  }
-  return true;
 }
 
 import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
@@ -3461,96 +3436,25 @@ function App() {
     return s + (b + r);
   }, 0), [wbExercises, profile.chosenClass, allExById]);
 
-  // ── Library tab — Finding #5 memoized derivations ──
-  // Lifted from inline IIFE computations that previously ran on every App
-  // render (xpFlash, toast, friendExBanner, etc. would all force a rescan
-  // of the 1500+ exercise list). Each useMemo lists the actual deps so the
-  // heavy work only runs when those change.
-
-  // Single-pass per-muscle count index. Replaces the 12 separate
-  // `allExercises.filter(...)` scans the old MUSCLE_CARD_DATA did per render.
-  const libMuscleCountsByGroup = useMemo(() => {
-    const counts = new Map();
-    for (const ex of allExercises) {
-      const mg = (ex.muscleGroup || "").toLowerCase().trim();
-      if (!mg) continue;
-      counts.set(mg, (counts.get(mg) || 0) + 1);
-    }
-    return counts;
-  }, [allExercises]);
-
-  const libMuscleCardData = useMemo(() => LIB_ALL_MUSCLE_OPTS.filter(m => m !== "full_body").map(mg => {
-    const meta = MUSCLE_META[mg] || {
-      emoji: "💪",
-      label: mg.charAt(0).toUpperCase() + mg.slice(1),
-      icon: "game-icons:weight-lifting-up"
-    };
-    return {
-      mg,
-      label: meta.label,
-      emoji: meta.emoji,
-      icon: meta.icon,
-      count: libMuscleCountsByGroup.get(mg) || 0,
-      color: getMuscleColor(mg)
-    };
-  }).filter(d => d.count > 0), [libMuscleCountsByGroup]);
-
-  // Library tab — main filtered list (search + type + muscle + equip).
-  const libFiltered = useMemo(() => {
-    const q2 = libSearchDebounced.toLowerCase().trim();
-    return allExercises.filter(ex => {
-      if (q2 && !ex.name.toLowerCase().includes(q2)) return false;
-      return libMatchesFilters(ex, libTypeFilters, libMuscleFilters, libEquipFilters);
-    });
-  }, [allExercises, libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters]);
-
-  // Cascading availability — which muscles/equip/types are still selectable
-  // given the OTHER filters. Each excludes its own filter set.
-  const libAvailableMuscles = useMemo(() => new Set(
-    allExercises.filter(ex => libMatchesFilters(ex, libTypeFilters, new Set(), libEquipFilters))
-      .map(ex => (ex.muscleGroup || "").toLowerCase().trim()).filter(Boolean)
-  ), [allExercises, libTypeFilters, libEquipFilters]);
-  const libAvailableEquip = useMemo(() => new Set(
-    allExercises.filter(ex => libMatchesFilters(ex, libTypeFilters, libMuscleFilters, new Set()))
-      .map(ex => (ex.equipment || "bodyweight").toLowerCase().trim()).filter(Boolean)
-  ), [allExercises, libTypeFilters, libMuscleFilters]);
-  const libAvailableTypes = useMemo(() => new Set(
-    allExercises.filter(ex => libMatchesFilters(ex, new Set(), libMuscleFilters, libEquipFilters))
-      .flatMap(ex => {
-        const types = (ex.exerciseType || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
-        const cat = (ex.category || "").toLowerCase();
-        return cat ? [...types, cat] : types;
-      })
-  ), [allExercises, libMuscleFilters, libEquipFilters]);
-
-  // Library home view — discover rows. Each row was an independent
-  // allExercises.filter() pass per render; now they're all cached together.
-  const libDiscoverRows = useMemo(() => {
-    const rows = [
-      { label: "Beginner Friendly", exercises: allExercises.filter(ex => (ex.baseXP || 0) < 45).slice(0, 15) },
-      { label: "Advanced Challenges", exercises: allExercises.filter(ex => (ex.baseXP || 0) >= 60).slice(0, 15) },
-    ];
-    if (_exReady) {
-      rows.push(
-        { label: "Bodyweight Only", exercises: allExercises.filter(ex => (ex.equipment || "bodyweight").toLowerCase() === "bodyweight").slice(0, 15) },
-        { label: "Dumbbell Exercises", exercises: allExercises.filter(ex => (ex.equipment || "").toLowerCase() === "dumbbell").slice(0, 15) },
-        { label: "Barbell Essentials", exercises: allExercises.filter(ex => (ex.equipment || "").toLowerCase() === "barbell").slice(0, 15) },
-      );
-    }
-    return rows;
-  }, [allExercises, _exReady]);
-
-  // Grimoire grid — separate filter state from the library tab.
-  const grimoireFiltered = useMemo(() => {
-    const q = exSearch.toLowerCase().trim();
-    const favs = profile.favoriteExercises || [];
-    return allExercises.filter(ex =>
-      (exCatFilters.size === 0 || exCatFilters.has(ex.category) || ex.secondaryCategory && exCatFilters.has(ex.secondaryCategory)) &&
-      (exMuscleFilter === "All" || ex.muscleGroup === exMuscleFilter) &&
-      (!showFavsOnly || favs.includes(ex.id)) &&
-      (q === "" || ex.name.toLowerCase().includes(q))
-    );
-  }, [allExercises, exCatFilters, exMuscleFilter, showFavsOnly, profile.favoriteExercises, exSearch]);
+  // ── Exercise filter derivations — extracted to features/exercises ──
+  // Eight memoized derivations the library tab + grimoire grid consume.
+  // The hook keeps the heavy allExercises scans off the App-render hot
+  // path (Finding #5 + #6 from docs/performance-audit.md).
+  const {
+    grimoireFiltered,
+    libFiltered,
+    libAvailableTypes,
+    libMuscleCardData,
+    libDiscoverRows,
+    libMuscleOpts,
+    libEquipOpts,
+  } = useExerciseFilters({
+    allExercises,
+    _exReady,
+    exSearch, exCatFilters, exMuscleFilter, showFavsOnly,
+    favoriteExercises: profile.favoriteExercises,
+    libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
+  });
 
   // Auto-update quest completion state when log or streak changes
   const computedQuests = () => {
@@ -6965,12 +6869,10 @@ function App() {
               setLibBrowseMode("home");
             };
             const hasFilters = libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0 || libSearch;
-            // libFiltered, libAvailableMuscles/Equip/Types are lifted to App
-            // body useMemos (Finding #5). MUSCLE_OPTS / EQUIP_OPTS stay local
-            // because they're cheap (filter over 12 / 7 strings) and depend on
-            // the lifted available* sets plus the user's current selection.
-            const MUSCLE_OPTS = LIB_ALL_MUSCLE_OPTS.filter(m => libAvailableMuscles.has(m) || libMuscleFilters.has(m));
-            const EQUIP_OPTS = LIB_ALL_EQUIP_OPTS.filter(e => libAvailableEquip.has(e) || libEquipFilters.has(e));
+            // libMuscleOpts / libEquipOpts come from useExerciseFilters now.
+            // Aliased to keep the JSX below using the existing names.
+            const MUSCLE_OPTS = libMuscleOpts;
+            const EQUIP_OPTS = libEquipOpts;
             const toggleSel = id => setLibSelected(s => {
               const n = new Set(s);
               n.has(id) ? n.delete(id) : n.add(id);
