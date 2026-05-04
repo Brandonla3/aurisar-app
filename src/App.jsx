@@ -25,6 +25,7 @@ import MyWorkoutsSubTab from './features/exercises/MyWorkoutsSubTab';
 import MessagesTab from './features/social/MessagesTab';
 import GuildTab from './features/social/GuildTab';
 import HistoryTab from './features/history/HistoryTab';
+import LogEntryEditModal from './features/history/LogEntryEditModal';
 import QuestsTab from './features/quests/QuestsTab';
 import CharacterTab from './features/character/CharacterTab';
 import WorkoutsTab from './features/workouts/WorkoutsTab';
@@ -7145,139 +7146,18 @@ function App() {
             }}>{"📅 Schedule Workout"}</button>}</div></div></div>, document.body);
     })()
 
-    /* ══ LOG ENTRY EDIT MODAL ════════════════════ */}{logEditModal && logEditDraft && (() => {
-      const d = logEditDraft;
-      const setD = patch => setLogEditDraft(prev => ({
-        ...prev,
-        ...patch
-      }));
-      const exData = allExById[d.exId];
-      const isCardio = exData ? exData.category === "cardio" : false;
-      const isFlex = exData ? exData.category === "flexibility" : false;
-      const showWeight = !isCardio && !isFlex;
-      const showDist = isCardio;
-      const showZone = isCardio;
-      const metric = isMetric(profile.units);
-      const wUnit = weightLabel(profile.units);
-      const dUnit = distLabel(profile.units);
-      const previewXP = calcEntryXP(d);
-      const xpDiff = previewXP - (_optionalChain([profile, 'access', _182 => _182.log, 'access', _183 => _183[logEditModal.idx], 'optionalAccess', _184 => _184.xp]) || 0);
-      return createPortal(<div className={"ledit-backdrop"} onClick={() => setLogEditModal(null)}><div className={"ledit-sheet"} onClick={e => e.stopPropagation()}><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
-          }}><div><div style={{
-                fontFamily: "'Inter',sans-serif",
-                fontSize: FS.fs88,
-                color: "#d4cec4"
-              }}>{"✎ Edit Log Entry"}</div><div style={{
-                fontSize: FS.fs65,
-                color: "#8a8478",
-                marginTop: S.s2
-              }}>{d.icon}{" "}{d.exercise}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setLogEditModal(null)}>{"✕"}</button></div>
-
-          {
-            /* Source info */
-          }{(d.sourcePlanName || d.sourceWorkoutName) && <div style={{
-            fontSize: FS.fs65,
-            color: "#8a8478",
-            fontStyle: "italic",
-            padding: "6px 10px",
-            background: "rgba(45,42,36,.12)",
-            borderRadius: R.r7,
-            border: "1px solid rgba(45,42,36,.2)"
-          }}>{d.sourcePlanName && <span>{"📋 From plan: "}<b style={{
-                color: "#b4ac9e"
-              }}>{d.sourcePlanName}</b></span>}{d.sourceWorkoutName && <span>{"💪 From workout: "}<b style={{
-                color: UI_COLORS.accent
-              }}>{d.sourceWorkoutName}</b></span>}</div>
-
-          /* Date */}<div className={"field"}><label>{"Date"}</label><input className={"inp"} type={"date"} value={d.dateKey || ""} onChange={e => {
-              const v = e.target.value;
-              const disp = v ? new Date(v + "T12:00:00").toLocaleDateString() : d.date;
-              setD({
-                dateKey: v,
-                date: disp
-              });
-            }} /></div>
-
-          {
-            /* Sets + Reps/Duration */
-          }<div className={"r2"}><div className={"field"}><label>{"Sets"}</label><input className={"inp"} type={"number"} min={"1"} max={"99"} value={d.sets || 1} onChange={e => setD({
-                sets: parseInt(e.target.value) || 1
-              })} /></div><div className={"field"}><label>{isCardio || isFlex ? "Duration (min)" : "Reps"}</label><input className={"inp"} type={"number"} min={"1"} max={"999"} value={d.reps || 1} onChange={e => setD({
-                reps: parseInt(e.target.value) || 1
-              })} /></div></div>
-
-          {
-            /* Weight */
-          }{showWeight && <div className={"field"}><label>{"Weight ("}{wUnit}{")"}</label><input className={"inp"} type={"number"} min={"0"} step={"2.5"} value={d.weightLbs ? metric ? lbsToKg(d.weightLbs) : d.weightLbs : ""} placeholder={"0"} onChange={e => {
-              const v = parseFloat(e.target.value) || null;
-              setD({
-                weightLbs: v ? metric ? parseFloat(kgToLbs(v)) : v : null
-              });
-            }} /></div>
-
-          /* Distance */}{showDist && <div className={"field"}><label>{"Distance ("}{dUnit}{")"}</label><input className={"inp"} type={"number"} min={"0"} step={"0.1"} value={d.distanceMi ? metric ? miToKm(d.distanceMi) : d.distanceMi : ""} placeholder={"0"} onChange={e => {
-              const v = parseFloat(e.target.value) || null;
-              setD({
-                distanceMi: v ? metric ? parseFloat(kmToMi(v)) : v : null
-              });
-            }} /></div>
-
-          /* HR Zone */}{showZone && <div className={"field"}><label>{"HR Zone"}</label><div className={"hr-zone-row"}>{HR_ZONES.map((z, zi) => {
-                const zn = zi + 1;
-                return <div key={zn} className={`hr-zone-btn ${d.hrZone === zn ? "sel" : ""}`} style={{
-                  "--zc": z.color,
-                  borderColor: d.hrZone === zn ? z.color : "rgba(45,42,36,.2)"
-                }} onClick={() => setD({
-                  hrZone: d.hrZone === zn ? null : zn
-                })}><span className={"hz-name"} style={{
-                    color: z.color
-                  }}>{"Z"}{zn}</span><span className={"hz-bpm"}>{z.short}</span></div>;
-              })}</div></div>
-
-          /* XP preview */}<div style={{
-            background: "rgba(45,42,36,.16)",
-            border: "1px solid rgba(180,172,158,.06)",
-            borderRadius: R.xl,
-            padding: "8px 14px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
-          }}><div style={{
-              fontSize: FS.md,
-              color: "#8a8478"
-            }}>{"New XP for this entry"}</div><div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: S.s8
-            }}>{xpDiff !== 0 && <div style={{
-                fontSize: FS.md,
-                color: xpDiff > 0 ? UI_COLORS.success : UI_COLORS.danger
-              }}>{xpDiff > 0 ? "+" : ""}{xpDiff}{" XP"}</div>}<div style={{
-                fontFamily: "'Inter',sans-serif",
-                fontSize: "1rem",
-                color: "#b4ac9e"
-              }}>{"⚡ "}{previewXP}</div></div></div>
-
-          {
-            /* Actions */
-          }<div style={{
-            display: "flex",
-            gap: S.s8
-          }}><button className={"btn btn-danger btn-sm"} style={{
-              flex: 0,
-              padding: "8px 12px"
-            }} onClick={() => {
-              setLogEditModal(null);
-              deleteLogEntryByIdx(logEditModal.idx);
-            }}>{"🗑"}</button><button className={"btn btn-ghost btn-sm"} style={{
-              flex: 1
-            }} onClick={() => setLogEditModal(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
-              flex: 2
-            }} onClick={saveLogEdit}>{"✦ Save Changes"}</button></div></div></div>, document.body);
-    })()
+    /* ══ LOG ENTRY EDIT MODAL ════════════════════ */}{logEditModal && logEditDraft && (
+      <LogEntryEditModal
+        logEditModal={logEditModal}
+        setLogEditModal={setLogEditModal}
+        logEditDraft={logEditDraft}
+        setLogEditDraft={setLogEditDraft}
+        allExById={allExById}
+        profile={profile}
+        saveLogEdit={saveLogEdit}
+        deleteLogEntryByIdx={deleteLogEntryByIdx}
+      />
+    )
 
     /* ══ CONFIRM DELETE MODAL ════════════════════ */}{confirmDelete && (
       <ConfirmDeleteModal
