@@ -811,39 +811,44 @@ function App() {
       if (_event === "PASSWORD_RECOVERY") {
         setIsPreviewMode(false); // arriving via password reset is a real auth — exit preview
         setAuthUser(user);
-        const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _23a => _23a.id]) || null);
-        if (adminFlags.disabled_at) {
-          await sb.auth.signOut();
-          setAuthMsg("Your account has been disabled. Contact support.");
-          setScreen("login");
-          return;
+        try {
+          const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _23a => _23a.id]) || null);
+          if (adminFlags.disabled_at) {
+            await sb.auth.signOut();
+            setAuthMsg("Your account has been disabled. Contact support.");
+            setScreen("login");
+            return;
+          }
+          setIsAdmin(adminFlags.is_admin);
+          const saved = await loadSave(_optionalChain([user, 'optionalAccess', _23 => _23.id]) || null);
+          if (_optionalChain([saved, 'optionalAccess', _24 => _24.chosenClass])) {
+            (_s => setProfile({
+              ..._s,
+              exercisePBs: Object.keys(_s.exercisePBs || {}).length > 0 ? _s.exercisePBs : calcExercisePBs(_s.log || [])
+            }))(ensureRestDay({
+              ...EMPTY_PROFILE,
+              ...saved,
+              plans: saved.plans || [],
+              quests: saved.quests || {},
+              customExercises: saved.customExercises || [],
+              scheduledWorkouts: saved.scheduledWorkouts || [],
+              workouts: saved.workouts || [],
+              checkInHistory: saved.checkInHistory || []
+            }));
+          }
+          setScreen("main");
+          setActiveTab("profile");
+          setSecurityMode(true);
+          setEditMode(false);
+          setPwPanelOpen(true);
+          setPwMsg({
+            ok: null,
+            text: "🔑 You followed a password reset link — please set your new password below."
+          });
+        } catch (e) {
+          console.error("[auth] PASSWORD_RECOVERY handler threw:", e);
+          setScreen("landing");
         }
-        setIsAdmin(adminFlags.is_admin);
-        const saved = await loadSave(_optionalChain([user, 'optionalAccess', _23 => _23.id]) || null);
-        if (_optionalChain([saved, 'optionalAccess', _24 => _24.chosenClass])) {
-          (_s => setProfile({
-            ..._s,
-            exercisePBs: Object.keys(_s.exercisePBs || {}).length > 0 ? _s.exercisePBs : calcExercisePBs(_s.log || [])
-          }))(ensureRestDay({
-            ...EMPTY_PROFILE,
-            ...saved,
-            plans: saved.plans || [],
-            quests: saved.quests || {},
-            customExercises: saved.customExercises || [],
-            scheduledWorkouts: saved.scheduledWorkouts || [],
-            workouts: saved.workouts || [],
-            checkInHistory: saved.checkInHistory || []
-          }));
-        }
-        setScreen("main");
-        setActiveTab("profile");
-        setSecurityMode(true);
-        setEditMode(false);
-        setPwPanelOpen(true);
-        setPwMsg({
-          ok: null,
-          text: "🔑 You followed a password reset link — please set your new password below."
-        });
         return;
       }
 
@@ -867,7 +872,7 @@ function App() {
       // every workout save until the next page reload.
       setIsPreviewMode(false);
       setAuthUser(user);
-      {
+      try {
         const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _25a => _25a.id]) || null);
         if (adminFlags.disabled_at) {
           await sb.auth.signOut();
@@ -876,28 +881,31 @@ function App() {
           return;
         }
         setIsAdmin(adminFlags.is_admin);
-      }
-      const saved = await loadSave(_optionalChain([user, 'optionalAccess', _25 => _25.id]) || null);
-      if (_optionalChain([saved, 'optionalAccess', _26 => _26.chosenClass])) {
-        (_s => setProfile({
-          ..._s,
-          exercisePBs: Object.keys(_s.exercisePBs || {}).length > 0 ? _s.exercisePBs : calcExercisePBs(_s.log || [])
-        }))(ensureRestDay({
-          ...EMPTY_PROFILE,
-          ...saved,
-          plans: saved.plans || [],
-          quests: saved.quests || {},
-          customExercises: saved.customExercises || [],
-          scheduledWorkouts: saved.scheduledWorkouts || [],
-          workouts: saved.workouts || [],
-          checkInHistory: saved.checkInHistory || []
-        }));
-        setScreen("main");
-      } else {
-        // Safety net: never navigate an active user away from "main" due to a
-        // failed/slow loadSave. Functional updater reads live screen state, not
-        // the stale closure value captured at mount.
-        setScreen(s => s === "main" ? s : user ? "intro" : "login");
+        const saved = await loadSave(_optionalChain([user, 'optionalAccess', _25 => _25.id]) || null);
+        if (_optionalChain([saved, 'optionalAccess', _26 => _26.chosenClass])) {
+          (_s => setProfile({
+            ..._s,
+            exercisePBs: Object.keys(_s.exercisePBs || {}).length > 0 ? _s.exercisePBs : calcExercisePBs(_s.log || [])
+          }))(ensureRestDay({
+            ...EMPTY_PROFILE,
+            ...saved,
+            plans: saved.plans || [],
+            quests: saved.quests || {},
+            customExercises: saved.customExercises || [],
+            scheduledWorkouts: saved.scheduledWorkouts || [],
+            workouts: saved.workouts || [],
+            checkInHistory: saved.checkInHistory || []
+          }));
+          setScreen("main");
+        } else {
+          // Safety net: never navigate an active user away from "main" due to a
+          // failed/slow loadSave. Functional updater reads live screen state, not
+          // the stale closure value captured at mount.
+          setScreen(s => s === "main" ? s : user ? "intro" : "login");
+        }
+      } catch (e) {
+        console.error("[auth] onAuthStateChange SIGNED_IN handler threw:", e);
+        setScreen(s => s === "main" ? s : "landing");
       }
     });
     // Check existing session on mount — handle both cases explicitly
