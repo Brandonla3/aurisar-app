@@ -28,6 +28,7 @@ const LeaderboardTab = memo(function LeaderboardTab({
   lbLoading,
   // Profile
   profile,
+  myPublicId,
   // Auth
   authUser,
 }) {
@@ -103,6 +104,12 @@ const TC = {
 const cls = CLASSES[profile.chosenClass] || CLASSES.warrior;
 const af = LB_FILTERS.find(f => f.id === lbFilter) || LB_FILTERS[0];
 const tc = TC[af.type] || "#b4ac9e";
+const _nv = profile.nameVisibility || { displayName: ["app", "game"], realName: ["hide"] };
+const myDisplayName = (_nv.displayName || []).includes("game")
+  ? (profile.playerName || "Unknown")
+  : (_nv.realName || []).includes("game")
+    ? (((profile.firstName || "") + " " + (profile.lastName || "")).trim() || profile.playerName || "Unknown")
+    : (profile.playerName || "Unknown");
 
 // Get the correct display name for a leaderboard row based on name visibility
 const getRowName = row => {
@@ -414,7 +421,7 @@ return <div> {
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap"
-        }}>{getNameForContext("game") || "You"}<span style={{
+        }}>{myDisplayName || "You"}<span style={{
             fontSize: FS.fs50,
             fontWeight: 700,
             color: cls.color,
