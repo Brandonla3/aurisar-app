@@ -26,8 +26,10 @@ import MessagesTab from './features/social/MessagesTab';
 import GuildTab from './features/social/GuildTab';
 import HistoryTab from './features/history/HistoryTab';
 import LogEntryEditModal from './features/history/LogEntryEditModal';
+import RetroEditModal from './features/history/RetroEditModal';
 import QuestsTab from './features/quests/QuestsTab';
 import CharacterTab from './features/character/CharacterTab';
+import MapOverlay from './features/character/MapOverlay';
 import WorkoutsTab from './features/workouts/WorkoutsTab';
 import WorkoutExercisePicker from './features/workouts/WorkoutExercisePicker';
 import CompletionModal from './features/workouts/CompletionModal';
@@ -6581,185 +6583,16 @@ function App() {
               color: "#b4ac9e"
             }}>{"Total: +"}{calExDetailModal.entries.reduce((s, e) => s + e.xp, 0)}{" XP"}</div></div></div></div></div>, document.body)
 
-    /* ══ RETRO EDIT MODAL ═══════════════════════ */}{retroEditModal && (() => {
-      const rem = retroEditModal;
-      // Build a synthetic workout from the log entries for the builder
-      const exercises = rem.entries.map(e => ({
-        exId: e.exId,
-        sets: e.sets || 3,
-        reps: e.reps || 10,
-        weightLbs: e.weightLbs || null,
-        weightPct: e.weightPct || 100,
-        distanceMi: e.distanceMi || null,
-        hrZone: e.hrZone || null,
-        durationMin: null
-      }));
-      const wo = {
-        id: rem.sourceId || uid(),
-        name: rem.sourceName,
-        icon: rem.sourceIcon,
-        exercises,
-        oneOff: rem.sourceType === "oneoff",
-        durationMin: _optionalChain([rem, 'access', _170 => _170.entries, 'access', _171 => _171[0], 'optionalAccess', _172 => _172.durationMin]) || null,
-        activeCal: _optionalChain([rem, 'access', _173 => _173.entries, 'access', _174 => _174[0], 'optionalAccess', _175 => _175.activeCal]) || null,
-        totalCal: _optionalChain([rem, 'access', _176 => _176.entries, 'access', _177 => _177[0], 'optionalAccess', _178 => _178.totalCal]) || null
-      };
-      return createPortal(<div className={"modal-backdrop"} onClick={() => setRetroEditModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
-          borderRadius: R.r16,
-          padding: S.s0,
-          maxHeight: "85vh",
-          overflowY: "auto"
-        }}><div className={"modal-body"}><div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: S.s12
-            }}><div style={{
-                fontSize: FS.fs90,
-                color: "#d4cec4",
-                fontFamily: "'Inter',sans-serif",
-                fontWeight: 600
-              }}>{"✎ Edit Completed "}{rem.sourceType === "plan" ? "Plan Session" : "Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setRetroEditModal(null)}>{"✕"}</button></div><div style={{
-              fontSize: FS.fs65,
-              color: "#8a8478",
-              marginBottom: S.s14,
-              lineHeight: 1.5
-            }}>{rem.sourceName}{" · "}{_optionalChain([rem, 'access', _179 => _179.entries, 'access', _180 => _180[0], 'optionalAccess', _181 => _181.date])}{" · Editing will recalculate XP and update your log."}</div>
-            {
-              /* Exercise list — editable */
-            }<div style={{
-              marginBottom: S.s12
-            }}>{rem.entries.map((e, i) => {
-                const exData = allExById[e.exId];
-                if (!exData) return null;
-                return <div key={i} style={{
-                  background: "rgba(45,42,36,.18)",
-                  border: "1px solid rgba(45,42,36,.2)",
-                  borderRadius: R.lg,
-                  padding: "10px 12px",
-                  marginBottom: S.s6
-                }}><div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: S.s8,
-                    marginBottom: S.s6
-                  }}><span style={{
-                      fontSize: "1rem"
-                    }}>{exData.icon}</span><span style={{
-                      fontSize: FS.fs78,
-                      color: "#d4cec4",
-                      flex: 1,
-                      fontWeight: 600
-                    }}>{exData.name}</span><button className={"btn btn-danger btn-xs"} onClick={() => {
-                      setRetroEditModal(prev => ({
-                        ...prev,
-                        entries: prev.entries.filter((_, j) => j !== i)
-                      }));
-                    }}>{"✕"}</button></div><div style={{
-                    display: "flex",
-                    gap: S.s6
-                  }}><div style={{
-                      flex: 1
-                    }}><label style={{
-                        fontSize: FS.fs58,
-                        color: "#b0a898",
-                        display: "block",
-                        marginBottom: S.s4
-                      }}>{"Sets"}</label><input className={"inp"} type={"number"} min={"1"} max={"20"} value={e.sets || ""} style={{
-                        padding: "4px 6px",
-                        fontSize: FS.lg
-                      }} onChange={ev => {
-                        const v = ev.target.value;
-                        setRetroEditModal(prev => ({
-                          ...prev,
-                          entries: prev.entries.map((r, j) => j === i ? {
-                            ...r,
-                            sets: v
-                          } : r)
-                        }));
-                      }} /></div><div style={{
-                      flex: 1
-                    }}><label style={{
-                        fontSize: FS.fs58,
-                        color: "#b0a898",
-                        display: "block",
-                        marginBottom: S.s4
-                      }}>{"Reps/Min"}</label><input className={"inp"} type={"number"} min={"1"} max={"300"} value={e.reps || ""} style={{
-                        padding: "4px 6px",
-                        fontSize: FS.lg
-                      }} onChange={ev => {
-                        const v = ev.target.value;
-                        setRetroEditModal(prev => ({
-                          ...prev,
-                          entries: prev.entries.map((r, j) => j === i ? {
-                            ...r,
-                            reps: v
-                          } : r)
-                        }));
-                      }} /></div>{!["cardio", "flexibility"].includes(exData.category) && <div style={{
-                      flex: 1
-                    }}><label style={{
-                        fontSize: FS.fs58,
-                        color: "#b0a898",
-                        display: "block",
-                        marginBottom: S.s4
-                      }}>{"Weight"}</label><input className={"inp"} type={"number"} min={"0"} max={"2000"} value={e.weightLbs || ""} style={{
-                        padding: "4px 6px",
-                        fontSize: FS.lg
-                      }} onChange={ev => {
-                        const v = ev.target.value;
-                        setRetroEditModal(prev => ({
-                          ...prev,
-                          entries: prev.entries.map((r, j) => j === i ? {
-                            ...r,
-                            weightLbs: v || null
-                          } : r)
-                        }));
-                      }} /></div>}</div></div>;
-              })}</div><div style={{
-              display: "flex",
-              gap: S.s8
-            }}><button className={"btn btn-ghost btn-sm"} style={{
-                flex: 1
-              }} onClick={() => setRetroEditModal(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
-                flex: 2
-              }} onClick={() => {
-                // Recalculate XP and update log entries in place
-                const now = new Date().toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit"
-                });
-                const newEntries = rem.entries.map((e, i) => {
-                  const updated = retroEditModal.entries[i];
-                  if (!updated) return null;
-                  const xp = calcExXP(updated.exId, parseInt(updated.sets) || 3, parseInt(updated.reps) || 10, profile.chosenClass, allExById);
-                  return {
-                    ...e,
-                    ...updated,
-                    xp,
-                    sets: parseInt(updated.sets) || e.sets,
-                    reps: parseInt(updated.reps) || e.reps
-                  };
-                }).filter(Boolean);
-                // Replace all matching entries in the log
-                const updatedLog = profile.log.map(le => {
-                  const matchIdx = rem.entries.findIndex(re => re._idx === le._idx || re.exId === le.exId && re.dateKey === le.dateKey && (re.sourceGroupId === le.sourceGroupId || re.sourcePlanId === le.sourcePlanId));
-                  if (matchIdx < 0) return le;
-                  const ne = newEntries[matchIdx];
-                  return ne ? {
-                    ...le,
-                    ...ne
-                  } : le;
-                });
-                const totalXP = updatedLog.filter(le => rem.entries.some(re => re._idx === le._idx)).reduce((s, e) => s + e.xp, 0);
-                setProfile(p => ({
-                  ...p,
-                  log: updatedLog
-                }));
-                setRetroEditModal(null);
-                showToast("✓ Workout log updated!");
-              }}>{"✓ Save Changes"}</button></div></div></div></div>, document.body);
-    })()
+    /* ══ RETRO EDIT MODAL ═══════════════════════ */}{retroEditModal && (
+      <RetroEditModal
+        retroEditModal={retroEditModal}
+        setRetroEditModal={setRetroEditModal}
+        allExById={allExById}
+        profile={profile}
+        setProfile={setProfile}
+        showToast={showToast}
+      />
+    )
 
     /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && createPortal(<div className={"modal-backdrop"} onClick={() => setAddToWorkoutPicker(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
@@ -6997,206 +6830,18 @@ function App() {
       />
     )
 
-    /* ══ MAP OVERLAY ═════════════════════════════ */}{mapOpen && (() => {
-      const myPos = getMapPosition(profile.xp, level);
-      const myRegion = MAP_REGIONS[myPos.regionIdx];
-      const weekStart = (() => {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        d.setDate(d.getDate() - d.getDay());
-        return d.toISOString().slice(0, 10);
-      })();
-      const travelActive = profile.travelBoost && profile.travelBoost.weekStart === weekStart;
-      const friendPositions = friends.map(f => {
-        const fLv = Math.max(1, Math.floor(Math.log(Math.max(1, f.xp || 0) / 100 + 1) * 3));
-        const fPos = getMapPosition(f.xp || 0, fLv);
-        return {
-          ...f,
-          mapX: fPos.x,
-          mapY: fPos.y,
-          regionIdx: fPos.regionIdx
-        };
-      });
-      return <div style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.92)",
-        zIndex: 200,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        overflowY: "auto",
-        padding: "14px 12px 30px"
-      }}><div style={{
-          width: "100%",
-          maxWidth: 420,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: S.s10,
-          flexShrink: 0
-        }}><div><div style={{
-              fontFamily: "'Cinzel Decorative',serif,Arial",
-              fontSize: FS.fs95,
-              color: "#b4ac9e",
-              letterSpacing: ".08em"
-            }}>{"⚔️ Auranthel"}</div><div style={{
-              fontSize: FS.fs65,
-              color: "#8a8478",
-              marginTop: S.s2,
-              display: "flex",
-              gap: S.s8,
-              alignItems: "center",
-              flexWrap: "wrap"
-            }}><span>{myRegion.icon}{" "}{myRegion.name}{" · Level "}{level}</span><span style={{
-                color: "#b4ac9e"
-              }}>{myRegion.boost.emoji}{" +7% "}{myRegion.boost.label}</span>{travelActive && <span style={{
-                color: UI_COLORS.success
-              }}>{"⚡ +10% Travel"}</span>}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => {
-            setMapOpen(false);
-            setMapTooltip(null);
-          }}>{"✕"}</button></div>
-
-        {
-          /* Zoom controls + map */
-        }<MapSVG myPos={myPos} myRegion={myRegion} friendPositions={friendPositions} mapTooltip={mapTooltip} setMapTooltip={setMapTooltip} travelActive={travelActive} profile={profile} />
-
-        {
-          /* Tooltip / travel panel */
-        }{mapTooltip && <div style={{
-          width: "100%",
-          maxWidth: 420,
-          marginTop: S.s10,
-          background: "rgba(10,8,4,.97)",
-          border: "1px solid rgba(180,172,158,.08)",
-          borderRadius: R.r10,
-          padding: "12px 14px",
-          flexShrink: 0
-        }}><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: S.s8
-          }}><div><div style={{
-                fontSize: FS.fs84,
-                color: "#d4cec4",
-                fontWeight: 600
-              }}>{mapTooltip.name}</div><div style={{
-                fontSize: FS.fs65,
-                color: "#8a8478",
-                marginTop: S.s2
-              }}>{mapTooltip.cls || "Unknown"}{" · "}{mapTooltip.region}</div></div><button className={"btn btn-ghost btn-xs"} onClick={() => setMapTooltip(null)}>{"✕"}</button></div>{!mapTooltip.alreadyTraveling ? <div><div style={{
-              fontSize: FS.fs68,
-              color: "#8a8478",
-              marginBottom: S.s8,
-              lineHeight: 1.5
-            }}>{"Travel to their location for "}<strong style={{
-                color: "#b4ac9e"
-              }}>{"+10% XP boost"}</strong>{" on all workouts this week."}</div><button className={"btn btn-gold"} style={{
-              width: "100%",
-              fontSize: FS.lg
-            }} onClick={() => {
-              const ws = (() => {
-                const d = new Date();
-                d.setHours(0, 0, 0, 0);
-                d.setDate(d.getDate() - d.getDay());
-                return d.toISOString().slice(0, 10);
-              })();
-              setProfile(p => ({
-                ...p,
-                travelBoost: {
-                  friendId: mapTooltip.id,
-                  friendName: mapTooltip.name,
-                  weekStart: ws
-                }
-              }));
-              showToast(`⚔️ Traveling with ${mapTooltip.name}! +10% XP this week.`);
-              setMapTooltip(null);
-            }}>{"⚔️ Travel with "}{mapTooltip.name}</button></div> : <div style={{
-            fontSize: FS.fs68,
-            color: _optionalChain([profile, 'access', _185 => _185.travelBoost, 'optionalAccess', _186 => _186.friendId]) === mapTooltip.id ? UI_COLORS.success : "#8a8478",
-            textAlign: "center",
-            padding: "6px 0"
-          }}>{_optionalChain([profile, 'access', _187 => _187.travelBoost, 'optionalAccess', _188 => _188.friendId]) === mapTooltip.id ? "✓ You are traveling with this warrior this week" : `Already traveling with ${_optionalChain([profile, 'access', _189 => _189.travelBoost, 'optionalAccess', _190 => _190.friendName])} this week`}</div>}</div>
-
-        /* Legend */}<div style={{
-          width: "100%",
-          maxWidth: 420,
-          marginTop: S.s12,
-          flexShrink: 0
-        }}><div style={{
-            fontSize: FS.sm,
-            color: "#8a8478",
-            marginBottom: S.s6,
-            letterSpacing: ".06em",
-            textTransform: "uppercase"
-          }}>{"Your Journey"}</div><div style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: S.s6
-          }}>{MAP_REGIONS.map((r, i) => {
-              const isVisited = i <= myPos.regionIdx,
-                isCurrent = i === myPos.regionIdx;
-              return <div key={r.id} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s6,
-                padding: "4px 8px",
-                background: isCurrent ? "rgba(45,42,36,.2)" : "rgba(45,42,36,.12)",
-                border: `1px solid ${isCurrent ? "rgba(180,172,158,.15)" : isVisited ? "rgba(45,42,36,.22)" : "rgba(45,42,36,.18)"}`,
-                borderRadius: R.md,
-                opacity: isVisited ? 1 : .4
-              }}><span style={{
-                  fontSize: FS.lg
-                }}>{r.icon}</span><div><div style={{
-                    fontSize: FS.sm,
-                    color: isCurrent ? "#b4ac9e" : isVisited ? "#d4cec4" : "#5a6060",
-                    lineHeight: 1.2
-                  }}>{r.name}{isCurrent && <span style={{
-                      color: "#b4ac9e",
-                      marginLeft: S.s4
-                    }}>{"◀"}</span>}</div><div style={{
-                    fontSize: FS.fs52,
-                    color: isCurrent ? "#b4ac9e" : isVisited ? "#8a8478" : "#3a4040",
-                    lineHeight: 1.2
-                  }}>{r.boost.emoji}{" "}{r.boost.label}{" +7% · Lv"}{r.levels[0]}{"–"}{r.levels[1]}</div></div></div>;
-            })}</div></div>
-
-        {
-          /* Active travel banner */
-        }{travelActive && <div style={{
-          width: "100%",
-          maxWidth: 420,
-          marginTop: S.s10,
-          padding: "10px 14px",
-          background: "rgba(46,204,113,.06)",
-          border: "1px solid rgba(46,204,113,.2)",
-          borderRadius: R.r10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexShrink: 0
-        }}><div><div style={{
-              fontSize: FS.lg,
-              color: UI_COLORS.success
-            }}>{"⚡ Travel Boost Active"}</div><div style={{
-              fontSize: FS.fs62,
-              color: "#8a8478",
-              marginTop: S.s2
-            }}>{"With "}<strong style={{
-                color: "#d4cec4"
-              }}>{profile.travelBoost.friendName}</strong>{" · +10% XP all workouts this week"}</div></div><button className={"btn btn-ghost btn-xs"} style={{
-            fontSize: FS.sm,
-            color: UI_COLORS.danger,
-            borderColor: "rgba(231,76,60,.3)"
-          }} onClick={() => {
-            setProfile(p => ({
-              ...p,
-              travelBoost: null
-            }));
-            showToast("Travel ended.");
-          }}>{"End"}</button></div>}</div>;
-    })()
+    /* ══ MAP OVERLAY ═════════════════════════════ */}{mapOpen && (
+      <MapOverlay
+        setMapOpen={setMapOpen}
+        level={level}
+        profile={profile}
+        setProfile={setProfile}
+        friends={friends}
+        mapTooltip={mapTooltip}
+        setMapTooltip={setMapTooltip}
+        showToast={showToast}
+      />
+    )
 
     /* ══ SHARE MODAL ═════════════════════════════ */}{shareModal && createPortal(<div className={"modal-backdrop"} onClick={() => setShareModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
