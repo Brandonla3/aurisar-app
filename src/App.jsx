@@ -13,6 +13,7 @@ import { formatXP } from './utils/format';
 import { FS, R, S } from './utils/tokens';
 import { sb } from './utils/supabase';
 import { ensureRestDay } from './utils/ensureRestDay';
+import { useWorkoutCompletion } from './state/useWorkoutCompletion';
 import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseLibrary';
 import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
@@ -4873,130 +4874,18 @@ function App() {
     });
   }
 
-  // Mark a workout complete — logs all its exercises under the chosen date
-  function confirmWorkoutComplete() {
-    const wo = completionModal && completionModal.workout;
-    if (!wo) return;
-    const dateStr = completionAction === "past" && completionDate && completionDate !== "pick" ? completionDate : todayStr();
-    const dateObj = new Date(dateStr + "T12:00:00");
-    const displayDate = dateObj.toLocaleDateString();
-    const now = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-    const batchId = uid();
-    const entries = wo.exercises.flatMap(ex => {
-      const exData = allExById[ex.exId];
-      if (!exData) return [];
-      const isC = exData.category === "cardio";
-      const isF = exData.category === "flexibility";
-      // Build all rows: main row + extra rows
-      const allRows = [{
-        sets: ex.sets || 3,
-        reps: ex.reps || 10,
-        weightLbs: ex.weightLbs || null
-      }, ...(ex.extraRows || [])];
-      const extraCount = (ex.extraRows || []).length;
-      return allRows.map(row => {
-        const xp = calcExXP(ex.exId, row.sets || 3, row.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
-        return {
-          exId: ex.exId,
-          exercise: exData.name,
-          icon: exData.icon,
-          xp,
-          mult: getMult(exData),
-          sets: parseInt(row.sets) || 3,
-          reps: parseInt(row.reps) || 10,
-          weightLbs: !isC && !isF ? row.weightLbs || null : null,
-          weightPct: 100,
-          hrZone: ex.hrZone || null,
-          distanceMi: ex.distanceMi || null,
-          seconds: ex.seconds || null,
-          time: now,
-          date: displayDate,
-          dateKey: dateStr,
-          sourceWorkoutId: wo.id,
-          sourceWorkoutName: wo.name,
-          sourceWorkoutIcon: wo.icon,
-          sourceWorkoutType: wo.oneOff ? "oneoff" : "reusable",
-          sourceGroupId: batchId,
-          sourceTotalCal: wo.totalCal || null,
-          sourceActiveCal: wo.activeCal || null,
-          sourceDurationSec: wo.durationMin || null
-        };
-      });
-    }).filter(Boolean);
-    if (entries.length === 0) {
-      showToast("No valid exercises to log.");
-      return;
-    }
-    const totalXP = entries.reduce((s, e) => s + e.xp, 0);
-    const newLog = [...entries, ...profile.log];
-    const newQuests = {
-      ...(profile.quests || {})
-    };
-    QUESTS.filter(q => q.auto && !newQuests[q.id] && !newQuests[q.id]).forEach(q => {
-      if (checkQuestCompletion(q, newLog, profile.checkInStreak)) newQuests[q.id] = {
-        completed: true,
-        completedAt: todayStr(),
-        claimed: false
-      };
-    });
-    // If one-off, save to workouts array (as oneOff or reusable based on flag)
-    const newWorkouts = wo.oneOff ? (() => {
-      const existing = (profile.workouts || []).find(w => w.id === wo.id);
-      const saved = {
-        ...wo,
-        completedAt: dateStr,
-        oneOff: wo.makeReusable ? false : true
-      };
-      delete saved.makeReusable; // clean up temp flag
-      if (existing) return (profile.workouts || []).map(w => w.id === wo.id ? saved : w);
-      return [...(profile.workouts || []), saved];
-    })() : profile.workouts || [];
-    // Fix sourceWorkoutType on log entries if converting to reusable
-    if (wo.makeReusable) {
-      entries.forEach(e => {
-        e.sourceWorkoutType = "reusable";
-      });
-    }
-    let _ciResult = {
-      checkInApplied: false,
-      checkInXP: 0,
-      checkInStreak: 0
-    };
-    setProfile(p => {
-      const base = {
-        ...p,
-        xp: p.xp + totalXP,
-        log: newLog,
-        quests: newQuests,
-        workouts: newWorkouts,
-        scheduledWorkouts: wo.oneOff ? (p.scheduledWorkouts || []).filter(sw => sw.sourceWorkoutId !== wo.id) : p.scheduledWorkouts || []
-      };
-      const ci = applyAutoCheckIn(base, dateStr);
-      _ciResult = ci;
-      return ci.profile;
-    });
-    setXpFlash({
-      amount: totalXP + _ciResult.checkInXP,
-      mult: 1
-    });
-    setTimeout(() => setXpFlash(null), 2500);
-    setCompletionModal(null);
-    setCompletionDate("");
-    setCompletionAction("today");
-    setScheduleWoDate("");
-    if (wo.makeReusable) {
-      setWorkoutSubTab("reusable");
-    }
-    const label = dateStr === todayStr() ? "today" : displayDate;
-    const reusableNote = wo.makeReusable ? " · Saved to Re-Usable tab!" : "";
-    const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
-    showToast(wo.icon + " " + wo.name + " completed " + label + "! " + formatXP(totalXP, {
-      signed: true
-    }) + " ⚡" + reusableNote + ciSuffix);
-  }
+  // Workout completion handler is extracted into useWorkoutCompletion (finding
+  // #3 in docs/performance-audit.md) — modal close happens before the heavy
+  // setProfile re-render and the rest is wrapped in startTransition.
+  const { confirmWorkoutComplete } = useWorkoutCompletion({
+    profile, setProfile,
+    allExById, applyAutoCheckIn, getMult,
+    showToast, setXpFlash, setWorkoutSubTab,
+    completionModal, setCompletionModal,
+    completionDate, setCompletionDate,
+    completionAction, setCompletionAction,
+    setScheduleWoDate,
+  });
   function scheduleWorkoutForDate() {
     const wo = _optionalChain([completionModal, 'optionalAccess', _64 => _64.workout]);
     if (!wo || !scheduleWoDate) return;
