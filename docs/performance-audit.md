@@ -46,8 +46,9 @@ Tick each box as the corresponding PR merges. Each remediation should reference 
   - [x] CalendarTab — PR [#129](https://github.com/Brandonla3/aurisar-app/pull/129)
   - [x] LeaderboardTab — PR [#130](https://github.com/Brandonla3/aurisar-app/pull/130)
   - [x] ProfileTab (VIEW + EDIT + SECURITY + NOTIFICATIONS) — PR [#131](https://github.com/Brandonla3/aurisar-app/pull/131)
+  - [x] OnboardingScreen (6-step wizard) — PR [#132](https://github.com/Brandonla3/aurisar-app/pull/132)
   - [ ] Shell / layout pieces: HUD, nav, background, toast, XP flash
-  - PRs: [#118](https://github.com/Brandonla3/aurisar-app/pull/118), [#121](https://github.com/Brandonla3/aurisar-app/pull/121)–[#131](https://github.com/Brandonla3/aurisar-app/pull/131) — ongoing
+  - PRs: [#118](https://github.com/Brandonla3/aurisar-app/pull/118), [#121](https://github.com/Brandonla3/aurisar-app/pull/121)–[#132](https://github.com/Brandonla3/aurisar-app/pull/132) — ongoing
 
 **Already landed (prior to this audit):**
 
@@ -69,7 +70,7 @@ Users are seeing general sluggishness across the app, including:
 
 The source audit suggests the performance issues are not caused by one isolated bug. They come from a combination of broad React re-renders, expensive synchronous work, mobile GPU-heavy CSS, repeated full-list calculations, and a very large top-level `App.jsx` that owns too many responsibilities.
 
-`src/App.jsx` was **16,204 lines** at audit time. Currently **9,687 lines** (−6,517) after PRs #121–#131.
+`src/App.jsx` was **16,204 lines** at audit time. Currently **9,364 lines** (−6,840) after PRs #121–#132.
 
 ---
 
