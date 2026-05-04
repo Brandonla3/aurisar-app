@@ -10,38 +10,38 @@
 
 Tick each box as the corresponding PR merges. Each remediation should reference this doc.
 
-- [ ] **1. Stabilize particle positions** _(low risk, recommended first)_
-  - [ ] Move `Math.random()` out of render path (precompute once via constants or `useMemo`)
-  - [ ] Disable particles on lower-end / mobile devices
-  - PR: _not opened_
-- [ ] **2. Mobile CSS performance overrides** _(low risk)_
-  - [ ] Add mobile-targeted media query that disables / reduces `backdrop-filter`
-  - [ ] Disable `.pt` particle animation on mobile
-  - [ ] Replace live blur on sticky header / bottom nav with flat translucent backgrounds on mobile
-  - PR: _not opened_
-- [ ] **3. Workout completion responsiveness** _(highest risk — split into its own PR)_
-  - [ ] Give instant visual feedback (pressed state, modal close) before heavy work
-  - [ ] Extract `useWorkoutCompletion` hook
-  - [ ] Defer non-critical work via `startTransition` / `requestIdleCallback`
-  - [ ] Add timing instrumentation for before/after measurement
-  - PR: _not opened_
-- [ ] **4. Debounce / queue persistence writes**
-  - [ ] Debounce `localStorage` writes (Supabase already debounced)
+- [x] **1. Stabilize particle positions** _(low risk, recommended first)_
+  - [x] Move `Math.random()` out of render path (precompute once via constants or `useMemo`)
+  - [x] Disable particles on lower-end / mobile devices
+  - PR: [#117](https://github.com/Brandonla3/aurisar-app/pull/117)
+- [x] **2. Mobile CSS performance overrides** _(low risk)_
+  - [x] Add mobile-targeted media query that disables / reduces `backdrop-filter`
+  - [x] Disable `.pt` particle animation on mobile
+  - [x] Replace live blur on sticky header / bottom nav with flat translucent backgrounds on mobile
+  - PR: [#117](https://github.com/Brandonla3/aurisar-app/pull/117)
+- [x] **3. Workout completion responsiveness** _(highest risk — split into its own PR)_
+  - [x] Give instant visual feedback (pressed state, modal close) before heavy work
+  - [x] Extract `useWorkoutCompletion` hook
+  - [x] Defer non-critical work via `startTransition` / `requestIdleCallback`
+  - [x] Add timing instrumentation for before/after measurement
+  - PR: [#118](https://github.com/Brandonla3/aurisar-app/pull/118)
+- [x] **4. Debounce / queue persistence writes**
+  - [x] Debounce `localStorage` writes (Supabase already debounced)
   - [ ] Consider splitting high-growth `log` from low-frequency profile preferences
-  - [ ] Flush pending writes on `pagehide` / explicit sign-out
-  - PR: _not opened_
-- [ ] **5. Memoize exercise library filters**
-  - [ ] Wrap derived filtered lists, available muscle/equipment/type sets, and counts in `useMemo`
-  - [ ] Precompute stable indexes for muscle / equipment / type / category
-  - [ ] Extract into `features/exercises/` with `useExerciseFilters` hook
-  - PR: _not opened_
-- [ ] **6. Continue App.jsx decomposition** _(incremental — multiple PRs)_
-  - [ ] Workout completion flow (links to #3)
-  - [ ] Exercise library / search / filter (links to #5)
+  - [x] Flush pending writes on `pagehide` / explicit sign-out
+  - PR: [#119](https://github.com/Brandonla3/aurisar-app/pull/119)
+- [x] **5. Memoize exercise library filters**
+  - [x] Wrap derived filtered lists, available muscle/equipment/type sets, and counts in `useMemo`
+  - [x] Precompute stable indexes for muscle / equipment / type / category
+  - [x] Extract into `features/exercises/` with `useExerciseFilters` hook
+  - PRs: [#120](https://github.com/Brandonla3/aurisar-app/pull/120) (memoize in App.jsx), [#121](https://github.com/Brandonla3/aurisar-app/pull/121) (extract `useExerciseFilters` hook)
+- [x] **6. Continue App.jsx decomposition** _(incremental — multiple PRs)_
+  - [x] Workout completion flow (links to #3) — PR [#118](https://github.com/Brandonla3/aurisar-app/pull/118)
+  - [x] Exercise library / search / filter (links to #5) — PRs [#121](https://github.com/Brandonla3/aurisar-app/pull/121) [#122](https://github.com/Brandonla3/aurisar-app/pull/122) [#123](https://github.com/Brandonla3/aurisar-app/pull/123)
   - [ ] Shell / layout pieces: HUD, nav, background, toast, XP flash
   - [ ] History / profile / social / messages
   - [ ] Quests / calendar
-  - PRs: ongoing — see commit history for `perf(...)` and `refactor(...)` prefixes
+  - PRs: [#118](https://github.com/Brandonla3/aurisar-app/pull/118), [#121](https://github.com/Brandonla3/aurisar-app/pull/121), [#122](https://github.com/Brandonla3/aurisar-app/pull/122), [#123](https://github.com/Brandonla3/aurisar-app/pull/123) — ongoing
 
 **Already landed (prior to this audit):**
 
@@ -63,7 +63,7 @@ Users are seeing general sluggishness across the app, including:
 
 The source audit suggests the performance issues are not caused by one isolated bug. They come from a combination of broad React re-renders, expensive synchronous work, mobile GPU-heavy CSS, repeated full-list calculations, and a very large top-level `App.jsx` that owns too many responsibilities.
 
-`src/App.jsx` is currently **16,204 lines**.
+`src/App.jsx` was **16,204 lines** at audit time. Currently **15,168 lines** (−1,036).
 
 ---
 
@@ -215,7 +215,7 @@ The local exercise catalog has over 1,500 hardcoded exercises, plus Supabase pat
 
 **Location:** [src/App.jsx](../src/App.jsx)
 
-`App.jsx` is **16,204 lines** and currently owns authentication flow, layout, tabs, workout flows, exercise library, history, profile, social, messages, modals, persistence triggers, and many derived calculations.
+`App.jsx` was **16,204 lines** at audit time and currently owns authentication flow, layout, tabs, workout flows, exercise library, history, profile, social, messages, modals, persistence triggers, and many derived calculations.
 
 **Impact:**
 
@@ -245,6 +245,7 @@ src/
 
     exercises/
       ExerciseLibraryTab.jsx
+      GrimoireGridTab.jsx
       ExercisePicker.jsx
       ExerciseDetailModal.jsx
       useExerciseFilters.js
@@ -277,13 +278,13 @@ src/
 
 ### Suggested implementation order
 
-1. Extract workout completion flow first (pairs with finding #3).
-2. Extract exercise library / search / filter next (pairs with finding #5).
+1. Extract workout completion flow first (pairs with finding #3). ✅ PR [#118](https://github.com/Brandonla3/aurisar-app/pull/118)
+2. Extract exercise library / search / filter next (pairs with finding #5). ✅ PRs [#121](https://github.com/Brandonla3/aurisar-app/pull/121) [#122](https://github.com/Brandonla3/aurisar-app/pull/122) [#123](https://github.com/Brandonla3/aurisar-app/pull/123)
 3. Extract shell/layout pieces: HUD, nav, background, toast, XP flash.
 4. Extract history / profile / social after the high-impact paths are isolated.
 5. Gradually move feature state into hooks once components are stable.
 
-The lowest-risk first PRs (and good warm-ups before #3) are **finding #1 (particle positions)** and **finding #2 (mobile CSS overrides)** — small surface area, no behavior change.
+The lowest-risk first PRs (and good warm-ups before #3) are **finding #1 (particle positions)** and **finding #2 (mobile CSS overrides)** — small surface area, no behavior change. ✅ PR [#117](https://github.com/Brandonla3/aurisar-app/pull/117)
 
 ---
 
