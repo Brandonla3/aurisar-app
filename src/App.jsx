@@ -31,6 +31,8 @@ import CalendarTab from './features/calendar/CalendarTab';
 import LeaderboardTab from './features/leaderboard/LeaderboardTab';
 import ProfileTab from './features/profile/ProfileTab';
 import OnboardingScreen from './features/onboarding/OnboardingScreen';
+import ClassRevealScreen from './features/onboarding/ClassRevealScreen';
+import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -5144,37 +5146,13 @@ function App() {
       />
     )
 
-    /* ══ CLASS REVEAL ═══════════════════════════ */}{screen === "classReveal" && detectedClass && (() => {
-      const dc = CLASSES[detectedClass];
-      return <div className={"screen"} style={{
-        "--cls-color": dc.color,
-        "--cls-glow": dc.glow
-      }}><p style={{
-          color: "#8a8478",
-          fontSize: FS.md,
-          letterSpacing: ".14em",
-          textTransform: "uppercase"
-        }}>{"The Fates have spoken…"}</p><div className={"reveal-card"} style={{
-          "--cls-color": dc.color,
-          "--cls-glow": dc.glow
-        }}><span className={"reveal-icon"}>{dc.icon}</span><div className={"reveal-name"}>{dc.name}</div><p style={{
-            color: "#8a8478",
-            fontStyle: "italic",
-            lineHeight: 1.5,
-            fontSize: FS.fs90
-          }}>{dc.description}</p><div className={"traits"} style={{
-            justifyContent: "center",
-            marginTop: S.s12
-          }}>{dc.traits.map(t => <span key={t} className={"trait"} style={{
-              "--cls-color": dc.color,
-              "--cls-glow": dc.glow
-            }}>{t}</span>)}</div></div><div style={{
-          display: "flex",
-          gap: S.s12,
-          flexWrap: "wrap",
-          justifyContent: "center"
-        }}><button className={"btn btn-gold"} onClick={() => confirmClass(detectedClass)}>{"Accept My Fate"}</button><button className={"btn btn-ghost"} onClick={() => setScreen("classPick")}>{"Choose Differently"}</button></div></div>;
-    })()
+    /* ══ CLASS REVEAL ═══════════════════════════ */}{screen === "classReveal" && detectedClass && (
+      <ClassRevealScreen
+        detectedClass={detectedClass}
+        confirmClass={confirmClass}
+        setScreen={setScreen}
+      />
+    )
 
     /* ══ CLASS PICK ═════════════════════════════ */}{screen === "classPick" && <div className={"screen"}><h1 className={"title"} style={{
         fontSize: "clamp(1.2rem,4vw,1.7rem)"
@@ -8903,36 +8881,17 @@ function App() {
             }} onClick={saveLogEdit}>{"✦ Save Changes"}</button></div></div></div>, document.body);
     })()
 
-    /* ══ CONFIRM DELETE MODAL ════════════════════ */}{confirmDelete && (() => {
-      // Support either type-based dispatch (existing pattern) or a generic
-      // {title, body, onConfirm, confirmLabel, cancelLabel} payload so
-      // window.confirm() can be replaced consistently.
-      const cd = confirmDelete;
-      const isGeneric = typeof cd.onConfirm === 'function';
-      const titleText = cd.title || (cd.type === "plan" ? "Delete Plan?" : cd.type === "workout" ? "Delete Workout?" : cd.type === "exercise" ? "Delete Exercise?" : cd.type === "logEntry" ? "Delete Log Entry?" : cd.type === "char" ? "Delete Character?" : "Are you sure?");
-      const bodyEl = cd.body ? typeof cd.body === 'string' ? <span>{cd.body}</span> : cd.body : cd.type === "char" ? "This will permanently erase all your XP, battle log, plans, and workouts. This cannot be undone." : cd.type === "logEntry" ? <span>{"Remove "}<span className={"cdel-name"}>{cd.name}</span>{" from your log? "}{cd.xp && <span>{"This will deduct "}{cd.xp}{" XP."}</span>}</span> : <span>{"Are you sure you want to delete "}<span className={"cdel-name"}>{cd.name}</span>{"? This cannot be undone."}</span>;
-      return createPortal(<div className={"cdel-backdrop"} onClick={e => {
-        if (e.target === e.currentTarget) setConfirmDelete(null);
-      }}><div className={"cdel-sheet"} role={"dialog"} aria-modal={"true"} aria-labelledby={"cdel-title"}><div className={"cdel-icon"} aria-hidden={"true"}>{cd.icon}</div><div id={"cdel-title"} className={"cdel-title"}>{titleText}</div><div className={"cdel-body"}>{bodyEl}</div>{cd.warning && <div className={"cdel-warning"}>{cd.warning}</div>}<div style={{
-            display: "flex",
-            gap: S.s8
-          }}><button className={"btn btn-ghost btn-sm"} style={{
-              flex: 1
-            }} onClick={() => setConfirmDelete(null)}>{cd.cancelLabel || "Cancel"}</button><button className={"btn btn-danger"} style={{
-              flex: 1
-            }} onClick={() => {
-              setConfirmDelete(null);
-              if (isGeneric) {
-                cd.onConfirm();
-                return;
-              }
-              const {
-                type,
-                id
-              } = cd;
-              if (type === "plan") plansContainerRef.current?.doDeletePlan(id);else if (type === "workout") _doDeleteWorkout(id);else if (type === "exercise") _doDeleteCustomEx(id);else if (type === "logEntry") _doDeleteLogEntry(id);else if (type === "char") _doResetChar();
-            }}>{cd.confirmLabel || "🗑 Delete"}</button></div></div></div>, document.body);
-    })()
+    /* ══ CONFIRM DELETE MODAL ════════════════════ */}{confirmDelete && (
+      <ConfirmDeleteModal
+        confirmDelete={confirmDelete}
+        setConfirmDelete={setConfirmDelete}
+        plansContainerRef={plansContainerRef}
+        _doDeleteWorkout={_doDeleteWorkout}
+        _doDeleteCustomEx={_doDeleteCustomEx}
+        _doDeleteLogEntry={_doDeleteLogEntry}
+        _doResetChar={_doResetChar}
+      />
+    )
 
     /* ══ MAP OVERLAY ═════════════════════════════ */}{mapOpen && (() => {
       const myPos = getMapPosition(profile.xp, level);
