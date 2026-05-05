@@ -3,6 +3,7 @@ import { MUSCLE_META, UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
 
 /**
  * Exercise library tab — extracted from the inline IIFE in App.jsx as the
@@ -70,6 +71,8 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     setSelEx, setSets, setReps, setExWeight, setWeightPct,
     setHrZone, setDistanceVal, setExHHMM, setExSec, setQuickRows,
   } = props;
+
+  const revealRef = useScrollReveal();
 
   const toggleSet = (setter, val) => {
     setter(s => {
@@ -674,7 +677,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
           const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
           const exMgColor = getMuscleColor(ex.muscleGroup);
-          return <div key={ex.id} className={`picker-ex-row${isSel ? " sel" : ""}`} onClick={() => {
+          return <div key={ex.id} ref={revealRef} className={`picker-ex-row scroll-reveal${isSel ? " sel" : ""}`} onClick={() => {
             if (libSelectMode) {
               toggleSel(ex.id);
             } else {
@@ -781,7 +784,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       display: "flex",
       alignItems: "flex-end",
       justifyContent: "center"
-    }}><div onClick={e => e.stopPropagation()} style={{
+    }}><div onClick={e => e.stopPropagation()} className={"sheet-slide-up"} style={{
         background: "linear-gradient(160deg,rgba(18,16,12,.92),rgba(12,12,10,.95))",
         border: "1px solid rgba(180,172,158,.06)",
         borderRadius: "16px 16px 0 0",

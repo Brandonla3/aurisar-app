@@ -124,6 +124,7 @@ const QuickLogModal = memo(function QuickLogModal({
         onClick={dismiss}
       >
         <div
+          className={"sheet-slide-up"}
           style={{ width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto", background: "linear-gradient(160deg,#0c0c0a,#0c0c0a)", border: "1px solid rgba(180,172,158,.06)", borderRadius: "18px 18px 0 0", padding: "0 0 24px" }}
           onClick={e => e.stopPropagation()}
         >

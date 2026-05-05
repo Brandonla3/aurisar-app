@@ -88,7 +88,7 @@
     .tab:active .tab-icon{transform:scale(.88)}
     .tab-badge{position:absolute;top:2px;right:calc(50% - 18px);background:#e74c3c;color:#fff;border-radius:50%;width:14px;height:14px;font-size:.46rem;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-weight:700;box-shadow:0 0 0 2px rgba(20,18,14,.78)}
     .hud-checkin-strip{display:flex;align-items:center;gap:10px;padding:11px 14px;background:linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2));border:1px solid rgba(180,172,158,.05);border-radius:12px;margin-bottom:14px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-    .scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+    .scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px));-webkit-mask-image:linear-gradient(to bottom,transparent 0,black 32px,black calc(100% - 48px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,black 32px,black calc(100% - 48px),transparent 100%)}
     .scroll-area::-webkit-scrollbar{width:3px}
     .scroll-area::-webkit-scrollbar-thumb{background:rgba(45,42,36,.3);border-radius:2px}
     .sec{font-family:'Inter',sans-serif;font-size:.6rem;color:#8a8478;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid rgba(180,172,158,.04)}
@@ -364,6 +364,14 @@
     .lib-glass-card:hover{background:rgba(255,255,255,.06)!important;border-color:rgba(180,172,158,.18)!important;box-shadow:0 4px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06)}
 
     /* ── LIBRARY HOME: Section Layout ── */
+    /* ── Scroll-reveal rows ── */
+    .scroll-reveal{opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease}
+    .scroll-visible{opacity:1;transform:translateY(0)}
+
+    /* ── Bottom-sheet slide-up ── */
+    @keyframes sheet-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    .sheet-slide-up{animation:sheet-slide-up .3s cubic-bezier(0.4,0,0.2,1) both}
+
     @keyframes libFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     .lib-home-section{animation:libFadeUp .4s ease-out both}
     .lib-home-section:nth-child(2){animation-delay:.08s}
