@@ -83,6 +83,8 @@ const ProfileTab = memo(function ProfileTab({
   profileComplete,
   showToast,
 }) {
+  const totalH = (parseInt(profile.heightFt) || 0) * 12 + (parseInt(profile.heightIn) || 0);
+  const bmi = calcBMI(profile.weightLbs, totalH);
 return (
 <>
 {!editMode && !securityMode && !notifMode && <div style={{

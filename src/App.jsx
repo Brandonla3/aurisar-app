@@ -5131,13 +5131,6 @@ function App() {
         inset: 0,
         zIndex: 900
       }} />}{navMenuOpen && <div className={"nav-menu-panel"}>{[{
-          icon: "⚔️",
-          label: "Profile",
-          action: () => guardAll(() => {
-            setActiveTab("profile");
-            setNavMenuOpen(false);
-          })
-        }, {
           icon: "📜",
           label: "Plans",
           action: () => guardAll(() => {
