@@ -53,7 +53,7 @@ const CompletionModal = memo(function CompletionModal({
       if (e.target !== e.currentTarget) return;
       dismiss();
     }}>
-      <div className={"completion-sheet"} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"} style={{ "--mg-color": woMgColor }}>
+      <div className={"completion-sheet sheet-slide-up"} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"} style={{ "--mg-color": woMgColor }}>
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: S.s8 }}>

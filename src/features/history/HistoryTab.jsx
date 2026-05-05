@@ -5,6 +5,7 @@ import { getMuscleColor, calcExercisePBs } from '../../utils/xp';
 import { _optionalChain, uid } from '../../utils/helpers';
 import { S, R, FS } from '../../utils/tokens';
 import { UI_COLORS, HR_ZONES } from '../../data/constants';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
 
 // Lazy TrendsTab — same pattern as App.jsx so recharts stays out of the
 // main chunk until the user actually opens the trends sub-tab.
@@ -71,6 +72,7 @@ const HistoryTab = memo(function HistoryTab({
 }) {
 
   const metric = isMetric(profile.units);
+  const revealRef = useScrollReveal();
   // Attach real array index to each entry so edits/deletes are index-stable
   const logWithIdx = profile.log.map((e, i) => ({
     ...e,
@@ -87,7 +89,7 @@ const HistoryTab = memo(function HistoryTab({
     const isC = exData ? exData.category === "cardio" : false;
     const isF = exData ? exData.category === "flexibility" : false;
     const exMgColor = getMuscleColor(exData && exData.muscleGroup);
-    return <div className={"h-entry"} style={{
+    return <div ref={revealRef} className={"h-entry scroll-reveal"} style={{
       "--mg-color": exMgColor
     }}><div className={"h-entry-hdr"}><span className={"h-icon"}>{e.icon}</span><div style={{
         flex: 1,
