@@ -67,7 +67,10 @@
     }
     /* HUD */
     .hud{position:relative;z-index:2;width:100%;max-width:520px;margin:0 auto;padding:12px;min-height:100vh;display:flex;flex-direction:column}
-    .hud-top{display:flex;align-items:center;gap:11px;padding:12px 14px;background:linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.25));border:1px solid rgba(180,172,158,.06);border-radius:12px;margin-bottom:11px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+    .hud-top{display:flex;align-items:center;gap:10px;padding:8px 14px 4px;margin-bottom:8px;}
+    .profile-pill{display:flex;align-items:center;gap:6px;background:rgba(45,42,36,.45);border:1px solid rgba(180,172,158,.09);border-radius:20px;padding:5px 10px 5px 5px;cursor:pointer;transition:background .18s;-webkit-tap-highlight-color:transparent}
+    .profile-pill:active{background:rgba(45,42,36,.7)}
+    .profile-pill-streak{font-family:'Inter',sans-serif;font-size:.78rem;font-weight:700;color:#b4ac9e;letter-spacing:.01em}
     .ava{border-radius:50%;background:linear-gradient(135deg,var(--cls-color),#0c0c0a);display:flex;align-items:center;justify-content:center;border:2px solid var(--cls-color);box-shadow:0 0 14px color-mix(in srgb,var(--cls-color) 38%,transparent);flex-shrink:0;width:48px;height:48px;font-size:1.3rem}
     .hud-info{flex:1;min-width:0}
     .hud-name{font-family:'Inter',sans-serif;font-size:.8rem;color:#d4cec4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -667,9 +670,7 @@
        ══════════════════════════════════════════════════ */
 
     /* ── HUD / Header ── */
-    .hud-top{display:flex;align-items:center;gap:11px;padding:13px 15px;background:linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.25));border:1px solid rgba(180,172,158,.06);border-radius:14px;margin-bottom:11px;position:relative;z-index:10;box-shadow:0 4px 24px rgba(0,0,0,.35);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-    .hud-top::before{content:'';position:absolute;top:0;left:14px;right:14px;height:1px;background:none;pointer-events:none;border-radius:1px}
-    .hud-top::after{content:'';position:absolute;inset:0;background:none;pointer-events:none}
+    .hud-top{display:flex;align-items:center;gap:10px;padding:8px 15px 4px;margin-bottom:8px;position:relative;z-index:10;}
     .ava{border-radius:50%;background:radial-gradient(circle at 40% 35%,color-mix(in srgb,var(--cls-color) 28%,#1a1200),#0c0c0a);display:flex;align-items:center;justify-content:center;border:2px solid var(--cls-color);box-shadow:0 0 18px color-mix(in srgb,var(--cls-color) 45%,transparent),0 0 40px color-mix(in srgb,var(--cls-color) 18%,transparent),inset 0 0 10px rgba(0,0,0,.5);flex-shrink:0;width:50px;height:50px;font-size:1.4rem;animation:hudAvaGlow 4s ease-in-out infinite}
     @keyframes hudAvaGlow{0%,100%{box-shadow:0 0 18px color-mix(in srgb,var(--cls-color) 45%,transparent),0 0 40px color-mix(in srgb,var(--cls-color) 18%,transparent)}50%{box-shadow:0 0 26px color-mix(in srgb,var(--cls-color) 65%,transparent),0 0 55px color-mix(in srgb,var(--cls-color) 28%,transparent)}}
     .hud-info{flex:1;min-width:0;position:relative;z-index:1}

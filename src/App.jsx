@@ -5122,44 +5122,7 @@ function App() {
     /* ══ MAIN ═══════════════════════════════════ */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
       maxHeight: "100dvh",
       overflow: "hidden"
-    } : {}}><div className={"hud-top"}><div className={"ava"} style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}><ClassIcon classKey={profile.chosenClass} size={26} color={cls.glow} /></div><div className={"hud-info"}><div className={"hud-name"}>{profile.playerName}</div><div className={"hud-sub"}>{cls.name}{profile.gym ? ` · ${profile.gym}` : ""}</div>{(profile.hudFields?.weight || profile.hudFields?.height || profile.hudFields?.bmi) && <div className={"hud-body"}>{profile.hudFields?.weight && profile.weightLbs ? isMetric(profile.units) ? lbsToKg(profile.weightLbs) + " kg" : profile.weightLbs + " lbs" : ""}{profile.hudFields?.weight && profile.weightLbs && profile.hudFields?.height && totalH > 0 ? " · " : ""}{profile.hudFields?.height && totalH > 0 ? isMetric(profile.units) ? ftInToCm(profile.heightFt, profile.heightIn) + " cm" : `${profile.heightFt}'${profile.heightIn}"` : ""}{profile.hudFields?.bmi && bmi ? `${profile.hudFields?.weight || profile.hudFields?.height ? " · " : ""}BMI ${bmi}` : ""}</div>}<div className={"xp-track"}><div className={"xp-fill"} style={{
-              width: `${Math.min(progress, 100)}%`
-            }} /></div><div className={"xp-lbl"}><span>{(profile.xp - curXP).toLocaleString()}{" / "}{formatXP(nxtXP - curXP)}</span><span>{"→ Lv "}{level + 1}</span></div></div><div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: S.s4,
-          position: "relative",
-          flexShrink: 0
-        }}><button className={"btn nav-menu-btn btn-ghost"} style={{
-            position: "relative"
-          }} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{
-              position: "absolute",
-              top: 1,
-              right: 2,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: UI_COLORS.danger,
-              border: "1.5px solid #0c0c0a"
-            }} />}</button><div style={{
-            textAlign: "right"
-          }}><div className={"hud-lv"}>{level}</div><div className={"hud-lv-lbl"}>{"Level"}</div><div style={{
-              fontSize: FS.fs48,
-              color: "#8a8478",
-              textAlign: "right",
-              marginTop: S.s2,
-              letterSpacing: ".03em",
-              fontFamily: "'Inter',sans-serif"
-            }}>{new Date().toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-                year: "numeric"
-              })}</div></div></div></div>
+    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => setActiveTab("profile"))}><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
         /* ══ DROPDOWN MENU — rendered outside hud-top to escape backdrop-filter stacking context ══ */
@@ -5285,48 +5248,7 @@ function App() {
         display: "flex",
         flexDirection: "column",
         paddingBottom: 0
-      } : {}}>{activeTab === "workout" && <><div className={"hud-checkin-strip"}><span style={{
-              fontSize: "1.05rem"
-            }}>{"🔥"}</span><span style={{
-              fontSize: FS.fs88,
-              fontWeight: 700,
-              color: "#b4ac9e"
-            }}>{profile.checkInStreak}</span><span style={{
-              fontSize: FS.fs58,
-              color: "#8a8478"
-            }}>{"day streak"}</span><div style={{
-              flex: 1
-            }} /><button style={{
-              fontSize: FS.fs50,
-              color: "#8a8478",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 8px"
-            }} onClick={() => {
-              setRetroCheckInModal(true);
-              setRetroDate("");
-            }}>{"↺ Retro"}</button><button style={{
-              fontSize: FS.fs50,
-              color: "#c49428",
-              background: "transparent",
-              border: "1px solid rgba(196,148,40,.2)",
-              borderRadius: R.md,
-              cursor: "pointer",
-              padding: "4px 8px"
-            }} onClick={() => setShowWNMockup(true)}>{"📲 Notification"}</button><button style={{
-              padding: "8px 16px",
-              borderRadius: R.lg,
-              fontSize: FS.fs54,
-              fontWeight: 600,
-              border: "1px solid rgba(180,172,158,.08)",
-              background: "linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",
-              color: "#d4cec4",
-              cursor: "pointer",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              letterSpacing: ".04em"
-            }} disabled={profile.lastCheckIn === todayStr()} onClick={doCheckIn}>{profile.lastCheckIn === todayStr() ? "✓ Checked In" : "Check In"}</button></div>
+      } : {}}>{activeTab === "workout" && <>
 
           {
             /* ══ EXERCISES SUB-TAB BAR ══ */
