@@ -19,6 +19,13 @@ const STDB_CENTER = 1600;
 function toWorld(v) { return (v - STDB_CENTER) / SCALE; }
 function toStdb(v)  { return Math.round(v * SCALE + STDB_CENTER); }
 
+// ── Math helpers (used by day/night cycle) ──────────────────────────────────
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const lerp    = (a, b, t) => a + (b - a) * t;
+const lerpColor3 = (a, b, t) => new BABYLON.Color3(
+  lerp(a.r, b.r, t), lerp(a.g, b.g, t), lerp(a.b, b.b, t)
+);
+
 // ── Class colours (built at call-time after BABYLON is on window) ────────────
 function classColor(ct) {
   const map = {
@@ -60,8 +67,10 @@ export class BabylonWorldScene {
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
     this.scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.006;
-    this.scene.fogColor   = new BABYLON.Color3(0.12, 0.16, 0.26);
+    // Thinner fog now that the day/night cycle drives its color & a real sky
+    // sits behind it. Color is overwritten each frame by _tickDayNight.
+    this.scene.fogDensity = 0.0018;
+    this.scene.fogColor   = new BABYLON.Color3(0.74, 0.84, 0.96);
 
     // ACES tone-mapping + slight contrast lift for richer PBR response
     const ip = this.scene.imageProcessingConfiguration;
@@ -73,6 +82,7 @@ export class BabylonWorldScene {
     this._setupEnvironment();
     this._setupLighting();
     this._setupShadows();
+    this._setupDayNight();
     this._buildTerrain();
     this._buildHub();
     this._buildTrees();
@@ -92,24 +102,41 @@ export class BabylonWorldScene {
     window.addEventListener('resize', this._onResize);
   }
 
-  // ── Environment IBL ────────────────────────────────────────────────────────
-  // Drop a prefiltered .env file at /public/textures/studio_small_08_2k.env to
-  // light PBR materials and (optionally) render an environment skybox. We HEAD
-  // it first because Vite's SPA fallback serves index.html for missing assets,
-  // which Babylon then logs as "Not a babylon environment map".
+  // ── Environment IBL (day + night) ──────────────────────────────────────────
+  // Drop prefiltered .env files at /public/env/overworld_day.env and
+  // /public/env/overworld_night.env. Each is HEAD-checked first because Vite's
+  // SPA fallback returns index.html for missing assets, which Babylon then
+  // logs as "Not a babylon environment map". The day/night cycle handles the
+  // texture swap; if a file is missing the cycle still runs (just no skybox
+  // or IBL contribution from that side).
 
   _setupEnvironment() {
-    const url = '/textures/studio_small_08_2k.env';
-    fetch(url, { method: 'HEAD' })
+    this._envDay   = null;
+    this._envNight = null;
+    this._skybox   = null;
+
+    this._loadEnv('/env/overworld_day.env').then(env => {
+      if (!env) return;
+      this._envDay = env;
+      // Seed scene env to day so first-frame PBR isn't black before _tickDayNight runs
+      this.scene.environmentTexture  = env;
+      this.scene.environmentIntensity = 0.85;
+      this._skybox = this.scene.createDefaultSkybox(env, true, 1500, 0.35);
+    });
+
+    this._loadEnv('/env/overworld_night.env').then(env => {
+      if (env) this._envNight = env;
+    });
+  }
+
+  _loadEnv(url) {
+    return fetch(url, { method: 'HEAD' })
       .then(r => {
         const ct = r.headers.get('content-type') ?? '';
-        if (!r.ok || ct.includes('text/html')) return;
-        const env = BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
-        this.scene.environmentTexture  = env;
-        this.scene.environmentIntensity = 0.85;
-        this.scene.createDefaultSkybox(env, true, 1000, 0.3);
+        if (!r.ok || ct.includes('text/html')) return null;
+        return BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
       })
-      .catch(() => { /* offline or network error — keep solid clear color */ });
+      .catch(() => null);
   }
 
   // ── Lighting (3-point RPG rig) ─────────────────────────────────────────────
@@ -124,12 +151,14 @@ export class BabylonWorldScene {
     key.diffuse   = new BABYLON.Color3(0.95, 0.88, 0.75);
     this._keyLight = key;
 
-    // Fill — cool hemispheric to lift shadows
+    // Fill — cool hemispheric to lift shadows. Intensity + groundColor are
+    // animated each frame by the day/night cycle.
     const fill = new BABYLON.HemisphericLight(
       'fill', new BABYLON.Vector3(0, 1, 0), this.scene
     );
     fill.intensity   = 0.35;
     fill.groundColor = new BABYLON.Color3(0.15, 0.18, 0.22);
+    this._fill = fill;
 
     // Rim — cool point light for silhouette readability in combat
     const rim = new BABYLON.PointLight(
@@ -153,6 +182,95 @@ export class BabylonWorldScene {
 
   _castShadow(mesh) {
     if (this._shadowGen && mesh) this._shadowGen.addShadowCaster(mesh, true);
+  }
+
+  // ── Day / night cycle ──────────────────────────────────────────────────────
+  // Drives sun direction/color, moon, fill, ambient, fog, exposure/contrast,
+  // and (when env files are present) the skybox + IBL swap. Default cycle is
+  // 15 in-game minutes per real second... no wait — 24 in-game hours per 15
+  // real minutes, starting at 09:00.
+
+  _setupDayNight() {
+    this._timeOfDay    = 9.0;
+    this._dayLengthSec = 900;          // real seconds for a full 24h cycle
+    this._hoursPerSec  = 24 / this._dayLengthSec;
+
+    const moon = new BABYLON.DirectionalLight(
+      'moon', new BABYLON.Vector3(0.3, -1.0, 0.2), this.scene
+    );
+    moon.intensity = 0;
+    moon.diffuse   = new BABYLON.Color3(0.55, 0.62, 0.90);
+    moon.specular  = new BABYLON.Color3(0.25, 0.30, 0.45);
+    this._moon = moon;
+
+    this._dayNight = {
+      sunDay:           new BABYLON.Color3(1.00, 0.97, 0.92),
+      sunSunset:        new BABYLON.Color3(1.00, 0.72, 0.48),
+      ambientDay:       new BABYLON.Color3(0.62, 0.70, 0.80),
+      ambientNight:     new BABYLON.Color3(0.10, 0.13, 0.20),
+      fogDay:           new BABYLON.Color3(0.74, 0.84, 0.96),
+      fogNight:         new BABYLON.Color3(0.06, 0.08, 0.12),
+      fillGroundDay:    new BABYLON.Color3(0.22, 0.24, 0.26),
+      fillGroundNight:  new BABYLON.Color3(0.05, 0.06, 0.08),
+    };
+  }
+
+  _tickDayNight(dtMs) {
+    const dn = this._dayNight;
+    if (!dn) return;
+
+    this._timeOfDay = (this._timeOfDay + (dtMs / 1000) * this._hoursPerSec) % 24;
+
+    // Sun phase: 0 at midnight, 0.5 at noon
+    const phase    = this._timeOfDay / 24;
+    const sunTheta = phase * Math.PI * 2 - Math.PI / 2;
+    const sunDir   = new BABYLON.Vector3(
+      Math.cos(sunTheta) * 0.35,
+      -Math.sin(sunTheta),
+       Math.sin(sunTheta) * 0.65
+    ).normalize();
+
+    this._keyLight.direction.copyFrom(sunDir);
+
+    const sunHeight = -sunDir.y;                                          // >0 above horizon
+    const dayFactor = clamp01((sunHeight + 0.08) / 0.22);                 // smooth dawn/dusk
+    const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
+
+    // Sun
+    this._keyLight.intensity = lerp(0.05, 2.4, dayFactor);
+    this._keyLight.diffuse   = lerpColor3(dn.sunSunset, dn.sunDay, clamp01(dayFactor * 1.25));
+
+    // Moon (inverse direction, ramps in at night)
+    this._moon.direction.copyFrom(sunDir.scale(-1));
+    this._moon.intensity = lerp(0, 0.45, 1 - dayFactor);
+
+    // Fill / ambient
+    this._fill.intensity   = lerp(0.12, 0.40, dayFactor);
+    this._fill.groundColor = lerpColor3(dn.fillGroundNight, dn.fillGroundDay, dayFactor);
+    this.scene.ambientColor = lerpColor3(dn.ambientNight, dn.ambientDay, dayFactor);
+
+    // Image processing (slightly warmer contrast at sunset)
+    const ip = this.scene.imageProcessingConfiguration;
+    ip.exposure = lerp(0.65, 1.05, dayFactor);
+    ip.contrast = lerp(1.03, 1.10, sunset);
+
+    // Fog
+    this.scene.fogColor = lerpColor3(dn.fogNight, dn.fogDay, dayFactor);
+
+    // Env + skybox (hard switch at noon/midnight; only swaps when env loaded)
+    if (dayFactor > 0.5) {
+      if (this._envDay && this.scene.environmentTexture !== this._envDay) {
+        this.scene.environmentTexture = this._envDay;
+        if (this._skybox?.material) this._skybox.material.reflectionTexture = this._envDay;
+      }
+      this.scene.environmentIntensity = lerp(0.35, 0.95, dayFactor);
+    } else {
+      if (this._envNight && this.scene.environmentTexture !== this._envNight) {
+        this.scene.environmentTexture = this._envNight;
+        if (this._skybox?.material) this._skybox.material.reflectionTexture = this._envNight;
+      }
+      this.scene.environmentIntensity = lerp(0.25, 0.50, dayFactor);
+    }
   }
 
   // ── Terrain ────────────────────────────────────────────────────────────────
@@ -410,6 +528,7 @@ export class BabylonWorldScene {
 
   _tick() {
     const dt = this.engine.getDeltaTime();
+    this._tickDayNight(dt);
     if (!this._local) return;
 
     this._moveLocal(dt);
