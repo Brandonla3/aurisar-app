@@ -1089,7 +1089,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
                 })}</span>{(wo.labels || []).map(l => <span key={l} className={"wo-label-chip"} style={{
                 pointerEvents: "none",
                 marginLeft: S.s2
-              }}>{l}</span>)}</div></div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"▶ Track"}</button></div></div>;
+              }}>{l}</span>)}</div></div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"Track"}</button></div></div>;
     })}</>}{workoutSubTab === "oneoff" && <>{(() => {
       const _now = new Date();
       const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
@@ -1158,7 +1158,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
                 }}>{badgeTxt}</span>{(wo.labels || []).map(l => <span key={l} className={"wo-label-chip"} style={{
                   pointerEvents: "none",
                   marginLeft: S.s2
-                }}>{l}</span>)}</div></div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"▶ Track"}</button></div>
+                }}>{l}</span>)}</div></div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"Track"}</button></div>
           {
             /* Action row */
           }<div style={{

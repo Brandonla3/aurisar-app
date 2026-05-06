@@ -62,28 +62,36 @@ export default function LiveWorkoutBanner({ liveWorkout, onToggleExercise, onFin
             </div>
 
             <div className="lw-ex-list">
-              {exercises.map((ex, i) => (
-                <div
-                  key={i}
-                  className={`lw-ex-row${ex.done ? ' done' : ''}`}
-                  onClick={() => onToggleExercise(i)}
-                  role="checkbox"
-                  aria-checked={ex.done}
-                >
-                  <div className={`lw-ex-cb${ex.done ? ' done' : ''}`}>
-                    {ex.done && <span className="lw-ex-check-mark">{"✓"}</span>}
-                  </div>
-                  <div className="lw-ex-info">
-                    <div className="lw-ex-name">{ex.name}</div>
-                    {ex.exId !== 'rest_day' && (
-                      <div className="lw-ex-meta">
-                        {ex.sets}{"×"}{ex.reps}
-                        {ex.weightLbs ? ` · ${ex.weightLbs} lbs` : ''}
-                      </div>
+              {exercises.map((ex, i) => {
+                const isFirstOfSuperset = ex.supersetWith !== null && ex.supersetWith > i;
+                const isInSuperset = ex.supersetWith !== null;
+                return (
+                  <React.Fragment key={i}>
+                    {isFirstOfSuperset && (
+                      <div className="lw-superset-label">{"⚡ Superset"}</div>
                     )}
-                  </div>
-                </div>
-              ))}
+                    <div
+                      className={`lw-ex-row${ex.done ? ' done' : ''}${isInSuperset ? ' in-superset' : ''}`}
+                      onClick={() => onToggleExercise(i)}
+                      role="checkbox"
+                      aria-checked={ex.done}
+                    >
+                      <div className={`lw-ex-cb${ex.done ? ' done' : ''}`}>
+                        {ex.done && <span className="lw-ex-check-mark">{"✓"}</span>}
+                      </div>
+                      <div className="lw-ex-info">
+                        <div className="lw-ex-name">{ex.name}</div>
+                        {ex.exId !== 'rest_day' && (
+                          <div className="lw-ex-meta">
+                            {ex.setsDesc || `${ex.sets}×${ex.reps}`}
+                            {ex.weightLbs ? ` · ${ex.weightLbs} lbs` : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </div>
 
             {confirmFinish ? (

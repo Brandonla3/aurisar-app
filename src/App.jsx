@@ -618,6 +618,7 @@ function App() {
   const [liveWorkout, setLiveWorkout] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
   });
+  const [pendingLiveWorkout, setPendingLiveWorkout] = useState(null);
   const [wbName, setWbName] = useState("");
   const [wbIcon, setWbIcon] = useState("💪");
   const [wbIconPickerOpen, setWbIconPickerOpen] = useState(false);
@@ -3945,12 +3946,35 @@ function App() {
     showToast(workout.icon + " " + workout.name + " added to " + plan.name + " ⚔️");
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
-  function startLiveWorkout(wo) {
-    const exercises = (wo.exercises || []).map(ex => {
+  function _buildLiveExercises(wo) {
+    return (wo.exercises || []).map((ex, i) => {
       const exData = allExById[ex.exId];
-      return { exId: ex.exId, name: exData?.name || ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null, done: false };
+      const rows = [{ sets: ex.sets, reps: ex.reps }];
+      (ex.extraRows || []).forEach(row => rows.push({ sets: row.sets ?? ex.sets, reps: row.reps ?? ex.reps }));
+      const setsDesc = rows.map(r => `${r.sets}×${r.reps}`).join(' / ');
+      return {
+        exId: ex.exId,
+        name: exData?.name || ex.exId,
+        sets: ex.sets, reps: ex.reps,
+        weightLbs: ex.weightLbs || null,
+        setsDesc,
+        supersetWith: (typeof ex.supersetWith === 'number' && ex.supersetWith >= 0) ? ex.supersetWith : null,
+        done: false,
+      };
     });
-    setLiveWorkout({ workoutId: wo.id, name: wo.name, icon: wo.icon, startedAt: new Date().toISOString(), exercises });
+  }
+
+  function startLiveWorkout(wo) {
+    if (liveWorkout && liveWorkout.workoutId !== wo.id) {
+      setPendingLiveWorkout(wo);
+      return;
+    }
+    setLiveWorkout({ workoutId: wo.id, name: wo.name, icon: wo.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(wo) });
+  }
+
+  function confirmReplaceLiveWorkout() {
+    setLiveWorkout({ workoutId: pendingLiveWorkout.id, name: pendingLiveWorkout.name, icon: pendingLiveWorkout.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(pendingLiveWorkout) });
+    setPendingLiveWorkout(null);
   }
 
   function handleToggleLiveEx(i) {
@@ -5274,7 +5298,7 @@ function App() {
             })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
                   display: "block"
                 }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} />}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
