@@ -21,4 +21,5 @@ export default __t.row({
   isMoving: __t.bool().name("is_moving"),
   zoneId: __t.u8().name("zone_id"),
   online: __t.bool(),
+  lastChatAt: __t.u64().name("last_chat_at"),
 });

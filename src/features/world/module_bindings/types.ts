@@ -33,6 +33,7 @@ export const Player = __t.object("Player", {
   isMoving: __t.bool(),
   zoneId: __t.u8(),
   online: __t.bool(),
+  lastChatAt: __t.u64(),
 });
 export type Player = __Infer<typeof Player>;
 

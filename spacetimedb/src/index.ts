@@ -33,6 +33,7 @@ const spacetimedb = schema({
       isMoving:    t.bool(),       // for animation state
       zoneId:      t.u8(),         // 0=hub 1=training 2=plaza
       online:      t.bool(),       // true while connection is active
+      lastChatAt:  t.u64(),        // micros since unix epoch of last sendChat — used for server-side rate limit
     }
   ),
 
@@ -103,6 +104,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         isMoving: false,
         zoneId: 0,
         online: true,
+        lastChatAt: 0n,
       });
     }
   }
@@ -144,8 +146,11 @@ export const movePlayer = spacetimedb.reducer(
 
 /**
  * Send a chat message (world or proximity).
- * Rate limited: max 1 message per second (enforced by checking last sent).
+ * Rate limited: max 1 message per second per sender (enforced server-side
+ * via player.lastChatAt — a malicious client cannot spam past this).
  */
+const CHAT_COOLDOWN_MICROS = 1_000_000n; // 1 second
+
 export const sendChat = spacetimedb.reducer(
   {
     text:    t.string(),
@@ -156,6 +161,11 @@ export const sendChat = spacetimedb.reducer(
     const player = ctx.db.player.identity.find(identity);
     if (!player) return;
 
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.lastChatAt > 0n && nowMicros - player.lastChatAt < CHAT_COOLDOWN_MICROS) {
+      return; // dropped: sender is over the 1 msg/sec rate limit
+    }
+
     const safeText = text.trim().slice(0, 280);
     if (!safeText) return;
 
@@ -164,15 +174,17 @@ export const sendChat = spacetimedb.reducer(
       : 'world';
 
     ctx.db.chatMessage.insert({
-      id: ctx.timestamp.microsSinceUnixEpoch,
+      id: nowMicros,
       senderId: identity,
       senderName: player.username,
       text: safeText,
-      sentAt: ctx.timestamp.microsSinceUnixEpoch / 1000n, // ms
+      sentAt: nowMicros / 1000n, // ms
       msgType: safeMsgType,
       x: player.x,
       y: player.y,
     });
+
+    ctx.db.player.identity.update({ ...player, lastChatAt: nowMicros });
   }
 );
 

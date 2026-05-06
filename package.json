@@ -11,13 +11,13 @@
   },
   "dependencies": {
     "@babylonjs/core": "^7.54.3",
-    "@clockworklabs/spacetimedb-sdk": "^2.0.0",
     "@supabase/supabase-js": "^2.105.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-is": "^19.2.5",
     "react-window": "^2.2.7",
     "recharts": "^3.8.1",
+    "spacetimedb": "^2.2.0",
     "three": "^0.184.0"
   },
   "devDependencies": {
@@ -32,8 +32,5 @@
     "globals": "^17.6.0",
     "sharp": "^0.34.5",
     "vite": "^8.0.10"
-  },
-  "overrides": {
-    "spacetimedb": "2.2.0"
   }
 }
