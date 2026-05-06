@@ -52,7 +52,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     try {
       conn = DbConnection.builder()
         .withUri(STDB_URI)
-        .withModuleName(STDB_MODULE)
+        .withDatabaseName(STDB_MODULE)
         .onConnect((connection, _identity, _token) => {
           setConnected(true);
 
@@ -90,10 +90,11 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             callbacksRef.current?.onChatMessage?.(row);
           });
         })
-        .onDisconnect((_ctx, _reason) => {
+        .onDisconnect((_ctx, err) => {
           setConnected(false);
+          if (err) console.error('[SpacetimeDB] Disconnected with error:', err);
         })
-        .onError((_ctx, err) => {
+        .onConnectError((_ctx, err) => {
           console.error('[SpacetimeDB] Connection error:', err);
         })
         .build();

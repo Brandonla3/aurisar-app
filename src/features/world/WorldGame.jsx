@@ -8,24 +8,15 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+import BABYLON from 'babylonjs';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 
-// ── Load Babylon.js UMD from CDN (avoids Vite circular-module issues) ─────────
-const BABYLON_CDN = 'https://cdn.jsdelivr.net/npm/babylonjs@7.54.3/babylon.js';
-
-function useBabylon() {
-  const [ready, setReady] = useState(() => typeof window !== 'undefined' && !!window.BABYLON);
-  useEffect(() => {
-    if (window.BABYLON) { setReady(true); return; }
-    const script   = document.createElement('script');
-    script.src     = BABYLON_CDN;
-    script.async   = true;
-    script.onload  = () => setReady(true);
-    script.onerror = () => console.error('[Aurisar] Failed to load Babylon.js from CDN');
-    document.head.appendChild(script);
-  }, []);
-  return ready;
+// Bundled UMD package (same artifact the CDN was serving) — avoids the CSP
+// script-src violation from loading jsdelivr at runtime, and keeps the scene
+// file's existing `window.BABYLON` references working unchanged.
+if (typeof window !== 'undefined' && !window.BABYLON) {
+  window.BABYLON = BABYLON;
 }
 
 // ── Chat styles (inline — no extra CSS file needed) ──────────────────────────
@@ -88,8 +79,6 @@ const S = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function WorldGame({ playerInfo }) {
-  const babylonReady = useBabylon();   // waits for CDN script
-
   const canvasRef  = useRef(null);
   const sceneRef   = useRef(null);
   const logEndRef  = useRef(null);
@@ -122,7 +111,7 @@ export default function WorldGame({ playerInfo }) {
 
   // ── Babylon scene mount / unmount ──────────────────────────────────────────
   useEffect(() => {
-    if (!babylonReady || !canvasRef.current) return;
+    if (!canvasRef.current) return;
 
     const scene = new BabylonWorldScene(
       canvasRef.current,
@@ -136,7 +125,7 @@ export default function WorldGame({ playerInfo }) {
       sceneRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [babylonReady]); // re-run once CDN script has loaded
+  }, []);
 
   // Keep movePlayer in the scene current (reference can change on reconnect)
   useEffect(() => {
@@ -183,34 +172,13 @@ export default function WorldGame({ playerInfo }) {
     <div style={S.wrap}>
       <canvas ref={canvasRef} style={S.canvas} />
 
-      {/* Babylon loading overlay — shown until CDN script is ready */}
-      {!babylonReady && (
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          background: '#0a0f1e', flexDirection: 'column', gap: 12,
-          fontFamily: 'Inter, system-ui, sans-serif',
-        }}>
-          <div style={{ color: '#7dd3fc', fontSize: 14 }}>Loading 3D engine…</div>
-          <div style={{
-            width: 160, height: 3, background: '#1e293b', borderRadius: 2, overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%', width: '40%', background: '#3b82f6',
-              borderRadius: 2, animation: 'slide 1.2s ease-in-out infinite',
-            }} />
-          </div>
-          <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`}</style>
-        </div>
-      )}
-
       {/* Connection badge */}
-      {babylonReady && !connected && (
+      {!connected && (
         <div style={S.statusBadge}>Connecting to Aurisar World…</div>
       )}
 
       {/* Online count */}
-      {babylonReady && connected && (
+      {connected && (
         <div style={S.onlineCount}>● {onlineCount} online</div>
       )}
 
