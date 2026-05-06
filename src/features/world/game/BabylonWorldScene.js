@@ -164,14 +164,28 @@ class LightingManager {
 
     this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
 
-    this.envDay    = BABYLON.CubeTexture.CreateFromPrefilteredData(this.options.env.overworldDay,   this.scene);
-    this.envNight  = BABYLON.CubeTexture.CreateFromPrefilteredData(this.options.env.overworldNight, this.scene);
-    this.envDungeon = BABYLON.CubeTexture.CreateFromPrefilteredData(this.options.env.dungeon,       this.scene);
+    // Env textures loaded asynchronously with a HEAD/content-type guard so
+    // missing files (or the Vite SPA HTML fallback) don't produce
+    // "Not a babylon environment map" errors on startup.
+    this.envDay     = null;
+    this.envNight   = null;
+    this.envDungeon = null;
+    this.skybox     = null;
 
-    this.scene.environmentTexture  = this.envDay;
-    this.scene.environmentIntensity = 0.9;
-
-    this.skybox = this.scene.createDefaultSkybox(this.envDay, true, 1500, 0.35);
+    this._loadEnvSafe(this.options.env.overworldDay).then(t => {
+      if (!t || this._disposed) return;
+      this.envDay = t;
+      if (this.profile === 'overworld' && !this._transition) {
+        this._setEnvironment(t, this.scene.environmentIntensity || 0.9);
+        if (!this.skybox) this.skybox = this.scene.createDefaultSkybox(t, true, 1500, 0.35);
+      }
+    });
+    this._loadEnvSafe(this.options.env.overworldNight).then(t => {
+      if (t && !this._disposed) this.envNight = t;
+    });
+    this._loadEnvSafe(this.options.env.dungeon).then(t => {
+      if (t && !this._disposed) this.envDungeon = t;
+    });
 
     this._dungeonTorches = [];
     this._dungeonMagic   = [];
@@ -232,6 +246,16 @@ class LightingManager {
     this.pipeDungeon.sharpenEnabled = true;
     this.pipeDungeon.sharpen.colorAmount = 0.15;
     this.pipeDungeon.sharpen.edgeAmount  = 0.10;
+  }
+
+  _loadEnvSafe(url) {
+    return fetch(url, { method: 'HEAD' })
+      .then(r => {
+        const ct = r.headers.get('content-type') ?? '';
+        if (!r.ok || ct.includes('text/html')) return null;
+        return BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
+      })
+      .catch(() => null);
   }
 
   // ── Frame update ──────────────────────────────────────────────────────────
@@ -308,6 +332,10 @@ class LightingManager {
   }
 
   _updateDungeon() {
+    // Zero key intensity — bounceDungeon owns the directional look.
+    // key stays *enabled* so ShadowGenerator keeps casting shadows.
+    this.key.intensity = 0;
+
     this.scene.imageProcessingConfiguration.exposure = 0.82;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
@@ -337,7 +365,9 @@ class LightingManager {
     this.profile = profile;
     const overworld = profile === 'overworld';
 
-    this.key.setEnabled(overworld);
+    // key stays enabled in both profiles — it is the ShadowGenerator source.
+    // In dungeon, _updateDungeon() zeroes its intensity instead.
+    this.key.setEnabled(true);
     this.moon.setEnabled(overworld);
     this.fillOverworld.setEnabled(overworld);
 
@@ -388,6 +418,7 @@ class LightingManager {
 
     this.fillOverworld.intensity = lerp(fromState.fillOverworldI, toState.fillOverworldI, t);
     this.fillDungeon.intensity   = lerp(fromState.fillDungeonI,   toState.fillDungeonI,   t);
+    this.key.intensity           = lerp(fromState.keyIntensity,   toState.keyIntensity,   t);
 
     const dungeonActive = (half ? to : from) === 'dungeon';
     for (const l of this._dungeonTorches) l.setEnabled(dungeonActive);
@@ -404,6 +435,7 @@ class LightingManager {
       envTex:        this.scene.environmentTexture,
       fillOverworldI: this.fillOverworld.intensity,
       fillDungeonI:   this.fillDungeon.intensity,
+      keyIntensity:   this.key.intensity,
     };
   }
 
@@ -465,6 +497,7 @@ class LightingManager {
   // ── Utils ─────────────────────────────────────────────────────────────────
 
   _setEnvironment(envTex, intensity) {
+    if (!envTex) return; // still loading or file unavailable — skip cleanly
     if (this.scene.environmentTexture !== envTex) {
       this.scene.environmentTexture = envTex;
       if (this.skybox?.material?.reflectionTexture) {
