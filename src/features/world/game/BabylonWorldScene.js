@@ -123,17 +123,28 @@ export class BabylonWorldScene {
     this._skybox   = null;
 
     this._loadEnv('/env/overworld_day.env').then(env => {
-      if (!env) return;
+      if (!env || this.engine.isDisposed) return;
       this._envDay = env;
-      // Seed scene env to day so first-frame PBR isn't black before _tickDayNight runs
-      this.scene.environmentTexture  = env;
-      this.scene.environmentIntensity = 0.85;
-      this._skybox = this.scene.createDefaultSkybox(env, true, 1500, 0.35);
+      // Bail if the user switched to dungeon while we were waiting on the
+      // network — dungeon owns the env texture/skybox in that case, and
+      // _applyOverworldProfile will pick this up on the way back.
+      if (this._lightingProfile === 'overworld') this._applyOverworldEnv();
     });
 
     this._loadEnv('/env/overworld_night.env').then(env => {
-      if (env) this._envNight = env;
+      if (env && !this.engine.isDisposed) this._envNight = env;
     });
+  }
+
+  _applyOverworldEnv() {
+    if (!this._envDay) return;
+    this.scene.environmentTexture  = this._envDay;
+    this.scene.environmentIntensity = 0.85;
+    if (!this._skybox) {
+      this._skybox = this.scene.createDefaultSkybox(this._envDay, true, 1500, 0.35);
+    } else if (this._skybox.material?.reflectionTexture !== this._envDay) {
+      this._skybox.material.reflectionTexture = this._envDay;
+    }
   }
 
   _loadEnv(url) {
@@ -159,13 +170,17 @@ export class BabylonWorldScene {
     this._keyLight = key;
 
     // Fill — cool hemispheric to lift shadows. Intensity + groundColor are
-    // animated each frame by the day/night cycle.
+    // animated each frame by the day/night cycle. Diffuse is set once here
+    // and the dungeon profile mutates it, so we capture the overworld value
+    // for restore on profile switch back.
     const fill = new BABYLON.HemisphericLight(
       'fill', new BABYLON.Vector3(0, 1, 0), this.scene
     );
     fill.intensity   = 0.35;
+    fill.diffuse     = new BABYLON.Color3(0.70, 0.75, 0.95);
     fill.groundColor = new BABYLON.Color3(0.15, 0.18, 0.22);
-    this._fill = fill;
+    this._fill                = fill;
+    this._fillDiffuseDefault  = fill.diffuse.clone();
 
     // Rim — cool point light for silhouette readability in combat. Stored so
     // the dungeon profile can disable it (we use torches/magic accents there).
@@ -316,11 +331,16 @@ export class BabylonWorldScene {
     const scene = this.scene;
     scene.clearColor   = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
     scene.fogDensity   = 0.0018;
+    // Restore fill.diffuse — the dungeon profile mutates it and the day/night
+    // cycle only drives intensity + groundColor, so without this the cool
+    // grey-blue dungeon tint would persist into overworld.
+    this._fill.diffuse = this._fillDiffuseDefault.clone();
     this._rim.setEnabled(true);
     this._moon.setEnabled(true);
     if (this._envDay) {
-      scene.environmentTexture  = this._envDay;
-      scene.environmentIntensity = 0.85;
+      // Handles the case where envDay finished loading while we were in
+      // dungeon — _setupEnvironment skipped the scene mutation back then.
+      this._applyOverworldEnv();
     } else {
       scene.environmentTexture = null;
     }
