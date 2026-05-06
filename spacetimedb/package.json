@@ -1,0 +1,21 @@
+{
+  "name": "aurisar-world-module",
+  "version": "1.0.0",
+  "description": "SpacetimeDB server module for the Aurisar 2D multiplayer world",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "spacetime build",
+    "publish:dev": "spacetime publish --server testnet aurisar-world-dev",
+    "publish:prod": "spacetime publish --server mainnet aurisar-world",
+    "generate": "spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings --server mainnet --database aurisar-world",
+    "generate:dev": "spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings --server testnet --database aurisar-world-dev",
+    "logs": "spacetime logs aurisar-world --server mainnet",
+    "sql": "spacetime sql aurisar-world"
+  },
+  "dependencies": {
+    "spacetimedb": "^2.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
