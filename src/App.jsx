@@ -5235,6 +5235,13 @@ function App() {
         inset: 0,
         zIndex: 900
       }} />}{navMenuOpen && <div className={"nav-menu-panel"}>{[{
+          icon: "⚔️",
+          label: "Character",
+          action: () => guardAll(() => {
+            setActiveTab("character");
+            setNavMenuOpen(false);
+          })
+        }, {
           icon: "📜",
           label: "Plans",
           action: () => guardAll(() => {
@@ -5325,7 +5332,7 @@ function App() {
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises", "mdi:dumbbell"], ["workouts", "Workouts", "mdi:weight-lifter"], ["calendar", "Calendar", "mdi:calendar-blank"], ["character", "Character", "game-icons:crossed-swords"], ["social", "Guild", "game-icons:tribal-pendant"]].map(([t, l, iconName]) => {
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises", "mdi:dumbbell"], ["workouts", "Workouts", "mdi:weight-lifter"], ["calendar", "Calendar", "mdi:calendar-blank"], ["social", "Guild", "game-icons:tribal-pendant"]].map(([t, l, iconName]) => {
             const isOn = activeTab === t;
             const tabColor = isOn ? "#d4cec4" : "#8a8478";
             const iconPath = iconName.replace(":", "/");
