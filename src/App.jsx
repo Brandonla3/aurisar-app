@@ -68,6 +68,7 @@ const LandingPage = React.lazy(() => import('./components/LandingPage').then(m =
 })));
 const AdminPage = React.lazy(() => import('./components/AdminPage'));
 import PlansTabContainer from './components/PlansTabContainer';
+import LiveWorkoutBanner from './components/LiveWorkoutBanner';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
 // import the TrendsTab module (which would drag recharts into the main chunk)
 // just to read this constant. Keep in sync with TrendsTab.js.
@@ -614,6 +615,9 @@ function App() {
   // Workouts tab
   const [workoutView, setWorkoutView] = useState("list"); // "list"|"detail"|"builder"|"templates"
   const [activeWorkout, setActiveWorkout] = useState(null);
+  const [liveWorkout, setLiveWorkout] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
+  });
   const [wbName, setWbName] = useState("");
   const [wbIcon, setWbIcon] = useState("💪");
   const [wbIconPickerOpen, setWbIconPickerOpen] = useState(false);
@@ -900,6 +904,13 @@ function App() {
   // demo data to the real signed-in user's Supabase row — that's the bug
   // that lost ~2 weeks of real workout history in April 2026.
   useEffect(() => { setPreviewMode(isPreviewMode); }, [isPreviewMode]);
+  useEffect(() => {
+    if (liveWorkout) {
+      localStorage.setItem('aurisar-live-workout', JSON.stringify(liveWorkout));
+    } else {
+      localStorage.removeItem('aurisar-live-workout');
+    }
+  }, [liveWorkout]);
   useEffect(() => {
     if (screen === "main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id]) || null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email]) || null);
   }, [profile, screen, isPreviewMode]);
@@ -3934,6 +3945,33 @@ function App() {
     showToast(workout.icon + " " + workout.name + " added to " + plan.name + " ⚔️");
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
+  function startLiveWorkout(wo) {
+    const exercises = (wo.exercises || []).map(ex => {
+      const exData = allExById[ex.exId];
+      return { exId: ex.exId, name: exData?.name || ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null, done: false };
+    });
+    setLiveWorkout({ workoutId: wo.id, name: wo.name, icon: wo.icon, startedAt: new Date().toISOString(), exercises });
+  }
+
+  function handleToggleLiveEx(i) {
+    setLiveWorkout(lw => lw ? { ...lw, exercises: lw.exercises.map((e, idx) => idx === i ? { ...e, done: !e.done } : e) } : null);
+  }
+
+  function handleFinishLiveWorkout(exercises) {
+    if (!liveWorkout || exercises.length === 0) { setLiveWorkout(null); return; }
+    const filteredWo = {
+      id: liveWorkout.workoutId, name: liveWorkout.name, icon: liveWorkout.icon,
+      exercises: exercises.map(ex => ({ exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null })),
+      durationMin: null, activeCal: null, totalCal: null,
+    };
+    openStatsPromptIfNeeded(filteredWo, (woWithStats, _sr) => {
+      setCompletionModal({ workout: woWithStats, fromStats: _sr });
+      setCompletionDate(todayStr());
+      setCompletionAction("today");
+    });
+    setLiveWorkout(null);
+  }
+
   function openStatsPromptIfNeeded(wo, onConfirm) {
     // Skip stats modal entirely for rest-day-only workouts
     const isRestDayOnly = wo.soloEx && wo._soloExId === "rest_day" || wo.exercises && wo.exercises.length > 0 && wo.exercises.every(e => e.exId === "rest_day");
@@ -5236,7 +5274,7 @@ function App() {
             })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
                   display: "block"
                 }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}</div></div><div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} />}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -5548,6 +5586,8 @@ function App() {
             setNewLabelInput={setNewLabelInput}
             activeWorkout={activeWorkout}
             setActiveWorkout={setActiveWorkout}
+            liveWorkout={liveWorkout}
+            startLiveWorkout={startLiveWorkout}
             collapsedWo={collapsedWo}
             setCollapsedWo={setCollapsedWo}
             profile={profile}

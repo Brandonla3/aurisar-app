@@ -551,6 +551,8 @@ const WorkoutsTab = memo(function WorkoutsTab({
   // Active workout
   activeWorkout, setActiveWorkout,
   collapsedWo, setCollapsedWo,
+  // Live workout tracker
+  liveWorkout, startLiveWorkout,
   // Profile
   profile, setProfile,
   // Recipe view
@@ -1087,74 +1089,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
                 })}</span>{(wo.labels || []).map(l => <span key={l} className={"wo-label-chip"} style={{
                 pointerEvents: "none",
                 marginLeft: S.s2
-              }}>{l}</span>)}</div>{wo.desc && <div className={`workout-desc ${collapsedWo.has(wo.id) ? "" : "recipe-desc-collapsed"}`} style={{
-              marginTop: S.s4,
-              position: "relative",
-              paddingRight: wo.desc.length > 60 ? 16 : 0
-            }} title={wo.desc}>{wo.desc}{wo.desc.length > 60 && <span className={`ex-collapse-btn ${collapsedWo.has(wo.id) ? "open" : ""}`} style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                fontSize: FS.sm,
-                padding: "0 2px"
-              }} onClick={e => {
-                e.stopPropagation();
-                setCollapsedWo(s => {
-                  const n = new Set(s);
-                  n.has(wo.id) ? n.delete(wo.id) : n.add(wo.id);
-                  return n;
-                });
-              }}>{"▼"}</span>}</div>}</div><div style={{
-            display: "flex",
-            gap: S.s0,
-            border: "1px solid rgba(180,172,158,.05)",
-            borderRadius: R.xl,
-            overflow: "hidden",
-            background: "rgba(45,42,36,.3)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            flexShrink: 0
-          }} onClick={e => e.stopPropagation()}><button style={{
-              padding: "6px 10px",
-              textAlign: "center",
-              fontFamily: "'Cinzel',serif",
-              fontSize: FS.fs55,
-              letterSpacing: ".06em",
-              cursor: "pointer",
-              color: "#8a8478",
-              background: "transparent",
-              border: "none",
-              borderRight: "1px solid rgba(180,172,158,.06)",
-              textTransform: "uppercase"
-            }} title={"Copy"} onClick={() => copyWorkout(wo)}>{"⎘ Copy"}</button><button style={{
-              padding: "6px 10px",
-              textAlign: "center",
-              fontFamily: "'Cinzel',serif",
-              fontSize: FS.fs55,
-              letterSpacing: ".06em",
-              cursor: "pointer",
-              color: "#8a8478",
-              background: "transparent",
-              border: "none",
-              borderRight: "1px solid rgba(180,172,158,.06)",
-              textTransform: "uppercase"
-            }} title={"Edit"} onClick={() => initWorkoutBuilder(wo)}>{"✎ Edit"}</button><button style={{
-              padding: "6px 10px",
-              textAlign: "center",
-              fontFamily: "'Cinzel',serif",
-              fontSize: FS.fs55,
-              letterSpacing: ".06em",
-              cursor: "pointer",
-              color: UI_COLORS.danger,
-              background: "transparent",
-              border: "none",
-              textTransform: "uppercase"
-            }} title={"Delete"} onClick={() => setConfirmDelete({
-              type: "workout",
-              id: wo.id,
-              name: wo.name,
-              icon: wo.icon
-            })}>{"✕ Del"}</button></div></div></div>;
+              }}>{l}</span>)}</div>}</div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"▶ Track"}</button></div></div>;
     })}</>}{workoutSubTab === "oneoff" && <>{(() => {
       const _now = new Date();
       const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
@@ -1223,60 +1158,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
                 }}>{badgeTxt}</span>{(wo.labels || []).map(l => <span key={l} className={"wo-label-chip"} style={{
                   pointerEvents: "none",
                   marginLeft: S.s2
-                }}>{l}</span>)}</div>{wo.desc && <div className={"workout-desc recipe-desc-collapsed"} style={{
-                marginTop: S.s4
-              }}>{wo.desc}</div>}</div><div style={{
-              display: "flex",
-              gap: S.s0,
-              border: "1px solid rgba(180,172,158,.05)",
-              borderRadius: R.xl,
-              overflow: "hidden",
-              background: "rgba(45,42,36,.3)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-              flexShrink: 0
-            }} onClick={e => e.stopPropagation()}><button style={{
-                padding: "6px 10px",
-                textAlign: "center",
-                fontFamily: "'Cinzel',serif",
-                fontSize: FS.fs55,
-                letterSpacing: ".06em",
-                cursor: "pointer",
-                color: "#8a8478",
-                background: "transparent",
-                border: "none",
-                borderRight: "1px solid rgba(180,172,158,.06)",
-                textTransform: "uppercase"
-              }} title={"Edit"} onClick={() => {
-                setWbName(wo.name);
-                setWbIcon(wo.icon);
-                setWbDesc(wo.desc || "");
-                setWbExercises(wo.exercises.map(e => ({
-                  ...e
-                })));
-                setWbEditId(wo.id);
-                setWbIsOneOff(true);
-                setWbLabels(wo.labels || []);
-                setNewLabelInput("");
-                setWorkoutView("builder");
-              }}>{"✎ Edit"}</button><button style={{
-                padding: "6px 10px",
-                textAlign: "center",
-                fontFamily: "'Cinzel',serif",
-                fontSize: FS.fs55,
-                letterSpacing: ".06em",
-                cursor: "pointer",
-                color: UI_COLORS.danger,
-                background: "transparent",
-                border: "none",
-                textTransform: "uppercase"
-              }} title={"Delete"} onClick={() => {
-                setProfile(p => ({
-                  ...p,
-                  scheduledWorkouts: (p.scheduledWorkouts || []).filter(sw => sw.sourceWorkoutId !== g.id)
-                }));
-                showToast("Scheduled workout removed.");
-              }}>{"✕ Del"}</button></div></div>
+                }}>{l}</span>)}</div>}</div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"▶ Track"}</button></div>
           {
             /* Action row */
           }<div style={{
