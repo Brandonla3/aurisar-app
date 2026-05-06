@@ -3996,6 +3996,29 @@ function App() {
     setLiveWorkout(null);
   }
 
+  function handleUpdateLiveEx(i, fields) {
+    setLiveWorkout(lw => {
+      if (!lw) return null;
+      return { ...lw, exercises: lw.exercises.map((e, idx) => idx === i ? { ...e, ...fields, setsDesc: null } : e) };
+    });
+  }
+
+  function handleRemoveLiveEx(i) {
+    setLiveWorkout(lw => {
+      if (!lw) return null;
+      return { ...lw, exercises: lw.exercises.filter((_, idx) => idx !== i) };
+    });
+  }
+
+  function handleAddLiveEx(exId, sets, reps, weightLbs) {
+    const exData = allExById[exId];
+    setLiveWorkout(lw => {
+      if (!lw) return null;
+      const newEx = { exId, name: exData?.name || exId, sets, reps, weightLbs: weightLbs || null, setsDesc: `${sets}×${reps}`, supersetWith: null, done: false };
+      return { ...lw, exercises: [...lw.exercises, newEx] };
+    });
+  }
+
   function openStatsPromptIfNeeded(wo, onConfirm) {
     // Skip stats modal entirely for rest-day-only workouts
     const isRestDayOnly = wo.soloEx && wo._soloExId === "rest_day" || wo.exercises && wo.exercises.length > 0 && wo.exercises.every(e => e.exId === "rest_day");
@@ -5298,7 +5321,7 @@ function App() {
             })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
                   display: "block"
                 }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
