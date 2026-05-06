@@ -68,6 +68,7 @@ const LandingPage = React.lazy(() => import('./components/LandingPage').then(m =
 })));
 const AdminPage = React.lazy(() => import('./components/AdminPage'));
 import PlansTabContainer from './components/PlansTabContainer';
+import LiveWorkoutBanner from './components/LiveWorkoutBanner';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
 // import the TrendsTab module (which would drag recharts into the main chunk)
 // just to read this constant. Keep in sync with TrendsTab.js.
@@ -614,6 +615,10 @@ function App() {
   // Workouts tab
   const [workoutView, setWorkoutView] = useState("list"); // "list"|"detail"|"builder"|"templates"
   const [activeWorkout, setActiveWorkout] = useState(null);
+  const [liveWorkout, setLiveWorkout] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
+  });
+  const [pendingLiveWorkout, setPendingLiveWorkout] = useState(null);
   const [wbName, setWbName] = useState("");
   const [wbIcon, setWbIcon] = useState("💪");
   const [wbIconPickerOpen, setWbIconPickerOpen] = useState(false);
@@ -900,6 +905,20 @@ function App() {
   // demo data to the real signed-in user's Supabase row — that's the bug
   // that lost ~2 weeks of real workout history in April 2026.
   useEffect(() => { setPreviewMode(isPreviewMode); }, [isPreviewMode]);
+  useEffect(() => {
+    if (liveWorkout) {
+      localStorage.setItem('aurisar-live-workout', JSON.stringify(liveWorkout));
+    } else {
+      localStorage.removeItem('aurisar-live-workout');
+    }
+  }, [liveWorkout]);
+  useEffect(() => {
+    const uid = authUser?.id || null;
+    if (liveWorkout && liveWorkout.userId !== uid) {
+      setLiveWorkout(null);
+      localStorage.removeItem('aurisar-live-workout');
+    }
+  }, [authUser?.id]);
   useEffect(() => {
     if (screen === "main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id]) || null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email]) || null);
   }, [profile, screen, isPreviewMode]);
@@ -3934,6 +3953,89 @@ function App() {
     showToast(workout.icon + " " + workout.name + " added to " + plan.name + " ⚔️");
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
+  function _buildLiveExercises(wo) {
+    return (wo.exercises || []).map((ex, i) => {
+      const exData = allExById[ex.exId];
+      const cat = (exData?.category || 'strength').toLowerCase();
+      const rows = [{ sets: ex.sets, reps: ex.reps }, ...(ex.extraRows || [])];
+      const setsDesc = rows.map(r => `${r.sets || '?'}×${r.reps || '?'}`).join(' / ');
+      return {
+        exId: ex.exId,
+        name: exData?.name || ex.exId,
+        category: cat,
+        noSets: NO_SETS_EX_IDS.has(ex.exId),
+        sets: ex.sets, reps: ex.reps,
+        weightLbs: ex.weightLbs || null,
+        extraRows: ex.extraRows || [],
+        setsDesc,
+        supersetWith: (typeof ex.supersetWith === 'number' && ex.supersetWith >= 0) ? ex.supersetWith : null,
+        done: false,
+      };
+    });
+  }
+
+  function startLiveWorkout(wo) {
+    if (liveWorkout && liveWorkout.workoutId !== wo.id) {
+      setPendingLiveWorkout(wo);
+      return;
+    }
+    setLiveWorkout({ workoutId: wo.id, name: wo.name, icon: wo.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(wo), userId: authUser?.id || null });
+  }
+
+  function confirmReplaceLiveWorkout() {
+    setLiveWorkout({ workoutId: pendingLiveWorkout.id, name: pendingLiveWorkout.name, icon: pendingLiveWorkout.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(pendingLiveWorkout), userId: authUser?.id || null });
+    setPendingLiveWorkout(null);
+  }
+
+  function handleToggleLiveEx(i) {
+    setLiveWorkout(lw => lw ? { ...lw, exercises: lw.exercises.map((e, idx) => idx === i ? { ...e, done: !e.done } : e) } : null);
+  }
+
+  function handleFinishLiveWorkout(exercises) {
+    if (!liveWorkout || exercises.length === 0) { setLiveWorkout(null); return; }
+    const filteredWo = {
+      id: liveWorkout.workoutId, name: liveWorkout.name, icon: liveWorkout.icon,
+      exercises: exercises.map(ex => ({ exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null, extraRows: ex.extraRows || [] })),
+      durationMin: null, activeCal: null, totalCal: null,
+    };
+    openStatsPromptIfNeeded(filteredWo, (woWithStats, _sr) => {
+      setCompletionModal({ workout: woWithStats, fromStats: _sr });
+      setCompletionDate(todayStr());
+      setCompletionAction("today");
+    });
+    setLiveWorkout(null);
+  }
+
+  function handleUpdateLiveEx(i, fields) {
+    setLiveWorkout(lw => {
+      if (!lw) return null;
+      return { ...lw, exercises: lw.exercises.map((e, idx) => {
+        if (idx !== i) return e;
+        const merged = { ...e, ...fields };
+        const rows = [{ sets: merged.sets, reps: merged.reps }, ...(merged.extraRows || [])];
+        const setsDesc = rows.map(r => `${r.sets || '?'}×${r.reps || '?'}`).join(' / ');
+        return { ...merged, setsDesc };
+      }) };
+    });
+  }
+
+  function handleRemoveLiveEx(i) {
+    setLiveWorkout(lw => {
+      if (!lw) return null;
+      return { ...lw, exercises: lw.exercises.filter((_, idx) => idx !== i) };
+    });
+  }
+
+  function handleAddLiveEx(exId, sets, reps, weightLbs) {
+    const exData = allExById[exId];
+    const cat = (exData?.category || 'strength').toLowerCase();
+    setLiveWorkout(lw => {
+      if (!lw) return null;
+      const newEx = { exId, name: exData?.name || exId, category: cat, noSets: NO_SETS_EX_IDS.has(exId), sets, reps, weightLbs: weightLbs || null, extraRows: [], setsDesc: `${sets}×${reps}`, supersetWith: null, done: false };
+      return { ...lw, exercises: [...lw.exercises, newEx] };
+    });
+  }
+
   function openStatsPromptIfNeeded(wo, onConfirm) {
     // Skip stats modal entirely for rest-day-only workouts
     const isRestDayOnly = wo.soloEx && wo._soloExId === "rest_day" || wo.exercises && wo.exercises.length > 0 && wo.exercises.every(e => e.exId === "rest_day");
@@ -5122,44 +5224,7 @@ function App() {
     /* ══ MAIN ═══════════════════════════════════ */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
       maxHeight: "100dvh",
       overflow: "hidden"
-    } : {}}><div className={"hud-top"}><div className={"ava"} style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}><ClassIcon classKey={profile.chosenClass} size={26} color={cls.glow} /></div><div className={"hud-info"}><div className={"hud-name"}>{profile.playerName}</div><div className={"hud-sub"}>{cls.name}{profile.gym ? ` · ${profile.gym}` : ""}</div>{(profile.hudFields?.weight || profile.hudFields?.height || profile.hudFields?.bmi) && <div className={"hud-body"}>{profile.hudFields?.weight && profile.weightLbs ? isMetric(profile.units) ? lbsToKg(profile.weightLbs) + " kg" : profile.weightLbs + " lbs" : ""}{profile.hudFields?.weight && profile.weightLbs && profile.hudFields?.height && totalH > 0 ? " · " : ""}{profile.hudFields?.height && totalH > 0 ? isMetric(profile.units) ? ftInToCm(profile.heightFt, profile.heightIn) + " cm" : `${profile.heightFt}'${profile.heightIn}"` : ""}{profile.hudFields?.bmi && bmi ? `${profile.hudFields?.weight || profile.hudFields?.height ? " · " : ""}BMI ${bmi}` : ""}</div>}<div className={"xp-track"}><div className={"xp-fill"} style={{
-              width: `${Math.min(progress, 100)}%`
-            }} /></div><div className={"xp-lbl"}><span>{(profile.xp - curXP).toLocaleString()}{" / "}{formatXP(nxtXP - curXP)}</span><span>{"→ Lv "}{level + 1}</span></div></div><div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: S.s4,
-          position: "relative",
-          flexShrink: 0
-        }}><button className={"btn nav-menu-btn btn-ghost"} style={{
-            position: "relative"
-          }} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{
-              position: "absolute",
-              top: 1,
-              right: 2,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: UI_COLORS.danger,
-              border: "1.5px solid #0c0c0a"
-            }} />}</button><div style={{
-            textAlign: "right"
-          }}><div className={"hud-lv"}>{level}</div><div className={"hud-lv-lbl"}>{"Level"}</div><div style={{
-              fontSize: FS.fs48,
-              color: "#8a8478",
-              textAlign: "right",
-              marginTop: S.s2,
-              letterSpacing: ".03em",
-              fontFamily: "'Inter',sans-serif"
-            }}>{new Date().toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-                year: "numeric"
-              })}</div></div></div></div>
+    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => setActiveTab("profile"))}><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
         /* ══ DROPDOWN MENU — rendered outside hud-top to escape backdrop-filter stacking context ══ */
@@ -5168,13 +5233,6 @@ function App() {
         inset: 0,
         zIndex: 900
       }} />}{navMenuOpen && <div className={"nav-menu-panel"}>{[{
-          icon: "⚔️",
-          label: "Profile",
-          action: () => guardAll(() => {
-            setActiveTab("profile");
-            setNavMenuOpen(false);
-          })
-        }, {
           icon: "📜",
           label: "Plans",
           action: () => guardAll(() => {
@@ -5280,53 +5338,12 @@ function App() {
             })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
                   display: "block"
                 }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}</div></div><div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
         paddingBottom: 0
-      } : {}}>{activeTab === "workout" && <><div className={"hud-checkin-strip"}><span style={{
-              fontSize: "1.05rem"
-            }}>{"🔥"}</span><span style={{
-              fontSize: FS.fs88,
-              fontWeight: 700,
-              color: "#b4ac9e"
-            }}>{profile.checkInStreak}</span><span style={{
-              fontSize: FS.fs58,
-              color: "#8a8478"
-            }}>{"day streak"}</span><div style={{
-              flex: 1
-            }} /><button style={{
-              fontSize: FS.fs50,
-              color: "#8a8478",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 8px"
-            }} onClick={() => {
-              setRetroCheckInModal(true);
-              setRetroDate("");
-            }}>{"↺ Retro"}</button><button style={{
-              fontSize: FS.fs50,
-              color: "#c49428",
-              background: "transparent",
-              border: "1px solid rgba(196,148,40,.2)",
-              borderRadius: R.md,
-              cursor: "pointer",
-              padding: "4px 8px"
-            }} onClick={() => setShowWNMockup(true)}>{"📲 Notification"}</button><button style={{
-              padding: "8px 16px",
-              borderRadius: R.lg,
-              fontSize: FS.fs54,
-              fontWeight: 600,
-              border: "1px solid rgba(180,172,158,.08)",
-              background: "linear-gradient(135deg,rgba(45,42,36,.45),rgba(45,42,36,.3))",
-              color: "#d4cec4",
-              cursor: "pointer",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              letterSpacing: ".04em"
-            }} disabled={profile.lastCheckIn === todayStr()} onClick={doCheckIn}>{profile.lastCheckIn === todayStr() ? "✓ Checked In" : "Check In"}</button></div>
+      } : {}}>{activeTab === "workout" && <>
 
           {
             /* ══ EXERCISES SUB-TAB BAR ══ */
@@ -5633,6 +5650,8 @@ function App() {
             setNewLabelInput={setNewLabelInput}
             activeWorkout={activeWorkout}
             setActiveWorkout={setActiveWorkout}
+            liveWorkout={liveWorkout}
+            startLiveWorkout={startLiveWorkout}
             collapsedWo={collapsedWo}
             setCollapsedWo={setCollapsedWo}
             profile={profile}
@@ -5922,6 +5941,9 @@ function App() {
             toggleNotifPref={toggleNotifPref}
             profileComplete={profileComplete}
             showToast={showToast}
+            doCheckIn={doCheckIn}
+            onOpenRetroCheckIn={() => { setRetroCheckInModal(true); setRetroDate(""); }}
+            onOpenWNMockup={() => setShowWNMockup(true)}
           />
         )}</div> {
         /* scroll-area */
