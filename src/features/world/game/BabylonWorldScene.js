@@ -242,10 +242,10 @@ export class BabylonWorldScene {
 
     // Moon (inverse direction, ramps in at night)
     this._moon.direction.copyFrom(sunDir.scale(-1));
-    this._moon.intensity = lerp(0, 0.45, 1 - dayFactor);
+    this._moon.intensity = lerp(0, 0.65, 1 - dayFactor);
 
     // Fill / ambient
-    this._fill.intensity   = lerp(0.12, 0.40, dayFactor);
+    this._fill.intensity   = lerp(0.18, 0.40, dayFactor);
     this._fill.groundColor = lerpColor3(dn.fillGroundNight, dn.fillGroundDay, dayFactor);
     this.scene.ambientColor = lerpColor3(dn.ambientNight, dn.ambientDay, dayFactor);
 
