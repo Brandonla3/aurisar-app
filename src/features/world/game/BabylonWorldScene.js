@@ -19,9 +19,9 @@ const STDB_CENTER = 1600;
 function toWorld(v) { return (v - STDB_CENTER) / SCALE; }
 function toStdb(v)  { return Math.round(v * SCALE + STDB_CENTER); }
 
-// ── Math helpers (used by day/night cycle) ──────────────────────────────────
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const lerp    = (a, b, t) => a + (b - a) * t;
+// ── Math helpers ────────────────────────────────────────────────────────────
+const clamp01    = (v) => Math.max(0, Math.min(1, v));
+const lerp       = (a, b, t) => a + (b - a) * t;
 const lerpColor3 = (a, b, t) => new BABYLON.Color3(
   lerp(a.r, b.r, t), lerp(a.g, b.g, t), lerp(a.b, b.b, t)
 );
@@ -37,6 +37,452 @@ function classColor(ct) {
   return map[ct] ?? new BABYLON.Color3(0.35, 0.55, 1.0);
 }
 
+// ── LightingManager ──────────────────────────────────────────────────────────
+// Owns all lighting, day/night cycle, zone transitions, and render pipelines.
+// Registered on scene.onBeforeRenderObservable — no per-frame calls needed
+// from the outside.
+
+class LightingManager {
+  /**
+   * @param {BABYLON.Scene} scene
+   * @param {BABYLON.Camera} camera
+   * @param {BABYLON.Engine} engine
+   * @param {object} options
+   */
+  constructor(scene, camera, engine, options = {}) {
+    this.scene  = scene;
+    this.camera = camera;
+    this.engine = engine;
+
+    this.options = {
+      dayLengthSec:  options.dayLengthSec  ?? 900,
+      startTimeOfDay: options.startTimeOfDay ?? 9.0,
+      env: {
+        overworldDay:   options.env?.overworldDay   ?? '/env/overworld_day.env',
+        overworldNight: options.env?.overworldNight ?? '/env/overworld_night.env',
+        dungeon:        options.env?.dungeon        ?? '/env/dungeon_dim.env',
+      },
+      maxDungeonTorches:      options.maxDungeonTorches      ?? 12,
+      maxDungeonMagicAccents: options.maxDungeonMagicAccents ?? 10,
+    };
+
+    this.profile    = 'overworld'; // 'overworld' | 'dungeon'
+    this.combatMode = false;
+    this.timeOfDay  = this.options.startTimeOfDay;
+    this._hoursPerSec = 24 / this.options.dayLengthSec;
+
+    this._transition = null; // { from, to, duration, elapsed }
+    this._disposed   = false;
+
+    this._setupCore();
+    this._setupOverworldRig();
+    this._setupDungeonRig();
+    this._setupPipelines();
+
+    this._setActiveProfileImmediate('overworld');
+    this._observer = this.scene.onBeforeRenderObservable.add(() => this._update());
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  setZone(zone, transitionSec = 1.25) {
+    if (zone !== 'overworld' && zone !== 'dungeon') {
+      console.warn(`[LightingManager] Unknown zone "${zone}"`);
+      return;
+    }
+    if (zone === this.profile && !this._transition) return;
+
+    this._transition = {
+      from:     this.profile,
+      to:       zone,
+      duration: Math.max(0.01, transitionSec),
+      elapsed:  0,
+    };
+  }
+
+  setCombatMode(enabled) { this.combatMode = !!enabled; }
+
+  setTimeOfDay(hours24) { this.timeOfDay = ((hours24 % 24) + 24) % 24; }
+
+  addDungeonTorch(position, opts = {}) {
+    if (this._dungeonTorches.length >= this.options.maxDungeonTorches) {
+      console.warn('[LightingManager] Torch cap reached');
+      return null;
+    }
+    const torch = this._createTorchLight(position, opts);
+    this._dungeonTorches.push(torch);
+    return torch;
+  }
+
+  addDungeonMagicAccent(position, opts = {}) {
+    if (this._dungeonMagic.length >= this.options.maxDungeonMagicAccents) {
+      console.warn('[LightingManager] Magic accent cap reached');
+      return null;
+    }
+    const accent = this._createMagicAccent(position, opts);
+    this._dungeonMagic.push(accent);
+    return accent;
+  }
+
+  clearDungeonLocalLights() {
+    for (const l of this._dungeonTorches) l.dispose();
+    for (const l of this._dungeonMagic)   l.dispose();
+    this._dungeonTorches.length = 0;
+    this._dungeonMagic.length   = 0;
+  }
+
+  dispose() {
+    if (this._disposed) return;
+    this._disposed = true;
+
+    if (this._observer) {
+      this.scene.onBeforeRenderObservable.remove(this._observer);
+      this._observer = null;
+    }
+
+    this.clearDungeonLocalLights();
+
+    [
+      this.key, this.moon, this.fillOverworld,
+      this.fillDungeon, this.bounceDungeon, this.rimCombat,
+    ].forEach(l => l?.dispose());
+
+    this._disposePipeline(this.pipeOverworld);
+    this._disposePipeline(this.pipeDungeon);
+
+    [this.envDay, this.envNight, this.envDungeon].forEach(t => t?.dispose());
+
+    if (this.skybox) this.skybox.dispose();
+  }
+
+  // ── Setup ─────────────────────────────────────────────────────────────────
+
+  _setupCore() {
+    this.scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    this.scene.imageProcessingConfiguration.toneMappingType =
+      BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+
+    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+
+    this.envDay    = BABYLON.CubeTexture.CreateFromPrefilteredData(this.options.env.overworldDay,   this.scene);
+    this.envNight  = BABYLON.CubeTexture.CreateFromPrefilteredData(this.options.env.overworldNight, this.scene);
+    this.envDungeon = BABYLON.CubeTexture.CreateFromPrefilteredData(this.options.env.dungeon,       this.scene);
+
+    this.scene.environmentTexture  = this.envDay;
+    this.scene.environmentIntensity = 0.9;
+
+    this.skybox = this.scene.createDefaultSkybox(this.envDay, true, 1500, 0.35);
+
+    this._dungeonTorches = [];
+    this._dungeonMagic   = [];
+  }
+
+  _setupOverworldRig() {
+    this.key = new BABYLON.DirectionalLight('lm_key', new BABYLON.Vector3(-0.6, -1, -0.35), this.scene);
+    this.key.position  = new BABYLON.Vector3(12, 20, 8);
+    this.key.intensity = 2.2;
+
+    this.moon = new BABYLON.DirectionalLight('lm_moon', new BABYLON.Vector3(0.3, -1, 0.2), this.scene);
+    this.moon.diffuse  = new BABYLON.Color3(0.55, 0.62, 0.9);
+    this.moon.specular = new BABYLON.Color3(0.25, 0.3, 0.45);
+    this.moon.intensity = 0.0;
+
+    this.fillOverworld = new BABYLON.HemisphericLight('lm_fill_overworld', new BABYLON.Vector3(0, 1, 0), this.scene);
+    this.fillOverworld.intensity   = 0.35;
+    this.fillOverworld.groundColor = new BABYLON.Color3(0.2, 0.22, 0.25);
+  }
+
+  _setupDungeonRig() {
+    this.fillDungeon = new BABYLON.HemisphericLight('lm_fill_dungeon', new BABYLON.Vector3(0, 1, 0), this.scene);
+    this.fillDungeon.intensity   = 0.12;
+    this.fillDungeon.diffuse     = new BABYLON.Color3(0.24, 0.27, 0.32);
+    this.fillDungeon.groundColor = new BABYLON.Color3(0.06, 0.05, 0.05);
+
+    this.bounceDungeon = new BABYLON.DirectionalLight('lm_bounce_dungeon', new BABYLON.Vector3(0.3, -1, 0.1), this.scene);
+    this.bounceDungeon.intensity = 0.25;
+    this.bounceDungeon.diffuse   = new BABYLON.Color3(0.34, 0.36, 0.42);
+
+    this.rimCombat = new BABYLON.PointLight('lm_rim_combat', new BABYLON.Vector3(0, 2.2, -2.5), this.scene);
+    this.rimCombat.diffuse   = new BABYLON.Color3(0.6, 0.66, 0.95);
+    this.rimCombat.range     = 12;
+    this.rimCombat.intensity = 0;
+  }
+
+  _setupPipelines() {
+    this.pipeOverworld = new BABYLON.DefaultRenderingPipeline('lm_overworld_pipe', true, this.scene, [this.camera]);
+    this.pipeOverworld.samples        = 4;
+    this.pipeOverworld.fxaaEnabled    = true;
+    this.pipeOverworld.bloomEnabled   = true;
+    this.pipeOverworld.bloomThreshold = 0.88;
+    this.pipeOverworld.bloomWeight    = 0.22;
+    this.pipeOverworld.bloomKernel    = 64;
+    this.pipeOverworld.bloomScale     = 0.5;
+    this.pipeOverworld.sharpenEnabled = true;
+    this.pipeOverworld.sharpen.colorAmount = 0.20;
+    this.pipeOverworld.sharpen.edgeAmount  = 0.15;
+
+    this.pipeDungeon = new BABYLON.DefaultRenderingPipeline('lm_dungeon_pipe', true, this.scene, [this.camera]);
+    this.pipeDungeon.samples        = 4;
+    this.pipeDungeon.fxaaEnabled    = true;
+    this.pipeDungeon.bloomEnabled   = true;
+    this.pipeDungeon.bloomThreshold = 0.90;
+    this.pipeDungeon.bloomWeight    = 0.30;
+    this.pipeDungeon.bloomKernel    = 64;
+    this.pipeDungeon.bloomScale     = 0.5;
+    this.pipeDungeon.sharpenEnabled = true;
+    this.pipeDungeon.sharpen.colorAmount = 0.15;
+    this.pipeDungeon.sharpen.edgeAmount  = 0.10;
+  }
+
+  // ── Frame update ──────────────────────────────────────────────────────────
+
+  _update() {
+    const dt = this.engine.getDeltaTime() / 1000;
+
+    if (this._transition) {
+      this._transition.elapsed += dt;
+      const t = clamp01(this._transition.elapsed / this._transition.duration);
+      if (t >= 1) {
+        this._setActiveProfileImmediate(this._transition.to);
+        this._transition = null;
+      } else {
+        this._blendProfiles(this._transition.from, this._transition.to, t);
+      }
+    } else {
+      if (this.profile === 'overworld') this._updateOverworld(dt);
+      else                               this._updateDungeon();
+    }
+
+    this._updateCombatRim();
+  }
+
+  _updateOverworld(dt) {
+    this.timeOfDay = (this.timeOfDay + dt * this._hoursPerSec) % 24;
+
+    const phase    = this.timeOfDay / 24;
+    const sunTheta = phase * Math.PI * 2 - Math.PI / 2;
+
+    const sunDir = new BABYLON.Vector3(
+      Math.cos(sunTheta) * 0.35,
+      -Math.sin(sunTheta),
+       Math.sin(sunTheta) * 0.65
+    ).normalize();
+
+    this.key.direction.copyFrom(sunDir);
+    this.moon.direction.copyFrom(sunDir.scale(-1));
+
+    const sunHeight = -sunDir.y;
+    const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
+    const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
+
+    this.key.intensity = lerp(0.05, 2.4, dayFactor);
+    this.key.diffuse   = lerpColor3(
+      new BABYLON.Color3(1.0, 0.72, 0.48),
+      new BABYLON.Color3(1.0, 0.97, 0.92),
+      clamp01(dayFactor * 1.25)
+    );
+    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor);
+
+    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor);
+    this.fillOverworld.groundColor = lerpColor3(
+      new BABYLON.Color3(0.05, 0.06, 0.08),
+      new BABYLON.Color3(0.22, 0.24, 0.26),
+      dayFactor
+    );
+
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor);
+    this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
+
+    this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
+    this.scene.fogColor   = lerpColor3(
+      new BABYLON.Color3(0.06, 0.08, 0.12),
+      new BABYLON.Color3(0.74, 0.84, 0.96),
+      dayFactor
+    );
+
+    if (dayFactor > 0.5) {
+      this._setEnvironment(this.envDay,   lerp(0.35, 0.95, dayFactor));
+    } else {
+      this._setEnvironment(this.envNight, lerp(0.25, 0.50, dayFactor));
+    }
+  }
+
+  _updateDungeon() {
+    this.scene.imageProcessingConfiguration.exposure = 0.82;
+    this.scene.imageProcessingConfiguration.contrast = 1.12;
+
+    this.scene.fogDensity = 0.018;
+    this.scene.fogColor   = new BABYLON.Color3(0.06, 0.07, 0.085);
+
+    this._setEnvironment(this.envDungeon, 0.35);
+  }
+
+  _updateCombatRim() {
+    const target = this.camera.getTarget ? this.camera.getTarget() : BABYLON.Vector3.Zero();
+    const camPos = this.camera.globalPosition ?? this.camera.position ?? new BABYLON.Vector3(0, 2, -4);
+    const backDir = target.subtract(camPos).normalize().scale(-1);
+
+    this.rimCombat.position.copyFrom(
+      target.add(backDir.scale(2.5)).add(new BABYLON.Vector3(0, 1.8, 0))
+    );
+
+    const base       = this.combatMode ? 35 : 0;
+    const profileMul = this.profile === 'dungeon' ? 1.15 : 1.0;
+    this.rimCombat.intensity = base * profileMul;
+  }
+
+  // ── Profile switching ─────────────────────────────────────────────────────
+
+  _setActiveProfileImmediate(profile) {
+    this.profile = profile;
+    const overworld = profile === 'overworld';
+
+    this.key.setEnabled(overworld);
+    this.moon.setEnabled(overworld);
+    this.fillOverworld.setEnabled(overworld);
+
+    this.fillDungeon.setEnabled(!overworld);
+    this.bounceDungeon.setEnabled(!overworld);
+
+    this._setPipelineEnabled(this.pipeOverworld, overworld);
+    this._setPipelineEnabled(this.pipeDungeon,  !overworld);
+
+    for (const l of this._dungeonTorches) l.setEnabled(!overworld);
+    for (const l of this._dungeonMagic)   l.setEnabled(!overworld);
+
+    if (overworld) this._updateOverworld(0);
+    else           this._updateDungeon();
+  }
+
+  _blendProfiles(from, to, t) {
+    this.key.setEnabled(true);
+    this.moon.setEnabled(true);
+    this.fillOverworld.setEnabled(true);
+    this.fillDungeon.setEnabled(true);
+    this.bounceDungeon.setEnabled(true);
+
+    const prevProfile = this.profile;
+
+    this.profile = from;
+    if (from === 'overworld') this._updateOverworld(0);
+    else                       this._updateDungeon();
+    const fromState = this._captureState();
+
+    this.profile = to;
+    if (to === 'overworld') this._updateOverworld(0);
+    else                     this._updateDungeon();
+    const toState = this._captureState();
+
+    this.profile = prevProfile;
+
+    this.scene.imageProcessingConfiguration.exposure = lerp(fromState.exposure, toState.exposure, t);
+    this.scene.imageProcessingConfiguration.contrast = lerp(fromState.contrast, toState.contrast, t);
+    this.scene.fogDensity          = lerp(fromState.fogDensity, toState.fogDensity, t);
+    this.scene.fogColor            = lerpColor3(fromState.fogColor, toState.fogColor, t);
+    this.scene.environmentIntensity = lerp(fromState.envIntensity, toState.envIntensity, t);
+
+    const half = t > 0.5;
+    this._setEnvironment(half ? toState.envTex : fromState.envTex, this.scene.environmentIntensity);
+    this._setPipelineEnabled(this.pipeOverworld, (half ? to : from) === 'overworld');
+    this._setPipelineEnabled(this.pipeDungeon,   (half ? to : from) === 'dungeon');
+
+    this.fillOverworld.intensity = lerp(fromState.fillOverworldI, toState.fillOverworldI, t);
+    this.fillDungeon.intensity   = lerp(fromState.fillDungeonI,   toState.fillDungeonI,   t);
+
+    const dungeonActive = (half ? to : from) === 'dungeon';
+    for (const l of this._dungeonTorches) l.setEnabled(dungeonActive);
+    for (const l of this._dungeonMagic)   l.setEnabled(dungeonActive);
+  }
+
+  _captureState() {
+    return {
+      exposure:      this.scene.imageProcessingConfiguration.exposure,
+      contrast:      this.scene.imageProcessingConfiguration.contrast,
+      fogDensity:    this.scene.fogDensity,
+      fogColor:      this.scene.fogColor.clone(),
+      envIntensity:  this.scene.environmentIntensity,
+      envTex:        this.scene.environmentTexture,
+      fillOverworldI: this.fillOverworld.intensity,
+      fillDungeonI:   this.fillDungeon.intensity,
+    };
+  }
+
+  // ── Dungeon local lights ──────────────────────────────────────────────────
+
+  _createTorchLight(position, opts = {}) {
+    const color        = opts.color        ?? new BABYLON.Color3(1.0, 0.58, 0.22);
+    const intensity    = opts.intensity    ?? 35;
+    const range        = opts.range        ?? 11;
+    const flickerSpeed  = opts.flickerSpeed  ?? 8.0;
+    const flickerAmount = opts.flickerAmount ?? 0.18;
+
+    const light = new BABYLON.PointLight(opts.name ?? 'torch', position.clone(), this.scene);
+    light.diffuse   = color;
+    light.specular  = new BABYLON.Color3(0.12, 0.08, 0.04);
+    light.intensity = intensity;
+    light.range     = range;
+    light.setEnabled(this.profile === 'dungeon');
+
+    const phase = Math.random() * Math.PI * 2;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      if (!light.isEnabled()) return;
+      const t = performance.now() * 0.001;
+      const noise =
+        Math.sin(t * flickerSpeed         + phase)       * 0.6 +
+        Math.sin(t * flickerSpeed * 2.37  + phase * 1.7) * 0.4;
+      light.intensity = intensity * (1 + noise * flickerAmount);
+    });
+    light.onDisposeObservable.add(() => this.scene.onBeforeRenderObservable.remove(obs));
+
+    return light;
+  }
+
+  _createMagicAccent(position, opts = {}) {
+    const color       = opts.color       ?? new BABYLON.Color3(0.35, 0.55, 1.0);
+    const intensity   = opts.intensity   ?? 22;
+    const range       = opts.range       ?? 8;
+    const pulseSpeed  = opts.pulseSpeed  ?? 2.0;
+    const pulseAmount = opts.pulseAmount ?? 0.15;
+
+    const light = new BABYLON.PointLight(opts.name ?? 'magicAccent', position.clone(), this.scene);
+    light.diffuse   = color;
+    light.specular  = color.scale(0.5);
+    light.intensity = intensity;
+    light.range     = range;
+    light.setEnabled(this.profile === 'dungeon');
+
+    const phase = Math.random() * Math.PI * 2;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      if (!light.isEnabled()) return;
+      const t = performance.now() * 0.001;
+      light.intensity = intensity * (1 + Math.sin(t * pulseSpeed + phase) * pulseAmount);
+    });
+    light.onDisposeObservable.add(() => this.scene.onBeforeRenderObservable.remove(obs));
+
+    return light;
+  }
+
+  // ── Utils ─────────────────────────────────────────────────────────────────
+
+  _setEnvironment(envTex, intensity) {
+    if (this.scene.environmentTexture !== envTex) {
+      this.scene.environmentTexture = envTex;
+      if (this.skybox?.material?.reflectionTexture) {
+        this.skybox.material.reflectionTexture = envTex;
+      }
+    }
+    this.scene.environmentIntensity = intensity;
+  }
+
+  _setPipelineEnabled(pipe, enabled) { if (pipe) pipe.setEnabled(enabled); }
+  _disposePipeline(pipe)             { if (pipe) pipe.dispose(); }
+}
+
+// ── Dungeon entrance constants ───────────────────────────────────────────────
+const DUNGEON_ENTRANCE      = Object.freeze({ x: 0, z: -37 });
+const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
+const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
+
 // ── Main export ──────────────────────────────────────────────────────────────
 export class BabylonWorldScene {
   constructor(canvas, playerInfo, callbacks) {
@@ -51,6 +497,7 @@ export class BabylonWorldScene {
     this._lastMoving    = false;
     this._lastSentAt    = 0;
     this._chatOpen      = false;
+    this._inDungeon     = false;
 
     this._init();
   }
@@ -66,38 +513,23 @@ export class BabylonWorldScene {
 
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
-    this.scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
-    // Thinner fog now that the day/night cycle drives its color & a real sky
-    // sits behind it. Color is overwritten each frame by _tickDayNight.
-    this.scene.fogDensity = 0.0018;
-    this.scene.fogColor   = new BABYLON.Color3(0.74, 0.84, 0.96);
 
-    // ACES tone-mapping + slight contrast lift for richer PBR response
-    const ip = this.scene.imageProcessingConfiguration;
-    ip.toneMappingEnabled = true;
-    ip.toneMappingType    = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-    ip.exposure           = 1.0;
-    ip.contrast           = 1.08;
+    // Camera must exist before LightingManager — its pipelines need a target
+    this._setupCamera();
 
-    this._setupEnvironment();
-    this._setupLighting();
+    // LightingManager owns all lighting, day/night, env, and render pipelines
+    this._lm = new LightingManager(this.scene, this._camera, this.engine);
+
     this._setupShadows();
-    this._setupDayNight();
+    this._setupSSAO();
 
-    // Lighting profile state (overworld is the default; dungeon disables the
-    // day/night tick and replaces the rig with torches + magic accents).
-    this._lightingProfile = 'overworld';
-    this._torches         = [];
-    this._magicLights     = [];
-    this._dungeonEnv      = null;
     this._buildTerrain();
     this._buildHub();
     this._buildTrees();
     this._buildRocks();
     this._buildPaths();
+    this._buildDungeonEntrance();
     this._buildLocalPlayer();
-    this._setupCamera();
-    this._setupPostProcessing();
     this._bindKeys();
 
     this.engine.runRenderLoop(() => {
@@ -109,94 +541,33 @@ export class BabylonWorldScene {
     window.addEventListener('resize', this._onResize);
   }
 
-  // ── Environment IBL (day + night) ──────────────────────────────────────────
-  // Drop prefiltered .env files at /public/env/overworld_day.env and
-  // /public/env/overworld_night.env. Each is HEAD-checked first because Vite's
-  // SPA fallback returns index.html for missing assets, which Babylon then
-  // logs as "Not a babylon environment map". The day/night cycle handles the
-  // texture swap; if a file is missing the cycle still runs (just no skybox
-  // or IBL contribution from that side).
+  // ── Camera ─────────────────────────────────────────────────────────────────
 
-  _setupEnvironment() {
-    this._envDay   = null;
-    this._envNight = null;
-    this._skybox   = null;
-
-    this._loadEnv('/env/overworld_day.env').then(env => {
-      if (!env || this.engine.isDisposed) return;
-      this._envDay = env;
-      // Bail if the user switched to dungeon while we were waiting on the
-      // network — dungeon owns the env texture/skybox in that case, and
-      // _applyOverworldProfile will pick this up on the way back.
-      if (this._lightingProfile === 'overworld') this._applyOverworldEnv();
-    });
-
-    this._loadEnv('/env/overworld_night.env').then(env => {
-      if (env && !this.engine.isDisposed) this._envNight = env;
-    });
-  }
-
-  _applyOverworldEnv() {
-    if (!this._envDay) return;
-    this.scene.environmentTexture  = this._envDay;
-    this.scene.environmentIntensity = 0.85;
-    if (!this._skybox) {
-      this._skybox = this.scene.createDefaultSkybox(this._envDay, true, 1500, 0.35);
-    } else if (this._skybox.material?.reflectionTexture !== this._envDay) {
-      this._skybox.material.reflectionTexture = this._envDay;
-    }
-  }
-
-  _loadEnv(url) {
-    return fetch(url, { method: 'HEAD' })
-      .then(r => {
-        const ct = r.headers.get('content-type') ?? '';
-        if (!r.ok || ct.includes('text/html')) return null;
-        return BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
-      })
-      .catch(() => null);
-  }
-
-  // ── Lighting (3-point RPG rig) ─────────────────────────────────────────────
-
-  _setupLighting() {
-    // Key light (sun) — primary directional, also the shadow source
-    const key = new BABYLON.DirectionalLight(
-      'key', new BABYLON.Vector3(-0.6, -1.0, -0.35), this.scene
+  _setupCamera() {
+    const cam = new BABYLON.ArcRotateCamera(
+      'cam',
+      -Math.PI / 2,  // alpha: behind player
+      Math.PI / 3.5, // beta: ~51 deg elevation
+      6.5,           // radius
+      new BABYLON.Vector3(0, 1.2, 0),
+      this.scene
     );
-    key.position  = new BABYLON.Vector3(12, 20, 8);
-    key.intensity = 2.2;
-    key.diffuse   = new BABYLON.Color3(0.95, 0.88, 0.75);
-    this._keyLight = key;
-
-    // Fill — cool hemispheric to lift shadows. Intensity + groundColor are
-    // animated each frame by the day/night cycle. Diffuse is set once here
-    // and the dungeon profile mutates it, so we capture the overworld value
-    // for restore on profile switch back.
-    const fill = new BABYLON.HemisphericLight(
-      'fill', new BABYLON.Vector3(0, 1, 0), this.scene
-    );
-    fill.intensity   = 0.35;
-    fill.diffuse     = new BABYLON.Color3(0.70, 0.75, 0.95);
-    fill.groundColor = new BABYLON.Color3(0.15, 0.18, 0.22);
-    this._fill                = fill;
-    this._fillDiffuseDefault  = fill.diffuse.clone();
-
-    // Rim — cool point light for silhouette readability in combat. Stored so
-    // the dungeon profile can disable it (we use torches/magic accents there).
-    const rim = new BABYLON.PointLight(
-      'rim', new BABYLON.Vector3(-2, 2.2, -2.5), this.scene
-    );
-    rim.diffuse   = new BABYLON.Color3(0.55, 0.62, 0.95);
-    rim.intensity = 50;
-    rim.range     = 10;
-    this._rim = rim;
+    cam.lowerRadiusLimit     = 2.5;
+    cam.upperRadiusLimit     = 22;
+    cam.lowerBetaLimit       = 0.25;
+    cam.upperBetaLimit       = Math.PI / 2.1;
+    cam.wheelPrecision       = 60;
+    cam.wheelDeltaPercentage = 0.01;
+    cam.panningSensibility   = 0;
+    cam.minZ                 = 0.1;
+    cam.attachControl(this.canvas, true);
+    this._camera = cam;
   }
 
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
-    const sg = new BABYLON.ShadowGenerator(2048, this._keyLight);
+    const sg = new BABYLON.ShadowGenerator(2048, this._lm.key);
     sg.useBlurExponentialShadowMap = true;
     sg.blurKernel  = 24;
     sg.bias        = 0.0005;
@@ -208,251 +579,49 @@ export class BabylonWorldScene {
     if (this._shadowGen && mesh) this._shadowGen.addShadowCaster(mesh, true);
   }
 
-  // ── Day / night cycle ──────────────────────────────────────────────────────
-  // Drives sun direction/color, moon, fill, ambient, fog, exposure/contrast,
-  // and (when env files are present) the skybox + IBL swap. Default cycle is
-  // 15 in-game minutes per real second... no wait — 24 in-game hours per 15
-  // real minutes, starting at 09:00.
+  // ── SSAO ───────────────────────────────────────────────────────────────────
 
-  _setupDayNight() {
-    this._timeOfDay    = 9.0;
-    this._dayLengthSec = 900;          // real seconds for a full 24h cycle
-    this._hoursPerSec  = 24 / this._dayLengthSec;
-
-    const moon = new BABYLON.DirectionalLight(
-      'moon', new BABYLON.Vector3(0.3, -1.0, 0.2), this.scene
-    );
-    moon.intensity = 0;
-    moon.diffuse   = new BABYLON.Color3(0.55, 0.62, 0.90);
-    moon.specular  = new BABYLON.Color3(0.25, 0.30, 0.45);
-    this._moon = moon;
-
-    this._dayNight = {
-      sunDay:           new BABYLON.Color3(1.00, 0.97, 0.92),
-      sunSunset:        new BABYLON.Color3(1.00, 0.72, 0.48),
-      ambientDay:       new BABYLON.Color3(0.62, 0.70, 0.80),
-      ambientNight:     new BABYLON.Color3(0.10, 0.13, 0.20),
-      fogDay:           new BABYLON.Color3(0.74, 0.84, 0.96),
-      fogNight:         new BABYLON.Color3(0.06, 0.08, 0.12),
-      fillGroundDay:    new BABYLON.Color3(0.22, 0.24, 0.26),
-      fillGroundNight:  new BABYLON.Color3(0.05, 0.06, 0.08),
-    };
+  _setupSSAO() {
+    if (this.engine.webGLVersion < 2) return;
+    try {
+      const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
+        ssaoRatio: 0.5, blurRatio: 1.0,
+      });
+      ssao.radius        = 2.0;
+      ssao.base          = 0.05;
+      ssao.totalStrength = 0.9;
+      this.scene.postProcessRenderPipelineManager
+        .attachCamerasToRenderPipeline('ssao2', this._camera);
+      this._ssao = ssao;
+    } catch (_) { /* SSAO2 unavailable — skip silently */ }
   }
 
-  _tickDayNight(dtMs) {
-    const dn = this._dayNight;
-    if (!dn) return;
-
-    this._timeOfDay = (this._timeOfDay + (dtMs / 1000) * this._hoursPerSec) % 24;
-
-    // Sun phase: 0 at midnight, 0.5 at noon
-    const phase    = this._timeOfDay / 24;
-    const sunTheta = phase * Math.PI * 2 - Math.PI / 2;
-    const sunDir   = new BABYLON.Vector3(
-      Math.cos(sunTheta) * 0.35,
-      -Math.sin(sunTheta),
-       Math.sin(sunTheta) * 0.65
-    ).normalize();
-
-    this._keyLight.direction.copyFrom(sunDir);
-
-    const sunHeight = -sunDir.y;                                          // >0 above horizon
-    const dayFactor = clamp01((sunHeight + 0.08) / 0.22);                 // smooth dawn/dusk
-    const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
-
-    // Sun
-    this._keyLight.intensity = lerp(0.05, 2.4, dayFactor);
-    this._keyLight.diffuse   = lerpColor3(dn.sunSunset, dn.sunDay, clamp01(dayFactor * 1.25));
-
-    // Moon (inverse direction, ramps in at night)
-    this._moon.direction.copyFrom(sunDir.scale(-1));
-    this._moon.intensity = lerp(0, 0.65, 1 - dayFactor);
-
-    // Fill / ambient
-    this._fill.intensity   = lerp(0.18, 0.40, dayFactor);
-    this._fill.groundColor = lerpColor3(dn.fillGroundNight, dn.fillGroundDay, dayFactor);
-    this.scene.ambientColor = lerpColor3(dn.ambientNight, dn.ambientDay, dayFactor);
-
-    // Image processing (slightly warmer contrast at sunset)
-    const ip = this.scene.imageProcessingConfiguration;
-    ip.exposure = lerp(0.65, 1.05, dayFactor);
-    ip.contrast = lerp(1.03, 1.10, sunset);
-
-    // Fog
-    this.scene.fogColor = lerpColor3(dn.fogNight, dn.fogDay, dayFactor);
-
-    // Env + skybox (hard switch at noon/midnight; only swaps when env loaded)
-    if (dayFactor > 0.5) {
-      if (this._envDay && this.scene.environmentTexture !== this._envDay) {
-        this.scene.environmentTexture = this._envDay;
-        if (this._skybox?.material) this._skybox.material.reflectionTexture = this._envDay;
-      }
-      this.scene.environmentIntensity = lerp(0.35, 0.95, dayFactor);
-    } else {
-      if (this._envNight && this.scene.environmentTexture !== this._envNight) {
-        this.scene.environmentTexture = this._envNight;
-        if (this._skybox?.material) this._skybox.material.reflectionTexture = this._envNight;
-      }
-      this.scene.environmentIntensity = lerp(0.25, 0.50, dayFactor);
-    }
-  }
-
-  // ── Lighting profile switcher ──────────────────────────────────────────────
-  // Public entry point. `'overworld'` re-enables the day/night cycle; `'dungeon'`
-  // freezes it and reconfigures the rig with low ambient + warm torch points
-  // (with flicker) + cool magic accents and denser fog.
+  // ── Lighting profile (public compatibility wrapper) ────────────────────────
 
   setLightingProfile(profile) {
-    if (profile === this._lightingProfile) return;
-    this._teardownProfile();
-    this._lightingProfile = profile;
-    if (profile === 'dungeon')   this._applyDungeonProfile();
-    else                          this._applyOverworldProfile();
+    const zone = profile === 'dungeon' ? 'dungeon' : 'overworld';
+    this._inDungeon = zone === 'dungeon';
+    this._lm.setZone(zone);
   }
 
-  _teardownProfile() {
-    this._torches.forEach(({ light, observer }) => {
-      this.scene.onBeforeRenderObservable.remove(observer);
-      light.dispose();
-    });
-    this._torches = [];
-    this._magicLights.forEach(({ light, observer }) => {
-      this.scene.onBeforeRenderObservable.remove(observer);
-      light.dispose();
-    });
-    this._magicLights = [];
-    if (this._dungeonEnv) {
-      this._dungeonEnv.dispose();
-      this._dungeonEnv = null;
+  // ── Dungeon proximity trigger ──────────────────────────────────────────────
+
+  _checkDungeonProximity() {
+    if (!this._local) return;
+    const { x, z } = this._local.root.position;
+    const dx = x - DUNGEON_ENTRANCE.x;
+    const dz = z - DUNGEON_ENTRANCE.z;
+    const distSq = dx * dx + dz * dz;
+
+    if (!this._inDungeon && distSq < DUNGEON_ENTER_DIST_SQ) {
+      this._inDungeon = true;
+      this._lm.setZone('dungeon', 1.25);
+      this.callbacks.onZoneChange?.('dungeon');
+    } else if (this._inDungeon && distSq > DUNGEON_EXIT_DIST_SQ) {
+      this._inDungeon = false;
+      this._lm.setZone('overworld', 1.25);
+      this.callbacks.onZoneChange?.('overworld');
     }
-  }
-
-  _applyOverworldProfile() {
-    const scene = this.scene;
-    scene.clearColor   = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
-    scene.fogDensity   = 0.0018;
-    // Restore fill.diffuse — the dungeon profile mutates it and the day/night
-    // cycle only drives intensity + groundColor, so without this the cool
-    // grey-blue dungeon tint would persist into overworld.
-    this._fill.diffuse = this._fillDiffuseDefault.clone();
-    this._rim.setEnabled(true);
-    this._moon.setEnabled(true);
-    if (this._envDay) {
-      // Handles the case where envDay finished loading while we were in
-      // dungeon — _setupEnvironment skipped the scene mutation back then.
-      this._applyOverworldEnv();
-    } else {
-      scene.environmentTexture = null;
-    }
-    // Day/night cycle resumes on the next _tick and re-drives key/fill/moon,
-    // ambient, fog color, exposure and contrast.
-  }
-
-  _applyDungeonProfile() {
-    const scene = this.scene;
-    scene.clearColor   = new BABYLON.Color4(0.03, 0.035, 0.045, 1);
-    scene.ambientColor = new BABYLON.Color3(0.06, 0.07, 0.09);
-    scene.fogDensity   = 0.018;
-    scene.fogColor     = new BABYLON.Color3(0.06, 0.07, 0.085);
-
-    const ip = scene.imageProcessingConfiguration;
-    ip.exposure = 0.82;
-    ip.contrast = 1.12;
-
-    // Repurpose the key directional as a soft "bounce" so unlit faces stay
-    // readable without flooding the scene.
-    this._keyLight.direction.copyFromFloats(0.3, -1.0, 0.1);
-    this._keyLight.intensity = 0.25;
-    this._keyLight.diffuse   = new BABYLON.Color3(0.34, 0.36, 0.42);
-
-    // Soft global fill, cool top / warm-ish ground
-    this._fill.intensity   = 0.12;
-    this._fill.diffuse     = new BABYLON.Color3(0.24, 0.27, 0.32);
-    this._fill.groundColor = new BABYLON.Color3(0.06, 0.05, 0.05);
-
-    // Disable overworld-only lights
-    this._moon.setEnabled(false);
-    this._rim.setEnabled(false);
-
-    // Optional dungeon IBL (HEAD-checked; reflections still matter for metals)
-    this._loadEnv('/env/dungeon_dim.env').then(env => {
-      // Bail if the user already switched back before the load resolved.
-      if (!env || this._lightingProfile !== 'dungeon') {
-        if (env) env.dispose();
-        return;
-      }
-      this._dungeonEnv          = env;
-      scene.environmentTexture  = env;
-      scene.environmentIntensity = 0.35;
-    });
-
-    // Warm torches at the four pillar caps
-    [[-8, -8], [8, -8], [-8, 8], [8, 8]].forEach(([x, z], i) => {
-      this._torches.push(this._createTorchLight(
-        new BABYLON.Vector3(x, 5.0, z),
-        { name: `torch${i}` }
-      ));
-    });
-
-    // Cool magic accent on the obelisk gem
-    this._magicLights.push(this._createMagicAccent(
-      new BABYLON.Vector3(0, 11, 0),
-      { name: 'magicGem', intensity: 18, range: 10,
-        color: new BABYLON.Color3(0.40, 0.50, 1.00) }
-    ));
-  }
-
-  _createTorchLight(position, opts = {}) {
-    const {
-      color         = new BABYLON.Color3(1.0, 0.58, 0.22),
-      intensity     = 35,
-      range         = 11,
-      flickerSpeed  = 8.0,
-      flickerAmount = 0.18,
-      name          = 'torch',
-    } = opts;
-
-    const light = new BABYLON.PointLight(name, position.clone(), this.scene);
-    light.diffuse   = color;
-    light.specular  = new BABYLON.Color3(0.12, 0.08, 0.04);
-    light.intensity = intensity;
-    light.range     = range;
-
-    const phase = Math.random() * Math.PI * 2;
-    const observer = this.scene.onBeforeRenderObservable.add(() => {
-      const t = performance.now() * 0.001;
-      const noise =
-        Math.sin(t * flickerSpeed         + phase)       * 0.6 +
-        Math.sin(t * flickerSpeed * 2.37  + phase * 1.7) * 0.4;
-      light.intensity = intensity * (1 + noise * flickerAmount);
-    });
-
-    return { light, observer };
-  }
-
-  _createMagicAccent(position, opts = {}) {
-    const {
-      color       = new BABYLON.Color3(0.35, 0.55, 1.0),
-      intensity   = 22,
-      range       = 8,
-      pulseSpeed  = 2.0,
-      pulseAmount = 0.15,
-      name        = 'magicAccent',
-    } = opts;
-
-    const light = new BABYLON.PointLight(name, position.clone(), this.scene);
-    light.diffuse   = color;
-    light.specular  = color.scale(0.5);
-    light.intensity = intensity;
-    light.range     = range;
-
-    const phase = Math.random() * Math.PI * 2;
-    const observer = this.scene.onBeforeRenderObservable.add(() => {
-      const t = performance.now() * 0.001;
-      light.intensity = intensity * (1.0 + Math.sin(t * pulseSpeed + phase) * pulseAmount);
-    });
-
-    return { light, observer };
   }
 
   // ── Terrain ────────────────────────────────────────────────────────────────
@@ -463,8 +632,8 @@ export class BabylonWorldScene {
     }, this.scene);
     const m = this._stdMat('groundMat', new BABYLON.Color3(0.18, 0.30, 0.12));
     m.specularColor = new BABYLON.Color3(0, 0, 0);
-    ground.material        = m;
-    ground.receiveShadows  = true;
+    ground.material       = m;
+    ground.receiveShadows = true;
   }
 
   // ── Hub ────────────────────────────────────────────────────────────────────
@@ -476,8 +645,8 @@ export class BabylonWorldScene {
     const plat = BABYLON.MeshBuilder.CreateCylinder('platform', {
       diameter: 22, height: 0.6, tessellation: 12,
     }, this.scene);
-    plat.position.y = 0.3;
-    plat.material   = stone;
+    plat.position.y     = 0.3;
+    plat.material       = stone;
     plat.receiveShadows = true;
     this._castShadow(plat);
 
@@ -518,9 +687,16 @@ export class BabylonWorldScene {
     gemMat.emissiveColor = new BABYLON.Color3(0.15, 0.35, 0.9);
     gem.material = gemMat;
 
-    this._createMagicAccent(new BABYLON.Vector3(0, 11, 0), {
-      name: 'gemLight', intensity: 22, range: 20,
-      color: new BABYLON.Color3(0.3, 0.5, 1.0),
+    // Gem glow — always-on, independent of zone profile
+    const gemLight = new BABYLON.PointLight('gemLight', new BABYLON.Vector3(0, 11, 0), this.scene);
+    gemLight.diffuse   = new BABYLON.Color3(0.3, 0.5, 1.0);
+    gemLight.specular  = new BABYLON.Color3(0.15, 0.25, 0.5);
+    gemLight.intensity = 22;
+    gemLight.range     = 20;
+    const gPhase = Math.random() * Math.PI * 2;
+    this.scene.onBeforeRenderObservable.add(() => {
+      const t = performance.now() * 0.001;
+      gemLight.intensity = 22 * (1.0 + Math.sin(t * 2.0 + gPhase) * 0.15);
     });
   }
 
@@ -596,6 +772,66 @@ export class BabylonWorldScene {
     });
   }
 
+  // ── Dungeon entrance ───────────────────────────────────────────────────────
+  // Gate sits at the end of the north path (z = -37). Two stone pillars, a
+  // lintel, and a faintly pulsing portal plane mark the trigger zone.
+
+  _buildDungeonEntrance() {
+    const { x, z } = DUNGEON_ENTRANCE;
+
+    const stone = this._stdMat('dunGate', new BABYLON.Color3(0.32, 0.30, 0.38));
+
+    // Pillars
+    const pL = BABYLON.MeshBuilder.CreateBox('dunPillarL', { width: 0.9, height: 5.2, depth: 0.9 }, this.scene);
+    pL.position.set(x - 2.1, 2.6, z);
+    pL.material = stone;
+    this._castShadow(pL);
+
+    const pR = BABYLON.MeshBuilder.CreateBox('dunPillarR', { width: 0.9, height: 5.2, depth: 0.9 }, this.scene);
+    pR.position.set(x + 2.1, 2.6, z);
+    pR.material = stone;
+    this._castShadow(pR);
+
+    // Lintel
+    const lintel = BABYLON.MeshBuilder.CreateBox('dunLintel', { width: 5.1, height: 0.75, depth: 0.9 }, this.scene);
+    lintel.position.set(x, 5.575, z);
+    lintel.material = stone;
+    this._castShadow(lintel);
+
+    // Portal plane — emissive, slightly transparent
+    const portalMat = new BABYLON.StandardMaterial('dunPortalMat', this.scene);
+    portalMat.diffuseColor    = new BABYLON.Color3(0.15, 0.10, 0.35);
+    portalMat.emissiveColor   = new BABYLON.Color3(0.20, 0.10, 0.55);
+    portalMat.alpha           = 0.45;
+    portalMat.backFaceCulling = false;
+
+    const portal = BABYLON.MeshBuilder.CreatePlane('dunPortal', { width: 3.3, height: 4.8 }, this.scene);
+    portal.position.set(x, 2.6, z);
+    portal.material = portalMat;
+
+    // Pulsing accent light in the gateway
+    const gLight = new BABYLON.PointLight('dunGateLight', new BABYLON.Vector3(x, 2.5, z), this.scene);
+    gLight.diffuse   = new BABYLON.Color3(0.35, 0.20, 0.85);
+    gLight.intensity = 18;
+    gLight.range     = 9;
+    const gPhase = Math.random() * Math.PI * 2;
+    this.scene.onBeforeRenderObservable.add(() => {
+      const t = performance.now() * 0.001;
+      const pulse = 1 + Math.sin(t * 1.8 + gPhase) * 0.20;
+      gLight.intensity = 18 * pulse;
+      portalMat.emissiveColor = new BABYLON.Color3(
+        0.20 + Math.sin(t * 1.5 + gPhase) * 0.05,
+        0.10,
+        0.55 + Math.sin(t * 1.8 + gPhase) * 0.10
+      );
+    });
+
+    // Floating label
+    const labelRoot = new BABYLON.TransformNode('dunEntranceLabelRoot', this.scene);
+    labelRoot.position.set(x, 6.8, z);
+    this._makeLabel('dunEntrance', 'Dungeon Entrance', labelRoot);
+  }
+
   // ── Local player ───────────────────────────────────────────────────────────
 
   _buildLocalPlayer() {
@@ -605,74 +841,8 @@ export class BabylonWorldScene {
     this._local.root.position.set(0, 0, 0);
   }
 
-  // ── Camera ─────────────────────────────────────────────────────────────────
-
-  _setupCamera() {
-    const cam = new BABYLON.ArcRotateCamera(
-      'cam',
-      -Math.PI / 2,  // alpha: behind player
-      Math.PI / 3.5, // beta: ~51 deg elevation
-      6.5,           // radius
-      new BABYLON.Vector3(0, 1.2, 0),
-      this.scene
-    );
-    cam.lowerRadiusLimit     = 2.5;
-    cam.upperRadiusLimit     = 22;
-    cam.lowerBetaLimit       = 0.25;
-    cam.upperBetaLimit       = Math.PI / 2.1;
-    cam.wheelPrecision       = 60;
-    cam.wheelDeltaPercentage = 0.01;
-    cam.panningSensibility   = 0;
-    cam.minZ                 = 0.1;
-    cam.attachControl(this.canvas, true);
-    this._camera = cam;
-  }
-
-  // ── Post-processing ────────────────────────────────────────────────────────
-  // DefaultRenderingPipeline: MSAA + mild bloom for magic/highlights, FXAA to
-  // tame shimmer, light sharpen. SSAO2 layered on top for grounding contact
-  // shadows; gated on a WebGL2 context so it skips on legacy fallback.
-
-  _setupPostProcessing() {
-    const pipe = new BABYLON.DefaultRenderingPipeline(
-      'rpgPipe', true, this.scene, [this._camera]
-    );
-    pipe.samples = 4;
-
-    pipe.bloomEnabled   = true;
-    pipe.bloomThreshold = 0.88;
-    pipe.bloomWeight    = 0.25;
-    pipe.bloomKernel    = 64;
-    pipe.bloomScale     = 0.5;
-
-    pipe.fxaaEnabled    = true;
-
-    pipe.sharpenEnabled = true;
-    pipe.sharpen.colorAmount = 0.2;
-    pipe.sharpen.edgeAmount  = 0.15;
-
-    this._pipeline = pipe;
-
-    // SSAO2 requires WebGL2 — guard before creating to avoid console errors
-    // on contexts that fell back to WebGL1.
-    if (this.engine.webGLVersion >= 2) {
-      try {
-        const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
-          ssaoRatio: 0.5, blurRatio: 1.0,
-        });
-        ssao.radius        = 2.0;
-        ssao.base          = 0.05;
-        ssao.totalStrength = 0.9;
-        this.scene.postProcessRenderPipelineManager
-          .attachCamerasToRenderPipeline('ssao2', this._camera);
-        this._ssao = ssao;
-      } catch (_) { /* SSAO2 unavailable — skip silently */ }
-    }
-  }
-
-  // ── PBR character material template ────────────────────────────────────────
-  // Helper for when humanoids get authored albedo/normal/ORM textures. ORM is
-  // the glTF-standard packed map: R=AO, G=Roughness, B=Metallic.
+  // ── Post-processing (PBR character material template) ──────────────────────
+  // Helper for when humanoids get authored albedo/normal/ORM textures.
 
   _createCharacterPBR(name, texBasePath) {
     const mat = new BABYLON.PBRMaterial(name, this.scene);
@@ -709,11 +879,12 @@ export class BabylonWorldScene {
   // ── Per-frame ──────────────────────────────────────────────────────────────
 
   _tick() {
-    const dt = this.engine.getDeltaTime();
-    if (this._lightingProfile === 'overworld') this._tickDayNight(dt);
+    // LightingManager self-updates via scene.onBeforeRenderObservable
     if (!this._local) return;
 
+    const dt = this.engine.getDeltaTime();
     this._moveLocal(dt);
+    this._checkDungeonProximity();
     this._animate(this._local, dt);
     this._trackCamera();
     this._syncStdb();
@@ -737,9 +908,9 @@ export class BabylonWorldScene {
 
     // alpha points FROM target TO camera, so add PI to get the true forward direction
     const speed = 0.012;
-    const alpha = this._camera.alpha + Math.PI;
-    const fwd   = new BABYLON.Vector3(Math.cos(alpha), 0, Math.sin(alpha));
-    const right = new BABYLON.Vector3(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2));
+    const alpha  = this._camera.alpha + Math.PI;
+    const fwd    = new BABYLON.Vector3(Math.cos(alpha), 0, Math.sin(alpha));
+    const right  = new BABYLON.Vector3(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2));
 
     const dir = BABYLON.Vector3.Zero();
     if (w) dir.addInPlace(fwd);
@@ -869,7 +1040,6 @@ export class BabylonWorldScene {
   // ── Class-specific gear ────────────────────────────────────────────────────
 
   _addClassGear(id, classType, root) {
-    // Helper: create a named StandardMaterial
     const mat = (name, r, g, b) => {
       const m = new BABYLON.StandardMaterial(`${id}_${name}`, this.scene);
       m.diffuseColor  = new BABYLON.Color3(r, g, b);
@@ -877,7 +1047,6 @@ export class BabylonWorldScene {
       return m;
     };
 
-    // Helper: create a mesh (box / cylinder / sphere), position, parent to root
     const mesh = (name, opts, px, py, pz, material, rx = 0, ry = 0, rz = 0) => {
       let n;
       if (opts.cyl)      n = BABYLON.MeshBuilder.CreateCylinder(`${id}_${name}`, opts.cyl, this.scene);
@@ -897,13 +1066,10 @@ export class BabylonWorldScene {
       case 'warrior': {
         const steel  = mat('steel',  0.58, 0.60, 0.65);
         const silver = mat('silver', 0.80, 0.82, 0.88);
-        // Helmet
         mesh('helm',  { box: { width: 0.50, height: 0.22, depth: 0.46 } },  0,     1.90,  0,    steel);
         mesh('visor', { box: { width: 0.36, height: 0.07, depth: 0.06 } },  0,     1.78,  0.23, steel);
-        // Pauldrons
         mesh('padL',  { box: { width: 0.30, height: 0.14, depth: 0.30 } }, -0.50,  1.38,  0,    steel);
         mesh('padR',  { box: { width: 0.30, height: 0.14, depth: 0.30 } },  0.50,  1.38,  0,    steel);
-        // Sword blade + crossguard
         mesh('blade', { box: { width: 0.07, height: 0.72, depth: 0.03 } },  0.60,  0.70,  0,    silver);
         mesh('guard', { box: { width: 0.26, height: 0.05, depth: 0.06 } },  0.60,  1.07,  0,    steel);
         break;
@@ -916,10 +1082,8 @@ export class BabylonWorldScene {
         const orbMat   = new BABYLON.StandardMaterial(`${id}_orb`, this.scene);
         orbMat.diffuseColor  = new BABYLON.Color3(0.55, 0.25, 1.00);
         orbMat.emissiveColor = new BABYLON.Color3(0.35, 0.15, 0.80);
-        // Hat brim + cone
         mesh('brim',  { cyl: { diameter: 0.72, height: 0.06, tessellation: 10 } },           0, 1.87, 0, hatMat);
         mesh('cone',  { cyl: { diameterTop: 0, diameterBottom: 0.52, height: 0.70, tessellation: 8 } }, 0, 2.27, 0, hatMat);
-        // Staff shaft + glowing orb
         mesh('shaft', { cyl: { diameter: 0.058, height: 1.55, tessellation: 6 } }, -0.56, 0.86, 0, staffMat);
         mesh('orb',   { sph: { diameter: 0.22, segments: 6 } },                    -0.56, 1.68, 0, orbMat);
         break;
@@ -929,16 +1093,13 @@ export class BabylonWorldScene {
       case 'archer': {
         const leatherMat = mat('lth', 0.38, 0.24, 0.10);
         const bowMat     = mat('bow', 0.50, 0.32, 0.12);
-        // Hood (squashed sphere)
         const hood = BABYLON.MeshBuilder.CreateSphere(`${id}_hood`, { diameter: 0.52, segments: 6 }, this.scene);
         hood.scaling.y = 0.70;
         hood.position.set(0, 1.70, 0);
         hood.material = leatherMat;
         hood.parent   = root;
         this._castShadow(hood);
-        // Quiver on back
         mesh('quiv',  { cyl: { diameter: 0.13, height: 0.50, tessellation: 6 } }, 0.10, 1.20, -0.22, leatherMat, 0.28);
-        // Bow — two angled limb cylinders + center grip
         mesh('limbT', { cyl: { diameter: 0.045, height: 0.46, tessellation: 5 } }, -0.62, 1.30, 0, bowMat,  0.36);
         mesh('limbB', { cyl: { diameter: 0.045, height: 0.46, tessellation: 5 } }, -0.62, 0.78, 0, bowMat, -0.36);
         mesh('grip',  { cyl: { diameter: 0.062, height: 0.20, tessellation: 5 } }, -0.62, 1.04, 0, leatherMat);
@@ -949,10 +1110,8 @@ export class BabylonWorldScene {
       case 'rogue': {
         const capMat    = mat('cap',    0.10, 0.10, 0.12);
         const daggerMat = mat('dagger', 0.80, 0.82, 0.86);
-        // Cap crown + brim
         mesh('crown', { cyl: { diameterTop: 0.38, diameterBottom: 0.44, height: 0.18, tessellation: 8 } }, 0, 1.88, 0, capMat);
         mesh('cbrim', { cyl: { diameter: 0.56, height: 0.05, tessellation: 8 } },                          0, 1.80, 0, capMat);
-        // Dual daggers at hips
         mesh('dagL',  { box: { width: 0.055, height: 0.36, depth: 0.030 } }, -0.44, 0.64, -0.12, daggerMat, 0.3);
         mesh('dagR',  { box: { width: 0.055, height: 0.36, depth: 0.030 } },  0.44, 0.64, -0.12, daggerMat, 0.3);
         break;
@@ -1052,7 +1211,7 @@ export class BabylonWorldScene {
     window.removeEventListener('keyup',   this._ku);
     window.removeEventListener('resize',  this._onResize);
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
-    this._teardownProfile?.();
+    this._lm?.dispose();
     this.engine.stopRenderLoop();
     this.engine.dispose();
   }
