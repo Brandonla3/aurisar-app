@@ -5726,7 +5726,7 @@ function App() {
           />
         )
 
-        /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} /></div>
+        /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
 
         /* ── CALENDAR TAB ────────────────────── */}{activeTab === "calendar" && (
           <CalendarTab
