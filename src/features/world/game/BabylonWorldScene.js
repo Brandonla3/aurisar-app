@@ -63,7 +63,16 @@ export class BabylonWorldScene {
     this.scene.fogDensity = 0.006;
     this.scene.fogColor   = new BABYLON.Color3(0.12, 0.16, 0.26);
 
+    // ACES tone-mapping + slight contrast lift for richer PBR response
+    const ip = this.scene.imageProcessingConfiguration;
+    ip.toneMappingEnabled = true;
+    ip.toneMappingType    = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+    ip.exposure           = 1.0;
+    ip.contrast           = 1.08;
+
+    this._setupEnvironment();
     this._setupLighting();
+    this._setupShadows();
     this._buildTerrain();
     this._buildHub();
     this._buildTrees();
@@ -71,6 +80,7 @@ export class BabylonWorldScene {
     this._buildPaths();
     this._buildLocalPlayer();
     this._setupCamera();
+    this._setupPostProcessing();
     this._bindKeys();
 
     this.engine.runRenderLoop(() => {
@@ -82,18 +92,67 @@ export class BabylonWorldScene {
     window.addEventListener('resize', this._onResize);
   }
 
-  // ── Lighting ───────────────────────────────────────────────────────────────
+  // ── Environment IBL ────────────────────────────────────────────────────────
+  // Drop a prefiltered .env file at /public/textures/studio_small_08_2k.env to
+  // light PBR materials and (optionally) render an environment skybox. We HEAD
+  // it first because Vite's SPA fallback serves index.html for missing assets,
+  // which Babylon then logs as "Not a babylon environment map".
+
+  _setupEnvironment() {
+    const url = '/textures/studio_small_08_2k.env';
+    fetch(url, { method: 'HEAD' })
+      .then(r => {
+        const ct = r.headers.get('content-type') ?? '';
+        if (!r.ok || ct.includes('text/html')) return;
+        const env = BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
+        this.scene.environmentTexture  = env;
+        this.scene.environmentIntensity = 0.85;
+        this.scene.createDefaultSkybox(env, true, 1000, 0.3);
+      })
+      .catch(() => { /* offline or network error — keep solid clear color */ });
+  }
+
+  // ── Lighting (3-point RPG rig) ─────────────────────────────────────────────
 
   _setupLighting() {
-    const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), this.scene);
-    hemi.intensity   = 0.55;
-    hemi.groundColor = new BABYLON.Color3(0.06, 0.08, 0.12);
-    hemi.diffuse     = new BABYLON.Color3(0.70, 0.75, 0.95);
+    // Key light (sun) — primary directional, also the shadow source
+    const key = new BABYLON.DirectionalLight(
+      'key', new BABYLON.Vector3(-0.6, -1.0, -0.35), this.scene
+    );
+    key.position  = new BABYLON.Vector3(12, 20, 8);
+    key.intensity = 2.2;
+    key.diffuse   = new BABYLON.Color3(0.95, 0.88, 0.75);
+    this._keyLight = key;
 
-    const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-1, -2.5, -1), this.scene);
-    sun.intensity = 0.75;
-    sun.diffuse   = new BABYLON.Color3(0.95, 0.88, 0.75);
-    sun.specular  = new BABYLON.Color3(0.15, 0.15, 0.15);
+    // Fill — cool hemispheric to lift shadows
+    const fill = new BABYLON.HemisphericLight(
+      'fill', new BABYLON.Vector3(0, 1, 0), this.scene
+    );
+    fill.intensity   = 0.35;
+    fill.groundColor = new BABYLON.Color3(0.15, 0.18, 0.22);
+
+    // Rim — cool point light for silhouette readability in combat
+    const rim = new BABYLON.PointLight(
+      'rim', new BABYLON.Vector3(-2, 2.2, -2.5), this.scene
+    );
+    rim.diffuse   = new BABYLON.Color3(0.55, 0.62, 0.95);
+    rim.intensity = 50;
+    rim.range     = 10;
+  }
+
+  // ── Shadows ────────────────────────────────────────────────────────────────
+
+  _setupShadows() {
+    const sg = new BABYLON.ShadowGenerator(2048, this._keyLight);
+    sg.useBlurExponentialShadowMap = true;
+    sg.blurKernel  = 24;
+    sg.bias        = 0.0005;
+    sg.normalBias  = 0.02;
+    this._shadowGen = sg;
+  }
+
+  _castShadow(mesh) {
+    if (this._shadowGen && mesh) this._shadowGen.addShadowCaster(mesh, true);
   }
 
   // ── Terrain ────────────────────────────────────────────────────────────────
@@ -104,7 +163,8 @@ export class BabylonWorldScene {
     }, this.scene);
     const m = this._stdMat('groundMat', new BABYLON.Color3(0.18, 0.30, 0.12));
     m.specularColor = new BABYLON.Color3(0, 0, 0);
-    ground.material = m;
+    ground.material        = m;
+    ground.receiveShadows  = true;
   }
 
   // ── Hub ────────────────────────────────────────────────────────────────────
@@ -118,6 +178,8 @@ export class BabylonWorldScene {
     }, this.scene);
     plat.position.y = 0.3;
     plat.material   = stone;
+    plat.receiveShadows = true;
+    this._castShadow(plat);
 
     [[-8, -8], [8, -8], [-8, 8], [8, 8]].forEach(([x, z], i) => {
       const p = BABYLON.MeshBuilder.CreateBox(`p${i}`, {
@@ -125,12 +187,14 @@ export class BabylonWorldScene {
       }, this.scene);
       p.position.set(x, 2.6, z);
       p.material = stone;
+      this._castShadow(p);
 
       const cap = BABYLON.MeshBuilder.CreateCylinder(`cap${i}`, {
         diameter: 1.6, height: 0.5, tessellation: 8,
       }, this.scene);
       cap.position.set(x, 4.85, z);
       cap.material = stone;
+      this._castShadow(cap);
     });
 
     const ob = BABYLON.MeshBuilder.CreateBox('obelisk', {
@@ -138,12 +202,14 @@ export class BabylonWorldScene {
     }, this.scene);
     ob.position.set(0, 4.6, 0);
     ob.material = dark;
+    this._castShadow(ob);
 
     const tip = BABYLON.MeshBuilder.CreateCylinder('obeliskTip', {
       diameterTop: 0, diameterBottom: 1.6, height: 2, tessellation: 4,
     }, this.scene);
     tip.position.set(0, 9.6, 0);
     tip.material = dark;
+    this._castShadow(tip);
 
     const gem = BABYLON.MeshBuilder.CreateSphere('gem', { diameter: 0.9, segments: 8 }, this.scene);
     gem.position.set(0, 11, 0);
@@ -181,6 +247,7 @@ export class BabylonWorldScene {
       }, this.scene);
       trunk.position.set(x, h / 2, z);
       trunk.material = trunkMat;
+      this._castShadow(trunk);
 
       [[0, r * 1.4, leafA], [1.5, r, leafB]].forEach(([yOff, diam, mat], j) => {
         const c = BABYLON.MeshBuilder.CreateCylinder(`leaf${i}_${j}`, {
@@ -188,6 +255,7 @@ export class BabylonWorldScene {
         }, this.scene);
         c.position.set(x, h + yOff, z);
         c.material = mat;
+        this._castShadow(c);
       });
     });
   }
@@ -208,6 +276,7 @@ export class BabylonWorldScene {
       rock.scaling.y  = 0.55;
       rock.rotation.y = i * 0.9;
       rock.material   = mat;
+      this._castShadow(rock);
     });
   }
 
@@ -247,14 +316,79 @@ export class BabylonWorldScene {
       new BABYLON.Vector3(0, 1.2, 0),
       this.scene
     );
-    cam.lowerRadiusLimit   = 2.5;
-    cam.upperRadiusLimit   = 22;
-    cam.lowerBetaLimit     = 0.25;
-    cam.upperBetaLimit     = Math.PI / 2.1;
-    cam.wheelPrecision     = 60;
-    cam.panningSensibility = 0;
+    cam.lowerRadiusLimit     = 2.5;
+    cam.upperRadiusLimit     = 22;
+    cam.lowerBetaLimit       = 0.25;
+    cam.upperBetaLimit       = Math.PI / 2.1;
+    cam.wheelPrecision       = 60;
+    cam.wheelDeltaPercentage = 0.01;
+    cam.panningSensibility   = 0;
+    cam.minZ                 = 0.1;
     cam.attachControl(this.canvas, true);
     this._camera = cam;
+  }
+
+  // ── Post-processing ────────────────────────────────────────────────────────
+  // DefaultRenderingPipeline: MSAA + mild bloom for magic/highlights, FXAA to
+  // tame shimmer, light sharpen. SSAO2 layered on top for grounding contact
+  // shadows; gated on a WebGL2 context so it skips on legacy fallback.
+
+  _setupPostProcessing() {
+    const pipe = new BABYLON.DefaultRenderingPipeline(
+      'rpgPipe', true, this.scene, [this._camera]
+    );
+    pipe.samples = 4;
+
+    pipe.bloomEnabled   = true;
+    pipe.bloomThreshold = 0.88;
+    pipe.bloomWeight    = 0.25;
+    pipe.bloomKernel    = 64;
+    pipe.bloomScale     = 0.5;
+
+    pipe.fxaaEnabled    = true;
+
+    pipe.sharpenEnabled = true;
+    pipe.sharpen.colorAmount = 0.2;
+    pipe.sharpen.edgeAmount  = 0.15;
+
+    this._pipeline = pipe;
+
+    // SSAO2 requires WebGL2 — guard before creating to avoid console errors
+    // on contexts that fell back to WebGL1.
+    if (this.engine.webGLVersion >= 2) {
+      try {
+        const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
+          ssaoRatio: 0.5, blurRatio: 1.0,
+        });
+        ssao.radius        = 2.0;
+        ssao.base          = 0.05;
+        ssao.totalStrength = 0.9;
+        this.scene.postProcessRenderPipelineManager
+          .attachCamerasToRenderPipeline('ssao2', this._camera);
+        this._ssao = ssao;
+      } catch (_) { /* SSAO2 unavailable — skip silently */ }
+    }
+  }
+
+  // ── PBR character material template ────────────────────────────────────────
+  // Helper for when humanoids get authored albedo/normal/ORM textures. ORM is
+  // the glTF-standard packed map: R=AO, G=Roughness, B=Metallic.
+
+  _createCharacterPBR(name, texBasePath) {
+    const mat = new BABYLON.PBRMaterial(name, this.scene);
+    mat.albedoTexture   = new BABYLON.Texture(`${texBasePath}/albedo.png`, this.scene);
+    mat.bumpTexture     = new BABYLON.Texture(`${texBasePath}/normal.png`, this.scene);
+    mat.metallicTexture = new BABYLON.Texture(`${texBasePath}/orm.png`, this.scene);
+    mat.useAmbientOcclusionFromMetallicTextureRed = true;
+    mat.useRoughnessFromMetallicTextureGreen      = true;
+    mat.useMetallnessFromMetallicTextureBlue      = true;
+    mat.roughness            = 1.0;
+    mat.metallic             = 1.0;
+    mat.environmentIntensity = 1.0;
+    mat.indexOfRefraction    = 1.5;
+    mat.albedoColor          = BABYLON.Color3.White();
+    mat.backFaceCulling      = true;
+    return mat;
   }
 
   // ── Input ──────────────────────────────────────────────────────────────────
@@ -413,6 +547,7 @@ export class BabylonWorldScene {
       m.position.set(px, py, pz);
       m.material = mat ?? bodyMat;
       m.parent   = root;
+      this._castShadow(m);
       return m;
     };
 
@@ -451,6 +586,7 @@ export class BabylonWorldScene {
       if (rx || ry || rz) n.rotation.set(rx, ry, rz);
       n.material = material;
       n.parent   = root;
+      this._castShadow(n);
       return n;
     };
 
@@ -498,6 +634,7 @@ export class BabylonWorldScene {
         hood.position.set(0, 1.70, 0);
         hood.material = leatherMat;
         hood.parent   = root;
+        this._castShadow(hood);
         // Quiver on back
         mesh('quiv',  { cyl: { diameter: 0.13, height: 0.50, tessellation: 6 } }, 0.10, 1.20, -0.22, leatherMat, 0.28);
         // Bow — two angled limb cylinders + center grip
