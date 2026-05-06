@@ -1744,17 +1744,24 @@
     .lw-ex-item-wrap{display:flex;flex-direction:column}
     .lw-dots-btn{background:transparent;border:none;color:#8a8478;font-size:.95rem;letter-spacing:.08em;cursor:pointer;padding:4px 6px;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:color .15s,background .15s;line-height:1}
     .lw-dots-btn:active,.lw-dots-btn.active{color:#d4cec4;background:rgba(180,172,158,.08)}
-    .lw-ex-edit{background:rgba(28,28,20,.55);border:1px solid rgba(180,172,158,.09);border-radius:0 0 8px 8px;padding:10px 12px 12px;margin-bottom:2px;animation:lwEditOpen .16s ease}
+    .lw-ex-edit{background:rgba(20,20,14,.6);border:1px solid rgba(180,172,158,.09);border-top:none;border-radius:0 0 8px 8px;padding:8px 10px 10px;margin-bottom:2px;animation:lwEditOpen .16s ease}
     @keyframes lwEditOpen{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-    .lw-ex-edit-fields{display:flex;gap:8px;margin-bottom:10px}
-    .lw-ex-edit-field{display:flex;flex-direction:column;gap:4px;flex:1}
-    .lw-ex-edit-lbl{font-size:.56rem;color:#8a8478;text-transform:uppercase;letter-spacing:.07em}
-    .lw-ex-edit-inp{background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.1);border-radius:6px;padding:6px 8px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;width:100%;outline:none;-webkit-appearance:none;appearance:none;text-align:center}
+    .lw-ex-edit-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(45,42,36,.18)}
+    .lw-ex-edit-row:first-child{padding-top:2px}
+    .lw-ex-edit-row-extra .lw-ex-edit-inp{background:rgba(45,42,36,.25)}
+    .lw-ex-edit-row-lbl{font-family:'Cinzel',serif;font-size:.54rem;color:#8a8478;letter-spacing:.06em;min-width:18px;flex-shrink:0}
+    .lw-ex-edit-col-hdr{font-size:.54rem;color:#8a8478;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px;text-align:center}
+    .lw-ex-edit-cell{display:flex;flex-direction:column;flex:1;min-width:0}
+    .lw-ex-edit-spacer{flex:1}
+    .lw-ex-edit-inp{background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.1);border-radius:6px;padding:5px 4px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;width:100%;outline:none;-webkit-appearance:none;appearance:none;text-align:center}
     .lw-ex-edit-inp:focus{border-color:rgba(180,172,158,.22)}
-    .lw-ex-edit-actions{display:flex;align-items:center;gap:10px}
-    .lw-ex-edit-save{flex:1}
-    .lw-ex-edit-remove{background:transparent;border:none;color:#c0392b;font-size:.72rem;cursor:pointer;padding:4px 6px;-webkit-tap-highlight-color:transparent;letter-spacing:.03em}
-    .lw-ex-edit-remove:active{color:#e74c3c}
+    .lw-ex-edit-row-remove{background:transparent;border:none;color:#666;font-size:.7rem;cursor:pointer;padding:4px 5px;flex-shrink:0;-webkit-tap-highlight-color:transparent;align-self:center}
+    .lw-ex-edit-row-remove:active{color:#c0392b}
+    .lw-add-row-btn{width:100%;background:transparent;border:1px dashed rgba(180,172,158,.1);border-radius:6px;padding:6px;color:#8a8478;font-size:.68rem;letter-spacing:.03em;cursor:pointer;margin-top:6px;-webkit-tap-highlight-color:transparent;transition:all .15s}
+    .lw-add-row-btn:active{background:rgba(45,42,36,.3);color:#b4ac9e}
+    .lw-ex-edit-actions{display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:8px}
+    .lw-ex-edit-remove-ex{background:transparent;border:none;color:#c0392b;font-size:.7rem;cursor:pointer;padding:4px 2px;-webkit-tap-highlight-color:transparent}
+    .lw-ex-edit-remove-ex:active{opacity:.7}
 
     /* ── Add exercise ── */
     .lw-add-ex-wrap{padding:12px 0 4px}

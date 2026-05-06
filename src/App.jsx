@@ -3949,14 +3949,17 @@ function App() {
   function _buildLiveExercises(wo) {
     return (wo.exercises || []).map((ex, i) => {
       const exData = allExById[ex.exId];
-      const rows = [{ sets: ex.sets, reps: ex.reps }];
-      (ex.extraRows || []).forEach(row => rows.push({ sets: row.sets ?? ex.sets, reps: row.reps ?? ex.reps }));
-      const setsDesc = rows.map(r => `${r.sets}×${r.reps}`).join(' / ');
+      const cat = (exData?.category || 'strength').toLowerCase();
+      const rows = [{ sets: ex.sets, reps: ex.reps }, ...(ex.extraRows || [])];
+      const setsDesc = rows.map(r => `${r.sets || '?'}×${r.reps || '?'}`).join(' / ');
       return {
         exId: ex.exId,
         name: exData?.name || ex.exId,
+        category: cat,
+        noSets: NO_SETS_EX_IDS.has(ex.exId),
         sets: ex.sets, reps: ex.reps,
         weightLbs: ex.weightLbs || null,
+        extraRows: ex.extraRows || [],
         setsDesc,
         supersetWith: (typeof ex.supersetWith === 'number' && ex.supersetWith >= 0) ? ex.supersetWith : null,
         done: false,
@@ -3985,7 +3988,7 @@ function App() {
     if (!liveWorkout || exercises.length === 0) { setLiveWorkout(null); return; }
     const filteredWo = {
       id: liveWorkout.workoutId, name: liveWorkout.name, icon: liveWorkout.icon,
-      exercises: exercises.map(ex => ({ exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null })),
+      exercises: exercises.map(ex => ({ exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null, extraRows: ex.extraRows || [] })),
       durationMin: null, activeCal: null, totalCal: null,
     };
     openStatsPromptIfNeeded(filteredWo, (woWithStats, _sr) => {
@@ -3999,7 +4002,13 @@ function App() {
   function handleUpdateLiveEx(i, fields) {
     setLiveWorkout(lw => {
       if (!lw) return null;
-      return { ...lw, exercises: lw.exercises.map((e, idx) => idx === i ? { ...e, ...fields, setsDesc: null } : e) };
+      return { ...lw, exercises: lw.exercises.map((e, idx) => {
+        if (idx !== i) return e;
+        const merged = { ...e, ...fields };
+        const rows = [{ sets: merged.sets, reps: merged.reps }, ...(merged.extraRows || [])];
+        const setsDesc = rows.map(r => `${r.sets || '?'}×${r.reps || '?'}`).join(' / ');
+        return { ...merged, setsDesc };
+      }) };
     });
   }
 
@@ -4012,9 +4021,10 @@ function App() {
 
   function handleAddLiveEx(exId, sets, reps, weightLbs) {
     const exData = allExById[exId];
+    const cat = (exData?.category || 'strength').toLowerCase();
     setLiveWorkout(lw => {
       if (!lw) return null;
-      const newEx = { exId, name: exData?.name || exId, sets, reps, weightLbs: weightLbs || null, setsDesc: `${sets}×${reps}`, supersetWith: null, done: false };
+      const newEx = { exId, name: exData?.name || exId, category: cat, noSets: NO_SETS_EX_IDS.has(exId), sets, reps, weightLbs: weightLbs || null, extraRows: [], setsDesc: `${sets}×${reps}`, supersetWith: null, done: false };
       return { ...lw, exercises: [...lw.exercises, newEx] };
     });
   }
