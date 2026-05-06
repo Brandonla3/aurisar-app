@@ -5,7 +5,8 @@
       "name": "aurisar-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 5180
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
