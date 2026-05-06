@@ -301,7 +301,10 @@ export class BabylonWorldScene {
       light.dispose();
     });
     this._torches = [];
-    this._magicLights.forEach(l => l.dispose());
+    this._magicLights.forEach(({ light, observer }) => {
+      this.scene.onBeforeRenderObservable.remove(observer);
+      light.dispose();
+    });
     this._magicLights = [];
     if (this._dungeonEnv) {
       this._dungeonEnv.dispose();
@@ -372,14 +375,11 @@ export class BabylonWorldScene {
     });
 
     // Cool magic accent on the obelisk gem
-    const magic = new BABYLON.PointLight(
-      'magicGem', new BABYLON.Vector3(0, 11, 0), scene
-    );
-    magic.diffuse  = new BABYLON.Color3(0.40, 0.50, 1.00);
-    magic.specular = new BABYLON.Color3(0.40, 0.50, 0.80);
-    magic.intensity = 18;
-    magic.range     = 10;
-    this._magicLights.push(magic);
+    this._magicLights.push(this._createMagicAccent(
+      new BABYLON.Vector3(0, 11, 0),
+      { name: 'magicGem', intensity: 18, range: 10,
+        color: new BABYLON.Color3(0.40, 0.50, 1.00) }
+    ));
   }
 
   _createTorchLight(position, opts = {}) {
@@ -405,6 +405,31 @@ export class BabylonWorldScene {
         Math.sin(t * flickerSpeed         + phase)       * 0.6 +
         Math.sin(t * flickerSpeed * 2.37  + phase * 1.7) * 0.4;
       light.intensity = intensity * (1 + noise * flickerAmount);
+    });
+
+    return { light, observer };
+  }
+
+  _createMagicAccent(position, opts = {}) {
+    const {
+      color       = new BABYLON.Color3(0.35, 0.55, 1.0),
+      intensity   = 22,
+      range       = 8,
+      pulseSpeed  = 2.0,
+      pulseAmount = 0.15,
+      name        = 'magicAccent',
+    } = opts;
+
+    const light = new BABYLON.PointLight(name, position.clone(), this.scene);
+    light.diffuse   = color;
+    light.specular  = color.scale(0.5);
+    light.intensity = intensity;
+    light.range     = range;
+
+    const phase = Math.random() * Math.PI * 2;
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      const t = performance.now() * 0.001;
+      light.intensity = intensity * (1.0 + Math.sin(t * pulseSpeed + phase) * pulseAmount);
     });
 
     return { light, observer };
@@ -473,10 +498,10 @@ export class BabylonWorldScene {
     gemMat.emissiveColor = new BABYLON.Color3(0.15, 0.35, 0.9);
     gem.material = gemMat;
 
-    const light = new BABYLON.PointLight('gemLight', new BABYLON.Vector3(0, 11, 0), this.scene);
-    light.diffuse   = new BABYLON.Color3(0.3, 0.5, 1.0);
-    light.intensity = 2.5;
-    light.range     = 20;
+    this._createMagicAccent(new BABYLON.Vector3(0, 11, 0), {
+      name: 'gemLight', intensity: 22, range: 20,
+      color: new BABYLON.Color3(0.3, 0.5, 1.0),
+    });
   }
 
   // ── Trees ──────────────────────────────────────────────────────────────────
