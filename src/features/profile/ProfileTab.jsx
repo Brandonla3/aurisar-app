@@ -3,7 +3,7 @@ import { calcBMI, xpToLevel } from '../../utils/xp';
 import { isMetric, lbsToKg, kgToLbs, ftInToCm, cmToFtIn } from '../../utils/units';
 import { S, R, FS } from '../../utils/tokens';
 import { UI_COLORS, QUESTS, EX_BY_ID } from '../../data/constants';
-import { _optionalChain } from '../../utils/helpers';
+import { _optionalChain, todayStr } from '../../utils/helpers';
 import { CLASSES } from '../../data/exercises';
 import { ClassIcon } from '../../components/ClassIcon';
 
@@ -82,6 +82,9 @@ const ProfileTab = memo(function ProfileTab({
   toggleNotifPref,
   profileComplete,
   showToast,
+  doCheckIn,
+  onOpenRetroCheckIn,
+  onOpenWNMockup,
 }) {
   const totalH = (parseInt(profile.heightFt) || 0) * 12 + (parseInt(profile.heightIn) || 0);
   const bmi = calcBMI(profile.weightLbs, totalH);
@@ -120,7 +123,9 @@ return (
       openEdit();
     }}>{"Edit"}</button></div>
 
-  /* Action buttons */}<div style={{
+  /* Check-in strip */}<div style={{display:"flex",alignItems:"center",gap:S.s8,marginBottom:S.s10,padding:"8px 12px",background:"rgba(45,42,36,.18)",borderRadius:R.r10,border:"1px solid rgba(180,172,158,.07)"}}><span style={{flex:1,fontSize:FS.sm,color:"#b4ac9e"}}>{"🔥 "}<span style={{fontWeight:700}}>{profile.checkInStreak}</span>{" day streak"}</span><button className={"btn btn-ghost btn-sm"} style={{fontSize:FS.fs52,padding:"4px 8px",color:"#8a8478"}} onClick={onOpenRetroCheckIn}>{"↺ Retro"}</button><button className={"btn btn-ghost btn-sm"} style={{fontSize:FS.fs52,padding:"4px 8px",color:"#8a8478"}} onClick={onOpenWNMockup}>{"📲"}</button><button className={"btn btn-gold btn-sm"} style={{fontSize:FS.fs58,padding:"4px 10px"}} disabled={profile.lastCheckIn === todayStr()} onClick={doCheckIn}>{profile.lastCheckIn === todayStr() ? "✓ Checked In" : "Check In"}</button></div>
+
+  {/* Action buttons */}<div style={{
     display: "flex",
     gap: S.s8,
     marginBottom: S.s12

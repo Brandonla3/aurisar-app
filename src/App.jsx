@@ -913,6 +913,13 @@ function App() {
     }
   }, [liveWorkout]);
   useEffect(() => {
+    const uid = authUser?.id || null;
+    if (liveWorkout && liveWorkout.userId !== uid) {
+      setLiveWorkout(null);
+      localStorage.removeItem('aurisar-live-workout');
+    }
+  }, [authUser?.id]);
+  useEffect(() => {
     if (screen === "main" && !isPreviewMode) doSave(profile, _optionalChain([authUser, 'optionalAccess', _28 => _28.id]) || null, _optionalChain([authUser, 'optionalAccess', _29 => _29.email]) || null);
   }, [profile, screen, isPreviewMode]);
 
@@ -3972,11 +3979,11 @@ function App() {
       setPendingLiveWorkout(wo);
       return;
     }
-    setLiveWorkout({ workoutId: wo.id, name: wo.name, icon: wo.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(wo) });
+    setLiveWorkout({ workoutId: wo.id, name: wo.name, icon: wo.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(wo), userId: authUser?.id || null });
   }
 
   function confirmReplaceLiveWorkout() {
-    setLiveWorkout({ workoutId: pendingLiveWorkout.id, name: pendingLiveWorkout.name, icon: pendingLiveWorkout.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(pendingLiveWorkout) });
+    setLiveWorkout({ workoutId: pendingLiveWorkout.id, name: pendingLiveWorkout.name, icon: pendingLiveWorkout.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(pendingLiveWorkout), userId: authUser?.id || null });
     setPendingLiveWorkout(null);
   }
 
@@ -5934,6 +5941,9 @@ function App() {
             toggleNotifPref={toggleNotifPref}
             profileComplete={profileComplete}
             showToast={showToast}
+            doCheckIn={doCheckIn}
+            onOpenRetroCheckIn={() => { setRetroCheckInModal(true); setRetroDate(""); }}
+            onOpenWNMockup={() => setShowWNMockup(true)}
           />
         )}</div> {
         /* scroll-area */
