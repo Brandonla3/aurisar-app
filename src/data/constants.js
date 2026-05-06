@@ -1204,7 +1204,7 @@ const TYPE_COLORS = {
 // tokenization layer for class-based styling.
 const UI_COLORS = {
   success:      "#2ecc71", // positive actions, beginner difficulty, cardio category
-  danger:       "#e74c3c", // destructive actions, advanced difficulty, strength category
+  danger:       "#ff5252", // destructive actions, advanced difficulty, strength category
   warning:      "#FFE87C", // pace boost highlight, accent emphasis
   info:         "#2980b9", // informational text, message UI fallback
   intermediate: "#f1c40f", // intermediate difficulty
