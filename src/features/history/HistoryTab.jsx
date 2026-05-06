@@ -141,14 +141,15 @@ const HistoryTab = memo(function HistoryTab({
 
   // ── EXERCISES sub-tab ────────────────────────────────────────
   function ExercisesTab() {
+    const standaloneEntries = logWithIdx.filter(e => !e.sourceWorkoutId && !e.sourcePlanId);
     const groups = {};
-    logWithIdx.forEach(e => {
+    standaloneEntries.forEach(e => {
       const dk = e.dateKey || e.date || "Unknown";
       if (!groups[dk]) groups[dk] = [];
       groups[dk].push(e);
     });
     const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-    return <>{logWithIdx.length === 0 && <div className={"empty"}>{"No battles logged yet."}<br />{"Begin your training."}</div>}{sortedKeys.map(dk => {
+    return <>{standaloneEntries.length === 0 && <div className={"empty"}>{"No standalone exercises logged yet."}<br />{"Exercises from workouts and plans appear in their own tabs."}</div>}{sortedKeys.map(dk => {
         const entries = groups[dk];
         const groupXP = entries.reduce((s, e) => s + e.xp, 0);
         const displayDate = _optionalChain([entries, 'access', _141 => _141[0], 'optionalAccess', _142 => _142.date]) || dk;
@@ -396,7 +397,7 @@ const HistoryTab = memo(function HistoryTab({
             }}><defs><linearGradient id={"cg5"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs><polyline points={"3,5 7,9 11,5"} stroke={"url(#cg5)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></div>{!collapsed && <div className={"log-group-body"}>{entries.map((e, i) => <EntryRow key={i} e={e} showSource={false} />)}</div>}</div>;
       })}</>;
   }
-  return <><div className={"sec"}>{"Battle Record — "}{profile.log.length}{" sessions · "}{formatXP(profile.xp)}{" total"}</div><div className={"log-subtab-bar"}>{[["exercises", "⚔️ Exercises"], ["workouts", "💪 Workouts"], ["plans", "📋 Plans"], ["trends", "📊 Trends"], ["deleted", "🗑 Deleted"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${logSubTab === t ? "on" : ""}`} onClick={() => setLogSubTab(t)}>{l}{t === "deleted" && (profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length > 0 && <span style={{
+  return <><div className={"sec"}>{"Battle Record — "}{profile.log.length}{" sessions · "}{formatXP(profile.xp)}{" total"}</div><div className={"log-subtab-bar"}>{[["exercises", "⚔️ Exercises"], ["workouts", "💪 Workouts"], ["trends", "📊 Trends"], ["deleted", "🗑 Deleted"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${logSubTab === t ? "on" : ""}`} onClick={() => setLogSubTab(t)}>{l}{t === "deleted" && (profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length > 0 && <span style={{
           marginLeft: S.s4,
           background: "#8a8478",
           color: "#fff",
@@ -407,7 +408,7 @@ const HistoryTab = memo(function HistoryTab({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center"
-        }}>{(profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length}</span>}</button>)}</div>{logSubTab === "exercises" && <ExercisesTab />}{logSubTab === "workouts" && <WorkoutsTab />}{logSubTab === "plans" && <PlansTab />}{logSubTab === "trends" && lazyMount(<TrendsTab log={profile.log} allExById={allExById} clsColor={clsColor} units={profile.units} chartOrder={profile.chartOrder || DEFAULT_CHART_ORDER} onChartOrderChange={order => setProfile(p => ({
+        }}>{(profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length}</span>}</button>)}</div>{logSubTab === "exercises" && <ExercisesTab />}{logSubTab === "workouts" && <WorkoutsTab />}{logSubTab === "trends" && lazyMount(<TrendsTab log={profile.log} allExById={allExById} clsColor={clsColor} units={profile.units} chartOrder={profile.chartOrder || DEFAULT_CHART_ORDER} onChartOrderChange={order => setProfile(p => ({
       ...p,
       chartOrder: order
     }))} workouts={profile.workouts} plans={profile.plans} />)}{logSubTab === "deleted" && (() => {

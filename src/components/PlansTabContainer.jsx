@@ -3,7 +3,7 @@ import { PLAN_TEMPLATES, HR_ZONES, NO_SETS_EX_IDS, RUNNING_EX_ID, UI_COLORS, QUE
 import { CLASSES } from '../data/exercises';
 import { _optionalChain, uid, todayStr } from '../utils/helpers';
 import { isMetric, lbsToKg, kgToLbs, miToKm, weightLabel, pctToSlider, sliderToPct } from '../utils/units';
-import { calcPlanXP, calcDayXP, calcExXP, hrRange, checkQuestCompletion } from '../utils/xp';
+import { calcPlanXP, calcDayXP, calcExXP, hrRange, checkQuestCompletion, calcExercisePBs, getMuscleColor } from '../utils/xp';
 import { formatXP } from '../utils/format';
 import { S, FS, R } from '../utils/tokens';
 
@@ -81,6 +81,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     onStatsPrompt, onOpenExEditor,
     setXpFlash, applyAutoCheckIn,
     pendingOpen, onPendingOpenDone,
+    setRetroEditModal,
   } = props;
 
   const [planView, setPlanView] = useState("list");
@@ -95,6 +96,10 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
   const [wizardTemplatePlan, setWizardTemplatePlan] = useState(null);
   const [dragDetailExIdx, setDragDetailExIdx] = useState(null);
   const [collapsedDetailEx, setCollapsedDetailEx] = useState({});
+  const [openHistLogGroups, setOpenHistLogGroups] = useState({});
+  function toggleHistLogGroup(gid) {
+    setOpenHistLogGroups(s => ({ ...s, [gid]: !s[gid] }));
+  }
 
   useImperativeHandle(ref, () => ({
     openBuilder: initBuilderFromTemplate,
@@ -295,6 +300,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
       <div style={{ display: "flex", gap: S.s8, marginBottom: S.s14, flexWrap: "wrap" }}>
         <button className={"btn btn-gold btn-sm"} onClick={initBuilderScratch}>{"＋ New Plan"}</button>
         <button className={"btn btn-ghost btn-sm"} onClick={() => setPlanView("recipe-pick")}>{"📋 Recipes"}</button>
+        <button className={"btn btn-ghost btn-sm"} onClick={() => setPlanView("historical")}>{"📜 History"}</button>
       </div>
 
       {/* Upcoming scheduled exercises */}
@@ -627,6 +633,97 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
             {plan.custom && <button className={"btn btn-glass"} style={{ width: "100%", marginTop: S.s8 }} onClick={() => startPlanWorkout(plan)}>{"📋 Mark Plan Complete"}</button>}
           </>;
         })()}
+      </>;
+    })()}
+
+    {planView === "historical" && (() => {
+      const logWithIdx = profile.log.map((e, i) => ({ ...e, _idx: i }));
+      const grouped = {};
+      logWithIdx.forEach(e => {
+        if (!e.sourcePlanId) return;
+        const gid = e.sourceGroupId || e.sourcePlanId;
+        if (!grouped[gid]) grouped[gid] = [];
+        grouped[gid].push(e);
+      });
+      const sortedGroups = Object.values(grouped).sort((a, b) => {
+        const da = _optionalChain([a, 'access', _a => _a[0], 'optionalAccess', _b => _b.dateKey]) || "";
+        const db = _optionalChain([b, 'access', _c => _c[0], 'optionalAccess', _d => _d.dateKey]) || "";
+        return db.localeCompare(da);
+      });
+      return <>
+        <div style={{ display: "flex", alignItems: "center", gap: S.s8, marginBottom: S.s12 }}>
+          <button className={"btn btn-ghost btn-sm"} onClick={() => setPlanView("list")}>{"← Back"}</button>
+          <div className={"sec"} style={{ margin: 0, border: "none", padding: S.s0 }}>{"Historical Plans"}</div>
+        </div>
+        {sortedGroups.length === 0 && <div className={"empty"}>{"No plan completions logged yet."}<br />{"Complete a plan to see it here."}</div>}
+        {sortedGroups.map((entries, gi) => {
+          const first = entries[0];
+          const groupXP = entries.reduce((s, e) => s + e.xp, 0);
+          const gid = first.sourceGroupId || first.sourcePlanId || String(gi);
+          const collapsed = !openHistLogGroups[gid];
+          const grpFirstEx = entries.map(en => allExById[en.exId]).find(Boolean);
+          const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
+          return <div key={gid} className={"log-group-card"} style={{ "--mg-color": grpMgColor }}>
+            <div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleHistLogGroup(gid)}>
+              <span className={"log-group-icon"}>{first.sourcePlanIcon || "📋"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className={"log-group-name"}>{first.sourcePlanName}</div>
+                <div className={"log-group-meta"}>{"📅 "}{first.date}{" · "}{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div className={"log-group-xp"}>{formatXP(groupXP, { prefix: "⚡ " })}</div>
+              {setRetroEditModal && <button className={"btn btn-ghost btn-xs"} style={{ fontSize: FS.sm, marginRight: S.s2, flexShrink: 0 }}
+                title={"Edit completed plan"} onClick={e => {
+                  e.stopPropagation();
+                  setRetroEditModal({ groupId: gid, entries: [...entries], dateKey: first.dateKey, sourceType: "plan", sourceName: first.sourcePlanName, sourceIcon: first.sourcePlanIcon || "📋", sourceId: first.sourcePlanId });
+                }}>{"✎"}</button>}
+              <button className={"btn btn-ghost btn-xs"} style={{ fontSize: FS.sm, marginRight: S.s2, flexShrink: 0, color: UI_COLORS.danger }}
+                title={"Delete all entries"} onClick={e => {
+                  e.stopPropagation();
+                  const totalXP = entries.reduce((s, en) => s + en.xp, 0);
+                  setConfirmDelete({
+                    icon: first.sourcePlanIcon || "📋",
+                    title: "Delete plan session?",
+                    body: `Delete entire "${first.sourcePlanName}" session — ${entries.length} exercises, ${formatXP(-totalXP, { signed: true })}. This cannot be undone.`,
+                    confirmLabel: "🗑 Delete session",
+                    onConfirm: () => {
+                      const idxSet = new Set(entries.map(en => en._idx));
+                      const deletedEntries = entries.map(en => ({ id: uid(), type: "logEntry", item: { ...en }, deletedAt: new Date().toISOString() }));
+                      const newLog = profile.log.filter((_, i) => !idxSet.has(i));
+                      setProfile(p => ({ ...p, xp: Math.max(0, p.xp - totalXP), log: newLog, exercisePBs: calcExercisePBs(newLog), deletedItems: [...(p.deletedItems || []), ...deletedEntries] }));
+                      showToast("Plan session deleted. " + formatXP(-totalXP, { signed: true }));
+                    }
+                  });
+                }}>{"🗑"}</button>
+              <svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} style={{ flexShrink: 0, transition: "transform .22s ease", transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}>
+                <defs><linearGradient id={"cg5hist"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs>
+                <polyline points={"3,5 7,9 11,5"} stroke={"url(#cg5hist)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} />
+              </svg>
+            </div>
+            {!collapsed && <div className={"log-group-body"}>
+              {entries.map((e, i) => {
+                const exData = allExById[e.exId];
+                const isC = exData ? exData.category === "cardio" : false;
+                const isF = exData ? exData.category === "flexibility" : false;
+                const exMgColor = getMuscleColor(exData && exData.muscleGroup);
+                return <div key={i} className={"h-entry"} style={{ "--mg-color": exMgColor }}>
+                  <div className={"h-entry-hdr"}>
+                    <span className={"h-icon"}>{e.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className={"h-name"}>{e.exercise}</div>
+                    </div>
+                    <div className={"h-xp"}>{"+"}{e.xp}{" XP"}</div>
+                  </div>
+                  <div className={"h-entry-body"}>
+                    <div className={"h-meta"}>
+                      {e.sets}{"×"}{e.reps}{isC || isF ? " min" : ""}
+                      <span style={{ marginLeft: S.s6, color: "#8a8478" }}>{e.time}{" · "}{e.date}</span>
+                    </div>
+                  </div>
+                </div>;
+              })}
+            </div>}
+          </div>;
+        })}
       </>;
     })()}
 

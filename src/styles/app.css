@@ -169,9 +169,8 @@
     .gender-btn{flex:1;padding:7px 4px;border-radius:7px;border:1px solid rgba(180,172,158,.06);background:rgba(45,42,36,.12);color:#8a8478;font-family:'Inter',sans-serif;font-size:.62rem;cursor:pointer;text-align:center;transition:all .18s}
     .gender-btn.sel{border-color:rgba(180,172,158,.3);color:#d4cec4;background:rgba(45,42,36,.18)}
     /* Plans */
-    .plan-card{background:linear-gradient(145deg,rgba(36,34,28,.88),rgba(26,24,20,.82));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:14px;margin-bottom:9px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-    .plan-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,color-mix(in srgb,var(--pc) 7%,transparent),transparent);pointer-events:none}
-    .plan-card:hover{border-color:color-mix(in srgb,var(--pc,#b4ac9e) 38%,transparent);transform:translateY(-1px)}
+    .plan-card{background:rgba(26,24,20,.92);border:1px solid rgba(180,172,158,.06);border-left:3px solid color-mix(in srgb,var(--pc,#b4ac9e) 35%,transparent);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative}
+    .plan-card:hover{border-color:rgba(180,172,158,.1)}
     .plan-card-top{display:flex;align-items:center;gap:11px}
     .plan-icon{font-size:1.7rem;width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--pc,#b4ac9e) 11%,transparent);flex-shrink:0}
     .plan-name{font-family:'Inter',sans-serif;font-size:.78rem;color:#d4cec4;line-height:1.2}
@@ -560,9 +559,9 @@
     .upcoming-section{margin-bottom:12px}
     .upcoming-card{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid rgba(180,172,158,.06);background:rgba(45,42,36,.14);margin-bottom:7px;cursor:pointer}
     .upcoming-card:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.2)}
-    /* WORKOUTS TAB */
-    .workout-card{background:linear-gradient(145deg,rgba(36,34,28,.88),rgba(26,24,20,.82));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:13px 14px;margin-bottom:10px;cursor:pointer;transition:all .18s}
-    .workout-card:hover{border-color:rgba(180,172,158,.07);background:rgba(45,42,36,.12)}
+    /* WORKOUTS TAB — base style (overridden by Forge card block below) */
+    .workout-card{background:rgba(26,24,20,.92);border:1px solid rgba(180,172,158,.06);border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:all .18s}
+    .workout-card:hover{border-color:rgba(180,172,158,.1)}
     .workout-card-top{display:flex;align-items:center;gap:11px}
     .workout-icon{font-size:1.6rem;flex-shrink:0}
     .workout-name{font-family:'Inter',sans-serif;font-size:.82rem;color:#d4cec4;margin-bottom:3px}
@@ -571,8 +570,8 @@
     .workout-desc{font-size:.7rem;color:#8a8478;margin-top:6px;font-style:italic}
     .workout-ex-pill-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
     .workout-ex-pill{font-size:.6rem;padding:2px 7px;border-radius:8px;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.05);color:#8a8478}
-    .workout-detail-ex{--mg-color:#B0A090;position:relative;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 10%,rgba(45,42,36,.34)),color-mix(in srgb,var(--mg-color) 3%,rgba(32,30,26,.18)));border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);margin-bottom:7px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 2px 10px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.025);transition:all .18s}
-    .workout-detail-ex:hover{border-color:color-mix(in srgb,var(--mg-color) 24%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.3),0 0 10px color-mix(in srgb,var(--mg-color) 7%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
+    .workout-detail-ex{--mg-color:#B0A090;position:relative;display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:8px;background:color-mix(in srgb,var(--mg-color) 7%,rgba(30,28,24,.9));border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);margin-bottom:6px;box-shadow:0 1px 6px rgba(0,0,0,.18);transition:all .18s}
+    .workout-detail-ex:hover{border-color:color-mix(in srgb,var(--mg-color) 22%,transparent);box-shadow:0 3px 10px rgba(0,0,0,.22)}
     .workout-detail-ex-orb{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 24%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 9%,rgba(25,23,18,.62)));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px color-mix(in srgb,var(--mg-color) 9%,transparent),inset 0 0 6px rgba(0,0,0,.3)}
     .workout-detail-ex-icon{font-size:1.1rem;flex-shrink:0}
     .workout-detail-ex-name{font-family:'Cinzel',serif;font-size:.78rem;color:#d4cec4;letter-spacing:.01em}
@@ -972,23 +971,20 @@
     /* ── Workout cards (Forge tab) — themed via --mg-color ── */
     .workout-card{
       --mg-color:#B0A090;
-      position:relative;border-radius:13px;padding:13px;margin-bottom:10px;cursor:pointer;overflow:hidden;
-      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 11%,rgba(45,42,36,.36)),rgba(32,30,26,.2) 60%,color-mix(in srgb,var(--mg-color) 5%,rgba(20,18,14,.28)));
-      border:1px solid color-mix(in srgb,var(--mg-color) 16%,transparent);
-      box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.03);
+      position:relative;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;
+      background:rgba(26,24,20,.92);
+      border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.06));
+      border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);
       transition:all .22s;-webkit-tap-highlight-color:transparent
     }
-    .workout-card::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1.5px;background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.32;transition:opacity .22s;pointer-events:none}
-    .workout-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 26%,transparent);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 18px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
-    .workout-card:hover::before{opacity:.7}
+    .workout-card:hover{border-color:color-mix(in srgb,var(--mg-color) 22%,rgba(180,172,158,.08));background:rgba(30,28,24,.95)}
     .workout-card:active{transform:scale(.985);transition:transform .1s ease}
-    .workout-card-top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+    .workout-card-top{display:flex;align-items:center;gap:11px;margin-bottom:6px}
     .workout-icon{
-      font-size:1.4rem;width:46px;height:46px;border-radius:11px;flex-shrink:0;
+      font-size:1.3rem;width:38px;height:38px;border-radius:8px;flex-shrink:0;
       display:flex;align-items:center;justify-content:center;
-      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 26%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 10%,rgba(25,23,18,.62)));
-      border:1px solid color-mix(in srgb,var(--mg-color) 22%,transparent);
-      box-shadow:0 3px 10px rgba(0,0,0,.45),0 0 14px color-mix(in srgb,var(--mg-color) 12%,transparent),inset 0 0 6px rgba(0,0,0,.35)
+      background:color-mix(in srgb,var(--mg-color) 16%,rgba(45,42,36,.5));
+      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
     }
     .workout-name{font-family:'Cinzel',serif;font-size:.82rem;color:#d4cec4;line-height:1.2;margin-bottom:3px;letter-spacing:.02em}
     .workout-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -1147,27 +1143,26 @@
     }
 
     /* ── History / Battle Log entries ── */
-    .h-entry{--mg-color:#8a8478;display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.05));border-left:3px solid color-mix(in srgb,var(--mg-color) 42%,transparent);border-radius:10px;margin-bottom:6px;transition:all .18s;overflow:hidden;background:rgba(22,21,17,.75)}
-    .h-entry:hover{border-color:color-mix(in srgb,var(--mg-color) 24%,rgba(180,172,158,.08));box-shadow:0 2px 8px rgba(0,0,0,.2)}
-    .h-entry-hdr{display:flex;align-items:center;gap:11px;padding:9px 12px 9px 11px;background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 11%,rgba(45,42,36,.38)),color-mix(in srgb,var(--mg-color) 4%,rgba(32,30,26,.22)));transition:background .15s}
-    .h-entry-body{padding:5px 12px 7px 11px;border-top:1px solid color-mix(in srgb,var(--mg-color) 8%,rgba(180,172,158,.04))}
-    .h-icon{font-size:1.05rem;flex-shrink:0;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 30% 30%,color-mix(in srgb,var(--mg-color) 26%,rgba(45,42,36,.4)),color-mix(in srgb,var(--mg-color) 8%,rgba(32,30,26,.5)));border:1px solid color-mix(in srgb,var(--mg-color) 22%,rgba(180,172,158,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-    .h-name{font-size:.78rem;color:#d4cec4;font-family:'Cinzel',serif;letter-spacing:.02em;font-weight:600}
-    .h-meta{font-size:.62rem;color:#8a8478;margin-top:2px}
-    .h-xp{margin-left:auto;font-family:'Cinzel',serif;font-size:.74rem;font-weight:700;color:color-mix(in srgb,var(--mg-color) 60%,#d4cec4);letter-spacing:.04em;white-space:nowrap;text-shadow:0 0 8px color-mix(in srgb,var(--mg-color) 30%,transparent)}
+    .h-entry{--mg-color:#8a8478;display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.05));border-left:3px solid color-mix(in srgb,var(--mg-color) 42%,transparent);border-radius:8px;margin-bottom:5px;transition:all .18s;overflow:hidden;background:rgba(22,21,17,.92)}
+    .h-entry:hover{border-color:color-mix(in srgb,var(--mg-color) 22%,rgba(180,172,158,.08))}
+    .h-entry-hdr{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 9px;background:rgba(28,26,22,.88);transition:background .15s}
+    .h-entry-body{padding:4px 10px 6px 9px;border-top:1px solid color-mix(in srgb,var(--mg-color) 8%,rgba(180,172,158,.04))}
+    .h-icon{font-size:.95rem;flex-shrink:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--mg-color) 18%,rgba(45,42,36,.4));border:1px solid color-mix(in srgb,var(--mg-color) 18%,rgba(180,172,158,.07))}
+    .h-name{font-size:.76rem;color:#d4cec4;font-family:'Cinzel',serif;letter-spacing:.02em;font-weight:600}
+    .h-meta{font-size:.6rem;color:#8a8478;margin-top:1px}
+    .h-xp{margin-left:auto;font-family:'Cinzel',serif;font-size:.7rem;font-weight:700;color:color-mix(in srgb,var(--mg-color) 60%,#d4cec4);letter-spacing:.04em;white-space:nowrap}
     .hist-date-lbl{font-family:'Cinzel',serif;font-size:.56rem;color:#8a8478;letter-spacing:.12em;text-transform:uppercase}
 
     /* ── Log group cards (Battle Log sub-tabs) ── */
-    .log-group-card{--mg-color:#8a8478;border:1px solid color-mix(in srgb,var(--mg-color) 16%,rgba(180,172,158,.06));border-left:3px solid color-mix(in srgb,var(--mg-color) 42%,transparent);border-radius:13px;margin-bottom:12px;overflow:hidden;background:rgba(22,21,17,.75);position:relative;box-shadow:0 4px 16px rgba(0,0,0,.18)}
-    .log-group-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--mg-color) 32%,rgba(180,172,158,.08)),transparent)}
-    .log-group-hdr{display:flex;align-items:center;gap:11px;padding:11px 14px;background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 12%,rgba(45,42,36,.42)),color-mix(in srgb,var(--mg-color) 5%,rgba(32,30,26,.28)));border-bottom:1px solid color-mix(in srgb,var(--mg-color) 10%,rgba(180,172,158,.05));cursor:pointer;user-select:none;transition:background .2s;position:relative}
-    .log-group-hdr:hover{background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 18%,rgba(45,42,36,.48)),color-mix(in srgb,var(--mg-color) 7%,rgba(32,30,26,.32)))}
+    .log-group-card{--mg-color:#8a8478;border:1px solid color-mix(in srgb,var(--mg-color) 16%,rgba(180,172,158,.06));border-left:3px solid color-mix(in srgb,var(--mg-color) 42%,transparent);border-radius:9px;margin-bottom:7px;overflow:hidden;background:rgba(22,21,17,.92);position:relative}
+    .log-group-hdr{display:flex;align-items:center;gap:9px;padding:7px 11px;background:rgba(28,26,22,.92);border-bottom:1px solid color-mix(in srgb,var(--mg-color) 10%,rgba(180,172,158,.05));cursor:pointer;user-select:none;transition:background .2s;position:relative}
+    .log-group-hdr:hover{background:rgba(34,32,28,.95)}
     .log-group-hdr.collapsed{border-bottom:none}
-    .log-group-icon{font-size:1.1rem;flex-shrink:0;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 30% 30%,color-mix(in srgb,var(--mg-color) 30%,rgba(45,42,36,.4)),color-mix(in srgb,var(--mg-color) 10%,rgba(32,30,26,.55)));border:1px solid color-mix(in srgb,var(--mg-color) 26%,rgba(180,172,158,.1));box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 12px color-mix(in srgb,var(--mg-color) 18%,transparent)}
-    .log-group-name{font-family:'Cinzel',serif;font-size:.78rem;color:#d4cec4;flex:1;min-width:0;letter-spacing:.04em;font-weight:600}
-    .log-group-meta{font-size:.6rem;color:#8a8478;margin-top:2px;letter-spacing:.02em}
-    .log-group-xp{font-family:'Cinzel',serif;font-size:.76rem;font-weight:700;color:color-mix(in srgb,var(--mg-color) 60%,#d4cec4);white-space:nowrap;letter-spacing:.04em;text-shadow:0 0 10px color-mix(in srgb,var(--mg-color) 30%,transparent);margin-right:4px}
-    .log-group-body{padding:9px 11px 11px;display:flex;flex-direction:column;gap:5px}
+    .log-group-icon{font-size:.9rem;flex-shrink:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--mg-color) 18%,rgba(45,42,36,.4));border:1px solid color-mix(in srgb,var(--mg-color) 18%,rgba(180,172,158,.07))}
+    .log-group-name{font-family:'Cinzel',serif;font-size:.74rem;color:#d4cec4;flex:1;min-width:0;letter-spacing:.03em;font-weight:600}
+    .log-group-meta{font-size:.58rem;color:#8a8478;margin-top:1px;letter-spacing:.01em}
+    .log-group-xp{font-family:'Cinzel',serif;font-size:.7rem;font-weight:700;color:color-mix(in srgb,var(--mg-color) 60%,#d4cec4);white-space:nowrap;letter-spacing:.03em;margin-right:4px}
+    .log-group-body{padding:5px 9px 7px;display:flex;flex-direction:column;gap:3px}
 
     /* ── Friend / Guild member cards ── */
     .friend-card{background:linear-gradient(145deg,rgba(45,42,36,.15),rgba(45,42,36,.08));border:1px solid rgba(180,172,158,.06);border-radius:12px;padding:14px;margin-bottom:10px;position:relative;overflow:hidden}
