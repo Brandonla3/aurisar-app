@@ -83,6 +83,13 @@ export class BabylonWorldScene {
     this._setupLighting();
     this._setupShadows();
     this._setupDayNight();
+
+    // Lighting profile state (overworld is the default; dungeon disables the
+    // day/night tick and replaces the rig with torches + magic accents).
+    this._lightingProfile = 'overworld';
+    this._torches         = [];
+    this._magicLights     = [];
+    this._dungeonEnv      = null;
     this._buildTerrain();
     this._buildHub();
     this._buildTrees();
@@ -160,13 +167,15 @@ export class BabylonWorldScene {
     fill.groundColor = new BABYLON.Color3(0.15, 0.18, 0.22);
     this._fill = fill;
 
-    // Rim — cool point light for silhouette readability in combat
+    // Rim — cool point light for silhouette readability in combat. Stored so
+    // the dungeon profile can disable it (we use torches/magic accents there).
     const rim = new BABYLON.PointLight(
       'rim', new BABYLON.Vector3(-2, 2.2, -2.5), this.scene
     );
     rim.diffuse   = new BABYLON.Color3(0.55, 0.62, 0.95);
     rim.intensity = 50;
     rim.range     = 10;
+    this._rim = rim;
   }
 
   // ── Shadows ────────────────────────────────────────────────────────────────
@@ -271,6 +280,134 @@ export class BabylonWorldScene {
       }
       this.scene.environmentIntensity = lerp(0.25, 0.50, dayFactor);
     }
+  }
+
+  // ── Lighting profile switcher ──────────────────────────────────────────────
+  // Public entry point. `'overworld'` re-enables the day/night cycle; `'dungeon'`
+  // freezes it and reconfigures the rig with low ambient + warm torch points
+  // (with flicker) + cool magic accents and denser fog.
+
+  setLightingProfile(profile) {
+    if (profile === this._lightingProfile) return;
+    this._teardownProfile();
+    this._lightingProfile = profile;
+    if (profile === 'dungeon')   this._applyDungeonProfile();
+    else                          this._applyOverworldProfile();
+  }
+
+  _teardownProfile() {
+    this._torches.forEach(({ light, observer }) => {
+      this.scene.onBeforeRenderObservable.remove(observer);
+      light.dispose();
+    });
+    this._torches = [];
+    this._magicLights.forEach(l => l.dispose());
+    this._magicLights = [];
+    if (this._dungeonEnv) {
+      this._dungeonEnv.dispose();
+      this._dungeonEnv = null;
+    }
+  }
+
+  _applyOverworldProfile() {
+    const scene = this.scene;
+    scene.clearColor   = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
+    scene.fogDensity   = 0.0018;
+    this._rim.setEnabled(true);
+    this._moon.setEnabled(true);
+    if (this._envDay) {
+      scene.environmentTexture  = this._envDay;
+      scene.environmentIntensity = 0.85;
+    } else {
+      scene.environmentTexture = null;
+    }
+    // Day/night cycle resumes on the next _tick and re-drives key/fill/moon,
+    // ambient, fog color, exposure and contrast.
+  }
+
+  _applyDungeonProfile() {
+    const scene = this.scene;
+    scene.clearColor   = new BABYLON.Color4(0.03, 0.035, 0.045, 1);
+    scene.ambientColor = new BABYLON.Color3(0.06, 0.07, 0.09);
+    scene.fogDensity   = 0.018;
+    scene.fogColor     = new BABYLON.Color3(0.06, 0.07, 0.085);
+
+    const ip = scene.imageProcessingConfiguration;
+    ip.exposure = 0.82;
+    ip.contrast = 1.12;
+
+    // Repurpose the key directional as a soft "bounce" so unlit faces stay
+    // readable without flooding the scene.
+    this._keyLight.direction.copyFromFloats(0.3, -1.0, 0.1);
+    this._keyLight.intensity = 0.25;
+    this._keyLight.diffuse   = new BABYLON.Color3(0.34, 0.36, 0.42);
+
+    // Soft global fill, cool top / warm-ish ground
+    this._fill.intensity   = 0.12;
+    this._fill.diffuse     = new BABYLON.Color3(0.24, 0.27, 0.32);
+    this._fill.groundColor = new BABYLON.Color3(0.06, 0.05, 0.05);
+
+    // Disable overworld-only lights
+    this._moon.setEnabled(false);
+    this._rim.setEnabled(false);
+
+    // Optional dungeon IBL (HEAD-checked; reflections still matter for metals)
+    this._loadEnv('/env/dungeon_dim.env').then(env => {
+      // Bail if the user already switched back before the load resolved.
+      if (!env || this._lightingProfile !== 'dungeon') {
+        if (env) env.dispose();
+        return;
+      }
+      this._dungeonEnv          = env;
+      scene.environmentTexture  = env;
+      scene.environmentIntensity = 0.35;
+    });
+
+    // Warm torches at the four pillar caps
+    [[-8, -8], [8, -8], [-8, 8], [8, 8]].forEach(([x, z], i) => {
+      this._torches.push(this._createTorchLight(
+        new BABYLON.Vector3(x, 5.0, z),
+        { name: `torch${i}` }
+      ));
+    });
+
+    // Cool magic accent on the obelisk gem
+    const magic = new BABYLON.PointLight(
+      'magicGem', new BABYLON.Vector3(0, 11, 0), scene
+    );
+    magic.diffuse  = new BABYLON.Color3(0.40, 0.50, 1.00);
+    magic.specular = new BABYLON.Color3(0.40, 0.50, 0.80);
+    magic.intensity = 18;
+    magic.range     = 10;
+    this._magicLights.push(magic);
+  }
+
+  _createTorchLight(position, opts = {}) {
+    const {
+      color         = new BABYLON.Color3(1.0, 0.58, 0.22),
+      intensity     = 35,
+      range         = 11,
+      flickerSpeed  = 8.0,
+      flickerAmount = 0.18,
+      name          = 'torch',
+    } = opts;
+
+    const light = new BABYLON.PointLight(name, position.clone(), this.scene);
+    light.diffuse   = color;
+    light.specular  = new BABYLON.Color3(0.12, 0.08, 0.04);
+    light.intensity = intensity;
+    light.range     = range;
+
+    const phase = Math.random() * Math.PI * 2;
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      const t = performance.now() * 0.001;
+      const noise =
+        Math.sin(t * flickerSpeed         + phase)       * 0.6 +
+        Math.sin(t * flickerSpeed * 2.37  + phase * 1.7) * 0.4;
+      light.intensity = intensity * (1 + noise * flickerAmount);
+    });
+
+    return { light, observer };
   }
 
   // ── Terrain ────────────────────────────────────────────────────────────────
@@ -528,7 +665,7 @@ export class BabylonWorldScene {
 
   _tick() {
     const dt = this.engine.getDeltaTime();
-    this._tickDayNight(dt);
+    if (this._lightingProfile === 'overworld') this._tickDayNight(dt);
     if (!this._local) return;
 
     this._moveLocal(dt);
@@ -870,6 +1007,7 @@ export class BabylonWorldScene {
     window.removeEventListener('keyup',   this._ku);
     window.removeEventListener('resize',  this._onResize);
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
+    this._teardownProfile?.();
     this.engine.stopRenderLoop();
     this.engine.dispose();
   }
