@@ -67,6 +67,7 @@ const LandingPage = React.lazy(() => import('./components/LandingPage').then(m =
   default: m.LandingPage
 })));
 const AdminPage = React.lazy(() => import('./components/AdminPage'));
+const WorldOverlay = React.lazy(() => import('./features/world/WorldOverlay.jsx'));
 import PlansTabContainer from './components/PlansTabContainer';
 import LiveWorkoutBanner from './components/LiveWorkoutBanner';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
@@ -450,6 +451,7 @@ function App() {
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authUser, setAuthUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false); // set from profiles.is_admin column on login
+  const [showWorld, setShowWorld] = useState(false);
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
   const [detectedClass, setDetectedClass] = useState(null);
   const [activeTab, setActiveTab] = useState("workout");
@@ -5338,7 +5340,7 @@ function App() {
             })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
                   display: "block"
                 }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+          })}<button key="world" className={"tab"} title="Enter Aurisar World" onClick={() => guardAll(() => setShowWorld(true))} style={{position:"relative"}}><span className={"tab-icon"}><img src={`https://api.iconify.design/mdi/earth.svg?color=${encodeURIComponent("#8a8478")}`} alt={""} width={22} height={22} style={{display:"block"}} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -6863,6 +6865,16 @@ function App() {
         setMapTooltip={setMapTooltip}
         showToast={showToast}
       />
+    )
+
+    /* ══ WORLD OVERLAY ══════════════════════════ */}{showWorld && (
+      <React.Suspense fallback={null}>
+        <WorldOverlay
+          onClose={() => setShowWorld(false)}
+          username={profile?.username}
+          aurisarClass={profile?.class_type}
+        />
+      </React.Suspense>
     )
 
     /* ══ SHARE MODAL ═════════════════════════════ */}{shareModal && createPortal(<div className={"modal-backdrop"} onClick={() => setShareModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
