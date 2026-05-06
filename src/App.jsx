@@ -460,6 +460,7 @@ function App() {
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
   const [detectedClass, setDetectedClass] = useState(null);
   const [activeTab, setActiveTab] = useState("workout");
+  const [prevTab, setPrevTab] = useState("workout");
 
   // Mount the Cloudflare Turnstile widget when the support modal opens.
   // The api.js loaded in index.html exposes window.turnstile; we render via
@@ -5231,7 +5232,7 @@ function App() {
     /* ══ MAIN ═══════════════════════════════════ */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
       maxHeight: "100dvh",
       overflow: "hidden"
-    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => setActiveTab("profile"))}><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
+    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem"}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
         /* ══ DROPDOWN MENU — rendered outside hud-top to escape backdrop-filter stacking context ══ */
