@@ -15,6 +15,7 @@ export function useAvatarConfig(userId) {
 
   useEffect(() => {
     if (!userId) return;
+    let canceled = false;
     setLoading(true);
     sb
       .from('profiles')
@@ -22,10 +23,12 @@ export function useAvatarConfig(userId) {
       .eq('id', userId)
       .single()
       .then(({ data, error: err }) => {
+        if (canceled) return; // userId changed mid-flight; drop this stale response
         if (err) { setError(err.message); }
         else     { setConfig(mergeConfig(data?.avatar_config)); }
         setLoading(false);
       });
+    return () => { canceled = true; };
   }, [userId]);
 
   const save = useCallback(async (newConfig) => {
