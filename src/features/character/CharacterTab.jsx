@@ -1,4 +1,5 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
+import AvatarCreator from '../avatar/AvatarCreator.jsx';
 import { UI_COLORS } from '../../data/constants';
 import { calcCharStats } from '../../utils/xp';
 import { ClassIcon } from '../../components/ClassIcon';
@@ -50,7 +51,12 @@ const CharacterTab = memo(function CharacterTab({
   myPublicId,
   // Sub-tab state
   charSubTab, setCharSubTab,
+  // Avatar creator
+  avatarConfig,
+  onSaveAvatar,
+  savingAvatar,
 }) {
+  const [creatorOpen, setCreatorOpen] = useState(false);
   const charStats = calcCharStats(cls, level, clsKey, profile);
   const statMax = Math.max(...Object.values(charStats));
 
@@ -110,40 +116,45 @@ const CharacterTab = memo(function CharacterTab({
 
       {
         /* ══ AVATAR SUB-TAB ══════════════════════════ */
-      }{charSubTab === "avatar" && <div><div className={"char-section"} style={{
-          textAlign: "center",
-          padding: "52px 24px"
-        }}><div style={{
-            fontSize: "2.6rem",
-            marginBottom: S.s14
-          }}>{"⚔️"}</div><div style={{
-            fontSize: FS.fs95,
-            color: "#b4ac9e",
-            fontWeight: 600,
-            marginBottom: S.s8,
-            letterSpacing: ".02em"
-          }}>{"Avatar Creator"}</div><div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: S.s6,
-            background: "rgba(45,42,36,.22)",
-            border: "1px solid rgba(180,172,158,.08)",
-            borderRadius: R.r20,
-            padding: "6px 14px",
-            marginBottom: S.s14
-          }}><span style={{
-              fontSize: FS.fs65,
-              color: "#b4ac9e",
+      }{charSubTab === "avatar" && <div>
+        <div className={"char-section"} style={{ textAlign: "center", padding: "40px 24px" }}>
+          <div style={{ fontSize: "2.6rem", marginBottom: S.s14 }}>{"⚔️"}</div>
+          <div style={{ fontSize: FS.fs95, color: "#b4ac9e", fontWeight: 600, marginBottom: S.s8, letterSpacing: ".02em" }}>
+            {"Appearance"}
+          </div>
+          <div style={{ fontSize: FS.fs76, color: "#8a8478", lineHeight: 1.7, maxWidth: 240, margin: "0 auto 20px" }}>
+            {"Customise your body, face, hair, species features, and base outfit."}
+          </div>
+          <button
+            onClick={() => setCreatorOpen(true)}
+            style={{
+              background: "linear-gradient(135deg,#3b82f6,#6366f1)",
+              border: "none",
+              borderRadius: R.r12,
+              color: "#fff",
+              fontSize: FS.fs95,
               fontWeight: 600,
-              letterSpacing: ".06em",
-              textTransform: "uppercase"
-            }}>{"Coming Soon"}</span></div><div style={{
-            fontSize: FS.fs76,
-            color: "#8a8478",
-            lineHeight: 1.7,
-            maxWidth: 260,
-            margin: "0 auto"
-          }}>{"Full 3D avatar customization is under development. Your character will come to life with Unreal Engine integration."}</div></div></div>
+              padding: "10px 28px",
+              cursor: "pointer",
+              fontFamily: "Inter, system-ui, sans-serif",
+              letterSpacing: ".02em",
+            }}
+          >
+            {"Edit Appearance"}
+          </button>
+        </div>
+        {creatorOpen && (
+          <AvatarCreator
+            initialConfig={avatarConfig}
+            saving={savingAvatar}
+            onSave={async (cfg) => {
+              const ok = await onSaveAvatar?.(cfg);
+              if (ok !== false) setCreatorOpen(false); // keep modal open on save failure so edits aren't lost
+            }}
+            onCancel={() => setCreatorOpen(false)}
+          />
+        )}
+      </div>
       /* ══ STATS SUB-TAB ════════════════════════════ */}{charSubTab === "stats" && <div><div className={"char-section"}>{rune("Character Stats")}<div style={{
             fontSize: FS.sm,
             color: "#8a8478",

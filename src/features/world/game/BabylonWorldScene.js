@@ -1,16 +1,22 @@
 /**
  * BabylonWorldScene — 3D multiplayer world renderer.
  *
- * Babylon.js is loaded as a UMD CDN script by WorldGame.jsx — NOT imported
- * here. This sidesteps Vite's circular-module issue (MatrixTrackPrecisionChange)
- * that occurs with any @babylonjs/core import path.
+ * Babylon.js is loaded as a bundled npm package by WorldGame.jsx (sets window.BABYLON).
+ * This file references only the global — no direct babylonjs imports.
  *
  * Coordinate mapping (SpacetimeDB pixel-space <-> 3D world units):
  *   STDB center = 1600 px  ->  3D origin = (0, 0, 0)
  *   1 world unit = 32 STDB px
+ *
+ * Character rendering is fully delegated to CharacterAvatar + AssetLibrary.
+ * Box-primitive fallback is used automatically when GLB assets are absent.
  */
 
 /* global BABYLON */
+
+import { AssetLibrary }    from './AssetLibrary.js';
+import { CharacterAvatar } from './CharacterAvatar.js';
+import { mergeConfig }     from './avatarSchema.js';
 
 // ── Coordinate helpers ──────────────────────────────────────────────────────
 const SCALE       = 32;
@@ -531,13 +537,17 @@ export class BabylonWorldScene {
     this._lastSentAt    = 0;
     this._chatOpen      = false;
     this._inDungeon     = false;
+    this._local         = null;
+    this._pendingUpdates = []; // remote rows queued while _local is loading
+    this._spawning       = new Set(); // identity IDs currently being async-spawned
 
-    this._init();
+    this._initSync();
+    this._initCharactersAsync();
   }
 
-  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  // ── Sync bootstrap (terrain, engine — no characters yet) ──────────────────
 
-  _init() {
+  _initSync() {
     this.engine = new BABYLON.Engine(this.canvas, true, {
       preserveDrawingBuffer: true,
       stencil: true,
@@ -562,16 +572,33 @@ export class BabylonWorldScene {
     this._buildRocks();
     this._buildPaths();
     this._buildDungeonEntrance();
-    this._buildLocalPlayer();
     this._bindKeys();
 
+    // Render loop guards on _local until CharacterAvatar is ready
     this.engine.runRenderLoop(() => {
-      this._tick();
+      if (this._local) this._tick();
       this.scene.render();
     });
 
     this._onResize = () => this.engine.resize();
     window.addEventListener('resize', this._onResize);
+  }
+
+  // ── Async character bootstrap ──────────────────────────────────────────────
+
+  async _initCharactersAsync() {
+    await AssetLibrary.init(this.scene);
+    this._local = await CharacterAvatar.create(
+      'local',
+      this.playerInfo?.username ?? 'You',
+      this.playerInfo?.avatarConfig ?? null,
+      this.scene,
+      AssetLibrary
+    );
+    this._local.root.position.set(0, 0, 0);
+    // Flush remote updates that arrived while we were loading
+    const pending = this._pendingUpdates.splice(0);
+    for (const row of pending) this.applyPlayerUpdate(row);
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
@@ -865,15 +892,6 @@ export class BabylonWorldScene {
     this._makeLabel('dunEntrance', 'Dungeon Entrance', labelRoot);
   }
 
-  // ── Local player ───────────────────────────────────────────────────────────
-
-  _buildLocalPlayer() {
-    const ct    = this.playerInfo?.classType ?? 'warrior';
-    const color = classColor(ct);
-    this._local = this._makeHumanoid('local', color, this.playerInfo?.username ?? 'You', ct);
-    this._local.root.position.set(0, 0, 0);
-  }
-
   // ── Post-processing (PBR character material template) ──────────────────────
   // Helper for when humanoids get authored albedo/normal/ORM textures.
 
@@ -913,18 +931,16 @@ export class BabylonWorldScene {
 
   _tick() {
     // LightingManager self-updates via scene.onBeforeRenderObservable
-    if (!this._local) return;
-
     const dt = this.engine.getDeltaTime();
     this._moveLocal(dt);
+    this._local.update(dt);
     this._checkDungeonProximity();
-    this._animate(this._local, dt);
     this._trackCamera();
     this._syncStdb();
 
     this._remotePlayers.forEach(rp => {
       this._lerpRemote(rp, dt);
-      this._animate(rp, dt);
+      rp.update(dt);
     });
   }
 
@@ -936,7 +952,7 @@ export class BabylonWorldScene {
     const a = this._keys['KeyA'] || this._keys['ArrowLeft'];
     const d = this._keys['KeyD'] || this._keys['ArrowRight'];
 
-    this._local.isMoving = w || s || a || d;
+    this._local.isMoving = !!(w || s || a || d);
     if (!this._local.isMoving) return;
 
     // alpha points FROM target TO camera, so add PI to get the true forward direction
@@ -1002,6 +1018,7 @@ export class BabylonWorldScene {
   applyPlayerUpdate(row) {
     if (row.identity === this._myIdentity) return;
     if (!row.online) { this._removeRemote(row.identity); return; }
+    if (!this._local) { this._pendingUpdates.push(row); return; }
 
     if (this._remotePlayers.has(row.identity)) {
       const rp    = this._remotePlayers.get(row.identity);
@@ -1009,19 +1026,35 @@ export class BabylonWorldScene {
       rp._targetZ = toWorld(row.y);
       rp.isMoving = row.isMoving;
     } else {
-      const rp = this._makeHumanoid(row.identity, classColor(row.classType), row.username, row.classType);
-      rp._targetX = toWorld(row.x);
-      rp._targetZ = toWorld(row.y);
-      rp.root.position.set(rp._targetX, 0, rp._targetZ);
-      this._remotePlayers.set(row.identity, rp);
+      this._spawnRemote(row);
+    }
+  }
+
+  async _spawnRemote(row) {
+    if (this._spawning.has(row.identity)) return;
+    this._spawning.add(row.identity);
+    try {
+      const config = row.avatarConfig ? mergeConfig(row.avatarConfig) : null;
+      const rp = await CharacterAvatar.create(
+        row.identity, row.username, config, this.scene, AssetLibrary
+      );
+      if (this._remotePlayers.has(row.identity)) {
+        rp.dispose(); // another update already spawned this player
+      } else {
+        rp._targetX = toWorld(row.x);
+        rp._targetZ = toWorld(row.y);
+        rp.root.position.set(rp._targetX, 0, rp._targetZ);
+        this._remotePlayers.set(row.identity, rp);
+      }
+    } finally {
+      this._spawning.delete(row.identity);
     }
   }
 
   _removeRemote(id) {
     const rp = this._remotePlayers.get(id);
     if (!rp) return;
-    rp.root.getChildMeshes().forEach(m => m.dispose());
-    rp.root.dispose();
+    rp.dispose();
     this._remotePlayers.delete(id);
   }
 
@@ -1030,128 +1063,6 @@ export class BabylonWorldScene {
     rp.root.position.x = BABYLON.Scalar.Lerp(rp.root.position.x, rp._targetX, f);
     rp.root.position.z = BABYLON.Scalar.Lerp(rp.root.position.z, rp._targetZ, f);
     rp.root.position.y = 0;
-  }
-
-  // ── Humanoid factory ───────────────────────────────────────────────────────
-
-  _makeHumanoid(id, color, username, classType = 'warrior') {
-    const root = new BABYLON.TransformNode(`${id}_root`, this.scene);
-
-    const bodyMat = new BABYLON.StandardMaterial(`${id}_body`, this.scene);
-    bodyMat.diffuseColor = color;
-
-    const darkMat = new BABYLON.StandardMaterial(`${id}_dark`, this.scene);
-    darkMat.diffuseColor = new BABYLON.Color3(
-      color.r * 0.35, color.g * 0.35, color.b * 0.35
-    );
-
-    const box = (name, w, h, d, px, py, pz, mat) => {
-      const m = BABYLON.MeshBuilder.CreateBox(`${id}_${name}`, {
-        width: w, height: h, depth: d,
-      }, this.scene);
-      m.position.set(px, py, pz);
-      m.material = mat ?? bodyMat;
-      m.parent   = root;
-      this._castShadow(m);
-      return m;
-    };
-
-    const torso = box('torso', 0.52, 0.68, 0.30,  0,     1.04, 0);
-    const head  = box('head',  0.42, 0.42, 0.38,  0,     1.64, 0);
-    const larm  = box('larm',  0.20, 0.58, 0.20, -0.38,  1.04, 0, darkMat);
-    const rarm  = box('rarm',  0.20, 0.58, 0.20,  0.38,  1.04, 0, darkMat);
-    const lleg  = box('lleg',  0.22, 0.68, 0.22, -0.14,  0.34, 0, darkMat);
-    const rleg  = box('rleg',  0.22, 0.68, 0.22,  0.14,  0.34, 0, darkMat);
-
-    this._addClassGear(id, classType, root);
-    this._makeLabel(id, username, root);
-
-    return { root, head, torso, larm, rarm, lleg, rleg,
-             animTime: 0, isMoving: false, _targetX: 0, _targetZ: 0 };
-  }
-
-  // ── Class-specific gear ────────────────────────────────────────────────────
-
-  _addClassGear(id, classType, root) {
-    const mat = (name, r, g, b) => {
-      const m = new BABYLON.StandardMaterial(`${id}_${name}`, this.scene);
-      m.diffuseColor  = new BABYLON.Color3(r, g, b);
-      m.specularColor = new BABYLON.Color3(0.08, 0.08, 0.08);
-      return m;
-    };
-
-    const mesh = (name, opts, px, py, pz, material, rx = 0, ry = 0, rz = 0) => {
-      let n;
-      if (opts.cyl)      n = BABYLON.MeshBuilder.CreateCylinder(`${id}_${name}`, opts.cyl, this.scene);
-      else if (opts.sph) n = BABYLON.MeshBuilder.CreateSphere(`${id}_${name}`, opts.sph, this.scene);
-      else               n = BABYLON.MeshBuilder.CreateBox(`${id}_${name}`, opts.box ?? opts, this.scene);
-      n.position.set(px, py, pz);
-      if (rx || ry || rz) n.rotation.set(rx, ry, rz);
-      n.material = material;
-      n.parent   = root;
-      this._castShadow(n);
-      return n;
-    };
-
-    switch (classType) {
-
-      // ── Warrior: steel helmet + pauldrons + sword ─────────────────────────
-      case 'warrior': {
-        const steel  = mat('steel',  0.58, 0.60, 0.65);
-        const silver = mat('silver', 0.80, 0.82, 0.88);
-        mesh('helm',  { box: { width: 0.50, height: 0.22, depth: 0.46 } },  0,     1.90,  0,    steel);
-        mesh('visor', { box: { width: 0.36, height: 0.07, depth: 0.06 } },  0,     1.78,  0.23, steel);
-        mesh('padL',  { box: { width: 0.30, height: 0.14, depth: 0.30 } }, -0.50,  1.38,  0,    steel);
-        mesh('padR',  { box: { width: 0.30, height: 0.14, depth: 0.30 } },  0.50,  1.38,  0,    steel);
-        mesh('blade', { box: { width: 0.07, height: 0.72, depth: 0.03 } },  0.60,  0.70,  0,    silver);
-        mesh('guard', { box: { width: 0.26, height: 0.05, depth: 0.06 } },  0.60,  1.07,  0,    steel);
-        break;
-      }
-
-      // ── Mage: wizard hat + glowing staff ─────────────────────────────────
-      case 'mage': {
-        const hatMat   = mat('hat',  0.22, 0.08, 0.42);
-        const staffMat = mat('stf',  0.42, 0.28, 0.12);
-        const orbMat   = new BABYLON.StandardMaterial(`${id}_orb`, this.scene);
-        orbMat.diffuseColor  = new BABYLON.Color3(0.55, 0.25, 1.00);
-        orbMat.emissiveColor = new BABYLON.Color3(0.35, 0.15, 0.80);
-        mesh('brim',  { cyl: { diameter: 0.72, height: 0.06, tessellation: 10 } },           0, 1.87, 0, hatMat);
-        mesh('cone',  { cyl: { diameterTop: 0, diameterBottom: 0.52, height: 0.70, tessellation: 8 } }, 0, 2.27, 0, hatMat);
-        mesh('shaft', { cyl: { diameter: 0.058, height: 1.55, tessellation: 6 } }, -0.56, 0.86, 0, staffMat);
-        mesh('orb',   { sph: { diameter: 0.22, segments: 6 } },                    -0.56, 1.68, 0, orbMat);
-        break;
-      }
-
-      // ── Archer: leather hood + quiver + bow ──────────────────────────────
-      case 'archer': {
-        const leatherMat = mat('lth', 0.38, 0.24, 0.10);
-        const bowMat     = mat('bow', 0.50, 0.32, 0.12);
-        const hood = BABYLON.MeshBuilder.CreateSphere(`${id}_hood`, { diameter: 0.52, segments: 6 }, this.scene);
-        hood.scaling.y = 0.70;
-        hood.position.set(0, 1.70, 0);
-        hood.material = leatherMat;
-        hood.parent   = root;
-        this._castShadow(hood);
-        mesh('quiv',  { cyl: { diameter: 0.13, height: 0.50, tessellation: 6 } }, 0.10, 1.20, -0.22, leatherMat, 0.28);
-        mesh('limbT', { cyl: { diameter: 0.045, height: 0.46, tessellation: 5 } }, -0.62, 1.30, 0, bowMat,  0.36);
-        mesh('limbB', { cyl: { diameter: 0.045, height: 0.46, tessellation: 5 } }, -0.62, 0.78, 0, bowMat, -0.36);
-        mesh('grip',  { cyl: { diameter: 0.062, height: 0.20, tessellation: 5 } }, -0.62, 1.04, 0, leatherMat);
-        break;
-      }
-
-      // ── Rogue: dark cap + dual daggers ────────────────────────────────────
-      case 'rogue': {
-        const capMat    = mat('cap',    0.10, 0.10, 0.12);
-        const daggerMat = mat('dagger', 0.80, 0.82, 0.86);
-        mesh('crown', { cyl: { diameterTop: 0.38, diameterBottom: 0.44, height: 0.18, tessellation: 8 } }, 0, 1.88, 0, capMat);
-        mesh('cbrim', { cyl: { diameter: 0.56, height: 0.05, tessellation: 8 } },                          0, 1.80, 0, capMat);
-        mesh('dagL',  { box: { width: 0.055, height: 0.36, depth: 0.030 } }, -0.44, 0.64, -0.12, daggerMat, 0.3);
-        mesh('dagR',  { box: { width: 0.055, height: 0.36, depth: 0.030 } },  0.44, 0.64, -0.12, daggerMat, 0.3);
-        break;
-      }
-
-      default: break;
-    }
   }
 
   // ── Name label ─────────────────────────────────────────────────────────────
@@ -1194,26 +1105,6 @@ export class BabylonWorldScene {
     } catch (_) { /* non-critical */ }
   }
 
-  // ── Animation ──────────────────────────────────────────────────────────────
-
-  _animate(h, dt) {
-    if (h.isMoving) {
-      h.animTime += dt * 0.007;
-      const s       = Math.sin(h.animTime) * 0.45;
-      h.larm.rotation.x =  s;
-      h.rarm.rotation.x = -s;
-      h.lleg.rotation.x = -s;
-      h.rleg.rotation.x =  s;
-    } else {
-      h.animTime = 0;
-      const t = 0.12;
-      h.larm.rotation.x = BABYLON.Scalar.Lerp(h.larm.rotation.x, 0, t);
-      h.rarm.rotation.x = BABYLON.Scalar.Lerp(h.rarm.rotation.x, 0, t);
-      h.lleg.rotation.x = BABYLON.Scalar.Lerp(h.lleg.rotation.x, 0, t);
-      h.rleg.rotation.x = BABYLON.Scalar.Lerp(h.rleg.rotation.x, 0, t);
-    }
-  }
-
   // ── Chat ───────────────────────────────────────────────────────────────────
 
   setChatOpen(open) {
@@ -1244,6 +1135,8 @@ export class BabylonWorldScene {
     window.removeEventListener('keyup',   this._ku);
     window.removeEventListener('resize',  this._onResize);
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
+    this._local?.dispose();
+    AssetLibrary.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
     this.engine.dispose();

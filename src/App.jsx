@@ -29,6 +29,7 @@ import LogEntryEditModal from './features/history/LogEntryEditModal';
 import RetroEditModal from './features/history/RetroEditModal';
 import QuestsTab from './features/quests/QuestsTab';
 import CharacterTab from './features/character/CharacterTab';
+import { useAvatarConfig } from './features/avatar/useAvatarConfig.js';
 import MapOverlay from './features/character/MapOverlay';
 import WorkoutsTab from './features/workouts/WorkoutsTab';
 import WorkoutExercisePicker from './features/workouts/WorkoutExercisePicker';
@@ -455,6 +456,7 @@ function App() {
   const [screen, setScreen] = useState("loading");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authUser, setAuthUser] = useState(null);
+  const { config: avatarConfig, save: saveAvatarConfig, loading: savingAvatar } = useAvatarConfig(authUser?.id);
   const [isAdmin, setIsAdmin] = useState(false); // set from profiles.is_admin column on login
   const [showWorld, setShowWorld] = useState(false);
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
@@ -5868,6 +5870,9 @@ function App() {
             myPublicId={myPublicId}
             charSubTab={charSubTab}
             setCharSubTab={setCharSubTab}
+            avatarConfig={avatarConfig}
+            onSaveAvatar={saveAvatarConfig}
+            savingAvatar={savingAvatar}
           />
         )
 
@@ -6886,6 +6891,7 @@ function App() {
           onClose={() => setShowWorld(false)}
           username={profile?.username}
           aurisarClass={profile?.class_type}
+          avatarConfig={avatarConfig}
         />
       </React.Suspense>
     )

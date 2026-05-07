@@ -3,7 +3,7 @@
  *
  * Sits above the Aurisar app via position:fixed.
  * ESC key exits back to the app.
- * Passes Aurisar profile data into WorldGame as playerInfo.
+ * Passes Aurisar profile data + avatarConfig into WorldGame as playerInfo.
  */
 
 import React, { useEffect } from 'react';
@@ -34,8 +34,9 @@ function toAvatarColor(aurisarClass) {
  * @param {function} onClose       - called when user exits the world
  * @param {string}   username      - from Aurisar profile
  * @param {string}   aurisarClass  - Aurisar class name (mapped to game class internally)
+ * @param {object}   avatarConfig  - AvatarConfig JSON from Supabase (null → default)
  */
-export default function WorldOverlay({ onClose, username, aurisarClass }) {
+export default function WorldOverlay({ onClose, username, aurisarClass, avatarConfig = null }) {
   // ── ESC to exit ──
   useEffect(() => {
     const handler = (e) => {
@@ -46,9 +47,10 @@ export default function WorldOverlay({ onClose, username, aurisarClass }) {
   }, [onClose]);
 
   const playerInfo = {
-    username:    username    ?? 'Adventurer',
-    classType:   toGameClass(aurisarClass),
-    avatarColor: toAvatarColor(aurisarClass),
+    username:     username    ?? 'Adventurer',
+    classType:    toGameClass(aurisarClass),
+    avatarColor:  toAvatarColor(aurisarClass),
+    avatarConfig: avatarConfig ?? null,
   };
 
   return (

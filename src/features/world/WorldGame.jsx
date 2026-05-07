@@ -9,6 +9,7 @@
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import BABYLON from 'babylonjs';
+import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 
