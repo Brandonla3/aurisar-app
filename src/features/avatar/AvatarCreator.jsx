@@ -30,7 +30,8 @@ const TABS = [
 export default function AvatarCreator({ initialConfig, onSave, onCancel, saving = false }) {
   const [config,   setConfig]   = useState(() => mergeConfig(initialConfig));
   const [activeTab, setTab]     = useState('body');
-  const avatarRef = useRef(null);
+  const avatarRef   = useRef(null);
+  const assetLibRef = useRef(null);
 
   const patch = useCallback((partial) => {
     setConfig(prev => ({ ...prev, ...partial }));
@@ -58,7 +59,7 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
     setConfig(prev => ({ ...prev, ...next, version: prev.version }));
   }, [config.gear]);
 
-  const panelProps = { config, avatar: avatarRef.current, onChange: patch };
+  const panelProps = { config, avatar: avatarRef.current, assetLibrary: assetLibRef.current, onChange: patch };
 
   return (
     <div style={S.overlay}>
@@ -108,7 +109,7 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
         <div style={S.preview}>
           <AvatarPreview
             config={config}
-            onAvatarReady={av => { avatarRef.current = av; }}
+            onAvatarReady={(av, lib) => { avatarRef.current = av; assetLibRef.current = lib; }}
             style={{ borderRadius: 12 }}
           />
           <p style={S.previewHint}>Drag to rotate · Scroll to zoom</p>

@@ -243,6 +243,11 @@ export class CharacterAvatar {
     this._applySkinMaterial();
   }
 
+  setMarking(key) {
+    this._config.skin.marking = key;
+    // Texture overlay applied once baked skin textures are available (Phase 1 asset pipeline).
+  }
+
   _applySkinMaterial() {
     if (!this._bodyMeshes.length) return;
     const color = hexToColor3(this._config.skin.tone);

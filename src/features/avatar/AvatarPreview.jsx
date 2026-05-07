@@ -76,7 +76,7 @@ export default function AvatarPreview({ config, onAvatarReady, style }) {
       'preview', '', cfg, scene, PreviewAssets
     );
     avatarRef.current.root.position.set(0, 0, 0);
-    onAvatarReady?.(avatarRef.current);
+    onAvatarReady?.(avatarRef.current, PreviewAssets);
   }, [onAvatarReady]);
 
   useEffect(() => {
@@ -115,7 +115,8 @@ export default function AvatarPreview({ config, onAvatarReady, style }) {
     cam.wheelPrecision   = 80;
     cam.attachControl(canvas, true);
 
-    // Load assets then build preview avatar
+    // Load assets then build preview avatar; pass lib alongside avatar so
+    // creator panels can resolve GLB containers for live mesh swaps.
     PreviewAssets.init(scene).then(() => rebuild(scene, mergeConfig(config)));
 
     const onResize = () => engine.resize();

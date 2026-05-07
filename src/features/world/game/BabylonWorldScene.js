@@ -538,6 +538,8 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
+    this._pendingUpdates = []; // remote rows queued while _local is loading
+    this._spawning       = new Set(); // identity IDs currently being async-spawned
 
     this._initSync();
     this._initCharactersAsync();
@@ -594,6 +596,9 @@ export class BabylonWorldScene {
       AssetLibrary
     );
     this._local.root.position.set(0, 0, 0);
+    // Flush remote updates that arrived while we were loading
+    const pending = this._pendingUpdates.splice(0);
+    for (const row of pending) this.applyPlayerUpdate(row);
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
@@ -1013,7 +1018,7 @@ export class BabylonWorldScene {
   applyPlayerUpdate(row) {
     if (row.identity === this._myIdentity) return;
     if (!row.online) { this._removeRemote(row.identity); return; }
-    if (!this._local) return;
+    if (!this._local) { this._pendingUpdates.push(row); return; }
 
     if (this._remotePlayers.has(row.identity)) {
       const rp    = this._remotePlayers.get(row.identity);
@@ -1026,14 +1031,24 @@ export class BabylonWorldScene {
   }
 
   async _spawnRemote(row) {
-    const config = row.avatarConfig ? mergeConfig(row.avatarConfig) : null;
-    const rp = await CharacterAvatar.create(
-      row.identity, row.username, config, this.scene, AssetLibrary
-    );
-    rp._targetX = toWorld(row.x);
-    rp._targetZ = toWorld(row.y);
-    rp.root.position.set(rp._targetX, 0, rp._targetZ);
-    this._remotePlayers.set(row.identity, rp);
+    if (this._spawning.has(row.identity)) return;
+    this._spawning.add(row.identity);
+    try {
+      const config = row.avatarConfig ? mergeConfig(row.avatarConfig) : null;
+      const rp = await CharacterAvatar.create(
+        row.identity, row.username, config, this.scene, AssetLibrary
+      );
+      if (this._remotePlayers.has(row.identity)) {
+        rp.dispose(); // another update already spawned this player
+      } else {
+        rp._targetX = toWorld(row.x);
+        rp._targetZ = toWorld(row.y);
+        rp.root.position.set(rp._targetX, 0, rp._targetZ);
+        this._remotePlayers.set(row.identity, rp);
+      }
+    } finally {
+      this._spawning.delete(row.identity);
+    }
   }
 
   _removeRemote(id) {
