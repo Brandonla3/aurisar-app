@@ -379,23 +379,24 @@ class LightingManager {
       new BABYLON.Color3(1.0, 0.97, 0.92),
       clamp01(dayFactor * 1.25)
     );
-    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor);
+    // Moon is brighter (0.60 vs old 0.45) so night is always legible.
+    this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
 
-    // Mobile has no IBL from .env files; use a stronger fill to avoid shadows
-    // going black and to compensate for the missing ambient environment light.
-    const fillMin = this._isMobile ? 0.35 : 0.12;
+    // Fill never fully dims at night — keeps geometry readable without
+    // destroying the nighttime atmosphere.
+    const fillMin = this._isMobile ? 0.50 : 0.20;
     const fillMax = this._isMobile ? 0.80 : 0.40;
     this.fillOverworld.intensity   = lerp(fillMin, fillMax, dayFactor);
     this.fillOverworld.groundColor = lerpColor3(
-      new BABYLON.Color3(0.08, 0.10, 0.14),
+      new BABYLON.Color3(0.10, 0.12, 0.18),
       new BABYLON.Color3(0.34, 0.36, 0.40),
       dayFactor
     );
 
-    // Slightly higher exposure on mobile keeps the scene perceptually bright
-    // on smaller screens viewed in variable lighting conditions.
+    // Night exposure raised from 0.65 → 0.82 so the tone-mapper keeps dark
+    // scenes bright enough to navigate; day cap slightly higher on mobile.
     const exposureMax = this._isMobile ? 1.30 : 1.05;
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, exposureMax, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.82, exposureMax, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -409,8 +410,8 @@ class LightingManager {
     // skybox mesh is present it covers clearColor completely; when the .env
     // files are absent (our current setup) this IS the sky.
     const sky = lerpColor3(
-      new BABYLON.Color3(0.02, 0.03, 0.08),  // night
-      new BABYLON.Color3(0.42, 0.58, 0.78),  // day
+      new BABYLON.Color3(0.06, 0.08, 0.18),  // night — deep navy, not black
+      new BABYLON.Color3(0.42, 0.58, 0.78),  // day  — sky blue
       dayFactor
     );
     this.scene.clearColor.r = sky.r;
@@ -659,9 +660,14 @@ export class BabylonWorldScene {
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
 
-    // LightingManager owns all lighting, day/night, env, and render pipelines
+    // Seed the day/night cycle from the device's real local time so the
+    // world matches the player's actual time of day, then run at real speed.
+    const now = new Date();
+    const realHour = now.getHours() + now.getMinutes() / 60;
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
+      startTimeOfDay: realHour,
+      dayLengthSec: 86400, // one real second = one game second
     });
 
     this._setupShadows();
