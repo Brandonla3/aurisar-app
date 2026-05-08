@@ -60,6 +60,8 @@ class LightingManager {
     this.camera = camera;
     this.engine = engine;
 
+    this._isMobile = options.isMobile ?? false;
+
     this.options = {
       dayLengthSec:  options.dayLengthSec  ?? 900,
       startTimeOfDay: options.startTimeOfDay ?? 9.0,
@@ -237,38 +239,45 @@ class LightingManager {
   }
 
   _setupPipelines() {
-    this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
-      bloomThreshold: 0.88, bloomWeight: 0.22, bloomKernel: 64, bloomScale: 0.5,
-      sharpenColor: 0.20, sharpenEdge: 0.15,
-    });
-    this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
-      bloomThreshold: 0.90, bloomWeight: 0.30, bloomKernel: 64, bloomScale: 0.5,
-      sharpenColor: 0.15, sharpenEdge: 0.10,
-    });
-
-    this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
+    this._noPipeline = true;
     this._imagePP    = null;
     this._glowLayer  = null;
 
+    // DefaultRenderingPipeline is desktop-only. On mobile WebGL2 it may succeed
+    // in construction (no exception) but produce a black render at frame time
+    // due to missing half-float / float render-target extensions. Skip it
+    // entirely on mobile and go straight to the lightweight fallback path.
+    if (!this._isMobile) {
+      this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
+        bloomThreshold: 0.88, bloomWeight: 0.22, bloomKernel: 64, bloomScale: 0.5,
+        sharpenColor: 0.20, sharpenEdge: 0.15,
+      });
+      this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
+        bloomThreshold: 0.90, bloomWeight: 0.30, bloomKernel: 64, bloomScale: 0.5,
+        sharpenColor: 0.15, sharpenEdge: 0.10,
+      });
+      this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
+    } else {
+      this.pipeOverworld = null;
+      this.pipeDungeon   = null;
+    }
+
     if (this._noPipeline) {
-      // Tier 3 fallback: ImageProcessingPostProcess attached directly to the
-      // camera. Unlike DefaultRenderingPipeline it does NOT require half-float
-      // render targets, so it works on mobile WebGL2 (Safari/Chrome iOS).
-      // It inherits scene.imageProcessingConfiguration automatically, giving
-      // us ACES tone-mapping, exposure, and contrast on every mobile device.
+      // ImageProcessingPostProcess: attaches directly to the camera using only
+      // standard 8-bit RGBA render targets (always supported on mobile WebGL2).
+      // Inherits scene.imageProcessingConfiguration — gives us ACES tone-mapping,
+      // exposure, and contrast without requiring any special GPU extensions.
       try {
         this._imagePP = new BABYLON.ImageProcessingPostProcess(
           'imgPP', 1.0, this.camera,
           BABYLON.Texture.BILINEAR_SAMPLINGMODE, this.engine, false,
           BABYLON.Constants.TEXTURETYPE_UNSIGNED_INT
         );
-        // We now have proper tone-mapping — clear the _noPipeline flag so
-        // the rest of the system uses normal (desktop-equivalent) intensities.
         this._noPipeline = false;
-      } catch (_) { /* truly no post-processing capability */ }
+      } catch (_) { /* truly no post-processing */ }
 
-      // GlowLayer: mobile-compatible bloom — renders to a downsampled texture
-      // and requires only standard 8-bit render targets.
+      // GlowLayer: lightweight bloom using a downsampled 8-bit texture.
+      // Works on all WebGL2 devices including mobile.
       try {
         this._glowLayer = new BABYLON.GlowLayer('glow', this.scene, {
           mainTextureFixedSize: 256,
@@ -278,10 +287,12 @@ class LightingManager {
       } catch (_) { /* skip bloom */ }
     }
 
-    // Ambient floor prevents fully-shadowed surfaces going black on all render
-    // paths, including desktop where IBL from the .env files handles this
-    // naturally (modest value avoids interference when IBL does load).
-    this.scene.ambientColor = new BABYLON.Color3(0.22, 0.25, 0.30);
+    // Ambient floor. On mobile there is no IBL from .env files, so this term
+    // is the sole contributor to shadowed-surface brightness — set it higher
+    // than the desktop value where IBL provides the ambient fill.
+    this.scene.ambientColor = this._isMobile
+      ? new BABYLON.Color3(0.40, 0.44, 0.50)
+      : new BABYLON.Color3(0.22, 0.25, 0.30);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -370,14 +381,21 @@ class LightingManager {
     );
     this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor);
 
-    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor);
+    // Mobile has no IBL from .env files; use a stronger fill to avoid shadows
+    // going black and to compensate for the missing ambient environment light.
+    const fillMin = this._isMobile ? 0.35 : 0.12;
+    const fillMax = this._isMobile ? 0.80 : 0.40;
+    this.fillOverworld.intensity   = lerp(fillMin, fillMax, dayFactor);
     this.fillOverworld.groundColor = lerpColor3(
-      new BABYLON.Color3(0.05, 0.06, 0.08),
+      new BABYLON.Color3(0.08, 0.10, 0.14),
       new BABYLON.Color3(0.34, 0.36, 0.40),
       dayFactor
     );
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor);
+    // Slightly higher exposure on mobile keeps the scene perceptually bright
+    // on smaller screens viewed in variable lighting conditions.
+    const exposureMax = this._isMobile ? 1.30 : 1.05;
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, exposureMax, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -411,7 +429,7 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = 0.82;
+    this.scene.imageProcessingConfiguration.exposure = this._isMobile ? 1.10 : 0.82;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -642,7 +660,9 @@ export class BabylonWorldScene {
     this._setupCamera();
 
     // LightingManager owns all lighting, day/night, env, and render pipelines
-    this._lm = new LightingManager(this.scene, this._camera, this.engine);
+    this._lm = new LightingManager(this.scene, this._camera, this.engine, {
+      isMobile: this._isMobile,
+    });
 
     this._setupShadows();
     this._setupSSAO();
@@ -830,6 +850,9 @@ export class BabylonWorldScene {
   // ── SSAO ───────────────────────────────────────────────────────────────────
 
   _setupSSAO() {
+    // SSAO2 can conflict with other render passes on mobile WebGL2 and produces
+    // incorrect (black) output on several iOS/Android implementations.
+    if (this._isMobile) return;
     if (this.engine.webGLVersion < 2) return;
     try {
       const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
