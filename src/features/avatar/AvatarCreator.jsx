@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import AvatarPreview   from './AvatarPreview.jsx';
 import BodyPanel       from './panels/BodyPanel.jsx';
 import FacePanel       from './panels/FacePanel.jsx';
@@ -17,16 +18,49 @@ const TABS = [
   { key: 'clothing', label: 'Clothing' },
 ];
 
+// Default panel width: fill up to 380px but never more than 65% of viewport
+// so the character preview is always visible even on narrow phones.
+const defaultPanelWidth = () => Math.min(380, Math.round(window.innerWidth * 0.65));
+
 export default function AvatarCreator({ initialConfig, onSave, onCancel, saving = false }) {
-  const [config,    setConfig] = useState(() => mergeConfig(initialConfig));
-  const [activeTab, setTab]    = useState('body');
-  const avatarRef   = useRef(null);
-  const assetLibRef = useRef(null);
+  const [config,    setConfig]    = useState(() => mergeConfig(initialConfig));
+  const [activeTab, setTab]       = useState('body');
+  const [panelWidth, setPanelWidth] = useState(defaultPanelWidth);
+
+  const avatarRef    = useRef(null);
+  const assetLibRef  = useRef(null);
+  const widthAtDragStart = useRef(0);
+  const xAtDragStart     = useRef(0);
 
   const patch = useCallback((partial) => {
     setConfig(prev => ({ ...prev, ...partial }));
   }, []);
 
+  // ── Drag-to-resize divider ───────────────────────────────────────────────
+  const onHandlePointerDown = useCallback((e) => {
+    e.preventDefault();
+    xAtDragStart.current = e.touches ? e.touches[0].clientX : e.clientX;
+    widthAtDragStart.current = panelWidth;
+
+    const onMove = (ev) => {
+      const x = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const next = Math.max(160, Math.min(window.innerWidth - 80,
+        widthAtDragStart.current + (x - xAtDragStart.current)));
+      setPanelWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend',  onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend',  onUp);
+  }, [panelWidth]);
+
+  // ── Randomise ────────────────────────────────────────────────────────────
   const randomise = useCallback(() => {
     const rand = (min = 0, max = 1) => Math.random() * (max - min) + min;
     const pick  = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -41,20 +75,12 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
 
     const next = {
       body: {
-        height:        rand(),
-        weight:        rand(),
-        muscle:        rand(),
-        age:           rand(0.1, 0.6),
-        shoulderWidth: rand(),
-        hipWidth:      rand(),
+        height: rand(), weight: rand(), muscle: rand(), age: rand(0.1, 0.6),
+        shoulderWidth: rand(), hipWidth: rand(),
       },
       face: {
-        jaw:           rand(),
-        eyeSize:       rand(),
-        noseWidth:     rand(),
-        browHeight:    rand(),
-        cheekFullness: rand(),
-        lipSize:       rand(),
+        jaw: rand(), eyeSize: rand(), noseWidth: rand(), browHeight: rand(),
+        cheekFullness: rand(), lipSize: rand(),
       },
       skin:    { tone: pick(tones), marking: null },
       species: { earMorph: rand(0, 0.8), hornMesh: pick(horns), tailMesh: pick(tails) },
@@ -67,20 +93,22 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
 
   const panelProps = { config, avatar: avatarRef.current, assetLibrary: assetLibRef.current, onChange: patch };
 
-  return (
+  // Render via portal so the overlay sits above ALL app stacking contexts
+  // (the nav panel, HUD, etc.) regardless of where CharacterTab is mounted.
+  return createPortal(
     <div style={S.overlay}>
-      {/* Header — title only */}
+
+      {/* Header */}
       <div style={S.header}>
         <span style={S.title}>Edit Appearance</span>
         <button style={S.btnClose} onClick={onCancel} title="Close">✕</button>
       </div>
 
-      {/* Body: left panel + 3D preview */}
+      {/* Body: resizable left panel + drag handle + 3D preview */}
       <div style={S.body}>
 
-        {/* Left — tabs + scrollable panel content + sticky action footer */}
-        <div style={S.left}>
-          {/* Tabs */}
+        {/* Left panel */}
+        <div style={{ ...S.left, width: panelWidth }}>
           <div style={S.tabRow}>
             {TABS.map(t => (
               <button
@@ -93,7 +121,6 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
             ))}
           </div>
 
-          {/* Scrollable panel area */}
           <div style={S.panelScroll}>
             {activeTab === 'body'     && <BodyPanel     {...panelProps} />}
             {activeTab === 'face'     && <FacePanel     {...panelProps} />}
@@ -103,7 +130,7 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
             {activeTab === 'clothing' && <ClothingPanel {...panelProps} />}
           </div>
 
-          {/* Sticky action footer — always visible */}
+          {/* Sticky action footer */}
           <div style={S.actionBar}>
             <button style={S.btnRandomise} onClick={randomise}>⚡ Randomise</button>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -119,6 +146,16 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
           </div>
         </div>
 
+        {/* Drag handle */}
+        <div
+          style={S.dragHandle}
+          onMouseDown={onHandlePointerDown}
+          onTouchStart={onHandlePointerDown}
+          title="Drag to resize"
+        >
+          <div style={S.dragGrip} />
+        </div>
+
         {/* Right — 3D preview */}
         <div style={S.preview}>
           <AvatarPreview
@@ -129,7 +166,8 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
           <p style={S.previewHint}>Drag to rotate · Scroll to zoom</p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -139,7 +177,7 @@ const S = {
   overlay: {
     position:      'fixed',
     inset:         0,
-    zIndex:        10000,
+    zIndex:        99999,
     background:    '#0d1117',
     display:       'flex',
     flexDirection: 'column',
@@ -149,7 +187,7 @@ const S = {
     display:        'flex',
     alignItems:     'center',
     justifyContent: 'space-between',
-    padding:        '0 20px',
+    padding:        '0 16px',
     height:         48,
     background:     '#0f172a',
     borderBottom:   '1px solid #1e293b',
@@ -160,7 +198,7 @@ const S = {
     background:   'transparent',
     border:       'none',
     color:        '#475569',
-    fontSize:     16,
+    fontSize:     18,
     cursor:       'pointer',
     padding:      '4px 8px',
     borderRadius: 6,
@@ -173,66 +211,65 @@ const S = {
     overflow: 'hidden',
   },
   left: {
-    width:         380,
     flexShrink:    0,
     display:       'flex',
     flexDirection: 'column',
     borderRight:   '1px solid #1e293b',
     background:    '#0f172a',
+    minWidth:      160,
   },
   tabRow: {
-    display:       'grid',
+    display:             'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
-    gap:           4,
-    padding:       '10px 12px',
-    borderBottom:  '1px solid #1e293b',
-    flexShrink:    0,
+    gap:                 4,
+    padding:             '10px 10px',
+    borderBottom:        '1px solid #1e293b',
+    flexShrink:          0,
   },
   tab: {
     background:   'transparent',
     border:       '1px solid #1e293b',
     borderRadius: 8,
     color:        '#64748b',
-    fontSize:     12,
+    fontSize:     11,
     fontWeight:   500,
-    padding:      '6px 4px',
+    padding:      '6px 2px',
     cursor:       'pointer',
     fontFamily:   'Inter, system-ui, sans-serif',
     textAlign:    'center',
-    transition:   'background 0.15s, color 0.15s, border-color 0.15s',
   },
   tabActive: {
-    background:  '#1e3a5f',
-    border:      '1px solid #3b82f6',
-    color:       '#7dd3fc',
-    fontWeight:  600,
+    background: '#1e3a5f',
+    border:     '1px solid #3b82f6',
+    color:      '#7dd3fc',
+    fontWeight: 600,
   },
   panelScroll: {
     flex:      1,
     overflowY: 'auto',
-    padding:   '4px 16px 12px',
+    padding:   '4px 14px 12px',
   },
   actionBar: {
     display:        'flex',
     alignItems:     'center',
     justifyContent: 'space-between',
-    padding:        '12px 16px',
+    padding:        '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
     borderTop:      '1px solid #1e293b',
     background:     '#0a1120',
     flexShrink:     0,
-    gap:            8,
+    gap:            6,
   },
   btnRandomise: {
-    background:   'transparent',
-    border:       '1px solid #334155',
-    borderRadius: 8,
-    color:        '#94a3b8',
-    fontSize:     12,
-    fontWeight:   500,
-    padding:      '8px 14px',
-    cursor:       'pointer',
-    fontFamily:   'Inter, system-ui, sans-serif',
-    letterSpacing:'0.01em',
+    background:    'transparent',
+    border:        '1px solid #334155',
+    borderRadius:  8,
+    color:         '#94a3b8',
+    fontSize:      12,
+    fontWeight:    500,
+    padding:       '8px 10px',
+    cursor:        'pointer',
+    fontFamily:    'Inter, system-ui, sans-serif',
+    whiteSpace:    'nowrap',
   },
   btnCancel: {
     background:   'transparent',
@@ -240,7 +277,7 @@ const S = {
     borderRadius: 8,
     color:        '#94a3b8',
     fontSize:     13,
-    padding:      '8px 16px',
+    padding:      '8px 12px',
     cursor:       'pointer',
     fontFamily:   'Inter, system-ui, sans-serif',
   },
@@ -251,16 +288,36 @@ const S = {
     color:        '#fff',
     fontSize:     13,
     fontWeight:   600,
-    padding:      '8px 22px',
+    padding:      '8px 18px',
     cursor:       'pointer',
     fontFamily:   'Inter, system-ui, sans-serif',
   },
+  // ── Drag handle ──────────────────────────────────────────────────────────
+  dragHandle: {
+    width:          12,
+    flexShrink:     0,
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    background:     '#0d1117',
+    cursor:         'col-resize',
+    userSelect:     'none',
+    touchAction:    'none',
+  },
+  dragGrip: {
+    width:        4,
+    height:       40,
+    borderRadius: 4,
+    background:   '#1e293b',
+  },
+  // ── Preview ──────────────────────────────────────────────────────────────
   preview: {
     flex:          1,
     display:       'flex',
     flexDirection: 'column',
-    padding:       16,
+    padding:       12,
     background:    '#0d1117',
+    minWidth:      0,
   },
   previewHint: {
     color:     '#334155',
