@@ -321,12 +321,30 @@ export default function WorldGame({ playerInfo }) {
             />
             <button style={S.sendBtn} onClick={submitChat}>Send</button>
           </div>
+        ) : IS_TOUCH ? (
+          <button
+            onClick={openChat}
+            aria-label="Open chat"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(15,23,42,0.75)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              border: '1px solid rgba(148,163,184,0.20)',
+              borderRadius: 20,
+              color: '#94a3b8', fontSize: 12,
+              fontFamily: 'Inter, system-ui, sans-serif',
+              minHeight: 36, padding: '0 14px',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span>💬</span>
+            <span>Chat</span>
+          </button>
         ) : (
           <div style={{ color: '#475569', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}>
-            {IS_TOUCH
-              ? <>Tap <kbd style={{ color: '#7dd3fc' }}>💬</kbd> or type to chat</>
-              : <>Press <kbd style={{ color: '#7dd3fc' }}>Enter</kbd> to chat · <kbd style={{ color: '#7dd3fc' }}>/w</kbd> world chat</>
-            }
+            Press <kbd style={{ color: '#7dd3fc' }}>Enter</kbd> to chat · <kbd style={{ color: '#7dd3fc' }}>/w</kbd> world chat
           </div>
         )}
       </div>
