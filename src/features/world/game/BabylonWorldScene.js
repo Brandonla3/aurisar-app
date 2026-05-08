@@ -229,39 +229,45 @@ class LightingManager {
   }
 
   _setupPipelines() {
-    // Mobile WebGL (especially Safari) may not support HDR render targets or
-    // MSAA — wrap in try/catch so a failure here doesn't crash the whole scene.
-    try {
-      this.pipeOverworld = new BABYLON.DefaultRenderingPipeline('lm_overworld_pipe', true, this.scene, [this.camera]);
-      this.pipeOverworld.samples        = 4;
-      this.pipeOverworld.fxaaEnabled    = true;
-      this.pipeOverworld.bloomEnabled   = true;
-      this.pipeOverworld.bloomThreshold = 0.88;
-      this.pipeOverworld.bloomWeight    = 0.22;
-      this.pipeOverworld.bloomKernel    = 64;
-      this.pipeOverworld.bloomScale     = 0.5;
-      this.pipeOverworld.sharpenEnabled = true;
-      this.pipeOverworld.sharpen.colorAmount = 0.20;
-      this.pipeOverworld.sharpen.edgeAmount  = 0.15;
-    } catch (_) {
-      this.pipeOverworld = null;
-    }
+    this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
+      bloomThreshold: 0.88, bloomWeight: 0.22, bloomKernel: 64, bloomScale: 0.5,
+      sharpenColor: 0.20, sharpenEdge: 0.15,
+    });
+    this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
+      bloomThreshold: 0.90, bloomWeight: 0.30, bloomKernel: 64, bloomScale: 0.5,
+      sharpenColor: 0.15, sharpenEdge: 0.10,
+    });
 
-    try {
-      this.pipeDungeon = new BABYLON.DefaultRenderingPipeline('lm_dungeon_pipe', true, this.scene, [this.camera]);
-      this.pipeDungeon.samples        = 4;
-      this.pipeDungeon.fxaaEnabled    = true;
-      this.pipeDungeon.bloomEnabled   = true;
-      this.pipeDungeon.bloomThreshold = 0.90;
-      this.pipeDungeon.bloomWeight    = 0.30;
-      this.pipeDungeon.bloomKernel    = 64;
-      this.pipeDungeon.bloomScale     = 0.5;
-      this.pipeDungeon.sharpenEnabled = true;
-      this.pipeDungeon.sharpen.colorAmount = 0.15;
-      this.pipeDungeon.sharpen.edgeAmount  = 0.10;
-    } catch (_) {
-      this.pipeDungeon = null;
+    // If both pipelines failed (typical on mobile Safari with limited WebGL2),
+    // boost scene exposure so the raw output isn't underexposed without the
+    // pipeline's tone-mapping post-process pass.
+    if (!this.pipeOverworld && !this.pipeDungeon) {
+      this.scene.imageProcessingConfiguration.exposure = 2.2;
     }
+  }
+
+  // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
+  // return null only if both fail.
+  _tryBuildPipeline(name, opts) {
+    for (const hdr of [true, false]) {
+      try {
+        const p = new BABYLON.DefaultRenderingPipeline(name, hdr, this.scene, [this.camera]);
+        p.samples        = hdr ? 4 : 1;
+        p.fxaaEnabled    = true;
+        p.bloomEnabled   = true;
+        p.bloomThreshold = opts.bloomThreshold;
+        p.bloomWeight    = opts.bloomWeight;
+        p.bloomKernel    = hdr ? opts.bloomKernel : 32; // smaller kernel on mobile
+        p.bloomScale     = opts.bloomScale;
+        p.sharpenEnabled = hdr; // skip sharpen on the non-HDR fallback
+        if (hdr) {
+          p.sharpen.colorAmount = opts.sharpenColor;
+          p.sharpen.edgeAmount  = opts.sharpenEdge;
+        }
+        return p;
+      } catch (_) { /* try next tier */ }
+    }
+    return null;
   }
 
   _loadEnvSafe(url) {
