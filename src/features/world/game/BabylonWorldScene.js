@@ -243,10 +243,13 @@ class LightingManager {
     // use higher raw light intensities to compensate.
     this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
 
-    // Also lift scene ambient so StandardMaterial surfaces have a base fill
-    // even in shadowed areas (pipeline would normally handle this via bloom).
     if (this._noPipeline) {
-      this.scene.ambientColor = new BABYLON.Color3(0.25, 0.25, 0.28);
+      // Lift scene ambient so StandardMaterial surfaces have a base fill in
+      // shadowed areas (pipeline would normally handle this via bloom).
+      this.scene.ambientColor = new BABYLON.Color3(0.55, 0.55, 0.60);
+      // Replace the near-black clear colour with a daylight sky tint, since
+      // the .env-based skybox never loaded — without this the sky is black.
+      this.scene.clearColor = new BABYLON.Color4(0.42, 0.58, 0.78, 1);
     }
   }
 
@@ -326,26 +329,28 @@ class LightingManager {
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
     // Without a post-process pipeline the tone-mapping pass is absent, so we
-    // lift raw light intensities and exposure to compensate.
-    const lm = this._noPipeline ? 2.0 : 1.0;
-    const em = this._noPipeline ? 1.8 : 1.0;
+    // lift raw light intensities to compensate. Hemispheric (ambient) gets
+    // the largest boost since it lights surfaces facing away from the sun.
+    const keyMul  = this._noPipeline ? 2.5 : 1.0;
+    const fillMul = this._noPipeline ? 4.0 : 1.0;
+    const exposureMul = this._noPipeline ? 1.6 : 1.0;
 
-    this.key.intensity = lerp(0.05, 2.4, dayFactor) * lm;
+    this.key.intensity = lerp(0.05, 2.4, dayFactor) * keyMul;
     this.key.diffuse   = lerpColor3(
       new BABYLON.Color3(1.0, 0.72, 0.48),
       new BABYLON.Color3(1.0, 0.97, 0.92),
       clamp01(dayFactor * 1.25)
     );
-    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor) * lm;
+    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor) * keyMul;
 
-    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor) * lm;
+    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor) * fillMul;
     this.fillOverworld.groundColor = lerpColor3(
-      new BABYLON.Color3(0.05, 0.06, 0.08),
-      new BABYLON.Color3(0.22, 0.24, 0.26),
+      this._noPipeline ? new BABYLON.Color3(0.20, 0.22, 0.26) : new BABYLON.Color3(0.05, 0.06, 0.08),
+      new BABYLON.Color3(0.34, 0.36, 0.40),
       dayFactor
     );
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor) * em;
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor) * exposureMul;
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -1279,6 +1284,14 @@ export class BabylonWorldScene {
     const m = new BABYLON.StandardMaterial(name + '_mat', this.scene);
     m.diffuseColor  = color;
     m.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    // ambientColor must be non-zero for scene.ambientColor to contribute —
+    // otherwise StandardMaterial ignores the scene-wide ambient term.
+    m.ambientColor = color.clone();
+    // When the post-process pipeline is unavailable (mobile fallback),
+    // self-illuminate so meshes stay visible regardless of lighting angle.
+    if (this._lm?._noPipeline) {
+      m.emissiveColor = color.scale(0.45).add(new BABYLON.Color3(0.08, 0.08, 0.10));
+    }
     return m;
   }
 
