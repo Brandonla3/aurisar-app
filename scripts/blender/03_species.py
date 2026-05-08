@@ -24,8 +24,8 @@ ASSETS  = os.path.join(REPO, 'public', 'assets', 'characters')
 SPECIES = os.path.join(ASSETS, 'species')
 BASE    = os.path.join(ASSETS, 'base_body.glb')
 
-HEAD_TOP  = Vector((0.0, 1.74, 0.0))   # approx top of skull
-HIPS_Y    = 0.92                       # hips bone height (rest pose)
+HEAD_TOP  = Vector((0.0, 1.67, 0.0))   # HeadTop_End bone Y=1.663 in base_body.glb
+HIPS_Y    = 0.92                       # Hips bone Y=0.921 in base_body.glb
 TAIL_BACK = -0.10                      # how far behind the hips the tail starts
 
 

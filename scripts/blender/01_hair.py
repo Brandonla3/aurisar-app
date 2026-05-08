@@ -28,8 +28,8 @@ ASSETS = os.path.join(REPO, 'public', 'assets', 'characters')
 HAIR   = os.path.join(ASSETS, 'hair')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
-# Approximate head pivot in MPFB rest pose. Tune if exports look offset.
-HEAD_CENTER = Vector((0.0, 1.65, 0.0))
+# Head pivot measured from base_body.glb: Head bone head=1.462 tail=1.673 → center 1.567.
+HEAD_CENTER = Vector((0.0, 1.57, 0.0))
 HEAD_RADIUS = 0.105
 
 
