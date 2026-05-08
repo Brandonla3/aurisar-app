@@ -30,13 +30,14 @@ ASSETS = os.path.join(REPO, 'public', 'assets', 'characters')
 CLOTH  = os.path.join(ASSETS, 'clothing')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
-# Y-axis Up; meter scale. Tune if the MPFB rig you ship differs.
+# Y-axis Up; meter scale. Measured from base_body.glb bones:
+#   Hips=0.921  LeftArm(shoulder)=1.362  LeftLeg(knee)=0.457  LeftFoot(ankle)=0.086  Toe=0.005
 TORSO_Y_MIN = 0.95
-TORSO_Y_MAX = 1.50
+TORSO_Y_MAX = 1.38   # cuts at shoulder line (was 1.50 — grabbed neck geometry)
 HIPS_Y      = 0.92
-KNEE_Y      = 0.50
-ANKLE_Y     = 0.10
-FOOT_Y      = 0.04
+KNEE_Y      = 0.46   # actual knee joint (was 0.50)
+ANKLE_Y     = 0.09   # actual ankle (was 0.10)
+FOOT_Y      = 0.01   # toe base (was 0.04)
 INFLATE     = 0.012   # outward offset to prevent body z-fight
 
 
