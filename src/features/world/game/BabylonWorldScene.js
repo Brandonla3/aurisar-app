@@ -541,6 +541,15 @@ export class BabylonWorldScene {
     this._pendingUpdates = []; // remote rows queued while _local is loading
     this._spawning       = new Set(); // identity IDs currently being async-spawned
 
+    // Mobile touch state — written by setJoystick() from WorldGame's React layer
+    this._joyDx = 0;
+    this._joyDy = 0;
+    // Camera drag touch (right-half of screen, managed internally)
+    this._camTouch = null; // { id, lastX, lastY }
+
+    this._isMobile = typeof window !== 'undefined' &&
+      window.matchMedia('(pointer: coarse)').matches;
+
     this._initSync();
     this._initCharactersAsync();
   }
@@ -620,8 +629,107 @@ export class BabylonWorldScene {
     cam.wheelDeltaPercentage = 0.01;
     cam.panningSensibility   = 0;
     cam.minZ                 = 0.1;
-    cam.attachControl(this.canvas, true);
+
+    if (this._isMobile) {
+      // On mobile we manage all pointer events manually so the left-half
+      // joystick overlay and right-half camera drag don't conflict.
+      this._bindTouchControls(cam);
+    } else {
+      cam.attachControl(this.canvas, true);
+    }
+
     this._camera = cam;
+  }
+
+  // ── Mobile pointer controls ────────────────────────────────────────────────
+  // Left half  → joystick (handled externally by WorldGame via setJoystick())
+  // Right half → camera orbit (alpha / beta from drag delta)
+  // Pinch on right half → zoom (radius)
+
+  _bindTouchControls(cam) {
+    const canvas = this.canvas;
+
+    // Track a second touch for pinch-zoom
+    this._pinchTouch = null; // { id, lastDist }
+
+    const onDown = (e) => {
+      const rect   = canvas.getBoundingClientRect();
+      const cx     = e.clientX - rect.left;
+      const isRight = cx >= rect.width / 2;
+
+      if (isRight) {
+        if (!this._camTouch && !this._pinchTouch) {
+          this._camTouch = { id: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+          canvas.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        } else if (this._camTouch && !this._pinchTouch) {
+          // Second finger on right = start pinch
+          const dx = e.clientX - this._camTouch.lastX;
+          const dy = e.clientY - this._camTouch.lastY;
+          this._pinchTouch = {
+            id: e.pointerId,
+            lastDist: Math.hypot(dx, dy),
+          };
+          canvas.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        }
+      }
+      // Left-half touches are captured by the React joystick overlay,
+      // so they never reach the canvas.
+    };
+
+    const onMove = (e) => {
+      if (this._camTouch && e.pointerId === this._camTouch.id) {
+        if (!this._pinchTouch) {
+          const dx = e.clientX - this._camTouch.lastX;
+          const dy = e.clientY - this._camTouch.lastY;
+          cam.alpha -= dx * 0.006;
+          cam.beta   = Math.max(cam.lowerBetaLimit,
+                       Math.min(cam.upperBetaLimit, cam.beta + dy * 0.006));
+        }
+        this._camTouch.lastX = e.clientX;
+        this._camTouch.lastY = e.clientY;
+        e.preventDefault();
+      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
+        const dx   = e.clientX - this._camTouch.lastX;
+        const dy   = e.clientY - this._camTouch.lastY;
+        const dist = Math.hypot(dx, dy);
+        const delta = this._pinchTouch.lastDist - dist;
+        cam.radius = Math.max(cam.lowerRadiusLimit,
+                     Math.min(cam.upperRadiusLimit, cam.radius + delta * 0.05));
+        this._pinchTouch.lastDist = dist;
+        e.preventDefault();
+      }
+    };
+
+    const onUp = (e) => {
+      if (this._camTouch && e.pointerId === this._camTouch.id) {
+        this._camTouch  = null;
+        this._pinchTouch = null;
+        e.preventDefault();
+      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
+        this._pinchTouch = null;
+        e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener('pointerdown',   onDown, { passive: false });
+    canvas.addEventListener('pointermove',   onMove, { passive: false });
+    canvas.addEventListener('pointerup',     onUp,   { passive: false });
+    canvas.addEventListener('pointercancel', onUp,   { passive: false });
+
+    this._touchCleanup = () => {
+      canvas.removeEventListener('pointerdown',   onDown, { passive: false });
+      canvas.removeEventListener('pointermove',   onMove, { passive: false });
+      canvas.removeEventListener('pointerup',     onUp,   { passive: false });
+      canvas.removeEventListener('pointercancel', onUp,   { passive: false });
+    };
+  }
+
+  // Called by WorldGame's React joystick overlay each frame
+  setJoystick(dx, dy) {
+    this._joyDx = dx;
+    this._joyDy = dy;
   }
 
   // ── Shadows ────────────────────────────────────────────────────────────────
@@ -952,9 +1060,6 @@ export class BabylonWorldScene {
     const a = this._keys['KeyA'] || this._keys['ArrowLeft'];
     const d = this._keys['KeyD'] || this._keys['ArrowRight'];
 
-    this._local.isMoving = !!(w || s || a || d);
-    if (!this._local.isMoving) return;
-
     // alpha points FROM target TO camera, so add PI to get the true forward direction
     const speed = 0.012;
     const alpha  = this._camera.alpha + Math.PI;
@@ -962,15 +1067,34 @@ export class BabylonWorldScene {
     const right  = new BABYLON.Vector3(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2));
 
     const dir = BABYLON.Vector3.Zero();
+
+    // Keyboard input
     if (w) dir.addInPlace(fwd);
     if (s) dir.subtractInPlace(fwd);
     if (a) dir.addInPlace(right);
     if (d) dir.subtractInPlace(right);
-    if (dir.lengthSquared() < 0.001) return;
+
+    // Virtual joystick input (mobile)
+    // _joyDx / _joyDy are normalised [-1, 1] from WorldGame's React overlay.
+    // Screen +X = camera right, screen +Y = camera backward.
+    let joyScale = 1;
+    const JOY_DEAD = 0.12; // normalised deadzone
+    const joyLen = Math.hypot(this._joyDx, this._joyDy);
+    if (joyLen > JOY_DEAD) {
+      joyScale = Math.min(1, (joyLen - JOY_DEAD) / (1 - JOY_DEAD));
+      const nx = this._joyDx / joyLen;
+      const ny = this._joyDy / joyLen;
+      dir.addInPlace(right.scale(-nx)); // -nx: screen left = strafe left
+      dir.addInPlace(fwd.scale(-ny));   // -ny: screen up   = move forward
+    }
+
+    this._local.isMoving = dir.lengthSquared() > 0.001;
+    if (!this._local.isMoving) return;
     dir.normalize();
 
+    const speedScale = (joyLen > JOY_DEAD && !w && !s && !a && !d) ? joyScale : 1;
     const pos = this._local.root.position;
-    pos.addInPlace(dir.scale(speed * dt));
+    pos.addInPlace(dir.scale(speed * dt * speedScale));
     pos.x = Math.max(-95, Math.min(95, pos.x));
     pos.z = Math.max(-95, Math.min(95, pos.z));
     pos.y = 0;
@@ -1134,6 +1258,7 @@ export class BabylonWorldScene {
     window.removeEventListener('keydown', this._kd);
     window.removeEventListener('keyup',   this._ku);
     window.removeEventListener('resize',  this._onResize);
+    this._touchCleanup?.();
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     this._local?.dispose();
     AssetLibrary.dispose();
