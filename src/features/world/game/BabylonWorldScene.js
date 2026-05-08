@@ -238,11 +238,15 @@ class LightingManager {
       sharpenColor: 0.15, sharpenEdge: 0.10,
     });
 
-    // If both pipelines failed (typical on mobile Safari with limited WebGL2),
-    // boost scene exposure so the raw output isn't underexposed without the
-    // pipeline's tone-mapping post-process pass.
-    if (!this.pipeOverworld && !this.pipeDungeon) {
-      this.scene.imageProcessingConfiguration.exposure = 2.2;
+    // Track whether we have any working pipeline. When we don't, the
+    // tone-mapping post-process is absent, so _updateOverworld/_updateDungeon
+    // use higher raw light intensities to compensate.
+    this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
+
+    // Also lift scene ambient so StandardMaterial surfaces have a base fill
+    // even in shadowed areas (pipeline would normally handle this via bloom).
+    if (this._noPipeline) {
+      this.scene.ambientColor = new BABYLON.Color3(0.25, 0.25, 0.28);
     }
   }
 
@@ -321,22 +325,27 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
-    this.key.intensity = lerp(0.05, 2.4, dayFactor);
+    // Without a post-process pipeline the tone-mapping pass is absent, so we
+    // lift raw light intensities and exposure to compensate.
+    const lm = this._noPipeline ? 2.0 : 1.0;
+    const em = this._noPipeline ? 1.8 : 1.0;
+
+    this.key.intensity = lerp(0.05, 2.4, dayFactor) * lm;
     this.key.diffuse   = lerpColor3(
       new BABYLON.Color3(1.0, 0.72, 0.48),
       new BABYLON.Color3(1.0, 0.97, 0.92),
       clamp01(dayFactor * 1.25)
     );
-    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor);
+    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor) * lm;
 
-    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor);
+    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor) * lm;
     this.fillOverworld.groundColor = lerpColor3(
       new BABYLON.Color3(0.05, 0.06, 0.08),
       new BABYLON.Color3(0.22, 0.24, 0.26),
       dayFactor
     );
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor) * em;
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -358,7 +367,8 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = 0.82;
+    const em = this._noPipeline ? 2.0 : 1.0;
+    this.scene.imageProcessingConfiguration.exposure = 0.82 * em;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -754,12 +764,20 @@ export class BabylonWorldScene {
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
-    const sg = new BABYLON.ShadowGenerator(2048, this._lm.key);
-    sg.useBlurExponentialShadowMap = true;
-    sg.blurKernel  = 24;
-    sg.bias        = 0.0005;
-    sg.normalBias  = 0.02;
-    this._shadowGen = sg;
+    // Try high-quality 2048 shadow map first; mobile GPUs often cap at 1024,
+    // so fall back gracefully rather than crashing the whole render loop.
+    for (const size of [2048, 1024, 512]) {
+      try {
+        const sg = new BABYLON.ShadowGenerator(size, this._lm.key);
+        sg.useBlurExponentialShadowMap = size >= 1024;
+        sg.blurKernel = size >= 1024 ? 24 : 8;
+        sg.bias       = 0.0005;
+        sg.normalBias = 0.02;
+        this._shadowGen = sg;
+        return;
+      } catch (_) { /* try smaller size */ }
+    }
+    this._shadowGen = null; // shadows unavailable — scene still renders
   }
 
   _castShadow(mesh) {
