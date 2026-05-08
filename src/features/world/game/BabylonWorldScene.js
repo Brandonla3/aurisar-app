@@ -155,6 +155,8 @@ class LightingManager {
 
     this._disposePipeline(this.pipeOverworld);
     this._disposePipeline(this.pipeDungeon);
+    this._imagePP?.dispose();
+    this._glowLayer?.dispose();
 
     [this.envDay, this.envNight, this.envDungeon].forEach(t => t?.dispose());
 
@@ -169,6 +171,12 @@ class LightingManager {
       BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
 
     this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+
+    // Replace the near-black scene default with a visible sky colour right
+    // away. This shows through until the env-based skybox loads; if the
+    // .env files are absent it stays as the permanent background and is
+    // animated per-frame in _updateOverworld / _updateDungeon.
+    this.scene.clearColor = new BABYLON.Color4(0.42, 0.58, 0.78, 1);
 
     // Env textures loaded asynchronously with a HEAD/content-type guard so
     // missing files (or the Vite SPA HTML fallback) don't produce
@@ -238,19 +246,42 @@ class LightingManager {
       sharpenColor: 0.15, sharpenEdge: 0.10,
     });
 
-    // Track whether we have any working pipeline. When we don't, the
-    // tone-mapping post-process is absent, so _updateOverworld/_updateDungeon
-    // use higher raw light intensities to compensate.
     this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
+    this._imagePP    = null;
+    this._glowLayer  = null;
 
     if (this._noPipeline) {
-      // Lift scene ambient so StandardMaterial surfaces have a base fill in
-      // shadowed areas (pipeline would normally handle this via bloom).
-      this.scene.ambientColor = new BABYLON.Color3(0.55, 0.55, 0.60);
-      // Replace the near-black clear colour with a daylight sky tint, since
-      // the .env-based skybox never loaded — without this the sky is black.
-      this.scene.clearColor = new BABYLON.Color4(0.42, 0.58, 0.78, 1);
+      // Tier 3 fallback: ImageProcessingPostProcess attached directly to the
+      // camera. Unlike DefaultRenderingPipeline it does NOT require half-float
+      // render targets, so it works on mobile WebGL2 (Safari/Chrome iOS).
+      // It inherits scene.imageProcessingConfiguration automatically, giving
+      // us ACES tone-mapping, exposure, and contrast on every mobile device.
+      try {
+        this._imagePP = new BABYLON.ImageProcessingPostProcess(
+          'imgPP', 1.0, this.camera,
+          BABYLON.Texture.BILINEAR_SAMPLINGMODE, this.engine, false,
+          BABYLON.Constants.TEXTURETYPE_UNSIGNED_INT
+        );
+        // We now have proper tone-mapping — clear the _noPipeline flag so
+        // the rest of the system uses normal (desktop-equivalent) intensities.
+        this._noPipeline = false;
+      } catch (_) { /* truly no post-processing capability */ }
+
+      // GlowLayer: mobile-compatible bloom — renders to a downsampled texture
+      // and requires only standard 8-bit render targets.
+      try {
+        this._glowLayer = new BABYLON.GlowLayer('glow', this.scene, {
+          mainTextureFixedSize: 256,
+          blurKernelSize: 16,
+        });
+        this._glowLayer.intensity = 0.4;
+      } catch (_) { /* skip bloom */ }
     }
+
+    // Ambient floor prevents fully-shadowed surfaces going black on all render
+    // paths, including desktop where IBL from the .env files handles this
+    // naturally (modest value avoids interference when IBL does load).
+    this.scene.ambientColor = new BABYLON.Color3(0.22, 0.25, 0.30);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -328,29 +359,25 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
-    // Without a post-process pipeline the tone-mapping pass is absent, so we
-    // lift raw light intensities to compensate. Hemispheric (ambient) gets
-    // the largest boost since it lights surfaces facing away from the sun.
-    const keyMul  = this._noPipeline ? 2.5 : 1.0;
-    const fillMul = this._noPipeline ? 4.0 : 1.0;
-    const exposureMul = this._noPipeline ? 1.6 : 1.0;
-
-    this.key.intensity = lerp(0.05, 2.4, dayFactor) * keyMul;
+    // ImageProcessingPostProcess (or DefaultRenderingPipeline) now provides
+    // proper ACES tone-mapping on every tier, so desktop and mobile use the
+    // same raw light intensity values. No device-specific multipliers needed.
+    this.key.intensity = lerp(0.05, 2.4, dayFactor);
     this.key.diffuse   = lerpColor3(
       new BABYLON.Color3(1.0, 0.72, 0.48),
       new BABYLON.Color3(1.0, 0.97, 0.92),
       clamp01(dayFactor * 1.25)
     );
-    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor) * keyMul;
+    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor);
 
-    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor) * fillMul;
+    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor);
     this.fillOverworld.groundColor = lerpColor3(
-      this._noPipeline ? new BABYLON.Color3(0.20, 0.22, 0.26) : new BABYLON.Color3(0.05, 0.06, 0.08),
+      new BABYLON.Color3(0.05, 0.06, 0.08),
       new BABYLON.Color3(0.34, 0.36, 0.40),
       dayFactor
     );
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor) * exposureMul;
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -359,6 +386,18 @@ class LightingManager {
       new BABYLON.Color3(0.74, 0.84, 0.96),
       dayFactor
     );
+
+    // Animate the background sky colour through day / night. When an env-based
+    // skybox mesh is present it covers clearColor completely; when the .env
+    // files are absent (our current setup) this IS the sky.
+    const sky = lerpColor3(
+      new BABYLON.Color3(0.02, 0.03, 0.08),  // night
+      new BABYLON.Color3(0.42, 0.58, 0.78),  // day
+      dayFactor
+    );
+    this.scene.clearColor.r = sky.r;
+    this.scene.clearColor.g = sky.g;
+    this.scene.clearColor.b = sky.b;
 
     if (dayFactor > 0.5) {
       this._setEnvironment(this.envDay,   lerp(0.35, 0.95, dayFactor));
@@ -372,8 +411,7 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    const em = this._noPipeline ? 2.0 : 1.0;
-    this.scene.imageProcessingConfiguration.exposure = 0.82 * em;
+    this.scene.imageProcessingConfiguration.exposure = 0.82;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -1284,13 +1322,16 @@ export class BabylonWorldScene {
     const m = new BABYLON.StandardMaterial(name + '_mat', this.scene);
     m.diffuseColor  = color;
     m.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    // ambientColor must be non-zero for scene.ambientColor to contribute —
-    // otherwise StandardMaterial ignores the scene-wide ambient term.
+    // Required: ambientColor must be non-zero for scene.ambientColor to
+    // contribute — StandardMaterial ignores the scene-wide ambient term when
+    // this is black (the default).
     m.ambientColor = color.clone();
-    // When the post-process pipeline is unavailable (mobile fallback),
-    // self-illuminate so meshes stay visible regardless of lighting angle.
+    // Emissive self-illumination is only applied when ALL post-processing has
+    // failed (DefaultRenderingPipeline AND ImageProcessingPostProcess both
+    // threw). This is essentially impossible on any device supporting WebGL2,
+    // but kept as an absolute last resort.
     if (this._lm?._noPipeline) {
-      m.emissiveColor = color.scale(0.45).add(new BABYLON.Color3(0.08, 0.08, 0.10));
+      m.emissiveColor = color.scale(0.25).add(new BABYLON.Color3(0.04, 0.04, 0.05));
     }
     return m;
   }
