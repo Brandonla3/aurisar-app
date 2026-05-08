@@ -229,29 +229,39 @@ class LightingManager {
   }
 
   _setupPipelines() {
-    this.pipeOverworld = new BABYLON.DefaultRenderingPipeline('lm_overworld_pipe', true, this.scene, [this.camera]);
-    this.pipeOverworld.samples        = 4;
-    this.pipeOverworld.fxaaEnabled    = true;
-    this.pipeOverworld.bloomEnabled   = true;
-    this.pipeOverworld.bloomThreshold = 0.88;
-    this.pipeOverworld.bloomWeight    = 0.22;
-    this.pipeOverworld.bloomKernel    = 64;
-    this.pipeOverworld.bloomScale     = 0.5;
-    this.pipeOverworld.sharpenEnabled = true;
-    this.pipeOverworld.sharpen.colorAmount = 0.20;
-    this.pipeOverworld.sharpen.edgeAmount  = 0.15;
+    // Mobile WebGL (especially Safari) may not support HDR render targets or
+    // MSAA — wrap in try/catch so a failure here doesn't crash the whole scene.
+    try {
+      this.pipeOverworld = new BABYLON.DefaultRenderingPipeline('lm_overworld_pipe', true, this.scene, [this.camera]);
+      this.pipeOverworld.samples        = 4;
+      this.pipeOverworld.fxaaEnabled    = true;
+      this.pipeOverworld.bloomEnabled   = true;
+      this.pipeOverworld.bloomThreshold = 0.88;
+      this.pipeOverworld.bloomWeight    = 0.22;
+      this.pipeOverworld.bloomKernel    = 64;
+      this.pipeOverworld.bloomScale     = 0.5;
+      this.pipeOverworld.sharpenEnabled = true;
+      this.pipeOverworld.sharpen.colorAmount = 0.20;
+      this.pipeOverworld.sharpen.edgeAmount  = 0.15;
+    } catch (_) {
+      this.pipeOverworld = null;
+    }
 
-    this.pipeDungeon = new BABYLON.DefaultRenderingPipeline('lm_dungeon_pipe', true, this.scene, [this.camera]);
-    this.pipeDungeon.samples        = 4;
-    this.pipeDungeon.fxaaEnabled    = true;
-    this.pipeDungeon.bloomEnabled   = true;
-    this.pipeDungeon.bloomThreshold = 0.90;
-    this.pipeDungeon.bloomWeight    = 0.30;
-    this.pipeDungeon.bloomKernel    = 64;
-    this.pipeDungeon.bloomScale     = 0.5;
-    this.pipeDungeon.sharpenEnabled = true;
-    this.pipeDungeon.sharpen.colorAmount = 0.15;
-    this.pipeDungeon.sharpen.edgeAmount  = 0.10;
+    try {
+      this.pipeDungeon = new BABYLON.DefaultRenderingPipeline('lm_dungeon_pipe', true, this.scene, [this.camera]);
+      this.pipeDungeon.samples        = 4;
+      this.pipeDungeon.fxaaEnabled    = true;
+      this.pipeDungeon.bloomEnabled   = true;
+      this.pipeDungeon.bloomThreshold = 0.90;
+      this.pipeDungeon.bloomWeight    = 0.30;
+      this.pipeDungeon.bloomKernel    = 64;
+      this.pipeDungeon.bloomScale     = 0.5;
+      this.pipeDungeon.sharpenEnabled = true;
+      this.pipeDungeon.sharpen.colorAmount = 0.15;
+      this.pipeDungeon.sharpen.edgeAmount  = 0.10;
+    } catch (_) {
+      this.pipeDungeon = null;
+    }
   }
 
   _loadEnvSafe(url) {
@@ -513,8 +523,11 @@ class LightingManager {
     this.scene.environmentIntensity = intensity;
   }
 
-  _setPipelineEnabled(pipe, enabled) { if (pipe) pipe.setEnabled(enabled); }
-  _disposePipeline(pipe)             { if (pipe) pipe.dispose(); }
+  _setPipelineEnabled(pipe, enabled) {
+    if (!pipe) return;
+    if (typeof pipe.setEnabled === 'function') pipe.setEnabled(enabled);
+  }
+  _disposePipeline(pipe) { if (pipe) pipe.dispose(); }
 }
 
 // ── Dungeon entrance constants ───────────────────────────────────────────────
