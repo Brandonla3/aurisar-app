@@ -1,5 +1,5 @@
 import React from 'react';
-import { ColorSwatch, SectionLabel } from './shared.jsx';
+import { ColorSwatch, MeshGrid, SectionLabel } from './shared.jsx';
 
 const SKIN_TONES = [
   '#FDDBB4', '#F5C89A', '#E8B07A', '#D4936A',
@@ -8,9 +8,13 @@ const SKIN_TONES = [
 ];
 
 const MARKINGS = [
-  { key: null,           label: 'None' },
-  { key: 'scar_face',    label: 'Face Scar' },
-  { key: 'tattoo_tribal',label: 'Tribal Tattoo' },
+  { key: null,              label: 'None' },
+  { key: 'scar_face',       label: 'Face Scar' },
+  { key: 'tattoo_tribal',   label: 'Tribal Tattoo' },
+  { key: 'freckles',        label: 'Freckles' },
+  { key: 'vitiligo',        label: 'Vitiligo' },
+  { key: 'scales_partial',  label: 'Scales' },
+  { key: 'glow_marks',      label: 'Glow Marks' },
 ];
 
 export default function SkinPanel({ config, avatar, onChange }) {
@@ -39,27 +43,14 @@ export default function SkinPanel({ config, avatar, onChange }) {
       </div>
 
       <SectionLabel>Markings</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {MARKINGS.map(m => (
-          <button
-            key={String(m.key)}
-            onClick={() => setMarking(m.key)}
-            style={{
-              background:   config.skin.marking === m.key ? '#1e3a5f' : '#1e293b',
-              border:       config.skin.marking === m.key ? '1px solid #7dd3fc' : '1px solid #334155',
-              borderRadius: 8,
-              padding:      '8px 12px',
-              color:        '#94a3b8',
-              fontSize:     12,
-              cursor:       'pointer',
-              textAlign:    'left',
-              fontFamily:   'Inter, system-ui, sans-serif',
-            }}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+      <MeshGrid
+        items={MARKINGS}
+        selected={config.skin.marking}
+        onSelect={setMarking}
+        renderItem={item => (
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>{item.label}</span>
+        )}
+      />
     </div>
   );
 }
