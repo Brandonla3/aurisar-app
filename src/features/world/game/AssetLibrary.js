@@ -24,7 +24,13 @@ const BASE = '/assets/characters/';
 // later with no other code change. See public/assets/characters/README.md for the
 // export contract.
 const MANIFEST = {
+  // Base bodies — neutral default + gendered variants. Selected via
+  // CharacterAvatar._resolveBaseBody based on config.body.gender.
   base_body:            'base_body.glb',
+  base_body_male:       'base_body_male.glb',
+  base_body_female:     'base_body_female.glb',
+
+  // Hair (8 styles + 'hair_shaved' renders as nothing — intentionally absent)
   'hair/hair_short':    'hair/hair_short.glb',
   'hair/hair_long':     'hair/hair_long.glb',
   'hair/hair_braids':   'hair/hair_braids.glb',
@@ -33,14 +39,32 @@ const MANIFEST = {
   'hair/hair_wavy':     'hair/hair_wavy.glb',
   'hair/hair_afro':     'hair/hair_afro.glb',
   'hair/hair_mohawk':   'hair/hair_mohawk.glb',
-  'clothing/top_casual':    'clothing/top_casual.glb',
-  'clothing/top_hoodie':    'clothing/top_hoodie.glb',
-  'clothing/bottom_jeans':  'clothing/bottom_jeans.glb',
-  'clothing/bottom_shorts': 'clothing/bottom_shorts.glb',
-  'clothing/shoes_boots':   'clothing/shoes_boots.glb',
+
+  // Clothing — fantasy RPG only (no modern items).
+  'clothing/top_tunic':           'clothing/top_tunic.glb',
+  'clothing/top_robe':            'clothing/top_robe.glb',
+  'clothing/top_cloth_shirt':     'clothing/top_cloth_shirt.glb',
+  'clothing/top_gambeson':        'clothing/top_gambeson.glb',
+  'clothing/top_leather_vest':    'clothing/top_leather_vest.glb',
+  'clothing/top_chainmail':       'clothing/top_chainmail.glb',
+  'clothing/bottom_trousers':     'clothing/bottom_trousers.glb',
+  'clothing/bottom_kilt':         'clothing/bottom_kilt.glb',
+  'clothing/bottom_leather_pants':'clothing/bottom_leather_pants.glb',
+  'clothing/bottom_breeches':     'clothing/bottom_breeches.glb',
+  'clothing/bottom_cloth_skirt':  'clothing/bottom_cloth_skirt.glb',
+  'clothing/bottom_leggings':     'clothing/bottom_leggings.glb',
+  'clothing/shoes_boots':         'clothing/shoes_boots.glb',
+  'clothing/shoes_sandals':       'clothing/shoes_sandals.glb',
+  'clothing/shoes_greaves':       'clothing/shoes_greaves.glb',
+  'clothing/shoes_leather_wraps': 'clothing/shoes_leather_wraps.glb',
+
+  // Species — horns (head-attached) and tails (hip-attached).
   'species/horns_small':    'species/horns_small.glb',
   'species/horns_large':    'species/horns_large.glb',
   'species/horns_curved':   'species/horns_curved.glb',
+  'species/tail_short':     'species/tail_short.glb',
+  'species/tail_long':      'species/tail_long.glb',
+  'species/tail_fluffy':    'species/tail_fluffy.glb',
 };
 
 const _containers = new Map();
