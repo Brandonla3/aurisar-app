@@ -17,12 +17,22 @@
 
 const BASE = '/assets/characters/';
 
-// Keys → relative paths under BASE
+// Keys → relative paths under BASE.
+// Hair keys must match `HAIR_STYLES` keys in src/features/avatar/panels/HairPanel.jsx.
+// `hair_shaved` intentionally has no entry — selecting it should render no mesh.
+// Missing files load silently (see _load below); a Blender-authored .glb can land
+// later with no other code change. See public/assets/characters/README.md for the
+// export contract.
 const MANIFEST = {
-  base_body:          'base_body.glb',
-  'hair/hair_short':  'hair/hair_short.glb',
-  'hair/hair_long':   'hair/hair_long.glb',
-  'hair/hair_braids': 'hair/hair_braids.glb',
+  base_body:            'base_body.glb',
+  'hair/hair_short':    'hair/hair_short.glb',
+  'hair/hair_long':     'hair/hair_long.glb',
+  'hair/hair_braids':   'hair/hair_braids.glb',
+  'hair/hair_ponytail': 'hair/hair_ponytail.glb',
+  'hair/hair_bun':      'hair/hair_bun.glb',
+  'hair/hair_wavy':     'hair/hair_wavy.glb',
+  'hair/hair_afro':     'hair/hair_afro.glb',
+  'hair/hair_mohawk':   'hair/hair_mohawk.glb',
   'clothing/top_casual':    'clothing/top_casual.glb',
   'clothing/top_hoodie':    'clothing/top_hoodie.glb',
   'clothing/bottom_jeans':  'clothing/bottom_jeans.glb',

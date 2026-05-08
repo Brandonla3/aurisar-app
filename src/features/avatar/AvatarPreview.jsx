@@ -28,11 +28,18 @@ const PreviewAssets = {
     this._scene = scene;
     // Import just the manifest logic
     const BASE = '/assets/characters/';
+    // Mirror of AssetLibrary.js MANIFEST — keep in sync.
+    // `hair_shaved` is intentionally absent: it renders as no mesh.
     const MANIFEST = {
-      base_body:          'base_body.glb',
-      'hair/hair_short':  'hair/hair_short.glb',
-      'hair/hair_long':   'hair/hair_long.glb',
-      'hair/hair_braids': 'hair/hair_braids.glb',
+      base_body:            'base_body.glb',
+      'hair/hair_short':    'hair/hair_short.glb',
+      'hair/hair_long':     'hair/hair_long.glb',
+      'hair/hair_braids':   'hair/hair_braids.glb',
+      'hair/hair_ponytail': 'hair/hair_ponytail.glb',
+      'hair/hair_bun':      'hair/hair_bun.glb',
+      'hair/hair_wavy':     'hair/hair_wavy.glb',
+      'hair/hair_afro':     'hair/hair_afro.glb',
+      'hair/hair_mohawk':   'hair/hair_mohawk.glb',
       'clothing/top_casual':    'clothing/top_casual.glb',
       'clothing/top_hoodie':    'clothing/top_hoodie.glb',
       'clothing/bottom_jeans':  'clothing/bottom_jeans.glb',
