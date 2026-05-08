@@ -85,12 +85,18 @@ def _decimate_to_budget(obj, max_tris: int):
 
 
 def _bind_to_head(obj, arm):
-    """Parent obj rigidly to the Head bone of arm. No skinning needed for static caps."""
-    # Use armature parent w/ auto weights for skinned hair (follows neck/spine)
+    """Bind obj to armature with auto weights so it follows neck/spine.
+
+    `parent_set(type='ARMATURE_AUTO')` resets obj.matrix_world to identity,
+    which breaks the alignment with the armature's 90° X rotation from
+    glTF import — the exporter then writes vertex data in the wrong frame
+    and the hair lies flat at runtime. Re-align obj to the armature.
+    """
     obj.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    obj.matrix_world = arm.matrix_world.copy()
     obj.select_set(False)
     arm.select_set(False)
 

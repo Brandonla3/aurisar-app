@@ -104,16 +104,30 @@ def _duplicate_body_region(body, y_min, y_max,
         bpy.ops.transform.shrink_fatten(value=INFLATE)
         bpy.ops.object.mode_set(mode='OBJECT')
 
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    # IMPORTANT: do NOT transform_apply rotation here. The duplicated body
+    # inherits the import 90° X rotation in matrix_world. Vertex data is
+    # already in armature-local Y-up — applying rotation would bake the
+    # world frame into vertices and produce a glTF where mesh and armature
+    # frames disagree (visible at runtime as clothing lying flat).
     return dup
 
 
 def _bind_to_armature(obj, arm):
+    """Bind obj to armature with auto weights.
+
+    `parent_set(type='ARMATURE_AUTO')` resets `obj.matrix_world` to identity,
+    which leaves obj at world origin while its parent (armature) keeps the
+    90° X rotation from glTF import. The exporter then bakes a -90° X local
+    transform into the mesh's vertex data, rotating Y→-Z and producing
+    clothing that lies flat at runtime. Re-align obj to match the armature's
+    world transform after binding so the exporter sees a clean Y-up mesh.
+    """
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    obj.matrix_world = arm.matrix_world.copy()
     obj.select_set(False)
     arm.select_set(False)
 
@@ -146,7 +160,7 @@ def _export_glb(out_path: str):
     bpy.ops.export_scene.gltf(
         filepath=out_path,
         export_format='GLB',
-        export_apply=True,
+        export_apply=False,  # Don't bake the Armature modifier into vertex data
         export_animations=False,
         export_morph=False,
         export_yup=True,

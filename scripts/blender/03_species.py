@@ -85,12 +85,19 @@ def _parent_to_head_bone(obj, arm):
 
 
 def _bind_to_armature(obj, arm):
-    """Skin obj with auto weights."""
+    """Skin obj with auto weights.
+
+    `parent_set(type='ARMATURE_AUTO')` resets obj.matrix_world to identity,
+    breaking alignment with the armature's 90° X import rotation. Without
+    re-aligning, the exporter writes vertex data in the wrong frame and the
+    tail lies flat at runtime. Restore obj.matrix_world after binding.
+    """
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    obj.matrix_world = arm.matrix_world.copy()
 
 
 def _export_glb(out_path: str, *, has_skin: bool):
