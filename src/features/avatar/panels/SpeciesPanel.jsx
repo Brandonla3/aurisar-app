@@ -27,7 +27,7 @@ export default function SpeciesPanel({ config, avatar, onChange, assetLibrary })
   };
 
   const setTail = (key) => {
-    avatar?.setTailMesh(key, assetLibrary);
+    avatar?.setTailMesh?.(key, assetLibrary);
     onChange({ species: { ...config.species, tailMesh: key } });
   };
 
