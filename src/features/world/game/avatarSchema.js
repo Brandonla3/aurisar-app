@@ -17,6 +17,34 @@ export const DEFAULT_AVATAR = {
   gear:     { helmet: null, chest: null, weapon: null },
 };
 
+/**
+ * Legacy → fantasy clothing key migration. Configs persisted before the
+ * fantasy-only wardrobe rollout reference modern keys (top_casual, bottom_jeans
+ * …) that no longer exist in the manifest. Without remapping, those slots
+ * silently render empty. Applied inside `mergeConfig` so every load path
+ * (Supabase, localStorage, world sync) gets the upgrade for free.
+ */
+const LEGACY_CLOTHING_ALIAS = {
+  top_casual:    'top_cloth_shirt',
+  top_hoodie:    'top_gambeson',
+  top_tank:      'top_leather_vest',
+  top_jacket:    'top_chainmail',
+  bottom_jeans:  'bottom_leather_pants',
+  bottom_shorts: 'bottom_breeches',
+  bottom_skirt:  'bottom_cloth_skirt',
+  shoes_sneakers:'shoes_leather_wraps',
+};
+
+function migrateClothing(clothing) {
+  if (!clothing) return clothing;
+  const out = { ...clothing };
+  for (const slot of CLOTHING_SLOTS) {
+    const key = out[slot];
+    if (key && LEGACY_CLOTHING_ALIAS[key]) out[slot] = LEGACY_CLOTHING_ALIAS[key];
+  }
+  return out;
+}
+
 /** Merge a partial config over the defaults — safe for partial saves. */
 export function mergeConfig(partial) {
   if (!partial) return structuredClone(DEFAULT_AVATAR);
@@ -27,7 +55,7 @@ export function mergeConfig(partial) {
     skin:     { ...DEFAULT_AVATAR.skin,     ...partial.skin },
     species:  { ...DEFAULT_AVATAR.species,  ...partial.species },
     hair:     { ...DEFAULT_AVATAR.hair,     ...partial.hair },
-    clothing: { ...DEFAULT_AVATAR.clothing, ...partial.clothing },
+    clothing: migrateClothing({ ...DEFAULT_AVATAR.clothing, ...partial.clothing }),
     gear:     { ...DEFAULT_AVATAR.gear,     ...partial.gear },
   };
 }

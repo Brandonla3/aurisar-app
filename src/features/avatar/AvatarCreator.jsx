@@ -70,9 +70,9 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
     const hCols  = ['#2C1B0A','#5C3317','#8B4513','#C68642','#1C1C1C','#708090','#B22222','#4B0082','#D4AF37'];
     const horns  = [null, null, null, 'horns_small', 'horns_large', 'horns_curved'];
     const tails  = [null, null, 'tail_short', 'tail_long', 'tail_fluffy'];
-    const tops   = ['top_casual','top_hoodie','top_tank','top_robe','top_jacket'];
-    const bots   = ['bottom_jeans','bottom_shorts','bottom_skirt','bottom_leggings'];
-    const shoes  = ['shoes_boots','shoes_sandals','shoes_sneakers'];
+    const tops   = ['top_tunic','top_robe','top_cloth_shirt','top_gambeson','top_leather_vest','top_chainmail'];
+    const bots   = ['bottom_trousers','bottom_kilt','bottom_leather_pants','bottom_breeches','bottom_cloth_skirt','bottom_leggings'];
+    const shoes  = ['shoes_boots','shoes_sandals','shoes_greaves','shoes_leather_wraps'];
 
     const next = {
       body: {
