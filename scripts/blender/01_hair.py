@@ -12,6 +12,12 @@ Outputs:
   hair_short.glb  hair_long.glb     hair_braids.glb  hair_ponytail.glb
   hair_bun.glb    hair_wavy.glb     hair_afro.glb    hair_mohawk.glb
 
+Coordinate system: Blender world is Z-up; glTF/Babylon is Y-up. Constants
+below are Z-up (height = Z). Export uses export_yup=True to emit glTF in
+Y-up convention. Vertex filtering against the imported body must use world
+coordinates (`obj.matrix_world @ v.co`) because base_body.glb arrives with
+a 90° X rotation when imported into a Z-up scene.
+
 Run:
     blender --background --python scripts/blender/01_hair.py
 """
@@ -28,9 +34,30 @@ ASSETS = os.path.join(REPO, 'public', 'assets', 'characters')
 HAIR   = os.path.join(ASSETS, 'hair')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
-# Head pivot measured from base_body.glb: Head bone head=1.462 tail=1.673 → center 1.567.
-HEAD_CENTER = Vector((0.0, 1.57, 0.0))
+# Head pivot in WORLD Z-up: Head bone center at Z=1.567 (head=1.462, tail=1.673).
+HEAD_CENTER = Vector((0.0, 0.0, 1.57))
 HEAD_RADIUS = 0.105
+
+
+def _strip_shape_keys(obj):
+    """transform_apply blocks on shape keys; remove them before baking."""
+    while obj.data.shape_keys and obj.data.shape_keys.key_blocks:
+        obj.shape_key_remove(obj.data.shape_keys.key_blocks[0])
+
+
+def _bake_world_into_mesh(obj):
+    """Manually transform vertices so obj.matrix_world becomes identity.
+
+    Imported glTF bodies arrive rotated 90° around X to convert Y-up→Z-up.
+    For new procedural meshes parented to that armature, we must bake the
+    world transform into vertex coords before exporting, otherwise the
+    skinning frame and the mesh frame disagree.
+    """
+    mat = obj.matrix_world.copy()
+    loc = obj.location.copy()
+    for v in obj.data.vertices:
+        v.co = (mat @ v.co) - loc
+    obj.matrix_world = Matrix.Translation(loc)
 
 
 # ── Scene helpers ───────────────────────────────────────────────────────────
@@ -123,20 +150,21 @@ def _export_glb(out_path: str):
 # ── Hair primitive builders ─────────────────────────────────────────────────
 
 def _add_uv_sphere_cap(name: str, radius: float, height_scale: float = 0.6):
-    """Hemispherical cap that sits over the skull."""
+    """Hemispherical cap that sits over the skull (Z-up world)."""
     bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, segments=20, ring_count=12,
                                           location=HEAD_CENTER)
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (1.0, height_scale, 1.05)
+    # Squash along Z (height) so the cap hugs the skull crown.
+    obj.scale = (1.05, 1.0, height_scale)
     bpy.ops.object.transform_apply(scale=True)
-    # Delete bottom half (verts with y < HEAD_CENTER.y - 0.01)
+    # Delete bottom half: verts below the head center plane in Z-up world.
     me = obj.data
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.object.mode_set(mode='OBJECT')
     for v in me.vertices:
-        if v.co.y < HEAD_CENTER.y - 0.005:
+        if v.co.z < HEAD_CENTER.z - 0.005:
             v.select = True
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.delete(type='VERT')
@@ -145,28 +173,29 @@ def _add_uv_sphere_cap(name: str, radius: float, height_scale: float = 0.6):
 
 
 def _extrude_strands(obj, count: int, length: float, jitter: float = 0.02):
-    """Pseudo-strands: select bottom rim verts and extrude downward in chunks."""
+    """Pseudo-strands: select bottom rim verts and extrude downward (-Z)."""
     me = obj.data
-    rim_y = min(v.co.y for v in me.vertices) + 0.01
+    rim_z = min(v.co.z for v in me.vertices) + 0.01
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.object.mode_set(mode='OBJECT')
     for v in me.vertices:
-        if v.co.y <= rim_y:
+        if v.co.z <= rim_z:
             v.select = True
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.extrude_region_move(
-        TRANSFORM_OT_translate={'value': (0, -length, 0)})
+        TRANSFORM_OT_translate={'value': (0, 0, -length)})
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
 def _add_ponytail(name='ponytail', length=0.30):
-    """Single tail behind the head."""
+    """Single tail behind the head (Z-up: +Y is back, -Z extrudes downward)."""
     bpy.ops.mesh.primitive_cylinder_add(
         radius=0.025, depth=length,
-        location=HEAD_CENTER + Vector((0, -0.06, -0.10)))
+        location=HEAD_CENTER + Vector((0, 0.10, -0.06)))
     obj = bpy.context.active_object
     obj.name = name
+    # Tilt back slightly: rotate around X so cylinder leans away from head.
     obj.rotation_euler = (math.radians(15), 0, 0)
     bpy.ops.object.transform_apply(rotation=True)
     return obj
@@ -175,23 +204,23 @@ def _add_ponytail(name='ponytail', length=0.30):
 def _add_bun(name='bun'):
     bpy.ops.mesh.primitive_uv_sphere_add(
         radius=0.06, segments=14, ring_count=10,
-        location=HEAD_CENTER + Vector((0, 0.04, -0.08)))
+        location=HEAD_CENTER + Vector((0, 0.08, 0.04)))
     obj = bpy.context.active_object
     obj.name = name
     return obj
 
 
 def _add_braids(parent_name='braids'):
-    """Two symmetrical braided strands hanging at the sides."""
+    """Two symmetrical braided strands hanging at the sides (Z-up)."""
     objs = []
     for sign, suffix in ((-1, 'L'), (1, 'R')):
         bpy.ops.mesh.primitive_cylinder_add(
             radius=0.018, depth=0.32,
-            location=HEAD_CENTER + Vector((sign * 0.08, -0.18, -0.02)))
+            location=HEAD_CENTER + Vector((sign * 0.08, 0.02, -0.18)))
         o = bpy.context.active_object
         o.name = f'{parent_name}_{suffix}'
-        # Slight twist via shear
-        o.scale = (1.0, 1.0, 0.85)
+        # Slight squash along X for a less-perfect cylinder.
+        o.scale = (0.85, 1.0, 1.0)
         bpy.ops.object.transform_apply(scale=True)
         objs.append(o)
     return _join(objs, parent_name)
@@ -199,12 +228,12 @@ def _add_braids(parent_name='braids'):
 
 def _add_mohawk(name='mohawk'):
     bpy.ops.mesh.primitive_cube_add(size=1.0,
-                                     location=HEAD_CENTER + Vector((0, 0.05, 0)))
+                                     location=HEAD_CENTER + Vector((0, 0, 0.05)))
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (0.04, 0.07, 0.16)
+    # X = side-to-side thin, Y = front-to-back length, Z = vertical fin height.
+    obj.scale = (0.04, 0.16, 0.07)
     bpy.ops.object.transform_apply(scale=True)
-    # Bevel edges for a softer look
     bpy.context.view_layer.objects.active = obj
     mod = obj.modifiers.new('bev', 'BEVEL')
     mod.width = 0.01
@@ -215,10 +244,10 @@ def _add_mohawk(name='mohawk'):
 
 def _add_afro(name='afro'):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.16, segments=18, ring_count=12,
-                                          location=HEAD_CENTER + Vector((0, 0.04, 0)))
+                                          location=HEAD_CENTER + Vector((0, 0, 0.04)))
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (1.05, 0.95, 1.05)
+    obj.scale = (1.05, 1.05, 0.95)
     bpy.ops.object.transform_apply(scale=True)
     return obj
 

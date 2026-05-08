@@ -6,6 +6,13 @@ tops, legs for bottoms, feet for shoes), scale outward ~0.01m so it sits over
 the body without z-fighting, then parent to the armature with automatic weights
 so the cloth deforms with the rig.
 
+Coordinate system: Blender world is Z-up; glTF arrives Y-up and gets a 90°
+X rotation on import. To filter "torso" vs "legs" by height, we must use
+WORLD coordinates (`obj.matrix_world @ v.co`) and bake the world matrix
+into vertex positions before exporting — otherwise skinning frame and mesh
+frame disagree and clothing exports lying flat. Shape keys block
+transform_apply, so we strip them from the duplicated body first.
+
 Outputs (all under public/assets/characters/clothing/):
 
   TOPS:    top_tunic.glb, top_robe.glb, top_cloth_shirt.glb,
@@ -23,22 +30,36 @@ from __future__ import annotations
 import os
 import sys
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 REPO   = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 ASSETS = os.path.join(REPO, 'public', 'assets', 'characters')
 CLOTH  = os.path.join(ASSETS, 'clothing')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
-# Y-axis Up; meter scale. Measured from base_body.glb bones:
-#   Hips=0.921  LeftArm(shoulder)=1.362  LeftLeg(knee)=0.457  LeftFoot(ankle)=0.086  Toe=0.005
-TORSO_Y_MIN = 0.95
-TORSO_Y_MAX = 1.38   # cuts at shoulder line (was 1.50 — grabbed neck geometry)
-HIPS_Y      = 0.92
-KNEE_Y      = 0.46   # actual knee joint (was 0.50)
-ANKLE_Y     = 0.09   # actual ankle (was 0.10)
-FOOT_Y      = 0.01   # toe base (was 0.04)
-INFLATE     = 0.012   # outward offset to prevent body z-fight
+# WORLD Z-up bone heights, meter scale, measured from base_body.glb:
+#   Hips=0.921  Shoulder=1.362  Knee=0.457  Ankle=0.086  Toe=0.005
+TORSO_Z_MIN = 0.95
+TORSO_Z_MAX = 1.38   # shoulder line
+HIPS_Z      = 0.92
+KNEE_Z      = 0.46
+ANKLE_Z     = 0.09
+FOOT_Z      = 0.01
+INFLATE     = 0.012  # outward normal offset to prevent body z-fight
+
+
+def _strip_shape_keys(obj):
+    while obj.data.shape_keys and obj.data.shape_keys.key_blocks:
+        obj.shape_key_remove(obj.data.shape_keys.key_blocks[0])
+
+
+def _bake_world_into_mesh(obj):
+    """Bake matrix_world into vertex coords; reset matrix to translation only."""
+    mat = obj.matrix_world.copy()
+    loc = obj.location.copy()
+    for v in obj.data.vertices:
+        v.co = (mat @ v.co) - loc
+    obj.matrix_world = Matrix.Translation(loc)
 
 
 def _clear_scene():
@@ -66,11 +87,16 @@ def _white_material(name: str):
     return mat
 
 
-def _duplicate_body_region(body, y_min, y_max,
+def _duplicate_body_region(body, z_min, z_max,
                            extra_below: float = 0.0,
                            extra_above: float = 0.0):
-    """Duplicate the body, then delete vertices outside the y range. Returns a new mesh obj."""
-    # Duplicate the body
+    """Duplicate body, delete verts outside [z_min, z_max] WORLD height range.
+
+    Important: vertex filtering uses world coordinates because the imported
+    body has a 90° X rotation in matrix_world (Y-up → Z-up frame change).
+    After filtering we bake matrix_world into the mesh so export and
+    skinning use a consistent frame.
+    """
     bpy.ops.object.select_all(action='DESELECT')
     body.select_set(True)
     bpy.context.view_layer.objects.active = body
@@ -79,25 +105,31 @@ def _duplicate_body_region(body, y_min, y_max,
     dup.hide_viewport = False
     dup.hide_render   = False
 
-    # Drop modifiers (Armature) — we re-add later via auto-weights
+    # Drop modifiers (Armature) — re-added later via auto-weights.
     for m in list(dup.modifiers):
         dup.modifiers.remove(m)
 
-    # Delete verts outside band
+    # Strip shape keys so transform_apply / bake can run.
+    _strip_shape_keys(dup)
+
+    # Bake the import rotation into vertex coords first, so v.co is in world
+    # space (modulo the dup's location which we keep as origin).
+    _bake_world_into_mesh(dup)
+
+    # Delete verts outside band — now v.co.z is the world height.
     me = dup.data
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.object.mode_set(mode='OBJECT')
-    keep_min = y_min - extra_below
-    keep_max = y_max + extra_above
+    keep_min = z_min - extra_below
+    keep_max = z_max + extra_above
     for v in me.vertices:
-        if v.co.y < keep_min or v.co.y > keep_max:
+        if v.co.z < keep_min or v.co.z > keep_max:
             v.select = True
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.delete(type='VERT')
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    # Inflate slightly along normals
     if INFLATE > 0:
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
@@ -163,57 +195,57 @@ def _tag_garment(obj, name):
 
 # ── Garment build functions ────────────────────────────────────────────────
 
-def build_top_basic(name: str, y_low=TORSO_Y_MIN, y_high=TORSO_Y_MAX, extra_below=0.0):
+def build_top_basic(name: str, z_low=TORSO_Z_MIN, z_high=TORSO_Z_MAX, extra_below=0.0):
     """Generic upper-body shell — used for tunics, shirts, vests, etc."""
     arm, body = bpy.context.scene['_arm'], bpy.context.scene['_body']
-    obj = _duplicate_body_region(body, y_low, y_high, extra_below=extra_below)
+    obj = _duplicate_body_region(body, z_low, z_high, extra_below=extra_below)
     _tag_garment(obj, name)
     return obj
 
 
-def build_bottom_basic(name: str, y_low: float, y_high: float):
+def build_bottom_basic(name: str, z_low: float, z_high: float):
     """Generic lower-body shell — pants, skirt, kilt, leggings."""
     body = bpy.context.scene['_body']
-    obj = _duplicate_body_region(body, y_low, y_high)
+    obj = _duplicate_body_region(body, z_low, z_high)
     _tag_garment(obj, name)
     return obj
 
 
-def build_shoe(name: str, y_high: float = ANKLE_Y):
+def build_shoe(name: str, z_high: float = ANKLE_Z):
     """Foot/lower-shin shell."""
     body = bpy.context.scene['_body']
-    obj = _duplicate_body_region(body, FOOT_Y, y_high)
+    obj = _duplicate_body_region(body, FOOT_Z, z_high)
     _tag_garment(obj, name)
     return obj
 
 
-# ── Garment specs (length, budget) ─────────────────────────────────────────
+# ── Garment specs (length, budget) — heights in WORLD Z-up meters ─────────
 
 TOPS = [
-    # (filename, y_low, y_high, extra_below — for long robes)
-    ('top_tunic.glb',         TORSO_Y_MIN - 0.05, TORSO_Y_MAX, 0.0),
-    ('top_robe.glb',          KNEE_Y,             TORSO_Y_MAX, 0.0),   # full-length robe
-    ('top_cloth_shirt.glb',   TORSO_Y_MIN,        TORSO_Y_MAX, 0.0),
-    ('top_gambeson.glb',      TORSO_Y_MIN - 0.05, TORSO_Y_MAX, 0.0),
-    ('top_leather_vest.glb',  TORSO_Y_MIN,        TORSO_Y_MAX - 0.10, 0.0),
-    ('top_chainmail.glb',     TORSO_Y_MIN - 0.08, TORSO_Y_MAX, 0.0),
+    # (filename, z_low, z_high, extra_below — for long robes)
+    ('top_tunic.glb',         TORSO_Z_MIN - 0.05, TORSO_Z_MAX, 0.0),
+    ('top_robe.glb',          KNEE_Z,             TORSO_Z_MAX, 0.0),   # full-length robe
+    ('top_cloth_shirt.glb',   TORSO_Z_MIN,        TORSO_Z_MAX, 0.0),
+    ('top_gambeson.glb',      TORSO_Z_MIN - 0.05, TORSO_Z_MAX, 0.0),
+    ('top_leather_vest.glb',  TORSO_Z_MIN,        TORSO_Z_MAX - 0.10, 0.0),
+    ('top_chainmail.glb',     TORSO_Z_MIN - 0.08, TORSO_Z_MAX, 0.0),
 ]
 
 BOTTOMS = [
-    # (filename, y_low, y_high)
-    ('bottom_trousers.glb',     ANKLE_Y, HIPS_Y),
-    ('bottom_kilt.glb',         KNEE_Y,  HIPS_Y),
-    ('bottom_leather_pants.glb',ANKLE_Y, HIPS_Y),
-    ('bottom_breeches.glb',     KNEE_Y - 0.05, HIPS_Y),
-    ('bottom_cloth_skirt.glb',  ANKLE_Y + 0.05, HIPS_Y),
-    ('bottom_leggings.glb',     ANKLE_Y, HIPS_Y),
+    # (filename, z_low, z_high)
+    ('bottom_trousers.glb',     ANKLE_Z, HIPS_Z),
+    ('bottom_kilt.glb',         KNEE_Z,  HIPS_Z),
+    ('bottom_leather_pants.glb',ANKLE_Z, HIPS_Z),
+    ('bottom_breeches.glb',     KNEE_Z - 0.05, HIPS_Z),
+    ('bottom_cloth_skirt.glb',  ANKLE_Z + 0.05, HIPS_Z),
+    ('bottom_leggings.glb',     ANKLE_Z, HIPS_Z),
 ]
 
 SHOES = [
-    ('shoes_boots.glb',         KNEE_Y - 0.10),  # knee-high boots
-    ('shoes_sandals.glb',       FOOT_Y + 0.04),  # foot only
-    ('shoes_greaves.glb',       KNEE_Y),         # full shin coverage
-    ('shoes_leather_wraps.glb', ANKLE_Y + 0.04),
+    ('shoes_boots.glb',         KNEE_Z - 0.10),  # knee-high boots
+    ('shoes_sandals.glb',       FOOT_Z + 0.04),  # foot only
+    ('shoes_greaves.glb',       KNEE_Z),         # full shin coverage
+    ('shoes_leather_wraps.glb', ANKLE_Z + 0.04),
 ]
 
 MAX_TRIS = 6000
@@ -223,14 +255,14 @@ def main() -> int:
     os.makedirs(CLOTH, exist_ok=True)
 
     # Tops
-    for fname, y_low, y_high, extra_below in TOPS:
+    for fname, z_low, z_high, extra_below in TOPS:
         out_path = os.path.join(CLOTH, fname)
         print(f'[run]  {fname}')
         _clear_scene()
         arm, body = _import_base_body()
         bpy.context.scene['_arm']  = arm
         bpy.context.scene['_body'] = body
-        obj = build_top_basic(fname[:-4], y_low, y_high, extra_below)
+        obj = build_top_basic(fname[:-4], z_low, z_high, extra_below)
         body.hide_viewport = True
         body.hide_render   = True
         _decimate(obj, MAX_TRIS)
@@ -239,13 +271,14 @@ def main() -> int:
         print(f'[OK]   {fname}')
 
     # Bottoms
-    for fname, y_low, y_high in BOTTOMS:
+    for fname, z_low, z_high in BOTTOMS:
         out_path = os.path.join(CLOTH, fname)
         print(f'[run]  {fname}')
         _clear_scene()
         arm, body = _import_base_body()
+        bpy.context.scene['_arm']  = arm
         bpy.context.scene['_body'] = body
-        obj = build_bottom_basic(fname[:-4], y_low, y_high)
+        obj = build_bottom_basic(fname[:-4], z_low, z_high)
         body.hide_viewport = True
         body.hide_render   = True
         _decimate(obj, MAX_TRIS)
@@ -254,13 +287,14 @@ def main() -> int:
         print(f'[OK]   {fname}')
 
     # Shoes
-    for fname, y_high in SHOES:
+    for fname, z_high in SHOES:
         out_path = os.path.join(CLOTH, fname)
         print(f'[run]  {fname}')
         _clear_scene()
         arm, body = _import_base_body()
+        bpy.context.scene['_arm']  = arm
         bpy.context.scene['_body'] = body
-        obj = build_shoe(fname[:-4], y_high)
+        obj = build_shoe(fname[:-4], z_high)
         body.hide_viewport = True
         body.hide_render   = True
         _decimate(obj, MAX_TRIS)
