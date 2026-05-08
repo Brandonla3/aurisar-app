@@ -90,8 +90,25 @@ export class CharacterAvatar {
 
   // ── GLB build ──────────────────────────────────────────────────────────────
 
+  /** Pick the right base-body container based on the configured gender.
+   *  Falls back to the neutral `base_body` container if the gendered variant
+   *  isn't loaded (e.g. file missing on disk). */
+  _resolveBaseBody(assetLibrary) {
+    const gender = this._config.body.gender;
+    if (gender === 'female') {
+      return assetLibrary.getContainer('base_body_female')
+          ?? assetLibrary.getContainer('base_body');
+    }
+    if (gender === 'male') {
+      return assetLibrary.getContainer('base_body_male')
+          ?? assetLibrary.getContainer('base_body');
+    }
+    return assetLibrary.getContainer('base_body');
+  }
+
   async _buildGLB(assetLibrary) {
-    const bodyContainer = assetLibrary.getContainer('base_body');
+    const bodyContainer = this._resolveBaseBody(assetLibrary);
+    if (!bodyContainer) { this._buildBox(); return; }
     const inst = bodyContainer.instantiateModelsToScene(
       name => `${this._id}_body_${name}`,
       false   // share materials
@@ -130,6 +147,9 @@ export class CharacterAvatar {
     }
     if (this._config.species.hornMesh) {
       await this._rebuildHorns(assetLibrary);
+    }
+    if (this._config.species.tailMesh) {
+      await this._rebuildTail(assetLibrary);
     }
   }
 
@@ -318,6 +338,42 @@ export class CharacterAvatar {
       }
     });
     this._slots['horns'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
+  }
+
+  // ── Tail ───────────────────────────────────────────────────────────────────
+
+  async setTailMesh(tailName, assetLibrary) {
+    this._config.species.tailMesh = tailName;
+    await this._rebuildTail(assetLibrary);
+  }
+
+  async _rebuildTail(assetLibrary) {
+    this._disposeSlot('tail');
+    if (!this._config.species.tailMesh) return;
+    const key = `species/${this._config.species.tailMesh}`;
+    const container = assetLibrary.getContainer(key);
+    if (!container) return;
+    const inst = container.instantiateModelsToScene(
+      name => `${this._id}_tail_${name}`, false
+    );
+    // If the tail GLB ships with skinned weights to Hips/Spine, share the body
+    // skeleton so it deforms with the rig. Otherwise parent rigidly to Hips.
+    const tailHasSkin = inst.rootNodes
+      .flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
+      .some(m => m.skeleton);
+    if (tailHasSkin && this._skeleton) {
+      inst.rootNodes.forEach(n => { n.parent = this.root; });
+      inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
+        .forEach(m => { m.skeleton = this._skeleton; });
+    } else {
+      const hipsBone = findBone(this._skeleton, BONES.hips);
+      const refMesh  = this._bodyMeshes[0] ?? null;
+      inst.rootNodes.forEach(n => {
+        if (hipsBone && refMesh) n.attachToBone(hipsBone, refMesh);
+        else                      n.parent = this.root;
+      });
+    }
+    this._slots['tail'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
   // ── Clothing ───────────────────────────────────────────────────────────────
