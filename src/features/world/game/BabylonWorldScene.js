@@ -60,6 +60,8 @@ class LightingManager {
     this.camera = camera;
     this.engine = engine;
 
+    this._isMobile = options.isMobile ?? false;
+
     this.options = {
       dayLengthSec:  options.dayLengthSec  ?? 900,
       startTimeOfDay: options.startTimeOfDay ?? 9.0,
@@ -155,6 +157,8 @@ class LightingManager {
 
     this._disposePipeline(this.pipeOverworld);
     this._disposePipeline(this.pipeDungeon);
+    this._imagePP?.dispose();
+    this._glowLayer?.dispose();
 
     [this.envDay, this.envNight, this.envDungeon].forEach(t => t?.dispose());
 
@@ -169,6 +173,12 @@ class LightingManager {
       BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
 
     this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+
+    // Replace the near-black scene default with a visible sky colour right
+    // away. This shows through until the env-based skybox loads; if the
+    // .env files are absent it stays as the permanent background and is
+    // animated per-frame in _updateOverworld / _updateDungeon.
+    this.scene.clearColor = new BABYLON.Color4(0.42, 0.58, 0.78, 1);
 
     // Env textures loaded asynchronously with a HEAD/content-type guard so
     // missing files (or the Vite SPA HTML fallback) don't produce
@@ -229,29 +239,84 @@ class LightingManager {
   }
 
   _setupPipelines() {
-    this.pipeOverworld = new BABYLON.DefaultRenderingPipeline('lm_overworld_pipe', true, this.scene, [this.camera]);
-    this.pipeOverworld.samples        = 4;
-    this.pipeOverworld.fxaaEnabled    = true;
-    this.pipeOverworld.bloomEnabled   = true;
-    this.pipeOverworld.bloomThreshold = 0.88;
-    this.pipeOverworld.bloomWeight    = 0.22;
-    this.pipeOverworld.bloomKernel    = 64;
-    this.pipeOverworld.bloomScale     = 0.5;
-    this.pipeOverworld.sharpenEnabled = true;
-    this.pipeOverworld.sharpen.colorAmount = 0.20;
-    this.pipeOverworld.sharpen.edgeAmount  = 0.15;
+    this._noPipeline = true;
+    this._imagePP    = null;
+    this._glowLayer  = null;
 
-    this.pipeDungeon = new BABYLON.DefaultRenderingPipeline('lm_dungeon_pipe', true, this.scene, [this.camera]);
-    this.pipeDungeon.samples        = 4;
-    this.pipeDungeon.fxaaEnabled    = true;
-    this.pipeDungeon.bloomEnabled   = true;
-    this.pipeDungeon.bloomThreshold = 0.90;
-    this.pipeDungeon.bloomWeight    = 0.30;
-    this.pipeDungeon.bloomKernel    = 64;
-    this.pipeDungeon.bloomScale     = 0.5;
-    this.pipeDungeon.sharpenEnabled = true;
-    this.pipeDungeon.sharpen.colorAmount = 0.15;
-    this.pipeDungeon.sharpen.edgeAmount  = 0.10;
+    // DefaultRenderingPipeline is desktop-only. On mobile WebGL2 it may succeed
+    // in construction (no exception) but produce a black render at frame time
+    // due to missing half-float / float render-target extensions. Skip it
+    // entirely on mobile and go straight to the lightweight fallback path.
+    if (!this._isMobile) {
+      this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
+        bloomThreshold: 0.88, bloomWeight: 0.22, bloomKernel: 64, bloomScale: 0.5,
+        sharpenColor: 0.20, sharpenEdge: 0.15,
+      });
+      this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
+        bloomThreshold: 0.90, bloomWeight: 0.30, bloomKernel: 64, bloomScale: 0.5,
+        sharpenColor: 0.15, sharpenEdge: 0.10,
+      });
+      this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
+    } else {
+      this.pipeOverworld = null;
+      this.pipeDungeon   = null;
+    }
+
+    if (this._noPipeline) {
+      // ImageProcessingPostProcess: attaches directly to the camera using only
+      // standard 8-bit RGBA render targets (always supported on mobile WebGL2).
+      // Inherits scene.imageProcessingConfiguration — gives us ACES tone-mapping,
+      // exposure, and contrast without requiring any special GPU extensions.
+      try {
+        this._imagePP = new BABYLON.ImageProcessingPostProcess(
+          'imgPP', 1.0, this.camera,
+          BABYLON.Texture.BILINEAR_SAMPLINGMODE, this.engine, false,
+          BABYLON.Constants.TEXTURETYPE_UNSIGNED_INT
+        );
+        this._noPipeline = false;
+      } catch (_) { /* truly no post-processing */ }
+
+      // GlowLayer: lightweight bloom using a downsampled 8-bit texture.
+      // Works on all WebGL2 devices including mobile.
+      try {
+        this._glowLayer = new BABYLON.GlowLayer('glow', this.scene, {
+          mainTextureFixedSize: 256,
+          blurKernelSize: 16,
+        });
+        this._glowLayer.intensity = 0.4;
+      } catch (_) { /* skip bloom */ }
+    }
+
+    // Ambient floor. On mobile there is no IBL from .env files, so this term
+    // is the sole contributor to shadowed-surface brightness — set it higher
+    // than the desktop value where IBL provides the ambient fill.
+    this.scene.ambientColor = this._isMobile
+      ? new BABYLON.Color3(0.40, 0.44, 0.50)
+      : new BABYLON.Color3(0.22, 0.25, 0.30);
+  }
+
+  // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
+  // return null only if both fail.
+  _tryBuildPipeline(name, opts) {
+    for (const hdr of [true, false]) {
+      try {
+        const p = new BABYLON.DefaultRenderingPipeline(name, hdr, this.scene, [this.camera]);
+        p.samples        = hdr ? 4 : 1;
+        p.fxaaEnabled    = true;
+        p.bloomEnabled   = true;
+        p.bloomThreshold = opts.bloomThreshold;
+        p.bloomWeight    = opts.bloomWeight;
+        p.bloomKernel    = hdr ? opts.bloomKernel : 32; // smaller kernel on mobile
+        p.bloomScale     = opts.bloomScale;
+        p.sharpenEnabled = hdr; // skip sharpen on the non-HDR fallback
+        if (hdr) {
+          p.sharpen.colorAmount = opts.sharpenColor;
+          p.sharpen.edgeAmount  = opts.sharpenEdge;
+        }
+        return p;
+      } catch (_) { /* try next tier */ }
+    }
+    return null;
   }
 
   _loadEnvSafe(url) {
@@ -305,22 +370,33 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
+    // ImageProcessingPostProcess (or DefaultRenderingPipeline) now provides
+    // proper ACES tone-mapping on every tier, so desktop and mobile use the
+    // same raw light intensity values. No device-specific multipliers needed.
     this.key.intensity = lerp(0.05, 2.4, dayFactor);
     this.key.diffuse   = lerpColor3(
       new BABYLON.Color3(1.0, 0.72, 0.48),
       new BABYLON.Color3(1.0, 0.97, 0.92),
       clamp01(dayFactor * 1.25)
     );
-    this.moon.intensity = lerp(0.0, 0.45, 1.0 - dayFactor);
+    // Moon is brighter (0.60 vs old 0.45) so night is always legible.
+    this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
 
-    this.fillOverworld.intensity   = lerp(0.12, 0.40, dayFactor);
+    // Fill never fully dims at night — keeps geometry readable without
+    // destroying the nighttime atmosphere.
+    const fillMin = this._isMobile ? 0.50 : 0.20;
+    const fillMax = this._isMobile ? 0.80 : 0.40;
+    this.fillOverworld.intensity   = lerp(fillMin, fillMax, dayFactor);
     this.fillOverworld.groundColor = lerpColor3(
-      new BABYLON.Color3(0.05, 0.06, 0.08),
-      new BABYLON.Color3(0.22, 0.24, 0.26),
+      new BABYLON.Color3(0.10, 0.12, 0.18),
+      new BABYLON.Color3(0.34, 0.36, 0.40),
       dayFactor
     );
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.65, 1.05, dayFactor);
+    // Night exposure raised from 0.65 → 0.82 so the tone-mapper keeps dark
+    // scenes bright enough to navigate; day cap slightly higher on mobile.
+    const exposureMax = this._isMobile ? 1.30 : 1.05;
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.82, exposureMax, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -329,6 +405,18 @@ class LightingManager {
       new BABYLON.Color3(0.74, 0.84, 0.96),
       dayFactor
     );
+
+    // Animate the background sky colour through day / night. When an env-based
+    // skybox mesh is present it covers clearColor completely; when the .env
+    // files are absent (our current setup) this IS the sky.
+    const sky = lerpColor3(
+      new BABYLON.Color3(0.06, 0.08, 0.18),  // night — deep navy, not black
+      new BABYLON.Color3(0.42, 0.58, 0.78),  // day  — sky blue
+      dayFactor
+    );
+    this.scene.clearColor.r = sky.r;
+    this.scene.clearColor.g = sky.g;
+    this.scene.clearColor.b = sky.b;
 
     if (dayFactor > 0.5) {
       this._setEnvironment(this.envDay,   lerp(0.35, 0.95, dayFactor));
@@ -342,7 +430,7 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = 0.82;
+    this.scene.imageProcessingConfiguration.exposure = this._isMobile ? 1.10 : 0.82;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -513,8 +601,11 @@ class LightingManager {
     this.scene.environmentIntensity = intensity;
   }
 
-  _setPipelineEnabled(pipe, enabled) { if (pipe) pipe.setEnabled(enabled); }
-  _disposePipeline(pipe)             { if (pipe) pipe.dispose(); }
+  _setPipelineEnabled(pipe, enabled) {
+    if (!pipe) return;
+    if (typeof pipe.setEnabled === 'function') pipe.setEnabled(enabled);
+  }
+  _disposePipeline(pipe) { if (pipe) pipe.dispose(); }
 }
 
 // ── Dungeon entrance constants ───────────────────────────────────────────────
@@ -541,6 +632,15 @@ export class BabylonWorldScene {
     this._pendingUpdates = []; // remote rows queued while _local is loading
     this._spawning       = new Set(); // identity IDs currently being async-spawned
 
+    // Mobile touch state — written by setJoystick() from WorldGame's React layer
+    this._joyDx = 0;
+    this._joyDy = 0;
+    // Camera drag touch (right-half of screen, managed internally)
+    this._camTouch = null; // { id, lastX, lastY }
+
+    this._isMobile = typeof window !== 'undefined' &&
+      window.matchMedia('(pointer: coarse)').matches;
+
     this._initSync();
     this._initCharactersAsync();
   }
@@ -560,8 +660,15 @@ export class BabylonWorldScene {
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
 
-    // LightingManager owns all lighting, day/night, env, and render pipelines
-    this._lm = new LightingManager(this.scene, this._camera, this.engine);
+    // Seed the day/night cycle from the device's real local time so the
+    // world matches the player's actual time of day, then run at real speed.
+    const now = new Date();
+    const realHour = now.getHours() + now.getMinutes() / 60;
+    this._lm = new LightingManager(this.scene, this._camera, this.engine, {
+      isMobile: this._isMobile,
+      startTimeOfDay: realHour,
+      dayLengthSec: 86400, // one real second = one game second
+    });
 
     this._setupShadows();
     this._setupSSAO();
@@ -620,19 +727,126 @@ export class BabylonWorldScene {
     cam.wheelDeltaPercentage = 0.01;
     cam.panningSensibility   = 0;
     cam.minZ                 = 0.1;
-    cam.attachControl(this.canvas, true);
+
+    if (this._isMobile) {
+      // On mobile we manage all pointer events manually so the left-half
+      // joystick overlay and right-half camera drag don't conflict.
+      this._bindTouchControls(cam);
+    } else {
+      cam.attachControl(this.canvas, true);
+    }
+
     this._camera = cam;
+  }
+
+  // ── Mobile pointer controls ────────────────────────────────────────────────
+  // Left half  → joystick (handled externally by WorldGame via setJoystick())
+  // Right half → camera orbit (alpha / beta from drag delta)
+  // Pinch on right half → zoom (radius)
+
+  _bindTouchControls(cam) {
+    const canvas = this.canvas;
+
+    // Track a second touch for pinch-zoom
+    this._pinchTouch = null; // { id, lastDist }
+
+    const onDown = (e) => {
+      const rect   = canvas.getBoundingClientRect();
+      const cx     = e.clientX - rect.left;
+      const isRight = cx >= rect.width / 2;
+
+      if (isRight) {
+        if (!this._camTouch && !this._pinchTouch) {
+          this._camTouch = { id: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+          canvas.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        } else if (this._camTouch && !this._pinchTouch) {
+          // Second finger on right = start pinch
+          const dx = e.clientX - this._camTouch.lastX;
+          const dy = e.clientY - this._camTouch.lastY;
+          this._pinchTouch = {
+            id: e.pointerId,
+            lastDist: Math.hypot(dx, dy),
+          };
+          canvas.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        }
+      }
+      // Left-half touches are captured by the React joystick overlay,
+      // so they never reach the canvas.
+    };
+
+    const onMove = (e) => {
+      if (this._camTouch && e.pointerId === this._camTouch.id) {
+        if (!this._pinchTouch) {
+          const dx = e.clientX - this._camTouch.lastX;
+          const dy = e.clientY - this._camTouch.lastY;
+          cam.alpha -= dx * 0.006;
+          cam.beta   = Math.max(cam.lowerBetaLimit,
+                       Math.min(cam.upperBetaLimit, cam.beta + dy * 0.006));
+        }
+        this._camTouch.lastX = e.clientX;
+        this._camTouch.lastY = e.clientY;
+        e.preventDefault();
+      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
+        const dx   = e.clientX - this._camTouch.lastX;
+        const dy   = e.clientY - this._camTouch.lastY;
+        const dist = Math.hypot(dx, dy);
+        const delta = this._pinchTouch.lastDist - dist;
+        cam.radius = Math.max(cam.lowerRadiusLimit,
+                     Math.min(cam.upperRadiusLimit, cam.radius + delta * 0.05));
+        this._pinchTouch.lastDist = dist;
+        e.preventDefault();
+      }
+    };
+
+    const onUp = (e) => {
+      if (this._camTouch && e.pointerId === this._camTouch.id) {
+        this._camTouch  = null;
+        this._pinchTouch = null;
+        e.preventDefault();
+      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
+        this._pinchTouch = null;
+        e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener('pointerdown',   onDown, { passive: false });
+    canvas.addEventListener('pointermove',   onMove, { passive: false });
+    canvas.addEventListener('pointerup',     onUp,   { passive: false });
+    canvas.addEventListener('pointercancel', onUp,   { passive: false });
+
+    this._touchCleanup = () => {
+      canvas.removeEventListener('pointerdown',   onDown, { passive: false });
+      canvas.removeEventListener('pointermove',   onMove, { passive: false });
+      canvas.removeEventListener('pointerup',     onUp,   { passive: false });
+      canvas.removeEventListener('pointercancel', onUp,   { passive: false });
+    };
+  }
+
+  // Called by WorldGame's React joystick overlay each frame
+  setJoystick(dx, dy) {
+    this._joyDx = dx;
+    this._joyDy = dy;
   }
 
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
-    const sg = new BABYLON.ShadowGenerator(2048, this._lm.key);
-    sg.useBlurExponentialShadowMap = true;
-    sg.blurKernel  = 24;
-    sg.bias        = 0.0005;
-    sg.normalBias  = 0.02;
-    this._shadowGen = sg;
+    // Try high-quality 2048 shadow map first; mobile GPUs often cap at 1024,
+    // so fall back gracefully rather than crashing the whole render loop.
+    for (const size of [2048, 1024, 512]) {
+      try {
+        const sg = new BABYLON.ShadowGenerator(size, this._lm.key);
+        sg.useBlurExponentialShadowMap = size >= 1024;
+        sg.blurKernel = size >= 1024 ? 24 : 8;
+        sg.bias       = 0.0005;
+        sg.normalBias = 0.02;
+        this._shadowGen = sg;
+        return;
+      } catch (_) { /* try smaller size */ }
+    }
+    this._shadowGen = null; // shadows unavailable — scene still renders
   }
 
   _castShadow(mesh) {
@@ -642,6 +856,9 @@ export class BabylonWorldScene {
   // ── SSAO ───────────────────────────────────────────────────────────────────
 
   _setupSSAO() {
+    // SSAO2 can conflict with other render passes on mobile WebGL2 and produces
+    // incorrect (black) output on several iOS/Android implementations.
+    if (this._isMobile) return;
     if (this.engine.webGLVersion < 2) return;
     try {
       const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
@@ -952,9 +1169,6 @@ export class BabylonWorldScene {
     const a = this._keys['KeyA'] || this._keys['ArrowLeft'];
     const d = this._keys['KeyD'] || this._keys['ArrowRight'];
 
-    this._local.isMoving = !!(w || s || a || d);
-    if (!this._local.isMoving) return;
-
     // alpha points FROM target TO camera, so add PI to get the true forward direction
     const speed = 0.012;
     const alpha  = this._camera.alpha + Math.PI;
@@ -962,15 +1176,34 @@ export class BabylonWorldScene {
     const right  = new BABYLON.Vector3(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2));
 
     const dir = BABYLON.Vector3.Zero();
+
+    // Keyboard input
     if (w) dir.addInPlace(fwd);
     if (s) dir.subtractInPlace(fwd);
     if (a) dir.addInPlace(right);
     if (d) dir.subtractInPlace(right);
-    if (dir.lengthSquared() < 0.001) return;
+
+    // Virtual joystick input (mobile)
+    // _joyDx / _joyDy are normalised [-1, 1] from WorldGame's React overlay.
+    // Screen +X = camera right, screen +Y = camera backward.
+    let joyScale = 1;
+    const JOY_DEAD = 0.12; // normalised deadzone
+    const joyLen = Math.hypot(this._joyDx, this._joyDy);
+    if (joyLen > JOY_DEAD) {
+      joyScale = Math.min(1, (joyLen - JOY_DEAD) / (1 - JOY_DEAD));
+      const nx = this._joyDx / joyLen;
+      const ny = this._joyDy / joyLen;
+      dir.addInPlace(right.scale(-nx)); // -nx: screen left = strafe left
+      dir.addInPlace(fwd.scale(-ny));   // -ny: screen up   = move forward
+    }
+
+    this._local.isMoving = dir.lengthSquared() > 0.001;
+    if (!this._local.isMoving) return;
     dir.normalize();
 
+    const speedScale = (joyLen > JOY_DEAD && !w && !s && !a && !d) ? joyScale : 1;
     const pos = this._local.root.position;
-    pos.addInPlace(dir.scale(speed * dt));
+    pos.addInPlace(dir.scale(speed * dt * speedScale));
     pos.x = Math.max(-95, Math.min(95, pos.x));
     pos.z = Math.max(-95, Math.min(95, pos.z));
     pos.y = 0;
@@ -1118,6 +1351,17 @@ export class BabylonWorldScene {
     const m = new BABYLON.StandardMaterial(name + '_mat', this.scene);
     m.diffuseColor  = color;
     m.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    // Required: ambientColor must be non-zero for scene.ambientColor to
+    // contribute — StandardMaterial ignores the scene-wide ambient term when
+    // this is black (the default).
+    m.ambientColor = color.clone();
+    // Emissive self-illumination is only applied when ALL post-processing has
+    // failed (DefaultRenderingPipeline AND ImageProcessingPostProcess both
+    // threw). This is essentially impossible on any device supporting WebGL2,
+    // but kept as an absolute last resort.
+    if (this._lm?._noPipeline) {
+      m.emissiveColor = color.scale(0.25).add(new BABYLON.Color3(0.04, 0.04, 0.05));
+    }
     return m;
   }
 
@@ -1134,6 +1378,7 @@ export class BabylonWorldScene {
     window.removeEventListener('keydown', this._kd);
     window.removeEventListener('keyup',   this._ku);
     window.removeEventListener('resize',  this._onResize);
+    this._touchCleanup?.();
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     this._local?.dispose();
     AssetLibrary.dispose();
