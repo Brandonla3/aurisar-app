@@ -456,7 +456,7 @@ function App() {
   const [screen, setScreen] = useState("loading");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authUser, setAuthUser] = useState(null);
-  const { config: avatarConfig, save: saveAvatarConfig, loading: savingAvatar } = useAvatarConfig(authUser?.id);
+  const { config: avatarConfig, save: saveAvatarConfig, saving: savingAvatar } = useAvatarConfig(authUser?.id);
   const [isAdmin, setIsAdmin] = useState(false); // set from profiles.is_admin column on login
   const [showWorld, setShowWorld] = useState(false);
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate

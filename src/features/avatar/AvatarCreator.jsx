@@ -23,9 +23,10 @@ const TABS = [
 const defaultPanelWidth = () => Math.min(380, Math.round(window.innerWidth * 0.65));
 
 export default function AvatarCreator({ initialConfig, onSave, onCancel, saving = false }) {
-  const [config,    setConfig]    = useState(() => mergeConfig(initialConfig));
-  const [activeTab, setTab]       = useState('body');
+  const [config,     setConfig]     = useState(() => mergeConfig(initialConfig));
+  const [activeTab,  setTab]        = useState('body');
   const [panelWidth, setPanelWidth] = useState(defaultPanelWidth);
+  const [saveError,  setSaveError]  = useState(null);
 
   const avatarRef    = useRef(null);
   const assetLibRef  = useRef(null);
@@ -88,6 +89,7 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
       clothing:{ top: pick(tops), bottom: pick(bots), shoes: pick(shoes) },
       gear:    config.gear,
     };
+    setSaveError(null);
     setConfig(prev => ({ ...prev, ...next, version: prev.version }));
   }, [config.gear]);
 
@@ -132,17 +134,24 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
 
           {/* Sticky action footer */}
           <div style={S.actionBar}>
-            <button style={S.btnRandomise} onClick={randomise}>⚡ Randomise</button>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={S.btnCancel} onClick={onCancel}>Cancel</button>
-              <button
-                style={{ ...S.btnSave, opacity: saving ? 0.6 : 1 }}
-                onClick={() => onSave(config)}
-                disabled={saving}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
+            <div style={S.actionRow}>
+              <button style={S.btnRandomise} onClick={randomise}>⚡ Randomise</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={S.btnCancel} onClick={onCancel}>Cancel</button>
+                <button
+                  style={{ ...S.btnSave, opacity: saving ? 0.6 : 1 }}
+                  onClick={async () => {
+                    setSaveError(null);
+                    const ok = await onSave(config);
+                    if (ok === false) setSaveError('Save failed — please try again.');
+                  }}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
             </div>
+            {saveError && <p style={S.saveError}>{saveError}</p>}
           </div>
         </div>
 
@@ -251,13 +260,24 @@ const S = {
   },
   actionBar: {
     display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
+    flexDirection:  'column',
+    gap:            8,
     padding:        '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
     borderTop:      '1px solid #1e293b',
     background:     '#0a1120',
     flexShrink:     0,
+  },
+  actionRow: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
     gap:            6,
+  },
+  saveError: {
+    color:      '#f87171',
+    fontSize:   11,
+    margin:     0,
+    textAlign:  'center',
   },
   btnRandomise: {
     background:    'transparent',

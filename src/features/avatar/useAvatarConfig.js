@@ -6,11 +6,16 @@ import { mergeConfig } from '../world/game/avatarSchema.js';
  * Load and save a user's AvatarConfig from Supabase profiles.avatar_config.
  *
  * @param {string|null} userId  — Supabase auth user ID
- * @returns {{ config, save, loading, error }}
+ * @returns {{ config, save, loading, saving, error }}
+ *
+ * `loading` — true only during initial fetch
+ * `saving`  — true only while a save is in-flight
+ * `error`   — last save error message (null if none / cleared on next save)
  */
 export function useAvatarConfig(userId) {
   const [config,  setConfig]  = useState(null);
   const [loading, setLoading] = useState(false);
+  const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState(null);
 
   useEffect(() => {
@@ -23,7 +28,7 @@ export function useAvatarConfig(userId) {
       .eq('id', userId)
       .single()
       .then(({ data, error: err }) => {
-        if (canceled) return; // userId changed mid-flight; drop this stale response
+        if (canceled) return;
         if (err) { setError(err.message); }
         else     { setConfig(mergeConfig(data?.avatar_config)); }
         setLoading(false);
@@ -32,17 +37,21 @@ export function useAvatarConfig(userId) {
   }, [userId]);
 
   const save = useCallback(async (newConfig) => {
-    if (!userId) return;
-    setLoading(true);
+    if (!userId) return false;
+    setError(null);
+    setSaving(true);
     const { error: err } = await sb
       .from('profiles')
       .update({ avatar_config: newConfig })
       .eq('id', userId);
-    if (err) setError(err.message);
-    else     setConfig(mergeConfig(newConfig));
-    setLoading(false);
-    return !err;
+    setSaving(false);
+    if (err) {
+      setError(err.message);
+      return false;
+    }
+    setConfig(mergeConfig(newConfig));
+    return true;
   }, [userId]);
 
-  return { config, save, loading, error };
+  return { config, save, loading, saving, error };
 }

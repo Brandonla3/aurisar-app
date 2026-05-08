@@ -149,7 +149,8 @@ const CharacterTab = memo(function CharacterTab({
             saving={savingAvatar}
             onSave={async (cfg) => {
               const ok = await onSaveAvatar?.(cfg);
-              if (ok !== false) setCreatorOpen(false); // keep modal open on save failure so edits aren't lost
+              if (ok !== false) setCreatorOpen(false);
+              return ok; // forward result so AvatarCreator can surface save errors
             }}
             onCancel={() => setCreatorOpen(false)}
           />
