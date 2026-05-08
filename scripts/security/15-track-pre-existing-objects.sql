@@ -1,5 +1,5 @@
 -- =============================================================================
--- 15 — Track pre-existing objects: admin_reset_user_mfa + 3 views
+-- 15 — Track pre-existing objects: xp_to_level, admin_reset_user_mfa + 3 views
 -- =============================================================================
 -- This migration is a no-op on production — the objects it defines already
 -- exist there. It exists to bring the repo into byte-for-byte sync with prod
@@ -10,19 +10,22 @@
 --   Migration 12 (12-security-hardening.sql) references four objects that
 --   pre-date this repo's SQL tracking. PR 95 worked around this with
 --   DO $$ IF EXISTS … END $$ guards so a fresh bootstrap wouldn't abort on
---   missing objects. This migration closes that gap by creating the four
---   objects unconditionally, so the guards in migration 12 become
---   harmless-but-redundant. The guards in migration 12 can stay — editing a
---   merged migration file would diverge from what was already applied to prod.
+--   missing objects. This migration closes that gap by creating the objects
+--   unconditionally, so the guards in migration 12 become harmless-but-
+--   redundant. The guards in migration 12 can stay — editing a merged
+--   migration file would diverge from what was already applied to prod.
 --
--- Objects tracked here (all four were verified live from project tczqtwxrnptgajxwynmg):
---   1. FUNCTION public.admin_reset_user_mfa(target_email text) — break-glass
+-- Objects tracked here (all verified live from project tczqtwxrnptgajxwynmg):
+--   1. FUNCTION public.xp_to_level(p_xp bigint) — XP→level formula. IMMUTABLE,
+--      EXECUTE granted to PUBLIC. Must precede community_leaderboard (section 4).
+--   2. FUNCTION public.admin_reset_user_mfa(target_email text) — break-glass
 --      MFA reset. SECURITY DEFINER, callable only via service_role / postgres.
---   2. VIEW    public.feedback_inbox       — admin view over public.feedback.
+--   3. VIEW    public.feedback_inbox       — admin view over public.feedback.
 --      security_invoker=on, SELECT for service_role only.
---   3. VIEW    public.community_leaderboard — player stats leaderboard.
+--   4. VIEW    public.community_leaderboard — player stats leaderboard.
 --      security_invoker=on, SELECT for anon + authenticated.
---   4. VIEW    public.leaderboard_full     — ranked leaderboard joining
+--      Depends on xp_to_level (section 1) — must be created after it.
+--   5. VIEW    public.leaderboard_full     — ranked leaderboard joining
 --      leaderboard_entries ⋈ xp_leaderboard (a regular table — no untracked
 --      view in the dependency chain). security_invoker=on, SELECT for
 --      anon + authenticated.
@@ -30,17 +33,59 @@
 -- Note: public.profiles_public is already tracked in migration 02
 -- (02-rls-add-safe-views-and-rpcs.sql:21) — it is not repeated here.
 --
--- Cascade dependency note: community_leaderboard calls xp_to_level(), a
--- function not found in migrations 01–14. If xp_to_level() also pre-dates
--- this repo's tracking it may need its own follow-up migration. It did not
--- appear in the Supabase advisor flags addressed by PR 95.
---
 -- Idempotent. Safe to re-run (CREATE OR REPLACE throughout).
 -- =============================================================================
 
 BEGIN;
 
--- ── 1. Function: admin_reset_user_mfa(target_email text) ────────────────────
+-- ── 1. Function: xp_to_level(p_xp bigint) ───────────────────────────────────
+-- Converts a raw XP value to an integer level using the game's levelling
+-- curve. IMMUTABLE (pure function, no side-effects). Called by
+-- community_leaderboard (section 4) — must exist before that view is created.
+-- EXECUTE is granted to PUBLIC (default) so any role can call it.
+-- Body reproduced verbatim from pg_get_functiondef on prod as of 2026-05-08.
+CREATE OR REPLACE FUNCTION public.xp_to_level(p_xp bigint)
+RETURNS integer
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path TO ''
+AS $function$
+declare
+  lv int := 1;
+  threshold bigint := 0;
+  inc numeric := 20000;
+  i int;
+begin
+  if p_xp is null or p_xp < 20000 then
+    return 1;
+  end if;
+
+  for i in 2..70 loop
+    threshold := threshold + round(inc);
+    if p_xp >= threshold then
+      lv := i;
+    else
+      exit;
+    end if;
+
+    if i < 10 then
+      inc := inc * 1.30;
+    elsif i < 30 then
+      inc := inc * 1.50;
+    elsif i < 40 then
+      inc := inc * 2.25;
+    end if;
+  end loop;
+
+  return lv;
+end;
+$function$;
+
+-- EXECUTE already granted to PUBLIC by default for new functions; re-state
+-- it explicitly so the grant is visible in tracked SQL.
+GRANT EXECUTE ON FUNCTION public.xp_to_level(bigint) TO PUBLIC;
+
+-- ── 2. Function: admin_reset_user_mfa(target_email text) ─────────────────────
 -- Break-glass helper: finds a user by email, deletes all their MFA factors
 -- and recovery codes. Intended for use from the Supabase SQL editor (postgres
 -- role) or via service_role service key — never from the browser client.
@@ -91,7 +136,7 @@ REVOKE EXECUTE ON FUNCTION public.admin_reset_user_mfa(target_email text) FROM a
 -- all public functions at project init. service_role also bypasses RLS.
 -- The postgres owner always retains access.
 
--- ── 2. View: feedback_inbox ──────────────────────────────────────────────────
+-- ── 3. View: feedback_inbox ──────────────────────────────────────────────────
 -- Admin view over public.feedback. Shows a truncated 120-char preview so
 -- admins can triage submissions without loading full message bodies.
 -- security_invoker=on: the view runs as the calling role, so RLS on the
@@ -112,7 +157,7 @@ SELECT id,
 REVOKE ALL   ON TABLE public.feedback_inbox FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.feedback_inbox TO service_role;
 
--- ── 3. View: community_leaderboard ──────────────────────────────────────────
+-- ── 4. View: community_leaderboard ──────────────────────────────────────────
 -- Public-facing player leaderboard. Extracts display fields from profiles.data
 -- jsonb and filters to players who have chosen a class and set a player name.
 -- security_invoker=on (default; explicitly set for clarity). Read access via
@@ -141,7 +186,7 @@ SELECT id                                                          AS user_id,
 REVOKE ALL   ON TABLE public.community_leaderboard FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.community_leaderboard TO anon, authenticated;
 
--- ── 4. View: leaderboard_full ────────────────────────────────────────────────
+-- ── 5. View: leaderboard_full ────────────────────────────────────────────────
 -- Ranked leaderboard: joins leaderboard_entries (per-category records) with
 -- xp_leaderboard (a regular table — relkind='r', verified 2026-05-07) to
 -- attach user profile data alongside each entry. Computes per-category rank
@@ -183,5 +228,6 @@ COMMIT;
 --   DROP VIEW     IF EXISTS public.community_leaderboard;
 --   DROP VIEW     IF EXISTS public.leaderboard_full;
 --   DROP FUNCTION IF EXISTS public.admin_reset_user_mfa(target_email text);
+--   DROP FUNCTION IF EXISTS public.xp_to_level(bigint);
 -- COMMIT;
 -- =============================================================================
