@@ -2,9 +2,15 @@ import React from 'react';
 import { ColorSwatch, MeshGrid, SectionLabel } from './shared.jsx';
 
 const HAIR_STYLES = [
-  { key: 'hair_short',  label: 'Short' },
-  { key: 'hair_long',   label: 'Long' },
-  { key: 'hair_braids', label: 'Braids' },
+  { key: 'hair_short',    label: 'Short' },
+  { key: 'hair_long',     label: 'Long' },
+  { key: 'hair_braids',   label: 'Braids' },
+  { key: 'hair_ponytail', label: 'Ponytail' },
+  { key: 'hair_bun',      label: 'Bun' },
+  { key: 'hair_wavy',     label: 'Wavy' },
+  { key: 'hair_afro',     label: 'Afro' },
+  { key: 'hair_mohawk',   label: 'Mohawk' },
+  { key: 'hair_shaved',   label: 'Shaved' },
 ];
 
 const HAIR_COLORS = [
@@ -12,6 +18,7 @@ const HAIR_COLORS = [
   '#C68642', '#D4AF37', '#F5DEB3', '#FFFACD',
   '#1C1C1C', '#708090', '#FFFFFF', '#B22222',
   '#800020', '#4B0082', '#000080', '#006400',
+  '#FF69B4', '#00CED1', '#FF4500', '#7B68EE',
 ];
 
 export default function HairPanel({ config, avatar, assetLibrary, onChange }) {

@@ -1,9 +1,30 @@
 import React from 'react';
 import { MeshGrid, SectionLabel } from './shared.jsx';
 
-const TOPS    = [{ key: 'top_casual', label: 'Casual' }, { key: 'top_hoodie', label: 'Hoodie' }];
-const BOTTOMS = [{ key: 'bottom_jeans', label: 'Jeans' }, { key: 'bottom_shorts', label: 'Shorts' }];
-const SHOES   = [{ key: 'shoes_boots', label: 'Boots' }];
+const TOPS = [
+  { key: 'top_casual',  label: 'Casual' },
+  { key: 'top_hoodie',  label: 'Hoodie' },
+  { key: 'top_tank',    label: 'Tank' },
+  { key: 'top_robe',    label: 'Robe' },
+  { key: 'top_jacket',  label: 'Jacket' },
+  { key: 'top_tunic',   label: 'Tunic' },
+];
+
+const BOTTOMS = [
+  { key: 'bottom_jeans',    label: 'Jeans' },
+  { key: 'bottom_shorts',   label: 'Shorts' },
+  { key: 'bottom_skirt',    label: 'Skirt' },
+  { key: 'bottom_leggings', label: 'Leggings' },
+  { key: 'bottom_trousers', label: 'Trousers' },
+  { key: 'bottom_kilt',     label: 'Kilt' },
+];
+
+const SHOES = [
+  { key: 'shoes_boots',    label: 'Boots' },
+  { key: 'shoes_sandals',  label: 'Sandals' },
+  { key: 'shoes_sneakers', label: 'Sneakers' },
+  { key: 'shoes_greaves',  label: 'Greaves' },
+];
 
 export default function ClothingPanel({ config, avatar, assetLibrary, onChange }) {
   const set = (slot, key) => {
