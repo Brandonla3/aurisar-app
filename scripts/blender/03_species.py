@@ -4,13 +4,6 @@
 Horns (3): static mesh parented rigidly to the Head bone — no skinning needed.
 Tails (3): skinned chain that follows Hips/Spine via auto-weights.
 
-Coordinate system: Z-up world. Horns build at world (X, Y, Z) and rigid-
-parent to the Head bone, which carries the import rotation, so they look
-correct without baking. Tails are skinned and procedural — they need the
-same world bake step that clothing uses, otherwise the armature flips them
-flat at export. See public/assets/characters/README.md for the export
-contract.
-
 Outputs (under public/assets/characters/species/):
   horns_small.glb, horns_large.glb, horns_curved.glb
   tail_short.glb,  tail_long.glb,  tail_fluffy.glb
@@ -24,30 +17,16 @@ import os
 import sys
 import math
 import bpy
-from mathutils import Vector, Matrix
+from mathutils import Vector
 
 REPO    = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 ASSETS  = os.path.join(REPO, 'public', 'assets', 'characters')
 SPECIES = os.path.join(ASSETS, 'species')
 BASE    = os.path.join(ASSETS, 'base_body.glb')
 
-# WORLD Z-up positions, meter scale, measured from base_body.glb bones.
-HEAD_TOP   = Vector((0.0, 0.0, 1.67))   # HeadTop_End bone height in world Z
-HIPS_Z     = 0.92                       # Hips bone height in world Z
-TAIL_BACK  = 0.10                       # +Y is "behind" hips after Y-up→Z-up
-
-
-def _strip_shape_keys(obj):
-    while obj.data.shape_keys and obj.data.shape_keys.key_blocks:
-        obj.shape_key_remove(obj.data.shape_keys.key_blocks[0])
-
-
-def _bake_world_into_mesh(obj):
-    mat = obj.matrix_world.copy()
-    loc = obj.location.copy()
-    for v in obj.data.vertices:
-        v.co = (mat @ v.co) - loc
-    obj.matrix_world = Matrix.Translation(loc)
+HEAD_TOP  = Vector((0.0, 1.67, 0.0))   # HeadTop_End bone Y=1.663 in base_body.glb
+HIPS_Y    = 0.92                       # Hips bone Y=0.921 in base_body.glb
+TAIL_BACK = -0.10                      # how far behind the hips the tail starts
 
 
 # ── Helpers (scene/material) ────────────────────────────────────────────────
@@ -146,23 +125,22 @@ def _add_cone(radius: float, depth: float, location: Vector,
 
 
 def build_horns_small():
-    # Z-up: tilt back via -X rotation, splay outward via Y rotation.
     left  = _add_cone(0.018, 0.07,
-                      HEAD_TOP + Vector((-0.045, 0.0, -0.02)),
-                      rotation_euler=(math.radians(-10), math.radians(10), 0))
+                      HEAD_TOP + Vector((-0.045, -0.02, 0.0)),
+                      rotation_euler=(math.radians(-10), 0, math.radians(10)))
     right = _add_cone(0.018, 0.07,
-                      HEAD_TOP + Vector((0.045, 0.0, -0.02)),
-                      rotation_euler=(math.radians(-10), math.radians(-10), 0))
+                      HEAD_TOP + Vector((0.045, -0.02, 0.0)),
+                      rotation_euler=(math.radians(-10), 0, math.radians(-10)))
     return _join([left, right], 'horns_small')
 
 
 def build_horns_large():
     left  = _add_cone(0.028, 0.18,
                       HEAD_TOP + Vector((-0.05, 0.0, 0.0)),
-                      rotation_euler=(math.radians(-25), math.radians(15), 0))
+                      rotation_euler=(math.radians(-25), 0, math.radians(15)))
     right = _add_cone(0.028, 0.18,
                       HEAD_TOP + Vector((0.05, 0.0, 0.0)),
-                      rotation_euler=(math.radians(-25), math.radians(-15), 0))
+                      rotation_euler=(math.radians(-25), 0, math.radians(-15)))
     return _join([left, right], 'horns_large')
 
 
@@ -170,16 +148,17 @@ def build_horns_curved():
     """Ram-style spirals built from a Curve → Mesh."""
     objs = []
     for sign in (-1, 1):
-        bpy.ops.curve.primitive_bezier_circle_add(
-            radius=0.05,
-            location=HEAD_TOP + Vector((sign*0.06, 0.0, -0.02)))
+        # Use a simple bezier circle squished + a path for the spiral feel.
+        bpy.ops.curve.primitive_bezier_circle_add(radius=0.05,
+                                                    location=HEAD_TOP + Vector((sign*0.06, -0.02, 0)))
         curve = bpy.context.active_object
         curve.data.bevel_depth = 0.018
         curve.data.bevel_resolution = 2
         curve.data.resolution_u = 8
+        # Convert curve to mesh
         bpy.ops.object.convert(target='MESH')
         m = bpy.context.active_object
-        m.scale = (0.7, 1.0, 0.9)
+        m.scale = (0.7, 0.9, 1.0)
         bpy.ops.object.transform_apply(scale=True)
         objs.append(m)
     return _join(objs, 'horns_curved')
@@ -189,32 +168,28 @@ def build_horns_curved():
 
 def _add_tail_chain(name: str, segments: int, length: float, base_radius: float,
                     fluffy: bool = False) -> bpy.types.Object:
-    """Build a tapered tail mesh from a series of cylinder segments.
-
-    Z-up world: starts at hips height (Z=HIPS_Z), behind the body (+Y),
-    extends rearward and droops downward (-Z). Cylinder default axis is Z,
-    rotated 90° around X so segments lie horizontal along Y (front-back).
-    """
+    """Build a tapered tail mesh from a series of cylinder segments."""
     objs = []
     seg_len = length / segments
     radius = base_radius
-    y = TAIL_BACK
-    z = HIPS_Z
+    y = HIPS_Y
+    z = TAIL_BACK
     droop_per_seg = 0.04 if not fluffy else 0.06
     for i in range(segments):
         bpy.ops.mesh.primitive_cylinder_add(
             vertices=10, radius=radius, depth=seg_len,
             location=(0, y, z))
         seg = bpy.context.active_object
-        seg.rotation_euler = (math.radians(90), 0, 0)
+        seg.rotation_euler = (math.radians(90), 0, 0)  # cylinder along Z
         bpy.ops.object.transform_apply(rotation=True)
         objs.append(seg)
-        # Walk along +Y, drooping in -Z, shrinking radius.
-        y += seg_len * 0.95
-        z -= droop_per_seg * (i + 1) / segments
+        # Step toward the tip — slight downward droop and shrinking radius
+        z -= seg_len * 0.95
+        y -= droop_per_seg * (i + 1) / segments
         radius *= 0.85 if not fluffy else 0.92
 
     if fluffy:
+        # Add a hemispherical "puff" at the tip
         bpy.ops.mesh.primitive_uv_sphere_add(radius=base_radius * 0.9,
                                               segments=12, ring_count=8,
                                               location=(0, y, z))
@@ -273,11 +248,7 @@ def main() -> int:
         _export_glb(out_path, has_skin=False)
         print(f'[OK]   {fname}')
 
-    # Tails — skinned to armature.
-    # Tails are procedurally built in WORLD space, so we must bake matrix_world
-    # into vertex coords before binding. Otherwise the auto-weight bind
-    # interprets the tail in armature-local space and the export comes out
-    # rotated 90° (lying flat on the ground).
+    # Tails — skinned to armature
     for fname, builder in TAILS:
         out_path = os.path.join(SPECIES, fname)
         print(f'[run]  {fname}')
@@ -287,7 +258,6 @@ def main() -> int:
         obj.data.materials.clear()
         obj.data.materials.append(_white_material(f'{obj.name}_mat'))
         _decimate(obj, MAX_TRIS)
-        _bake_world_into_mesh(obj)
         _bind_to_armature(obj, arm)
         _export_glb(out_path, has_skin=True)
         print(f'[OK]   {fname}')
