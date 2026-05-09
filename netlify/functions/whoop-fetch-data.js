@@ -8,7 +8,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 async function refreshAccessToken(supabase, userId, currentRefreshToken, clientId, clientSecret) {
-  const res = await fetch("https://api.whoop.com/oauth/oauth2/token", {
+  const res = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -31,7 +31,7 @@ async function refreshAccessToken(supabase, userId, currentRefreshToken, clientI
 }
 
 async function whoopGet(path, accessToken) {
-  const res = await fetch(`https://api.whoop.com${path}`, {
+  const res = await fetch(`https://api.prod.whoop.com${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error(`Whoop API error ${res.status} on ${path}`);
