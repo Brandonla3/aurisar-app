@@ -77,7 +77,11 @@ export default async (req) => {
 
   if (!tokenRes.ok) {
     const err = await tokenRes.text();
-    return new Response(JSON.stringify({ error: err }), {
+    console.error("[whoop-token-exchange] Whoop token endpoint returned", tokenRes.status, err, {
+      redirectUriUsed: redirectUri,
+      clientIdPrefix:  clientId?.slice(0, 6),
+    });
+    return new Response(JSON.stringify({ error: `Whoop ${tokenRes.status}: ${err}` }), {
       status: 502, headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
@@ -100,7 +104,8 @@ export default async (req) => {
   });
 
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("[whoop-token-exchange] Supabase upsert failed", error);
+    return new Response(JSON.stringify({ error: `Supabase: ${error.message}` }), {
       status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
