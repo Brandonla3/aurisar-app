@@ -93,7 +93,10 @@ const lazyMount = el => <React.Suspense fallback={LazyFallback}>{el}</React.Susp
 
 // World feature is desktop-only for now (no touch controls yet). Hides the
 // World pill on phones/tablets so users don't tap into a stuck-camera scene.
+// Width threshold keeps touch-capable laptops/desktops (Surface, Chromebooks)
+// unaffected — only narrow viewports with touch are treated as mobile/tablet.
 const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
+  window.innerWidth < 1024 &&
   ((window.navigator?.maxTouchPoints ?? 0) > 0 || 'ontouchstart' in window);
 
 // ── Virtualized workout-builder picker row (item 4: react-window) ─────────
