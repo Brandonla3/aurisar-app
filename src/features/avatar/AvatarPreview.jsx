@@ -64,10 +64,8 @@ const PreviewAssets = {
       'species/tail_short':     'species/tail_short.glb',
       'species/tail_long':      'species/tail_long.glb',
       'species/tail_fluffy':    'species/tail_fluffy.glb',
-      'gear/helmet_fantasy1':    'gear/helmet_fantasy1.glb',
-      'gear/chest_fantasy1':     'gear/chest_fantasy1.glb',
-      'gear/gauntlets_fantasy1': 'gear/gauntlets_fantasy1.glb',
-      'gear/legs_fantasy1':      'gear/legs_fantasy1.glb',
+      // Gear — populated via scripts/blender/import_armor.py pipeline. Keep
+      // in sync with AssetLibrary.js MANIFEST.
     };
     const load = async (key, path) => {
       try {

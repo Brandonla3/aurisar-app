@@ -435,9 +435,12 @@ export class CharacterAvatar {
     const inst = container.instantiateModelsToScene(
       name => `${this._id}_gear_${slot}_${name}`, false
     );
-    // Armor pieces are modeled in character world-space (vertices at absolute
-    // positions), so parent to the character root — same pattern as clothing.
+    // Gear is authored as skinned meshes bound to the shared MPFB rig — same
+    // pattern as clothing. Parent to root, then re-point each child mesh's
+    // skeleton at the body rig so animations drive the armor too.
     inst.rootNodes.forEach(n => { n.parent = this.root; });
+    inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
+      .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
     this._slots[`gear_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 

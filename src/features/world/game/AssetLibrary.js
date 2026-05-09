@@ -66,11 +66,10 @@ const MANIFEST = {
   'species/tail_long':      'species/tail_long.glb',
   'species/tail_fluffy':    'species/tail_fluffy.glb',
 
-  // Gear — Fantasy I leather armor set (Kagi Vision Pack).
-  'gear/helmet_fantasy1':    'gear/helmet_fantasy1.glb',
-  'gear/chest_fantasy1':     'gear/chest_fantasy1.glb',
-  'gear/gauntlets_fantasy1': 'gear/gauntlets_fantasy1.glb',
-  'gear/legs_fantasy1':      'gear/legs_fantasy1.glb',
+  // Gear — slot scaffolding only. Real assets land via the upcoming
+  // scripts/blender/import_armor.py pipeline (auto-skin to MPFB rig +
+  // preserve original materials). Add `gear/<key>: 'gear/<key>.glb'`
+  // entries here once those GLBs ship.
 };
 
 const _containers = new Map();
