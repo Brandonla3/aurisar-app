@@ -49,9 +49,9 @@ export default function WorldOverlay({ onClose, username, aurisarClass, avatarCo
   return (
     <div
       style={{
-        position:   'fixed',
-        inset:      0,
-        zIndex:     9999,
+        position: 'fixed',
+        top: 0, right: 0, bottom: 0, left: 0,
+        zIndex:   9999,
         background: '#000',
         // Respect notch / home-bar on iOS
         paddingTop:    'env(safe-area-inset-top, 0px)',
