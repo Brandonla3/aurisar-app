@@ -65,6 +65,11 @@ const MANIFEST = {
   'species/tail_short':     'species/tail_short.glb',
   'species/tail_long':      'species/tail_long.glb',
   'species/tail_fluffy':    'species/tail_fluffy.glb',
+
+  // Gear — slot scaffolding only. Real assets land via the upcoming
+  // scripts/blender/import_armor.py pipeline (auto-skin to MPFB rig +
+  // preserve original materials). Add `gear/<key>: 'gear/<key>.glb'`
+  // entries here once those GLBs ship.
 };
 
 const _containers = new Map();

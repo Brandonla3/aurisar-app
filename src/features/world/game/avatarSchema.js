@@ -14,12 +14,12 @@ export const DEFAULT_AVATAR = {
   species:  { earMorph: 0, hornMesh: null, tailMesh: null },
   hair:     { style: 'hair_short', color: '#2C1B0A' },
   clothing: { top: 'top_tunic', bottom: 'bottom_trousers', shoes: 'shoes_boots' },
-  gear:     { helmet: null, chest: null, weapon: null },
+  gear:     { helmet: null, chest: null, weapon: null, gauntlets: null, legs: null },
 };
 
 /** Asset keys for each clothing/gear slot. */
 export const CLOTHING_SLOTS = ['top', 'bottom', 'shoes'];
-export const GEAR_SLOTS     = ['helmet', 'chest', 'weapon'];
+export const GEAR_SLOTS     = ['helmet', 'chest', 'weapon', 'gauntlets', 'legs'];
 
 /**
  * Legacy → fantasy clothing key migration. Configs persisted before the
