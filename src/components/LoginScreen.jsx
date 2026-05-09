@@ -297,6 +297,23 @@ export default function LoginScreen({
                 </div>
               )}
 
+              {/* Privacy Policy link */}
+              <div style={{
+                marginTop: 14,
+                textAlign: 'center',
+                fontSize: 11,
+                color: 'var(--au-text-faint)',
+              }}>
+                By continuing, you agree to our{' '}
+                <a
+                  href="/privacy"
+                  style={{ color: 'var(--au-text-dim)', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                >
+                  Privacy Policy
+                </a>
+                . We never sell your data.
+              </div>
+
               {/* Preview mode — dev PIN gate */}
               {PREVIEW_ENABLED && loginSubScreen === null && (
                 <PreviewPinSection

@@ -116,7 +116,6 @@ export default async (req) => {
   const title = `[${type.toUpperCase()}] ${message.slice(0, MAX_TITLE_LEN)}`;
   const issueBody = [
     `**Type:** ${escapeMarkdown(type)}`,
-    `**Email:** ${escapeMarkdown(cleanEmail || "anonymous")}`,
     `**Account ID:** ${escapeMarkdown(cleanAcct || "N/A")}`,
     "",
     escapeMarkdown(message),

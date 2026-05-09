@@ -57,6 +57,7 @@ import { ExIcon, getExIconName, getExIconColor } from './components/ExIcon';
 import { ClassIcon } from './components/ClassIcon';
 import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import LoginScreen from './components/LoginScreen';
+import PrivacyPolicy from './components/PrivacyPolicy';
 // Heavy / route-scoped components are lazy-loaded so first paint doesn't pay for
 // recharts (~150KB), three.js (~600KB), or the landing page assets.
 const TrendsTab = React.lazy(() => import('./components/TrendsTab').then(m => ({
@@ -90,7 +91,12 @@ const LazyFallback = <div style={{
 }} role={'status'} aria-live={'polite'} aria-label={'Loading'}>{"Loading…"}</div>;
 const lazyMount = el => <React.Suspense fallback={LazyFallback}>{el}</React.Suspense>;
 
+// World feature is desktop-only for now (no touch controls yet). Hides the
+// World pill on phones/tablets so users don't tap into a stuck-camera scene.
+// Width threshold keeps touch-capable laptops/desktops (Surface, Chromebooks)
+// unaffected — only narrow viewports with touch are treated as mobile/tablet.
 const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
+  window.innerWidth < 1024 &&
   ((window.navigator?.maxTouchPoints ?? 0) > 0 || 'ontouchstart' in window);
 
 // ── Virtualized workout-builder picker row (item 4: react-window) ─────────
@@ -4852,6 +4858,8 @@ function App() {
     setIsPreviewMode(true);
     setScreen("main");
   }
+  if (window.location.pathname === '/privacy') return <PrivacyPolicy />;
+
   if (screen === "loading") return <div style={{
     minHeight: "100vh",
     background: "#0c0c0a",
@@ -5353,7 +5361,7 @@ function App() {
             })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
                   display: "block"
                 }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}<button key="world" className={"tab"} title="Enter Aurisar World" onClick={() => guardAll(() => setShowWorld(true))} style={{position:"relative"}}><span className={"tab-icon"}><img src={`https://api.iconify.design/mdi/earth.svg?color=${encodeURIComponent("#8a8478")}`} alt={""} width={22} height={22} style={{display:"block"}} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+          })}{!IS_TOUCH_DEVICE && <button key="world" className={"tab"} title="Enter Aurisar World" onClick={() => guardAll(() => setShowWorld(true))} style={{position:"relative"}}><span className={"tab-icon"}><img src={`https://api.iconify.design/mdi/earth.svg?color=${encodeURIComponent("#8a8478")}`} alt={""} width={22} height={22} style={{display:"block"}} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button>}</div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
