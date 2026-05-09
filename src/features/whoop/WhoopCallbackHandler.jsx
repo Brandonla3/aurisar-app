@@ -19,16 +19,19 @@ export default function WhoopCallbackHandler() {
 
     (async () => {
       try {
-        const { data: { user } } = await sb.auth.getUser();
-        if (!user) {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) {
           window.location.replace('/');
           return;
         }
 
         const res = await fetch('/.netlify/functions/whoop-token-exchange', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, userId: user.id }),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ code }),
         });
 
         setStatus(res.ok ? 'success' : 'error');

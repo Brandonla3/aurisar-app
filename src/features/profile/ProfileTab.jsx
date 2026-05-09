@@ -110,14 +110,19 @@ const ProfileTab = memo(function ProfileTab({
   }
 
   async function handleSyncWhoop() {
-    if (!authUser?.id || whoopSyncing) return;
+    if (whoopSyncing) return;
     setWhoopSyncing(true);
     setWhoopMsg('');
     try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { setWhoopMsg('Not signed in.'); setWhoopSyncing(false); return; }
       const res = await fetch('/.netlify/functions/whoop-fetch-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: authUser.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({}),
       });
       const data = await res.json();
       setWhoopMsg(res.ok ? `Synced ${data.synced ?? 0} records.` : 'Sync failed. Try again.');

@@ -47,16 +47,36 @@ export default async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: { ...corsHeaders, "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" },
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
     });
   }
 
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-  const { userId } = await req.json().catch(() => ({}));
-  if (!userId) {
-    return new Response(JSON.stringify({ error: "Missing userId" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  // Verify the caller's Supabase session — derive userId from the token,
+  // never from the request body (prevents cross-account data access).
+  const bearerToken = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!bearerToken) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
+
+  const supabaseAnon = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
+  );
+  const { data: { user }, error: authErr } = await supabaseAnon.auth.getUser(bearerToken);
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+  const userId = user.id; // authoritative — ignore any userId in body
 
   const clientId     = process.env.WHOOP_CLIENT_ID;
   const clientSecret = process.env.WHOOP_CLIENT_SECRET;
@@ -73,7 +93,9 @@ export default async (req) => {
     .single();
 
   if (tokenErr || !tokenRow) {
-    return new Response(JSON.stringify({ error: "Whoop not linked" }), { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    return new Response(JSON.stringify({ error: "Whoop not linked" }), {
+      status: 404, headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
 
   let { access_token, refresh_token, expires_at } = tokenRow;
