@@ -34,7 +34,10 @@ async function whoopGet(path, accessToken) {
   const res = await fetch(`https://api.prod.whoop.com${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`Whoop API error ${res.status} on ${path}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Whoop API ${res.status} on ${path}: ${body.slice(0, 200)}`);
+  }
   return res.json();
 }
 
@@ -107,44 +110,80 @@ export default async (req) => {
 
   const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const end   = new Date().toISOString();
-
-  const [recoveries, cycles, sleeps] = await Promise.all([
-    whoopGet(`/v4/recovery?start=${start}&end=${end}&limit=25`, access_token),
-    whoopGet(`/v2/cycle?start=${start}&end=${end}&limit=25`, access_token),
-    whoopGet(`/v2/activity/sleep?start=${start}&end=${end}&limit=25`, access_token),
-  ]);
-
   const today = new Date().toISOString().slice(0, 10);
 
-  const rows = [
-    ...(recoveries.records ?? []).map(r => ({
-      user_id:    userId,
-      data_type:  "recovery",
-      cycle_date: r.created_at?.slice(0, 10) ?? today,
-      payload:    r,
-    })),
-    ...(cycles.records ?? []).map(r => ({
-      user_id:    userId,
-      data_type:  "cycle",
-      cycle_date: r.start?.slice(0, 10) ?? today,
-      payload:    r,
-    })),
-    ...(sleeps.records ?? []).map(r => ({
-      user_id:    userId,
-      data_type:  "sleep",
-      cycle_date: r.start?.slice(0, 10) ?? today,
-      payload:    r,
-    })),
-  ];
+  // Fetch all six data types in parallel. Use allSettled so a single
+  // endpoint failure doesn't sink the whole sync — we surface the per-
+  // endpoint status in the response so the client can show what worked.
+  const [recoveries, cycles, sleeps, workouts, basicProfile, bodyMeasurement] =
+    await Promise.allSettled([
+      whoopGet(`/developer/v2/recovery?start=${start}&end=${end}&limit=25`, access_token),
+      whoopGet(`/developer/v2/cycle?start=${start}&end=${end}&limit=25`, access_token),
+      whoopGet(`/developer/v2/activity/sleep?start=${start}&end=${end}&limit=25`, access_token),
+      whoopGet(`/developer/v2/activity/workout?start=${start}&end=${end}&limit=25`, access_token),
+      whoopGet(`/developer/v2/user/profile/basic`, access_token),
+      whoopGet(`/developer/v2/user/measurement/body`, access_token),
+    ]);
 
-  if (rows.length > 0) {
-    await supabase.from("whoop_data").upsert(rows, {
-      onConflict: "user_id,data_type,cycle_date",
+  const rows = [];
+  const errors = {};
+
+  function pushTimeSeries(settled, dataType, dateField) {
+    if (settled.status !== "fulfilled") {
+      errors[dataType] = settled.reason?.message ?? String(settled.reason);
+      return;
+    }
+    for (const r of settled.value.records ?? []) {
+      rows.push({
+        user_id:    userId,
+        data_type:  dataType,
+        cycle_date: r[dateField]?.slice(0, 10) ?? today,
+        payload:    r,
+      });
+    }
+  }
+
+  function pushSingleton(settled, dataType) {
+    if (settled.status !== "fulfilled") {
+      errors[dataType] = settled.reason?.message ?? String(settled.reason);
+      return;
+    }
+    rows.push({
+      user_id:    userId,
+      data_type:  dataType,
+      cycle_date: today,
+      payload:    settled.value,
     });
   }
 
-  return new Response(JSON.stringify({ synced: rows.length }), {
-    status: 200,
+  pushTimeSeries(recoveries,      "recovery", "created_at");
+  pushTimeSeries(cycles,          "cycle",    "start");
+  pushTimeSeries(sleeps,          "sleep",    "start");
+  pushTimeSeries(workouts,        "workout",  "start");
+  pushSingleton(basicProfile,     "profile");
+  pushSingleton(bodyMeasurement,  "body_measurement");
+
+  if (Object.keys(errors).length > 0) {
+    console.error("[whoop-fetch-data] partial failure", errors);
+  }
+
+  let upsertError = null;
+  if (rows.length > 0) {
+    const { error: upErr } = await supabase.from("whoop_data").upsert(rows, {
+      onConflict: "user_id,data_type,cycle_date",
+    });
+    if (upErr) {
+      console.error("[whoop-fetch-data] supabase upsert failed", upErr);
+      upsertError = upErr.message;
+    }
+  }
+
+  return new Response(JSON.stringify({
+    synced: rows.length,
+    errors,
+    upsertError,
+  }), {
+    status: upsertError ? 500 : 200,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 };

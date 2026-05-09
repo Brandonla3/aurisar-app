@@ -52,7 +52,22 @@ export default function WhoopCallbackHandler() {
 
         if (res.ok) {
           setStatus('success');
-          setTimeout(() => { window.location.replace('/'); }, 1800);
+          // Land on the profile tab when the app reloads, and let it know to
+          // show a one-shot success banner.
+          sessionStorage.setItem('aurisar_post_oauth_tab', 'profile');
+          sessionStorage.setItem('aurisar_whoop_just_connected', '1');
+          // Kick off the first sync in the background — don't block the
+          // redirect on it. If it fails, the profile tab's manual Sync
+          // button will still work.
+          fetch('/.netlify/functions/whoop-fetch-data', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({}),
+          }).catch(() => {});
+          setTimeout(() => { window.location.replace('/'); }, 1500);
         } else {
           let body = '';
           try { body = await res.text(); } catch { /* ignore */ }

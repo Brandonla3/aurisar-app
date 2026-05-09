@@ -10,6 +10,75 @@ import { ClassIcon } from '../../components/ClassIcon';
 
 const LEADERBOARD_PB_IDS = new Set(["bench", "bench_press", "squat", "barbell_back_squat", "deadlift", "barbell_deadlift", "overhead_press", "ohp", "pull_up", "pullups", "push_up", "pushups", "running", "treadmill_run", "run"]);
 
+// ── Whoop value formatters ──────────────────────────────────────────
+const _emdash = '—';
+const _isNum  = (v) => typeof v === 'number' && Number.isFinite(v);
+function formatNum(v, decimals = 0) {
+  return _isNum(v) ? v.toFixed(decimals) : _emdash;
+}
+function formatPct(v) {
+  return _isNum(v) ? `${v.toFixed(0)}%` : _emdash;
+}
+function formatBpm(v) {
+  return _isNum(v) ? `${v.toFixed(0)} bpm` : _emdash;
+}
+function formatMs(v) {
+  return _isNum(v) ? `${v.toFixed(1)} ms` : _emdash;
+}
+function formatTemp(c) {
+  if (!_isNum(c)) return _emdash;
+  const f = c * 9 / 5 + 32;
+  return `${c.toFixed(1)}°C / ${f.toFixed(1)}°F`;
+}
+function formatDuration(ms) {
+  if (!_isNum(ms)) return _emdash;
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+function formatMeters(m) {
+  if (!_isNum(m)) return _emdash;
+  const totalIn = m / 0.0254;
+  const ft = Math.floor(totalIn / 12);
+  const inches = Math.round(totalIn - ft * 12);
+  return `${m.toFixed(2)} m / ${ft}'${inches}"`;
+}
+function formatKg(kg) {
+  if (!_isNum(kg)) return _emdash;
+  const lb = kg * 2.2046226218;
+  return `${kg.toFixed(1)} kg / ${lb.toFixed(1)} lb`;
+}
+
+function WhoopFieldCard({ title, payload, rows }) {
+  const empty = !payload;
+  return (
+    <div style={{
+      padding: '10px 12px',
+      background: 'rgba(45,42,36,.18)',
+      borderRadius: 10,
+      border: '1px solid rgba(180,172,158,.07)',
+      opacity: empty ? 0.55 : 1,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#d4cec4', marginBottom: 6, letterSpacing: 0.4 }}>
+        {title}
+      </div>
+      {empty ? (
+        <div style={{ fontSize: 11, color: '#7a7268' }}>No data yet — sync to fetch.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 3 }}>
+          {rows.map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
+              <span style={{ color: '#8a8478' }}>{label}</span>
+              <span style={{ color: '#d4cec4', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Profile tab — extracted from the four inline JSX blocks in App.jsx as part
  * of Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
@@ -90,12 +159,40 @@ const ProfileTab = memo(function ProfileTab({
   const [whoopLinked, setWhoopLinked] = useState(null); // null=loading, true/false
   const [whoopSyncing, setWhoopSyncing] = useState(false);
   const [whoopMsg, setWhoopMsg] = useState('');
+  const [whoopJustConnected, setWhoopJustConnected] = useState(() => {
+    try {
+      const flag = sessionStorage.getItem('aurisar_whoop_just_connected');
+      if (flag) sessionStorage.removeItem('aurisar_whoop_just_connected');
+      return !!flag;
+    } catch { return false; }
+  });
+  // Latest record per data_type. Keys: recovery, cycle, sleep, workout,
+  // profile, body_measurement. Values are the raw payload from Whoop.
+  const [whoopData, setWhoopData] = useState({});
 
   useEffect(() => {
     if (!authUser?.id) return;
     sb.from('whoop_tokens').select('user_id').eq('user_id', authUser.id).maybeSingle()
       .then(({ data }) => setWhoopLinked(!!data));
   }, [authUser?.id]);
+
+  async function loadWhoopData() {
+    if (!authUser?.id) return;
+    const { data, error } = await sb
+      .from('whoop_data')
+      .select('data_type, cycle_date, payload, fetched_at')
+      .eq('user_id', authUser.id)
+      .order('cycle_date', { ascending: false });
+    if (error || !data) return;
+    // Take the most recent record for each data_type.
+    const latest = {};
+    for (const row of data) {
+      if (!latest[row.data_type]) latest[row.data_type] = row.payload;
+    }
+    setWhoopData(latest);
+  }
+
+  useEffect(() => { if (whoopLinked) loadWhoopData(); /* eslint-disable-next-line */ }, [whoopLinked, authUser?.id]);
 
   async function handleConnectWhoop() {
     try {
@@ -124,8 +221,18 @@ const ProfileTab = memo(function ProfileTab({
         },
         body: JSON.stringify({}),
       });
-      const data = await res.json();
-      setWhoopMsg(res.ok ? `Synced ${data.synced ?? 0} records.` : 'Sync failed. Try again.');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const failed = data.errors ? Object.keys(data.errors) : [];
+        if (failed.length === 0) {
+          setWhoopMsg(`Synced ${data.synced ?? 0} records.`);
+        } else {
+          setWhoopMsg(`Synced ${data.synced ?? 0} records. Failed: ${failed.join(', ')}`);
+        }
+        await loadWhoopData();
+      } else {
+        setWhoopMsg(`Sync failed${data.upsertError ? `: ${data.upsertError}` : '. Try again.'}`);
+      }
     } catch {
       setWhoopMsg('Network error during sync.');
     }
@@ -602,6 +709,12 @@ return (
 {/* ── CONNECTED SERVICES ────────────────────── */}
 <div className={"profile-section"} style={{marginTop: S.s12}}>
   <div className={"profile-rune-divider"} style={{margin:"0 0 10px"}}><span className={"profile-rune-label"}>{"⠿ Connected Services ⠿"}</span></div>
+  {whoopJustConnected ? (
+    <div style={{display:"flex",alignItems:"center",gap:S.s8,padding:"8px 12px",background:"rgba(46,204,113,.10)",border:"1px solid rgba(46,204,113,.35)",borderRadius:R.r10,marginBottom:S.s8}}>
+      <div style={{fontSize:18}}>{"✓"}</div>
+      <div style={{fontSize:FS.fs58,color:"#9be7b6"}}>Whoop connected. Pulling your latest data…</div>
+    </div>
+  ) : null}
   <div style={{display:"flex",alignItems:"center",gap:S.s10,padding:"10px 12px",background:"rgba(45,42,36,.18)",borderRadius:R.r10,border:"1px solid rgba(180,172,158,.07)"}}>
     <div style={{fontSize:20,flexShrink:0}}>{"⌚"}</div>
     <div style={{flex:1,minWidth:0}}>
@@ -627,6 +740,53 @@ return (
       )}
     </div>
   </div>
+  {whoopLinked && (
+    <div style={{marginTop:S.s10,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:S.s8}}>
+      <WhoopFieldCard title="Recovery"      payload={whoopData.recovery}
+        rows={[
+          ['Recovery score', formatPct(whoopData.recovery?.score?.recovery_score)],
+          ['HRV (RMSSD)',    formatMs(whoopData.recovery?.score?.hrv_rmssd_milli)],
+          ['Resting HR',     formatBpm(whoopData.recovery?.score?.resting_heart_rate)],
+          ['SpO₂',           formatPct(whoopData.recovery?.score?.spo2_percentage)],
+          ['Skin temp',      formatTemp(whoopData.recovery?.score?.skin_temp_celsius)],
+        ]} />
+      <WhoopFieldCard title="Sleep"         payload={whoopData.sleep}
+        rows={[
+          ['Performance',    formatPct(whoopData.sleep?.score?.sleep_performance_percentage)],
+          ['Efficiency',     formatPct(whoopData.sleep?.score?.sleep_efficiency_percentage)],
+          ['Consistency',    formatPct(whoopData.sleep?.score?.sleep_consistency_percentage)],
+          ['Time in bed',    formatDuration(whoopData.sleep?.score?.stage_summary?.total_in_bed_time_milli)],
+          ['REM sleep',      formatDuration(whoopData.sleep?.score?.stage_summary?.total_rem_sleep_time_milli)],
+        ]} />
+      <WhoopFieldCard title="Cycle (day strain)" payload={whoopData.cycle}
+        rows={[
+          ['Day strain',     formatNum(whoopData.cycle?.score?.strain, 1)],
+          ['Avg HR',         formatBpm(whoopData.cycle?.score?.average_heart_rate)],
+          ['Max HR',         formatBpm(whoopData.cycle?.score?.max_heart_rate)],
+          ['Energy (kJ)',    formatNum(whoopData.cycle?.score?.kilojoule, 0)],
+        ]} />
+      <WhoopFieldCard title="Last workout"  payload={whoopData.workout}
+        rows={[
+          ['Strain',         formatNum(whoopData.workout?.score?.strain, 1)],
+          ['Avg HR',         formatBpm(whoopData.workout?.score?.average_heart_rate)],
+          ['Max HR',         formatBpm(whoopData.workout?.score?.max_heart_rate)],
+          ['Distance (m)',   formatNum(whoopData.workout?.score?.distance_meter, 0)],
+          ['Energy (kJ)',    formatNum(whoopData.workout?.score?.kilojoule, 0)],
+        ]} />
+      <WhoopFieldCard title="Profile"       payload={whoopData.profile}
+        rows={[
+          ['First name',     whoopData.profile?.first_name ?? '—'],
+          ['Last name',      whoopData.profile?.last_name ?? '—'],
+          ['Email',          whoopData.profile?.email ?? '—'],
+        ]} />
+      <WhoopFieldCard title="Body measurement" payload={whoopData.body_measurement}
+        rows={[
+          ['Height',         formatMeters(whoopData.body_measurement?.height_meter)],
+          ['Weight',         formatKg(whoopData.body_measurement?.weight_kilogram)],
+          ['Max HR',         formatBpm(whoopData.body_measurement?.max_heart_rate)],
+        ]} />
+    </div>
+  )}
 </div>
 
 </div>
