@@ -63,7 +63,7 @@ export default async (req) => {
     });
   }
 
-  const tokenRes = await fetch("https://api.whoop.com/oauth/oauth2/token", {
+  const tokenRes = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
