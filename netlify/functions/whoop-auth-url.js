@@ -36,7 +36,7 @@ export default async (req) => {
     client_id:     clientId,
     response_type: "code",
     redirect_uri:  redirectUri,
-    scope:         "read:recovery read:sleep read:cycles read:workout read:heartrate read:profile",
+    scope:         "offline read:recovery read:sleep read:cycles read:workout read:profile read:body_measurement",
     state,
   });
 
