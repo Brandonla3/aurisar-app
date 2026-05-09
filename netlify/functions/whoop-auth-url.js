@@ -18,7 +18,10 @@ export default async (req) => {
     });
   }
 
-  if (!ALLOWED_ORIGINS.has(origin)) {
+  // Same-origin browser fetches (relative URL on the same domain) send no
+  // Origin header, so origin is "". Only block when an Origin is present
+  // and unrecognised — matches the pattern in send-support-email.js.
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
     return new Response("Forbidden", { status: 403 });
   }
 
