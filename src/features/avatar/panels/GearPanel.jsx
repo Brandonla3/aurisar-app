@@ -3,11 +3,6 @@ import { MeshGrid, SectionLabel } from './shared.jsx';
 
 const NONE_ONLY = [{ key: null, label: 'None' }];
 
-const LEGS = [
-  { key: null,            label: 'None' },
-  { key: 'legs_fantasy1', label: 'Fantasy I' },
-];
-
 export default function GearPanel({ config, avatar, assetLibrary, onChange }) {
   const set = (slot, key) => {
     avatar?.setGear(slot, key, assetLibrary);
@@ -17,8 +12,9 @@ export default function GearPanel({ config, avatar, assetLibrary, onChange }) {
   return (
     <div style={{ padding: '12px 0' }}>
       <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 14px' }}>
-        Armor — auto-skinned via the Blender pipeline. New options land as
-        more pieces are processed through scripts/blender/04_import_armor.py.
+        Armor — slot scaffolding wired to the runtime. Real options land as
+        each piece is fit + processed through scripts/blender/04_import_armor.py
+        and visually verified on the character.
       </p>
 
       <SectionLabel>Helmet</SectionLabel>
@@ -46,7 +42,7 @@ export default function GearPanel({ config, avatar, assetLibrary, onChange }) {
       <div style={{ height: 16 }} />
 
       <SectionLabel>Legs</SectionLabel>
-      <MeshGrid items={LEGS} selected={config.gear.legs}
+      <MeshGrid items={NONE_ONLY} selected={config.gear.legs}
         onSelect={k => set('legs', k)}
         renderItem={i => <span style={{ fontSize: 11, color: '#94a3b8' }}>{i.label}</span>}
       />

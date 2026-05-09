@@ -68,8 +68,8 @@ const MANIFEST = {
 
   // Gear — auto-skinned via scripts/blender/04_import_armor.py. Each piece
   // ships skin weights bound to the shared MPFB rig so it deforms with the
-  // body. Add new entries here as `gear/<key>: 'gear/<key>.glb'`.
-  'gear/legs_fantasy1': 'gear/legs_fantasy1.glb',
+  // body. Add new entries here as `gear/<key>: 'gear/<key>.glb'` once a piece
+  // has been fit + processed + visually verified.
 };
 
 const _containers = new Map();

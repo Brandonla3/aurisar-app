@@ -66,7 +66,6 @@ const PreviewAssets = {
       'species/tail_fluffy':    'species/tail_fluffy.glb',
       // Gear — auto-skinned via scripts/blender/04_import_armor.py. Keep
       // in sync with AssetLibrary.js MANIFEST.
-      'gear/legs_fantasy1': 'gear/legs_fantasy1.glb',
     };
     const load = async (key, path) => {
       try {
