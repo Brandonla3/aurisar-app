@@ -928,7 +928,11 @@ function App() {
   }, [liveWorkout]);
   useEffect(() => {
     const uid = authUser?.id || null;
-    if (liveWorkout && liveWorkout.userId !== uid) {
+    // Skip while auth is still initializing (uid === null means session hasn't
+    // resolved yet). Clearing here would wipe a restored workout before the
+    // real user ID is known. We only want to clear when a *different* user is
+    // confirmed (uid is known and doesn't match).
+    if (uid !== null && liveWorkout && liveWorkout.userId !== uid) {
       setLiveWorkout(null);
       localStorage.removeItem('aurisar-live-workout');
     }
