@@ -15,3 +15,5 @@ dist
 coverage/
 .cache/
 .vite/
+__pycache__/
+*.pyc

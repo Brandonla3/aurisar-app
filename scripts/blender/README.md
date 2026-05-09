@@ -15,8 +15,44 @@ They are written to be:
 | 2 | `01_hair.py`           | 8 hair `.glb`s under `public/assets/characters/hair/` |
 | 3 | `02_clothing.py`       | 16 fantasy clothing `.glb`s under `public/assets/characters/clothing/` |
 | 4 | `03_species.py`        | 6 species accessory `.glb`s (3 horns + 3 tails) under `public/assets/characters/species/` |
+| —  | `04_import_armor.py`   | **Per-asset processor** — auto-skins one raw armor GLB to the MPFB rig. Run once per piece, not as part of the bulk pipeline. Outputs to `public/assets/characters/gear/`. |
 
-Phase 1 (elf morph) is the only script that **modifies existing assets**. The others write new files only.
+Phase 1 (elf morph) is the only script that **modifies existing assets**. Scripts 1-3 write new files only. `04_import_armor.py` is invoked per-asset (CLI args or library call).
+
+## Authoring new armor (auto-skin pipeline)
+
+`04_import_armor.py` is how raw armor GLBs (BlenderKit, Quixel, Sketchfab CC0, hand-modeled) become game-ready skinned assets.
+
+```bash
+blender --background --python scripts/blender/04_import_armor.py -- \
+  --input  ~/Downloads/some_helmet.glb \
+  --output public/assets/characters/gear/helmet_warlord.glb \
+  --slot   helmet
+```
+
+What it does:
+1. Loads `base_body_male.glb` as the reference rig (provides 65 Mixamo bones + source skin weights).
+2. Loads the raw armor GLB. **Original materials are preserved** — no overrides.
+3. Applies all geometry-affecting modifiers (Mirror, Subsurf, Solidify, Auto Smooth) so the exported mesh matches the artist's viewport.
+4. Drops any armature the armor brought with it.
+5. Transfers vertex group weights from the body to each armor mesh via `bpy.ops.object.data_transfer` with `POLYINTERP_NEAREST` mapping.
+6. Binds each armor mesh to the body's armature with an Armature modifier.
+7. Exports armor meshes + body armature only (the body mesh itself is excluded) as a GLB.
+
+After exporting, wire the asset:
+- Add `'gear/<key>': 'gear/<key>.glb'` to `MANIFEST` in `src/features/world/game/AssetLibrary.js` AND `src/features/avatar/AvatarPreview.jsx`.
+- Add `{ key: '<key>', label: '...' }` to the appropriate slot list in `src/features/avatar/panels/GearPanel.jsx`.
+
+The runtime (`setGear` in `CharacterAvatar.js`) then loads it, parents to the character root, re-points each mesh's skeleton at the live body skeleton, and disposes the GLB's duplicate armature so skeleton count stays flat as more pieces equip.
+
+### Pre-fitting in Blender first
+
+The pipeline assumes the armor is **roughly aligned** with the body in Blender before export. Weight transfer uses closest-surface mapping, so an armor piece floating off to the side will get nonsense weights. Open the armor + `base_body_male.glb` together in Blender, scale/translate the armor to sit on the right body part, then export.
+
+### Limits
+
+- **Skinned armor only.** Rigid weapons (swords, shields) need a different code path — `setGear` will need a "no skin weights → attachToBone" branch when those land.
+- **One body rig.** Pipeline targets `base_body_male.glb`. If/when female/elf base bodies have different bone counts or names, weight transfer will need to run per body or use a shared canonical rig.
 
 ## Blender requirements
 

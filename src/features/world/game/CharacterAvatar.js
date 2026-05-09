@@ -443,6 +443,11 @@ export class CharacterAvatar {
     inst.rootNodes.forEach(n => { n.parent = this.root; });
     inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
       .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
+    // Each gear GLB ships with its own copy of the armature (needed so the GLB
+    // can encode skin weights). After rebinding meshes to the body skeleton,
+    // dispose the duplicate to keep the scene's skeleton count flat as more
+    // gear loads — important when thousands of pieces are equipped over time.
+    (inst.skeletons ?? []).forEach(s => s.dispose?.());
     this._slots[`gear_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
