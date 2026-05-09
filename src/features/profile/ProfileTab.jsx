@@ -1,4 +1,5 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
+import { sb } from '../../utils/supabase';
 import { calcBMI, xpToLevel } from '../../utils/xp';
 import { isMetric, lbsToKg, kgToLbs, ftInToCm, cmToFtIn } from '../../utils/units';
 import { S, R, FS } from '../../utils/tokens';
@@ -86,6 +87,46 @@ const ProfileTab = memo(function ProfileTab({
   onOpenRetroCheckIn,
   onOpenWNMockup,
 }) {
+  const [whoopLinked, setWhoopLinked] = useState(null); // null=loading, true/false
+  const [whoopSyncing, setWhoopSyncing] = useState(false);
+  const [whoopMsg, setWhoopMsg] = useState('');
+
+  useEffect(() => {
+    if (!authUser?.id) return;
+    sb.from('whoop_tokens').select('user_id').eq('user_id', authUser.id).maybeSingle()
+      .then(({ data }) => setWhoopLinked(!!data));
+  }, [authUser?.id]);
+
+  async function handleConnectWhoop() {
+    try {
+      const res = await fetch('/.netlify/functions/whoop-auth-url');
+      if (!res.ok) { setWhoopMsg('Could not start Whoop auth. Try again.'); return; }
+      const { url, state } = await res.json();
+      sessionStorage.setItem('whoop_oauth_state', state);
+      window.location.href = url;
+    } catch {
+      setWhoopMsg('Network error. Check your connection.');
+    }
+  }
+
+  async function handleSyncWhoop() {
+    if (!authUser?.id || whoopSyncing) return;
+    setWhoopSyncing(true);
+    setWhoopMsg('');
+    try {
+      const res = await fetch('/.netlify/functions/whoop-fetch-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: authUser.id }),
+      });
+      const data = await res.json();
+      setWhoopMsg(res.ok ? `Synced ${data.synced ?? 0} records.` : 'Sync failed. Try again.');
+    } catch {
+      setWhoopMsg('Network error during sync.');
+    }
+    setWhoopSyncing(false);
+  }
+
   const totalH = (parseInt(profile.heightFt) || 0) * 12 + (parseInt(profile.heightIn) || 0);
   const bmi = calcBMI(profile.weightLbs, totalH);
 return (
@@ -551,7 +592,39 @@ return (
           "--cls-glow": "#8a8478",
           marginRight: S.s4,
           fontSize: FS.fs65
-        }}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>)}</div></div>}</div> : null}</div>
+        }}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>)}</div></div>}</div> : null}
+
+{/* ── CONNECTED SERVICES ────────────────────── */}
+<div className={"profile-section"} style={{marginTop: S.s12}}>
+  <div className={"profile-rune-divider"} style={{margin:"0 0 10px"}}><span className={"profile-rune-label"}>{"⠿ Connected Services ⠿"}</span></div>
+  <div style={{display:"flex",alignItems:"center",gap:S.s10,padding:"10px 12px",background:"rgba(45,42,36,.18)",borderRadius:R.r10,border:"1px solid rgba(180,172,158,.07)"}}>
+    <div style={{fontSize:20,flexShrink:0}}>{"⌚"}</div>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{fontSize:FS.fs76,color:"#d4cec4",fontWeight:600}}>{"Whoop"}</div>
+      <div style={{fontSize:FS.sm,color:"#8a8478",marginTop:S.s2}}>
+        {whoopLinked === null ? "Checking..." : whoopLinked ? "Connected — recovery, sleep & strain data" : "Not connected"}
+      </div>
+      <div style={{fontSize:FS.fs58,color:"#5a5650",marginTop:S.s4}}>
+        Linking shares fitness data with Aurisar.{" "}
+        <a href="/privacy" target="_blank" rel="noreferrer" style={{color:"#7a7268",textDecoration:"underline",textUnderlineOffset:2}}>Privacy Policy</a>
+      </div>
+      {whoopMsg ? <div style={{fontSize:FS.fs58,color:whoopMsg.startsWith("Synced") ? "#2ecc71" : "#e74c3c",marginTop:S.s4}}>{whoopMsg}</div> : null}
+    </div>
+    <div style={{display:"flex",gap:S.s6,flexShrink:0}}>
+      {whoopLinked ? (
+        <button className={"btn btn-ghost btn-sm"} style={{fontSize:FS.fs58}} disabled={whoopSyncing} onClick={handleSyncWhoop}>
+          {whoopSyncing ? "Syncing…" : "↻ Sync"}
+        </button>
+      ) : (
+        <button className={"btn btn-ghost btn-sm"} style={{fontSize:FS.fs58}} onClick={handleConnectWhoop}>
+          {"Connect"}
+        </button>
+      )}
+    </div>
+  </div>
+</div>
+
+</div>
 
 /* ── PROFILE EDIT ─────────────────────── */}{editMode && <><div style={{
     display: "flex",
