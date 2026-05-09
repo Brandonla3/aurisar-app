@@ -7,6 +7,7 @@ import SpeciesPanel    from './panels/SpeciesPanel.jsx';
 import SkinPanel       from './panels/SkinPanel.jsx';
 import HairPanel       from './panels/HairPanel.jsx';
 import ClothingPanel   from './panels/ClothingPanel.jsx';
+import GearPanel       from './panels/GearPanel.jsx';
 import { mergeConfig, DEFAULT_AVATAR } from '../world/game/avatarSchema.js';
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { key: 'skin',     label: 'Skin' },
   { key: 'hair',     label: 'Hair' },
   { key: 'clothing', label: 'Clothing' },
+  { key: 'armor',    label: 'Armor' },
 ];
 
 // Default panel width: fill up to 380px but never more than 65% of viewport
@@ -33,8 +35,12 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
   const widthAtDragStart = useRef(0);
   const xAtDragStart     = useRef(0);
 
-  const patch = useCallback((partial) => {
-    setConfig(prev => ({ ...prev, ...partial }));
+  const patch = useCallback((partialOrFn) => {
+    if (typeof partialOrFn === 'function') {
+      setConfig(partialOrFn);
+    } else {
+      setConfig(prev => ({ ...prev, ...partialOrFn }));
+    }
   }, []);
 
   // ── Drag-to-resize divider ───────────────────────────────────────────────
@@ -130,6 +136,7 @@ export default function AvatarCreator({ initialConfig, onSave, onCancel, saving 
             {activeTab === 'skin'     && <SkinPanel     {...panelProps} />}
             {activeTab === 'hair'     && <HairPanel     {...panelProps} />}
             {activeTab === 'clothing' && <ClothingPanel {...panelProps} />}
+            {activeTab === 'armor'    && <GearPanel     {...panelProps} />}
           </div>
 
           {/* Sticky action footer */}

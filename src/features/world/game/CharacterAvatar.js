@@ -23,7 +23,7 @@
 
 /* global BABYLON */
 
-import { mergeConfig, MORPH_KEYS, BONES, CLOTHING_SLOTS } from './avatarSchema.js';
+import { mergeConfig, MORPH_KEYS, BONES, CLOTHING_SLOTS, GEAR_SLOTS } from './avatarSchema.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -154,6 +154,10 @@ export class CharacterAvatar {
     }
     if (this._config.species.tailMesh) {
       await this._rebuildTail(assetLibrary);
+    }
+    for (const slot of GEAR_SLOTS) {
+      const meshName = this._config.gear[slot];
+      if (meshName) await this.setGear(slot, meshName, assetLibrary);
     }
   }
 
@@ -431,13 +435,9 @@ export class CharacterAvatar {
     const inst = container.instantiateModelsToScene(
       name => `${this._id}_gear_${slot}_${name}`, false
     );
-    const boneName = { helmet: BONES.head, chest: BONES.spine, weapon: BONES.rightHand }[slot];
-    const bone = findBone(this._skeleton, boneName);
-    const refMesh = this._bodyMeshes[0] ?? null;
-    inst.rootNodes.forEach(n => {
-      if (bone && refMesh) n.attachToBone(bone, refMesh);
-      else n.parent = this.root;
-    });
+    // Armor pieces are modeled in character world-space (vertices at absolute
+    // positions), so parent to the character root — same pattern as clothing.
+    inst.rootNodes.forEach(n => { n.parent = this.root; });
     this._slots[`gear_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 

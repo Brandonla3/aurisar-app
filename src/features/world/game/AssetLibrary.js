@@ -65,6 +65,12 @@ const MANIFEST = {
   'species/tail_short':     'species/tail_short.glb',
   'species/tail_long':      'species/tail_long.glb',
   'species/tail_fluffy':    'species/tail_fluffy.glb',
+
+  // Gear — Fantasy I leather armor set (Kagi Vision Pack).
+  'gear/helmet_fantasy1':    'gear/helmet_fantasy1.glb',
+  'gear/chest_fantasy1':     'gear/chest_fantasy1.glb',
+  'gear/gauntlets_fantasy1': 'gear/gauntlets_fantasy1.glb',
+  'gear/legs_fantasy1':      'gear/legs_fantasy1.glb',
 };
 
 const _containers = new Map();
