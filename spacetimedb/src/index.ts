@@ -23,11 +23,12 @@ const spacetimedb = schema({
   player: table(
     { public: true },
     {
-      identity:    t.identity().primaryKey(),  // primary key — SpacetimeDB connection identity
-      username:    t.string(),     // display name from Aurisar profile
-      classType:   t.string(),     // 'warrior' | 'mage' | 'archer' | 'rogue'
-      avatarColor: t.string(),     // hex color string for the player marker
-      x:           t.f32(),        // world X position (pixels)
+      identity:     t.identity().primaryKey(),  // primary key — SpacetimeDB connection identity
+      username:     t.string(),     // display name from Aurisar profile
+      classType:    t.string(),     // 'warrior' | 'mage' | 'archer' | 'rogue'
+      avatarColor:  t.string(),     // hex color string for the player marker
+      avatarConfig: t.string(),     // JSON-encoded AvatarConfig for 3D character rendering
+      x:            t.f32(),        // world X position (pixels)
       y:           t.f32(),        // world Y position (pixels)
       direction:   t.u8(),         // 0=down 1=up 2=left 3=right
       isMoving:    t.bool(),       // for animation state
@@ -69,11 +70,12 @@ export default spacetimedb;
  */
 export const setPlayerInfo = spacetimedb.reducer(
   {
-    username:    t.string(),
-    classType:   t.string(),
-    avatarColor: t.string(),
+    username:     t.string(),
+    classType:    t.string(),
+    avatarColor:  t.string(),
+    avatarConfig: t.string(),
   },
-  (ctx, { username, classType, avatarColor }) => {
+  (ctx, { username, classType, avatarColor, avatarConfig }) => {
     const identity = ctx.sender;
 
     // Validate inputs
@@ -89,6 +91,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         username: safeName,
         classType: safeClass,
         avatarColor,
+        avatarConfig,
         online: true,
       });
     } else {
@@ -98,6 +101,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         username: safeName,
         classType: safeClass,
         avatarColor,
+        avatarConfig,
         x: 1600,
         y: 1600,
         direction: 0,
@@ -107,6 +111,20 @@ export const setPlayerInfo = spacetimedb.reducer(
         lastChatAt: 0n,
       });
     }
+  }
+);
+
+/**
+ * Update the calling player's full avatar customization config.
+ * Called after the user saves changes in AvatarCreator.
+ */
+export const setAvatarConfig = spacetimedb.reducer(
+  { avatarConfig: t.string() },
+  (ctx, { avatarConfig }) => {
+    if (avatarConfig.length > 4096) throw new Error('avatarConfig too large');
+    const existing = ctx.db.player.identity.find(ctx.sender);
+    if (!existing) return;
+    ctx.db.player.identity.update({ ...existing, avatarConfig });
   }
 );
 

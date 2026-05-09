@@ -17,6 +17,10 @@ export const DEFAULT_AVATAR = {
   gear:     { helmet: null, chest: null, weapon: null },
 };
 
+/** Asset keys for each clothing/gear slot. */
+export const CLOTHING_SLOTS = ['top', 'bottom', 'shoes'];
+export const GEAR_SLOTS     = ['helmet', 'chest', 'weapon'];
+
 /**
  * Legacy → fantasy clothing key migration. Configs persisted before the
  * fantasy-only wardrobe rollout reference modern keys (top_casual, bottom_jeans
@@ -88,7 +92,3 @@ export const BONES = {
   spine:     'Spine1',
   hips:      'Hips',
 };
-
-/** Asset keys for each clothing/gear slot. */
-export const CLOTHING_SLOTS = ['top', 'bottom', 'shoes'];
-export const GEAR_SLOTS     = ['helmet', 'chest', 'weapon'];

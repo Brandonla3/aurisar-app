@@ -135,11 +135,7 @@ def _export_glb(out_path: str):
     bpy.ops.object.select_all(action='DESELECT')
     arm = next(o for o in bpy.context.scene.objects if o.type == 'ARMATURE')
     arm.select_set(True)
-    # Select all visible meshes EXCEPT the original body
-    for o in bpy.context.scene.objects:
-        if o.type == 'MESH' and not o.hide_viewport and 'top_' in o.name + 'bottom_' + o.name + 'shoes_' + o.name:
-            pass
-    # Simpler: select every mesh tagged with 'GARMENT' custom prop
+    # Select every mesh tagged with 'GARMENT' custom prop
     for o in bpy.context.scene.objects:
         if o.type == 'MESH' and o.get('GARMENT'):
             o.select_set(True)

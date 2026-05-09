@@ -11,9 +11,9 @@ const STDB_URI    = import.meta.env.VITE_SPACETIMEDB_URI    ?? 'wss://maincloud.
 const STDB_MODULE = import.meta.env.VITE_SPACETIMEDB_MODULE ?? 'aurisar-world';
 
 /**
- * @param {object|null} playerInfo  - { username, classType, avatarColor }
+ * @param {object|null} playerInfo  - { username, classType, avatarColor, avatarConfig }
  * @param {object}      callbacks   - { onPlayerUpdate, onPlayerDelete, onChatMessage }
- * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, identity }}
+ * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, setAvatarConfig, identity }}
  */
 export function useSpacetimeWorld(playerInfo, callbacks) {
   const connRef      = useRef(null);
@@ -42,6 +42,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch (_) { /* not connected yet */ }
   }, []);
 
+  const setAvatarConfig = useCallback((configJson) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.setAvatarConfig(configJson);
+    } catch (_) { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -60,7 +68,8 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           connection.reducers.setPlayerInfo(
             playerInfo.username,
             playerInfo.classType,
-            playerInfo.avatarColor
+            playerInfo.avatarColor,
+            playerInfo.avatarConfig ? JSON.stringify(playerInfo.avatarConfig) : ''
           );
 
           // Subscribe to live tables
@@ -129,6 +138,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     onlineCount,
     movePlayer,
     sendChat,
+    setAvatarConfig,
     identity: connRef.current?.identity ?? null,
   };
 }
