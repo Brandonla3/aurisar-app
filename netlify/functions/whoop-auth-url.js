@@ -41,7 +41,7 @@ export default async (req) => {
   });
 
   return new Response(
-    JSON.stringify({ url: `https://app.whoop.com/oauth/oauth2/auth?${params}`, state }),
+    JSON.stringify({ url: `https://api.prod.whoop.com/oauth/oauth2/auth?${params}`, state }),
     { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
   );
 };
