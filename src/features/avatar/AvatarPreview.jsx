@@ -64,7 +64,7 @@ const PreviewAssets = {
       'species/tail_short':     'species/tail_short.glb',
       'species/tail_long':      'species/tail_long.glb',
       'species/tail_fluffy':    'species/tail_fluffy.glb',
-      // Gear — populated via scripts/blender/import_armor.py pipeline. Keep
+      // Gear — auto-skinned via scripts/blender/04_import_armor.py. Keep
       // in sync with AssetLibrary.js MANIFEST.
     };
     const load = async (key, path) => {

@@ -12,8 +12,9 @@ export default function GearPanel({ config, avatar, assetLibrary, onChange }) {
   return (
     <div style={{ padding: '12px 0' }}>
       <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 14px' }}>
-        Armor — slot scaffolding wired to the runtime. No shippable assets yet;
-        upcoming Blender pipeline (auto-skin to MPFB rig) will populate options.
+        Armor — slot scaffolding wired to the runtime. Real options land as
+        each piece is fit + processed through scripts/blender/04_import_armor.py
+        and visually verified on the character.
       </p>
 
       <SectionLabel>Helmet</SectionLabel>

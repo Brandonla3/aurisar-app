@@ -66,10 +66,10 @@ const MANIFEST = {
   'species/tail_long':      'species/tail_long.glb',
   'species/tail_fluffy':    'species/tail_fluffy.glb',
 
-  // Gear — slot scaffolding only. Real assets land via the upcoming
-  // scripts/blender/import_armor.py pipeline (auto-skin to MPFB rig +
-  // preserve original materials). Add `gear/<key>: 'gear/<key>.glb'`
-  // entries here once those GLBs ship.
+  // Gear — auto-skinned via scripts/blender/04_import_armor.py. Each piece
+  // ships skin weights bound to the shared MPFB rig so it deforms with the
+  // body. Add new entries here as `gear/<key>: 'gear/<key>.glb'` once a piece
+  // has been fit + processed + visually verified.
 };
 
 const _containers = new Map();
