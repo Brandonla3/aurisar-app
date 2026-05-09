@@ -423,7 +423,7 @@ export class CharacterAvatar {
     this._slots[`clothing_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
-  // ── Gear (bone-attached, gameplay items) ───────────────────────────────────
+  // ── Gear (skinned to body rig — armor; weapons TBD) ────────────────────────
 
   async setGear(slot, meshName, assetLibrary) {
     this._config.gear[slot] = meshName;
@@ -435,9 +435,11 @@ export class CharacterAvatar {
     const inst = container.instantiateModelsToScene(
       name => `${this._id}_gear_${slot}_${name}`, false
     );
-    // Gear is authored as skinned meshes bound to the shared MPFB rig — same
-    // pattern as clothing. Parent to root, then re-point each child mesh's
-    // skeleton at the body rig so animations drive the armor too.
+    // Armor pieces are authored as skinned meshes bound to the shared MPFB rig
+    // (same pattern as clothing): parent to character root, then re-point each
+    // child mesh's skeleton at the body rig so animations drive the armor too.
+    // TODO(weapons): when rigid weapon assets land, detect meshes without skin
+    // weights and fall back to attachToBone(rightHand) for those.
     inst.rootNodes.forEach(n => { n.parent = this.root; });
     inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
       .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
