@@ -1267,7 +1267,11 @@ export class BabylonWorldScene {
     if (this._spawning.has(row.identity)) return;
     this._spawning.add(row.identity);
     try {
-      const config = row.avatarConfig ? mergeConfig(row.avatarConfig) : null;
+      let parsedConfig = null;
+      if (row.avatarConfig) {
+        try { parsedConfig = JSON.parse(row.avatarConfig); } catch { parsedConfig = null; }
+      }
+      const config = mergeConfig(parsedConfig);
       const rp = await CharacterAvatar.create(
         row.identity, row.username, config, this.scene, AssetLibrary
       );

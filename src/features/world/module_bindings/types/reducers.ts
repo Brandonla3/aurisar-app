@@ -8,9 +8,11 @@ import { type Infer as __Infer } from "spacetimedb";
 // Import all reducer arg schemas
 import MovePlayerReducer from "../move_player_reducer";
 import SendChatReducer from "../send_chat_reducer";
+import SetAvatarConfigReducer from "../set_avatar_config_reducer";
 import SetPlayerInfoReducer from "../set_player_info_reducer";
 
 export type MovePlayerParams = __Infer<typeof MovePlayerReducer>;
 export type SendChatParams = __Infer<typeof SendChatReducer>;
+export type SetAvatarConfigParams = __Infer<typeof SetAvatarConfigReducer>;
 export type SetPlayerInfoParams = __Infer<typeof SetPlayerInfoReducer>;
 

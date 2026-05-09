@@ -11,8 +11,5 @@ import {
 } from "spacetimedb";
 
 export default {
-  username: __t.string(),
-  classType: __t.string(),
-  avatarColor: __t.string(),
   avatarConfig: __t.string(),
 };

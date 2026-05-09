@@ -69,10 +69,9 @@ export class CharacterAvatar {
     this._slots      = {};   // slot key → { nodes, meshes }
 
     // Box fallback state
-    this._useFallback  = false;
+    this._useFallback   = false;
     this._fallbackLimbs = null;
     this._animTime      = 0;
-    this._wasMoving     = null;
   }
 
   // ── Factory ────────────────────────────────────────────────────────────────
@@ -134,7 +133,12 @@ export class CharacterAvatar {
     this._idleAnim   = this._animGroups.find(ag => /idle/i.test(ag.name)) ?? null;
     this._walkAnim   = this._animGroups.find(ag => /walk/i.test(ag.name)) ?? null;
     this._animGroups.forEach(ag => ag.stop());
-    if (this._idleAnim) { this._idleAnim.loopAnimation = true; this._idleAnim.play(); }
+    if (this._idleAnim) {
+      this._idleAnim.loopAnimation = true;
+      this._idleAnim.weight = 1;
+      this._idleAnim.play(true);
+    }
+    if (this._walkAnim) { this._walkAnim.weight = 0; }
 
     // Apply morph targets and materials from stored config
     this._applyAllMorphs();
@@ -213,14 +217,29 @@ export class CharacterAvatar {
   }
 
   _animateGLB() {
-    if (this.isMoving === this._wasMoving) return;
-    this._wasMoving = this.isMoving;
+    const BLEND = 0.08;
     if (this.isMoving) {
-      this._idleAnim?.stop();
-      if (this._walkAnim) { this._walkAnim.loopAnimation = true; this._walkAnim.play(); }
+      if (this._walkAnim && !this._walkAnim.isPlaying) {
+        this._walkAnim.weight = 0;
+        this._walkAnim.loopAnimation = true;
+        this._walkAnim.play(true);
+      }
+      if (this._walkAnim) this._walkAnim.weight = Math.min(1, (this._walkAnim.weight ?? 0) + BLEND);
+      if (this._idleAnim) {
+        this._idleAnim.weight = Math.max(0, (this._idleAnim.weight ?? 1) - BLEND);
+        if (this._idleAnim.weight <= 0 && this._idleAnim.isPlaying) this._idleAnim.stop();
+      }
     } else {
-      this._walkAnim?.stop();
-      if (this._idleAnim) { this._idleAnim.loopAnimation = true; this._idleAnim.play(); }
+      if (this._idleAnim && !this._idleAnim.isPlaying) {
+        this._idleAnim.weight = 0;
+        this._idleAnim.loopAnimation = true;
+        this._idleAnim.play(true);
+      }
+      if (this._idleAnim) this._idleAnim.weight = Math.min(1, (this._idleAnim.weight ?? 0) + BLEND);
+      if (this._walkAnim) {
+        this._walkAnim.weight = Math.max(0, (this._walkAnim.weight ?? 1) - BLEND);
+        if (this._walkAnim.weight <= 0 && this._walkAnim.isPlaying) this._walkAnim.stop();
+      }
     }
   }
 
