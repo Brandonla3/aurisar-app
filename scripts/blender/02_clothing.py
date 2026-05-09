@@ -30,7 +30,7 @@ ASSETS = os.path.join(REPO, 'public', 'assets', 'characters')
 CLOTH  = os.path.join(ASSETS, 'clothing')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
-# GLTF Y-up height values (= Blender world Z after import). Measured from base_body.glb bones:
+# GLTF Y-up height values (local vertex Y = height, since the body mesh is in Y-up local space).
 #   Hips=0.921  LeftArm(shoulder)=1.362  LeftLeg(knee)=0.457  LeftFoot(ankle)=0.086  Toe=0.005
 TORSO_Y_MIN = 0.95
 TORSO_Y_MAX = 1.38   # cuts at shoulder line (was 1.50 — grabbed neck geometry)
@@ -105,14 +105,6 @@ def _duplicate_body_region(body, y_min, y_max,
         bpy.ops.object.mode_set(mode='OBJECT')
 
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-
-    # Body vertices are in GLTF Y-up local space (Y=height). Apply the armature's
-    # world matrix to convert to Blender Z-up (Z=height) so export_yup produces
-    # correct GLTF Y (height) values and auto-weights land on the right bones.
-    arm = next(o for o in bpy.context.scene.objects if o.type == 'ARMATURE')
-    arm_mat = arm.matrix_world.copy()
-    for v in dup.data.vertices:
-        v.co = arm_mat @ v.co
 
     return dup
 
