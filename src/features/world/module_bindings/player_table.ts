@@ -15,6 +15,7 @@ export default __t.row({
   username: __t.string(),
   classType: __t.string().name("class_type"),
   avatarColor: __t.string().name("avatar_color"),
+  avatarConfig: __t.string().name("avatar_config"),
   x: __t.f32(),
   y: __t.f32(),
   direction: __t.u8(),

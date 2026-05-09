@@ -83,6 +83,7 @@ export const setPlayerInfo = spacetimedb.reducer(
     const safeClass = ['warrior', 'mage', 'archer', 'rogue'].includes(classType)
       ? classType
       : 'warrior';
+    const safeAvatarConfig = avatarConfig.length <= 4096 ? avatarConfig : '';
 
     const existing = ctx.db.player.identity.find(identity);
     if (existing) {
@@ -91,7 +92,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         username: safeName,
         classType: safeClass,
         avatarColor,
-        avatarConfig,
+        avatarConfig: safeAvatarConfig,
         online: true,
       });
     } else {

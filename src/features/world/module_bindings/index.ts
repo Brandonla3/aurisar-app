@@ -36,6 +36,7 @@ import {
 // Import all reducer arg schemas
 import MovePlayerReducer from "./move_player_reducer";
 import SendChatReducer from "./send_chat_reducer";
+import SetAvatarConfigReducer from "./set_avatar_config_reducer";
 import SetPlayerInfoReducer from "./set_player_info_reducer";
 
 // Import all procedure arg schemas
@@ -72,6 +73,7 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("move_player", MovePlayerReducer),
   __reducerSchema("send_chat", SendChatReducer),
+  __reducerSchema("set_avatar_config", SetAvatarConfigReducer),
   __reducerSchema("set_player_info", SetPlayerInfoReducer),
 );
 
