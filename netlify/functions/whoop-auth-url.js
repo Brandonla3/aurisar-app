@@ -18,7 +18,11 @@ export default async (req) => {
     });
   }
 
-  if (!ALLOWED_ORIGINS.has(origin)) {
+  // Only block requests that arrive with an unrecognised Origin header.
+  // Same-origin browser fetches (relative URL, same Netlify domain) never
+  // include an Origin header at all — origin is "" — so they must be allowed.
+  // Matches the pattern used in send-support-email.js (denyOrigin checks !origin).
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
     return new Response("Forbidden", { status: 403 });
   }
 
