@@ -18,10 +18,7 @@ export default async (req) => {
     });
   }
 
-  // Block cross-origin callers from unknown origins only.
-  // Same-origin browser requests never include an Origin header (origin = ""),
-  // which is allowed — matching the pattern used in send-support-email.js.
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  if (!ALLOWED_ORIGINS.has(origin)) {
     return new Response("Forbidden", { status: 403 });
   }
 
