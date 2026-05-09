@@ -7,6 +7,14 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
 ]);
 
+// Hard cap on pagination — 200 pages × 25 records = 5,000 records per
+// data_type per sync. Whoop accounts older than ~13 years would hit
+// this; everyone else's full backfill comfortably fits.
+const MAX_PAGES_PER_TYPE = 200;
+// Supabase upsert batch size — keep the payload well under request
+// size limits even for users with thousands of historical records.
+const UPSERT_BATCH = 500;
+
 async function refreshAccessToken(supabase, userId, currentRefreshToken, clientId, clientSecret) {
   const res = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
     method: "POST",
@@ -39,6 +47,48 @@ async function whoopGet(path, accessToken) {
     throw new Error(`Whoop API ${res.status} on ${path}: ${body.slice(0, 200)}`);
   }
   return res.json();
+}
+
+// Walks Whoop's next_token cursor until exhausted (or MAX_PAGES_PER_TYPE
+// is hit, whichever comes first). startISO/endISO are optional bounds:
+// when both are null, the endpoint returns everything Whoop has for the
+// user. When startISO is set, the endpoint returns records on/after it.
+async function fetchAllPaginated(basePath, accessToken, { startISO = null, endISO = null, perPage = 25 } = {}) {
+  const records = [];
+  let nextToken = null;
+  let pages = 0;
+  do {
+    const params = new URLSearchParams();
+    params.set("limit", String(perPage));
+    if (startISO)  params.set("start",     startISO);
+    if (endISO)    params.set("end",       endISO);
+    if (nextToken) params.set("nextToken", nextToken);
+    const data = await whoopGet(`${basePath}?${params}`, accessToken);
+    if (Array.isArray(data?.records)) records.push(...data.records);
+    nextToken = data?.next_token ?? null;
+    pages++;
+    if (pages >= MAX_PAGES_PER_TYPE) {
+      console.warn(`[whoop-fetch-data] hit page cap (${MAX_PAGES_PER_TYPE}) on ${basePath}; truncating`);
+      break;
+    }
+  } while (nextToken);
+  return records;
+}
+
+function recordIdFor(dataType, payload) {
+  // Cycle / sleep / workout records have a top-level `id`. Recovery
+  // records don't — they're keyed by their owning cycle's `cycle_id`
+  // (one recovery per cycle). Singletons (profile, body_measurement)
+  // have no per-record id, so use the data_type itself as a sentinel.
+  return payload?.id ?? payload?.cycle_id ?? dataType;
+}
+
+function cycleDateFor(dataType, payload, today) {
+  if (dataType === "recovery") return payload?.created_at?.slice(0, 10) ?? today;
+  if (dataType === "cycle" || dataType === "sleep" || dataType === "workout") {
+    return payload?.start?.slice(0, 10) ?? today;
+  }
+  return today; // singletons
 }
 
 export default async (req) => {
@@ -108,80 +158,115 @@ export default async (req) => {
     access_token = await refreshAccessToken(supabase, userId, refresh_token, clientId, clientSecret);
   }
 
-  const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const end   = new Date().toISOString();
-  const today = new Date().toISOString().slice(0, 10);
+  // ── Backfill vs incremental ─────────────────────────────────────
+  // First sync ever for this user (backfill_completed_at IS NULL):
+  //   pull all Whoop history with no `start` filter, paginating until
+  //   exhausted. Subsequent syncs only fetch since last_synced_at,
+  //   with a 24h overlap so any records edited late don't slip past.
+  const isBackfill = !tokenRow.backfill_completed_at;
+  const startISO = isBackfill
+    ? null
+    : (tokenRow.last_synced_at
+        ? new Date(new Date(tokenRow.last_synced_at).getTime() - 24 * 60 * 60 * 1000).toISOString()
+        : null);
+  const endISO = new Date().toISOString();
+  const today  = endISO.slice(0, 10);
 
-  // Fetch all six data types in parallel. Use allSettled so a single
-  // endpoint failure doesn't sink the whole sync — we surface the per-
-  // endpoint status in the response so the client can show what worked.
-  const [recoveries, cycles, sleeps, workouts, basicProfile, bodyMeasurement] =
+  const [recoveriesRes, cyclesRes, sleepsRes, workoutsRes, profileRes, bodyRes] =
     await Promise.allSettled([
-      whoopGet(`/developer/v2/recovery?start=${start}&end=${end}&limit=25`, access_token),
-      whoopGet(`/developer/v2/cycle?start=${start}&end=${end}&limit=25`, access_token),
-      whoopGet(`/developer/v2/activity/sleep?start=${start}&end=${end}&limit=25`, access_token),
-      whoopGet(`/developer/v2/activity/workout?start=${start}&end=${end}&limit=25`, access_token),
-      whoopGet(`/developer/v2/user/profile/basic`, access_token),
-      whoopGet(`/developer/v2/user/measurement/body`, access_token),
+      fetchAllPaginated("/developer/v2/recovery",         access_token, { startISO, endISO }),
+      fetchAllPaginated("/developer/v2/cycle",            access_token, { startISO, endISO }),
+      fetchAllPaginated("/developer/v2/activity/sleep",   access_token, { startISO, endISO }),
+      fetchAllPaginated("/developer/v2/activity/workout", access_token, { startISO, endISO }),
+      whoopGet("/developer/v2/user/profile/basic",        access_token),
+      whoopGet("/developer/v2/user/measurement/body",     access_token),
     ]);
 
   const rows = [];
   const errors = {};
+  const counts = {};
 
-  function pushTimeSeries(settled, dataType, dateField) {
+  function pushTimeSeries(settled, dataType) {
     if (settled.status !== "fulfilled") {
       errors[dataType] = settled.reason?.message ?? String(settled.reason);
+      counts[dataType] = 0;
       return;
     }
-    for (const r of settled.value.records ?? []) {
+    let n = 0;
+    for (const r of settled.value) {
       rows.push({
         user_id:    userId,
         data_type:  dataType,
-        cycle_date: r[dateField]?.slice(0, 10) ?? today,
+        record_id:  String(recordIdFor(dataType, r)),
+        cycle_date: cycleDateFor(dataType, r, today),
         payload:    r,
       });
+      n++;
     }
+    counts[dataType] = n;
   }
 
   function pushSingleton(settled, dataType) {
     if (settled.status !== "fulfilled") {
       errors[dataType] = settled.reason?.message ?? String(settled.reason);
+      counts[dataType] = 0;
       return;
     }
     rows.push({
       user_id:    userId,
       data_type:  dataType,
+      record_id:  dataType,
       cycle_date: today,
       payload:    settled.value,
     });
+    counts[dataType] = 1;
   }
 
-  pushTimeSeries(recoveries,      "recovery", "created_at");
-  pushTimeSeries(cycles,          "cycle",    "start");
-  pushTimeSeries(sleeps,          "sleep",    "start");
-  pushTimeSeries(workouts,        "workout",  "start");
-  pushSingleton(basicProfile,     "profile");
-  pushSingleton(bodyMeasurement,  "body_measurement");
+  pushTimeSeries(recoveriesRes, "recovery");
+  pushTimeSeries(cyclesRes,     "cycle");
+  pushTimeSeries(sleepsRes,     "sleep");
+  pushTimeSeries(workoutsRes,   "workout");
+  pushSingleton(profileRes,     "profile");
+  pushSingleton(bodyRes,        "body_measurement");
 
   if (Object.keys(errors).length > 0) {
     console.error("[whoop-fetch-data] partial failure", errors);
   }
 
+  // Batch upserts so a backfill of thousands of records fits within
+  // Supabase request limits.
   let upsertError = null;
-  if (rows.length > 0) {
-    const { error: upErr } = await supabase.from("whoop_data").upsert(rows, {
-      onConflict: "user_id,data_type,cycle_date",
+  for (let i = 0; i < rows.length; i += UPSERT_BATCH) {
+    const batch = rows.slice(i, i + UPSERT_BATCH);
+    const { error: upErr } = await supabase.from("whoop_data").upsert(batch, {
+      onConflict: "user_id,data_type,record_id",
     });
     if (upErr) {
-      console.error("[whoop-fetch-data] supabase upsert failed", upErr);
+      console.error("[whoop-fetch-data] supabase upsert failed", upErr, { batchIndex: i });
       upsertError = upErr.message;
+      break;
     }
+  }
+
+  // Stamp sync state — but only if the upsert succeeded. If it failed,
+  // leave backfill_completed_at NULL so the next sync retries the full
+  // backfill rather than silently switching to incremental.
+  if (!upsertError) {
+    const tokenUpdate = { last_synced_at: new Date().toISOString() };
+    if (isBackfill) tokenUpdate.backfill_completed_at = new Date().toISOString();
+    const { error: stampErr } = await supabase
+      .from("whoop_tokens")
+      .update(tokenUpdate)
+      .eq("user_id", userId);
+    if (stampErr) console.error("[whoop-fetch-data] failed to stamp sync state", stampErr);
   }
 
   return new Response(JSON.stringify({
     synced: rows.length,
+    counts,
     errors,
     upsertError,
+    backfill: isBackfill,
   }), {
     status: upsertError ? 500 : 200,
     headers: { "Content-Type": "application/json", ...corsHeaders },

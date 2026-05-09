@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import { sb } from '../../utils/supabase';
 import { calcBMI, xpToLevel } from '../../utils/xp';
 import { isMetric, lbsToKg, kgToLbs, ftInToCm, cmToFtIn } from '../../utils/units';
@@ -206,10 +206,10 @@ const ProfileTab = memo(function ProfileTab({
     }
   }
 
-  async function handleSyncWhoop() {
+  async function handleSyncWhoop({ silent = false } = {}) {
     if (whoopSyncing) return;
     setWhoopSyncing(true);
-    setWhoopMsg('');
+    if (!silent) setWhoopMsg('');
     try {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { setWhoopMsg('Not signed in.'); setWhoopSyncing(false); return; }
@@ -224,10 +224,11 @@ const ProfileTab = memo(function ProfileTab({
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         const failed = data.errors ? Object.keys(data.errors) : [];
+        const prefix = data.backfill ? 'Backfill complete' : 'Synced';
         if (failed.length === 0) {
-          setWhoopMsg(`Synced ${data.synced ?? 0} records.`);
+          setWhoopMsg(`${prefix} — ${data.synced ?? 0} records.`);
         } else {
-          setWhoopMsg(`Synced ${data.synced ?? 0} records. Failed: ${failed.join(', ')}`);
+          setWhoopMsg(`${prefix} — ${data.synced ?? 0} records. Failed: ${failed.join(', ')}`);
         }
         await loadWhoopData();
       } else {
@@ -238,6 +239,22 @@ const ProfileTab = memo(function ProfileTab({
     }
     setWhoopSyncing(false);
   }
+
+  // P2 fix from Codex review on PR #174: the callback handler's fire-
+  // and-forget sync may be cancelled when the browser navigates back
+  // to "/", leaving Profile with empty cards. Once the page mounts and
+  // we confirm the user is linked, kick off one sync ourselves. Guarded
+  // by a ref so it only fires once per "just connected" landing.
+  const autoSyncFiredRef = useRef(false);
+  useEffect(() => {
+    if (whoopLinked && whoopJustConnected && !autoSyncFiredRef.current) {
+      autoSyncFiredRef.current = true;
+      // Give the success banner ~1 frame to paint before the sync
+      // status overwrites it.
+      handleSyncWhoop({ silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whoopLinked, whoopJustConnected]);
 
   const totalH = (parseInt(profile.heightFt) || 0) * 12 + (parseInt(profile.heightIn) || 0);
   const bmi = calcBMI(profile.weightLbs, totalH);
