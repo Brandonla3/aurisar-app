@@ -31,6 +31,11 @@ const lerp       = (a, b, t) => a + (b - a) * t;
 const lerpColor3 = (a, b, t) => new BABYLON.Color3(
   lerp(a.r, b.r, t), lerp(a.g, b.g, t), lerp(a.b, b.b, t)
 );
+function lerpColor3Into(out, a, b, t) {
+  out.r = a.r + (b.r - a.r) * t;
+  out.g = a.g + (b.g - a.g) * t;
+  out.b = a.b + (b.b - a.b) * t;
+}
 
 // ── Class colours (built at call-time after BABYLON is on window) ────────────
 function classColor(ct) {
@@ -81,6 +86,19 @@ class LightingManager {
 
     this._transition = null; // { from, to, duration, elapsed }
     this._disposed   = false;
+
+    // Pre-allocated scratch objects — prevents ~13 GC-able allocations per frame
+    this._scratchDir   = new BABYLON.Vector3();
+    this._scratchColor = new BABYLON.Color3();
+    this._nightDiffuse = new BABYLON.Color3(1.0, 0.72, 0.48);
+    this._dayDiffuse   = new BABYLON.Color3(1.0, 0.97, 0.92);
+    this._nightGround  = new BABYLON.Color3(0.10, 0.12, 0.18);
+    this._dayGround    = new BABYLON.Color3(0.34, 0.36, 0.40);
+    this._nightFog     = new BABYLON.Color3(0.06, 0.08, 0.12);
+    this._dayFog       = new BABYLON.Color3(0.74, 0.84, 0.96);
+    this._nightSky     = new BABYLON.Color3(0.06, 0.08, 0.18);
+    this._daySky       = new BABYLON.Color3(0.42, 0.58, 0.78);
+    this._dungeonFog   = new BABYLON.Color3(0.06, 0.07, 0.085);
 
     this._setupCore();
     this._setupOverworldRig();
@@ -292,7 +310,7 @@ class LightingManager {
     // than the desktop value where IBL provides the ambient fill.
     this.scene.ambientColor = this._isMobile
       ? new BABYLON.Color3(0.40, 0.44, 0.50)
-      : new BABYLON.Color3(0.22, 0.25, 0.30);
+      : new BABYLON.Color3(0.14, 0.16, 0.18);  // day baseline; night raised in _updateOverworld
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -357,66 +375,51 @@ class LightingManager {
     const phase    = this.timeOfDay / 24;
     const sunTheta = phase * Math.PI * 2 - Math.PI / 2;
 
-    const sunDir = new BABYLON.Vector3(
+    // Reuse pre-allocated scratch Vector3 — avoids one new Vector3 per frame
+    this._scratchDir.set(
       Math.cos(sunTheta) * 0.35,
       -Math.sin(sunTheta),
        Math.sin(sunTheta) * 0.65
-    ).normalize();
+    );
+    this._scratchDir.normalize();
+    this.key.direction.copyFrom(this._scratchDir);
+    this._scratchDir.scaleInPlace(-1);
+    this.moon.direction.copyFrom(this._scratchDir);
 
-    this.key.direction.copyFrom(sunDir);
-    this.moon.direction.copyFrom(sunDir.scale(-1));
-
-    const sunHeight = -sunDir.y;
+    const sunHeight = -this.key.direction.y;
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
-    // ImageProcessingPostProcess (or DefaultRenderingPipeline) now provides
-    // proper ACES tone-mapping on every tier, so desktop and mobile use the
-    // same raw light intensity values. No device-specific multipliers needed.
     this.key.intensity = lerp(0.05, 2.4, dayFactor);
-    this.key.diffuse   = lerpColor3(
-      new BABYLON.Color3(1.0, 0.72, 0.48),
-      new BABYLON.Color3(1.0, 0.97, 0.92),
-      clamp01(dayFactor * 1.25)
-    );
-    // Moon is brighter (0.60 vs old 0.45) so night is always legible.
+    lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
     this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
 
-    // Fill never fully dims at night — keeps geometry readable without
-    // destroying the nighttime atmosphere.
     const fillMin = this._isMobile ? 0.50 : 0.20;
     const fillMax = this._isMobile ? 0.80 : 0.40;
-    this.fillOverworld.intensity   = lerp(fillMin, fillMax, dayFactor);
-    this.fillOverworld.groundColor = lerpColor3(
-      new BABYLON.Color3(0.10, 0.12, 0.18),
-      new BABYLON.Color3(0.34, 0.36, 0.40),
-      dayFactor
-    );
+    this.fillOverworld.intensity = lerp(fillMin, fillMax, dayFactor);
+    lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    // Night exposure raised from 0.65 → 0.82 so the tone-mapper keeps dark
-    // scenes bright enough to navigate; day cap slightly higher on mobile.
     const exposureMax = this._isMobile ? 1.30 : 1.05;
     this.scene.imageProcessingConfiguration.exposure = lerp(0.82, exposureMax, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
-    this.scene.fogColor   = lerpColor3(
-      new BABYLON.Color3(0.06, 0.08, 0.12),
-      new BABYLON.Color3(0.74, 0.84, 0.96),
-      dayFactor
-    );
+    lerpColor3Into(this.scene.fogColor, this._nightFog, this._dayFog, dayFactor);
 
-    // Animate the background sky colour through day / night. When an env-based
-    // skybox mesh is present it covers clearColor completely; when the .env
-    // files are absent (our current setup) this IS the sky.
-    const sky = lerpColor3(
-      new BABYLON.Color3(0.06, 0.08, 0.18),  // night — deep navy, not black
-      new BABYLON.Color3(0.42, 0.58, 0.78),  // day  — sky blue
-      dayFactor
-    );
-    this.scene.clearColor.r = sky.r;
-    this.scene.clearColor.g = sky.g;
-    this.scene.clearColor.b = sky.b;
+    // Dynamic ambient: cooler/brighter at night so geometry is readable without IBL
+    if (!this._isMobile) {
+      this.scene.ambientColor.copyFromFloats(
+        lerp(0.30, 0.14, dayFactor),
+        lerp(0.33, 0.16, dayFactor),
+        lerp(0.42, 0.18, dayFactor)
+      );
+    }
+
+    // Sky background — mutate clearColor in-place via scratch to avoid allocation
+    lerpColor3Into(this._scratchColor, this._nightSky, this._daySky, dayFactor);
+    this.scene.clearColor.r = this._scratchColor.r;
+    this.scene.clearColor.g = this._scratchColor.g;
+    this.scene.clearColor.b = this._scratchColor.b;
 
     if (dayFactor > 0.5) {
       this._setEnvironment(this.envDay,   lerp(0.35, 0.95, dayFactor));
@@ -434,23 +437,21 @@ class LightingManager {
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
-    this.scene.fogColor   = new BABYLON.Color3(0.06, 0.07, 0.085);
+    this.scene.fogColor.copyFrom(this._dungeonFog);
 
     this._setEnvironment(this.envDungeon, 0.35);
   }
 
   _updateCombatRim() {
+    if (!this.combatMode) { this.rimCombat.intensity = 0; return; }
     const target = this.camera.getTarget ? this.camera.getTarget() : BABYLON.Vector3.Zero();
     const camPos = this.camera.globalPosition ?? this.camera.position ?? new BABYLON.Vector3(0, 2, -4);
     const backDir = target.subtract(camPos).normalize().scale(-1);
-
     this.rimCombat.position.copyFrom(
       target.add(backDir.scale(2.5)).add(new BABYLON.Vector3(0, 1.8, 0))
     );
-
-    const base       = this.combatMode ? 35 : 0;
     const profileMul = this.profile === 'dungeon' ? 1.15 : 1.0;
-    this.rimCombat.intensity = base * profileMul;
+    this.rimCombat.intensity = 35 * profileMul;
   }
 
   // ── Profile switching ─────────────────────────────────────────────────────
@@ -637,6 +638,12 @@ export class BabylonWorldScene {
     this._joyDy = 0;
     // Camera drag touch (right-half of screen, managed internally)
     this._camTouch = null; // { id, lastX, lastY }
+
+    // Pre-allocated movement scratch vectors — avoids 4 allocations per frame
+    this._moveFwd   = new BABYLON.Vector3();
+    this._moveRight = new BABYLON.Vector3();
+    this._moveDir   = new BABYLON.Vector3();
+    this._camTarget = new BABYLON.Vector3(0, 1.2, 0);
 
     this._isMobile = typeof window !== 'undefined' &&
       window.matchMedia('(pointer: coarse)').matches;
@@ -833,13 +840,12 @@ export class BabylonWorldScene {
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
-    // Try high-quality 2048 shadow map first; mobile GPUs often cap at 1024,
-    // so fall back gracefully rather than crashing the whole render loop.
-    for (const size of [2048, 1024, 512]) {
+    // Start at 1024 — 4× cheaper shadow pass vs 2048 with minimal visual difference.
+    for (const size of [1024, 512]) {
       try {
         const sg = new BABYLON.ShadowGenerator(size, this._lm.key);
-        sg.useBlurExponentialShadowMap = size >= 1024;
-        sg.blurKernel = size >= 1024 ? 24 : 8;
+        sg.useBlurExponentialShadowMap = true;
+        sg.blurKernel = size >= 1024 ? 16 : 8;
         sg.bias       = 0.0005;
         sg.normalBias = 0.02;
         this._shadowGen = sg;
@@ -862,11 +868,11 @@ export class BabylonWorldScene {
     if (this.engine.webGLVersion < 2) return;
     try {
       const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
-        ssaoRatio: 0.5, blurRatio: 1.0,
+        ssaoRatio: 0.35, blurRatio: 0.75,
       });
       ssao.radius        = 2.0;
       ssao.base          = 0.05;
-      ssao.totalStrength = 0.9;
+      ssao.totalStrength = 0.75;
       this.scene.postProcessRenderPipelineManager
         .attachCamerasToRenderPipeline('ssao2', this._camera);
       this._ssao = ssao;
@@ -1092,15 +1098,14 @@ export class BabylonWorldScene {
     gLight.intensity = 18;
     gLight.range     = 9;
     const gPhase = Math.random() * Math.PI * 2;
+    const _portalEmissive = new BABYLON.Color3(0.20, 0.10, 0.55);
+    portalMat.emissiveColor = _portalEmissive;
     this.scene.onBeforeRenderObservable.add(() => {
       const t = performance.now() * 0.001;
-      const pulse = 1 + Math.sin(t * 1.8 + gPhase) * 0.20;
-      gLight.intensity = 18 * pulse;
-      portalMat.emissiveColor = new BABYLON.Color3(
-        0.20 + Math.sin(t * 1.5 + gPhase) * 0.05,
-        0.10,
-        0.55 + Math.sin(t * 1.8 + gPhase) * 0.10
-      );
+      gLight.intensity = 18 * (1 + Math.sin(t * 1.8 + gPhase) * 0.20);
+      _portalEmissive.r = 0.20 + Math.sin(t * 1.5 + gPhase) * 0.05;
+      _portalEmissive.b = 0.55 + Math.sin(t * 1.8 + gPhase) * 0.10;
+      // .g = 0.10 is constant — no update needed
     });
 
     // Floating label
@@ -1169,55 +1174,53 @@ export class BabylonWorldScene {
     const a = this._keys['KeyA'] || this._keys['ArrowLeft'];
     const d = this._keys['KeyD'] || this._keys['ArrowRight'];
 
-    // alpha points FROM target TO camera, so add PI to get the true forward direction
+    const joyLen    = Math.hypot(this._joyDx, this._joyDy);
+    const joyActive = joyLen > 0.12;
+
+    // Early exit before any Vector3 allocation when there is no input
+    if (!w && !s && !a && !d && !joyActive) { this._local.isMoving = false; return; }
+
     const speed = 0.012;
     const alpha  = this._camera.alpha + Math.PI;
-    const fwd    = new BABYLON.Vector3(Math.cos(alpha), 0, Math.sin(alpha));
-    const right  = new BABYLON.Vector3(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2));
+    this._moveFwd.set(Math.cos(alpha), 0, Math.sin(alpha));
+    this._moveRight.set(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2));
+    this._moveDir.setAll(0);
 
-    const dir = BABYLON.Vector3.Zero();
+    if (w) this._moveDir.addInPlace(this._moveFwd);
+    if (s) this._moveDir.subtractInPlace(this._moveFwd);
+    if (a) this._moveDir.addInPlace(this._moveRight);
+    if (d) this._moveDir.subtractInPlace(this._moveRight);
 
-    // Keyboard input
-    if (w) dir.addInPlace(fwd);
-    if (s) dir.subtractInPlace(fwd);
-    if (a) dir.addInPlace(right);
-    if (d) dir.subtractInPlace(right);
-
-    // Virtual joystick input (mobile)
-    // _joyDx / _joyDy are normalised [-1, 1] from WorldGame's React overlay.
-    // Screen +X = camera right, screen +Y = camera backward.
     let joyScale = 1;
-    const JOY_DEAD = 0.12; // normalised deadzone
-    const joyLen = Math.hypot(this._joyDx, this._joyDy);
-    if (joyLen > JOY_DEAD) {
-      joyScale = Math.min(1, (joyLen - JOY_DEAD) / (1 - JOY_DEAD));
+    if (joyActive) {
+      joyScale = Math.min(1, (joyLen - 0.12) / (1 - 0.12));
       const nx = this._joyDx / joyLen;
       const ny = this._joyDy / joyLen;
-      dir.addInPlace(right.scale(-nx)); // -nx: screen left = strafe left
-      dir.addInPlace(fwd.scale(-ny));   // -ny: screen up   = move forward
+      this._moveDir.addInPlace(this._moveRight.scale(-nx));
+      this._moveDir.addInPlace(this._moveFwd.scale(-ny));
     }
 
-    this._local.isMoving = dir.lengthSquared() > 0.001;
+    this._local.isMoving = this._moveDir.lengthSquared() > 0.001;
     if (!this._local.isMoving) return;
-    dir.normalize();
+    this._moveDir.normalize();
 
-    const speedScale = (joyLen > JOY_DEAD && !w && !s && !a && !d) ? joyScale : 1;
+    const speedScale = (joyActive && !w && !s && !a && !d) ? joyScale : 1;
     const pos = this._local.root.position;
-    pos.addInPlace(dir.scale(speed * dt * speedScale));
+    pos.addInPlace(this._moveDir.scale(speed * dt * speedScale));
     pos.x = Math.max(-95, Math.min(95, pos.x));
     pos.z = Math.max(-95, Math.min(95, pos.z));
     pos.y = 0;
 
-    const target = Math.atan2(dir.x, dir.z);
+    const target = Math.atan2(this._moveDir.x, this._moveDir.z);
     this._local.root.rotation.y = this._lerpAngle(
       this._local.root.rotation.y, target, 0.18
     );
   }
 
   _trackCamera() {
-    const p   = this._local.root.position;
-    const tgt = new BABYLON.Vector3(p.x, 1.2, p.z);
-    BABYLON.Vector3.LerpToRef(this._camera.target, tgt, 0.12, this._camera.target);
+    const p = this._local.root.position;
+    this._camTarget.set(p.x, 1.2, p.z);
+    BABYLON.Vector3.LerpToRef(this._camera.target, this._camTarget, 0.12, this._camera.target);
   }
 
   _syncStdb() {
@@ -1358,7 +1361,7 @@ export class BabylonWorldScene {
     // Required: ambientColor must be non-zero for scene.ambientColor to
     // contribute — StandardMaterial ignores the scene-wide ambient term when
     // this is black (the default).
-    m.ambientColor = color.clone();
+    m.ambientColor = new BABYLON.Color3(1, 1, 1);
     // Emissive self-illumination is only applied when ALL post-processing has
     // failed (DefaultRenderingPipeline AND ImageProcessingPostProcess both
     // threw). This is essentially impossible on any device supporting WebGL2,
