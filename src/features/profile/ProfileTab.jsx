@@ -1572,374 +1572,147 @@ return (
 </div>}{/* VIEW_MODE_END */}
 
 
-{/* ── PROFILE EDIT ─────────────────────── */}{editMode && <><div style={{
+{/* ── PROFILE EDIT ─────────────────────── */}{editMode && <>
+
+  {/* Sticky header: title + cancel + save */}
+  <div style={{
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: S.s12
-  }}><div className={"sec"} style={{
-      margin: 0,
-      border: "none",
-      padding: S.s0
-    }}>{"✎ Edit Profile"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button></div><div className={"edit-panel"} style={{
-    "--cls-color": cls.color,
-    "--cls-glow": cls.glow
-  }}><div><div className={"profile-rune-divider"} style={{
-        margin: "0 0 10px"
-      }}><span className={"profile-rune-label"}>{"⠿ Identity ⠿"}</span></div><div className={"field"}><label>{"Display Name"}</label><input className={"inp"} value={draft.playerName || ""} onChange={e => setDraft(d => ({
-          ...d,
-          playerName: e.target.value
-        }))} placeholder={"Your warrior name\u2026"} /></div><div style={{
-        display: "flex",
-        gap: S.s10,
-        marginBottom: S.s2
-      }}><div className={"field"} style={{
-          flex: 1
-        }}><label>{"First Name"}</label><input className={"inp"} value={draft.firstName || ""} onChange={e => setDraft(d => ({
-            ...d,
-            firstName: e.target.value
-          }))} placeholder={"First name"} /></div><div className={"field"} style={{
-          flex: 1
-        }}><label>{"Last Name"}</label><input className={"inp"} value={draft.lastName || ""} onChange={e => setDraft(d => ({
-            ...d,
-            lastName: e.target.value
-          }))} placeholder={"Last name"} /></div></div><div className={"sec"} style={{
-        fontSize: FS.fs68,
-        marginBottom: S.s8,
-        marginTop: S.s4
-      }}>{"Class"}</div><div className={"cls-mini-grid"}>{Object.entries(CLASSES).map(([key, c]) => <div key={key} className={`cls-mini ${draft.chosenClass === key ? "sel" : ""}`} style={{
-          "--bc": c.color,
-          opacity: c.locked ? 0.35 : 1,
-          cursor: c.locked ? "not-allowed" : "pointer"
-        }} onClick={() => {
-          if (!c.locked) setDraft(d => ({
-            ...d,
-            chosenClass: key
-          }));
-        }}><div className={"cls-mini-icon"} style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}><ClassIcon classKey={key} size={18} color={c.glow} /></div><span className={"cls-mini-name"}>{c.locked ? "🔒" : c.name}</span></div>)}</div></div>
+    gap: S.s8,
+    marginBottom: S.s12,
+    padding: "8px 0",
+    background: "rgba(10,9,8,.96)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+  }}>
+    <div className={"sec"} style={{ margin: 0, border: "none", padding: S.s0 }}>{"✎ Edit Profile"}</div>
+    <div style={{ display: "flex", gap: S.s8, alignItems: "center" }}>
+      <button className={"btn btn-ghost btn-sm"} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button>
+      <button className={"btn btn-gold btn-sm"} onClick={saveEdit}>{"⚔️ Save"}</button>
+    </div>
+  </div>
 
-    {
-      /* ── UNITS ── */
-    }<div><div className={"profile-rune-divider"} style={{
-        margin: "0 0 10px"
-      }}><span className={"profile-rune-label"}>{"⠿ Measurement Units ⠿"}</span></div><div className={"units-toggle"}><div className={`units-opt ${(draft.units || "imperial") === "imperial" ? "on" : ""}`} onClick={() => {
-          const cur = draft.units || "imperial";
-          if (cur === "metric") {
-            const wBack = draft._dispWeight ? parseFloat(kgToLbs(draft._dispWeight)).toFixed(1) : "";
-            const htCm = draft._dispHeightCm;
-            let hFt = "",
-              hIn = "";
-            if (htCm) {
-              const c = cmToFtIn(htCm);
-              hFt = String(c.ft);
-              hIn = String(c.inch);
+  {/* Edit sections — styled as log-group-cards to match the profile view */}
+  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+
+    {/* ── IDENTITY ── */}
+    <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={"log-group-hdr"} style={{ cursor: "default" }}>
+        <div className={"log-group-icon"}>{"👤"}</div>
+        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Identity"}</div>
+      </div>
+      <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className={"field"}><label>{"Display Name"}</label><input className={"inp"} value={draft.playerName || ""} onChange={e => setDraft(d => ({ ...d, playerName: e.target.value }))} placeholder={"Your warrior name…"} /></div>
+        <div style={{ display: "flex", gap: S.s10 }}>
+          <div className={"field"} style={{ flex: 1 }}><label>{"First Name"}</label><input className={"inp"} value={draft.firstName || ""} onChange={e => setDraft(d => ({ ...d, firstName: e.target.value }))} placeholder={"First name"} /></div>
+          <div className={"field"} style={{ flex: 1 }}><label>{"Last Name"}</label><input className={"inp"} value={draft.lastName || ""} onChange={e => setDraft(d => ({ ...d, lastName: e.target.value }))} placeholder={"Last name"} /></div>
+        </div>
+        <div>
+          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: ".6rem", color: "#8a8478", letterSpacing: ".13em", textTransform: "uppercase", marginBottom: S.s8 }}>{"Class"}</div>
+          <div className={"cls-mini-grid"}>{Object.entries(CLASSES).map(([key, c]) => <div key={key} className={`cls-mini ${draft.chosenClass === key ? "sel" : ""}`} style={{ "--bc": c.color, opacity: c.locked ? 0.35 : 1, cursor: c.locked ? "not-allowed" : "pointer" }} onClick={() => { if (!c.locked) setDraft(d => ({ ...d, chosenClass: key })); }}><div className={"cls-mini-icon"} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><ClassIcon classKey={key} size={18} color={c.glow} /></div><span className={"cls-mini-name"}>{c.locked ? "🔒" : c.name}</span></div>)}</div>
+        </div>
+      </div>
+    </div>
+
+    {/* ── UNITS ── */}
+    <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={"log-group-hdr"} style={{ cursor: "default" }}>
+        <div className={"log-group-icon"}>{"⚖️"}</div>
+        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Measurement Units"}</div>
+      </div>
+      <div style={{ padding: "8px 11px 12px" }}>
+        <div className={"units-toggle"}>
+          <div className={`units-opt ${(draft.units || "imperial") === "imperial" ? "on" : ""}`} onClick={() => {
+            const cur = draft.units || "imperial";
+            if (cur === "metric") {
+              const wBack = draft._dispWeight ? parseFloat(kgToLbs(draft._dispWeight)).toFixed(1) : "";
+              const htCm = draft._dispHeightCm;
+              let hFt = "", hIn = "";
+              if (htCm) { const c = cmToFtIn(htCm); hFt = String(c.ft); hIn = String(c.inch); }
+              setDraft(d => ({ ...d, units: "imperial", weightLbs: wBack, _dispWeight: "", _dispHeightCm: "", heightFt: hFt, heightIn: hIn }));
             }
-            setDraft(d => ({
-              ...d,
-              units: "imperial",
-              weightLbs: wBack,
-              _dispWeight: "",
-              _dispHeightCm: "",
-              heightFt: hFt,
-              heightIn: hIn
-            }));
-          }
-        }}>{"🇺🇸 Imperial"}</div><div className={`units-opt ${(draft.units || "imperial") === "metric" ? "on" : ""}`} onClick={() => {
-          const cur = draft.units || "imperial";
-          if (cur === "imperial") {
-            const wKg = draft.weightLbs ? lbsToKg(draft.weightLbs) : "";
-            const hCm = ftInToCm(draft.heightFt, draft.heightIn) || "";
-            setDraft(d => ({
-              ...d,
-              units: "metric",
-              _dispWeight: wKg,
-              _dispHeightCm: String(hCm)
-            }));
-          }
-        }}>{"🌍 Metric"}</div></div></div>
+          }}>{"🇺🇸 Imperial"}</div>
+          <div className={`units-opt ${(draft.units || "imperial") === "metric" ? "on" : ""}`} onClick={() => {
+            const cur = draft.units || "imperial";
+            if (cur === "imperial") {
+              const wKg = draft.weightLbs ? lbsToKg(draft.weightLbs) : "";
+              const hCm = ftInToCm(draft.heightFt, draft.heightIn) || "";
+              setDraft(d => ({ ...d, units: "metric", _dispWeight: wKg, _dispHeightCm: String(hCm) }));
+            }
+          }}>{"🌍 Metric"}</div>
+        </div>
+      </div>
+    </div>
 
-    {
-      /* ── BODY STATS ── */
-    }<div><div className={"profile-rune-divider"} style={{
-        margin: "0 0 10px"
-      }}><span className={"profile-rune-label"}>{"⠿ Body Stats ⠿"}</span></div>{(draft.units || "imperial") === "imperial" ? <><div className={"r2"}><div className={"field"}><label>{"Weight (lbs)"}</label><input className={"inp"} type={"number"} min={"50"} max={"600"} placeholder={"185"} value={draft.weightLbs || ""} onChange={e => setDraft(d => ({
-              ...d,
-              weightLbs: e.target.value
-            }))} /></div><div className={"field"}><label>{"Age"}</label><input className={"inp"} type={"number"} min={"10"} max={"100"} placeholder={"30"} value={draft.age || ""} onChange={e => setDraft(d => ({
-              ...d,
-              age: e.target.value
-            }))} /></div></div><div className={"field"}><label>{"Height (ft / in)"}</label><div style={{
-            display: "flex",
-            gap: S.s6
-          }}><input className={"inp"} type={"number"} min={"3"} max={"8"} placeholder={"5"} style={{
-              width: "50%"
-            }} value={draft.heightFt || ""} onChange={e => setDraft(d => ({
-              ...d,
-              heightFt: e.target.value
-            }))} /><input className={"inp"} type={"number"} min={"0"} max={"11"} placeholder={"11"} style={{
-              width: "50%"
-            }} value={draft.heightIn || ""} onChange={e => setDraft(d => ({
-              ...d,
-              heightIn: e.target.value
-            }))} /></div></div>{(() => {
-          const ph = (parseInt(draft.heightFt) || 0) * 12 + (parseInt(draft.heightIn) || 0);
-          const pb = calcBMI(draft.weightLbs, ph);
-          return pb ? <div style={{
-            fontSize: FS.md,
-            color: "#8a8478",
-            fontStyle: "italic",
-            marginTop: S.sNeg6
-          }}>{"BMI: "}<span style={{
-              color: "#b4ac9e"
-            }}>{pb}</span></div> : null;
-        })()}</> : <><div className={"r2"}><div className={"field"}><label>{"Weight (kg)"}</label><input className={"inp"} type={"number"} min={"20"} max={"300"} step={"0.1"} placeholder={"84"} value={draft._dispWeight || ""} onChange={e => setDraft(d => ({
-              ...d,
-              _dispWeight: e.target.value
-            }))} /></div><div className={"field"}><label>{"Age"}</label><input className={"inp"} type={"number"} min={"10"} max={"100"} placeholder={"30"} value={draft.age || ""} onChange={e => setDraft(d => ({
-              ...d,
-              age: e.target.value
-            }))} /></div></div><div className={"field"}><label>{"Height (cm)"}</label><input className={"inp"} type={"number"} min={"100"} max={"250"} placeholder={"178"} value={draft._dispHeightCm || ""} onChange={e => setDraft(d => ({
-            ...d,
-            _dispHeightCm: e.target.value
-          }))} /></div>{draft._dispWeight && <div style={{
-          fontSize: FS.md,
-          color: "#8a8478",
-          fontStyle: "italic",
-          marginTop: S.sNeg6
-        }}>{draft._dispWeight}{" kg = "}{parseFloat(kgToLbs(draft._dispWeight)).toFixed(1)}{" lbs"}</div>}</>}<div style={{
-        marginTop: S.s10,
-        padding: "8px 12px",
-        background: "rgba(45,42,36,.18)",
-        border: "1px solid rgba(180,172,158,.05)",
-        borderRadius: R.xl
-      }}><div style={{
-          fontSize: FS.fs62,
-          color: "#8a8478",
-          marginBottom: S.s8,
-          letterSpacing: ".04em",
-          textTransform: "uppercase"
-        }}>{"Show on Hero Banner"}</div><div style={{
-          display: "flex",
-          gap: S.s6,
-          flexWrap: "wrap"
-        }}>{[{
-            key: "weight",
-            label: "Weight"
-          }, {
-            key: "height",
-            label: "Height"
-          }, {
-            key: "bmi",
-            label: "BMI"
-          }].map(f => {
-            const on = (draft.hudFields || {})[f.key];
-            return <button key={f.key} className={`gender-btn ${on ? "sel" : ""}`} style={{
-              fontSize: FS.fs68
-            }} onClick={() => setDraft(d => ({
-              ...d,
-              hudFields: {
-                ...(d.hudFields || {}),
-                [f.key]: !on
-              }
-            }))}>{(on ? "✓ " : "") + f.label}</button>;
-          })}</div><div style={{
-          fontSize: FS.sm,
-          color: "#8a8478",
-          marginTop: S.s6,
-          fontStyle: "italic"
-        }}>{"Selected fields appear under your name in the main header"}</div></div><div className={"field"}><label>{"Gender "}<span style={{
-            fontSize: FS.fs55,
-            opacity: .6
-          }}>{"(optional)"}</span></label><div style={{
-          display: "flex",
-          gap: S.s6,
-          flexWrap: "wrap"
-        }}>{["Male", "Female", "Prefer not to say"].map(g => <button key={g} className={`gender-btn ${draft.gender === g ? "sel" : ""}`} onClick={() => setDraft(d => ({
-            ...d,
-            gender: d.gender === g ? "" : g
-          }))}>{g}</button>)}<button className={`gender-btn ${draft.gender && !["Male", "Female", "Prefer not to say"].includes(draft.gender) ? "sel" : ""}`} onClick={() => {
-            const v = window.prompt("Enter your gender identity:", "");
-            if (v && v.trim()) setDraft(d => ({
-              ...d,
-              gender: v.trim()
-            }));
-          }}>{draft.gender && !["Male", "Female", "Prefer not to say"].includes(draft.gender) ? draft.gender : "Not Listed"}</button></div>{draft.gender && <div style={{
-          fontSize: FS.fs62,
-          color: "#b4ac9e",
-          marginTop: S.s4
-        }}>{"Selected: "}{draft.gender}</div>}</div></div>
+    {/* ── BODY STATS ── */}
+    <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={"log-group-hdr"} style={{ cursor: "default" }}>
+        <div className={"log-group-icon"}>{"💪"}</div>
+        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Body Stats"}</div>
+      </div>
+      <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {(draft.units || "imperial") === "imperial" ? <>
+          <div className={"r2"}>
+            <div className={"field"}><label>{"Weight (lbs)"}</label><input className={"inp"} type={"number"} min={"50"} max={"600"} placeholder={"185"} value={draft.weightLbs || ""} onChange={e => setDraft(d => ({ ...d, weightLbs: e.target.value }))} /></div>
+            <div className={"field"}><label>{"Age"}</label><input className={"inp"} type={"number"} min={"10"} max={"100"} placeholder={"30"} value={draft.age || ""} onChange={e => setDraft(d => ({ ...d, age: e.target.value }))} /></div>
+          </div>
+          <div className={"field"}><label>{"Height (ft / in)"}</label><div style={{ display: "flex", gap: S.s6 }}><input className={"inp"} type={"number"} min={"3"} max={"8"} placeholder={"5"} style={{ width: "50%" }} value={draft.heightFt || ""} onChange={e => setDraft(d => ({ ...d, heightFt: e.target.value }))} /><input className={"inp"} type={"number"} min={"0"} max={"11"} placeholder={"11"} style={{ width: "50%" }} value={draft.heightIn || ""} onChange={e => setDraft(d => ({ ...d, heightIn: e.target.value }))} /></div></div>
+          {(() => { const ph = (parseInt(draft.heightFt) || 0) * 12 + (parseInt(draft.heightIn) || 0); const pb = calcBMI(draft.weightLbs, ph); return pb ? <div style={{ fontSize: FS.md, color: "#8a8478", fontStyle: "italic", marginTop: S.sNeg6 }}>{"BMI: "}<span style={{ color: "#b4ac9e" }}>{pb}</span></div> : null; })()}
+        </> : <>
+          <div className={"r2"}>
+            <div className={"field"}><label>{"Weight (kg)"}</label><input className={"inp"} type={"number"} min={"20"} max={"300"} step={"0.1"} placeholder={"84"} value={draft._dispWeight || ""} onChange={e => setDraft(d => ({ ...d, _dispWeight: e.target.value }))} /></div>
+            <div className={"field"}><label>{"Age"}</label><input className={"inp"} type={"number"} min={"10"} max={"100"} placeholder={"30"} value={draft.age || ""} onChange={e => setDraft(d => ({ ...d, age: e.target.value }))} /></div>
+          </div>
+          <div className={"field"}><label>{"Height (cm)"}</label><input className={"inp"} type={"number"} min={"100"} max={"250"} placeholder={"178"} value={draft._dispHeightCm || ""} onChange={e => setDraft(d => ({ ...d, _dispHeightCm: e.target.value }))} /></div>
+          {draft._dispWeight && <div style={{ fontSize: FS.md, color: "#8a8478", fontStyle: "italic", marginTop: S.sNeg6 }}>{draft._dispWeight}{" kg = "}{parseFloat(kgToLbs(draft._dispWeight)).toFixed(1)}{" lbs"}</div>}
+        </>}
+        <div style={{ padding: "8px 12px", background: "rgba(45,42,36,.18)", border: "1px solid rgba(180,172,158,.05)", borderRadius: R.xl }}>
+          <div style={{ fontSize: FS.fs62, color: "#8a8478", marginBottom: S.s8, letterSpacing: ".04em", textTransform: "uppercase" }}>{"Show on Hero Banner"}</div>
+          <div style={{ display: "flex", gap: S.s6, flexWrap: "wrap" }}>{[{ key: "weight", label: "Weight" }, { key: "height", label: "Height" }, { key: "bmi", label: "BMI" }].map(f => { const on = (draft.hudFields || {})[f.key]; return <button key={f.key} className={`gender-btn ${on ? "sel" : ""}`} style={{ fontSize: FS.fs68 }} onClick={() => setDraft(d => ({ ...d, hudFields: { ...(d.hudFields || {}), [f.key]: !on } }))}>{(on ? "✓ " : "") + f.label}</button>; })}</div>
+          <div style={{ fontSize: FS.sm, color: "#8a8478", marginTop: S.s6, fontStyle: "italic" }}>{"Selected fields appear under your name in the main header"}</div>
+        </div>
+        <div className={"field"}><label>{"Gender "}<span style={{ fontSize: FS.fs55, opacity: .6 }}>{"(optional)"}</span></label><div style={{ display: "flex", gap: S.s6, flexWrap: "wrap" }}>{["Male", "Female", "Prefer not to say"].map(g => <button key={g} className={`gender-btn ${draft.gender === g ? "sel" : ""}`} onClick={() => setDraft(d => ({ ...d, gender: d.gender === g ? "" : g }))}>{g}</button>)}<button className={`gender-btn ${draft.gender && !["Male", "Female", "Prefer not to say"].includes(draft.gender) ? "sel" : ""}`} onClick={() => { const v = window.prompt("Enter your gender identity:", ""); if (v && v.trim()) setDraft(d => ({ ...d, gender: v.trim() })); }}>{draft.gender && !["Male", "Female", "Prefer not to say"].includes(draft.gender) ? draft.gender : "Not Listed"}</button></div>{draft.gender && <div style={{ fontSize: FS.fs62, color: "#b4ac9e", marginTop: S.s4 }}>{"Selected: "}{draft.gender}</div>}</div>
+      </div>
+    </div>
 
-    {
-      /* ── PREFERENCES ── */
-    }<div><div className={"profile-rune-divider"} style={{
-        margin: "0 0 10px"
-      }}><span className={"profile-rune-label"}>{"⠿ Preferences ⠿"}</span></div><div className={"field"}><label>{"Home Gym"}</label><input className={"inp"} placeholder={"Planet Fitness, Gold's Gym, Home…"} value={draft.gym || ""} onChange={e => setDraft(d => ({
-          ...d,
-          gym: e.target.value
-        }))} /></div><div style={{
-        display: "flex",
-        gap: S.s8
-      }}><div className={"field"} style={{
-          flex: 1
-        }}><label>{"State"}</label><select className={"inp"} value={draft.state || ""} onChange={e => setDraft(d => ({
-            ...d,
-            state: e.target.value
-          }))} style={{
-            cursor: "pointer"
-          }}><option value={""}>{"Select State"}</option>{["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"].map(s => <option key={s} value={s}>{s}</option>)}</select></div><div className={"field"} style={{
-          flex: 1
-        }}><label>{"Country"}</label><select className={"inp"} value={draft.country || "United States"} onChange={e => setDraft(d => ({
-            ...d,
-            country: e.target.value
-          }))} style={{
-            cursor: "pointer"
-          }}>{["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Mexico", "Brazil", "India", "Japan", "South Korea", "Philippines", "Other"].map(c => <option key={c} value={c}>{c}</option>)}</select></div></div><div className={"field"}><label>{"Running PB "}<span style={{
-            fontSize: FS.fs55,
-            opacity: .6
-          }}>{"("}{isMetric(draft.units || "imperial") ? "min/km" : "min/mi"}{")"}</span></label><input className={"inp"} type={"number"} min={"3"} max={"20"} step={"0.1"} placeholder={isMetric(draft.units || "imperial") ? "e.g. 5.2" : "e.g. 8.5"} value={draft.runningPB || ""} onChange={e => setDraft(d => ({
-          ...d,
-          runningPB: e.target.value ? parseFloat(e.target.value) : ""
-        }))} /></div></div>
+    {/* ── PREFERENCES ── */}
+    <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={"log-group-hdr"} style={{ cursor: "default" }}>
+        <div className={"log-group-icon"}>{"🌍"}</div>
+        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Preferences"}</div>
+      </div>
+      <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className={"field"}><label>{"Home Gym"}</label><input className={"inp"} placeholder={"Planet Fitness, Gold's Gym, Home…"} value={draft.gym || ""} onChange={e => setDraft(d => ({ ...d, gym: e.target.value }))} /></div>
+        <div style={{ display: "flex", gap: S.s8 }}>
+          <div className={"field"} style={{ flex: 1 }}><label>{"State"}</label><select className={"inp"} value={draft.state || ""} onChange={e => setDraft(d => ({ ...d, state: e.target.value }))} style={{ cursor: "pointer" }}><option value={""}>{"Select State"}</option>{["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+          <div className={"field"} style={{ flex: 1 }}><label>{"Country"}</label><select className={"inp"} value={draft.country || "United States"} onChange={e => setDraft(d => ({ ...d, country: e.target.value }))} style={{ cursor: "pointer" }}>{["United States","Canada","United Kingdom","Australia","Germany","France","Mexico","Brazil","India","Japan","South Korea","Philippines","Other"].map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+        </div>
+        <div className={"field"}><label>{"Running PB "}<span style={{ fontSize: FS.fs55, opacity: .6 }}>{"("}{isMetric(draft.units || "imperial") ? "min/km" : "min/mi"}{")"}</span></label><input className={"inp"} type={"number"} min={"3"} max={"20"} step={"0.1"} placeholder={isMetric(draft.units || "imperial") ? "e.g. 5.2" : "e.g. 8.5"} value={draft.runningPB || ""} onChange={e => setDraft(d => ({ ...d, runningPB: e.target.value ? parseFloat(e.target.value) : "" }))} /></div>
+      </div>
+    </div>
 
-    {
-      /* ── ABOUT YOU ── */
-    }<div><div className={"profile-rune-divider"} style={{
-        margin: "0 0 10px"
-      }}><span className={"profile-rune-label"}>{"⠿ About You ⠿"}</span></div><div className={"field"}><label>{"Personal Motto "}<span style={{
-            fontSize: FS.fs55,
-            opacity: .6
-          }}>{"(optional)"}</span></label><input className={"inp"} placeholder={"Your battle cry…"} value={draft.motto || ""} onChange={e => setDraft(d => ({
-          ...d,
-          motto: e.target.value
-        }))} /></div><div className={"field"}><label>{"Training Style"}</label><div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: S.s6,
-          marginTop: S.s4
-        }}>{[{
-            val: "heavy",
-            label: "Heavy Lifts"
-          }, {
-            val: "cardio",
-            label: "Cardio"
-          }, {
-            val: "sculpt",
-            label: "Sculpting"
-          }, {
-            val: "hiit",
-            label: "HIIT"
-          }, {
-            val: "mindful",
-            label: "Mindful"
-          }, {
-            val: "sport",
-            label: "Sport"
-          }, {
-            val: "mixed",
-            label: "Mixed"
-          }].map(o => <button key={o.val} className={`gender-btn ${(draft.trainingStyle || "") === o.val ? "sel" : ""}`} onClick={() => setDraft(d => ({
-            ...d,
-            trainingStyle: d.trainingStyle === o.val ? "" : o.val
-          }))}>{o.label}</button>)}</div></div><div className={"field"}><label>{"Workout Timing"}</label><div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: S.s6,
-          marginTop: S.s4
-        }}>{[{
-            val: "earlymorning",
-            label: "⚡ Early AM"
-          }, {
-            val: "morning",
-            label: "☀️ Morning"
-          }, {
-            val: "afternoon",
-            label: "Afternoon"
-          }, {
-            val: "evening",
-            label: "🌙 Evening"
-          }, {
-            val: "varies",
-            label: "Varies"
-          }].map(o => <button key={o.val} className={`gender-btn ${(draft.workoutTiming || "") === o.val ? "sel" : ""}`} onClick={() => setDraft(d => ({
-            ...d,
-            workoutTiming: d.workoutTiming === o.val ? "" : o.val
-          }))}>{o.label}</button>)}</div></div><div className={"field"}><label>{"Fitness Priorities "}<span style={{
-            fontSize: FS.fs55,
-            opacity: .6
-          }}>{"(pick up to 3)"}</span></label><div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: S.s4,
-          marginTop: S.s4
-        }}>{[{
-            val: "be_strong",
-            label: "💪 Strong"
-          }, {
-            val: "look_strong",
-            label: "🪞 Look Strong"
-          }, {
-            val: "feel_good",
-            label: "🌿 Feel Good"
-          }, {
-            val: "eat_right",
-            label: "🥗 Nutrition"
-          }, {
-            val: "mental_clarity",
-            label: "🧠 Clarity"
-          }, {
-            val: "athletic_perf",
-            label: "🏅 Performance"
-          }, {
-            val: "endurance",
-            label: "🔥 Endurance"
-          }, {
-            val: "longevity",
-            label: "🕊️ Longevity"
-          }, {
-            val: "competition",
-            label: "🏆 Compete"
-          }, {
-            val: "social",
-            label: "👥 Social"
-          }, {
-            val: "flexibility",
-            label: "🤸 Mobility"
-          }, {
-            val: "weight_loss",
-            label: "⚖️ Weight"
-          }].map(o => {
-            const active = (draft.fitnessPriorities || []).includes(o.val);
-            return <button key={o.val} className={`gender-btn ${active ? "sel" : ""}`} onClick={() => setDraft(d => {
-              const p = d.fitnessPriorities || [];
-              return {
-                ...d,
-                fitnessPriorities: active ? p.filter(x => x !== o.val) : p.length < 3 ? [...p, o.val] : p
-              };
-            })}>{o.label}</button>;
-          })}</div></div><div className={"field"}><label>{"Sports Background"}</label><div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: S.s4,
-          marginTop: S.s4
-        }}>{["Football", "Basketball", "Soccer", "Running", "Cycling", "Swimming", "Boxing", "MMA", "Wrestling", "CrossFit", "Powerlifting", "Bodybuilding", "Yoga", "Hiking", "Gymnastics", "Golf", "Triathlon", "Rowing", "Volleyball", "Tennis", "Dance"].map(s => {
-            const v = s.toLowerCase().replace(/ /g, "_");
-            const active = (draft.sportsBackground || []).includes(v);
-            return <button key={v} className={`gender-btn ${active ? "sel" : ""}`} style={{
-              fontSize: FS.fs62
-            }} onClick={() => setDraft(d => {
-              const b = d.sportsBackground || [];
-              return {
-                ...d,
-                sportsBackground: active ? b.filter(x => x !== v) : [...b, v]
-              };
-            })}>{s}</button>;
-          })}</div></div></div><button className={"btn btn-gold"} style={{
-      width: "100%"
-    }} onClick={saveEdit}>{"⚔️ Save Profile"}</button></div></>
+    {/* ── ABOUT YOU ── */}
+    <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={"log-group-hdr"} style={{ cursor: "default" }}>
+        <div className={"log-group-icon"}>{"🌿"}</div>
+        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"About You"}</div>
+      </div>
+      <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className={"field"}><label>{"Personal Motto "}<span style={{ fontSize: FS.fs55, opacity: .6 }}>{"(optional)"}</span></label><input className={"inp"} placeholder={"Your battle cry…"} value={draft.motto || ""} onChange={e => setDraft(d => ({ ...d, motto: e.target.value }))} /></div>
+        <div className={"field"}><label>{"Training Style"}</label><div style={{ display: "flex", flexWrap: "wrap", gap: S.s6, marginTop: S.s4 }}>{[{ val: "heavy", label: "Heavy Lifts" }, { val: "cardio", label: "Cardio" }, { val: "sculpt", label: "Sculpting" }, { val: "hiit", label: "HIIT" }, { val: "mindful", label: "Mindful" }, { val: "sport", label: "Sport" }, { val: "mixed", label: "Mixed" }].map(o => <button key={o.val} className={`gender-btn ${(draft.trainingStyle || "") === o.val ? "sel" : ""}`} onClick={() => setDraft(d => ({ ...d, trainingStyle: d.trainingStyle === o.val ? "" : o.val }))}>{o.label}</button>)}</div></div>
+        <div className={"field"}><label>{"Workout Timing"}</label><div style={{ display: "flex", flexWrap: "wrap", gap: S.s6, marginTop: S.s4 }}>{[{ val: "earlymorning", label: "⚡ Early AM" }, { val: "morning", label: "☀️ Morning" }, { val: "afternoon", label: "Afternoon" }, { val: "evening", label: "🌙 Evening" }, { val: "varies", label: "Varies" }].map(o => <button key={o.val} className={`gender-btn ${(draft.workoutTiming || "") === o.val ? "sel" : ""}`} onClick={() => setDraft(d => ({ ...d, workoutTiming: d.workoutTiming === o.val ? "" : o.val }))}>{o.label}</button>)}</div></div>
+        <div className={"field"}><label>{"Fitness Priorities "}<span style={{ fontSize: FS.fs55, opacity: .6 }}>{"(pick up to 3)"}</span></label><div style={{ display: "flex", flexWrap: "wrap", gap: S.s4, marginTop: S.s4 }}>{[{ val: "be_strong", label: "💪 Strong" }, { val: "look_strong", label: "🪞 Look Strong" }, { val: "feel_good", label: "🌿 Feel Good" }, { val: "eat_right", label: "🥗 Nutrition" }, { val: "mental_clarity", label: "🧠 Clarity" }, { val: "athletic_perf", label: "🏅 Performance" }, { val: "endurance", label: "🔥 Endurance" }, { val: "longevity", label: "🕊️ Longevity" }, { val: "competition", label: "🏆 Compete" }, { val: "social", label: "👥 Social" }, { val: "flexibility", label: "🤸 Mobility" }, { val: "weight_loss", label: "⚖️ Weight" }].map(o => { const active = (draft.fitnessPriorities || []).includes(o.val); return <button key={o.val} className={`gender-btn ${active ? "sel" : ""}`} onClick={() => setDraft(d => { const p = d.fitnessPriorities || []; return { ...d, fitnessPriorities: active ? p.filter(x => x !== o.val) : p.length < 3 ? [...p, o.val] : p }; })}>{o.label}</button>; })}</div></div>
+        <div className={"field"}><label>{"Sports Background"}</label><div style={{ display: "flex", flexWrap: "wrap", gap: S.s4, marginTop: S.s4 }}>{["Football","Basketball","Soccer","Running","Cycling","Swimming","Boxing","MMA","Wrestling","CrossFit","Powerlifting","Bodybuilding","Yoga","Hiking","Gymnastics","Golf","Triathlon","Rowing","Volleyball","Tennis","Dance"].map(s => { const v = s.toLowerCase().replace(/ /g, "_"); const active = (draft.sportsBackground || []).includes(v); return <button key={v} className={`gender-btn ${active ? "sel" : ""}`} style={{ fontSize: FS.fs62 }} onClick={() => setDraft(d => { const b = d.sportsBackground || []; return { ...d, sportsBackground: active ? b.filter(x => x !== v) : [...b, v] }; })}>{s}</button>; })}</div></div>
+      </div>
+    </div>
+
+  </div>
+</>}
+
 
 
 /* ── NOTIFICATION PREFERENCES ─────────────────── */}{notifMode && <><div style={{
