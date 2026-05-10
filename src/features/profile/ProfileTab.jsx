@@ -1068,7 +1068,6 @@ return (
           userSelect: "none"
         }} onClick={() => setShowPrivateId(s => !s)}>{showPrivateId ? "Hide" : "Show"}</span></div></div></div>
       </div>
-    </div>
 
   {
     /* ═══ CHANGE EMAIL — collapsible ═══ */
