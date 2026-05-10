@@ -84,12 +84,11 @@ const DAY_ABBREVS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 // SVG bar chart showing the last 7 days of a Whoop metric + a dashed average line.
 function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', clsColor }) {
   if (!historyData || historyData.length === 0) return null;
-  const points = historyData
-    .map(row => ({ date: row.date, value: extractValue(row.payload) }))
-    .filter(d => _isNum(d.value));
-  if (points.length === 0) return null;
+  const points = historyData.map(row => ({ date: row.date, value: extractValue(row.payload) }));
+  const numeric = points.filter(d => _isNum(d.value));
+  if (numeric.length === 0) return null;
 
-  const avg = points.reduce((s, p) => s + p.value, 0) / points.length;
+  const avg = numeric.reduce((s, p) => s + p.value, 0) / numeric.length;
   const W = 280, H = 72;
   const padL = 4, padR = 4, padT = 6, padB = 18;
   const chartH = H - padT - padB;
@@ -117,13 +116,14 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
         {Array.from({ length: 7 }, (_, i) => {
           const p = points[i];
           const x = padL + i * colW + (colW - barW) / 2;
-          if (!p) {
+          if (!p || !_isNum(p.value)) {
+            const emptyLabel = p ? DAY_ABBREVS[new Date(p.date + 'T12:00:00').getDay()] : '—';
             return (
               <g key={i}>
                 <rect x={x} y={padT + chartH - 2} width={barW} height={2} rx={1}
                   fill="rgba(180,172,158,.06)" />
                 <text x={x + barW / 2} y={H - 3} textAnchor="middle"
-                  fontFamily="Inter,sans-serif" fontSize="7" fill="rgba(180,172,158,.25)">—</text>
+                  fontFamily="Inter,sans-serif" fontSize="7" fill="rgba(180,172,158,.25)">{emptyLabel}</text>
               </g>
             );
           }
@@ -141,7 +141,7 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
             </g>
           );
         })}
-        {points.length > 1 && (
+        {numeric.length > 1 && (
           <line x1={padL} y1={avgY} x2={W - padR} y2={avgY}
             stroke={clsColor} strokeWidth={1} strokeDasharray="3,3" opacity={0.55} />
         )}
