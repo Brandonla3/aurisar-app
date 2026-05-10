@@ -5426,9 +5426,6 @@ function App() {
         display: "flex",
         flexDirection: "column",
         paddingBottom: 0
-      } : editMode && activeTab === "profile" ? {
-        WebkitMaskImage: "none",
-        maskImage: "none",
       } : {}}>{activeTab === "workout" && <>
 
           {

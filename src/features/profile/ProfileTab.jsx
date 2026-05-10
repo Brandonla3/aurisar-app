@@ -1574,26 +1574,40 @@ return (
 
 {/* ── PROFILE EDIT ─────────────────────── */}{editMode && <>
 
-  {/* Sticky header: title + cancel + save */}
+  {/* In-flow header — visible immediately on entering edit mode */}
   <div style={{
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: S.s8,
     marginBottom: S.s12,
-    padding: "8px 0",
-    background: "rgba(10,9,8,.96)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
+    padding: "2px 0",
   }}>
     <div className={"sec"} style={{ margin: 0, border: "none", padding: S.s0 }}>{"✎ Edit Profile"}</div>
-    <div style={{ display: "flex", gap: S.s8, alignItems: "center" }}>
-      <button className={"btn btn-ghost btn-sm"} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button>
-      <button className={"btn btn-gold btn-sm"} onClick={saveEdit}>{"⚔️ Save"}</button>
-    </div>
+    <button className={"btn btn-ghost btn-sm"} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button>
+  </div>
+
+  {/* Floating save bar — fixed above the bottom nav, always reachable while scrolling */}
+  <div style={{
+    position: "fixed",
+    bottom: "calc(var(--bottom-nav-h) + 10px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "calc(100% - 32px)",
+    maxWidth: 488,
+    zIndex: 90,
+    display: "flex",
+    gap: S.s8,
+    padding: "10px 14px",
+    background: "rgba(14,13,10,.95)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    borderRadius: 14,
+    border: `1px solid color-mix(in srgb,${cls.color} 18%,rgba(180,172,158,.08))`,
+    boxShadow: "0 -4px 24px rgba(0,0,0,.45)",
+  }}>
+    <button className={"btn btn-ghost btn-sm"} style={{ flex: 1 }} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button>
+    <button className={"btn btn-gold"} style={{ flex: 2 }} onClick={saveEdit}>{"⚔️ Save Profile"}</button>
   </div>
 
   {/* Edit sections — styled as log-group-cards to match the profile view */}
@@ -1711,6 +1725,8 @@ return (
     </div>
 
   </div>
+  {/* Extra space so the floating save bar doesn't cover the last card */}
+  <div style={{ height: 80 }} />
 </>}
 
 
