@@ -17,6 +17,15 @@
 import { AssetLibrary }    from './AssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
 import { mergeConfig }     from './avatarSchema.js';
+import {
+  TileLoader,
+  ProceduralTileProvider,
+  buildTileIndex,
+  streamingParams,
+} from '../streaming/index.js';
+// Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
+// validation runs in CI via src/features/world/config/validators.js.
+import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
 
 // ── Coordinate helpers ──────────────────────────────────────────────────────
 const SCALE       = 32;
@@ -680,11 +689,7 @@ export class BabylonWorldScene {
     this._setupShadows();
     this._setupSSAO();
 
-    this._buildTerrain();
-    this._buildHub();
-    this._buildTrees();
-    this._buildRocks();
-    this._buildPaths();
+    this._setupTileStreaming();
     this._buildDungeonEntrance();
     this._bindKeys();
 
@@ -907,152 +912,24 @@ export class BabylonWorldScene {
     }
   }
 
-  // ── Terrain ────────────────────────────────────────────────────────────────
+  // ── Tile streaming ─────────────────────────────────────────────────────────
+  // World geometry comes from the tile streamer driven by
+  // world_build_config.tiling_streaming. The ProceduralTileProvider builds
+  // a deterministic grass/tree/rock scatter per tile from its tile_id, so
+  // every player sees the same layout. A later slice will swap in a
+  // GlbTileProvider once Blender authoring lands.
 
-  _buildTerrain() {
-    const ground = BABYLON.MeshBuilder.CreateGround('ground', {
-      width: 200, height: 200, subdivisions: 2,
-    }, this.scene);
-    const m = this._stdMat('groundMat', new BABYLON.Color3(0.18, 0.30, 0.12));
-    m.specularColor = new BABYLON.Color3(0, 0, 0);
-    ground.material       = m;
-    ground.receiveShadows = true;
-  }
-
-  // ── Hub ────────────────────────────────────────────────────────────────────
-
-  _buildHub() {
-    const stone = this._stdMat('stone', new BABYLON.Color3(0.48, 0.48, 0.52));
-    const dark  = this._stdMat('dark',  new BABYLON.Color3(0.22, 0.22, 0.28));
-
-    const plat = BABYLON.MeshBuilder.CreateCylinder('platform', {
-      diameter: 22, height: 0.6, tessellation: 12,
-    }, this.scene);
-    plat.position.y     = 0.3;
-    plat.material       = stone;
-    plat.receiveShadows = true;
-    this._castShadow(plat);
-
-    [[-8, -8], [8, -8], [-8, 8], [8, 8]].forEach(([x, z], i) => {
-      const p = BABYLON.MeshBuilder.CreateBox(`p${i}`, {
-        width: 1.2, height: 4, depth: 1.2,
-      }, this.scene);
-      p.position.set(x, 2.6, z);
-      p.material = stone;
-      this._castShadow(p);
-
-      const cap = BABYLON.MeshBuilder.CreateCylinder(`cap${i}`, {
-        diameter: 1.6, height: 0.5, tessellation: 8,
-      }, this.scene);
-      cap.position.set(x, 4.85, z);
-      cap.material = stone;
-      this._castShadow(cap);
+  _setupTileStreaming() {
+    const provider = new ProceduralTileProvider(worldBuildConfig);
+    const params = streamingParams(worldBuildConfig);
+    const tileIndex = buildTileIndex(params, {
+      render: (id) => `/tiles/${id}_render.glb`, // unused by procedural provider
+      gameplay: (id) => `/tiles/${id}_gameplay.json`,
     });
+    this._tileLoader = new TileLoader(this.scene, worldBuildConfig, tileIndex, provider);
 
-    const ob = BABYLON.MeshBuilder.CreateBox('obelisk', {
-      width: 1.2, height: 8, depth: 1.2,
-    }, this.scene);
-    ob.position.set(0, 4.6, 0);
-    ob.material = dark;
-    this._castShadow(ob);
-
-    const tip = BABYLON.MeshBuilder.CreateCylinder('obeliskTip', {
-      diameterTop: 0, diameterBottom: 1.6, height: 2, tessellation: 4,
-    }, this.scene);
-    tip.position.set(0, 9.6, 0);
-    tip.material = dark;
-    this._castShadow(tip);
-
-    const gem = BABYLON.MeshBuilder.CreateSphere('gem', { diameter: 0.9, segments: 8 }, this.scene);
-    gem.position.set(0, 11, 0);
-    const gemMat = new BABYLON.StandardMaterial('gemMat', this.scene);
-    gemMat.diffuseColor  = new BABYLON.Color3(0.2, 0.4, 1.0);
-    gemMat.emissiveColor = new BABYLON.Color3(0.15, 0.35, 0.9);
-    gem.material = gemMat;
-
-    // Gem glow — always-on, independent of zone profile
-    const gemLight = new BABYLON.PointLight('gemLight', new BABYLON.Vector3(0, 11, 0), this.scene);
-    gemLight.diffuse   = new BABYLON.Color3(0.3, 0.5, 1.0);
-    gemLight.specular  = new BABYLON.Color3(0.15, 0.25, 0.5);
-    gemLight.intensity = 22;
-    gemLight.range     = 20;
-    const gPhase = Math.random() * Math.PI * 2;
-    this.scene.onBeforeRenderObservable.add(() => {
-      const t = performance.now() * 0.001;
-      gemLight.intensity = 22 * (1.0 + Math.sin(t * 2.0 + gPhase) * 0.15);
-    });
-  }
-
-  // ── Trees ──────────────────────────────────────────────────────────────────
-
-  _buildTrees() {
-    const trunkMat = this._stdMat('trunk', new BABYLON.Color3(0.35, 0.22, 0.10));
-    const leafA    = this._stdMat('leafA', new BABYLON.Color3(0.14, 0.42, 0.14));
-    const leafB    = this._stdMat('leafB', new BABYLON.Color3(0.10, 0.32, 0.10));
-
-    const positions = [
-      [18, 12], [-15, 22], [28, -18], [-22, -12], [10, 34],
-      [38,  8], [-32, 18], [22, -34], [ -8, -28], [42, 28],
-      [-40, -5], [14, -40], [-28, 38], [35, -25], [-18, -42],
-      [50, 15], [-45, 20], [12, 48], [-50, -30], [25, 50],
-    ];
-
-    positions.forEach(([x, z], i) => {
-      const h = 2.8 + (i % 3) * 0.7;
-      const r = 1.0 + (i % 4) * 0.12;
-
-      const trunk = BABYLON.MeshBuilder.CreateCylinder(`trunk${i}`, {
-        diameterTop: 0.25, diameterBottom: 0.45, height: h, tessellation: 6,
-      }, this.scene);
-      trunk.position.set(x, h / 2, z);
-      trunk.material = trunkMat;
-      this._castShadow(trunk);
-
-      [[0, r * 1.4, leafA], [1.5, r, leafB]].forEach(([yOff, diam, mat], j) => {
-        const c = BABYLON.MeshBuilder.CreateCylinder(`leaf${i}_${j}`, {
-          diameterTop: 0, diameterBottom: diam, height: 2.2, tessellation: 6,
-        }, this.scene);
-        c.position.set(x, h + yOff, z);
-        c.material = mat;
-        this._castShadow(c);
-      });
-    });
-  }
-
-  // ── Rocks ──────────────────────────────────────────────────────────────────
-
-  _buildRocks() {
-    const mat = this._stdMat('rock', new BABYLON.Color3(0.42, 0.42, 0.44));
-    [
-      [12, 10], [-9, 18], [20, -10], [-17, -22], [32, -6],
-      [-25, 6], [7, -32], [-38, 25], [28, 38], [-12, 45],
-    ].forEach(([x, z], i) => {
-      const d    = 0.8 + (i % 3) * 0.5;
-      const rock = BABYLON.MeshBuilder.CreateSphere(`rock${i}`, {
-        diameter: d, segments: 3,
-      }, this.scene);
-      rock.position.set(x, d * 0.25, z);
-      rock.scaling.y  = 0.55;
-      rock.rotation.y = i * 0.9;
-      rock.material   = mat;
-      this._castShadow(rock);
-    });
-  }
-
-  // ── Paths ──────────────────────────────────────────────────────────────────
-
-  _buildPaths() {
-    const mat = this._stdMat('path', new BABYLON.Color3(0.38, 0.38, 0.40));
-    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz], di) => {
-      for (let i = 1; i <= 8; i++) {
-        const s = BABYLON.MeshBuilder.CreateBox(`stone${di}_${i}`, {
-          width: 1.8, height: 0.08, depth: 1.8,
-        }, this.scene);
-        s.position.set(dx * (12 + i * 3), 0.04, dz * (12 + i * 3));
-        s.rotation.y = (i * 0.2) % 0.3;
-        s.material   = mat;
-      }
-    });
+    // Seed the initial ring synchronously enough to be visible on first frame.
+    this._tileLoader.stream({ x: 0, z: 0 });
   }
 
   // ── Dungeon entrance ───────────────────────────────────────────────────────
@@ -1157,6 +1034,7 @@ export class BabylonWorldScene {
     this._moveLocal(dt);
     this._local.update(dt);
     this._checkDungeonProximity();
+    this._streamTiles();
     this._trackCamera();
     this._syncStdb();
 
@@ -1164,6 +1042,14 @@ export class BabylonWorldScene {
       this._lerpRemote(rp, dt);
       rp.update(dt);
     });
+  }
+
+  // stream() is a no-op while the player stays inside the current tile —
+  // safe to call every frame.
+  _streamTiles() {
+    const p = this._local?.root?.position;
+    if (!p || !this._tileLoader) return;
+    this._tileLoader.stream({ x: p.x, z: p.z });
   }
 
   _moveLocal(dt) {
@@ -1389,6 +1275,7 @@ export class BabylonWorldScene {
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     this._local?.dispose();
     AssetLibrary.dispose();
+    this._tileLoader?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
     this.engine.dispose();

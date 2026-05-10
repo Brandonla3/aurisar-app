@@ -1,13 +1,18 @@
 /**
  * TileLoader — owns the lifecycle of streamed world tiles.
  *
- * Pure-infra: this class is not yet wired into BabylonWorldScene. The next
- * slice will instantiate one against the live scene and call stream() each
- * time the player crosses a tile boundary.
+ * Provider abstraction: TileLoader doesn't know how to produce tile
+ * content. It delegates to a provider with a single async method
+ * `load(meta, scene)` that returns a Babylon AssetContainer (or any
+ * object exposing addAllToScene/removeAllFromScene/dispose).
  *
- * Babylon is consumed via the global pollution from `import BABYLON from
- * 'babylonjs'` elsewhere in the bundle, matching the convention used by
- * AssetLibrary.js.
+ * Providers shipped today:
+ *  - GlbTileProvider:        downloads meta.renderUrl as a GLB
+ *  - ProceduralTileProvider: builds tile geometry deterministically from id
+ *
+ * Babylon is consumed via the global pollution from
+ * `import BABYLON from 'babylonjs'` elsewhere in the bundle, matching the
+ * convention used by AssetLibrary.js.
  */
 
 /* global BABYLON */
@@ -15,10 +20,14 @@
 import { streamingParams, worldToTile, getNeighborhood } from './tileMath.js';
 
 export class TileLoader {
-  constructor(scene, config, tileIndex) {
+  constructor(scene, config, tileIndex, provider) {
+    if (!provider || typeof provider.load !== 'function') {
+      throw new Error('TileLoader: provider with .load(meta, scene) is required');
+    }
     this.scene = scene;
     this.params = streamingParams(config);
     this.tileIndex = tileIndex;
+    this.provider = provider;
     this.loaded = new Map();
     this.inFlight = new Map();
     this.lastCenter = null;
@@ -40,11 +49,7 @@ export class TileLoader {
     const meta = this.tileIndex[id];
     if (!meta) return;
 
-    const lastSlash = meta.renderUrl.lastIndexOf('/');
-    const dir = lastSlash >= 0 ? meta.renderUrl.slice(0, lastSlash + 1) : '';
-    const file = lastSlash >= 0 ? meta.renderUrl.slice(lastSlash + 1) : meta.renderUrl;
-
-    const promise = BABYLON.SceneLoader.LoadAssetContainerAsync(dir, file, this.scene)
+    const promise = Promise.resolve(this.provider.load(meta, this.scene))
       .then((container) => {
         container.addAllToScene();
         for (const mesh of container.meshes) {
