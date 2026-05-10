@@ -53,7 +53,7 @@ const spacetimedb = schema({
       isMoving:    t.bool(),       // for animation state
       zoneId:      t.u8(),         // 0=hub 1=training 2=plaza
       online:      t.bool(),       // true while connection is active
-      lastChatAt:  t.u64(),        // micros since unix epoch of last sendChat — used for server-side rate limit
+      lastChatAt:  t.u64().default(0n), // micros since unix epoch of last sendChat — default 0n so existing rows backfill non-destructively
     }
   ),
 
