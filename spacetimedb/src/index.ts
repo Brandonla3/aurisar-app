@@ -6,9 +6,28 @@
  *
  * Deploy:  spacetime publish --server mainnet aurisar-world
  * Regen:   spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings
+ *
+ * Coordinate system (must stay in sync with the client):
+ *   STDB px → world units:   (px - 1600) / 32     (client toWorld)
+ *   world units → STDB px:   units * 32 + 1600    (client toStdb)
+ *   Spawn at STDB (1600, 1600) = world origin.
+ *
+ * World bounds match world_build_config.tiling_streaming.world_bounds_m
+ * (canonical: src/features/world/config/world_build_config.json):
+ *   world_bounds_m: ±1000 world units (2km × 2km playable area)
+ *   In STDB px:      1600 ± 32000 → [-30400, 33600]
+ *   With 32 px (= 1 world unit) player half-width buffer: clamp to
+ *   [-30368, 33568] on both axes.
  */
 
 import { schema, table, t } from 'spacetimedb/server';
+
+// World bounds in STDB px. Derived from world_build_config — see header.
+const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
+const WORLD_CENTER_PX = 1600;       // legacy origin offset (matches client STDB_CENTER)
+const PLAYER_HALF_PX = 32;          // 1 world unit player half-width
+const WORLD_MIN_PX = WORLD_CENTER_PX - WORLD_HALF_PX + PLAYER_HALF_PX; // -30368
+const WORLD_MAX_PX = WORLD_CENTER_PX + WORLD_HALF_PX - PLAYER_HALF_PX; // 33568
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCHEMA
@@ -145,9 +164,10 @@ export const movePlayer = spacetimedb.reducer(
     const existing = ctx.db.player.identity.find(identity);
     if (!existing) return; // player hasn't called setPlayerInfo yet
 
-    // World bounds: 3200x3200 px, with 32px border padding
-    const clampedX = Math.max(32, Math.min(3168, x));
-    const clampedY = Math.max(32, Math.min(3168, y));
+    // World bounds: 64000x64000 px (2km x 2km world), with 32px player half-width buffer.
+    // See header for derivation from world_build_config.tiling_streaming.
+    const clampedX = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
+    const clampedY = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
 
     // Zone detection based on position
     const zoneId = detectZone(clampedX, clampedY);
@@ -245,15 +265,18 @@ export const clientDisconnected = spacetimedb.clientDisconnected((ctx) => {
 /**
  * Returns the zone ID for a given world position.
  *
- * World layout (3200 × 3200 px):
- *   Zone 0 — The Aurisar Hub:     center (1200-2000, 1200-2000)
- *   Zone 1 — Training Grounds:    top-left (0-1200, 0-1200)
- *   Zone 2 — Leaderboard Plaza:   bottom-right (2000-3200, 2000-3200)
- *   Zone 3 — Wilderness:          everywhere else
+ * Original gameplay zones occupy the inner 3200×3200 px area (their fixed
+ * STDB px ranges). The surrounding 2km × 2km world is all Wilderness — that
+ * is where the castle-approach biome lives and where future zones can attach.
+ *
+ *   Zone 0 — The Aurisar Hub:     (1200-2000, 1200-2000)
+ *   Zone 1 — Training Grounds:    (0-1200, 0-1200)
+ *   Zone 2 — Leaderboard Plaza:   (2000-3200, 2000-3200)
+ *   Zone 3 — Wilderness:          everywhere else, including all new bounds
  */
 function detectZone(x: number, y: number): number {
   if (x >= 1200 && x <= 2000 && y >= 1200 && y <= 2000) return 0; // Hub
-  if (x <= 1200 && y <= 1200) return 1; // Training
-  if (x >= 2000 && y >= 2000) return 2; // Plaza
+  if (x >= 0 && x <= 1200 && y >= 0 && y <= 1200) return 1;       // Training
+  if (x >= 2000 && x <= 3200 && y >= 2000 && y <= 3200) return 2; // Plaza
   return 3; // Wilderness
 }
