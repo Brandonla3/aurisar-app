@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Profile Redesign — 5 Mockups</title>
 <style>
-  /* ── Shared base ── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --bg: #0e0d0a;
@@ -26,7 +25,6 @@
     --green: #2ecc71;
     --red: #e74c3c;
     --cls: #C49428;
-    --cls-glow: rgba(196,148,40,.25);
     --radius: 11px;
     --radius-sm: 7px;
   }
@@ -38,7 +36,7 @@
     line-height: 1.5;
   }
 
-  /* ── Nav to switch mockups ── */
+  /* Mockup switcher nav */
   .mockup-nav {
     position: sticky;
     top: 0;
@@ -53,7 +51,16 @@
     scrollbar-width: none;
   }
   .mockup-nav::-webkit-scrollbar { display: none; }
-  .mockup-nav-title { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; margin-right: 4px; flex-shrink: 0; }
+  .mockup-nav-title {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
   .nav-btn {
     flex-shrink: 0;
     padding: 5px 12px;
@@ -66,11 +73,12 @@
     cursor: pointer;
     transition: all .15s;
     white-space: nowrap;
+    font-family: inherit;
   }
   .nav-btn:hover { border-color: var(--border2); color: var(--text2); }
   .nav-btn.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
 
-  /* ── Mockup wrapper ── */
+  /* Mockup panels */
   .mockup-panel { display: none; padding: 16px; max-width: 480px; margin: 0 auto; }
   .mockup-panel.visible { display: block; }
   .mockup-label {
@@ -85,7 +93,7 @@
   }
   .mockup-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-  /* ── Shared component atoms ── */
+  /* Shared atoms */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -119,26 +127,6 @@
     color: var(--text2);
   }
   .badge-green { background: rgba(46,204,113,.1); border-color: rgba(46,204,113,.3); color: #6ddfaa; }
-  .rune-divider {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 8px;
-  }
-  .rune-divider::before, .rune-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-  .rune-label {
-    font-size: 9.5px;
-    color: var(--muted);
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    font-weight: 600;
-  }
   .stat-row {
     display: flex;
     align-items: baseline;
@@ -149,8 +137,6 @@
   .stat-row:last-child { border-bottom: none; }
   .stat-label { font-size: 12px; color: var(--muted); width: 80px; flex-shrink: 0; }
   .stat-val { font-size: 13px; color: var(--text2); font-family: 'Inter', monospace; }
-
-  /* combat chips shared */
   .combat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .combat-chip {
     display: flex;
@@ -164,8 +150,6 @@
   }
   .chip-val { font-size: 17px; font-weight: 700; color: var(--text); }
   .chip-lbl { font-size: 9.5px; color: var(--muted); letter-spacing: .06em; text-align: center; }
-
-  /* whoop data grid */
   .whoop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
   .whoop-card {
     background: var(--surface);
@@ -173,14 +157,13 @@
     border-radius: var(--radius-sm);
     padding: 9px 10px;
   }
-  .whoop-card-title { font-size: 10.5px; font-weight: 700; color: var(--text2); margin-bottom: 5px; letter-spacing: .04em; }
+  .whoop-card-title { font-size: 10.5px; font-weight: 700; color: var(--text2); margin-bottom: 5px; }
   .whoop-row { display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; margin-bottom: 2px; }
   .whoop-row:last-child { margin-bottom: 0; }
   .whoop-key { color: var(--muted); }
   .whoop-val { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
 
-  /* ── MOCKUP 1 styles ── */
-  /* Tab bar for mockup 1 */
+  /* Mockup 1 */
   .m1-tab-bar {
     display: flex;
     gap: 0;
@@ -202,12 +185,11 @@
     cursor: pointer;
     transition: all .15s;
     white-space: nowrap;
+    user-select: none;
   }
-  .m1-tab.active {
-    background: var(--bg4);
-    color: var(--text);
-    box-shadow: 0 1px 4px rgba(0,0,0,.4);
-  }
+  .m1-tab.active { background: var(--bg4); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .m1-pane { display: none; }
+  .m1-pane.active { display: block; }
   .m1-accordion {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -230,13 +212,11 @@
   .m1-acc-meta { font-size: 11px; color: var(--dim); }
   .m1-acc-chevron { font-size: 11px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
   .m1-acc-chevron.open { transform: rotate(180deg); }
-  .m1-acc-body {
-    padding: 0 14px 12px;
-    border-top: 1px solid var(--border);
-  }
+  .m1-acc-body { padding: 0 14px 12px; border-top: 1px solid var(--border); display: none; }
+  .m1-acc-body.open { display: block; }
   .m1-acc-body-inner { padding-top: 10px; }
 
-  /* ── MOCKUP 2 styles ── */
+  /* Mockup 2 */
   .m2-hero {
     background: var(--bg3);
     border: 1px solid var(--border);
@@ -245,23 +225,14 @@
     margin-bottom: 10px;
   }
   .m2-avatar {
-    width: 52px;
-    height: 52px;
+    width: 52px; height: 52px;
     border-radius: 50%;
     background: var(--surface2);
     border: 2px solid rgba(196,148,40,.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
   }
-  .m2-action-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin-bottom: 12px;
-  }
+  .m2-action-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 12px; }
   .m2-action-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -273,34 +244,25 @@
   }
   .m2-action-card:hover { border-color: var(--border2); background: var(--surface2); }
   .m2-action-icon { font-size: 18px; display: block; margin-bottom: 3px; }
-  .m2-action-label { font-size: 10.5px; color: var(--muted); font-weight: 600; letter-spacing: .04em; }
-  .m2-section {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    margin-bottom: 10px;
-  }
+  .m2-action-label { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .m2-section { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 10px; }
   .m2-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     cursor: pointer;
+    user-select: none;
   }
+  .m2-section-header:hover { background: var(--surface2); }
   .m2-section-title { font-size: 12px; font-weight: 700; color: var(--text2); letter-spacing: .05em; text-transform: uppercase; }
-  .m2-section-body { padding: 12px 14px; }
+  .m2-section-body { padding: 12px 14px; display: none; }
+  .m2-section-body.open { display: block; }
 
-  /* ── MOCKUP 3 styles ── */
+  /* Mockup 3 */
   .m3-pill-nav {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-    margin-bottom: 12px;
+    display: flex; gap: 6px; overflow-x: auto;
+    scrollbar-width: none; padding-bottom: 2px; margin-bottom: 12px;
   }
   .m3-pill-nav::-webkit-scrollbar { display: none; }
   .m3-pill {
@@ -310,86 +272,49 @@
     border: 1px solid var(--border);
     background: transparent;
     color: var(--muted);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .15s;
-    white-space: nowrap;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+    white-space: nowrap; user-select: none;
+    font-family: inherit;
   }
-  .m3-pill.active {
-    background: var(--bg4);
-    border-color: rgba(196,148,40,.35);
-    color: var(--gold);
-  }
-  .m3-card {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 13px 14px;
-    margin-bottom: 8px;
-  }
+  .m3-pill.active { background: var(--bg4); border-color: rgba(196,148,40,.35); color: var(--gold); }
+  .m3-pane { display: none; }
+  .m3-pane.active { display: block; }
+  .m3-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 14px; margin-bottom: 8px; }
   .m3-card-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-    cursor: pointer;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    cursor: pointer; user-select: none;
   }
   .m3-card-header-icon { font-size: 14px; }
   .m3-card-header-title { font-size: 12.5px; font-weight: 700; color: var(--text2); flex: 1; }
   .m3-card-header-collapse { font-size: 10px; color: var(--dim); padding: 3px 7px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); }
+  .m3-card-body { display: block; }
+  .m3-card-body.collapsed { display: none; }
   .m3-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 14px; }
 
-  /* ── MOCKUP 4 styles ── */
+  /* Mockup 4 */
   .m4-page-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 0;
-    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; margin-bottom: 14px;
     border-bottom: 1px solid var(--border);
   }
   .m4-avatar-ring {
-    width: 54px;
-    height: 54px;
-    border-radius: 50%;
-    background: var(--surface2);
-    border: 2px solid rgba(196,148,40,.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    position: relative;
-    flex-shrink: 0;
+    width: 54px; height: 54px; border-radius: 50%;
+    background: var(--surface2); border: 2px solid rgba(196,148,40,.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; position: relative; flex-shrink: 0;
   }
   .m4-class-dot {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--cls);
-    border: 2px solid var(--bg);
+    position: absolute; bottom: 0; right: 0;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--cls); border: 2px solid var(--bg);
   }
-  .m4-section {
-    margin-bottom: 6px;
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
+  .m4-section { margin-bottom: 6px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
   .m4-section-toggle {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    background: var(--surface);
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    transition: background .12s;
-    font-family: inherit;
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--surface);
+    border: none; text-align: left; cursor: pointer;
+    transition: background .12s; font-family: inherit;
   }
   .m4-section-toggle:hover { background: var(--surface2); }
   .m4-section-icon { font-size: 15px; flex-shrink: 0; }
@@ -398,92 +323,48 @@
   .m4-section-hint { font-size: 10.5px; color: var(--dim); margin-top: 1px; }
   .m4-section-arrow { font-size: 11px; color: var(--dim); transition: transform .2s; }
   .m4-section-arrow.open { transform: rotate(90deg); }
-  .m4-section-body { padding: 12px 14px; background: var(--bg3); border-top: 1px solid var(--border); }
-  .m4-quick-stats {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-    margin-bottom: 12px;
-  }
+  .m4-section-body { padding: 12px 14px; background: var(--bg3); border-top: 1px solid var(--border); display: none; }
+  .m4-section-body.open { display: block; }
+  .m4-quick-stats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 12px; }
   .m4-quick-stats::-webkit-scrollbar { display: none; }
   .m4-stat-pill {
-    flex-shrink: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    text-align: center;
-    min-width: 64px;
+    flex-shrink: 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; text-align: center; min-width: 64px;
   }
   .m4-stat-val { font-size: 16px; font-weight: 700; color: var(--text); display: block; }
-  .m4-stat-lbl { font-size: 9.5px; color: var(--muted); letter-spacing: .04em; display: block; margin-top: 1px; }
+  .m4-stat-lbl { font-size: 9.5px; color: var(--muted); display: block; margin-top: 1px; }
 
-  /* ── MOCKUP 5 styles ── */
+  /* Mockup 5 */
   .m5-hero-band {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 12px;
   }
   .m5-avatar {
-    width: 50px;
-    height: 50px;
-    border-radius: 14px;
-    background: var(--bg4);
-    border: 1px solid rgba(196,148,40,.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
+    width: 50px; height: 50px; border-radius: 14px;
+    background: var(--bg4); border: 1px solid rgba(196,148,40,.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
   }
   .m5-tab-strip {
-    display: flex;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    margin-bottom: 12px;
-    background: var(--surface);
+    display: flex; border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 12px; background: var(--surface);
   }
   .m5-tab {
-    flex: 1;
-    padding: 8px 4px;
-    text-align: center;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
-    cursor: pointer;
-    border-right: 1px solid var(--border);
-    transition: all .15s;
-    white-space: nowrap;
-    background: transparent;
+    flex: 1; padding: 8px 4px; text-align: center;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    cursor: pointer; border-right: 1px solid var(--border);
+    transition: all .15s; white-space: nowrap; background: transparent;
+    user-select: none;
   }
   .m5-tab:last-child { border-right: none; }
-  .m5-tab.active {
-    color: var(--text);
-    background: var(--bg4);
-    box-shadow: inset 0 -2px 0 rgba(196,148,40,.5);
-  }
-  .m5-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 8px;
-    overflow: hidden;
-  }
+  .m5-tab.active { color: var(--text); background: var(--bg4); box-shadow: inset 0 -2px 0 rgba(196,148,40,.5); }
+  .m5-pane { display: none; }
+  .m5-pane.active { display: block; }
+  .m5-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
   .m5-section-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 13px;
-    cursor: pointer;
+    display: flex; align-items: center; gap: 8px; padding: 10px 13px;
+    cursor: pointer; user-select: none; transition: background .12s;
   }
   .m5-section-head:hover { background: var(--surface2); }
   .m5-section-icon { font-size: 14px; }
@@ -491,50 +372,35 @@
   .m5-section-count { font-size: 10.5px; color: var(--dim); }
   .m5-section-caret { font-size: 10px; color: var(--dim); transition: transform .2s; }
   .m5-section-caret.open { transform: rotate(180deg); }
-  .m5-section-body { padding: 0 13px 12px; border-top: 1px solid var(--border); }
+  .m5-section-body { padding: 0 13px 12px; border-top: 1px solid var(--border); display: none; }
+  .m5-section-body.open { display: block; }
   .m5-section-body-inner { padding-top: 10px; }
   .m5-whoop-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 13px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface2);
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 13px; border-bottom: 1px solid var(--border); background: var(--surface2);
   }
-  .m5-whoop-logo { font-size: 22px; }
   .m5-whoop-info { flex: 1; }
   .m5-whoop-title { font-size: 13px; font-weight: 700; color: var(--text); }
   .m5-whoop-sub { font-size: 11px; color: #6ddfaa; }
   .m5-whoop-subtab-bar {
-    display: flex;
-    gap: 0;
-    padding: 8px 13px 0;
+    display: flex; padding: 8px 13px 0;
     border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
+    overflow-x: auto; scrollbar-width: none;
   }
   .m5-whoop-subtab-bar::-webkit-scrollbar { display: none; }
   .m5-wtab {
-    flex-shrink: 0;
-    padding: 6px 12px;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--muted);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all .15s;
-    white-space: nowrap;
+    flex-shrink: 0; padding: 6px 12px;
+    font-size: 11.5px; font-weight: 600; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .15s; white-space: nowrap; user-select: none;
   }
   .m5-wtab.active { color: var(--text); border-bottom-color: var(--cls); }
-  .m5-whoop-pane { padding: 12px 13px; }
+  .mw-pane { padding: 12px 13px; display: none; }
+  .mw-pane.active { display: block; }
   .m5-metric-list { display: flex; flex-direction: column; gap: 8px; }
   .m5-metric {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    background: var(--bg3);
-    border-radius: var(--radius-sm);
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; background: var(--bg3); border-radius: var(--radius-sm);
   }
   .m5-metric-icon { font-size: 18px; flex-shrink: 0; }
   .m5-metric-info { flex: 1; }
@@ -545,183 +411,174 @@
 </head>
 <body>
 
-<!-- ── Mockup switcher nav ── -->
 <nav class="mockup-nav">
   <span class="mockup-nav-title">Mockup</span>
-  <button class="nav-btn active" onclick="show(1)">1 · Tabbed + Accordion</button>
-  <button class="nav-btn" onclick="show(2)">2 · Hero + Cards</button>
-  <button class="nav-btn" onclick="show(3)">3 · Pill Nav + Collapse</button>
-  <button class="nav-btn" onclick="show(4)">4 · Full-Width Sections</button>
-  <button class="nav-btn" onclick="show(5)">5 · Whoop as Sub-Tab</button>
+  <button class="nav-btn active" data-mockup="1">1 · Tabbed + Accordion</button>
+  <button class="nav-btn" data-mockup="2">2 · Hero + Cards</button>
+  <button class="nav-btn" data-mockup="3">3 · Pill Nav + Collapse</button>
+  <button class="nav-btn" data-mockup="4">4 · Full-Width Sections</button>
+  <button class="nav-btn" data-mockup="5">5 · Whoop as Sub-Tab</button>
 </nav>
 
-<!-- ════════════════════════════════════════════════════════
-     MOCKUP 1 — Tabbed layout + collapsible accordions
-     ════════════════════════════════════════════════════════ -->
+
+<!-- ══════════════════════════════════════
+     MOCKUP 1 — Tabbed layout + Accordions
+     ══════════════════════════════════════ -->
 <div id="m1" class="mockup-panel visible">
   <div class="mockup-label">1 · Tabbed Layout + Collapsible Accordions</div>
 
-  <!-- Streak strip -->
   <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;">
     <span style="flex:1;font-size:12px;color:var(--text2)">🔥 <strong>14</strong> day streak</span>
     <button class="btn btn-sm">↺ Retro</button>
     <button class="btn btn-gold btn-sm">Check In</button>
   </div>
 
-  <!-- Top tab bar: Overview / Stats / Whoop / Security -->
   <div class="m1-tab-bar">
-    <div class="m1-tab active" onclick="m1Tab(this,'m1-overview')">Overview</div>
-    <div class="m1-tab" onclick="m1Tab(this,'m1-stats')">Stats</div>
-    <div class="m1-tab" onclick="m1Tab(this,'m1-whoop')">⌚ Whoop</div>
-    <div class="m1-tab" onclick="m1Tab(this,'m1-security')">🔒 Security</div>
+    <div class="m1-tab active" data-pane="m1-overview">Overview</div>
+    <div class="m1-tab" data-pane="m1-stats">Stats</div>
+    <div class="m1-tab" data-pane="m1-whoop">⌚ Whoop</div>
+    <div class="m1-tab" data-pane="m1-security">🔒 Security</div>
   </div>
 
-  <!-- OVERVIEW pane -->
-  <div id="m1-overview" class="m1-pane">
-
-    <!-- Identity accordion -->
+  <!-- OVERVIEW -->
+  <div id="m1-overview" class="m1-pane active">
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
+      <div class="m1-acc-header">
         <span class="m1-acc-icon">👤</span>
         <span class="m1-acc-title">Identity</span>
         <span class="m1-acc-meta">WarriorX · #4821</span>
         <span class="m1-acc-chevron open">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:block">
+      <div class="m1-acc-body open">
         <div class="m1-acc-body-inner">
           <div class="stat-row"><span class="stat-label">Display Name</span><span class="stat-val">WarriorX</span></div>
           <div class="stat-row"><span class="stat-label">Real Name</span><span class="stat-val" style="color:var(--dim);font-style:italic">Hidden</span></div>
           <div class="stat-row"><span class="stat-label">Account ID</span><span class="stat-val">#4821 <span style="color:var(--cls);cursor:pointer;font-size:11px">Copy</span></span></div>
-          <div class="stat-row"><span class="stat-label">Class</span><span class="stat-val">⚔️ Warrior</span></div>
+          <div class="stat-row"><span class="stat-label">Class</span><span class="stat-val">&#9876;&#65039; Warrior</span></div>
         </div>
       </div>
     </div>
 
-    <!-- Combat Record accordion -->
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">🏆</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#127942;</span>
         <span class="m1-acc-title">Combat Record</span>
         <span class="m1-acc-meta">Lv 24 · 12,400 XP</span>
         <span class="m1-acc-chevron open">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:block">
+      <div class="m1-acc-body open">
         <div class="m1-acc-body-inner">
           <div class="combat-grid">
             <div class="combat-chip"><span class="chip-val">12,400</span><span class="chip-lbl">Total XP</span></div>
             <div class="combat-chip"><span class="chip-val">24</span><span class="chip-lbl">Level</span></div>
-            <div class="combat-chip"><span class="chip-val">14🔥</span><span class="chip-lbl">Streak</span></div>
+            <div class="combat-chip"><span class="chip-val">14&#128293;</span><span class="chip-lbl">Streak</span></div>
             <div class="combat-chip"><span class="chip-val">187</span><span class="chip-lbl">Sessions</span></div>
             <div class="combat-chip"><span class="chip-val">8</span><span class="chip-lbl">Quests</span></div>
-            <div class="combat-chip" style="border-color:rgba(255,232,124,.2)"><span class="chip-val" style="color:var(--gold);font-size:14px">7:32 /mi</span><span class="chip-lbl">🏃 Run PB</span></div>
+            <div class="combat-chip" style="border-color:rgba(255,232,124,.2)"><span class="chip-val" style="color:var(--gold);font-size:14px">7:32 /mi</span><span class="chip-lbl">&#127939; Run PB</span></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- About You accordion (collapsed by default) -->
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">🌿</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#127807;</span>
         <span class="m1-acc-title">About You</span>
         <span class="m1-acc-meta">Motto · Priorities</span>
         <span class="m1-acc-chevron">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:none">
+      <div class="m1-acc-body">
         <div class="m1-acc-body-inner">
           <div style="font-size:13px;color:var(--text2);font-style:italic;text-align:center;margin-bottom:10px">"Train hard, recover harder."</div>
           <div class="stat-row"><span class="stat-label">Training</span><span class="stat-val">Heavy Compounds</span></div>
           <div style="margin-top:8px;font-size:11px;color:var(--muted);margin-bottom:5px">Fitness Priorities</div>
           <div style="display:flex;flex-wrap:wrap;gap:5px">
-            <span class="badge">💪 Being Strong</span>
-            <span class="badge">🔥 Endurance</span>
-            <span class="badge">🧠 Mental Clarity</span>
+            <span class="badge">&#128170; Being Strong</span>
+            <span class="badge">&#128293; Endurance</span>
+            <span class="badge">&#129504; Mental Clarity</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Quick actions -->
     <div style="display:flex;gap:6px;margin-top:4px">
-      <button class="btn" style="flex:1" onclick="">✎ Edit Profile</button>
-      <button class="btn" style="flex:1" onclick="">🔔 Alerts</button>
+      <button class="btn" style="flex:1">&#9998; Edit Profile</button>
+      <button class="btn" style="flex:1">&#128276; Alerts</button>
     </div>
   </div>
 
-  <!-- STATS pane (hidden) -->
-  <div id="m1-stats" class="m1-pane" style="display:none">
-    <!-- Personal Bests accordion -->
+  <!-- STATS -->
+  <div id="m1-stats" class="m1-pane">
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">🏆</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#127942;</span>
         <span class="m1-acc-title">Personal Bests</span>
         <span class="m1-acc-meta">5 lifts</span>
         <span class="m1-acc-chevron open">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:block">
+      <div class="m1-acc-body open">
         <div class="m1-acc-body-inner">
-          <div class="stat-row"><span style="font-size:14px;margin-right:4px">🏋️</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">🏆 185 lbs</span></div>
-          <div class="stat-row"><span style="font-size:14px;margin-right:4px">🦵</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">🏆 225 lbs</span></div>
-          <div class="stat-row"><span style="font-size:14px;margin-right:4px">⬆️</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">🏆 275 lbs</span></div>
-          <div class="stat-row"><span style="font-size:14px;margin-right:4px">🤸</span><span class="stat-val" style="flex:1">OHP</span><span style="font-size:12px;color:var(--text2);font-weight:600">🏆 115 lbs</span></div>
-          <div class="stat-row"><span style="font-size:14px;margin-right:4px">🏃</span><span class="stat-val" style="flex:1">Running</span><span style="font-size:12px;color:var(--text2);font-weight:600">🏆 7:32 /mi</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:4px">&#127947;</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">&#127942; 185 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:4px">&#129461;</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">&#127942; 225 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:4px">&#11014;&#65039;</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">&#127942; 275 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:4px">&#129340;</span><span class="stat-val" style="flex:1">OHP</span><span style="font-size:12px;color:var(--text2);font-weight:600">&#127942; 115 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:4px">&#127939;</span><span class="stat-val" style="flex:1">Running</span><span style="font-size:12px;color:var(--text2);font-weight:600">&#127942; 7:32 /mi</span></div>
         </div>
       </div>
     </div>
-    <!-- Physical Stats accordion -->
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">⚔️</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#9876;&#65039;</span>
         <span class="m1-acc-title">Warrior Data</span>
         <span class="m1-acc-meta">Body stats</span>
         <span class="m1-acc-chevron open">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:block">
+      <div class="m1-acc-body open">
         <div class="m1-acc-body-inner" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
-          <div class="stat-row"><span class="stat-label">⚖️ Weight</span><span class="stat-val">185 lbs</span></div>
-          <div class="stat-row"><span class="stat-label">📏 Height</span><span class="stat-val">5'11"</span></div>
-          <div class="stat-row"><span class="stat-label">🧬 BMI</span><span class="stat-val">25.8</span></div>
-          <div class="stat-row"><span class="stat-label">🎂 Age</span><span class="stat-val">28</span></div>
-          <div class="stat-row"><span class="stat-label">⚡ Units</span><span class="stat-val">Imperial</span></div>
-          <div class="stat-row"><span class="stat-label">👤 Gender</span><span class="stat-val">Male</span></div>
-          <div class="stat-row"><span class="stat-label">📍 State</span><span class="stat-val">CA</span></div>
-          <div class="stat-row"><span class="stat-label">🌍 Country</span><span class="stat-val">USA</span></div>
+          <div class="stat-row"><span class="stat-label">&#9878;&#65039; Weight</span><span class="stat-val">185 lbs</span></div>
+          <div class="stat-row"><span class="stat-label">&#128207; Height</span><span class="stat-val">5'11"</span></div>
+          <div class="stat-row"><span class="stat-label">&#129516; BMI</span><span class="stat-val">25.8</span></div>
+          <div class="stat-row"><span class="stat-label">&#127874; Age</span><span class="stat-val">28</span></div>
+          <div class="stat-row"><span class="stat-label">&#9889; Units</span><span class="stat-val">Imperial</span></div>
+          <div class="stat-row"><span class="stat-label">&#128100; Gender</span><span class="stat-val">Male</span></div>
+          <div class="stat-row"><span class="stat-label">&#128205; State</span><span class="stat-val">CA</span></div>
+          <div class="stat-row"><span class="stat-label">&#127758; Country</span><span class="stat-val">USA</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- WHOOP pane (hidden) -->
-  <div id="m1-whoop" class="m1-pane" style="display:none">
+  <!-- WHOOP -->
+  <div id="m1-whoop" class="m1-pane">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px">
-      <span style="font-size:20px">⌚</span>
+      <span style="font-size:20px">&#8987;</span>
       <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text)">Whoop</div><div style="font-size:11px;color:#6ddfaa">Connected — recovery, sleep &amp; strain</div></div>
-      <button class="btn btn-sm">↻ Sync</button>
+      <button class="btn btn-sm">&#8635; Sync</button>
     </div>
     <div class="whoop-grid">
       <div class="whoop-card">
-        <div class="whoop-card-title">💚 Recovery</div>
+        <div class="whoop-card-title">&#128154; Recovery</div>
         <div class="whoop-row"><span class="whoop-key">Score</span><span class="whoop-val">78%</span></div>
         <div class="whoop-row"><span class="whoop-key">HRV</span><span class="whoop-val">62.3 ms</span></div>
         <div class="whoop-row"><span class="whoop-key">Resting HR</span><span class="whoop-val">48 bpm</span></div>
-        <div class="whoop-row"><span class="whoop-key">SpO₂</span><span class="whoop-val">98%</span></div>
+        <div class="whoop-row"><span class="whoop-key">SpO2</span><span class="whoop-val">98%</span></div>
       </div>
       <div class="whoop-card">
-        <div class="whoop-card-title">😴 Sleep</div>
+        <div class="whoop-card-title">&#128564; Sleep</div>
         <div class="whoop-row"><span class="whoop-key">Performance</span><span class="whoop-val">82%</span></div>
         <div class="whoop-row"><span class="whoop-key">Efficiency</span><span class="whoop-val">91%</span></div>
-        <div class="whoop-row"><span class="whoop-key">Time in Bed</span><span class="whoop-val">7h 42m</span></div>
+        <div class="whoop-row"><span class="whoop-key">In Bed</span><span class="whoop-val">7h 42m</span></div>
         <div class="whoop-row"><span class="whoop-key">REM</span><span class="whoop-val">1h 28m</span></div>
       </div>
       <div class="whoop-card">
-        <div class="whoop-card-title">⚡ Day Strain</div>
+        <div class="whoop-card-title">&#9889; Day Strain</div>
         <div class="whoop-row"><span class="whoop-key">Strain</span><span class="whoop-val">14.2</span></div>
         <div class="whoop-row"><span class="whoop-key">Avg HR</span><span class="whoop-val">72 bpm</span></div>
         <div class="whoop-row"><span class="whoop-key">Max HR</span><span class="whoop-val">178 bpm</span></div>
         <div class="whoop-row"><span class="whoop-key">Energy</span><span class="whoop-val">2,140 kJ</span></div>
       </div>
       <div class="whoop-card">
-        <div class="whoop-card-title">🏋️ Last Workout</div>
+        <div class="whoop-card-title">&#127947; Last Workout</div>
         <div class="whoop-row"><span class="whoop-key">Strain</span><span class="whoop-val">16.8</span></div>
         <div class="whoop-row"><span class="whoop-key">Avg HR</span><span class="whoop-val">148 bpm</span></div>
         <div class="whoop-row"><span class="whoop-key">Duration</span><span class="whoop-val">52m</span></div>
@@ -730,16 +587,16 @@
     </div>
   </div>
 
-  <!-- SECURITY pane (hidden) -->
-  <div id="m1-security" class="m1-pane" style="display:none">
+  <!-- SECURITY -->
+  <div id="m1-security" class="m1-pane">
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">📧</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#128231;</span>
         <span class="m1-acc-title">Email</span>
         <span class="m1-acc-meta">user@example.com</span>
         <span class="m1-acc-chevron">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:none">
+      <div class="m1-acc-body">
         <div class="m1-acc-body-inner">
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Change your account email address.</div>
           <button class="btn" style="width:100%">Change Email</button>
@@ -747,26 +604,26 @@
       </div>
     </div>
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">🔑</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#128273;</span>
         <span class="m1-acc-title">Password</span>
         <span class="m1-acc-meta">Last changed 30d ago</span>
         <span class="m1-acc-chevron">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:none">
+      <div class="m1-acc-body">
         <div class="m1-acc-body-inner">
           <button class="btn" style="width:100%">Change Password</button>
         </div>
       </div>
     </div>
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">🛡️</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#128737;</span>
         <span class="m1-acc-title">Two-Factor Auth</span>
         <span class="m1-acc-meta"><span class="badge badge-green">Enabled</span></span>
         <span class="m1-acc-chevron">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:none">
+      <div class="m1-acc-body">
         <div class="m1-acc-body-inner">
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">MFA is active. <strong style="color:var(--text2)">8 recovery codes</strong> remaining.</div>
           <div style="display:flex;gap:6px">
@@ -777,13 +634,13 @@
       </div>
     </div>
     <div class="m1-accordion">
-      <div class="m1-acc-header" onclick="m1Toggle(this)">
-        <span class="m1-acc-icon">📱</span>
+      <div class="m1-acc-header">
+        <span class="m1-acc-icon">&#128241;</span>
         <span class="m1-acc-title">Phone</span>
         <span class="m1-acc-meta">Not set</span>
         <span class="m1-acc-chevron">▾</span>
       </div>
-      <div class="m1-acc-body" style="display:none">
+      <div class="m1-acc-body">
         <div class="m1-acc-body-inner">
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Optional — used for admin identity verification.</div>
           <button class="btn" style="width:100%">Add Phone Number</button>
@@ -794,27 +651,25 @@
 </div>
 
 
-<!-- ════════════════════════════════════════════════════════
-     MOCKUP 2 — Hero card + action shortcuts + section cards
-     ════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════
+     MOCKUP 2 — Hero + Section Cards
+     ══════════════════════════════════════ -->
 <div id="m2" class="mockup-panel">
   <div class="mockup-label">2 · Hero Card + Action Shortcuts + Section Cards</div>
 
-  <!-- Hero identity card -->
   <div class="m2-hero">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <div class="m2-avatar">⚔️</div>
+      <div class="m2-avatar">&#9876;&#65039;</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:17px;font-weight:700;color:var(--text)">WarriorX</div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Level 24 · Warrior · #4821</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-          <span class="badge badge-green">🔥 14 streak</span>
+          <span class="badge badge-green">&#128293; 14 streak</span>
           <span class="badge">187 sessions</span>
         </div>
       </div>
-      <button class="btn btn-sm">✎ Edit</button>
+      <button class="btn btn-sm">&#9998; Edit</button>
     </div>
-    <!-- XP bar -->
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:10.5px;color:var(--muted);width:32px">Lv 24</span>
       <div style="flex:1;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden">
@@ -825,36 +680,21 @@
     <div style="text-align:center;font-size:10px;color:var(--dim);margin-top:3px">12,400 / 20,000 XP</div>
   </div>
 
-  <!-- Quick action grid -->
   <div class="m2-action-grid">
-    <div class="m2-action-card">
-      <span class="m2-action-icon">📊</span>
-      <span class="m2-action-label">Stats</span>
-    </div>
-    <div class="m2-action-card">
-      <span class="m2-action-icon">⌚</span>
-      <span class="m2-action-label">Whoop</span>
-    </div>
-    <div class="m2-action-card">
-      <span class="m2-action-icon">🔒</span>
-      <span class="m2-action-label">Security</span>
-    </div>
+    <div class="m2-action-card"><span class="m2-action-icon">&#128202;</span><span class="m2-action-label">Stats</span></div>
+    <div class="m2-action-card"><span class="m2-action-icon">&#8987;</span><span class="m2-action-label">Whoop</span></div>
+    <div class="m2-action-card"><span class="m2-action-icon">&#128274;</span><span class="m2-action-label">Security</span></div>
   </div>
 
-  <!-- Streak check-in banner -->
   <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;">
-    <span style="font-size:18px">🔥</span>
+    <span style="font-size:18px">&#128293;</span>
     <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--text2)">14-day streak</div><div style="font-size:10.5px;color:var(--muted)">Keep it going — check in today</div></div>
     <button class="btn btn-gold btn-sm">Check In</button>
   </div>
 
-  <!-- Combat Record section card -->
   <div class="m2-section">
-    <div class="m2-section-header" onclick="m2Toggle(this)">
-      <span class="m2-section-title">🏆 Combat Record</span>
-      <span style="font-size:11px;color:var(--dim)">▾</span>
-    </div>
-    <div class="m2-section-body" style="display:block">
+    <div class="m2-section-header"><span class="m2-section-title">&#127942; Combat Record</span><span style="font-size:11px;color:var(--dim)">&#9660;</span></div>
+    <div class="m2-section-body open">
       <div class="combat-grid">
         <div class="combat-chip"><span class="chip-val">12,400</span><span class="chip-lbl">Total XP</span></div>
         <div class="combat-chip"><span class="chip-val">24</span><span class="chip-lbl">Level</span></div>
@@ -863,192 +703,168 @@
     </div>
   </div>
 
-  <!-- Personal Bests section card -->
   <div class="m2-section">
-    <div class="m2-section-header" onclick="m2Toggle(this)">
-      <span class="m2-section-title">🏆 Personal Bests</span>
-      <span style="font-size:11px;color:var(--dim)">▾</span>
-    </div>
+    <div class="m2-section-header"><span class="m2-section-title">&#127942; Personal Bests</span><span style="font-size:11px;color:var(--dim)">&#9660;</span></div>
     <div class="m2-section-body">
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🏋️</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🦵</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">⬆️</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#127947;</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#129461;</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#11014;&#65039;</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs</span></div>
     </div>
   </div>
 
-  <!-- Physical stats section card -->
   <div class="m2-section">
-    <div class="m2-section-header" onclick="m2Toggle(this)">
-      <span class="m2-section-title">⚔️ Warrior Data</span>
-      <span style="font-size:11px;color:var(--dim)">▾</span>
-    </div>
+    <div class="m2-section-header"><span class="m2-section-title">&#9876;&#65039; Warrior Data</span><span style="font-size:11px;color:var(--dim)">&#9660;</span></div>
     <div class="m2-section-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
-        <div class="stat-row"><span class="stat-label">⚖️ Weight</span><span class="stat-val">185 lbs</span></div>
-        <div class="stat-row"><span class="stat-label">📏 Height</span><span class="stat-val">5'11"</span></div>
-        <div class="stat-row"><span class="stat-label">🧬 BMI</span><span class="stat-val">25.8</span></div>
-        <div class="stat-row"><span class="stat-label">🎂 Age</span><span class="stat-val">28</span></div>
+        <div class="stat-row"><span class="stat-label">&#9878;&#65039; Weight</span><span class="stat-val">185 lbs</span></div>
+        <div class="stat-row"><span class="stat-label">&#128207; Height</span><span class="stat-val">5'11"</span></div>
+        <div class="stat-row"><span class="stat-label">&#129516; BMI</span><span class="stat-val">25.8</span></div>
+        <div class="stat-row"><span class="stat-label">&#127874; Age</span><span class="stat-val">28</span></div>
       </div>
     </div>
   </div>
 
-  <!-- Whoop section card -->
   <div class="m2-section">
-    <div class="m2-section-header" onclick="m2Toggle(this)">
-      <span class="m2-section-title">⌚ Whoop · Connected</span>
-      <span style="font-size:11px;color:var(--dim)">▾</span>
-    </div>
+    <div class="m2-section-header"><span class="m2-section-title">&#8987; Whoop · Connected</span><span style="font-size:11px;color:var(--dim)">&#9660;</span></div>
     <div class="m2-section-body">
-      <div class="whoop-grid">
+      <div class="whoop-grid" style="margin-top:0">
         <div class="whoop-card">
-          <div class="whoop-card-title">💚 Recovery</div>
+          <div class="whoop-card-title">&#128154; Recovery</div>
           <div class="whoop-row"><span class="whoop-key">Score</span><span class="whoop-val">78%</span></div>
           <div class="whoop-row"><span class="whoop-key">HRV</span><span class="whoop-val">62.3 ms</span></div>
           <div class="whoop-row"><span class="whoop-key">Resting HR</span><span class="whoop-val">48 bpm</span></div>
         </div>
         <div class="whoop-card">
-          <div class="whoop-card-title">😴 Sleep</div>
+          <div class="whoop-card-title">&#128564; Sleep</div>
           <div class="whoop-row"><span class="whoop-key">Perf.</span><span class="whoop-val">82%</span></div>
           <div class="whoop-row"><span class="whoop-key">Efficiency</span><span class="whoop-val">91%</span></div>
           <div class="whoop-row"><span class="whoop-key">In Bed</span><span class="whoop-val">7h 42m</span></div>
         </div>
       </div>
-      <button class="btn btn-sm" style="width:100%;margin-top:8px">↻ Sync Whoop</button>
+      <button class="btn btn-sm" style="width:100%;margin-top:8px">&#8635; Sync Whoop</button>
     </div>
   </div>
 </div>
 
 
-<!-- ════════════════════════════════════════════════════════
-     MOCKUP 3 — Pill nav + collapsible cards
-     ════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════
+     MOCKUP 3 — Pill Nav + Collapse
+     ══════════════════════════════════════ -->
 <div id="m3" class="mockup-panel">
   <div class="mockup-label">3 · Pill Category Nav + Collapsible Cards</div>
 
-  <!-- Compact identity row -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-    <div style="width:44px;height:44px;border-radius:12px;background:var(--surface2);border:1px solid rgba(196,148,40,.35);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⚔️</div>
+    <div style="width:44px;height:44px;border-radius:12px;background:var(--surface2);border:1px solid rgba(196,148,40,.35);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">&#9876;&#65039;</div>
     <div style="flex:1">
       <div style="font-size:16px;font-weight:700;color:var(--text)">WarriorX</div>
-      <div style="font-size:11px;color:var(--muted)">Level 24 · 🔥 14 streak · #4821</div>
+      <div style="font-size:11px;color:var(--muted)">Level 24 · &#128293; 14 streak · #4821</div>
     </div>
-    <button class="btn btn-sm">✎</button>
+    <button class="btn btn-sm">&#9998;</button>
   </div>
 
-  <!-- Scrollable pill nav -->
   <div class="m3-pill-nav">
-    <div class="m3-pill active" onclick="m3Pill(this,'m3-overview')">Overview</div>
-    <div class="m3-pill" onclick="m3Pill(this,'m3-record')">Record</div>
-    <div class="m3-pill" onclick="m3Pill(this,'m3-pbs')">PBs</div>
-    <div class="m3-pill" onclick="m3Pill(this,'m3-body')">Body</div>
-    <div class="m3-pill" onclick="m3Pill(this,'m3-whoop')">⌚ Whoop</div>
-    <div class="m3-pill" onclick="m3Pill(this,'m3-settings')">Settings</div>
+    <button class="m3-pill active" data-pane="m3-overview">Overview</button>
+    <button class="m3-pill" data-pane="m3-record">Record</button>
+    <button class="m3-pill" data-pane="m3-pbs">PBs</button>
+    <button class="m3-pill" data-pane="m3-body">Body</button>
+    <button class="m3-pill" data-pane="m3-whoop">&#8987; Whoop</button>
+    <button class="m3-pill" data-pane="m3-settings">Settings</button>
   </div>
 
-  <!-- OVERVIEW -->
-  <div id="m3-overview" class="m3-pane">
+  <div id="m3-overview" class="m3-pane active">
     <div class="m3-card">
-      <div class="m3-card-header" onclick="m3Collapse(this)">
-        <span class="m3-card-header-icon">👤</span>
+      <div class="m3-card-header">
+        <span class="m3-card-header-icon">&#128100;</span>
         <span class="m3-card-header-title">Identity</span>
-        <span class="m3-card-header-collapse open">▴ Collapse</span>
+        <span class="m3-card-header-collapse">&#9650; Collapse</span>
       </div>
-      <div>
+      <div class="m3-card-body">
         <div class="stat-row"><span class="stat-label">Display Name</span><span class="stat-val">WarriorX</span></div>
         <div class="stat-row"><span class="stat-label">Real Name</span><span class="stat-val" style="color:var(--dim);font-style:italic">Hidden</span></div>
         <div class="stat-row"><span class="stat-label">Account ID</span><span class="stat-val">#4821</span></div>
       </div>
     </div>
     <div class="m3-card">
-      <div class="m3-card-header" onclick="m3Collapse(this)">
-        <span class="m3-card-header-icon">🌿</span>
+      <div class="m3-card-header">
+        <span class="m3-card-header-icon">&#127807;</span>
         <span class="m3-card-header-title">About You</span>
-        <span class="m3-card-header-collapse open">▴ Collapse</span>
+        <span class="m3-card-header-collapse">&#9650; Collapse</span>
       </div>
-      <div>
+      <div class="m3-card-body">
         <div style="font-size:13px;font-style:italic;color:var(--text2);text-align:center;margin-bottom:9px">"Train hard, recover harder."</div>
         <div class="stat-row"><span class="stat-label">Training</span><span class="stat-val">Heavy Compounds</span></div>
-        <div style="margin-top:8px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Priorities</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">
-            <span class="badge">💪 Being Strong</span>
-            <span class="badge">🔥 Endurance</span>
-          </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px">
+          <span class="badge">&#128170; Being Strong</span>
+          <span class="badge">&#128293; Endurance</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- RECORD (hidden) -->
-  <div id="m3-record" class="m3-pane" style="display:none">
+  <div id="m3-record" class="m3-pane">
     <div class="m3-card" style="padding:13px 14px">
       <div class="combat-grid">
         <div class="combat-chip"><span class="chip-val">12,400</span><span class="chip-lbl">Total XP</span></div>
         <div class="combat-chip"><span class="chip-val">24</span><span class="chip-lbl">Level</span></div>
-        <div class="combat-chip"><span class="chip-val">14🔥</span><span class="chip-lbl">Streak</span></div>
+        <div class="combat-chip"><span class="chip-val">14&#128293;</span><span class="chip-lbl">Streak</span></div>
         <div class="combat-chip"><span class="chip-val">187</span><span class="chip-lbl">Sessions</span></div>
         <div class="combat-chip"><span class="chip-val">8</span><span class="chip-lbl">Quests</span></div>
-        <div class="combat-chip" style="border-color:rgba(255,232,124,.2)"><span class="chip-val" style="color:var(--gold);font-size:14px">7:32/mi</span><span class="chip-lbl">🏃 Run PB</span></div>
+        <div class="combat-chip" style="border-color:rgba(255,232,124,.2)"><span class="chip-val" style="color:var(--gold);font-size:14px">7:32/mi</span><span class="chip-lbl">&#127939; Run PB</span></div>
       </div>
     </div>
   </div>
 
-  <!-- PBS (hidden) -->
-  <div id="m3-pbs" class="m3-pane" style="display:none">
+  <div id="m3-pbs" class="m3-pane">
     <div class="m3-card">
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🏋️</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs 1RM</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🦵</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs 1RM</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">⬆️</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs 1RM</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🤸</span><span class="stat-val" style="flex:1">OHP</span><span style="font-size:12px;color:var(--text2);font-weight:600">115 lbs 1RM</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#127947;</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs 1RM</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#129461;</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs 1RM</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#11014;&#65039;</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs 1RM</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#129340;</span><span class="stat-val" style="flex:1">OHP</span><span style="font-size:12px;color:var(--text2);font-weight:600">115 lbs 1RM</span></div>
     </div>
   </div>
 
-  <!-- BODY (hidden) -->
-  <div id="m3-body" class="m3-pane" style="display:none">
+  <div id="m3-body" class="m3-pane">
     <div class="m3-card">
       <div class="m3-two-col">
-        <div class="stat-row"><span class="stat-label">⚖️ Weight</span><span class="stat-val">185 lbs</span></div>
-        <div class="stat-row"><span class="stat-label">📏 Height</span><span class="stat-val">5'11"</span></div>
-        <div class="stat-row"><span class="stat-label">🧬 BMI</span><span class="stat-val">25.8</span></div>
-        <div class="stat-row"><span class="stat-label">🎂 Age</span><span class="stat-val">28</span></div>
-        <div class="stat-row"><span class="stat-label">⚡ Units</span><span class="stat-val">Imperial</span></div>
-        <div class="stat-row"><span class="stat-label">👤 Gender</span><span class="stat-val">Male</span></div>
-        <div class="stat-row"><span class="stat-label">📍 State</span><span class="stat-val">CA</span></div>
-        <div class="stat-row"><span class="stat-label">🌍 Country</span><span class="stat-val">USA</span></div>
+        <div class="stat-row"><span class="stat-label">&#9878;&#65039; Weight</span><span class="stat-val">185 lbs</span></div>
+        <div class="stat-row"><span class="stat-label">&#128207; Height</span><span class="stat-val">5'11"</span></div>
+        <div class="stat-row"><span class="stat-label">&#129516; BMI</span><span class="stat-val">25.8</span></div>
+        <div class="stat-row"><span class="stat-label">&#127874; Age</span><span class="stat-val">28</span></div>
+        <div class="stat-row"><span class="stat-label">&#9889; Units</span><span class="stat-val">Imperial</span></div>
+        <div class="stat-row"><span class="stat-label">&#128100; Gender</span><span class="stat-val">Male</span></div>
+        <div class="stat-row"><span class="stat-label">&#128205; State</span><span class="stat-val">CA</span></div>
+        <div class="stat-row"><span class="stat-label">&#127758; Country</span><span class="stat-val">USA</span></div>
       </div>
     </div>
   </div>
 
-  <!-- WHOOP (hidden) -->
-  <div id="m3-whoop" class="m3-pane" style="display:none">
+  <div id="m3-whoop" class="m3-pane">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px">
-      <span style="font-size:20px">⌚</span>
+      <span style="font-size:20px">&#8987;</span>
       <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text)">Whoop</div><div style="font-size:11px;color:#6ddfaa">Connected</div></div>
-      <button class="btn btn-sm">↻ Sync</button>
+      <button class="btn btn-sm">&#8635; Sync</button>
     </div>
     <div class="whoop-grid">
       <div class="whoop-card">
-        <div class="whoop-card-title">💚 Recovery</div>
+        <div class="whoop-card-title">&#128154; Recovery</div>
         <div class="whoop-row"><span class="whoop-key">Score</span><span class="whoop-val">78%</span></div>
         <div class="whoop-row"><span class="whoop-key">HRV</span><span class="whoop-val">62.3 ms</span></div>
         <div class="whoop-row"><span class="whoop-key">Resting HR</span><span class="whoop-val">48 bpm</span></div>
-        <div class="whoop-row"><span class="whoop-key">SpO₂</span><span class="whoop-val">98%</span></div>
       </div>
       <div class="whoop-card">
-        <div class="whoop-card-title">😴 Sleep</div>
+        <div class="whoop-card-title">&#128564; Sleep</div>
         <div class="whoop-row"><span class="whoop-key">Performance</span><span class="whoop-val">82%</span></div>
         <div class="whoop-row"><span class="whoop-key">Efficiency</span><span class="whoop-val">91%</span></div>
         <div class="whoop-row"><span class="whoop-key">In Bed</span><span class="whoop-val">7h 42m</span></div>
-        <div class="whoop-row"><span class="whoop-key">REM</span><span class="whoop-val">1h 28m</span></div>
       </div>
       <div class="whoop-card">
-        <div class="whoop-card-title">⚡ Day Strain</div>
+        <div class="whoop-card-title">&#9889; Day Strain</div>
         <div class="whoop-row"><span class="whoop-key">Strain</span><span class="whoop-val">14.2</span></div>
         <div class="whoop-row"><span class="whoop-key">Avg HR</span><span class="whoop-val">72 bpm</span></div>
         <div class="whoop-row"><span class="whoop-key">Max HR</span><span class="whoop-val">178 bpm</span></div>
       </div>
       <div class="whoop-card">
-        <div class="whoop-card-title">🏋️ Last Workout</div>
+        <div class="whoop-card-title">&#127947; Last Workout</div>
         <div class="whoop-row"><span class="whoop-key">Strain</span><span class="whoop-val">16.8</span></div>
         <div class="whoop-row"><span class="whoop-key">Avg HR</span><span class="whoop-val">148 bpm</span></div>
         <div class="whoop-row"><span class="whoop-key">Duration</span><span class="whoop-val">52m</span></div>
@@ -1056,273 +872,256 @@
     </div>
   </div>
 
-  <!-- SETTINGS (hidden) -->
-  <div id="m3-settings" class="m3-pane" style="display:none">
+  <div id="m3-settings" class="m3-pane">
     <div class="m3-card">
-      <div class="m3-card-header" onclick="m3Collapse(this)">
-        <span class="m3-card-header-icon">🔒</span>
+      <div class="m3-card-header">
+        <span class="m3-card-header-icon">&#128274;</span>
         <span class="m3-card-header-title">Security</span>
-        <span class="m3-card-header-collapse open">▴ Collapse</span>
+        <span class="m3-card-header-collapse">&#9650; Collapse</span>
       </div>
-      <div>
-        <div class="stat-row"><span class="stat-label">Email</span><span class="stat-val" style="font-size:11px">user@example.com <span style="color:var(--cls);cursor:pointer">Change</span></span></div>
-        <div class="stat-row"><span class="stat-label">Password</span><span class="stat-val" style="font-size:11px">••••••••• <span style="color:var(--cls);cursor:pointer">Change</span></span></div>
+      <div class="m3-card-body">
+        <div class="stat-row"><span class="stat-label">Email</span><span class="stat-val" style="font-size:11px;flex:1">user@example.com</span><span style="font-size:11px;color:var(--cls);cursor:pointer">Change</span></div>
+        <div class="stat-row"><span class="stat-label">Password</span><span class="stat-val" style="flex:1">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span><span style="font-size:11px;color:var(--cls);cursor:pointer">Change</span></div>
         <div class="stat-row"><span class="stat-label">MFA</span><span class="stat-val"><span class="badge badge-green">Enabled</span></span></div>
-        <div class="stat-row"><span class="stat-label">Phone</span><span class="stat-val" style="color:var(--dim)">Not set</span></div>
       </div>
-    </div>
-    <div class="m3-card" style="padding:13px 14px">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">🔔 Notification Preferences</div>
-      <button class="btn" style="width:100%">Manage Alerts</button>
     </div>
   </div>
 </div>
 
 
-<!-- ════════════════════════════════════════════════════════
-     MOCKUP 4 — Full-width toggle sections, quick-stat scroll
-     ════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════
+     MOCKUP 4 — Full-Width Toggle Sections
+     ══════════════════════════════════════ -->
 <div id="m4" class="mockup-panel">
   <div class="mockup-label">4 · Full-Width Toggle Sections + Quick-Stat Scroll</div>
 
-  <!-- Page header -->
   <div class="m4-page-header">
-    <div class="m4-avatar-ring">⚔️<div class="m4-class-dot"></div></div>
+    <div class="m4-avatar-ring">&#9876;&#65039;<div class="m4-class-dot"></div></div>
     <div style="flex:1">
       <div style="font-size:17px;font-weight:700;color:var(--text)">WarriorX</div>
       <div style="font-size:11.5px;color:var(--muted)">Level 24 · Warrior</div>
     </div>
     <div style="display:flex;gap:6px">
-      <button class="btn btn-sm">✎</button>
-      <button class="btn btn-gold btn-sm">🔥 Check In</button>
+      <button class="btn btn-sm">&#9998;</button>
+      <button class="btn btn-gold btn-sm">&#128293; Check In</button>
     </div>
   </div>
 
-  <!-- Quick stat scroll -->
   <div class="m4-quick-stats">
     <div class="m4-stat-pill"><span class="m4-stat-val">12.4k</span><span class="m4-stat-lbl">XP</span></div>
     <div class="m4-stat-pill"><span class="m4-stat-val">24</span><span class="m4-stat-lbl">Level</span></div>
-    <div class="m4-stat-pill"><span class="m4-stat-val">14🔥</span><span class="m4-stat-lbl">Streak</span></div>
+    <div class="m4-stat-pill"><span class="m4-stat-val">14&#128293;</span><span class="m4-stat-lbl">Streak</span></div>
     <div class="m4-stat-pill"><span class="m4-stat-val">187</span><span class="m4-stat-lbl">Sessions</span></div>
     <div class="m4-stat-pill"><span class="m4-stat-val">8</span><span class="m4-stat-lbl">Quests</span></div>
     <div class="m4-stat-pill" style="border-color:rgba(255,232,124,.3)"><span class="m4-stat-val" style="color:var(--gold)">7:32</span><span class="m4-stat-lbl">Run PB</span></div>
   </div>
 
-  <!-- Identity section -->
   <div class="m4-section">
-    <button class="m4-section-toggle" onclick="m4Toggle(this)">
-      <span class="m4-section-icon">👤</span>
+    <button class="m4-section-toggle">
+      <span class="m4-section-icon">&#128100;</span>
       <div class="m4-section-info">
         <div class="m4-section-name">Identity</div>
         <div class="m4-section-hint">Display name, visibility, account ID</div>
       </div>
-      <span class="m4-section-arrow open">▶</span>
+      <span class="m4-section-arrow open">&#9658;</span>
     </button>
-    <div class="m4-section-body" style="display:block">
+    <div class="m4-section-body open">
       <div class="stat-row"><span class="stat-label">Display Name</span><span class="stat-val">WarriorX</span></div>
       <div class="stat-row"><span class="stat-label">Real Name</span><span class="stat-val" style="color:var(--dim);font-style:italic">Hidden</span></div>
       <div class="stat-row"><span class="stat-label">Account ID</span><span class="stat-val">#4821 <span style="color:var(--cls);cursor:pointer;font-size:11px">Copy</span></span></div>
-      <div class="stat-row"><span class="stat-label">Class</span><span class="stat-val">⚔️ Warrior</span></div>
+      <div class="stat-row"><span class="stat-label">Class</span><span class="stat-val">&#9876;&#65039; Warrior</span></div>
     </div>
   </div>
 
-  <!-- Personal Bests section -->
   <div class="m4-section">
-    <button class="m4-section-toggle" onclick="m4Toggle(this)">
-      <span class="m4-section-icon">🏆</span>
+    <button class="m4-section-toggle">
+      <span class="m4-section-icon">&#127942;</span>
       <div class="m4-section-info">
         <div class="m4-section-name">Personal Bests</div>
         <div class="m4-section-hint">5 recorded lifts</div>
       </div>
-      <span class="m4-section-arrow">▶</span>
+      <span class="m4-section-arrow">&#9658;</span>
     </button>
-    <div class="m4-section-body" style="display:none">
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🏋️</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">🦵</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs</span></div>
-      <div class="stat-row"><span style="font-size:14px;margin-right:6px">⬆️</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs</span></div>
+    <div class="m4-section-body">
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#127947;</span><span class="stat-val" style="flex:1">Bench Press</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#129461;</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs</span></div>
+      <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#11014;&#65039;</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs</span></div>
     </div>
   </div>
 
-  <!-- Body stats section -->
   <div class="m4-section">
-    <button class="m4-section-toggle" onclick="m4Toggle(this)">
-      <span class="m4-section-icon">⚔️</span>
+    <button class="m4-section-toggle">
+      <span class="m4-section-icon">&#9876;&#65039;</span>
       <div class="m4-section-info">
         <div class="m4-section-name">Warrior Data</div>
         <div class="m4-section-hint">Weight, height, BMI, location</div>
       </div>
-      <span class="m4-section-arrow">▶</span>
+      <span class="m4-section-arrow">&#9658;</span>
     </button>
-    <div class="m4-section-body" style="display:none">
+    <div class="m4-section-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
-        <div class="stat-row"><span class="stat-label">⚖️ Weight</span><span class="stat-val">185 lbs</span></div>
-        <div class="stat-row"><span class="stat-label">📏 Height</span><span class="stat-val">5'11"</span></div>
-        <div class="stat-row"><span class="stat-label">🧬 BMI</span><span class="stat-val">25.8</span></div>
-        <div class="stat-row"><span class="stat-label">🎂 Age</span><span class="stat-val">28</span></div>
-        <div class="stat-row"><span class="stat-label">📍 State</span><span class="stat-val">CA</span></div>
-        <div class="stat-row"><span class="stat-label">🌍 Country</span><span class="stat-val">USA</span></div>
+        <div class="stat-row"><span class="stat-label">&#9878;&#65039; Weight</span><span class="stat-val">185 lbs</span></div>
+        <div class="stat-row"><span class="stat-label">&#128207; Height</span><span class="stat-val">5'11"</span></div>
+        <div class="stat-row"><span class="stat-label">&#129516; BMI</span><span class="stat-val">25.8</span></div>
+        <div class="stat-row"><span class="stat-label">&#127874; Age</span><span class="stat-val">28</span></div>
+        <div class="stat-row"><span class="stat-label">&#128205; State</span><span class="stat-val">CA</span></div>
+        <div class="stat-row"><span class="stat-label">&#127758; Country</span><span class="stat-val">USA</span></div>
       </div>
     </div>
   </div>
 
-  <!-- About You section -->
   <div class="m4-section">
-    <button class="m4-section-toggle" onclick="m4Toggle(this)">
-      <span class="m4-section-icon">🌿</span>
+    <button class="m4-section-toggle">
+      <span class="m4-section-icon">&#127807;</span>
       <div class="m4-section-info">
         <div class="m4-section-name">About You</div>
         <div class="m4-section-hint">Motto, training style, priorities</div>
       </div>
-      <span class="m4-section-arrow">▶</span>
+      <span class="m4-section-arrow">&#9658;</span>
     </button>
-    <div class="m4-section-body" style="display:none">
+    <div class="m4-section-body">
       <div style="font-size:13px;font-style:italic;color:var(--text2);text-align:center;margin-bottom:9px">"Train hard, recover harder."</div>
       <div class="stat-row"><span class="stat-label">Training</span><span class="stat-val">Heavy Compounds</span></div>
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px">
-        <span class="badge">💪 Being Strong</span>
-        <span class="badge">🔥 Endurance</span>
-        <span class="badge">🧠 Mental Clarity</span>
+        <span class="badge">&#128170; Being Strong</span>
+        <span class="badge">&#128293; Endurance</span>
+        <span class="badge">&#129504; Mental Clarity</span>
       </div>
     </div>
   </div>
 
-  <!-- Whoop section -->
   <div class="m4-section">
-    <button class="m4-section-toggle" onclick="m4Toggle(this)">
-      <span class="m4-section-icon">⌚</span>
+    <button class="m4-section-toggle">
+      <span class="m4-section-icon">&#8987;</span>
       <div class="m4-section-info">
         <div class="m4-section-name">Whoop</div>
         <div class="m4-section-hint" style="color:#6ddfaa">Connected — tap to view data</div>
       </div>
-      <span class="m4-section-arrow">▶</span>
+      <span class="m4-section-arrow">&#9658;</span>
     </button>
-    <div class="m4-section-body" style="display:none">
+    <div class="m4-section-body">
       <div class="whoop-grid" style="margin-top:0">
         <div class="whoop-card">
-          <div class="whoop-card-title">💚 Recovery</div>
+          <div class="whoop-card-title">&#128154; Recovery</div>
           <div class="whoop-row"><span class="whoop-key">Score</span><span class="whoop-val">78%</span></div>
           <div class="whoop-row"><span class="whoop-key">HRV</span><span class="whoop-val">62.3 ms</span></div>
           <div class="whoop-row"><span class="whoop-key">Resting HR</span><span class="whoop-val">48 bpm</span></div>
         </div>
         <div class="whoop-card">
-          <div class="whoop-card-title">😴 Sleep</div>
+          <div class="whoop-card-title">&#128564; Sleep</div>
           <div class="whoop-row"><span class="whoop-key">Perf.</span><span class="whoop-val">82%</span></div>
           <div class="whoop-row"><span class="whoop-key">Efficiency</span><span class="whoop-val">91%</span></div>
           <div class="whoop-row"><span class="whoop-key">In Bed</span><span class="whoop-val">7h 42m</span></div>
         </div>
       </div>
-      <button class="btn btn-sm" style="width:100%;margin-top:8px">↻ Sync Whoop</button>
+      <button class="btn btn-sm" style="width:100%;margin-top:8px">&#8635; Sync Whoop</button>
     </div>
   </div>
 
-  <!-- Security & Alerts section -->
   <div class="m4-section">
-    <button class="m4-section-toggle" onclick="m4Toggle(this)">
-      <span class="m4-section-icon">🔒</span>
+    <button class="m4-section-toggle">
+      <span class="m4-section-icon">&#128274;</span>
       <div class="m4-section-info">
         <div class="m4-section-name">Security &amp; Alerts</div>
         <div class="m4-section-hint">Email, password, MFA, notifications</div>
       </div>
-      <span class="m4-section-arrow">▶</span>
+      <span class="m4-section-arrow">&#9658;</span>
     </button>
-    <div class="m4-section-body" style="display:none">
+    <div class="m4-section-body">
       <div class="stat-row"><span class="stat-label">Email</span><span class="stat-val" style="font-size:11px;flex:1">user@example.com</span><span style="font-size:11px;color:var(--cls);cursor:pointer">Change</span></div>
-      <div class="stat-row"><span class="stat-label">Password</span><span class="stat-val" style="flex:1">•••••••••</span><span style="font-size:11px;color:var(--cls);cursor:pointer">Change</span></div>
+      <div class="stat-row"><span class="stat-label">Password</span><span class="stat-val" style="flex:1">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span><span style="font-size:11px;color:var(--cls);cursor:pointer">Change</span></div>
       <div class="stat-row"><span class="stat-label">MFA</span><span class="stat-val" style="flex:1"><span class="badge badge-green">Enabled</span></span></div>
-      <div style="margin-top:8px"><button class="btn btn-sm" style="width:100%">🔔 Manage Alerts</button></div>
+      <div style="margin-top:8px"><button class="btn btn-sm" style="width:100%">&#128276; Manage Alerts</button></div>
     </div>
   </div>
 </div>
 
 
-<!-- ════════════════════════════════════════════════════════
-     MOCKUP 5 — Hero band + tab strip + Whoop sub-tabs
-     (Whoop gets its own rich sub-tab panel)
-     ════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════
+     MOCKUP 5 — Hero + Tab Strip + Whoop Sub-Tabs
+     ══════════════════════════════════════ -->
 <div id="m5" class="mockup-panel">
   <div class="mockup-label">5 · Hero Band + Tab Strip + Whoop as Sub-Tab Panel</div>
 
-  <!-- Hero band -->
   <div class="m5-hero-band">
-    <div class="m5-avatar">⚔️</div>
+    <div class="m5-avatar">&#9876;&#65039;</div>
     <div style="flex:1;min-width:0">
       <div style="font-size:16px;font-weight:700;color:var(--text)">WarriorX</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:1px">Lv 24 Warrior · #4821 · 🔥 14-day streak</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:1px">Lv 24 Warrior · #4821 · &#128293; 14-day streak</div>
       <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
         <div style="flex:1;height:3px;background:var(--surface2);border-radius:2px;overflow:hidden">
           <div style="width:62%;height:100%;background:linear-gradient(90deg,rgba(196,148,40,.5),rgba(196,148,40,.85));border-radius:2px"></div>
         </div>
-        <span style="font-size:10px;color:var(--dim)">Lv 25 →</span>
+        <span style="font-size:10px;color:var(--dim)">Lv 25 &#8594;</span>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:5px">
-      <button class="btn btn-sm">✎ Edit</button>
+      <button class="btn btn-sm">&#9998; Edit</button>
       <button class="btn btn-gold btn-sm">Check In</button>
     </div>
   </div>
 
-  <!-- Main tab strip: Profile / Stats / Whoop / Security -->
   <div class="m5-tab-strip">
-    <div class="m5-tab active" onclick="m5Tab(this,'m5-profile')">Profile</div>
-    <div class="m5-tab" onclick="m5Tab(this,'m5-stats')">Stats</div>
-    <div class="m5-tab" onclick="m5Tab(this,'m5-whoop')">⌚ Whoop</div>
-    <div class="m5-tab" onclick="m5Tab(this,'m5-security')">Security</div>
+    <div class="m5-tab active" data-pane="m5-profile">Profile</div>
+    <div class="m5-tab" data-pane="m5-stats">Stats</div>
+    <div class="m5-tab" data-pane="m5-whoop">&#8987; Whoop</div>
+    <div class="m5-tab" data-pane="m5-security">Security</div>
   </div>
 
   <!-- PROFILE pane -->
-  <div id="m5-profile" class="m5-pane">
+  <div id="m5-profile" class="m5-pane active">
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">👤</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#128100;</span>
         <span class="m5-section-title">Identity</span>
         <span class="m5-section-count">Display · Real Name · ID</span>
-        <span class="m5-section-caret open">▾</span>
+        <span class="m5-section-caret open">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:block">
+      <div class="m5-section-body open">
         <div class="m5-section-body-inner">
           <div class="stat-row"><span class="stat-label">Display Name</span><span class="stat-val">WarriorX</span></div>
           <div class="stat-row"><span class="stat-label">Real Name</span><span class="stat-val" style="color:var(--dim);font-style:italic">Hidden</span></div>
           <div class="stat-row"><span class="stat-label">Account ID</span><span class="stat-val">#4821 <span style="color:var(--cls);cursor:pointer;font-size:11px">Copy</span></span></div>
-          <div class="stat-row"><span class="stat-label">Class</span><span class="stat-val">⚔️ Warrior</span></div>
+          <div class="stat-row"><span class="stat-label">Class</span><span class="stat-val">&#9876;&#65039; Warrior</span></div>
         </div>
       </div>
     </div>
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">🌿</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#127807;</span>
         <span class="m5-section-title">About You</span>
         <span class="m5-section-count">Motto · Priorities</span>
-        <span class="m5-section-caret open">▾</span>
+        <span class="m5-section-caret open">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:block">
+      <div class="m5-section-body open">
         <div class="m5-section-body-inner">
           <div style="font-size:13px;font-style:italic;color:var(--text2);text-align:center;margin-bottom:10px">"Train hard, recover harder."</div>
           <div class="stat-row"><span class="stat-label">Training</span><span class="stat-val">Heavy Compounds</span></div>
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:9px">
-            <span class="badge">💪 Being Strong</span>
-            <span class="badge">🔥 Endurance</span>
-            <span class="badge">🧠 Mental Clarity</span>
+            <span class="badge">&#128170; Being Strong</span>
+            <span class="badge">&#128293; Endurance</span>
+            <span class="badge">&#129504; Mental Clarity</span>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- STATS pane (hidden) -->
-  <div id="m5-stats" class="m5-pane" style="display:none">
+  <!-- STATS pane -->
+  <div id="m5-stats" class="m5-pane">
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">🏆</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#127942;</span>
         <span class="m5-section-title">Combat Record</span>
         <span class="m5-section-count">XP · Level · Streak</span>
-        <span class="m5-section-caret open">▾</span>
+        <span class="m5-section-caret open">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:block">
+      <div class="m5-section-body open">
         <div class="m5-section-body-inner">
           <div class="combat-grid">
             <div class="combat-chip"><span class="chip-val">12,400</span><span class="chip-lbl">XP</span></div>
             <div class="combat-chip"><span class="chip-val">24</span><span class="chip-lbl">Level</span></div>
-            <div class="combat-chip"><span class="chip-val">14🔥</span><span class="chip-lbl">Streak</span></div>
+            <div class="combat-chip"><span class="chip-val">14&#128293;</span><span class="chip-lbl">Streak</span></div>
             <div class="combat-chip"><span class="chip-val">187</span><span class="chip-lbl">Sessions</span></div>
             <div class="combat-chip"><span class="chip-val">8</span><span class="chip-lbl">Quests</span></div>
             <div class="combat-chip" style="border-color:rgba(255,232,124,.2)"><span class="chip-val" style="color:var(--gold);font-size:14px">7:32/mi</span><span class="chip-lbl">Run PB</span></div>
@@ -1331,197 +1130,110 @@
       </div>
     </div>
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">🏆</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#127942;</span>
         <span class="m5-section-title">Personal Bests</span>
         <span class="m5-section-count">5 lifts</span>
-        <span class="m5-section-caret">▾</span>
+        <span class="m5-section-caret">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:none">
+      <div class="m5-section-body">
         <div class="m5-section-body-inner">
-          <div class="stat-row"><span style="font-size:14px;margin-right:6px">🏋️</span><span class="stat-val" style="flex:1">Bench</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs</span></div>
-          <div class="stat-row"><span style="font-size:14px;margin-right:6px">🦵</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs</span></div>
-          <div class="stat-row"><span style="font-size:14px;margin-right:6px">⬆️</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#127947;</span><span class="stat-val" style="flex:1">Bench</span><span style="font-size:12px;color:var(--text2);font-weight:600">185 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#129461;</span><span class="stat-val" style="flex:1">Squat</span><span style="font-size:12px;color:var(--text2);font-weight:600">225 lbs</span></div>
+          <div class="stat-row"><span style="font-size:14px;margin-right:6px">&#11014;&#65039;</span><span class="stat-val" style="flex:1">Deadlift</span><span style="font-size:12px;color:var(--text2);font-weight:600">275 lbs</span></div>
         </div>
       </div>
     </div>
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">⚔️</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#9876;&#65039;</span>
         <span class="m5-section-title">Warrior Data</span>
         <span class="m5-section-count">Body stats</span>
-        <span class="m5-section-caret">▾</span>
+        <span class="m5-section-caret">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:none">
+      <div class="m5-section-body">
         <div class="m5-section-body-inner" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
-          <div class="stat-row"><span class="stat-label">⚖️ Weight</span><span class="stat-val">185 lbs</span></div>
-          <div class="stat-row"><span class="stat-label">📏 Height</span><span class="stat-val">5'11"</span></div>
-          <div class="stat-row"><span class="stat-label">🧬 BMI</span><span class="stat-val">25.8</span></div>
-          <div class="stat-row"><span class="stat-label">🎂 Age</span><span class="stat-val">28</span></div>
-          <div class="stat-row"><span class="stat-label">📍 State</span><span class="stat-val">CA</span></div>
-          <div class="stat-row"><span class="stat-label">🌍 Country</span><span class="stat-val">USA</span></div>
+          <div class="stat-row"><span class="stat-label">&#9878;&#65039; Weight</span><span class="stat-val">185 lbs</span></div>
+          <div class="stat-row"><span class="stat-label">&#128207; Height</span><span class="stat-val">5'11"</span></div>
+          <div class="stat-row"><span class="stat-label">&#129516; BMI</span><span class="stat-val">25.8</span></div>
+          <div class="stat-row"><span class="stat-label">&#127874; Age</span><span class="stat-val">28</span></div>
+          <div class="stat-row"><span class="stat-label">&#128205; State</span><span class="stat-val">CA</span></div>
+          <div class="stat-row"><span class="stat-label">&#127758; Country</span><span class="stat-val">USA</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- WHOOP pane (hidden) — has its own sub-tab bar: Recovery / Sleep / Strain / Body -->
-  <div id="m5-whoop" class="m5-pane" style="display:none">
+  <!-- WHOOP pane — has its own sub-tab bar -->
+  <div id="m5-whoop" class="m5-pane">
     <div class="m5-section" style="padding:0">
-      <!-- Whoop header -->
       <div class="m5-whoop-header">
-        <span class="m5-whoop-logo">⌚</span>
+        <span style="font-size:22px">&#8987;</span>
         <div class="m5-whoop-info">
           <div class="m5-whoop-title">Whoop</div>
           <div class="m5-whoop-sub">Connected · Last synced 2h ago</div>
         </div>
-        <button class="btn btn-sm">↻ Sync</button>
+        <button class="btn btn-sm">&#8635; Sync</button>
       </div>
-
-      <!-- Whoop sub-tab bar -->
       <div class="m5-whoop-subtab-bar">
-        <div class="m5-wtab active" onclick="m5WhoopTab(this,'mw-recovery')">Recovery</div>
-        <div class="m5-wtab" onclick="m5WhoopTab(this,'mw-sleep')">Sleep</div>
-        <div class="m5-wtab" onclick="m5WhoopTab(this,'mw-strain')">Strain</div>
-        <div class="m5-wtab" onclick="m5WhoopTab(this,'mw-body')">Body</div>
+        <div class="m5-wtab active" data-pane="mw-recovery">Recovery</div>
+        <div class="m5-wtab" data-pane="mw-sleep">Sleep</div>
+        <div class="m5-wtab" data-pane="mw-strain">Strain</div>
+        <div class="m5-wtab" data-pane="mw-body">Body</div>
       </div>
-
-      <!-- Recovery pane -->
-      <div id="mw-recovery" class="m5-whoop-pane mw-pane">
+      <div id="mw-recovery" class="mw-pane active">
         <div class="m5-metric-list">
-          <div class="m5-metric">
-            <span class="m5-metric-icon">💚</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Recovery Score</div></div>
-            <div><span class="m5-metric-value">78</span><span class="m5-metric-unit">%</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">💓</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">HRV</div></div>
-            <div><span class="m5-metric-value">62.3</span><span class="m5-metric-unit">ms</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🫀</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Resting Heart Rate</div></div>
-            <div><span class="m5-metric-value">48</span><span class="m5-metric-unit">bpm</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🩸</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">SpO₂</div></div>
-            <div><span class="m5-metric-value">98</span><span class="m5-metric-unit">%</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🌡️</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Skin Temp</div></div>
-            <div><span class="m5-metric-value">36.8</span><span class="m5-metric-unit">°C</span></div>
-          </div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128154;</span><div class="m5-metric-info"><div class="m5-metric-label">Recovery Score</div></div><div><span class="m5-metric-value">78</span><span class="m5-metric-unit">%</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128147;</span><div class="m5-metric-info"><div class="m5-metric-label">HRV</div></div><div><span class="m5-metric-value">62.3</span><span class="m5-metric-unit">ms</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#129480;</span><div class="m5-metric-info"><div class="m5-metric-label">Resting Heart Rate</div></div><div><span class="m5-metric-value">48</span><span class="m5-metric-unit">bpm</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#129656;</span><div class="m5-metric-info"><div class="m5-metric-label">SpO2</div></div><div><span class="m5-metric-value">98</span><span class="m5-metric-unit">%</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#127777;&#65039;</span><div class="m5-metric-info"><div class="m5-metric-label">Skin Temp</div></div><div><span class="m5-metric-value">36.8</span><span class="m5-metric-unit">&#176;C</span></div></div>
         </div>
       </div>
-
-      <!-- Sleep pane (hidden) -->
-      <div id="mw-sleep" class="m5-whoop-pane mw-pane" style="display:none">
+      <div id="mw-sleep" class="mw-pane">
         <div class="m5-metric-list">
-          <div class="m5-metric">
-            <span class="m5-metric-icon">😴</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Sleep Performance</div></div>
-            <div><span class="m5-metric-value">82</span><span class="m5-metric-unit">%</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">📊</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Efficiency</div></div>
-            <div><span class="m5-metric-value">91</span><span class="m5-metric-unit">%</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🛏️</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Time in Bed</div></div>
-            <div><span class="m5-metric-value">7h 42m</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🌀</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">REM Sleep</div></div>
-            <div><span class="m5-metric-value">1h 28m</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🔄</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Consistency</div></div>
-            <div><span class="m5-metric-value">74</span><span class="m5-metric-unit">%</span></div>
-          </div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128564;</span><div class="m5-metric-info"><div class="m5-metric-label">Sleep Performance</div></div><div><span class="m5-metric-value">82</span><span class="m5-metric-unit">%</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128202;</span><div class="m5-metric-info"><div class="m5-metric-label">Efficiency</div></div><div><span class="m5-metric-value">91</span><span class="m5-metric-unit">%</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128716;</span><div class="m5-metric-info"><div class="m5-metric-label">Time in Bed</div></div><div><span class="m5-metric-value" style="font-size:16px">7h 42m</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128300;</span><div class="m5-metric-info"><div class="m5-metric-label">REM Sleep</div></div><div><span class="m5-metric-value" style="font-size:16px">1h 28m</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128260;</span><div class="m5-metric-info"><div class="m5-metric-label">Consistency</div></div><div><span class="m5-metric-value">74</span><span class="m5-metric-unit">%</span></div></div>
         </div>
       </div>
-
-      <!-- Strain pane (hidden) -->
-      <div id="mw-strain" class="m5-whoop-pane mw-pane" style="display:none">
+      <div id="mw-strain" class="mw-pane">
         <div class="m5-metric-list">
-          <div class="m5-metric">
-            <span class="m5-metric-icon">⚡</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Day Strain</div></div>
-            <div><span class="m5-metric-value">14.2</span><span class="m5-metric-unit">/21</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">📈</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Avg Heart Rate</div></div>
-            <div><span class="m5-metric-value">72</span><span class="m5-metric-unit">bpm</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🔺</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Max Heart Rate</div></div>
-            <div><span class="m5-metric-value">178</span><span class="m5-metric-unit">bpm</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🔋</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Energy</div></div>
-            <div><span class="m5-metric-value">2,140</span><span class="m5-metric-unit">kJ</span></div>
-          </div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#9889;</span><div class="m5-metric-info"><div class="m5-metric-label">Day Strain</div></div><div><span class="m5-metric-value">14.2</span><span class="m5-metric-unit">/21</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128200;</span><div class="m5-metric-info"><div class="m5-metric-label">Avg Heart Rate</div></div><div><span class="m5-metric-value">72</span><span class="m5-metric-unit">bpm</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128314;</span><div class="m5-metric-info"><div class="m5-metric-label">Max Heart Rate</div></div><div><span class="m5-metric-value">178</span><span class="m5-metric-unit">bpm</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128267;</span><div class="m5-metric-info"><div class="m5-metric-label">Energy</div></div><div><span class="m5-metric-value">2,140</span><span class="m5-metric-unit">kJ</span></div></div>
         </div>
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;letter-spacing:.04em">LAST WORKOUT</div>
           <div class="m5-metric-list">
-            <div class="m5-metric">
-              <span class="m5-metric-icon">🏋️</span>
-              <div class="m5-metric-info"><div class="m5-metric-label">Workout Strain</div></div>
-              <div><span class="m5-metric-value">16.8</span></div>
-            </div>
-            <div class="m5-metric">
-              <span class="m5-metric-icon">⏱️</span>
-              <div class="m5-metric-info"><div class="m5-metric-label">Duration</div></div>
-              <div><span class="m5-metric-value">52m</span></div>
-            </div>
+            <div class="m5-metric"><span class="m5-metric-icon">&#127947;</span><div class="m5-metric-info"><div class="m5-metric-label">Workout Strain</div></div><div><span class="m5-metric-value">16.8</span></div></div>
+            <div class="m5-metric"><span class="m5-metric-icon">&#9201;&#65039;</span><div class="m5-metric-info"><div class="m5-metric-label">Duration</div></div><div><span class="m5-metric-value" style="font-size:16px">52m</span></div></div>
           </div>
         </div>
       </div>
-
-      <!-- Body pane (hidden) -->
-      <div id="mw-body" class="m5-whoop-pane mw-pane" style="display:none">
+      <div id="mw-body" class="mw-pane">
         <div class="m5-metric-list">
-          <div class="m5-metric">
-            <span class="m5-metric-icon">📏</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Height</div></div>
-            <div><span class="m5-metric-value" style="font-size:14px">1.80 m</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">⚖️</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Weight</div></div>
-            <div><span class="m5-metric-value" style="font-size:14px">83.9 kg</span></div>
-          </div>
-          <div class="m5-metric">
-            <span class="m5-metric-icon">🫀</span>
-            <div class="m5-metric-info"><div class="m5-metric-label">Max Heart Rate</div></div>
-            <div><span class="m5-metric-value">188</span><span class="m5-metric-unit">bpm</span></div>
-          </div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#128207;</span><div class="m5-metric-info"><div class="m5-metric-label">Height</div></div><div><span class="m5-metric-value" style="font-size:16px">1.80 m</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#9878;&#65039;</span><div class="m5-metric-info"><div class="m5-metric-label">Weight</div></div><div><span class="m5-metric-value" style="font-size:16px">83.9 kg</span></div></div>
+          <div class="m5-metric"><span class="m5-metric-icon">&#129480;</span><div class="m5-metric-info"><div class="m5-metric-label">Max Heart Rate</div></div><div><span class="m5-metric-value">188</span><span class="m5-metric-unit">bpm</span></div></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- SECURITY pane (hidden) -->
-  <div id="m5-security" class="m5-pane" style="display:none">
+  <!-- SECURITY pane -->
+  <div id="m5-security" class="m5-pane">
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">📧</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#128231;</span>
         <span class="m5-section-title">Email</span>
         <span class="m5-section-count">user@example.com</span>
-        <span class="m5-section-caret open">▾</span>
+        <span class="m5-section-caret open">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:block">
+      <div class="m5-section-body open">
         <div class="m5-section-body-inner">
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Change your account email address.</div>
           <button class="btn" style="width:100%">Change Email</button>
@@ -1529,26 +1241,24 @@
       </div>
     </div>
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">🔑</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#128273;</span>
         <span class="m5-section-title">Password</span>
         <span class="m5-section-count">Last changed 30d ago</span>
-        <span class="m5-section-caret">▾</span>
+        <span class="m5-section-caret">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:none">
-        <div class="m5-section-body-inner">
-          <button class="btn" style="width:100%">Change Password</button>
-        </div>
+      <div class="m5-section-body">
+        <div class="m5-section-body-inner"><button class="btn" style="width:100%">Change Password</button></div>
       </div>
     </div>
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">🛡️</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#128737;</span>
         <span class="m5-section-title">Two-Factor Auth</span>
         <span class="m5-section-count" style="color:#6ddfaa">Enabled</span>
-        <span class="m5-section-caret">▾</span>
+        <span class="m5-section-caret">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:none">
+      <div class="m5-section-body">
         <div class="m5-section-body-inner">
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text2)">8 recovery codes</strong> remaining.</div>
           <div style="display:flex;gap:6px">
@@ -1559,104 +1269,130 @@
       </div>
     </div>
     <div class="m5-section">
-      <div class="m5-section-head" onclick="m5Collapse(this)">
-        <span class="m5-section-icon">🔔</span>
+      <div class="m5-section-head">
+        <span class="m5-section-icon">&#128276;</span>
         <span class="m5-section-title">Notification Alerts</span>
         <span class="m5-section-count">Streak, XP, Quests</span>
-        <span class="m5-section-caret">▾</span>
+        <span class="m5-section-caret">&#9660;</span>
       </div>
-      <div class="m5-section-body" style="display:none">
-        <div class="m5-section-body-inner">
-          <button class="btn" style="width:100%">Manage Alerts</button>
-        </div>
+      <div class="m5-section-body">
+        <div class="m5-section-body-inner"><button class="btn" style="width:100%">Manage Alerts</button></div>
       </div>
     </div>
   </div>
 </div>
 
-
 <script>
-/* ── Navigation ── */
-function show(n) {
-  document.querySelectorAll('.mockup-panel').forEach(p => p.classList.remove('visible'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('m' + n).classList.add('visible');
-  document.querySelectorAll('.nav-btn')[n - 1].classList.add('active');
-}
+document.addEventListener('DOMContentLoaded', function() {
 
-/* ── Mockup 1: tab + accordion ── */
-function m1Tab(btn, paneId) {
-  const nav = btn.closest('.m1-tab-bar');
-  nav.querySelectorAll('.m1-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  const panel = btn.closest('.mockup-panel');
-  panel.querySelectorAll('.m1-pane').forEach(p => p.style.display = 'none');
-  document.getElementById(paneId).style.display = 'block';
-}
-function m1Toggle(header) {
-  const body = header.nextElementSibling;
-  const chevron = header.querySelector('.m1-acc-chevron');
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  chevron.classList.toggle('open', !open);
-}
+  // ── Mockup switcher ──
+  document.querySelectorAll('.nav-btn').forEach(function(btn, idx) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.mockup-panel').forEach(function(p) { p.classList.remove('visible'); });
+      document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+      var n = btn.getAttribute('data-mockup');
+      document.getElementById('m' + n).classList.add('visible');
+      btn.classList.add('active');
+    });
+  });
 
-/* ── Mockup 2: section cards ── */
-function m2Toggle(header) {
-  const body = header.nextElementSibling;
-  body.style.display = body.style.display === 'none' ? 'block' : 'none';
-}
+  // ── Mockup 1: tab bar ──
+  document.querySelectorAll('.m1-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var paneId = tab.getAttribute('data-pane');
+      tab.closest('.m1-tab-bar').querySelectorAll('.m1-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      tab.closest('.mockup-panel').querySelectorAll('.m1-pane').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById(paneId).classList.add('active');
+    });
+  });
 
-/* ── Mockup 3: pill nav + card collapse ── */
-function m3Pill(pill, paneId) {
-  const nav = pill.closest('.m3-pill-nav');
-  nav.querySelectorAll('.m3-pill').forEach(p => p.classList.remove('active'));
-  pill.classList.add('active');
-  const panel = pill.closest('.mockup-panel');
-  panel.querySelectorAll('.m3-pane').forEach(p => p.style.display = 'none');
-  document.getElementById(paneId).style.display = 'block';
-}
-function m3Collapse(header) {
-  const body = header.nextElementSibling;
-  const btn = header.querySelector('.m3-card-header-collapse');
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  btn.textContent = open ? '▾ Expand' : '▴ Collapse';
-  btn.classList.toggle('open', !open);
-}
+  // ── Mockup 1: accordions ──
+  document.querySelectorAll('.m1-acc-header').forEach(function(header) {
+    header.addEventListener('click', function() {
+      var body = header.nextElementSibling;
+      var chevron = header.querySelector('.m1-acc-chevron');
+      var isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      if (chevron) { chevron.classList.toggle('open', !isOpen); }
+    });
+  });
 
-/* ── Mockup 4: full-width toggle ── */
-function m4Toggle(btn) {
-  const body = btn.nextElementSibling;
-  const arrow = btn.querySelector('.m4-section-arrow');
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  arrow.classList.toggle('open', !open);
-}
+  // ── Mockup 2: section cards ──
+  document.querySelectorAll('.m2-section-header').forEach(function(header) {
+    header.addEventListener('click', function() {
+      var body = header.nextElementSibling;
+      body.classList.toggle('open');
+    });
+  });
 
-/* ── Mockup 5: tab + collapse + whoop sub-tabs ── */
-function m5Tab(tab, paneId) {
-  const strip = tab.closest('.m5-tab-strip');
-  strip.querySelectorAll('.m5-tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-  const panel = tab.closest('.mockup-panel');
-  panel.querySelectorAll('.m5-pane').forEach(p => p.style.display = 'none');
-  document.getElementById(paneId).style.display = 'block';
-}
-function m5Collapse(header) {
-  const body = header.nextElementSibling;
-  const caret = header.querySelector('.m5-section-caret');
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  caret.classList.toggle('open', !open);
-}
-function m5WhoopTab(tab, paneId) {
-  const bar = tab.closest('.m5-whoop-subtab-bar');
-  bar.querySelectorAll('.m5-wtab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-  document.querySelectorAll('.mw-pane').forEach(p => p.style.display = 'none');
-  document.getElementById(paneId).style.display = 'block';
-}
+  // ── Mockup 3: pill nav ──
+  document.querySelectorAll('.m3-pill').forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      var paneId = pill.getAttribute('data-pane');
+      pill.closest('.m3-pill-nav').querySelectorAll('.m3-pill').forEach(function(p) { p.classList.remove('active'); });
+      pill.classList.add('active');
+      pill.closest('.mockup-panel').querySelectorAll('.m3-pane').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById(paneId).classList.add('active');
+    });
+  });
+
+  // ── Mockup 3: card collapse ──
+  document.querySelectorAll('.m3-card-header').forEach(function(header) {
+    header.addEventListener('click', function() {
+      var body = header.nextElementSibling;
+      var btn = header.querySelector('.m3-card-header-collapse');
+      var isCollapsed = body.classList.contains('collapsed');
+      body.classList.toggle('collapsed', !isCollapsed);
+      if (btn) { btn.textContent = isCollapsed ? '▲ Collapse' : '▾ Expand'; }
+    });
+  });
+
+  // ── Mockup 4: section toggles ──
+  document.querySelectorAll('.m4-section-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var body = btn.nextElementSibling;
+      var arrow = btn.querySelector('.m4-section-arrow');
+      var isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      if (arrow) { arrow.classList.toggle('open', !isOpen); }
+    });
+  });
+
+  // ── Mockup 5: main tab strip ──
+  document.querySelectorAll('.m5-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var paneId = tab.getAttribute('data-pane');
+      tab.closest('.m5-tab-strip').querySelectorAll('.m5-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      tab.closest('.mockup-panel').querySelectorAll('.m5-pane').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById(paneId).classList.add('active');
+    });
+  });
+
+  // ── Mockup 5: section collapse ──
+  document.querySelectorAll('.m5-section-head').forEach(function(header) {
+    header.addEventListener('click', function() {
+      var body = header.nextElementSibling;
+      var caret = header.querySelector('.m5-section-caret');
+      var isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      if (caret) { caret.classList.toggle('open', !isOpen); }
+    });
+  });
+
+  // ── Mockup 5: Whoop sub-tabs ──
+  document.querySelectorAll('.m5-wtab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var paneId = tab.getAttribute('data-pane');
+      tab.closest('.m5-whoop-subtab-bar').querySelectorAll('.m5-wtab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      tab.closest('.m5-section').querySelectorAll('.mw-pane').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById(paneId).classList.add('active');
+    });
+  });
+
+});
 </script>
 </body>
 </html>
