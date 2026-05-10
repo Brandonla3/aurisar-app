@@ -1574,35 +1574,27 @@ return (
 
 {/* ── PROFILE EDIT ─────────────────────── */}{editMode && <>
 
-  {/* Fixed header: follows the user while scrolling */}
+  {/* Sticky header: title + cancel + save */}
   <div style={{
-    position: "fixed",
+    position: "sticky",
     top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
+    zIndex: 10,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: S.s8,
+    marginBottom: S.s12,
+    padding: "8px 0",
     background: "rgba(10,9,8,.96)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
   }}>
-    <div style={{
-      maxWidth: 520,
-      margin: "0 auto",
-      padding: "12px 12px 8px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: S.s8,
-    }}>
-      <div className={"sec"} style={{ margin: 0, border: "none", padding: S.s0 }}>{"✎ Edit Profile"}</div>
-      <div style={{ display: "flex", gap: S.s8, alignItems: "center" }}>
-        <button className={"btn btn-ghost btn-sm"} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button>
-        <button className={"btn btn-gold btn-sm"} onClick={saveEdit}>{"⚔️ Save"}</button>
-      </div>
+    <div className={"sec"} style={{ margin: 0, border: "none", padding: S.s0 }}>{"✎ Edit Profile"}</div>
+    <div style={{ display: "flex", gap: S.s8, alignItems: "center" }}>
+      <button className={"btn btn-ghost btn-sm"} onClick={() => setEditMode(false)}>{"✕ Cancel"}</button>
+      <button className={"btn btn-gold btn-sm"} onClick={saveEdit}>{"⚔️ Save"}</button>
     </div>
   </div>
-  {/* Spacer so fixed header doesn't overlap the first card */}
-  <div style={{ height: 48, marginBottom: S.s12 }} />
 
   {/* Edit sections — styled as log-group-cards to match the profile view */}
   <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
