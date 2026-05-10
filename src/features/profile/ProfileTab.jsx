@@ -670,7 +670,7 @@ return (
       <div>
         {/* Personal Bests card */}
         {pbEntries.length > 0 && (
-          <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+          <div className={"log-group-card"} style={{ "--mg-color": cls.color, overflow: "visible" }}>
             <div className={`log-group-hdr${collapsed.personalBests ? " collapsed" : ""}`}
               onClick={() => setCollapsed(c => ({ ...c, personalBests: !c.personalBests }))}>
               <div className={"log-group-icon"}>{"🏆"}</div>
@@ -681,7 +681,7 @@ return (
               <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: collapsed.personalBests ? "none" : "rotate(180deg)", flexShrink: 0 }}>{"▼"}</span>
             </div>
             {!collapsed.personalBests && (
-              <div style={{ padding: "8px 11px 10px" }}>
+              <div style={{ padding: "8px 11px 10px", overflow: "visible" }}>
                 {/* Filter dropdown */}
                 <div style={{ position: "relative", marginBottom: S.s8 }}>
                   <div style={{
@@ -949,17 +949,7 @@ return (
 
   {
     /* ═══ Email Verification Status (with Show/Hide) ═══ */
-  }{authUser && <div style={{
-    background: "rgba(45,42,36,.18)",
-    border: "1px solid rgba(45,42,36,.2)",
-    borderRadius: R.r10,
-    padding: "10px 14px",
-    marginBottom: S.s12,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: S.s8
-  }}><div style={{
+  }{authUser && <div className={"log-group-card"} style={{ "--mg-color": authUser.email_confirmed_at ? "#2ecc71" : cls.color }}><div style={{
       display: "flex",
       alignItems: "center",
       gap: S.s8,
@@ -1004,13 +994,16 @@ return (
       color: authUser.email_confirmed_at ? "#7ebf73" : UI_COLORS.danger
     }}>{authUser.email_confirmed_at ? "\u2713 Verified" : "Unverified"}</span></div>
 
-  /* ═══ Account IDs ═══ */}<div style={{
-    background: "rgba(45,42,36,.12)",
-    border: "1px solid rgba(45,42,36,.15)",
-    borderRadius: R.r10,
-    padding: "10px 14px",
-    marginBottom: S.s12
-  }}><div style={{
+  /* ═══ Account IDs ═══ */}
+    <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={"log-group-hdr"} style={{ cursor: "default" }}>
+        <div className={"log-group-icon"}>{"\uD83D\uDD11"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Account IDs"}</div>
+          <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{"Public \u00b7 Private"}</div>
+        </div>
+      </div>
+      <div style={{ padding: "8px 11px 10px" }}><div style={{
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -1074,45 +1067,23 @@ return (
           textDecoration: "underline",
           userSelect: "none"
         }} onClick={() => setShowPrivateId(s => !s)}>{showPrivateId ? "Hide" : "Show"}</span></div></div></div>
+      </div>
+    </div>
 
   {
     /* ═══ CHANGE EMAIL — collapsible ═══ */
-  }<div className={"edit-panel"} style={{
-    marginBottom: S.s12,
-    padding: S.s0,
-    overflow: "hidden"
-  }}><div style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      cursor: "pointer"
-    }} onClick={() => {
-      setEmailPanelOpen(s => !s);
-      if (emailPanelOpen) {
-        setNewEmail("");
-        setEmailMsg(null);
-      }
-    }}><label style={{
-        margin: 0,
-        cursor: "pointer"
-      }}>{"📧 Change Email Address"}</label><span style={{
-        fontSize: FS.fs65,
-        color: "#b4ac9e",
-        userSelect: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: S.s4
-      }}>{emailPanelOpen ? "Collapse" : "Expand"}<svg width={"12"} height={"12"} viewBox={"0 0 14 14"} fill={"none"} style={{
-          transition: "transform .2s",
-          transform: emailPanelOpen ? "rotate(180deg)" : "rotate(0deg)"
-        }}><defs><linearGradient id={"cgEm"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs><polyline points={"3,5 7,9 11,5"} stroke={"url(#cgEm)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></span></div>{emailPanelOpen && <div style={{
-      padding: "0 14px 14px 14px",
-      display: "flex",
-      flexDirection: "column",
-      gap: S.s10,
-      borderTop: "1px solid rgba(45,42,36,.2)"
-    }}><div style={{
+  }<div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={`log-group-hdr${emailPanelOpen ? "" : " collapsed"}`}
+        onClick={() => { setEmailPanelOpen(s => !s); if (emailPanelOpen) { setNewEmail(""); setEmailMsg(null); } }}>
+        <div className={"log-group-icon"}>{"📧"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Change Email Address"}</div>
+        </div>
+        <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: emailPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
+      </div>
+      {emailPanelOpen && (
+        <div style={{ padding: "8px 11px 10px" }}>
+          <div style={{
         fontSize: FS.fs64,
         color: "#8a8478",
         marginTop: S.s10,
@@ -1129,58 +1100,26 @@ return (
         borderRadius: R.md
       }}>{emailMsg.text}</div>}<button className={"btn btn-ghost btn-sm"} style={{
         width: "100%"
-      }} onClick={changeEmailAddress} disabled={!newEmail.trim()}>{"📧 Update Email"}</button></div>}</div>
+      }} onClick={changeEmailAddress} disabled={!newEmail.trim()}>{"📧 Update Email"}</button>
+        </div>
+      )}
+    </div>
 
   {
     /* ═══ MFA (TOTP) — collapsible ═══ */
-  }<div className={"edit-panel"} style={{
-    marginBottom: S.s12,
-    padding: S.s0,
-    overflow: "hidden"
-  }}><div style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      cursor: "pointer"
-    }} onClick={() => guardRecoveryCodes(() => {
-      setMfaPanelOpen(s => !s);
-      if (mfaPanelOpen) {
-        setMfaMsg(null);
-        setMfaEnrolling(false);
-        setMfaQR(null);
-        setMfaCode("");
-      }
-    })}><label style={{
-        margin: 0,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: S.s8
-      }}>{"🛡️ Multi-Factor Authentication"}{mfaEnabled && <span style={{
-          fontSize: FS.fs56,
-          fontWeight: 700,
-          padding: "2px 8px",
-          borderRadius: R.r10,
-          background: "#1a2e1a",
-          color: "#7ebf73"
-        }}>{"Active"}</span>}</label><span style={{
-        fontSize: FS.fs65,
-        color: "#b4ac9e",
-        userSelect: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: S.s4
-      }}>{mfaPanelOpen ? "Collapse" : "Expand"}<svg width={"12"} height={"12"} viewBox={"0 0 14 14"} fill={"none"} style={{
-          transition: "transform .2s",
-          transform: mfaPanelOpen ? "rotate(180deg)" : "rotate(0deg)"
-        }}><defs><linearGradient id={"cgMf"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs><polyline points={"3,5 7,9 11,5"} stroke={"url(#cgMf)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></span></div>{mfaPanelOpen && <div style={{
-      padding: "0 14px 14px 14px",
-      display: "flex",
-      flexDirection: "column",
-      gap: S.s10,
-      borderTop: "1px solid rgba(45,42,36,.2)"
-    }}>{!mfaEnabled && !mfaEnrolling && !mfaRecoveryCodes && <div style={{
+  }<div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={`log-group-hdr${mfaPanelOpen ? "" : " collapsed"}`}
+        onClick={() => guardRecoveryCodes(() => { setMfaPanelOpen(s => !s); if (mfaPanelOpen) { setMfaMsg(null); setMfaEnrolling(false); setMfaQR(null); setMfaCode(""); } })}>
+        <div className={"log-group-icon"}>{"🛡️"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Two-Factor Authentication"}</div>
+          <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{mfaEnabled ? `Active · ${mfaCodesRemaining ?? "?"} recovery codes` : "Not enabled"}</div>
+        </div>
+        <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: mfaPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
+      </div>
+      {mfaPanelOpen && (
+        <div style={{ padding: "8px 11px 10px" }}>
+          {!mfaEnabled && !mfaEnrolling && !mfaRecoveryCodes && <div style={{
         marginTop: S.s10
       }}><div style={{
           fontSize: FS.fs64,
@@ -1418,57 +1357,26 @@ return (
         textAlign: "center",
         padding: "6px 8px",
         borderRadius: R.md
-      }}>{mfaMsg.text}</div>}</div>}</div>
+      }}>{mfaMsg.text}</div>}
+        </div>
+      )}
+    </div>
 
   {
     /* ═══ Phone Number — collapsible ═══ */
-  }<div className={"edit-panel"} style={{
-    marginBottom: S.s12,
-    padding: S.s0,
-    overflow: "hidden"
-  }}><div style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      cursor: "pointer"
-    }} onClick={() => {
-      setPhonePanelOpen(s => !s);
-      if (phonePanelOpen) {
-        setPhoneMsg(null);
-        setPhoneOtpSent(false);
-        setPhoneOtpCode("");
-      }
-    }}><label style={{
-        margin: 0,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: S.s8
-      }}>{"📱 Phone Number (optional)"}{profile.phone && profile.phoneVerified && <span style={{
-          fontSize: FS.fs56,
-          fontWeight: 700,
-          padding: "2px 8px",
-          borderRadius: R.r10,
-          background: "#1a2e1a",
-          color: "#7ebf73"
-        }}>{"Verified"}</span>}</label><span style={{
-        fontSize: FS.fs65,
-        color: "#b4ac9e",
-        userSelect: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: S.s4
-      }}>{phonePanelOpen ? "Collapse" : "Expand"}<svg width={"12"} height={"12"} viewBox={"0 0 14 14"} fill={"none"} style={{
-          transition: "transform .2s",
-          transform: phonePanelOpen ? "rotate(180deg)" : "rotate(0deg)"
-        }}><defs><linearGradient id={"cgPh"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs><polyline points={"3,5 7,9 11,5"} stroke={"url(#cgPh)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></span></div>{phonePanelOpen && <div style={{
-      padding: "0 14px 14px 14px",
-      display: "flex",
-      flexDirection: "column",
-      gap: S.s10,
-      borderTop: "1px solid rgba(45,42,36,.2)"
-    }}>{profile.phone && <div style={{
+  }<div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={`log-group-hdr${phonePanelOpen ? "" : " collapsed"}`}
+        onClick={() => { setPhonePanelOpen(s => !s); if (phonePanelOpen) { setPhoneMsg(null); setPhoneOtpSent(false); setPhoneOtpCode(""); } }}>
+        <div className={"log-group-icon"}>{"📱"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Phone Number"}</div>
+          <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{profile.phone && profile.phoneVerified ? "✓ Verified" : profile.phone ? "On file" : "Optional"}</div>
+        </div>
+        <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: phonePanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
+      </div>
+      {phonePanelOpen && (
+        <div style={{ padding: "8px 11px 10px" }}>
+          {profile.phone && <div style={{
         marginTop: S.s10
       }}><div style={{
           display: "flex",
@@ -1548,47 +1456,25 @@ return (
         textAlign: "center",
         padding: "6px 8px",
         borderRadius: R.md
-      }}>{phoneMsg.text}</div>}</div>}</div>
+      }}>{phoneMsg.text}</div>}
+        </div>
+      )}
+    </div>
 
   {
     /* ═══ Set / Change Password — collapsible ═══ */
-  }<div className={"edit-panel"} style={{
-    marginBottom: S.s12,
-    padding: S.s0,
-    overflow: "hidden"
-  }}><div style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      cursor: "pointer"
-    }} onClick={() => {
-      setPwPanelOpen(s => !s);
-      if (pwPanelOpen) {
-        setPwNew("");
-        setPwConfirm("");
-        setPwMsg(null);
-      }
-    }}><label style={{
-        margin: 0,
-        cursor: "pointer"
-      }}>{"🔑 Set / Change Password"}</label><span style={{
-        fontSize: FS.fs65,
-        color: "#b4ac9e",
-        userSelect: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: S.s4
-      }}>{pwPanelOpen ? "Collapse" : "Expand"}<svg width={"12"} height={"12"} viewBox={"0 0 14 14"} fill={"none"} style={{
-          transition: "transform .2s",
-          transform: pwPanelOpen ? "rotate(180deg)" : "rotate(0deg)"
-        }}><defs><linearGradient id={"cgPw"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs><polyline points={"3,5 7,9 11,5"} stroke={"url(#cgPw)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></span></div>{pwPanelOpen && <div style={{
-      padding: "0 14px 14px 14px",
-      display: "flex",
-      flexDirection: "column",
-      gap: S.s10,
-      borderTop: "1px solid rgba(45,42,36,.2)"
-    }}><div className={"field"} style={{
+  }<div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
+      <div className={`log-group-hdr${pwPanelOpen ? "" : " collapsed"}`}
+        onClick={() => { setPwPanelOpen(s => !s); if (pwPanelOpen) { setPwNew(""); setPwConfirm(""); setPwMsg(null); } }}>
+        <div className={"log-group-icon"}>{"🔑"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Set / Change Password"}</div>
+        </div>
+        <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: pwPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
+      </div>
+      {pwPanelOpen && (
+        <div style={{ padding: "8px 11px 10px" }}>
+          <div className={"field"} style={{
         marginTop: S.s10
       }}><div style={{
           display: "flex",
@@ -1614,7 +1500,10 @@ return (
         border: pwMsg.ok === null ? "1px solid rgba(180,172,158,.06)" : "none"
       }}>{pwMsg.text}</div>}<button className={"btn btn-ghost btn-sm"} style={{
         width: "100%"
-      }} onClick={changePassword} disabled={!pwNew || !pwConfirm}>{"🔑 Save Password"}</button></div>}</div><div className={"div"} />
+      }} onClick={changePassword} disabled={!pwNew || !pwConfirm}>{"🔑 Save Password"}</button>
+        </div>
+      )}
+    </div><div className={"div"} />
 
       <button className={"btn btn-ghost btn-sm"} style={{ width: "100%", marginBottom: S.s8, marginTop: 8 }}
         onClick={() => { setEditMode(false); setSecurityMode(false); setNotifMode(true); }}>
