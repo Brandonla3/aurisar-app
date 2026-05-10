@@ -29,6 +29,7 @@ const CompletionModal = memo(function CompletionModal({
   // Data
   profile,
   allExById,
+  clsColor,
   // Callbacks
   confirmWorkoutComplete,
   scheduleWorkoutForDate,
@@ -38,6 +39,7 @@ const CompletionModal = memo(function CompletionModal({
   const xp = wo.exercises.reduce((s, ex) => s + calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById), 0);
   const firstEx = wo.exercises.map(e => allExById[e.exId]).find(Boolean);
   const woMgColor = getMuscleColor(firstEx?.muscleGroup);
+  const accentColor = clsColor || "#b4ac9e";
   const inPickMode = completionAction === "past";
   const inScheduleMode = completionAction === "schedule";
   const pickerValue = inPickMode && completionDate !== "pick" ? completionDate : "";
@@ -53,7 +55,7 @@ const CompletionModal = memo(function CompletionModal({
       if (e.target !== e.currentTarget) return;
       dismiss();
     }}>
-      <div className={"completion-sheet sheet-slide-up"} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"} style={{ "--mg-color": woMgColor }}>
+      <div className={"completion-sheet sheet-slide-up"} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"} style={{ "--mg-color": accentColor }}>
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: S.s8 }}>
@@ -71,7 +73,7 @@ const CompletionModal = memo(function CompletionModal({
         </div>
 
         {/* Workout card */}
-        <div className={"completion-wo-card"}>
+        <div className={"completion-wo-card"} style={{ "--mg-color": woMgColor }}>
           <span className={"completion-wo-icon"}>{wo.icon}</span>
           <div>
             <div className={"completion-wo-name"}>{wo.name}</div>

@@ -604,6 +604,7 @@ const WorkoutsTab = memo(function WorkoutsTab({
   showToast,
   // Computed
   allExById,
+  clsColor,
 }) {
   function updateWbEx(idx, field, val) {
     setWbExercises(exs => exs.map((e, i) => i === idx ? { ...e, [field]: val } : e));
@@ -1570,14 +1571,16 @@ if (workoutView === "detail" && activeWorkout) {
     }}><button className={"btn btn-ghost btn-sm"} onClick={() => {
         setWorkoutView("list");
         setActiveWorkout(null);
-      }}>{"← Back"}</button><div className={"sec"} style={{
-        margin: 0,
-        border: "none",
-        padding: S.s0,
+      }}>{"← Back"}</button><div style={{
+        fontFamily: "'Cinzel',serif",
+        fontSize: ".78rem",
+        fontWeight: 600,
+        color: "#d4cec4",
+        letterSpacing: ".03em",
         flex: 1,
         overflow: "hidden",
         textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
+        whiteSpace: "nowrap",
       }}>{wo.icon}{" "}{wo.name}</div><div style={{
         display: "flex",
         gap: S.s6,
@@ -1595,7 +1598,8 @@ if (workoutView === "detail" && activeWorkout) {
     }}><div className={"xp-projection"} style={{
         flex: 1,
         minWidth: 160,
-        margin: 0
+        margin: 0,
+        "--mg-color": clsColor || "#b4ac9e"
       }}><div><div className={"xp-proj-label"}>{"Total Projected XP"}</div><div className={"xp-proj-detail"}>{wo.exercises.length}{" exercises"}</div></div><div className={"xp-proj-value"}>{"⚡ "}{xp.toLocaleString()}</div></div></div><div className={"sec"} style={{
       marginBottom: S.s8
     }}>{"Exercises"}</div>{wo.exercises.map((ex, i) => {
