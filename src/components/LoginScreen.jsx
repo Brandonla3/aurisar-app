@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { sb } from '../utils/supabase';
 import aurisarLogo from '../assets/aurisar-logo.png';
 
 // ─── Ambient particles + vignette + grain ─────────────────────────────────────
@@ -457,18 +458,30 @@ function MainAuthForm({
 // ─── Passkey button ───────────────────────────────────────────────────────────
 function PasskeyButton({ disabled }) {
   const [msg, setMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleClick() {
+    setLoading(true);
+    setMsg(null);
+    try {
+      const { error } = await sb.auth.signInWithPasskey();
+      if (error) setMsg(error.message);
+      // on success, onAuthStateChange in App.jsx handles navigation
+    } catch (e) {
+      setMsg(e.message ?? 'Passkey sign-in failed.');
+    }
+    setLoading(false);
+  }
+
   return (
     <div>
       <button
         type="button"
         className="au-btn-passkey"
-        disabled={disabled}
-        onClick={() => {
-          setMsg('Passkey sign-in coming soon.');
-          setTimeout(() => setMsg(null), 3000);
-        }}
+        disabled={disabled || loading}
+        onClick={handleClick}
       >
-        <Glyph name="key" size={14} /> Sign in with Passkey
+        <Glyph name="key" size={14} /> {loading ? 'Signing in…' : 'Sign in with Passkey'}
       </button>
       {msg && (
         <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--au-text-faint)', marginTop: 8 }}>
