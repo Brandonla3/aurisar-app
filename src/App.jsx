@@ -2873,6 +2873,10 @@ function App() {
     setPhoneOtpSent(false);
     setPhoneOtpCode("");
     setPhoneMsg(null);
+    setPasskeyPanelOpen(false);
+    setPasskeyFactors([]);
+    setPasskeyMsg(null);
+    setPasskeyRegistering(false);
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
