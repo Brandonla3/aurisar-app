@@ -458,7 +458,16 @@ function App() {
   const [showWorld, setShowWorld] = useState(false);
   const [previewPinEnabled] = useState(true); // on/off switch for preview PIN gate
   const [detectedClass, setDetectedClass] = useState(null);
-  const [activeTab, setActiveTab] = useState("workout");
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('aurisar_post_oauth_tab');
+      if (saved) {
+        sessionStorage.removeItem('aurisar_post_oauth_tab');
+        return saved;
+      }
+    } catch { /* sessionStorage may be unavailable in some contexts */ }
+    return "workout";
+  });
   const [prevTab, setPrevTab] = useState("workout");
 
   // Mount the Cloudflare Turnstile widget when the support modal opens.
