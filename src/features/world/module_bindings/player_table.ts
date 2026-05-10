@@ -15,12 +15,12 @@ export default __t.row({
   username: __t.string(),
   classType: __t.string().name("class_type"),
   avatarColor: __t.string().name("avatar_color"),
-  avatarConfig: __t.string().name("avatar_config"),
   x: __t.f32(),
   y: __t.f32(),
   direction: __t.u8(),
   isMoving: __t.bool().name("is_moving"),
   zoneId: __t.u8().name("zone_id"),
   online: __t.bool(),
+  avatarConfig: __t.string().name("avatar_config"),
   lastChatAt: __t.u64().name("last_chat_at"),
 });
