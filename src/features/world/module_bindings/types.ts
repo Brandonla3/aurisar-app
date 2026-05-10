@@ -22,6 +22,18 @@ export const ChatMessage = __t.object("ChatMessage", {
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;
 
+export const Mob = __t.object("Mob", {
+  mobId: __t.u64(),
+  mobType: __t.string(),
+  x: __t.f32(),
+  y: __t.f32(),
+  hp: __t.i32(),
+  maxHp: __t.i32(),
+  state: __t.string(),
+  spawnNetId: __t.string(),
+});
+export type Mob = __Infer<typeof Mob>;
+
 export const Player = __t.object("Player", {
   identity: __t.identity(),
   username: __t.string(),

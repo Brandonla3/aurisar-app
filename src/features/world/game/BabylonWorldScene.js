@@ -631,6 +631,8 @@ export class BabylonWorldScene {
     this.callbacks   = callbacks;
 
     this._remotePlayers = new Map();
+    this._mobs          = new Map(); // mobId(BigInt) -> { root, body, head, hpFill, hpBar, lastHp, maxHp, dead }
+    this._lastAttackAt  = 0;          // ms timestamp; throttles spacebar
     this._myIdentity    = null;
     this._keys          = {};
     this._lastPos       = { x: 0, z: 0 };
@@ -1035,6 +1037,7 @@ export class BabylonWorldScene {
     this._local.update(dt);
     this._checkDungeonProximity();
     this._streamTiles();
+    this._handleAttackInput();
     this._trackCamera();
     this._syncStdb();
 
@@ -1042,6 +1045,9 @@ export class BabylonWorldScene {
       this._lerpRemote(rp, dt);
       rp.update(dt);
     });
+
+    // Make mob HP bars face the camera each frame.
+    this._mobs.forEach(m => { m.hpBar?.lookAt(this._camera.position); });
   }
 
   // stream() is a no-op while the player stays inside the current tile —
@@ -1050,6 +1056,128 @@ export class BabylonWorldScene {
     const p = this._local?.root?.position;
     if (!p || !this._tileLoader) return;
     this._tileLoader.stream({ x: p.x, z: p.z });
+  }
+
+  // ── Mobs (slice 5a) ────────────────────────────────────────────────────────
+  // Mob rows arrive from useSpacetimeWorld -> WorldGame -> applyMobUpdate.
+  // Position is server-side in STDB px; we toWorld() it for Babylon coords.
+
+  applyMobUpdate(row) {
+    if (!this.scene) return; // pre-init race; server will resend on resubscribe
+    let m = this._mobs.get(row.mobId);
+    if (!m) m = this._spawnMob(row);
+    if (!m) return;
+
+    m.root.position.x = toWorld(row.x);
+    m.root.position.z = toWorld(row.y);
+
+    // HP bar — scale fill to current/max ratio. Hide entire bar on death.
+    m.maxHp = row.maxHp;
+    m.lastHp = row.hp;
+    const dead = row.state !== 'alive' || row.hp <= 0;
+    if (dead && !m.dead) {
+      m.dead = true;
+      m.body.setEnabled(false);
+      m.head.setEnabled(false);
+      m.hpBar.setEnabled(false);
+    } else if (!dead) {
+      const ratio = Math.max(0, Math.min(1, row.hp / Math.max(1, row.maxHp)));
+      m.hpFill.scaling.x = ratio;
+      // Re-center fill since pivot is at center: shift left by half the missing width.
+      m.hpFill.position.x = -(1 - ratio) * 0.5;
+    }
+  }
+
+  _removeMob(mobId) {
+    const m = this._mobs.get(mobId);
+    if (!m) return;
+    m.root.dispose(false, true);
+    this._mobs.delete(mobId);
+  }
+
+  _spawnMob(row) {
+    if (row.mobType !== 'wolf') return null; // slice 5a only ships wolves
+
+    const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);
+
+    const bodyMat = this._stdMat('mobWolfBody', new BABYLON.Color3(0.42, 0.38, 0.32));
+    const body = BABYLON.MeshBuilder.CreateCylinder(`mob_body_${row.mobId}`, {
+      diameterTop: 0.55, diameterBottom: 0.65, height: 0.85, tessellation: 8,
+    }, this.scene);
+    body.parent = root;
+    body.position.y = 0.55;
+    body.rotation.x = Math.PI / 2;     // lay the cylinder horizontal — wolf body
+    body.material = bodyMat;
+    this._castShadow(body);
+
+    const head = BABYLON.MeshBuilder.CreateSphere(`mob_head_${row.mobId}`, {
+      diameter: 0.55, segments: 6,
+    }, this.scene);
+    head.parent = root;
+    head.position.set(0.5, 0.75, 0);
+    head.material = bodyMat;
+    this._castShadow(head);
+
+    // HP bar — a flat plane parented to the mob, made to face the camera each tick.
+    const hpBar = new BABYLON.TransformNode(`mob_hpbar_${row.mobId}`, this.scene);
+    hpBar.parent = root;
+    hpBar.position.y = 1.6;
+
+    const hpBgMat = new BABYLON.StandardMaterial('mobHpBg', this.scene);
+    hpBgMat.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.08);
+    hpBgMat.disableLighting = true;
+    const hpBg = BABYLON.MeshBuilder.CreatePlane(`mob_hpbg_${row.mobId}`, {
+      width: 1.0, height: 0.12,
+    }, this.scene);
+    hpBg.parent = hpBar;
+    hpBg.material = hpBgMat;
+
+    const hpFillMat = new BABYLON.StandardMaterial('mobHpFill', this.scene);
+    hpFillMat.emissiveColor = new BABYLON.Color3(0.85, 0.18, 0.18);
+    hpFillMat.disableLighting = true;
+    const hpFill = BABYLON.MeshBuilder.CreatePlane(`mob_hpfill_${row.mobId}`, {
+      width: 1.0, height: 0.10,
+    }, this.scene);
+    hpFill.parent = hpBar;
+    hpFill.material = hpFillMat;
+    hpFill.position.z = -0.001; // sit just in front of background
+    // Scale.x will be set in applyMobUpdate based on hp ratio.
+
+    const entry = {
+      root, body, head, hpBar, hpFill,
+      maxHp: row.maxHp, lastHp: row.hp, dead: false,
+    };
+    this._mobs.set(row.mobId, entry);
+    return entry;
+  }
+
+  // ── Combat input ───────────────────────────────────────────────────────────
+
+  _handleAttackInput() {
+    if (this._chatOpen) return;
+    if (!this._keys['Space']) return;
+    const now = performance.now();
+    if (now - this._lastAttackAt < 350) return; // soft cooldown — matches damage cadence
+
+    const target = this._findNearestAliveMobInRange(3.0); // 3 world units = matches server MELEE_RANGE_PX
+    if (!target) return;
+    this._lastAttackAt = now;
+    this.callbacks.onCastAbility?.(target.mobId);
+  }
+
+  _findNearestAliveMobInRange(maxRange) {
+    const p = this._local?.root?.position;
+    if (!p) return null;
+    let bestId = null;
+    let bestSq = maxRange * maxRange;
+    this._mobs.forEach((m, mobId) => {
+      if (m.dead) return;
+      const dx = m.root.position.x - p.x;
+      const dz = m.root.position.z - p.z;
+      const dsq = dx * dx + dz * dz;
+      if (dsq < bestSq) { bestSq = dsq; bestId = mobId; }
+    });
+    return bestId ? { mobId: bestId } : null;
   }
 
   _moveLocal(dt) {
@@ -1273,6 +1401,7 @@ export class BabylonWorldScene {
     window.removeEventListener('resize',  this._onResize);
     this._touchCleanup?.();
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
+    [...this._mobs.keys()].forEach(id => this._removeMob(id));
     this._local?.dispose();
     AssetLibrary.dispose();
     this._tileLoader?.dispose();

@@ -34,7 +34,9 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import CastAbilityReducer from "./cast_ability_reducer";
 import MovePlayerReducer from "./move_player_reducer";
+import SeedWorldReducer from "./seed_world_reducer";
 import SendChatReducer from "./send_chat_reducer";
 import SetAvatarConfigReducer from "./set_avatar_config_reducer";
 import SetPlayerInfoReducer from "./set_player_info_reducer";
@@ -43,6 +45,7 @@ import SetPlayerInfoReducer from "./set_player_info_reducer";
 
 // Import all table schema definitions
 import ChatMessageRow from "./chat_message_table";
+import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
 
 /** Type-only namespace exports for generated type groups. */
@@ -56,6 +59,17 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, ChatMessageRow),
+  mob: __table({
+    name: 'mob',
+    indexes: [
+      { accessor: 'mobId', name: 'mob_mob_id_idx_btree', algorithm: 'btree', columns: [
+        'mobId',
+      ] },
+    ],
+    constraints: [
+      { name: 'mob_mob_id_key', constraint: 'unique', columns: ['mobId'] },
+    ],
+  }, MobRow),
   player: __table({
     name: 'player',
     indexes: [
@@ -71,7 +85,9 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("cast_ability", CastAbilityReducer),
   __reducerSchema("move_player", MovePlayerReducer),
+  __reducerSchema("seed_world", SeedWorldReducer),
   __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("set_avatar_config", SetAvatarConfigReducer),
   __reducerSchema("set_player_info", SetPlayerInfoReducer),
