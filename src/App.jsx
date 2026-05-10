@@ -439,6 +439,14 @@ function App() {
     setMfaChallengeLoading,
     mfaChallengeFactorId,
     setMfaChallengeFactorId,
+    passkeyPanelOpen,
+    setPasskeyPanelOpen,
+    passkeyFactors,
+    setPasskeyFactors,
+    passkeyMsg,
+    setPasskeyMsg,
+    passkeyRegistering,
+    setPasskeyRegistering,
     phonePanelOpen,
     setPhonePanelOpen,
     phoneInput,
@@ -1435,8 +1443,50 @@ function App() {
       } catch {
         setMfaHasLegacyCodes(false);
       }
+      // Also refresh passkey factors
+      await loadPasskeyFactors();
     } catch (e) {
       console.warn("MFA check error:", e);
+    }
+  }
+  async function loadPasskeyFactors() {
+    try {
+      const { data, error } = await sb.auth.mfa.listFactors();
+      if (!error && data) {
+        setPasskeyFactors((data.webauthn ?? []).filter(f => f.status === "verified"));
+      }
+    } catch (e) {
+      console.warn("Passkey load error:", e);
+    }
+  }
+  async function registerPasskey() {
+    setPasskeyRegistering(true);
+    setPasskeyMsg(null);
+    try {
+      const { error } = await sb.auth.registerPasskey();
+      if (error) {
+        setPasskeyMsg({ ok: false, text: error.message });
+      } else {
+        setPasskeyMsg({ ok: true, text: "✓ Passkey registered successfully." });
+        await loadPasskeyFactors();
+      }
+    } catch (e) {
+      setPasskeyMsg({ ok: false, text: e.message ?? "Passkey registration failed." });
+    }
+    setPasskeyRegistering(false);
+  }
+  async function removePasskey(factorId) {
+    setPasskeyMsg(null);
+    try {
+      const { error } = await sb.auth.mfa.unenroll({ factorId });
+      if (error) {
+        setPasskeyMsg({ ok: false, text: "Failed to remove: " + error.message });
+      } else {
+        setPasskeyFactors(prev => prev.filter(f => f.id !== factorId));
+        setPasskeyMsg({ ok: true, text: "✓ Passkey removed." });
+      }
+    } catch (e) {
+      setPasskeyMsg({ ok: false, text: e.message ?? "Failed to remove passkey." });
     }
   }
   async function startMfaEnroll() {
@@ -2823,6 +2873,10 @@ function App() {
     setPhoneOtpSent(false);
     setPhoneOtpCode("");
     setPhoneMsg(null);
+    setPasskeyPanelOpen(false);
+    setPasskeyFactors([]);
+    setPasskeyMsg(null);
+    setPasskeyRegistering(false);
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
@@ -5967,8 +6021,20 @@ function App() {
             changeEmailAddress={changeEmailAddress}
             resetChar={resetChar}
             verifyMfaEnroll={verifyMfaEnroll}
+            startMfaEnroll={startMfaEnroll}
+            unenrollMfa={unenrollMfa}
+            regenerateRecoveryCodes={regenerateRecoveryCodes}
             confirmMfaDisableWithTotp={confirmMfaDisableWithTotp}
             guardRecoveryCodes={guardRecoveryCodes}
+            checkMfaStatus={checkMfaStatus}
+            passkeyPanelOpen={passkeyPanelOpen}
+            setPasskeyPanelOpen={setPasskeyPanelOpen}
+            passkeyFactors={passkeyFactors}
+            passkeyMsg={passkeyMsg}
+            setPasskeyMsg={setPasskeyMsg}
+            passkeyRegistering={passkeyRegistering}
+            registerPasskey={registerPasskey}
+            removePasskey={removePasskey}
             toggleNameVisibility={toggleNameVisibility}
             toggleNotifPref={toggleNotifPref}
             profileComplete={profileComplete}

@@ -222,8 +222,19 @@ const ProfileTab = memo(function ProfileTab({
   changeEmailAddress,
   resetChar,
   verifyMfaEnroll,
+  startMfaEnroll,
+  unenrollMfa,
+  regenerateRecoveryCodes,
   confirmMfaDisableWithTotp,
   guardRecoveryCodes,
+  checkMfaStatus,
+  // Passkey management
+  passkeyPanelOpen, setPasskeyPanelOpen,
+  passkeyFactors,
+  passkeyMsg, setPasskeyMsg,
+  passkeyRegistering,
+  registerPasskey,
+  removePasskey,
   toggleNameVisibility,
   toggleNotifPref,
   profileComplete,
@@ -468,7 +479,7 @@ return (
         background: "rgba(20,18,14,.8)",
       }}>
         {tabs.map((t, i) => (
-          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{
+          <div key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === "security") checkMfaStatus(); }} style={{
             flex: 1, textAlign: "center", padding: "7px 4px",
             fontFamily: "'Inter',sans-serif", fontSize: ".68rem", fontWeight: 600,
             color: activeTab === t.id ? "#d4cec4" : "#8a8478",
@@ -1357,6 +1368,47 @@ return (
         padding: "6px 8px",
         borderRadius: R.md
       }}>{mfaMsg.text}</div>}
+        </div>
+      )}
+    </div>
+
+  {
+    /* ═══ Passkeys — collapsible ═══ */
+  }<div className={"log-group-card"} style={{ "--mg-color": cls.color, marginBottom: 8 }}>
+      <div className={`log-group-hdr${passkeyPanelOpen ? "" : " collapsed"}`}
+        onClick={() => { setPasskeyPanelOpen(s => !s); setPasskeyMsg(null); }}>
+        <div className={"log-group-icon"}>{"🔑"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Passkeys"}</div>
+          <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{passkeyFactors.length > 0 ? `${passkeyFactors.length} registered` : "Sign in without a password"}</div>
+        </div>
+        <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: passkeyPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
+      </div>
+      {passkeyPanelOpen && (
+        <div style={{ padding: "8px 11px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {passkeyFactors.length === 0 ? (
+            <div style={{ fontSize: ".68rem", color: "#8a8478", fontStyle: "italic" }}>{"No passkeys registered yet."}</div>
+          ) : (
+            passkeyFactors.map(f => (
+              <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", background: "rgba(45,42,36,.18)", borderRadius: 8, gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: ".72rem", color: "#d4cec4" }}>{f.friendly_name || "Passkey"}</div>
+                  {f.created_at && <div style={{ fontSize: ".58rem", color: "#8a8478" }}>{new Date(f.created_at).toLocaleDateString()}</div>}
+                </div>
+                <button className={"btn btn-ghost btn-sm"} style={{ color: "#e74c3c", borderColor: "rgba(231,76,60,.2)", flexShrink: 0 }}
+                  onClick={() => removePasskey(f.id)}>{"Remove"}</button>
+              </div>
+            ))
+          )}
+          <button className={"btn btn-ghost btn-sm"} style={{ width: "100%" }}
+            disabled={passkeyRegistering} onClick={registerPasskey}>
+            {passkeyRegistering ? "Opening browser prompt…" : "➕ Add a Passkey"}
+          </button>
+          {passkeyMsg && (
+            <div style={{ fontSize: ".68rem", color: passkeyMsg.ok ? "#7ebf73" : "#e74c3c", textAlign: "center", padding: "4px 8px", borderRadius: 6 }}>
+              {passkeyMsg.text}
+            </div>
+          )}
         </div>
       )}
     </div>

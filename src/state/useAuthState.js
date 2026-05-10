@@ -85,6 +85,12 @@ export function useAuthState() {
   const [mfaChallengeLoading, setMfaChallengeLoading] = useState(false);
   const [mfaChallengeFactorId, setMfaChallengeFactorId] = useState(null);
 
+  // ── Passkey management ───────────────────────────────────────────────────
+  const [passkeyPanelOpen, setPasskeyPanelOpen] = useState(false);
+  const [passkeyFactors, setPasskeyFactors] = useState([]);
+  const [passkeyMsg, setPasskeyMsg] = useState(null);
+  const [passkeyRegistering, setPasskeyRegistering] = useState(false);
+
   // ── Phone OTP enrollment ─────────────────────────────────────────────────
   const [phonePanelOpen, setPhonePanelOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
@@ -124,6 +130,9 @@ export function useAuthState() {
     mfaChallengeScreen, setMfaChallengeScreen, mfaChallengeCode, setMfaChallengeCode,
     mfaChallengeMsg, setMfaChallengeMsg, mfaChallengeLoading, setMfaChallengeLoading,
     mfaChallengeFactorId, setMfaChallengeFactorId,
+    // Passkey management
+    passkeyPanelOpen, setPasskeyPanelOpen, passkeyFactors, setPasskeyFactors,
+    passkeyMsg, setPasskeyMsg, passkeyRegistering, setPasskeyRegistering,
     // Phone OTP
     phonePanelOpen, setPhonePanelOpen, phoneInput, setPhoneInput,
     phoneOtpSent, setPhoneOtpSent, phoneOtpCode, setPhoneOtpCode, phoneMsg, setPhoneMsg,
