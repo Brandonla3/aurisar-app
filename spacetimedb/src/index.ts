@@ -42,18 +42,24 @@ const spacetimedb = schema({
   player: table(
     { public: true },
     {
+      // Original columns — order MUST match the deployed maincloud schema.
+      // SpacetimeDB treats column reordering on a live table as a manual
+      // migration. New columns get appended below with .default(...) so
+      // existing rows backfill non-destructively.
       identity:     t.identity().primaryKey(),  // primary key — SpacetimeDB connection identity
       username:     t.string(),     // display name from Aurisar profile
       classType:    t.string(),     // 'warrior' | 'mage' | 'archer' | 'rogue'
       avatarColor:  t.string(),     // hex color string for the player marker
-      avatarConfig: t.string(),     // JSON-encoded AvatarConfig for 3D character rendering
       x:            t.f32(),        // world X position (pixels)
-      y:           t.f32(),        // world Y position (pixels)
-      direction:   t.u8(),         // 0=down 1=up 2=left 3=right
-      isMoving:    t.bool(),       // for animation state
-      zoneId:      t.u8(),         // 0=hub 1=training 2=plaza
-      online:      t.bool(),       // true while connection is active
-      lastChatAt:  t.u64().default(0n), // micros since unix epoch of last sendChat — default 0n so existing rows backfill non-destructively
+      y:            t.f32(),        // world Y position (pixels)
+      direction:    t.u8(),         // 0=down 1=up 2=left 3=right
+      isMoving:     t.bool(),       // for animation state
+      zoneId:       t.u8(),         // 0=hub 1=training 2=plaza
+      online:       t.bool(),       // true while connection is active
+      // Appended columns — declared after the originals so the live table
+      // gets ADD COLUMN semantics, not a manual reorder migration.
+      avatarConfig: t.string().default(''),       // JSON-encoded AvatarConfig; default '' on backfill — client re-syncs via setPlayerInfo on next login
+      lastChatAt:   t.u64().default(0n),          // micros since unix epoch of last sendChat — default 0n behaves correctly with the > 0n rate-limit guard
     }
   ),
 
