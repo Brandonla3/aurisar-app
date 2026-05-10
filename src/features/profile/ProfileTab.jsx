@@ -1715,7 +1715,7 @@ return (
 
 
 
-/* ── NOTIFICATION PREFERENCES ─────────────────── */}{notifMode && <><div style={{
+{/* ── NOTIFICATION PREFERENCES ─────────────────── */}{notifMode && <><div style={{
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
