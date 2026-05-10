@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "version": "v1.0.0",
+    "created_utc": "2026-05-10T00:00:00Z",
+    "source_file": "world_master.blend"
+  },
+  "tile": {
+    "tile_id": "T_03_03",
+    "world_bounds": {
+      "min": { "x": -232, "y": -20, "z": -232 },
+      "max": { "x": 24, "y": 120, "z": 24 }
+    },
+    "neighbors": [
+      "T_02_02",
+      "T_02_03",
+      "T_02_04",
+      "T_03_02",
+      "T_03_04",
+      "T_04_02",
+      "T_04_03",
+      "T_04_04"
+    ]
+  },
+  "spawns": [
+    {
+      "net_id": "SPAWN_MOB_WOLF_0001",
+      "mob_type": "wolf",
+      "position": { "x": -120.5, "y": 4.1, "z": -88.2 },
+      "yaw_deg": 45,
+      "respawn_sec": 25,
+      "max_alive": 3,
+      "leash_radius_m": 35,
+      "aggro_radius_m": 18
+    }
+  ],
+  "encounter_zones": [
+    {
+      "net_id": "ZONE_ENC_001",
+      "shape": "box",
+      "center": { "x": -40, "y": 3, "z": -10 },
+      "size": { "x": 30, "y": 10, "z": 30 },
+      "waves": [
+        { "mob_type": "bandit_melee", "count": 4, "spawn_interval_sec": 1.25 },
+        { "mob_type": "bandit_archer", "count": 2, "spawn_interval_sec": 2.0 }
+      ]
+    }
+  ],
+  "waypoints": [
+    {
+      "net_id": "WAY_ROUTE_MAIN_0001",
+      "position": { "x": -10, "y": 2.5, "z": 8 },
+      "tags": ["main_route", "to_castle"]
+    }
+  ],
+  "pois": [
+    {
+      "net_id": "POI_CASTLE_MARKER_001",
+      "kind": "castle_marker",
+      "position": { "x": 300, "y": 85, "z": 300 }
+    }
+  ],
+  "nav_hints": {
+    "walkable_cost_scale": 1.0,
+    "blocked_volumes": [
+      {
+        "min": { "x": -60, "y": 0, "z": -60 },
+        "max": { "x": -45, "y": 30, "z": -45 }
+      }
+    ]
+  }
+}

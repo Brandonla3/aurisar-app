@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurisar.app/schemas/prompt_stack.schema.json",
+  "title": "RPG World Prompt Stack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meta",
+    "project",
+    "art_direction",
+    "world_layout",
+    "biome",
+    "landmarks",
+    "lighting_weather",
+    "performance",
+    "negative_prompts"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "authoring_tool", "created_utc"],
+      "properties": {
+        "version": { "type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "authoring_tool": { "type": "string", "enum": ["blender", "pipeline", "manual"] },
+        "created_utc": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "engine", "network_stack", "target_platforms", "camera_style"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "engine": { "type": "string", "enum": ["babylonjs"] },
+        "network_stack": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["spacetimedb", "supabase", "netlify"] },
+          "uniqueItems": true
+        },
+        "target_platforms": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["mobile", "desktop"] },
+          "uniqueItems": true
+        },
+        "camera_style": {
+          "type": "string",
+          "enum": ["third_person", "isometric", "first_person"]
+        }
+      }
+    },
+    "art_direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "mood", "references"],
+      "properties": {
+        "style": { "type": "string", "enum": ["fantasy_realism", "stylized_fantasy", "realism"] },
+        "mood": { "type": "string", "enum": ["epic", "somber", "mystical", "heroic"] },
+        "references": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "type", "value"],
+            "properties": {
+              "label": { "type": "string", "maxLength": 120 },
+              "type": { "type": "string", "enum": ["game", "image_url", "artbook", "screenshot"] },
+              "value": { "type": "string", "minLength": 1, "maxLength": 500 }
+            }
+          }
+        }
+      }
+    },
+    "world_layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_size_m", "play_focus_m", "terrain_shape", "pathing"],
+      "properties": {
+        "world_size_m": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "z"],
+          "properties": {
+            "x": { "type": "number", "minimum": 128, "maximum": 10000 },
+            "z": { "type": "number", "minimum": 128, "maximum": 10000 }
+          }
+        },
+        "play_focus_m": { "type": "number", "minimum": 64, "maximum": 2000 },
+        "terrain_shape": {
+          "type": "string",
+          "enum": ["rolling_plains", "mountain_valley", "forest_basin", "mixed"]
+        },
+        "pathing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["main_route_to_landmark", "combat_clearings"],
+          "properties": {
+            "main_route_to_landmark": { "type": "boolean" },
+            "combat_clearings": { "type": "integer", "minimum": 0, "maximum": 200 }
+          }
+        }
+      }
+    },
+    "biome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grass", "trees", "seasonal_state", "wind"],
+      "properties": {
+        "grass": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["height", "density", "dryness_mix"],
+          "properties": {
+            "height": { "type": "string", "enum": ["short", "medium", "tall"] },
+            "density": { "type": "string", "enum": ["sparse", "medium", "dense"] },
+            "dryness_mix": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "trees": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["species", "count_hint", "distribution", "canopy_shadow_priority"],
+          "properties": {
+            "species": { "type": "string", "enum": ["oak", "pine", "mixed_temperate"] },
+            "count_hint": { "type": "integer", "minimum": 0, "maximum": 200000 },
+            "distribution": { "type": "string", "enum": ["clustered", "spread_out", "mixed"] },
+            "canopy_shadow_priority": { "type": "boolean" }
+          }
+        },
+        "seasonal_state": {
+          "type": "string",
+          "enum": ["spring", "summer", "early_fall", "late_fall", "winter"]
+        },
+        "wind": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "intensity", "gustiness"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "gustiness": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "landmarks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["castle"],
+      "properties": {
+        "castle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["placement", "scale", "interior_required", "visual_role"],
+          "properties": {
+            "placement": { "type": "string", "enum": ["background", "midground", "foreground"] },
+            "scale": { "type": "string", "enum": ["small", "medium", "large", "massive"] },
+            "interior_required": { "type": "boolean" },
+            "visual_role": { "type": "string", "enum": ["objective_anchor", "set_dressing", "skyline"] }
+          }
+        }
+      }
+    },
+    "lighting_weather": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["time_of_day", "sky", "visibility_haze"],
+      "properties": {
+        "time_of_day": { "type": "string", "enum": ["dawn", "morning", "noon", "evening", "sunset", "night"] },
+        "sky": { "type": "string", "enum": ["clear", "partly_cloudy", "overcast", "storm"] },
+        "visibility_haze": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["poly_budget_hint", "fps_target_mobile", "lod_required", "streaming_required"],
+      "properties": {
+        "poly_budget_hint": { "type": "integer", "minimum": 1000, "maximum": 2000000 },
+        "fps_target_mobile": { "type": "integer", "minimum": 20, "maximum": 240 },
+        "lod_required": { "type": "boolean" },
+        "streaming_required": { "type": "boolean" }
+      }
+    },
+    "negative_prompts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    }
+  }
+}
