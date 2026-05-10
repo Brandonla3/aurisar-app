@@ -1819,10 +1819,27 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
           setDragWbExIdx(null);
         }} onDragEnd={() => setDragWbExIdx(null)}><WbExCard ex={ex} i={i} exD={exD} collapsed={!!collapsedWbEx[i]} profile={profile} allExById={allExById} metric={metric} wUnit={wUnit} setWbExercises={setWbExercises} setCollapsedWbEx={setCollapsedWbEx} setSsChecked={setSsChecked} ssChecked={ssChecked} exCount={wbExercises.length} openExEditor={openExEditor} /></div></>;
     });
-  })()}<div className={"div"} />{wbIsOneOff ? wbEditId ?
+  })()}<div style={{ height: 80 }} /><div style={{
+    position: "fixed",
+    bottom: "calc(var(--bottom-nav-h) + 10px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "calc(100% - 32px)",
+    maxWidth: 488,
+    zIndex: 90,
+    display: "flex",
+    gap: S.s8,
+    padding: "10px 14px",
+    background: "rgba(14,13,10,.95)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    borderRadius: 14,
+    border: "1px solid rgba(180,172,158,.12)",
+    boxShadow: "0 -4px 24px rgba(0,0,0,.45)",
+  }}>{wbIsOneOff ? wbEditId ?
   // Editing an existing scheduled one-off — save changes in place
   <button className={"btn btn-gold"} style={{
-    width: "100%"
+    flex: 1
   }} onClick={() => {
     if (!wbName.trim()) {
       showToast("Name your workout first!");
@@ -1844,9 +1861,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
     };
     setProfile(p => ({
       ...p,
-      // Update the saved workout object
       workouts: (p.workouts || []).find(w => w.id === wbEditId) ? (p.workouts || []).map(w => w.id === wbEditId ? updated : w) : [...(p.workouts || []), updated],
-      // Sync the name/icon on all matching scheduledWorkouts
       scheduledWorkouts: (p.scheduledWorkouts || []).map(sw => sw.sourceWorkoutId === wbEditId ? {
         ...sw,
         sourceWorkoutName: updated.name,
@@ -1860,7 +1875,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
   }}>{"💾 Save Changes"}</button> :
   // New one-off — proceed through stats prompt then to log/schedule
   <button className={"btn btn-gold"} style={{
-    width: "100%"
+    flex: 1
   }} onClick={() => {
     if (!wbName.trim()) {
       showToast("Name your workout first!");
@@ -1893,55 +1908,48 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
       setCompletionAction("today");
     });
     setWorkoutView("list");
-  }}>{"Next: Log or Schedule →"}</button> : wbEditId ? <div style={{
-    display: "flex",
-    gap: S.s8
-  }}><button className={"btn btn-gold"} style={{
-      flex: 1
-    }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button><button className={"btn btn-ghost"} style={{
-      flex: 1
-    }} onClick={saveAsNewWorkout}>{"📋 Save As New"}</button></div> : <div style={{
-    display: "flex",
-    gap: S.s8,
-    width: "100%"
-  }}><button className={"btn btn-gold"} style={{
-      flex: 1
-    }} onClick={saveBuiltWorkout}>{"💾 Save Workout"}</button><button className={"btn btn-gold"} style={{
-      flex: 1,
-      background: "linear-gradient(135deg,#8B7425,#A89030)"
-    }} onClick={() => {
-      if (!wbName.trim()) {
-        showToast("Name your workout first!");
-        return;
-      }
-      if (wbExercises.length === 0) {
-        showToast("Add at least one exercise.");
-        return;
-      }
-      const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
-      const wo = {
-        id: uid(),
-        name: wbName.trim(),
-        icon: wbIcon,
-        desc: wbDesc.trim(),
-        exercises: wbExercises,
-        createdAt: todayStr(),
-        oneOff: true,
-        durationMin: dur || null,
-        activeCal: wbActiveCal || null,
-        totalCal: wbTotalCal || null,
-        labels: wbLabels
-      };
-      openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-        setCompletionModal({
-          workout: woWithStats,
-          fromStats: _sr
-        });
-        setCompletionDate(todayStr());
-        setCompletionAction("today");
+  }}>{"Next: Log or Schedule →"}</button> : wbEditId ? <>
+  <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button>
+  <button className={"btn btn-ghost"} style={{ flex: 1 }} onClick={saveAsNewWorkout}>{"📋 Save As New"}</button>
+  </> : <>
+  <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Save Workout"}</button>
+  <button className={"btn btn-gold"} style={{
+    flex: 1,
+    background: "linear-gradient(135deg,#8B7425,#A89030)"
+  }} onClick={() => {
+    if (!wbName.trim()) {
+      showToast("Name your workout first!");
+      return;
+    }
+    if (wbExercises.length === 0) {
+      showToast("Add at least one exercise.");
+      return;
+    }
+    const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
+    const wo = {
+      id: uid(),
+      name: wbName.trim(),
+      icon: wbIcon,
+      desc: wbDesc.trim(),
+      exercises: wbExercises,
+      createdAt: todayStr(),
+      oneOff: true,
+      durationMin: dur || null,
+      activeCal: wbActiveCal || null,
+      totalCal: wbTotalCal || null,
+      labels: wbLabels
+    };
+    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
+      setCompletionModal({
+        workout: woWithStats,
+        fromStats: _sr
       });
-      setWorkoutView("list");
-    }}>{"✓ Complete / Schedule"}</button></div>}</>;
+      setCompletionDate(todayStr());
+      setCompletionAction("today");
+    });
+    setWorkoutView("list");
+  }}>{"✓ Complete / Schedule"}</button>
+  </>}</div></>;
 return null;
 });
 
