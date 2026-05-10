@@ -1008,7 +1008,7 @@ return (
 </div>}{/* VIEW_MODE_END */}
 
 
-/* ── PROFILE EDIT ─────────────────────── */}{editMode && <><div style={{
+{/* ── PROFILE EDIT ─────────────────────── */}{editMode && <><div style={{
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
