@@ -1,0 +1,477 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurisar.app/schemas/world_build_config.schema.json",
+  "title": "World Build Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meta",
+    "world_identity",
+    "stack",
+    "prompt_stack",
+    "blender_authoring",
+    "tiling_streaming",
+    "export_pipeline",
+    "lod_profiles",
+    "runtime_babylon",
+    "multiplayer_spacetimedb",
+    "supabase_persistence",
+    "tile_gameplay_contract",
+    "validation_rules",
+    "deployment"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_version", "created_utc", "project_name", "environment"],
+      "properties": {
+        "config_version": { "type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "created_utc": { "type": "string", "format": "date-time" },
+        "project_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "environment": { "type": "string", "enum": ["dev", "staging", "production_candidate", "production"] },
+        "notes": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "world_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "world_mode",
+        "is_world_replacement",
+        "active_zone_id",
+        "zone_role",
+        "future_zone_expansion_enabled"
+      ],
+      "properties": {
+        "world_id": { "type": "string", "pattern": "^[a-z0-9_]+$", "minLength": 3, "maxLength": 64 },
+        "world_mode": { "type": "string", "enum": ["modular_world_slice", "full_world_replacement"] },
+        "is_world_replacement": { "type": "boolean" },
+        "active_zone_id": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "zone_role": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "future_zone_expansion_enabled": { "type": "boolean" }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "network_realtime", "hosting", "persistence"],
+      "properties": {
+        "engine": { "type": "string", "enum": ["babylonjs"] },
+        "network_realtime": { "type": "string", "enum": ["spacetimedb"] },
+        "hosting": { "type": "string", "enum": ["netlify"] },
+        "persistence": { "type": "string", "enum": ["supabase"] }
+      }
+    },
+    "prompt_stack": {
+      "$ref": "https://aurisar.app/schemas/prompt_stack.schema.json"
+    },
+    "blender_authoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "unit_system", "collections_contract", "object_naming", "custom_properties_required"],
+      "properties": {
+        "version": { "type": "string" },
+        "unit_system": { "type": "string", "enum": ["metric", "imperial"] },
+        "collections_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "required_collections"],
+          "properties": {
+            "root": { "type": "string", "minLength": 1 },
+            "required_collections": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            }
+          }
+        },
+        "object_naming": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "custom_properties_required": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "tiling_streaming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_bounds_m",
+        "tile_size_m",
+        "tile_grid",
+        "tile_id_pattern",
+        "active_streaming_ring",
+        "load_strategy",
+        "unload_policy"
+      ],
+      "properties": {
+        "world_bounds_m": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min_x", "max_x", "min_z", "max_z"],
+          "properties": {
+            "min_x": { "type": "number" },
+            "max_x": { "type": "number" },
+            "min_z": { "type": "number" },
+            "max_z": { "type": "number" }
+          }
+        },
+        "tile_size_m": { "type": "number", "minimum": 32, "maximum": 2048 },
+        "tile_grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cols", "rows"],
+          "properties": {
+            "cols": { "type": "integer", "minimum": 1, "maximum": 64 },
+            "rows": { "type": "integer", "minimum": 1, "maximum": 64 }
+          }
+        },
+        "tile_id_pattern": { "type": "string", "minLength": 1 },
+        "active_streaming_ring": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "load_strategy": { "type": "string", "minLength": 1 },
+        "unload_policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "export_pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["export_format", "babylon_import_profile", "export_flags", "per_tile_outputs", "build_products"],
+      "properties": {
+        "export_format": { "type": "string", "enum": ["glb", "gltf"] },
+        "babylon_import_profile": { "type": "string", "minLength": 1 },
+        "export_flags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "apply_modifiers",
+            "include_uvs",
+            "include_normals",
+            "include_tangents",
+            "include_vertex_colors",
+            "include_materials",
+            "include_animations",
+            "use_draco_or_meshopt_postprocess"
+          ],
+          "properties": {
+            "apply_modifiers": { "type": "boolean" },
+            "include_uvs": { "type": "boolean" },
+            "include_normals": { "type": "boolean" },
+            "include_tangents": { "type": "boolean" },
+            "include_vertex_colors": { "type": "boolean" },
+            "include_materials": { "type": "boolean" },
+            "include_animations": { "type": "boolean" },
+            "use_draco_or_meshopt_postprocess": { "type": "boolean" }
+          }
+        },
+        "per_tile_outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "build_products": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["generate_tile_manifest", "generate_spacetimedb_seed", "generate_supabase_snapshot"],
+          "properties": {
+            "generate_tile_manifest": { "type": "boolean" },
+            "generate_spacetimedb_seed": { "type": "boolean" },
+            "generate_supabase_snapshot": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "lod_profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trees", "grass", "castle"],
+      "properties": {
+        "trees": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lod0_max_m", "lod1_max_m", "lod2_max_m", "billboard_beyond_m"],
+          "properties": {
+            "lod0_max_m": { "type": "number", "minimum": 1 },
+            "lod1_max_m": { "type": "number", "minimum": 1 },
+            "lod2_max_m": { "type": "number", "minimum": 1 },
+            "billboard_beyond_m": { "type": "number", "minimum": 1 }
+          }
+        },
+        "grass": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dense_max_m", "sparse_max_m", "off_beyond_m"],
+          "properties": {
+            "dense_max_m": { "type": "number", "minimum": 1 },
+            "sparse_max_m": { "type": "number", "minimum": 1 },
+            "off_beyond_m": { "type": "number", "minimum": 1 }
+          }
+        },
+        "castle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lod0_max_m", "lod1_beyond_m"],
+          "properties": {
+            "lod0_max_m": { "type": "number", "minimum": 1 },
+            "lod1_beyond_m": { "type": "number", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "runtime_babylon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mobile_tier_profiles", "instancing", "texture_policy"],
+      "properties": {
+        "mobile_tier_profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "mid", "high"],
+          "properties": {
+            "low": { "$ref": "#/$defs/tierProfile" },
+            "mid": { "$ref": "#/$defs/tierProfile" },
+            "high": { "$ref": "#/$defs/tierProfile" }
+          }
+        },
+        "instancing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["use_thin_instances_for_foliage", "freeze_static_world_matrices"],
+          "properties": {
+            "use_thin_instances_for_foliage": { "type": "boolean" },
+            "freeze_static_world_matrices": { "type": "boolean" }
+          }
+        },
+        "texture_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prefer_ktx2_basis", "max_texture_size_mobile"],
+          "properties": {
+            "prefer_ktx2_basis": { "type": "boolean" },
+            "max_texture_size_mobile": { "type": "integer", "minimum": 64, "maximum": 8192 }
+          }
+        }
+      }
+    },
+    "multiplayer_spacetimedb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_model", "interest_management", "tick_rates", "tables", "reducers", "reconciliation"],
+      "properties": {
+        "authority_model": { "type": "string", "minLength": 1 },
+        "interest_management": { "type": "string", "minLength": 1 },
+        "tick_rates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["simulation_hz", "network_snapshot_hz"],
+          "properties": {
+            "simulation_hz": { "type": "integer", "minimum": 1, "maximum": 240 },
+            "network_snapshot_hz": { "type": "integer", "minimum": 1, "maximum": 240 }
+          }
+        },
+        "tables": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "reducers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "reconciliation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["client_prediction", "server_reconcile"],
+          "properties": {
+            "client_prediction": { "type": "boolean" },
+            "server_reconcile": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "supabase_persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_authoritative_realtime", "tables", "sync_events"],
+      "properties": {
+        "is_authoritative_realtime": { "type": "boolean" },
+        "tables": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "sync_events": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "tile_gameplay_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_ref", "required_sections", "net_id_policy"],
+      "properties": {
+        "schema_ref": { "type": "string", "minLength": 1 },
+        "required_sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "net_id_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["must_be_stable", "must_be_unique_global", "pattern"],
+          "properties": {
+            "must_be_stable": { "type": "boolean" },
+            "must_be_unique_global": { "type": "boolean" },
+            "pattern": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "validation_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hard_fail_on_conflicts", "rules"],
+      "properties": {
+        "hard_fail_on_conflicts": { "type": "boolean" },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["netlify", "env_keys_required"],
+      "properties": {
+        "netlify": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["site_build_command", "publish_dir", "edge_functions_enabled"],
+          "properties": {
+            "site_build_command": { "type": "string", "minLength": 1 },
+            "publish_dir": { "type": "string", "minLength": 1 },
+            "edge_functions_enabled": { "type": "boolean" }
+          }
+        },
+        "env_keys_required": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "prompt_stack": {
+            "properties": {
+              "project": {
+                "properties": {
+                  "target_platforms": { "contains": { "const": "mobile" } }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "prompt_stack": {
+            "properties": {
+              "performance": {
+                "properties": {
+                  "lod_required": { "const": true },
+                  "streaming_required": { "const": true }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "prompt_stack": {
+            "properties": {
+              "landmarks": {
+                "properties": {
+                  "castle": {
+                    "properties": { "placement": { "const": "background" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "prompt_stack": {
+            "properties": {
+              "landmarks": {
+                "properties": {
+                  "castle": {
+                    "properties": { "interior_required": { "const": false } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "world_identity": {
+            "properties": { "is_world_replacement": { "const": true } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "world_identity": {
+            "properties": {
+              "world_mode": { "const": "full_world_replacement" },
+              "active_zone_id": { "const": "root_world" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "tierProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hardware_scaling_level", "shadow_map_size", "postfx"],
+      "properties": {
+        "hardware_scaling_level": { "type": "number", "minimum": 0.25, "maximum": 4 },
+        "shadow_map_size": { "type": "integer", "minimum": 64, "maximum": 8192 },
+        "postfx": { "type": "boolean" }
+      }
+    }
+  }
+}

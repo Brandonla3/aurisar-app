@@ -1,0 +1,256 @@
+{
+  "meta": {
+    "config_version": "v1.0.0",
+    "created_utc": "2026-05-10T00:00:00Z",
+    "project_name": "Aurisar Shared World",
+    "environment": "production_candidate",
+    "notes": "Unified world build + prompt + streaming + multiplayer config. Slice 1: contract only — no runtime wiring yet."
+  },
+  "world_identity": {
+    "world_id": "aurisar_overworld_v1",
+    "world_mode": "full_world_replacement",
+    "is_world_replacement": true,
+    "active_zone_id": "root_world",
+    "zone_role": "starter_combat_approach",
+    "future_zone_expansion_enabled": true
+  },
+  "stack": {
+    "engine": "babylonjs",
+    "network_realtime": "spacetimedb",
+    "hosting": "netlify",
+    "persistence": "supabase"
+  },
+  "prompt_stack": {
+    "meta": {
+      "version": "v1.0.0",
+      "authoring_tool": "pipeline",
+      "created_utc": "2026-05-10T00:00:00Z"
+    },
+    "project": {
+      "name": "Aurisar Shared World - Castle Approach",
+      "engine": "babylonjs",
+      "network_stack": ["spacetimedb", "supabase", "netlify"],
+      "target_platforms": ["mobile", "desktop"],
+      "camera_style": "third_person"
+    },
+    "art_direction": {
+      "style": "fantasy_realism",
+      "mood": "epic",
+      "references": [
+        { "label": "World of Warcraft", "type": "game", "value": "Environmental readability and heroic scale" },
+        { "label": "Guild Wars", "type": "game", "value": "Landscape composition and pathway framing" },
+        { "label": "Manor Lords screenshot", "type": "image_url", "value": "https://assets-prd.ignimgs.com/2024/04/24/manor-lords-review-blogroll-1713930788182.jpg" }
+      ]
+    },
+    "world_layout": {
+      "world_size_m": { "x": 2000, "z": 2000 },
+      "play_focus_m": 600,
+      "terrain_shape": "rolling_plains",
+      "pathing": {
+        "main_route_to_landmark": true,
+        "combat_clearings": 8
+      }
+    },
+    "biome": {
+      "grass": { "height": "short", "density": "medium", "dryness_mix": 0.35 },
+      "trees": { "species": "oak", "count_hint": 700, "distribution": "spread_out", "canopy_shadow_priority": true },
+      "seasonal_state": "early_fall",
+      "wind": { "enabled": true, "intensity": 0.25, "gustiness": 0.15 }
+    },
+    "landmarks": {
+      "castle": {
+        "placement": "background",
+        "scale": "massive",
+        "interior_required": false,
+        "visual_role": "objective_anchor"
+      }
+    },
+    "lighting_weather": {
+      "time_of_day": "sunset",
+      "sky": "clear",
+      "visibility_haze": 0.2
+    },
+    "performance": {
+      "poly_budget_hint": 16000,
+      "fps_target_mobile": 45,
+      "lod_required": true,
+      "streaming_required": true
+    },
+    "negative_prompts": [
+      "no dense photogrammetry clutter",
+      "no interior castle details",
+      "no heavy fog or storms",
+      "no very tall grass blocking combat readability",
+      "no overly noisy terrain microdetail"
+    ]
+  },
+  "blender_authoring": {
+    "version": "5.1.1",
+    "unit_system": "metric",
+    "collections_contract": {
+      "root": "WORLD_ROOT",
+      "required_collections": [
+        "GEO_STATIC/TERRAIN/TILES_RENDER",
+        "GEO_STATIC/TERRAIN/TILES_COLLISION",
+        "GEO_STATIC/TERRAIN/TILES_NAV",
+        "GEO_STATIC/CASTLE/CASTLE_LOD0",
+        "GEO_STATIC/CASTLE/CASTLE_LOD1",
+        "FOLIAGE/TREES/OAK_LOD0",
+        "FOLIAGE/TREES/OAK_LOD1",
+        "FOLIAGE/TREES/OAK_LOD2",
+        "FOLIAGE/GRASS/GRASS_NEAR",
+        "GAMEPLAY/SPAWN_POINTS",
+        "GAMEPLAY/ENCOUNTER_ZONES",
+        "GAMEPLAY/WAYPOINTS",
+        "MARKERS/PLAYER_START",
+        "MARKERS/CASTLE_TARGET"
+      ]
+    },
+    "object_naming": {
+      "terrain_render": "TRN_R_T####",
+      "terrain_collision": "TRN_C_T####",
+      "spawn_point": "SPAWN_MOB_<TYPE>_####",
+      "encounter_zone": "ZONE_ENC_###",
+      "waypoint": "WAY_<ROUTE>_####",
+      "poi": "POI_<KIND>_####"
+    },
+    "custom_properties_required": [
+      "net_id",
+      "tile_id",
+      "entity_type",
+      "replicated",
+      "collision_profile"
+    ]
+  },
+  "tiling_streaming": {
+    "world_bounds_m": { "min_x": -1000, "max_x": 1000, "min_z": -1000, "max_z": 1000 },
+    "tile_size_m": 256,
+    "tile_grid": { "cols": 8, "rows": 8 },
+    "tile_id_pattern": "T_##_##",
+    "active_streaming_ring": 1,
+    "load_strategy": "player_tile_plus_neighbors",
+    "unload_policy": "drop_outside_active_ring"
+  },
+  "export_pipeline": {
+    "export_format": "glb",
+    "babylon_import_profile": "mobile_shared_world_v1",
+    "export_flags": {
+      "apply_modifiers": true,
+      "include_uvs": true,
+      "include_normals": true,
+      "include_tangents": true,
+      "include_vertex_colors": true,
+      "include_materials": true,
+      "include_animations": false,
+      "use_draco_or_meshopt_postprocess": true
+    },
+    "per_tile_outputs": [
+      "tile_<ID>_render.glb",
+      "tile_<ID>_collision.glb",
+      "tile_<ID>_gameplay.json"
+    ],
+    "build_products": {
+      "generate_tile_manifest": true,
+      "generate_spacetimedb_seed": true,
+      "generate_supabase_snapshot": true
+    }
+  },
+  "lod_profiles": {
+    "trees": {
+      "lod0_max_m": 60,
+      "lod1_max_m": 180,
+      "lod2_max_m": 450,
+      "billboard_beyond_m": 450
+    },
+    "grass": {
+      "dense_max_m": 45,
+      "sparse_max_m": 80,
+      "off_beyond_m": 80
+    },
+    "castle": {
+      "lod0_max_m": 300,
+      "lod1_beyond_m": 300
+    }
+  },
+  "runtime_babylon": {
+    "mobile_tier_profiles": {
+      "low": { "hardware_scaling_level": 1.5, "shadow_map_size": 512, "postfx": false },
+      "mid": { "hardware_scaling_level": 1.25, "shadow_map_size": 1024, "postfx": false },
+      "high": { "hardware_scaling_level": 1.0, "shadow_map_size": 1024, "postfx": true }
+    },
+    "instancing": {
+      "use_thin_instances_for_foliage": true,
+      "freeze_static_world_matrices": true
+    },
+    "texture_policy": {
+      "prefer_ktx2_basis": true,
+      "max_texture_size_mobile": 1024
+    }
+  },
+  "multiplayer_spacetimedb": {
+    "authority_model": "server_authoritative_combat",
+    "interest_management": "tile_radius_subscriptions",
+    "tick_rates": {
+      "simulation_hz": 20,
+      "network_snapshot_hz": 10
+    },
+    "tables": ["players", "mobs", "projectiles", "encounters", "loot_drops"],
+    "reducers": ["move_player", "cast_ability", "mob_tick", "resolve_projectiles", "pickup_loot"],
+    "reconciliation": {
+      "client_prediction": true,
+      "server_reconcile": true
+    }
+  },
+  "supabase_persistence": {
+    "is_authoritative_realtime": false,
+    "tables": [
+      "user_profiles",
+      "player_loadouts",
+      "account_inventory",
+      "quest_progress",
+      "session_summaries",
+      "economy_ledger"
+    ],
+    "sync_events": ["on_login", "on_checkpoint", "on_logout", "on_session_end"]
+  },
+  "tile_gameplay_contract": {
+    "schema_ref": "tile_gameplay.schema.json",
+    "required_sections": [
+      "meta",
+      "tile",
+      "spawns",
+      "encounter_zones",
+      "waypoints",
+      "pois",
+      "nav_hints"
+    ],
+    "net_id_policy": {
+      "must_be_stable": true,
+      "must_be_unique_global": true,
+      "pattern": "^[A-Z0-9_\\-]{4,64}$"
+    }
+  },
+  "validation_rules": {
+    "hard_fail_on_conflicts": true,
+    "rules": [
+      "if target_platforms contains mobile => lod_required must be true",
+      "if target_platforms contains mobile => streaming_required must be true",
+      "if castle placement is background => interior_required must be false",
+      "if world_mode is modular_world_slice => active_zone_id required",
+      "if is_world_replacement is true => active_zone_id must be root_world"
+    ]
+  },
+  "deployment": {
+    "netlify": {
+      "site_build_command": "npm run build",
+      "publish_dir": "dist",
+      "edge_functions_enabled": true
+    },
+    "env_keys_required": [
+      "BABYLON_ASSET_BASE_URL",
+      "SPACETIMEDB_ENDPOINT",
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY"
+    ]
+  }
+}
