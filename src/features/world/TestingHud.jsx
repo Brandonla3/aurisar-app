@@ -195,15 +195,26 @@ function _renderMinimap(ctx, pose, mobs) {
     ctx.stroke();
   }
 
-  // World bounds — slightly brighter outline
-  ctx.strokeStyle = 'rgba(255, 220, 120, 0.35)';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(
-    toMapX(PARAMS.minX),
-    toMapY(PARAMS.minZ),
-    PARAMS.tileSize * PARAMS.cols * scale,
-    PARAMS.tileSize * PARAMS.rows * scale,
-  );
+  // World bounds — thick yellow outline. Always visible: even when the bounds
+  // are outside the minimap viewport, draw clamped "you-are-here vs the edge"
+  // segments along the relevant minimap edges so you can tell at a glance how
+  // close you are to a border.
+  const boundsX0 = toMapX(PARAMS.minX);
+  const boundsZ0 = toMapY(PARAMS.minZ);
+  const boundsX1 = toMapX(PARAMS.maxX);
+  const boundsZ1 = toMapY(PARAMS.maxZ);
+  ctx.strokeStyle = 'rgba(255, 220, 80, 0.85)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  // Left border (west)
+  if (boundsX0 >= 0 && boundsX0 <= w) { ctx.moveTo(boundsX0, Math.max(0, boundsZ0)); ctx.lineTo(boundsX0, Math.min(w, boundsZ1)); }
+  // Right border (east)
+  if (boundsX1 >= 0 && boundsX1 <= w) { ctx.moveTo(boundsX1, Math.max(0, boundsZ0)); ctx.lineTo(boundsX1, Math.min(w, boundsZ1)); }
+  // Top border (north / -Z)
+  if (boundsZ0 >= 0 && boundsZ0 <= w) { ctx.moveTo(Math.max(0, boundsX0), boundsZ0); ctx.lineTo(Math.min(w, boundsX1), boundsZ0); }
+  // Bottom border (south / +Z)
+  if (boundsZ1 >= 0 && boundsZ1 <= w) { ctx.moveTo(Math.max(0, boundsX0), boundsZ1); ctx.lineTo(Math.min(w, boundsX1), boundsZ1); }
+  ctx.stroke();
 
   // Mobs — red dots, faded if dead
   for (const m of mobs) {
@@ -237,5 +248,13 @@ function _renderMinimap(ctx, pose, mobs) {
 
 function _renderCoords(host, pose) {
   const tile = worldToTile(pose.x, pose.z, PARAMS);
-  host.textContent = `${tile} · (${pose.x.toFixed(0)}, ${pose.z.toFixed(0)})`;
+  // Distance to the nearest world border. When this hits 0 the player is
+  // pressed against the server-clamped edge of the 2km world.
+  const distW = Math.max(0, pose.x - PARAMS.minX);
+  const distE = Math.max(0, PARAMS.maxX - pose.x);
+  const distN = Math.max(0, pose.z - PARAMS.minZ);
+  const distS = Math.max(0, PARAMS.maxZ - pose.z);
+  const nearest = Math.min(distW, distE, distN, distS);
+  host.innerHTML = `<div>${tile} · (${pose.x.toFixed(0)}, ${pose.z.toFixed(0)})</div>` +
+    `<div style="opacity:0.7">edge: ${Math.round(nearest)}m</div>`;
 }
