@@ -34,6 +34,16 @@ const STDB_CENTER = 1600;
 function toWorld(v) { return (v - STDB_CENTER) / SCALE; }
 function toStdb(v)  { return Math.round(v * SCALE + STDB_CENTER); }
 
+// SpacetimeDB `Identity` is a class instance, not a primitive — every callback
+// constructs a fresh instance for the same logical player, so using the raw
+// object as a Map/Set key (reference equality) caused duplicate spawns and a
+// dead-end `=== this._myIdentity` check that never matched. Canonicalize to
+// hex on every key/comparison boundary.
+function idKey(id) {
+  if (!id) return '';
+  return typeof id.toHexString === 'function' ? id.toHexString() : String(id);
+}
+
 // ── Math helpers ────────────────────────────────────────────────────────────
 const clamp01    = (v) => Math.max(0, Math.min(1, v));
 const lerp       = (a, b, t) => a + (b - a) * t;
@@ -1321,15 +1331,18 @@ export class BabylonWorldScene {
 
   // ── Remote players ─────────────────────────────────────────────────────────
 
-  setMyIdentity(id) { this._myIdentity = id; }
+  // Store as canonical hex so subsequent comparisons against row.identity
+  // (which is a fresh Identity instance each callback) actually match.
+  setMyIdentity(id) { this._myIdentity = idKey(id); }
 
   applyPlayerUpdate(row) {
-    if (row.identity === this._myIdentity) return;
+    const key = idKey(row.identity);
+    if (key === this._myIdentity) return;
     if (!row.online) { this._removeRemote(row.identity); return; }
     if (!this._local) { this._pendingUpdates.push(row); return; }
 
-    if (this._remotePlayers.has(row.identity)) {
-      const rp    = this._remotePlayers.get(row.identity);
+    if (this._remotePlayers.has(key)) {
+      const rp    = this._remotePlayers.get(key);
       rp._targetX = toWorld(row.x);
       rp._targetZ = toWorld(row.y);
       rp.isMoving = row.isMoving;
@@ -1339,8 +1352,9 @@ export class BabylonWorldScene {
   }
 
   async _spawnRemote(row) {
-    if (this._spawning.has(row.identity)) return;
-    this._spawning.add(row.identity);
+    const key = idKey(row.identity);
+    if (this._spawning.has(key)) return;
+    this._spawning.add(key);
     try {
       let parsedConfig = null;
       if (row.avatarConfig) {
@@ -1350,24 +1364,27 @@ export class BabylonWorldScene {
       const rp = await CharacterAvatar.create(
         row.identity, row.username, config, this.scene, AssetLibrary
       );
-      if (this._remotePlayers.has(row.identity)) {
+      if (this._remotePlayers.has(key)) {
         rp.dispose(); // another update already spawned this player
       } else {
         rp._targetX = toWorld(row.x);
         rp._targetZ = toWorld(row.y);
         rp.root.position.set(rp._targetX, 0, rp._targetZ);
-        this._remotePlayers.set(row.identity, rp);
+        this._remotePlayers.set(key, rp);
       }
     } finally {
-      this._spawning.delete(row.identity);
+      this._spawning.delete(key);
     }
   }
 
+  // Accepts either a raw Identity (from STDB callbacks) or a canonical hex
+  // string (from the disposal loop in dispose()).
   _removeRemote(id) {
-    const rp = this._remotePlayers.get(id);
+    const key = typeof id === 'string' ? id : idKey(id);
+    const rp = this._remotePlayers.get(key);
     if (!rp) return;
     rp.dispose();
-    this._remotePlayers.delete(id);
+    this._remotePlayers.delete(key);
   }
 
   _lerpRemote(rp, dt) {
