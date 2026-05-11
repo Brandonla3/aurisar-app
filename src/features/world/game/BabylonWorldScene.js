@@ -1077,8 +1077,7 @@ export class BabylonWorldScene {
     const dead = row.state !== 'alive' || row.hp <= 0;
     if (dead && !m.dead) {
       m.dead = true;
-      m.body.setEnabled(false);
-      m.head.setEnabled(false);
+      m.visual.setEnabled(false);
       m.hpBar.setEnabled(false);
     } else if (!dead) {
       const ratio = Math.max(0, Math.min(1, row.hp / Math.max(1, row.maxHp)));
@@ -1099,24 +1098,83 @@ export class BabylonWorldScene {
     if (row.mobType !== 'wolf') return null; // slice 5a only ships wolves
 
     const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);
+    // Visual subtree — everything that should hide on death lives under here.
+    // Hiding `visual` keeps the HP bar parent intact (it's hidden separately)
+    // and makes the spawn easier to extend with new wolf parts later.
+    const visual = new BABYLON.TransformNode(`mob_visual_${row.mobId}`, this.scene);
+    visual.parent = root;
+    // Wolf faces +Z by convention. The runtime currently doesn't rotate mobs to
+    // their movement direction, but using a consistent forward axis means a
+    // later AI slice can do `root.rotation.y = atan2(vx, vz)` without surprises.
+    //
+    // Color: charcoal grey body with a paler underside / muzzle highlight so
+    // the silhouette reads as a quadruped wolf instead of a featureless blob.
+    const bodyMat = this._stdMat('mobWolfBody',  new BABYLON.Color3(0.28, 0.26, 0.24));
+    const pale    = this._stdMat('mobWolfPale',  new BABYLON.Color3(0.55, 0.50, 0.44));
+    const dark    = this._stdMat('mobWolfDark',  new BABYLON.Color3(0.12, 0.11, 0.10));
 
-    const bodyMat = this._stdMat('mobWolfBody', new BABYLON.Color3(0.42, 0.38, 0.32));
-    const body = BABYLON.MeshBuilder.CreateCylinder(`mob_body_${row.mobId}`, {
-      diameterTop: 0.55, diameterBottom: 0.65, height: 0.85, tessellation: 8,
+    // ── Torso ── elongated box along Z (forward axis).
+    const body = BABYLON.MeshBuilder.CreateBox(`mob_body_${row.mobId}`, {
+      width: 0.55, height: 0.45, depth: 1.0,
     }, this.scene);
-    body.parent = root;
-    body.position.y = 0.55;
-    body.rotation.x = Math.PI / 2;     // lay the cylinder horizontal — wolf body
+    body.parent = visual;
+    body.position.set(0, 0.65, 0);
     body.material = bodyMat;
     this._castShadow(body);
 
-    const head = BABYLON.MeshBuilder.CreateSphere(`mob_head_${row.mobId}`, {
-      diameter: 0.55, segments: 6,
+    // ── Head ── cube at the front of the torso, slightly higher.
+    const head = BABYLON.MeshBuilder.CreateBox(`mob_head_${row.mobId}`, {
+      width: 0.40, height: 0.38, depth: 0.40,
     }, this.scene);
-    head.parent = root;
-    head.position.set(0.5, 0.75, 0);
+    head.parent = visual;
+    head.position.set(0, 0.82, 0.62);
     head.material = bodyMat;
     this._castShadow(head);
+
+    // ── Snout ── smaller box jutting forward from the head; pale tip.
+    const snout = BABYLON.MeshBuilder.CreateBox(`mob_snout_${row.mobId}`, {
+      width: 0.22, height: 0.20, depth: 0.28,
+    }, this.scene);
+    snout.parent = visual;
+    snout.position.set(0, 0.72, 0.90);
+    snout.material = pale;
+
+    // ── Ears ── two upright triangular prisms on top of the head.
+    for (const sign of [-1, 1]) {
+      const ear = BABYLON.MeshBuilder.CreateCylinder(`mob_ear_${row.mobId}_${sign}`, {
+        diameterTop: 0, diameterBottom: 0.14, height: 0.18, tessellation: 4,
+      }, this.scene);
+      ear.parent = visual;
+      ear.position.set(sign * 0.13, 1.08, 0.55);
+      ear.material = dark;
+    }
+
+    // ── Legs ── four thin cylinders at the corners of the torso.
+    const legPositions = [
+      [ 0.18, 0.30,  0.36], // front-right
+      [-0.18, 0.30,  0.36], // front-left
+      [ 0.18, 0.30, -0.36], // back-right
+      [-0.18, 0.30, -0.36], // back-left
+    ];
+    for (let i = 0; i < legPositions.length; i++) {
+      const [x, y, z] = legPositions[i];
+      const leg = BABYLON.MeshBuilder.CreateCylinder(`mob_leg_${row.mobId}_${i}`, {
+        diameter: 0.14, height: 0.60, tessellation: 6,
+      }, this.scene);
+      leg.parent = visual;
+      leg.position.set(x, y, z);
+      leg.material = dark;
+      this._castShadow(leg);
+    }
+
+    // ── Tail ── small cylinder angled up-back from the rear of the body.
+    const tail = BABYLON.MeshBuilder.CreateCylinder(`mob_tail_${row.mobId}`, {
+      diameterTop: 0.06, diameterBottom: 0.14, height: 0.45, tessellation: 6,
+    }, this.scene);
+    tail.parent = visual;
+    tail.position.set(0, 0.75, -0.62);
+    tail.rotation.x = -Math.PI / 4; // angle up-back
+    tail.material = bodyMat;
 
     // HP bar — a flat plane parented to the mob, made to face the camera each tick.
     const hpBar = new BABYLON.TransformNode(`mob_hpbar_${row.mobId}`, this.scene);
@@ -1144,7 +1202,7 @@ export class BabylonWorldScene {
     // Scale.x will be set in applyMobUpdate based on hp ratio.
 
     const entry = {
-      root, body, head, hpBar, hpFill,
+      root, visual, hpBar, hpFill,
       maxHp: row.maxHp, lastHp: row.hp, dead: false,
     };
     this._mobs.set(row.mobId, entry);
