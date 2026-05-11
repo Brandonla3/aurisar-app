@@ -5806,6 +5806,7 @@ function App() {
             daysUntil={daysUntil}
             showToast={showToast}
             allExById={allExById}
+            clsColor={cls.color}
           />
         )
 
@@ -6462,9 +6463,13 @@ function App() {
       />
     )}
 
-    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)} style={{ alignItems: "center" }}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
-        padding: S.s0
+        padding: S.s0,
+        "--mg-color": cls.color,
+        background: "linear-gradient(160deg,#12120e,#0c0c0a)",
+        backdropFilter: "none",
+        WebkitBackdropFilter: "none",
       }}><div className={"modal-body"}><div className={"stats-prompt-banner"} onClick={() => {
             setProfile(p => ({
               ...p,
@@ -6554,7 +6559,7 @@ function App() {
               }}>{"✓"}</span>}</div><div><div className={"stats-prompt-reusable-title"}>{"💪 Also save as Reusable Workout"}</div><div className={"stats-prompt-reusable-sub"}>{"Keep this workout in your Re-Usable tab for future use"}</div></div></div>}<div style={{
             display: "flex",
             gap: S.s8
-          }}><button className={"btn btn-gold"} style={{
+          }}><button className={"btn btn-cls"} style={{
               flex: 1,
               fontSize: FS.fs75
             }} onClick={() => {
@@ -6919,6 +6924,7 @@ function App() {
         setScheduleWoDate={setScheduleWoDate}
         profile={profile}
         allExById={allExById}
+        clsColor={cls.color}
         confirmWorkoutComplete={confirmWorkoutComplete}
         scheduleWorkoutForDate={scheduleWorkoutForDate}
         setStatsPromptModal={setStatsPromptModal}
