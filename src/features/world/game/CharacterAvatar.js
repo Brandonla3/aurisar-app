@@ -144,24 +144,25 @@ export class CharacterAvatar {
     this._applyAllMorphs();
     this._applySkinMaterial();
 
-    // TODO: modular pieces (hair, clothing, species, gear) temporarily disabled
-    // while the GLB pipeline auto-weight fix is verified end-to-end.
-    // Re-enable once the regenerated assets are confirmed artifact-free.
-    //
-    // await this._rebuildHair(assetLibrary);
-    // for (const slot of CLOTHING_SLOTS) {
-    //   await this._rebuildClothingSlot(slot, assetLibrary);
-    // }
-    // if (this._config.species.hornMesh) {
-    //   await this._rebuildHorns(assetLibrary);
-    // }
-    // if (this._config.species.tailMesh) {
-    //   await this._rebuildTail(assetLibrary);
-    // }
-    // for (const slot of GEAR_SLOTS) {
-    //   const meshName = this._config.gear[slot];
-    //   if (meshName) await this.setGear(slot, meshName, assetLibrary);
-    // }
+    // Attach modular pieces. Re-enabled now that the regenerated GLBs
+    // (correct GLTF Y-up → Blender Z-up axis, clean auto-weights) ship in
+    // this same PR — without this loop the in-world avatar appears as the
+    // base body only (no hair / clothing / horns / tail) on every page load,
+    // which is a worse regression than the artifact the asset fix removes.
+    await this._rebuildHair(assetLibrary);
+    for (const slot of CLOTHING_SLOTS) {
+      await this._rebuildClothingSlot(slot, assetLibrary);
+    }
+    if (this._config.species.hornMesh) {
+      await this._rebuildHorns(assetLibrary);
+    }
+    if (this._config.species.tailMesh) {
+      await this._rebuildTail(assetLibrary);
+    }
+    for (const slot of GEAR_SLOTS) {
+      const meshName = this._config.gear[slot];
+      if (meshName) await this.setGear(slot, meshName, assetLibrary);
+    }
   }
 
   // ── Box fallback build ─────────────────────────────────────────────────────
