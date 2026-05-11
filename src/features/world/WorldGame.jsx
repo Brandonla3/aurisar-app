@@ -13,6 +13,7 @@ import BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
+import TestingHud             from './TestingHud.jsx';
 
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
@@ -266,6 +267,8 @@ export default function WorldGame({ playerInfo }) {
   return (
     <div style={S.wrap}>
       <canvas ref={canvasRef} style={S.canvas} />
+
+      <TestingHud sceneRef={sceneRef} />
 
       {/* Mobile: virtual joystick zone (left half, above canvas) */}
       {IS_TOUCH && (
