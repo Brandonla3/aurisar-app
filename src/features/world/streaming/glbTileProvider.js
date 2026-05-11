@@ -24,20 +24,24 @@ export class TileFetchError extends Error {
   }
 }
 
-// Patterns that LoadAssetContainerAsync surfaces when the underlying file
-// fetch fails. Babylon wraps fetch errors inside its loader, so we match on
-// substrings rather than instanceof checks. Whitelisted to "asset missing"
-// shapes — anything else is treated as a real bug.
+// Narrow set of patterns that mean "the file isn't on the server." Earlier
+// versions included broader strings like 'load from' and 'unable to load',
+// but those swallowed legitimate parser / runtime loader failures too —
+// hiding real authored-GLB regressions behind a silent procedural fallback
+// (Codex P2 on #191). Now we only match patterns that unambiguously
+// indicate an HTTP 404 or network-level fetch refusal.
 const MISSING_PATTERNS = [
   '404',
   'Not Found',
-  'Failed to fetch',
-  'unable to load',
-  'load from',          // Babylon's loader prefix when fetch itself rejects
-  'NetworkError',
+  'Failed to fetch',   // Chromium fetch rejection
+  'NetworkError',      // Firefox fetch rejection
 ];
 
 function looksLikeMissing(err) {
+  // Direct HTTP status check first — Babylon's WebRequest exposes .status
+  // on some failure modes and this is more reliable than substring matching.
+  const status = err?.request?.status ?? err?.status;
+  if (status === 404) return true;
   const msg = String(err?.message ?? err ?? '');
   return MISSING_PATTERNS.some((p) => msg.includes(p));
 }

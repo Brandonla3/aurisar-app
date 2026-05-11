@@ -654,8 +654,9 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
-    this._pendingUpdates = []; // remote rows queued while _local is loading
-    this._spawning       = new Set(); // identity IDs currently being async-spawned
+    this._pendingUpdates    = []; // remote rows queued while _local is loading
+    this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
+    this._spawning          = new Set(); // identity IDs currently being async-spawned
 
     // Mobile touch state — written by setJoystick() from WorldGame's React layer
     this._joyDx = 0;
@@ -736,7 +737,11 @@ export class BabylonWorldScene {
       AssetLibrary
     );
     this._local.root.position.set(0, 0, 0);
-    // Flush remote updates that arrived while we were loading
+    // Flush remote updates that arrived while we were loading.
+    // Mobs first — they can spawn independently of `_local` once
+    // MobAssetLibrary is ready, and we want them visible ASAP.
+    const pendingMobs = this._pendingMobUpdates.splice(0);
+    for (const row of pendingMobs) this.applyMobUpdate(row);
     const pending = this._pendingUpdates.splice(0);
     for (const row of pending) this.applyPlayerUpdate(row);
   }
@@ -1088,6 +1093,13 @@ export class BabylonWorldScene {
 
   applyMobUpdate(row) {
     if (!this.scene) return; // pre-init race; server will resend on resubscribe
+    // Queue until MobAssetLibrary finishes loading. _spawnMob's GLB-vs-primitive
+    // decision is made once at first sight, so rows that arrive before assets
+    // are ready would otherwise be baked as primitives and never upgrade —
+    // subsequent updates find the mob already in `_mobs` and skip `_spawnMob`
+    // entirely. Flush happens in `_initCharactersAsync` after both libraries
+    // resolve. (Codex P1 on #191.)
+    if (!MobAssetLibrary.isReady()) { this._pendingMobUpdates.push(row); return; }
     let m = this._mobs.get(row.mobId);
     if (!m) m = this._spawnMob(row);
     if (!m) return;
