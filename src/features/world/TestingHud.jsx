@@ -195,26 +195,53 @@ function _renderMinimap(ctx, pose, mobs) {
     ctx.stroke();
   }
 
-  // World bounds — thick yellow outline. Always visible: even when the bounds
-  // are outside the minimap viewport, draw clamped "you-are-here vs the edge"
-  // segments along the relevant minimap edges so you can tell at a glance how
-  // close you are to a border.
+  // World bounds — two-layer indicator so the player can always tell where
+  // the borders are, no matter how far away.
+  //
+  // 1. Bold yellow line on each border whose canvas position falls anywhere
+  //    in [0, w]. Endpoints are clamped so a partially-visible border still
+  //    draws as a clean segment.
+  // 2. When a border is fully off-canvas (the common case near origin),
+  //    draw a thin translucent strip along the matching canvas edge so the
+  //    direction is still visible. Combined with the "edge: Nm" readout
+  //    underneath, this gives the player full orientation.
   const boundsX0 = toMapX(PARAMS.minX);
   const boundsZ0 = toMapY(PARAMS.minZ);
   const boundsX1 = toMapX(PARAMS.maxX);
   const boundsZ1 = toMapY(PARAMS.maxZ);
+
   ctx.strokeStyle = 'rgba(255, 220, 80, 0.85)';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  // Left border (west)
-  if (boundsX0 >= 0 && boundsX0 <= w) { ctx.moveTo(boundsX0, Math.max(0, boundsZ0)); ctx.lineTo(boundsX0, Math.min(w, boundsZ1)); }
-  // Right border (east)
-  if (boundsX1 >= 0 && boundsX1 <= w) { ctx.moveTo(boundsX1, Math.max(0, boundsZ0)); ctx.lineTo(boundsX1, Math.min(w, boundsZ1)); }
-  // Top border (north / -Z)
-  if (boundsZ0 >= 0 && boundsZ0 <= w) { ctx.moveTo(Math.max(0, boundsX0), boundsZ0); ctx.lineTo(Math.min(w, boundsX1), boundsZ0); }
-  // Bottom border (south / +Z)
-  if (boundsZ1 >= 0 && boundsZ1 <= w) { ctx.moveTo(Math.max(0, boundsX0), boundsZ1); ctx.lineTo(Math.min(w, boundsX1), boundsZ1); }
+  // West border (vertical at boundsX0)
+  if (boundsX0 >= 0 && boundsX0 <= w) {
+    ctx.moveTo(boundsX0, Math.max(0, boundsZ0));
+    ctx.lineTo(boundsX0, Math.min(w, boundsZ1));
+  }
+  // East border (vertical at boundsX1)
+  if (boundsX1 >= 0 && boundsX1 <= w) {
+    ctx.moveTo(boundsX1, Math.max(0, boundsZ0));
+    ctx.lineTo(boundsX1, Math.min(w, boundsZ1));
+  }
+  // North border (horizontal at boundsZ0)
+  if (boundsZ0 >= 0 && boundsZ0 <= w) {
+    ctx.moveTo(Math.max(0, boundsX0), boundsZ0);
+    ctx.lineTo(Math.min(w, boundsX1), boundsZ0);
+  }
+  // South border (horizontal at boundsZ1)
+  if (boundsZ1 >= 0 && boundsZ1 <= w) {
+    ctx.moveTo(Math.max(0, boundsX0), boundsZ1);
+    ctx.lineTo(Math.min(w, boundsX1), boundsZ1);
+  }
   ctx.stroke();
+
+  // Off-screen indicators — fire when the bound is past the viewport edge.
+  ctx.fillStyle = 'rgba(255, 220, 80, 0.30)';
+  const indicatorPx = 3;
+  if (boundsX0 < 0) ctx.fillRect(0, 0, indicatorPx, w);                    // west off-screen
+  if (boundsX1 > w) ctx.fillRect(w - indicatorPx, 0, indicatorPx, w);      // east off-screen
+  if (boundsZ0 < 0) ctx.fillRect(0, 0, w, indicatorPx);                    // north off-screen
+  if (boundsZ1 > w) ctx.fillRect(0, w - indicatorPx, w, indicatorPx);      // south off-screen
 
   // Mobs — red dots, faded if dead
   for (const m of mobs) {
