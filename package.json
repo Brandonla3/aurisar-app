@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:glb": "node scripts/build_glb_assets.mjs"
+    "build:glb": "node scripts/build_glb_assets.mjs",
+    "build:gameplay": "node scripts/copy_gameplay_to_public.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "version": "v1.0.0",
+    "created_utc": "2026-05-11T00:00:00Z",
+    "source_file": "manual_authored_slice_5b"
+  },
+  "tile": {
+    "tile_id": "T_03_03",
+    "world_bounds": {
+      "min": { "x": -232, "y": -20, "z": -232 },
+      "max": { "x":   24, "y": 120, "z":   24 }
+    },
+    "neighbors": [
+      "T_02_02", "T_02_03", "T_02_04",
+      "T_03_02",            "T_03_04",
+      "T_04_02", "T_04_03", "T_04_04"
+    ]
+  },
+
+  "spawns": [
+    {
+      "net_id": "SPAWN_MOB_WOLF_NEAR_NW",
+      "mob_type": "wolf",
+      "position": { "x":  -50, "y": 0, "z":  -30 },
+      "yaw_deg": 45,
+      "respawn_sec": 25,
+      "max_alive": 2,
+      "leash_radius_m": 35,
+      "aggro_radius_m": 18
+    },
+    {
+      "net_id": "SPAWN_MOB_WOLF_MID_W",
+      "mob_type": "wolf",
+      "position": { "x": -180, "y": 0, "z":  -60 },
+      "yaw_deg": 90,
+      "respawn_sec": 25,
+      "max_alive": 2,
+      "leash_radius_m": 35,
+      "aggro_radius_m": 18
+    },
+    {
+      "net_id": "SPAWN_MOB_WOLF_MID_S",
+      "mob_type": "wolf",
+      "position": { "x":   10, "y": 0, "z": -120 },
+      "yaw_deg": -90,
+      "respawn_sec": 25,
+      "max_alive": 2,
+      "leash_radius_m": 35,
+      "aggro_radius_m": 18
+    },
+    {
+      "net_id": "SPAWN_MOB_WOLF_FAR_SW",
+      "mob_type": "wolf",
+      "position": { "x": -170, "y": 0, "z": -180 },
+      "yaw_deg": 135,
+      "respawn_sec": 25,
+      "max_alive": 2,
+      "leash_radius_m": 35,
+      "aggro_radius_m": 18
+    },
+    {
+      "net_id": "SPAWN_MOB_WOLF_DEEP_S",
+      "mob_type": "wolf",
+      "position": { "x":  -80, "y": 0, "z": -200 },
+      "yaw_deg": 180,
+      "respawn_sec": 25,
+      "max_alive": 2,
+      "leash_radius_m": 35,
+      "aggro_radius_m": 18
+    }
+  ],
+
+  "encounter_zones": [],
+  "waypoints": [],
+  "pois": [],
+  "nav_hints": {
+    "walkable_cost_scale": 1.0,
+    "blocked_volumes": []
+  }
+}

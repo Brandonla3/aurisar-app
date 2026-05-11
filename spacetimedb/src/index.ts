@@ -21,6 +21,7 @@
  */
 
 import { schema, table, t } from 'spacetimedb/server';
+import { tileGameplay } from './gameplay/index.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -268,31 +269,59 @@ const MELEE_COOLDOWN_MICROS = 300_000n;       // 300 ms between swings; client t
 const SEED_WOLF_HP         = 100;
 
 /**
- * Idempotently seed one wolf near the world origin if no mobs exist yet.
- * Called by the client on connect. Safe to call repeatedly — only inserts
- * when the mob table is empty.
+ * Idempotently seed mobs from the bundled per-tile gameplay manifest.
+ * Called by the client on connect; safe to call repeatedly — each spawn
+ * is keyed by a unique `spawnNetId` and we skip any net_id that already
+ * has a row (alive or dead), so re-seeding after a server-side wipe
+ * works cleanly.
  *
- * Slice 5b/5c will replace this with a tile_gameplay JSON loader that reads
- * spawn definitions per tile, but for now a single hardcoded wolf is enough
- * to prove the end-to-end combat pipeline.
+ * Each manifest spawn point produces `max_alive` mob rows. The instance
+ * index is suffixed onto the source `net_id` (e.g.
+ * `SPAWN_MOB_WOLF_NEAR_NW_0`, `_1`) to keep each row uniquely
+ * addressable while still letting tile-author logic group them.
+ *
+ * Slice 5c will add respawn / aggro / leash; for now spawned mobs sit at
+ * their spawn position until a player attacks them.
  */
 export const seedWorld = spacetimedb.reducer({}, (ctx) => {
-  // Iterate to check emptiness — table is tiny in slice 5a, scan is fine.
-  for (const _existing of ctx.db.mob.iter()) {
-    return; // already seeded
-  }
+  // Pre-compute the set of already-seeded netIds. Iter is O(N) but the
+  // table is tiny — at slice 5b scale, the few tens of rows here cost
+  // microseconds.
+  const seeded = new Set<string>();
+  for (const row of ctx.db.mob.iter()) seeded.add(row.spawnNetId);
 
-  const mobId = ctx.timestamp.microsSinceUnixEpoch;
-  ctx.db.mob.insert({
-    mobId,
-    mobType: 'wolf',
-    x: 1696,      // ~3 world units east of spawn (1600 + 96)
-    y: 1600,
-    hp: SEED_WOLF_HP,
-    maxHp: SEED_WOLF_HP,
-    state: 'alive',
-    spawnNetId: 'SLICE5A_HARDCODED_WOLF',
-  });
+  let inserted = 0;
+  for (const tile of tileGameplay) {
+    for (const spawn of tile.spawns) {
+      for (let i = 0; i < spawn.max_alive; i++) {
+        const netId = `${spawn.net_id}_${i}`;
+        if (seeded.has(netId)) continue;
+        // Gameplay JSON positions are absolute world meters (1 m = 1
+        // world unit). STDB px = worldUnits * 32 + WORLD_CENTER_PX.
+        // Babylon Y (spawn.position.y) maps to vertical and is ignored —
+        // mobs walk on the ground plane. Spawn.position.z maps to mob.y
+        // because the mob table's y is the world's Z axis (Babylon's
+        // ground-plane second axis).
+        const xPx = Math.round(spawn.position.x * 32 + WORLD_CENTER_PX);
+        const yPx = Math.round(spawn.position.z * 32 + WORLD_CENTER_PX);
+        ctx.db.mob.insert({
+          // microsSinceUnixEpoch alone is not unique inside a single
+          // reducer call (all inserts share the same timestamp), so add
+          // a per-insert offset.
+          mobId:      ctx.timestamp.microsSinceUnixEpoch + BigInt(inserted),
+          mobType:    spawn.mob_type,
+          x:          xPx,
+          y:          yPx,
+          hp:         SEED_WOLF_HP,
+          maxHp:      SEED_WOLF_HP,
+          state:      'alive',
+          spawnNetId: netId,
+        });
+        seeded.add(netId);
+        inserted++;
+      }
+    }
+  }
 });
 
 /**
