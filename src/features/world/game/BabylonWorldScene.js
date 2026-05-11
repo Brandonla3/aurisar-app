@@ -288,11 +288,14 @@ class LightingManager {
     // due to missing half-float / float render-target extensions. Skip it
     // entirely on mobile and go straight to the lightweight fallback path.
     if (!this._isMobile) {
+      // Raised bloomThreshold + lower bloomWeight so the lit overworld no
+      // longer ghosts around characters at midday (first PR pass kept the
+      // old aggressive bloom while also raising exposure).
       this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
-        bloomThreshold: 0.88, bloomWeight: 0.22, bloomScale: 0.5,
+        bloomThreshold: 1.05, bloomWeight: 0.15, bloomScale: 0.5,
       });
       this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
-        bloomThreshold: 0.90, bloomWeight: 0.30, bloomScale: 0.5,
+        bloomThreshold: 0.95, bloomWeight: 0.25, bloomScale: 0.5,
       });
       this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
     } else {
@@ -325,12 +328,12 @@ class LightingManager {
       } catch (_) { /* skip bloom */ }
     }
 
-    // Ambient floor. The IBL .env files referenced by _loadEnvSafe (overworld_day/
-    // overworld_night/dungeon_dim) are not in /public/env, so scene.environmentTexture
-    // stays null on every device and the IBL fill desktop used to rely on never
-    // arrives. Until those textures ship, desktop matches the mobile baseline so
-    // the world isn't visibly dimmer than the rest of the app.
-    this.scene.ambientColor = new BABYLON.Color3(0.40, 0.44, 0.50);
+    // Ambient floor. The IBL .env files referenced by _loadEnvSafe
+    // (overworld_day / overworld_night / dungeon_dim) are not in /public/env,
+    // so scene.environmentTexture stays null on every device and the IBL fill
+    // desktop used to rely on never arrives. Day value is set here; night
+    // raises it dynamically in _updateOverworld so geometry stays readable.
+    this.scene.ambientColor = new BABYLON.Color3(0.26, 0.29, 0.34);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -412,18 +415,26 @@ class LightingManager {
     lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
     this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
 
-    // Desktop now uses the same fill/exposure curve as mobile. The split
-    // existed because desktop also got IBL ambient from .env files, but those
-    // textures aren't shipped — without them, desktop was rendering ~40%
-    // darker than mobile for no good reason.
-    this.fillOverworld.intensity = lerp(0.50, 0.80, dayFactor);
+    // Unified fill / exposure / ambient curve for both desktop and mobile.
+    // Values sit between the original desktop tuning (which relied on missing
+    // IBL .env textures and rendered too dark) and the first-pass mobile
+    // tuning (which over-exposed the scene and washed out the sky with bloom).
+    this.fillOverworld.intensity = lerp(0.40, 0.55, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(1.05, 1.30, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.92, 1.10, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
     lerpColor3Into(this.scene.fogColor, this._nightFog, this._dayFog, dayFactor);
+
+    // Dynamic ambient: raise at night to compensate for the dimmer key light
+    // (no IBL to fill in the dark side of geometry).
+    this.scene.ambientColor.copyFromFloats(
+      lerp(0.36, 0.26, dayFactor),
+      lerp(0.39, 0.29, dayFactor),
+      lerp(0.46, 0.34, dayFactor)
+    );
 
     // Sky background — mutate clearColor in-place via scratch to avoid allocation
     lerpColor3Into(this._scratchColor, this._nightSky, this._daySky, dayFactor);
@@ -443,7 +454,7 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = 1.10;
+    this.scene.imageProcessingConfiguration.exposure = 0.98;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -673,15 +684,19 @@ export class BabylonWorldScene {
       adaptToDeviceRatio: true,
     });
 
-    // Cap effective DPR. Uncapped, a 4K / Retina display renders at native
-    // device-pixel-ratio (often 2× or higher), quadrupling per-frame pixel
-    // work and tipping the HDR pipeline + shadow blur passes into mid-teen
-    // fps on integrated GPUs.
-    const dpr = Math.min(
-      (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
-      1.5
-    );
-    this.engine.setHardwareScalingLevel(1 / dpr);
+    // Desktop only: cap effective DPR. Uncapped, a 4K / Retina display renders
+    // at native device-pixel-ratio (often 2× or higher), quadrupling per-frame
+    // pixel work and tipping the HDR pipeline + shadow blur passes into
+    // mid-teen fps on integrated GPUs. Mobile is left at the device DPR — it
+    // already performs fine and capping there is a visible quality regression
+    // (Codex P2 on #193).
+    if (!this._isMobile) {
+      const dpr = Math.min(
+        (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+        1.5
+      );
+      this.engine.setHardwareScalingLevel(1 / dpr);
+    }
 
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
