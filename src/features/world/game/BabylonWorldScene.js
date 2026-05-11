@@ -1393,6 +1393,40 @@ export class BabylonWorldScene {
     return from + diff * t;
   }
 
+  // ── Pose accessors (used by TestingHud for compass + minimap) ──────────────
+  // Cheap to call every frame — no allocation hot path. Returns null until
+  // the local avatar finishes loading.
+
+  getPose() {
+    const p = this._local?.root?.position;
+    if (!p) return null;
+    // Camera-relative forward heading: where pressing W would move you,
+    // projected onto the XZ plane. atan2(forward.x, forward.z) so 0 = +Z
+    // (south), increases clockwise.
+    let yaw = 0;
+    if (this._camera) {
+      const fwdX = this._camTarget.x - this._camera.position.x;
+      const fwdZ = this._camTarget.z - this._camera.position.z;
+      yaw = Math.atan2(fwdX, fwdZ);
+    }
+    return { x: p.x, z: p.z, yaw };
+  }
+
+  // Snapshots mob positions in world units. Used by the minimap each frame.
+  // Returns a fresh array — caller may iterate freely.
+  getMobs() {
+    const out = [];
+    this._mobs.forEach((m, mobId) => {
+      out.push({
+        mobId,
+        x: m.root.position.x,
+        z: m.root.position.z,
+        dead: !!m.dead,
+      });
+    });
+    return out;
+  }
+
   // ── Dispose ────────────────────────────────────────────────────────────────
 
   dispose() {
