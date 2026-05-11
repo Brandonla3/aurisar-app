@@ -52,8 +52,12 @@ export class TileLoader {
     const promise = Promise.resolve(this.provider.load(meta, this.scene))
       .then((container) => {
         container.addAllToScene();
+        // Freeze + bounding-sphere cull every renderable, including InstancedMesh
+        // (used by ProceduralTileProvider for the tree/rock scatter — InstancedMesh
+        // extends AbstractMesh, not Mesh, so the old `instanceof BABYLON.Mesh`
+        // check skipped the bulk of tile geometry).
         for (const mesh of container.meshes) {
-          if (mesh instanceof BABYLON.Mesh) {
+          if (mesh instanceof BABYLON.Mesh || mesh instanceof BABYLON.InstancedMesh) {
             mesh.freezeWorldMatrix();
             mesh.cullingStrategy = BABYLON.AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
           }

@@ -7,6 +7,11 @@
  *
  * Uses a seeded PRNG so the same tile_id always yields the same scatter,
  * regardless of which player loads it — required for shared-world parity.
+ *
+ * Trees and rocks are rendered as InstancedMesh copies of three shared
+ * template meshes. With ring=1 the active scatter is 9 tiles × 18 trees +
+ * 9 tiles × 6 rocks ≈ 270 nodes, but only three instanced draw calls
+ * actually hit the GPU per frame.
  */
 
 /* global BABYLON */
@@ -38,6 +43,7 @@ export class ProceduralTileProvider {
   constructor(config, options = {}) {
     this.params = streamingParams(config);
     this._materials = null;
+    this._templates = null;
     // Optional: skip scatter for visual debugging or perf testing.
     this.scatter = options.scatter !== false;
   }
@@ -65,6 +71,39 @@ export class ProceduralTileProvider {
     return this._materials;
   }
 
+  // Template meshes shared by every tile. Each scattered tree/rock is an
+  // InstancedMesh of the matching template, with per-instance position /
+  // scaling carrying the variance the old code expressed as separate meshes.
+  // Templates live for the lifetime of the provider — they are intentionally
+  // NOT pushed into the tile AssetContainer so unload doesn't dispose them.
+  _ensureTemplates(scene) {
+    if (this._templates && this._templates.scene === scene) return this._templates;
+    const mats = this._ensureMaterials(scene);
+
+    const trunkSrc = BABYLON.MeshBuilder.CreateCylinder('tile_tpl_trunk', {
+      diameterTop: 0.25, diameterBottom: 0.45, height: 1, tessellation: 6,
+    }, scene);
+    trunkSrc.material = mats.trunk;
+
+    const leafSrc = BABYLON.MeshBuilder.CreateCylinder('tile_tpl_leaf', {
+      diameterTop: 0, diameterBottom: 1, height: 2.4, tessellation: 6,
+    }, scene);
+    leafSrc.material = mats.leaf;
+
+    const rockSrc = BABYLON.MeshBuilder.CreateSphere('tile_tpl_rock', {
+      diameter: 1, segments: 3,
+    }, scene);
+    rockSrc.material = mats.rock;
+
+    for (const m of [trunkSrc, leafSrc, rockSrc]) {
+      m.setEnabled(false);   // template itself never renders
+      m.isPickable = false;
+    }
+
+    this._templates = { scene, trunkSrc, leafSrc, rockSrc };
+    return this._templates;
+  }
+
   load(meta, scene) {
     const mats = this._ensureMaterials(scene);
     const bounds = tileBounds(meta.id, this.params);
@@ -88,45 +127,40 @@ export class ProceduralTileProvider {
     container.meshes.push(ground);
 
     if (this.scatter) {
-      // Trees: cylinder trunk + cone leaf cluster.
-      const halfSize = size / 2;
+      const tpl = this._ensureTemplates(scene);
+
+      // Trees: instanced cylinder trunk (height via scaling.y) + instanced
+      // cone leaf cluster (radius via scaling.x/z).
       for (let i = 0; i < TREES_PER_TILE; i++) {
         const lx = cx + (rng() - 0.5) * size * 0.9;
         const lz = cz + (rng() - 0.5) * size * 0.9;
         const h = 2.8 + rng() * 2.4;
 
-        const trunk = BABYLON.MeshBuilder.CreateCylinder(`tile_${meta.id}_trunk${i}`, {
-          diameterTop: 0.25, diameterBottom: 0.45, height: h, tessellation: 6,
-        }, scene);
+        const trunk = tpl.trunkSrc.createInstance(`tile_${meta.id}_trunk${i}`);
         trunk.position.set(lx, h / 2, lz);
-        trunk.material = mats.trunk;
+        trunk.scaling.y = h;
         container.meshes.push(trunk);
 
-        const leaf = BABYLON.MeshBuilder.CreateCylinder(`tile_${meta.id}_leaf${i}`, {
-          diameterTop: 0, diameterBottom: 1.6 + rng() * 0.6, height: 2.4, tessellation: 6,
-        }, scene);
+        const leafDia = 1.6 + rng() * 0.6;
+        const leaf = tpl.leafSrc.createInstance(`tile_${meta.id}_leaf${i}`);
         leaf.position.set(lx, h + 0.6, lz);
-        leaf.material = mats.leaf;
+        leaf.scaling.x = leafDia;
+        leaf.scaling.z = leafDia;
         container.meshes.push(leaf);
       }
 
-      // Rocks: low-poly squashed spheres.
+      // Rocks: instanced spheres, squashed via scaling.y.
       for (let i = 0; i < ROCKS_PER_TILE; i++) {
         const lx = cx + (rng() - 0.5) * size * 0.95;
         const lz = cz + (rng() - 0.5) * size * 0.95;
-        const d = 0.8 + rng() * 1.4;
+        const d  = 0.8 + rng() * 1.4;
 
-        const rock = BABYLON.MeshBuilder.CreateSphere(`tile_${meta.id}_rock${i}`, {
-          diameter: d, segments: 3,
-        }, scene);
+        const rock = tpl.rockSrc.createInstance(`tile_${meta.id}_rock${i}`);
         rock.position.set(lx, d * 0.25, lz);
-        rock.scaling.y = 0.55;
+        rock.scaling.set(d, d * 0.55, d);
         rock.rotation.y = rng() * Math.PI * 2;
-        rock.material = mats.rock;
         container.meshes.push(rock);
       }
-      // Silence the unused halfSize warning in case future scatters reference it.
-      void halfSize;
     }
 
     return container;

@@ -290,11 +290,9 @@ class LightingManager {
     if (!this._isMobile) {
       this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
         bloomThreshold: 0.88, bloomWeight: 0.22, bloomScale: 0.5,
-        sharpenColor: 0.20, sharpenEdge: 0.15,
       });
       this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
         bloomThreshold: 0.90, bloomWeight: 0.30, bloomScale: 0.5,
-        sharpenColor: 0.15, sharpenEdge: 0.10,
       });
       this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
     } else {
@@ -327,12 +325,12 @@ class LightingManager {
       } catch (_) { /* skip bloom */ }
     }
 
-    // Ambient floor. On mobile there is no IBL from .env files, so this term
-    // is the sole contributor to shadowed-surface brightness — set it higher
-    // than the desktop value where IBL provides the ambient fill.
-    this.scene.ambientColor = this._isMobile
-      ? new BABYLON.Color3(0.40, 0.44, 0.50)
-      : new BABYLON.Color3(0.14, 0.16, 0.18);  // day baseline; night raised in _updateOverworld
+    // Ambient floor. The IBL .env files referenced by _loadEnvSafe (overworld_day/
+    // overworld_night/dungeon_dim) are not in /public/env, so scene.environmentTexture
+    // stays null on every device and the IBL fill desktop used to rely on never
+    // arrives. Until those textures ship, desktop matches the mobile baseline so
+    // the world isn't visibly dimmer than the rest of the app.
+    this.scene.ambientColor = new BABYLON.Color3(0.40, 0.44, 0.50);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -341,18 +339,16 @@ class LightingManager {
     for (const hdr of [true, false]) {
       try {
         const p = new BABYLON.DefaultRenderingPipeline(name, hdr, this.scene, [this.camera]);
-        p.samples        = hdr ? 2 : 1;   // 4× → 2×: ~35-50% GPU saving; difference imperceptible with FXAA
-        p.fxaaEnabled    = !hdr;          // FXAA is redundant on top of any MSAA — only enable on samples=1 fallback
+        // No MSAA — FXAA alone is ~10× cheaper on integrated GPUs and the
+        // difference is imperceptible at the camera distances used here.
+        p.samples        = 1;
+        p.fxaaEnabled    = true;
         p.bloomEnabled   = true;
         p.bloomThreshold = opts.bloomThreshold;
         p.bloomWeight    = opts.bloomWeight;
-        p.bloomKernel    = 32;            // unified — HDR no longer needs the 64-tap kernel
+        p.bloomKernel    = 16;            // halved — full pipeline cost
         p.bloomScale     = opts.bloomScale;
-        p.sharpenEnabled = hdr; // skip sharpen on the non-HDR fallback
-        if (hdr) {
-          p.sharpen.colorAmount = opts.sharpenColor;
-          p.sharpen.edgeAmount  = opts.sharpenEdge;
-        }
+        p.sharpenEnabled = false;         // sharpen was a marginal-quality, full-cost pass
         return p;
       } catch (_) { /* try next tier */ }
     }
@@ -416,26 +412,18 @@ class LightingManager {
     lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
     this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
 
-    const fillMin = this._isMobile ? 0.50 : 0.30;
-    const fillMax = this._isMobile ? 0.80 : 0.55;
-    this.fillOverworld.intensity = lerp(fillMin, fillMax, dayFactor);
+    // Desktop now uses the same fill/exposure curve as mobile. The split
+    // existed because desktop also got IBL ambient from .env files, but those
+    // textures aren't shipped — without them, desktop was rendering ~40%
+    // darker than mobile for no good reason.
+    this.fillOverworld.intensity = lerp(0.50, 0.80, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    const exposureMax = this._isMobile ? 1.30 : 1.18;
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.82, exposureMax, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(1.05, 1.30, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
     lerpColor3Into(this.scene.fogColor, this._nightFog, this._dayFog, dayFactor);
-
-    // Dynamic ambient: cooler/brighter at night so geometry is readable without IBL
-    if (!this._isMobile) {
-      this.scene.ambientColor.copyFromFloats(
-        lerp(0.30, 0.14, dayFactor),
-        lerp(0.33, 0.16, dayFactor),
-        lerp(0.42, 0.18, dayFactor)
-      );
-    }
 
     // Sky background — mutate clearColor in-place via scratch to avoid allocation
     lerpColor3Into(this._scratchColor, this._nightSky, this._daySky, dayFactor);
@@ -455,7 +443,7 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = this._isMobile ? 1.10 : 0.82;
+    this.scene.imageProcessingConfiguration.exposure = 1.10;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -681,10 +669,19 @@ export class BabylonWorldScene {
 
   _initSync() {
     this.engine = new BABYLON.Engine(this.canvas, true, {
-      preserveDrawingBuffer: true,
       stencil: true,
       adaptToDeviceRatio: true,
     });
+
+    // Cap effective DPR. Uncapped, a 4K / Retina display renders at native
+    // device-pixel-ratio (often 2× or higher), quadrupling per-frame pixel
+    // work and tipping the HDR pipeline + shadow blur passes into mid-teen
+    // fps on integrated GPUs.
+    const dpr = Math.min(
+      (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+      1.5
+    );
+    this.engine.setHardwareScalingLevel(1 / dpr);
 
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
@@ -692,14 +689,15 @@ export class BabylonWorldScene {
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
 
-    // Seed the day/night cycle from the device's real local time so the
-    // world matches the player's actual time of day, then run at real speed.
-    const now = new Date();
-    const realHour = now.getHours() + now.getMinutes() / 60;
+    // Pin the world to mid-morning until the full day/night lighting story
+    // (incl. IBL .env files) ships. Wall-clock time was making the world
+    // unplayably dark in the evening, and dayLengthSec=86400 meant the cycle
+    // barely moved while you played. A slow 1h cycle starting at 10am keeps
+    // typical sessions firmly in daylight while leaving the cycle code alive.
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
-      startTimeOfDay: realHour,
-      dayLengthSec: 86400, // one real second = one game second
+      startTimeOfDay: 10.0,
+      dayLengthSec:   3600,
     });
 
     this._setupShadows();
@@ -876,7 +874,9 @@ export class BabylonWorldScene {
       try {
         const sg = new BABYLON.ShadowGenerator(size, this._lm.key);
         sg.useBlurExponentialShadowMap = true;
-        sg.blurKernel = size >= 1024 ? 16 : 8;
+        // Blur kernel halved — the previous 16-tap pass was the second-largest
+        // per-frame GPU cost behind SSAO2. 8 taps is visually similar.
+        sg.blurKernel = size >= 1024 ? 8 : 4;
         sg.bias       = 0.0005;
         sg.normalBias = 0.02;
         this._shadowGen = sg;
@@ -893,21 +893,12 @@ export class BabylonWorldScene {
   // ── SSAO ───────────────────────────────────────────────────────────────────
 
   _setupSSAO() {
-    // SSAO2 can conflict with other render passes on mobile WebGL2 and produces
-    // incorrect (black) output on several iOS/Android implementations.
-    if (this._isMobile) return;
-    if (this.engine.webGLVersion < 2) return;
-    try {
-      const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
-        ssaoRatio: 0.35, blurRatio: 0.75,
-      });
-      ssao.radius        = 2.0;
-      ssao.base          = 0.05;
-      ssao.totalStrength = 0.50;
-      this.scene.postProcessRenderPipelineManager
-        .attachCamerasToRenderPipeline('ssao2', this._camera);
-      this._ssao = ssao;
-    } catch (_) { /* SSAO2 unavailable — skip silently */ }
+    // SSAO2 is currently disabled. Combined with the HDR DefaultRenderingPipeline
+    // and blur-ESM shadows it was the dominant per-frame GPU cost on integrated
+    // GPUs, and the visual contribution at the camera angles used here is
+    // marginal. Re-enabling is a single early-return removal once we have
+    // budget to retune it.
+    return;
   }
 
   // ── Lighting profile (public compatibility wrapper) ────────────────────────
