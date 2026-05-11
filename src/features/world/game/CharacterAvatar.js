@@ -144,7 +144,11 @@ export class CharacterAvatar {
     this._applyAllMorphs();
     this._applySkinMaterial();
 
-    // Attach modular pieces
+    // Attach modular pieces. Re-enabled now that the regenerated GLBs
+    // (correct GLTF Y-up → Blender Z-up axis, clean auto-weights) ship in
+    // this same PR — without this loop the in-world avatar appears as the
+    // base body only (no hair / clothing / horns / tail) on every page load,
+    // which is a worse regression than the artifact the asset fix removes.
     await this._rebuildHair(assetLibrary);
     for (const slot of CLOTHING_SLOTS) {
       await this._rebuildClothingSlot(slot, assetLibrary);

@@ -24,9 +24,10 @@ ASSETS  = os.path.join(REPO, 'public', 'assets', 'characters')
 SPECIES = os.path.join(ASSETS, 'species')
 BASE    = os.path.join(ASSETS, 'base_body.glb')
 
-HEAD_TOP  = Vector((0.0, 1.67, 0.0))   # HeadTop_End bone Y=1.663 in base_body.glb
-HIPS_Y    = 0.92                       # Hips bone Y=0.921 in base_body.glb
-TAIL_BACK = -0.10                      # how far behind the hips the tail starts
+# Blender Z = height (GLTF Y-up values). Blender Y = depth (negative = behind character).
+HEAD_TOP  = Vector((0.0, 0.0, 1.67))   # HeadTop_End bone Z=1.663 in Blender world space
+HIPS_Z    = 0.92                       # Hips bone Z=0.921 in Blender world space (height)
+TAIL_Y    = -0.10                      # how far behind the hips the tail starts (Blender Y)
 
 
 # ── Helpers (scene/material) ────────────────────────────────────────────────
@@ -126,10 +127,10 @@ def _add_cone(radius: float, depth: float, location: Vector,
 
 def build_horns_small():
     left  = _add_cone(0.018, 0.07,
-                      HEAD_TOP + Vector((-0.045, -0.02, 0.0)),
+                      HEAD_TOP + Vector((-0.045, 0.0, -0.02)),
                       rotation_euler=(math.radians(-10), 0, math.radians(10)))
     right = _add_cone(0.018, 0.07,
-                      HEAD_TOP + Vector((0.045, -0.02, 0.0)),
+                      HEAD_TOP + Vector((0.045, 0.0, -0.02)),
                       rotation_euler=(math.radians(-10), 0, math.radians(-10)))
     return _join([left, right], 'horns_small')
 
@@ -150,7 +151,7 @@ def build_horns_curved():
     for sign in (-1, 1):
         # Use a simple bezier circle squished + a path for the spiral feel.
         bpy.ops.curve.primitive_bezier_circle_add(radius=0.05,
-                                                    location=HEAD_TOP + Vector((sign*0.06, -0.02, 0)))
+                                                    location=HEAD_TOP + Vector((sign*0.06, 0.0, -0.02)))
         curve = bpy.context.active_object
         curve.data.bevel_depth = 0.018
         curve.data.bevel_resolution = 2
@@ -172,27 +173,27 @@ def _add_tail_chain(name: str, segments: int, length: float, base_radius: float,
     objs = []
     seg_len = length / segments
     radius = base_radius
-    y = HIPS_Y
-    z = TAIL_BACK
+    hips_z = HIPS_Z       # current Z (height); droops downward each segment
+    tail_y = TAIL_Y       # current Y (depth); extends behind character each segment
     droop_per_seg = 0.04 if not fluffy else 0.06
     for i in range(segments):
         bpy.ops.mesh.primitive_cylinder_add(
             vertices=10, radius=radius, depth=seg_len,
-            location=(0, y, z))
+            location=(0, tail_y, hips_z))
         seg = bpy.context.active_object
-        seg.rotation_euler = (math.radians(90), 0, 0)  # cylinder along Z
+        seg.rotation_euler = (math.radians(90), 0, 0)  # cylinder along Y (depth axis)
         bpy.ops.object.transform_apply(rotation=True)
         objs.append(seg)
-        # Step toward the tip — slight downward droop and shrinking radius
-        z -= seg_len * 0.95
-        y -= droop_per_seg * (i + 1) / segments
+        # Step toward the tip — tail extends behind (more negative Y) and droops down (−Z)
+        tail_y -= seg_len * 0.95
+        hips_z -= droop_per_seg * (i + 1) / segments
         radius *= 0.85 if not fluffy else 0.92
 
     if fluffy:
         # Add a hemispherical "puff" at the tip
         bpy.ops.mesh.primitive_uv_sphere_add(radius=base_radius * 0.9,
                                               segments=12, ring_count=8,
-                                              location=(0, y, z))
+                                              location=(0, tail_y, hips_z))
         objs.append(bpy.context.active_object)
     return _join(objs, name)
 
