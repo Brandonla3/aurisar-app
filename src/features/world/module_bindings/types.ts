@@ -47,6 +47,7 @@ export const Player = __t.object("Player", {
   online: __t.bool(),
   avatarConfig: __t.string(),
   lastChatAt: __t.u64(),
+  lastAttackAt: __t.u64(),
 });
 export type Player = __Infer<typeof Player>;
 

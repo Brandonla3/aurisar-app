@@ -60,6 +60,7 @@ const spacetimedb = schema({
       // gets ADD COLUMN semantics, not a manual reorder migration.
       avatarConfig: t.string().default(''),       // JSON-encoded AvatarConfig; default '' on backfill — client re-syncs via setPlayerInfo on next login
       lastChatAt:   t.u64().default(0n),          // micros since unix epoch of last sendChat — default 0n behaves correctly with the > 0n rate-limit guard
+      lastAttackAt: t.u64().default(0n),          // micros since unix epoch of last castAbility — server-enforced melee cooldown (see castAbility reducer)
     }
   ),
 
@@ -158,6 +159,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         zoneId: 0,
         online: true,
         lastChatAt: 0n,
+        lastAttackAt: 0n,
       });
     }
   }
@@ -260,9 +262,10 @@ export const sendChat = spacetimedb.reducer(
 // COMBAT (slice 5a)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MELEE_RANGE_PX = 96;       // 3 world units = 96 STDB px
-const MELEE_DAMAGE   = 25;       // 4 swings kills a 100-HP wolf
-const SEED_WOLF_HP   = 100;
+const MELEE_RANGE_PX       = 96;             // 3 world units = 96 STDB px
+const MELEE_DAMAGE         = 25;              // 4 swings kills a 100-HP wolf
+const MELEE_COOLDOWN_MICROS = 300_000n;       // 300 ms between swings; client throttles at 350 ms so legit input has headroom
+const SEED_WOLF_HP         = 100;
 
 /**
  * Idempotently seed one wolf near the world origin if no mobs exist yet.
@@ -305,12 +308,23 @@ export const castAbility = spacetimedb.reducer(
     const player = ctx.db.player.identity.find(ctx.sender);
     if (!player) return; // not authenticated yet
 
+    // Server-enforced cooldown. The client throttles at 350ms for UX, but
+    // a modified client could spam reducer calls without this guard — that
+    // would let them instakill mobs while still passing the range check.
+    // We also record the swing on accepted-but-missed calls (out of range,
+    // dead mob) to neutralise DoS via spammed-miss probing.
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.lastAttackAt > 0n && nowMicros - player.lastAttackAt < MELEE_COOLDOWN_MICROS) {
+      return; // dropped: caller is over the melee cadence
+    }
+    ctx.db.player.identity.update({ ...player, lastAttackAt: nowMicros });
+
     const mob = ctx.db.mob.mobId.find(mobId);
     if (!mob) return;
     if (mob.state !== 'alive') return;
 
-    // Range check — Manhattan distance is cheap and good enough at this scale.
-    // Use squared euclidean to avoid sqrt and keep it monotonic.
+    // Range check — squared euclidean to avoid sqrt; monotonic so the
+    // comparison is equivalent to comparing actual distances.
     const dx = player.x - mob.x;
     const dy = player.y - mob.y;
     if (dx * dx + dy * dy > MELEE_RANGE_PX * MELEE_RANGE_PX) return;
