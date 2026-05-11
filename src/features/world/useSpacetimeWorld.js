@@ -81,8 +81,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           );
 
           // Seed the world's mobs on first ever connect. Idempotent server-side,
-          // so subsequent connects are no-ops.
-          try { connection.reducers.seedWorld(); } catch (_) {}
+          // so subsequent connects are no-ops. Errors are logged so they're
+          // visible during debugging (previously a swallowed empty catch hid
+          // CSP / binding failures for hours).
+          try {
+            connection.reducers.seedWorld();
+          } catch (err) {
+            console.error('[useSpacetimeWorld] seedWorld() failed:', err);
+          }
 
           // Subscribe to live tables
           connection
