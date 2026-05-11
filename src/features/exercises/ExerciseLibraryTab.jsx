@@ -783,14 +783,15 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       zIndex: 500,
       display: "flex",
       alignItems: "flex-end",
-      justifyContent: "center"
+      justifyContent: "center",
+      paddingBottom: "var(--bottom-nav-h)"
     }}><div onClick={e => e.stopPropagation()} className={"sheet-slide-up"} style={{
         background: "linear-gradient(160deg,rgba(18,16,12,.92),rgba(12,12,10,.95))",
         border: "1px solid rgba(180,172,158,.06)",
         borderRadius: "16px 16px 0 0",
         width: "100%",
         maxWidth: 520,
-        maxHeight: "90vh",
+        maxHeight: "calc(90vh - var(--bottom-nav-h))",
         overflowY: "auto",
         padding: "20px 18px 32px"
       }}><div style={{
