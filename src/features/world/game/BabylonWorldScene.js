@@ -15,11 +15,14 @@
 /* global BABYLON */
 
 import { AssetLibrary }    from './AssetLibrary.js';
+import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
 import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
+  GlbTileProvider,
   ProceduralTileProvider,
+  FallbackTileProvider,
   buildTileIndex,
   streamingParams,
 } from '../streaming/index.js';
@@ -651,8 +654,9 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
-    this._pendingUpdates = []; // remote rows queued while _local is loading
-    this._spawning       = new Set(); // identity IDs currently being async-spawned
+    this._pendingUpdates    = []; // remote rows queued while _local is loading
+    this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
+    this._spawning          = new Set(); // identity IDs currently being async-spawned
 
     // Mobile touch state — written by setJoystick() from WorldGame's React layer
     this._joyDx = 0;
@@ -718,7 +722,13 @@ export class BabylonWorldScene {
   // ── Async character bootstrap ──────────────────────────────────────────────
 
   async _initCharactersAsync() {
-    await AssetLibrary.init(this.scene);
+    // Load both asset libraries in parallel — mob GLBs are not load-critical
+    // (missing ones fall back to primitives), but starting their fetch here
+    // means the first mob spawn doesn't pay a network roundtrip.
+    await Promise.all([
+      AssetLibrary.init(this.scene),
+      MobAssetLibrary.init(this.scene),
+    ]);
     this._local = await CharacterAvatar.create(
       'local',
       this.playerInfo?.username ?? 'You',
@@ -727,7 +737,11 @@ export class BabylonWorldScene {
       AssetLibrary
     );
     this._local.root.position.set(0, 0, 0);
-    // Flush remote updates that arrived while we were loading
+    // Flush remote updates that arrived while we were loading.
+    // Mobs first — they can spawn independently of `_local` once
+    // MobAssetLibrary is ready, and we want them visible ASAP.
+    const pendingMobs = this._pendingMobUpdates.splice(0);
+    for (const row of pendingMobs) this.applyMobUpdate(row);
     const pending = this._pendingUpdates.splice(0);
     for (const row of pending) this.applyPlayerUpdate(row);
   }
@@ -926,17 +940,22 @@ export class BabylonWorldScene {
 
   // ── Tile streaming ─────────────────────────────────────────────────────────
   // World geometry comes from the tile streamer driven by
-  // world_build_config.tiling_streaming. The ProceduralTileProvider builds
-  // a deterministic grass/tree/rock scatter per tile from its tile_id, so
-  // every player sees the same layout. A later slice will swap in a
-  // GlbTileProvider once Blender authoring lands.
+  // world_build_config.tiling_streaming. The primary GlbTileProvider loads
+  // authored .glb tiles from /assets/tiles/. Any tile whose .glb isn't
+  // present (404) falls back transparently to the ProceduralTileProvider,
+  // which builds a deterministic grass/tree/rock scatter from tile_id using
+  // the same RNG seed as the authored placeholders — so the boundary
+  // between authored and procedural tiles is visually seamless.
 
   _setupTileStreaming() {
-    const provider = new ProceduralTileProvider(worldBuildConfig);
+    const provider = new FallbackTileProvider(
+      new GlbTileProvider(),
+      new ProceduralTileProvider(worldBuildConfig),
+    );
     const params = streamingParams(worldBuildConfig);
     const tileIndex = buildTileIndex(params, {
-      render: (id) => `/tiles/${id}_render.glb`, // unused by procedural provider
-      gameplay: (id) => `/tiles/${id}_gameplay.json`,
+      render:   (id) => `/assets/tiles/${id}_render.glb`,
+      gameplay: (id) => `/assets/tiles/${id}_gameplay.json`,
     });
     this._tileLoader = new TileLoader(this.scene, worldBuildConfig, tileIndex, provider);
 
@@ -1074,6 +1093,13 @@ export class BabylonWorldScene {
 
   applyMobUpdate(row) {
     if (!this.scene) return; // pre-init race; server will resend on resubscribe
+    // Queue until MobAssetLibrary finishes loading. _spawnMob's GLB-vs-primitive
+    // decision is made once at first sight, so rows that arrive before assets
+    // are ready would otherwise be baked as primitives and never upgrade —
+    // subsequent updates find the mob already in `_mobs` and skip `_spawnMob`
+    // entirely. Flush happens in `_initCharactersAsync` after both libraries
+    // resolve. (Codex P1 on #191.)
+    if (!MobAssetLibrary.isReady()) { this._pendingMobUpdates.push(row); return; }
     let m = this._mobs.get(row.mobId);
     if (!m) m = this._spawnMob(row);
     if (!m) return;
@@ -1105,25 +1131,67 @@ export class BabylonWorldScene {
   }
 
   _spawnMob(row) {
-    if (row.mobType !== 'wolf') return null; // slice 5a only ships wolves
+    // GLB path first; primitive fallback only for known mob types (wolf
+    // today). Unknown mob types with no GLB return null so the row stays
+    // invisible until either a GLB is authored or a primitive case is added.
+    const hasGlb = MobAssetLibrary.hasContainer(row.mobType);
+    if (!hasGlb && row.mobType !== 'wolf') return null;
 
     const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);
     // Visual subtree — everything that should hide on death lives under here.
     // Hiding `visual` keeps the HP bar parent intact (it's hidden separately)
-    // and makes the spawn easier to extend with new wolf parts later.
+    // and lets us swap GLB vs primitive geometry without touching the HP bar
+    // or root-position wiring.
     const visual = new BABYLON.TransformNode(`mob_visual_${row.mobId}`, this.scene);
     visual.parent = root;
-    // Wolf faces +Z by convention. The runtime currently doesn't rotate mobs to
-    // their movement direction, but using a consistent forward axis means a
-    // later AI slice can do `root.rotation.y = atan2(vx, vz)` without surprises.
-    //
-    // Color: charcoal grey body with a paler underside / muzzle highlight so
-    // the silhouette reads as a quadruped wolf instead of a featureless blob.
+
+    if (hasGlb) {
+      this._buildMobVisualFromGlb(row, visual);
+    } else {
+      this._buildMobVisualPrimitive(row, visual);
+    }
+
+    const { hpBar, hpFill } = this._buildMobHpBar(row, root);
+
+    const entry = {
+      root, visual, hpBar, hpFill,
+      maxHp: row.maxHp, lastHp: row.hp, dead: false,
+    };
+    this._mobs.set(row.mobId, entry);
+    return entry;
+  }
+
+  // Instantiate the mob's GLB AssetContainer under `visual`. Mirrors the
+  // pattern from CharacterAvatar._buildGLB — `cloneMaterials: false` is
+  // intentional (shared materials across mob instances; revisit when we
+  // need per-mob tinting like alpha-wolf darker etc.).
+  _buildMobVisualFromGlb(row, visual) {
+    const container = MobAssetLibrary.getContainer(row.mobType);
+    const inst = container.instantiateModelsToScene(
+      (name) => `mob_${row.mobId}_${name}`,
+      false, // share materials
+    );
+    for (const node of inst.rootNodes) {
+      node.parent = visual;
+    }
+    // Cast shadows from every freshly-instantiated mesh in the hierarchy.
+    for (const node of inst.rootNodes) {
+      const meshes = node.getChildMeshes ? node.getChildMeshes(false) : [];
+      for (const mesh of meshes) {
+        if (mesh instanceof BABYLON.Mesh) this._castShadow(mesh);
+      }
+    }
+  }
+
+  // Build the quadruped composite from MeshBuilder primitives. Used when no
+  // wolf.glb is available (e.g., asset deleted, build:glb not yet run).
+  // Wolf faces +Z; later AI slice can `root.rotation.y = atan2(vx, vz)`.
+  _buildMobVisualPrimitive(row, visual) {
     const bodyMat = this._stdMat('mobWolfBody',  new BABYLON.Color3(0.28, 0.26, 0.24));
     const pale    = this._stdMat('mobWolfPale',  new BABYLON.Color3(0.55, 0.50, 0.44));
     const dark    = this._stdMat('mobWolfDark',  new BABYLON.Color3(0.12, 0.11, 0.10));
 
-    // ── Torso ── elongated box along Z (forward axis).
+    // Torso
     const body = BABYLON.MeshBuilder.CreateBox(`mob_body_${row.mobId}`, {
       width: 0.55, height: 0.45, depth: 1.0,
     }, this.scene);
@@ -1132,7 +1200,7 @@ export class BabylonWorldScene {
     body.material = bodyMat;
     this._castShadow(body);
 
-    // ── Head ── cube at the front of the torso, slightly higher.
+    // Head + snout
     const head = BABYLON.MeshBuilder.CreateBox(`mob_head_${row.mobId}`, {
       width: 0.40, height: 0.38, depth: 0.40,
     }, this.scene);
@@ -1141,7 +1209,6 @@ export class BabylonWorldScene {
     head.material = bodyMat;
     this._castShadow(head);
 
-    // ── Snout ── smaller box jutting forward from the head; pale tip.
     const snout = BABYLON.MeshBuilder.CreateBox(`mob_snout_${row.mobId}`, {
       width: 0.22, height: 0.20, depth: 0.28,
     }, this.scene);
@@ -1149,7 +1216,7 @@ export class BabylonWorldScene {
     snout.position.set(0, 0.72, 0.90);
     snout.material = pale;
 
-    // ── Ears ── two upright triangular prisms on top of the head.
+    // Ears
     for (const sign of [-1, 1]) {
       const ear = BABYLON.MeshBuilder.CreateCylinder(`mob_ear_${row.mobId}_${sign}`, {
         diameterTop: 0, diameterBottom: 0.14, height: 0.18, tessellation: 4,
@@ -1159,12 +1226,12 @@ export class BabylonWorldScene {
       ear.material = dark;
     }
 
-    // ── Legs ── four thin cylinders at the corners of the torso.
+    // Legs
     const legPositions = [
-      [ 0.18, 0.30,  0.36], // front-right
-      [-0.18, 0.30,  0.36], // front-left
-      [ 0.18, 0.30, -0.36], // back-right
-      [-0.18, 0.30, -0.36], // back-left
+      [ 0.18, 0.30,  0.36],
+      [-0.18, 0.30,  0.36],
+      [ 0.18, 0.30, -0.36],
+      [-0.18, 0.30, -0.36],
     ];
     for (let i = 0; i < legPositions.length; i++) {
       const [x, y, z] = legPositions[i];
@@ -1177,16 +1244,20 @@ export class BabylonWorldScene {
       this._castShadow(leg);
     }
 
-    // ── Tail ── small cylinder angled up-back from the rear of the body.
+    // Tail
     const tail = BABYLON.MeshBuilder.CreateCylinder(`mob_tail_${row.mobId}`, {
       diameterTop: 0.06, diameterBottom: 0.14, height: 0.45, tessellation: 6,
     }, this.scene);
     tail.parent = visual;
     tail.position.set(0, 0.75, -0.62);
-    tail.rotation.x = -Math.PI / 4; // angle up-back
+    tail.rotation.x = -Math.PI / 4;
     tail.material = bodyMat;
+  }
 
-    // HP bar — a flat plane parented to the mob, made to face the camera each tick.
+  // HP bar — two flat planes (bg + fill) parented to the mob root. The
+  // planes use BILLBOARDMODE_ALL so they face the camera at any angle. The
+  // fill plane's X scale is set in applyMobUpdate based on hp ratio.
+  _buildMobHpBar(row, root) {
     const hpBar = new BABYLON.TransformNode(`mob_hpbar_${row.mobId}`, this.scene);
     hpBar.parent = root;
     hpBar.position.y = 1.6;
@@ -1199,6 +1270,7 @@ export class BabylonWorldScene {
     }, this.scene);
     hpBg.parent = hpBar;
     hpBg.material = hpBgMat;
+    hpBg.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
     const hpFillMat = new BABYLON.StandardMaterial('mobHpFill', this.scene);
     hpFillMat.emissiveColor = new BABYLON.Color3(0.85, 0.18, 0.18);
@@ -1209,14 +1281,9 @@ export class BabylonWorldScene {
     hpFill.parent = hpBar;
     hpFill.material = hpFillMat;
     hpFill.position.z = -0.001; // sit just in front of background
-    // Scale.x will be set in applyMobUpdate based on hp ratio.
+    hpFill.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-    const entry = {
-      root, visual, hpBar, hpFill,
-      maxHp: row.maxHp, lastHp: row.hp, dead: false,
-    };
-    this._mobs.set(row.mobId, entry);
-    return entry;
+    return { hpBar, hpFill };
   }
 
   // ── Combat input ───────────────────────────────────────────────────────────
@@ -1513,6 +1580,7 @@ export class BabylonWorldScene {
     [...this._mobs.keys()].forEach(id => this._removeMob(id));
     this._local?.dispose();
     AssetLibrary.dispose();
+    MobAssetLibrary.dispose();
     this._tileLoader?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
