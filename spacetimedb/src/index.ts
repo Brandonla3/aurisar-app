@@ -60,6 +60,7 @@ const spacetimedb = schema({
       // gets ADD COLUMN semantics, not a manual reorder migration.
       avatarConfig: t.string().default(''),       // JSON-encoded AvatarConfig; default '' on backfill — client re-syncs via setPlayerInfo on next login
       lastChatAt:   t.u64().default(0n),          // micros since unix epoch of last sendChat — default 0n behaves correctly with the > 0n rate-limit guard
+      lastAttackAt: t.u64().default(0n),          // micros since unix epoch of last castAbility — server-enforced melee cooldown (see castAbility reducer)
     }
   ),
 
@@ -78,6 +79,29 @@ const spacetimedb = schema({
       msgType:     t.string(),     // 'world' | 'proximity' | 'emote'
       x:           t.f32(),        // sender position at send time (proximity filter)
       y:           t.f32(),
+    }
+  ),
+
+  /**
+   * Server-authoritative mob entities. Slice 5a ships a stationary wolf as
+   * proof of the combat pipeline; 5b adds projectiles, 5c adds AI movement.
+   *
+   * mob_id uses the same timestamp-as-unique-id pattern as chatMessage.
+   * Position is in STDB px (same coord system as player).
+   * hp/maxHp are i32 so damage math can briefly go negative before being
+   * clamped — UI treats hp<=0 as dead.
+   */
+  mob: table(
+    { public: true },
+    {
+      mobId:       t.u64().primaryKey(),
+      mobType:     t.string(),     // 'wolf' for now
+      x:           t.f32(),
+      y:           t.f32(),
+      hp:          t.i32(),
+      maxHp:       t.i32(),
+      state:       t.string(),     // 'alive' | 'dead'
+      spawnNetId:  t.string(),     // matches tile_gameplay net_id when seeded from JSON; '' when hardcoded
     }
   ),
 
@@ -135,6 +159,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         zoneId: 0,
         online: true,
         lastChatAt: 0n,
+        lastAttackAt: 0n,
       });
     }
   }
@@ -234,6 +259,86 @@ export const sendChat = spacetimedb.reducer(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// COMBAT (slice 5a)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MELEE_RANGE_PX       = 96;             // 3 world units = 96 STDB px
+const MELEE_DAMAGE         = 25;              // 4 swings kills a 100-HP wolf
+const MELEE_COOLDOWN_MICROS = 300_000n;       // 300 ms between swings; client throttles at 350 ms so legit input has headroom
+const SEED_WOLF_HP         = 100;
+
+/**
+ * Idempotently seed one wolf near the world origin if no mobs exist yet.
+ * Called by the client on connect. Safe to call repeatedly — only inserts
+ * when the mob table is empty.
+ *
+ * Slice 5b/5c will replace this with a tile_gameplay JSON loader that reads
+ * spawn definitions per tile, but for now a single hardcoded wolf is enough
+ * to prove the end-to-end combat pipeline.
+ */
+export const seedWorld = spacetimedb.reducer({}, (ctx) => {
+  // Iterate to check emptiness — table is tiny in slice 5a, scan is fine.
+  for (const _existing of ctx.db.mob.iter()) {
+    return; // already seeded
+  }
+
+  const mobId = ctx.timestamp.microsSinceUnixEpoch;
+  ctx.db.mob.insert({
+    mobId,
+    mobType: 'wolf',
+    x: 1696,      // ~3 world units east of spawn (1600 + 96)
+    y: 1600,
+    hp: SEED_WOLF_HP,
+    maxHp: SEED_WOLF_HP,
+    state: 'alive',
+    spawnNetId: 'SLICE5A_HARDCODED_WOLF',
+  });
+});
+
+/**
+ * Server-authoritative melee attack. Client passes a target mob_id; the
+ * server validates the caller is within range and the mob is alive before
+ * applying damage. Subsequent slices add `abilityId` for non-melee.
+ */
+export const castAbility = spacetimedb.reducer(
+  {
+    mobId: t.u64(),
+  },
+  (ctx, { mobId }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return; // not authenticated yet
+
+    // Server-enforced cooldown. The client throttles at 350ms for UX, but
+    // a modified client could spam reducer calls without this guard — that
+    // would let them instakill mobs while still passing the range check.
+    // We also record the swing on accepted-but-missed calls (out of range,
+    // dead mob) to neutralise DoS via spammed-miss probing.
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.lastAttackAt > 0n && nowMicros - player.lastAttackAt < MELEE_COOLDOWN_MICROS) {
+      return; // dropped: caller is over the melee cadence
+    }
+    ctx.db.player.identity.update({ ...player, lastAttackAt: nowMicros });
+
+    const mob = ctx.db.mob.mobId.find(mobId);
+    if (!mob) return;
+    if (mob.state !== 'alive') return;
+
+    // Range check — squared euclidean to avoid sqrt; monotonic so the
+    // comparison is equivalent to comparing actual distances.
+    const dx = player.x - mob.x;
+    const dy = player.y - mob.y;
+    if (dx * dx + dy * dy > MELEE_RANGE_PX * MELEE_RANGE_PX) return;
+
+    const newHp = mob.hp - MELEE_DAMAGE;
+    ctx.db.mob.mobId.update({
+      ...mob,
+      hp: Math.max(0, newHp),
+      state: newHp <= 0 ? 'dead' : 'alive',
+    });
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LIFECYCLE REDUCERS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -247,6 +352,7 @@ export const clientConnected = spacetimedb.clientConnected((ctx) => {
     ctx.db.player.identity.update({ ...existing, online: true });
   }
   // If no row exists, setPlayerInfo will create one.
+  // Mob seeding is handled by the client invoking seedWorld() once on connect.
 });
 
 /**

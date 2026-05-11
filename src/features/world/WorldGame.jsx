@@ -125,8 +125,18 @@ export default function WorldGame({ playerInfo }) {
     setChatMessages(prev => [...prev, row].slice(-60));
   }, []);
 
-  const { connected, onlineCount, movePlayer, sendChat, identity } =
-    useSpacetimeWorld(playerInfo, { onPlayerUpdate, onPlayerDelete, onChatMessage });
+  const onMobUpsert = useCallback((row) => {
+    sceneRef.current?.applyMobUpdate(row);
+  }, []);
+
+  const onMobDelete = useCallback((row) => {
+    sceneRef.current?._removeMob(row.mobId);
+  }, []);
+
+  const { connected, onlineCount, movePlayer, sendChat, castAbility, identity } =
+    useSpacetimeWorld(playerInfo, {
+      onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
+    });
 
   useEffect(() => {
     if (identity) sceneRef.current?.setMyIdentity(identity);
@@ -139,7 +149,7 @@ export default function WorldGame({ playerInfo }) {
     const scene = new BabylonWorldScene(
       canvasRef.current,
       playerInfo,
-      { onMove: movePlayer }
+      { onMove: movePlayer, onCastAbility: castAbility }
     );
     sceneRef.current = scene;
 
@@ -150,10 +160,13 @@ export default function WorldGame({ playerInfo }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep movePlayer ref current (can change on reconnect)
+  // Keep movePlayer + castAbility refs current (can change on reconnect)
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onMove = movePlayer;
   }, [movePlayer]);
+  useEffect(() => {
+    if (sceneRef.current) sceneRef.current.callbacks.onCastAbility = castAbility;
+  }, [castAbility]);
 
   // Scroll chat to bottom on new messages
   useEffect(() => {

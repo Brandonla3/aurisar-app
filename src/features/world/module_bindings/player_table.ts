@@ -23,4 +23,5 @@ export default __t.row({
   online: __t.bool(),
   avatarConfig: __t.string().name("avatar_config"),
   lastChatAt: __t.u64().name("last_chat_at"),
+  lastAttackAt: __t.u64().name("last_attack_at"),
 });

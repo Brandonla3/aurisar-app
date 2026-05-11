@@ -12,8 +12,8 @@ const STDB_MODULE = import.meta.env.VITE_SPACETIMEDB_MODULE ?? 'aurisar-world';
 
 /**
  * @param {object|null} playerInfo  - { username, classType, avatarColor, avatarConfig }
- * @param {object}      callbacks   - { onPlayerUpdate, onPlayerDelete, onChatMessage }
- * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, setAvatarConfig, identity }}
+ * @param {object}      callbacks   - { onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete }
+ * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, setAvatarConfig, castAbility, identity }}
  */
 export function useSpacetimeWorld(playerInfo, callbacks) {
   const connRef      = useRef(null);
@@ -50,6 +50,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch (_) { /* not connected yet */ }
   }, []);
 
+  const castAbility = useCallback((mobId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.castAbility(mobId);
+    } catch (_) { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -72,13 +80,21 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             playerInfo.avatarConfig ? JSON.stringify(playerInfo.avatarConfig) : ''
           );
 
+          // Seed the world's mobs on first ever connect. Idempotent server-side,
+          // so subsequent connects are no-ops.
+          try { connection.reducers.seedWorld(); } catch (_) {}
+
           // Subscribe to live tables
           connection
             .subscriptionBuilder()
             .onApplied(() => {
               _refreshOnlineCount(connection);
             })
-            .subscribe(['SELECT * FROM player', 'SELECT * FROM chat_message']);
+            .subscribe([
+              'SELECT * FROM player',
+              'SELECT * FROM chat_message',
+              'SELECT * FROM mob',
+            ]);
 
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {
@@ -97,6 +113,17 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           // ── chat_message table events ──
           connection.db.chatMessage.onInsert((_ctx, row) => {
             callbacksRef.current?.onChatMessage?.(row);
+          });
+
+          // ── mob table events ──
+          connection.db.mob.onInsert((_ctx, row) => {
+            callbacksRef.current?.onMobUpsert?.(row);
+          });
+          connection.db.mob.onUpdate((_ctx, _oldRow, row) => {
+            callbacksRef.current?.onMobUpsert?.(row);
+          });
+          connection.db.mob.onDelete((_ctx, row) => {
+            callbacksRef.current?.onMobDelete?.(row);
           });
         })
         .onDisconnect((_ctx, err) => {
@@ -139,6 +166,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     movePlayer,
     sendChat,
     setAvatarConfig,
+    castAbility,
     identity: connRef.current?.identity ?? null,
   };
 }
