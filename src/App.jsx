@@ -6463,7 +6463,7 @@ function App() {
       />
     )}
 
-    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)} style={{ alignItems: "center" }}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0,
         "--mg-color": cls.color,
@@ -6559,7 +6559,7 @@ function App() {
               }}>{"✓"}</span>}</div><div><div className={"stats-prompt-reusable-title"}>{"💪 Also save as Reusable Workout"}</div><div className={"stats-prompt-reusable-sub"}>{"Keep this workout in your Re-Usable tab for future use"}</div></div></div>}<div style={{
             display: "flex",
             gap: S.s8
-          }}><button className={"btn btn-gold"} style={{
+          }}><button className={"btn btn-cls"} style={{
               flex: 1,
               fontSize: FS.fs75
             }} onClick={() => {
