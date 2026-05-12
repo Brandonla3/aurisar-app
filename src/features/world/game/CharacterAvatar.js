@@ -34,6 +34,27 @@ function hexToColor3(hex) {
   return new BABYLON.Color3(r, g, b);
 }
 
+// Default albedo per clothing slot. The Blender-authored clothing GLBs ship
+// with no baseColorFactor (per scripts/blender/README.md: "runtime-tinted via
+// albedoColor"), which makes them render pure white otherwise — appearing as
+// bright humanoid-shaped meshes overlaid on the character.
+const CLOTHING_DEFAULTS = {
+  top:    new BABYLON.Color3(0.55, 0.42, 0.31), // leather tan
+  bottom: new BABYLON.Color3(0.31, 0.23, 0.15), // dark trousers
+  shoes:  new BABYLON.Color3(0.18, 0.13, 0.09), // dark boot leather
+};
+
+const SPECIES_DEFAULTS = {
+  horns: new BABYLON.Color3(0.75, 0.65, 0.50),  // bone / ivory
+  tail:  new BABYLON.Color3(0.40, 0.30, 0.18),  // warm brown fur
+};
+
+function tintInstance(inst, color) {
+  inst.rootNodes
+    .flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
+    .forEach(m => { if (m.material) m.material.albedoColor = color; });
+}
+
 function findMorph(manager, name) {
   if (!manager) return null;
   for (let i = 0; i < manager.numTargets; i++) {
@@ -360,6 +381,7 @@ export class CharacterAvatar {
         n.parent = this.root;
       }
     });
+    tintInstance(inst, SPECIES_DEFAULTS.horns);
     this._slots['horns'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
@@ -396,6 +418,7 @@ export class CharacterAvatar {
         else                      n.parent = this.root;
       });
     }
+    tintInstance(inst, SPECIES_DEFAULTS.tail);
     this._slots['tail'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
@@ -420,6 +443,8 @@ export class CharacterAvatar {
     // Reassign skeleton so clothing skinning follows the body rig
     inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
       .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
+    // Tint the GLB's blank material so the piece doesn't render pure white.
+    tintInstance(inst, CLOTHING_DEFAULTS[slot] ?? CLOTHING_DEFAULTS.top);
     this._slots[`clothing_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
@@ -448,6 +473,10 @@ export class CharacterAvatar {
     // dispose the duplicate to keep the scene's skeleton count flat as more
     // gear loads — important when thousands of pieces are equipped over time.
     (inst.skeletons ?? []).forEach(s => s.dispose?.());
+    // Gear ships through the same blank-material pipeline as clothing — tint
+    // so it doesn't render white. Steel/iron baseline; per-piece colors can
+    // ride on the config later.
+    tintInstance(inst, new BABYLON.Color3(0.62, 0.62, 0.66));
     this._slots[`gear_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
