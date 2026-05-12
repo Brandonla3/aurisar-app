@@ -740,16 +740,48 @@ export class BabylonWorldScene {
     window.addEventListener('resize', this._onResize);
   }
 
+  // ── Diagnostics ────────────────────────────────────────────────────────────
+
+  // Logs every mesh currently in the scene plus its parent chain. Helps
+  // identify rogue meshes (e.g. an AssetContainer leaking its source mesh
+  // into the active scene at world origin). Exposed on window for ad-hoc use
+  // and called once right after the local character finishes loading.
+  _dumpSceneMeshes(label = 'scene meshes') {
+    const meshes = this.scene.meshes || [];
+    const rows = meshes.map(m => {
+      const parents = [];
+      let p = m.parent;
+      while (p && parents.length < 4) { parents.push(p.name || '<unnamed>'); p = p.parent; }
+      return {
+        name:    m.name,
+        type:    m.getClassName?.() ?? typeof m,
+        enabled: m.isEnabled?.() ?? null,
+        visible: m.isVisible !== false,
+        pos:     m.position ? [m.position.x.toFixed(2), m.position.y.toFixed(2), m.position.z.toFixed(2)].join(', ') : '—',
+        parents: parents.join(' › ') || '<root>',
+      };
+    });
+    // eslint-disable-next-line no-console
+    console.log(`[BabylonWorldScene] ${label}: count=${rows.length}`);
+    // eslint-disable-next-line no-console
+    console.table(rows);
+  }
+
   // ── Async character bootstrap ──────────────────────────────────────────────
 
   async _initCharactersAsync() {
     // Load both asset libraries in parallel — mob GLBs are not load-critical
     // (missing ones fall back to primitives), but starting their fetch here
     // means the first mob spawn doesn't pay a network roundtrip.
+    const meshesBefore = this.scene.meshes.length;
     await Promise.all([
       AssetLibrary.init(this.scene),
       MobAssetLibrary.init(this.scene),
     ]);
+    const meshesAfterAssetInit = this.scene.meshes.length;
+    // eslint-disable-next-line no-console
+    console.log(`[BabylonWorldScene] mesh count: before AssetLibrary=${meshesBefore}, after=${meshesAfterAssetInit}. If after > before by more than ~3 ground meshes, GLBs are leaking source meshes into the scene.`);
+
     this._local = await CharacterAvatar.create(
       'local',
       this.playerInfo?.username ?? 'You',
@@ -758,6 +790,14 @@ export class BabylonWorldScene {
       AssetLibrary
     );
     this._local.root.position.set(0, 0, 0);
+
+    // One-shot diagnostic — list everything in the scene right after the local
+    // character is built. Expose on window so it can be re-run from the
+    // browser console at any time.
+    if (typeof window !== 'undefined') {
+      window.__aurisarDumpScene = () => this._dumpSceneMeshes('on demand');
+    }
+    this._dumpSceneMeshes('after local character build');
     // Flush remote updates that arrived while we were loading.
     // Mobs first — they can spawn independently of `_local` once
     // MobAssetLibrary is ready, and we want them visible ASAP.
