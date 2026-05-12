@@ -86,6 +86,48 @@ const S = {
     fontFamily: 'Inter, system-ui, sans-serif',
     textAlign: 'right', lineHeight: '1.6', pointerEvents: 'none',
   },
+  // Slice 5c: player HP bar — top-left, opposite the online counter.
+  hpBarWrap: {
+    position: 'absolute', top: 12, left: 14, zIndex: 10,
+    display: 'flex', alignItems: 'center', gap: 8,
+    fontFamily: 'Inter, system-ui, sans-serif',
+    pointerEvents: 'none',
+  },
+  hpBarBg: {
+    width: 140, height: 10, borderRadius: 5,
+    background: 'rgba(0,0,0,0.55)',
+    border: '1px solid rgba(148,163,184,0.30)',
+    overflow: 'hidden',
+  },
+  hpBarFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg,#dc2626 0%,#ef4444 50%,#f87171 100%)',
+    transition: 'width 120ms linear',
+  },
+  hpBarLabel: {
+    color: '#e2e8f0', fontSize: 11, fontVariantNumeric: 'tabular-nums',
+    textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+  },
+  // Slice 5c: death overlay. Centered red text on a dimming film.
+  deathOverlay: {
+    position: 'absolute', inset: 0,
+    background: 'radial-gradient(circle at center,rgba(50,0,0,0.55) 0%,rgba(0,0,0,0.85) 100%)',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 100, pointerEvents: 'none',
+    fontFamily: 'Inter, system-ui, sans-serif',
+    color: '#fca5a5',
+  },
+  deathTitle: {
+    fontSize: 48, fontWeight: 700, letterSpacing: '0.04em',
+    color: '#fecaca',
+    textShadow: '0 2px 12px rgba(220,38,38,0.6)',
+    marginBottom: 12,
+  },
+  deathSub: {
+    fontSize: 16, color: '#cbd5e1',
+    textShadow: '0 1px 4px rgba(0,0,0,0.7)',
+  },
   // Virtual joystick zone — covers the left half, sits above the canvas
   joyZone: {
     position: 'absolute',
@@ -109,6 +151,9 @@ export default function WorldGame({ playerInfo }) {
   const [chatMessages, setChatMessages] = useState([]);
   // Visual joystick state: null = idle, object = active
   const [joyVis, setJoyVis] = useState(null); // { baseX, baseY, thumbX, thumbY }
+  // Slice 5c: local player liveness from the SpacetimeDB player row.
+  // Updated by BabylonWorldScene's onLocalPlayerUpdate callback.
+  const [localHp, setLocalHp] = useState({ hp: 100, maxHp: 100, dead: false, deadUntil: 0n });
 
   const inputRef  = useRef(null);
   const joyTouchRef = useRef(null); // { id, baseX, baseY }
@@ -143,6 +188,12 @@ export default function WorldGame({ playerInfo }) {
     if (identity) sceneRef.current?.setMyIdentity(identity);
   }, [identity]);
 
+  // Slice 5c — local-player HP / death overlay state, driven by BabylonWorldScene
+  // when our own row arrives via the player table subscription.
+  const onLocalPlayerUpdate = useCallback((state) => {
+    setLocalHp(state);
+  }, []);
+
   // ── Babylon scene mount / unmount ─────────────────────────────────────────
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -150,7 +201,7 @@ export default function WorldGame({ playerInfo }) {
     const scene = new BabylonWorldScene(
       canvasRef.current,
       playerInfo,
-      { onMove: movePlayer, onCastAbility: castAbility }
+      { onMove: movePlayer, onCastAbility: castAbility, onLocalPlayerUpdate }
     );
     sceneRef.current = scene;
 
@@ -305,6 +356,33 @@ export default function WorldGame({ playerInfo }) {
       {connected && (
         <div style={{ ...S.onlineCount, right: IS_TOUCH ? 120 : 14 }}>
           ● {onlineCount} online
+        </div>
+      )}
+
+      {/* Slice 5c: local-player HP bar (always visible while connected). */}
+      {connected && (
+        <div style={S.hpBarWrap}>
+          <div style={S.hpBarBg}>
+            <div
+              style={{
+                ...S.hpBarFill,
+                width: `${Math.max(0, Math.min(100, (localHp.hp / Math.max(1, localHp.maxHp)) * 100))}%`,
+              }}
+            />
+          </div>
+          <span style={S.hpBarLabel}>
+            {Math.max(0, localHp.hp)}/{localHp.maxHp} HP
+          </span>
+        </div>
+      )}
+
+      {/* Slice 5c: death overlay. Dimmed red film + "You died" text while the
+          server-side respawn timer ticks. Auto-dismisses when the server
+          marks us alive again (hp > 0, deadUntil cleared). */}
+      {localHp.dead && (
+        <div style={S.deathOverlay}>
+          <div style={S.deathTitle}>You died</div>
+          <div style={S.deathSub}>Respawning at the hub…</div>
         </div>
       )}
 

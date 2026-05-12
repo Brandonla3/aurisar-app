@@ -24,4 +24,7 @@ export default __t.row({
   avatarConfig: __t.string().name("avatar_config"),
   lastChatAt: __t.u64().name("last_chat_at"),
   lastAttackAt: __t.u64().name("last_attack_at"),
+  hp: __t.i32(),
+  maxHp: __t.i32().name("max_hp"),
+  deadUntil: __t.u64().name("dead_until"),
 });
