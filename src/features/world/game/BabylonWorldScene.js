@@ -658,6 +658,17 @@ export class BabylonWorldScene {
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
     this._spawning          = new Set(); // identity IDs currently being async-spawned
 
+    // Slice 5c: local-player liveness. The server pushes hp / deadUntil
+    // through the player row; we mirror them here so `_handleAttackInput`
+    // and `_moveLocal` can gate inputs while dead. `_localWasDead` flips
+    // false→true on death (so we can snap to the server's authoritative
+    // death spot) and true→false on respawn (so we snap to origin where
+    // `respawnPlayer` placed us).
+    this._localHp        = 100;
+    this._localMaxHp     = 100;
+    this._localDead      = false;
+    this._localWasDead   = false;
+
     // Mobile touch state — written by setJoystick() from WorldGame's React layer
     this._joyDx = 0;
     this._joyDy = 0;
@@ -1290,6 +1301,7 @@ export class BabylonWorldScene {
 
   _handleAttackInput() {
     if (this._chatOpen) return;
+    if (this._localDead) return;            // slice 5c: dead players can't swing
     if (!this._keys['Space']) return;
     const now = performance.now();
     if (now - this._lastAttackAt < 350) return; // soft cooldown — matches damage cadence
@@ -1317,6 +1329,7 @@ export class BabylonWorldScene {
 
   _moveLocal(dt) {
     if (this._chatOpen) { this._local.isMoving = false; return; }
+    if (this._localDead) { this._local.isMoving = false; return; }   // slice 5c: dead can't walk
 
     const w = this._keys['KeyW'] || this._keys['ArrowUp'];
     const s = this._keys['KeyS'] || this._keys['ArrowDown'];
@@ -1404,7 +1417,10 @@ export class BabylonWorldScene {
 
   applyPlayerUpdate(row) {
     const key = idKey(row.identity);
-    if (key === this._myIdentity) return;
+    if (key === this._myIdentity) {
+      this._applyLocalPlayerUpdate(row);
+      return;
+    }
     if (!row.online) { this._removeRemote(row.identity); return; }
     if (!this._local) { this._pendingUpdates.push(row); return; }
 
@@ -1416,6 +1432,53 @@ export class BabylonWorldScene {
     } else {
       this._spawnRemote(row);
     }
+  }
+
+  // Slice 5c: handle the local player's own row updates. We don't lerp
+  // position from the server (the local avatar is client-authoritative
+  // for smoothness while moving), but we DO snap on death/respawn
+  // transitions so the "you died" overlay shows over the right spot and
+  // respawn puts the camera at origin.
+  _applyLocalPlayerUpdate(row) {
+    this._localHp    = row.hp ?? this._localMaxHp;
+    this._localMaxHp = row.maxHp ?? this._localMaxHp;
+
+    const now = (typeof BigInt === 'function' ? BigInt(Date.now()) * 1000n : 0n);
+    const isDead = (row.hp ?? this._localMaxHp) <= 0 ||
+                   (typeof row.deadUntil === 'bigint' && row.deadUntil > now);
+
+    if (isDead && !this._localWasDead) {
+      // Just died — pin the local avatar at the server's death position
+      // so the death overlay covers a static scene. Without this, the
+      // client's keyboard-driven _moveLocal could keep walking the corpse.
+      if (this._local) {
+        this._local.root.position.x = toWorld(row.x);
+        this._local.root.position.z = toWorld(row.y);
+        this._local.isMoving = false;
+      }
+    } else if (!isDead && this._localWasDead) {
+      // Just respawned — server moved us to origin, snap the local avatar
+      // there too so movement input picks up from the new position.
+      if (this._local) {
+        this._local.root.position.x = toWorld(row.x);
+        this._local.root.position.z = toWorld(row.y);
+        this._local.isMoving = false;
+      }
+      // Reset our last-sent cache so the next movePlayer call doesn't
+      // get suppressed by the "barely moved" diff check.
+      this._lastPos = { x: this._local?.root?.position?.x ?? 0,
+                        z: this._local?.root?.position?.z ?? 0 };
+    }
+    this._localDead    = isDead;
+    this._localWasDead = isDead;
+
+    // Forward to the React layer for HUD HP bar + death overlay rendering.
+    this.callbacks?.onLocalPlayerUpdate?.({
+      hp:        this._localHp,
+      maxHp:     this._localMaxHp,
+      dead:      this._localDead,
+      deadUntil: row.deadUntil ?? 0n,
+    });
   }
 
   async _spawnRemote(row) {

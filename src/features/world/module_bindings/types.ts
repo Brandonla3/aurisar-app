@@ -31,8 +31,27 @@ export const Mob = __t.object("Mob", {
   maxHp: __t.i32(),
   state: __t.string(),
   spawnNetId: __t.string(),
+  spawnX: __t.f32(),
+  spawnY: __t.f32(),
+  aggroRadiusPx: __t.f32(),
+  leashRadiusPx: __t.f32(),
+  respawnSec: __t.u32(),
+  lastAttackAt: __t.u64(),
 });
 export type Mob = __Infer<typeof Mob>;
+
+export const MobAiTickScheduleRow = __t.object("MobAiTickScheduleRow", {
+  id: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type MobAiTickScheduleRow = __Infer<typeof MobAiTickScheduleRow>;
+
+export const MobRespawnQueueRow = __t.object("MobRespawnQueueRow", {
+  id: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  spawnNetId: __t.string(),
+});
+export type MobRespawnQueueRow = __Infer<typeof MobRespawnQueueRow>;
 
 export const Player = __t.object("Player", {
   identity: __t.identity(),
@@ -48,6 +67,16 @@ export const Player = __t.object("Player", {
   avatarConfig: __t.string(),
   lastChatAt: __t.u64(),
   lastAttackAt: __t.u64(),
+  hp: __t.i32(),
+  maxHp: __t.i32(),
+  deadUntil: __t.u64(),
 });
 export type Player = __Infer<typeof Player>;
+
+export const PlayerRespawnQueueRow = __t.object("PlayerRespawnQueueRow", {
+  id: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  identity: __t.identity(),
+});
+export type PlayerRespawnQueueRow = __Infer<typeof PlayerRespawnQueueRow>;
 

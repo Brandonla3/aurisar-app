@@ -19,4 +19,10 @@ export default __t.row({
   maxHp: __t.i32().name("max_hp"),
   state: __t.string(),
   spawnNetId: __t.string().name("spawn_net_id"),
+  spawnX: __t.f32().name("spawn_x"),
+  spawnY: __t.f32().name("spawn_y"),
+  aggroRadiusPx: __t.f32().name("aggro_radius_px"),
+  leashRadiusPx: __t.f32().name("leash_radius_px"),
+  respawnSec: __t.u32().name("respawn_sec"),
+  lastAttackAt: __t.u64().name("last_attack_at"),
 });
