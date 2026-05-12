@@ -339,7 +339,7 @@ class LightingManager {
     // so scene.environmentTexture stays null on every device and the IBL fill
     // desktop used to rely on never arrives. Day value is set here; night
     // raises it dynamically in _updateOverworld so geometry stays readable.
-    this.scene.ambientColor = new BABYLON.Color3(0.20, 0.22, 0.26);
+    this.scene.ambientColor = new BABYLON.Color3(0.14, 0.16, 0.20);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -417,21 +417,20 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
-    // Daytime key intensity dropped from 2.4 → 1.4. Combined with the missing
-    // IBL contribution (env textures aren't shipped), 2.4 was over-saturating
-    // PBR characters and pushing surface luminance past the bloom threshold.
-    this.key.intensity = lerp(0.05, 1.4, dayFactor);
+    // Daytime key intensity stepped down again — the previous 1.4 still read
+    // too bright on lit characters after the tone-map swap let more color
+    // through. 1.0 sits in line with mobile games of this scale.
+    this.key.intensity = lerp(0.05, 1.0, dayFactor);
     lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
-    this.moon.intensity = lerp(0.0, 0.40, 1.0 - dayFactor);
+    this.moon.intensity = lerp(0.0, 0.30, 1.0 - dayFactor);
 
-    // Unified curve for desktop and mobile. Cut across the board from the
-    // previous pass — at midday the scene was reading "insanely bright"
-    // because key + fill + ambient + exposure were all near their max
-    // simultaneously, stacking into ~saturated luminance on lit surfaces.
-    this.fillOverworld.intensity = lerp(0.28, 0.38, dayFactor);
+    // Unified curve for desktop and mobile. Cut further from the previous
+    // pass — fill, exposure, and ambient all came down so direct sun no
+    // longer dominates the lit hemisphere of geometry.
+    this.fillOverworld.intensity = lerp(0.22, 0.28, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.85, 1.00, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.88, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -440,9 +439,9 @@ class LightingManager {
     // Dynamic ambient: raise at night to keep geometry readable when the key
     // is dim; keep day-side low so the directional light still defines form.
     this.scene.ambientColor.copyFromFloats(
-      lerp(0.30, 0.20, dayFactor),
-      lerp(0.33, 0.22, dayFactor),
-      lerp(0.40, 0.26, dayFactor)
+      lerp(0.24, 0.14, dayFactor),
+      lerp(0.26, 0.16, dayFactor),
+      lerp(0.32, 0.20, dayFactor)
     );
 
     // Sky background — mutate clearColor in-place via scratch to avoid allocation
