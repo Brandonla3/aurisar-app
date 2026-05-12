@@ -6,10 +6,10 @@
   "scripts": {
     "build": "spacetime build",
     "publish:dev": "spacetime publish --server testnet aurisar-world-dev",
-    "publish:prod": "spacetime publish --server mainnet aurisar-world",
-    "generate": "spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings --server mainnet --database aurisar-world",
+    "publish:prod": "spacetime publish --server maincloud aurisar-world",
+    "generate": "spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings --server maincloud --database aurisar-world",
     "generate:dev": "spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings --server testnet --database aurisar-world-dev",
-    "logs": "spacetime logs aurisar-world --server mainnet",
+    "logs": "spacetime logs aurisar-world --server maincloud",
     "sql": "spacetime sql aurisar-world"
   },
   "dependencies": {
