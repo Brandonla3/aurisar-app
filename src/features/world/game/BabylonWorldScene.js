@@ -288,11 +288,13 @@ class LightingManager {
     // due to missing half-float / float render-target extensions. Skip it
     // entirely on mobile and go straight to the lightweight fallback path.
     if (!this._isMobile) {
-      // Raised bloomThreshold + lower bloomWeight so the lit overworld no
-      // longer ghosts around characters at midday (first PR pass kept the
-      // old aggressive bloom while also raising exposure).
+      // High bloom threshold + low weight so daylight scene surfaces don't
+      // trigger bloom — only intentional emissives (portal, magic accents)
+      // pass the threshold. The earlier 0.88 threshold was lifted from a
+      // pre-PR tuning that assumed HDR + IBL; without IBL it bloomed the
+      // entire sky and character at midday.
       this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
-        bloomThreshold: 1.05, bloomWeight: 0.15, bloomScale: 0.5,
+        bloomThreshold: 1.20, bloomWeight: 0.12, bloomScale: 0.5,
       });
       this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
         bloomThreshold: 0.95, bloomWeight: 0.25, bloomScale: 0.5,
@@ -333,7 +335,7 @@ class LightingManager {
     // so scene.environmentTexture stays null on every device and the IBL fill
     // desktop used to rely on never arrives. Day value is set here; night
     // raises it dynamically in _updateOverworld so geometry stays readable.
-    this.scene.ambientColor = new BABYLON.Color3(0.26, 0.29, 0.34);
+    this.scene.ambientColor = new BABYLON.Color3(0.20, 0.22, 0.26);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -411,29 +413,32 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
-    this.key.intensity = lerp(0.05, 2.4, dayFactor);
+    // Daytime key intensity dropped from 2.4 → 1.4. Combined with the missing
+    // IBL contribution (env textures aren't shipped), 2.4 was over-saturating
+    // PBR characters and pushing surface luminance past the bloom threshold.
+    this.key.intensity = lerp(0.05, 1.4, dayFactor);
     lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
-    this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
+    this.moon.intensity = lerp(0.0, 0.40, 1.0 - dayFactor);
 
-    // Unified fill / exposure / ambient curve for both desktop and mobile.
-    // Values sit between the original desktop tuning (which relied on missing
-    // IBL .env textures and rendered too dark) and the first-pass mobile
-    // tuning (which over-exposed the scene and washed out the sky with bloom).
-    this.fillOverworld.intensity = lerp(0.40, 0.55, dayFactor);
+    // Unified curve for desktop and mobile. Cut across the board from the
+    // previous pass — at midday the scene was reading "insanely bright"
+    // because key + fill + ambient + exposure were all near their max
+    // simultaneously, stacking into ~saturated luminance on lit surfaces.
+    this.fillOverworld.intensity = lerp(0.28, 0.38, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.92, 1.10, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.85, 1.00, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
     lerpColor3Into(this.scene.fogColor, this._nightFog, this._dayFog, dayFactor);
 
-    // Dynamic ambient: raise at night to compensate for the dimmer key light
-    // (no IBL to fill in the dark side of geometry).
+    // Dynamic ambient: raise at night to keep geometry readable when the key
+    // is dim; keep day-side low so the directional light still defines form.
     this.scene.ambientColor.copyFromFloats(
-      lerp(0.36, 0.26, dayFactor),
-      lerp(0.39, 0.29, dayFactor),
-      lerp(0.46, 0.34, dayFactor)
+      lerp(0.30, 0.20, dayFactor),
+      lerp(0.33, 0.22, dayFactor),
+      lerp(0.40, 0.26, dayFactor)
     );
 
     // Sky background — mutate clearColor in-place via scratch to avoid allocation
