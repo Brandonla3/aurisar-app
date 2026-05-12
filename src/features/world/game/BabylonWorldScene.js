@@ -117,9 +117,9 @@ class LightingManager {
     this._nightGround  = new BABYLON.Color3(0.10, 0.12, 0.18);
     this._dayGround    = new BABYLON.Color3(0.34, 0.36, 0.40);
     this._nightFog     = new BABYLON.Color3(0.06, 0.08, 0.12);
-    this._dayFog       = new BABYLON.Color3(0.74, 0.84, 0.96);
+    this._dayFog       = new BABYLON.Color3(0.62, 0.78, 0.94);  // bluer, less wash
     this._nightSky     = new BABYLON.Color3(0.06, 0.08, 0.18);
-    this._daySky       = new BABYLON.Color3(0.42, 0.58, 0.78);
+    this._daySky       = new BABYLON.Color3(0.32, 0.58, 0.92);  // more saturated daytime sky
     this._dungeonFog   = new BABYLON.Color3(0.06, 0.07, 0.085);
 
     this._setupCore();
@@ -209,8 +209,12 @@ class LightingManager {
 
   _setupCore() {
     this.scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    // KHR PBR Neutral preserves color saturation in midtones, where ACES
+    // visibly desaturated the sky (read as grey-white instead of blue) and
+    // ground (read as olive-grey instead of green). Both maps cost the same
+    // per pixel.
     this.scene.imageProcessingConfiguration.toneMappingType =
-      BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+      BABYLON.ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
 
     this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
 

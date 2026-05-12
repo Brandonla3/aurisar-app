@@ -52,7 +52,9 @@ export class ProceduralTileProvider {
   _ensureMaterials(scene) {
     if (this._materials && this._materials.scene === scene) return this._materials;
     const grass = new BABYLON.StandardMaterial('tile_grass', scene);
-    grass.diffuseColor = new BABYLON.Color3(0.18, 0.30, 0.12);
+    // More saturated green — old (0.18, 0.30, 0.12) read olive-grey after the
+    // ambient + tone-mapping chain landed on it.
+    grass.diffuseColor = new BABYLON.Color3(0.22, 0.46, 0.14);
     grass.specularColor = new BABYLON.Color3(0, 0, 0);
 
     const trunk = new BABYLON.StandardMaterial('tile_trunk', scene);
