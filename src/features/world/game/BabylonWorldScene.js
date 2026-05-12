@@ -712,15 +712,15 @@ export class BabylonWorldScene {
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
 
-    // Pin the world to mid-morning until the full day/night lighting story
-    // (incl. IBL .env files) ships. Wall-clock time was making the world
-    // unplayably dark in the evening, and dayLengthSec=86400 meant the cycle
-    // barely moved while you played. A slow 1h cycle starting at 10am keeps
-    // typical sessions firmly in daylight while leaving the cycle code alive.
+    // Seed the day/night cycle from the device's real local time so the
+    // world matches the player's actual time of day, then run at real speed
+    // (1 real-time second = 1 game-time second).
+    const now = new Date();
+    const realHour = now.getHours() + now.getMinutes() / 60;
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
-      startTimeOfDay: 10.0,
-      dayLengthSec:   3600,
+      startTimeOfDay: realHour,
+      dayLengthSec:   86400,
     });
 
     this._setupShadows();
