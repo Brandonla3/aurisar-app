@@ -126,6 +126,7 @@ const getRowName = row => {
 };
 const getRowVal = (row, filterId) => {
   if (filterId === "overall_xp") return row.total_xp || 0;
+  if (filterId === "weekly_xp") return row.weekly_xp || 0;
   if (filterId === "streak") return row.streak || 0;
   const pbs = row.exercise_pbs || {};
   if (filterId === "bench_1rm") return (pbs["bench"] || pbs["bench_press"] || {}).weight || 0;
@@ -153,7 +154,7 @@ const sorted = (lbData || []).slice().sort((a, b) => {
   const bv = getRowVal(b, lbFilter);
   if (lbFilter === "run_pace") return (av || 999) - (bv || 999); // lower is better
   return bv - av;
-}).filter(r => getRowVal(r, lbFilter) > 0 || lbFilter === "overall_xp");
+}).filter(r => getRowVal(r, lbFilter) > 0 || lbFilter === "overall_xp" || lbFilter === "weekly_xp");
 const myRow = sorted.find(r => r.is_me);
 const myRank = myRow ? sorted.indexOf(myRow) + 1 : null;
 const myVal = myRow ? getRowVal(myRow, lbFilter) : 0;
@@ -179,7 +180,6 @@ const MultiDrop = ({
     position: "relative",
     flex: 1
   }}>
-    // Trigger chip
     <div style={{
       background: open ? "rgba(45,42,36,.45)" : "rgba(45,42,36,.2)",
       border: "1px solid " + (open ? "rgba(180,172,158,.12)" : "rgba(180,172,158,.06)"),
@@ -226,7 +226,6 @@ const MultiDrop = ({
       boxShadow: "0 8px 32px rgba(0,0,0,.6)",
       overflow: "hidden"
     }}>
-      // Select All / Clear All header
       <div style={{
         display: "flex",
         justifyContent: "space-between",
@@ -244,7 +243,6 @@ const MultiDrop = ({
           cursor: "pointer",
           fontWeight: 600
         }} onClick={() => setSelected([])}>{"Clear All"}</span></div>
-      // Scrollable options
       <div style={{
         maxHeight: 200,
         overflowY: "auto",
@@ -280,7 +278,6 @@ const MultiDrop = ({
               background: on ? "rgba(180,172,158,.08)" : "transparent"
             }}>{on ? "\u2713" : ""}</span>{opt}</div>;
         })}</div>
-      // Done button
       <div style={{
         padding: "6px 10px",
         borderTop: "1px solid rgba(180,172,158,.06)",

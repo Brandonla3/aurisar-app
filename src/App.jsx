@@ -2377,7 +2377,7 @@ function App() {
       loadLeaderboard();
       loadLeaderboardFilters();
     }
-  }, [activeTab]);
+  }, [activeTab, authUser?.id]);
   useEffect(() => {
     if (activeTab === 'leaderboard' && authUser && lbData !== null) {
       loadLeaderboard();
@@ -5848,6 +5848,7 @@ function App() {
             lbWorldRanks={lbWorldRanks}
             lbLoading={lbLoading}
             profile={profile}
+            myPublicId={myPublicId}
             authUser={authUser}
           />
         )
