@@ -126,14 +126,22 @@ jobs:
         # and the live world reflects the new manifest immediately —
         # rather than waiting for the first client connect to trigger
         # it. Safe to call repeatedly; no-op if already current.
-        run: spacetime call aurisar-world seed_world
+        #
+        # `--server maincloud` is required: `spacetime call` and `sql`
+        # use the CLI's selected default server when no flag is passed,
+        # and that default is NOT inherited from the preceding publish.
+        # On a fresh runner the default may be `local` (set by the
+        # installer), which would error with "database not found" — or
+        # worse, in a future setup, silently hit the wrong environment.
+        run: spacetime call --server maincloud aurisar-world seed_world
 
       - name: Verify mob table
         # Read-only sanity check. We don't fail the job on row count
         # (the manifest can legitimately add or remove spawns), but the
         # output appears in the job log so a reviewer can eyeball it
-        # after a deploy.
+        # after a deploy. `--server maincloud` for the same reason as
+        # the seed step above.
         run: |
-          spacetime sql aurisar-world \
+          spacetime sql --server maincloud aurisar-world \
             "SELECT mob_id, mob_type, spawn_net_id, spawn_x, spawn_y, hp FROM mob" \
             || echo "::warning::SELECT failed — module may need investigation, but publish + seed already succeeded"
