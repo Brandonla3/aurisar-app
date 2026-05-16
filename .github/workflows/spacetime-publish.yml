@@ -63,6 +63,33 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        # `spacetime publish` compiles TypeScript with `tsc` from the
+        # module's local node_modules and resolves runtime imports (the
+        # `spacetimedb` package, `spacetimedb/server`) against the same
+        # install. Without this step, the previous run logged:
+        #
+        #   tsc not found in node_modules. Make sure you have the
+        #   `typescript` package as a dev-dependency...
+        #   [UNRESOLVED_IMPORT] Could not resolve 'spacetimedb/server'
+        #   [UNRESOLVED_IMPORT] Could not resolve 'spacetimedb'
+        #
+        # Matching the main CI workflow's Node 20 + npm cache, with the
+        # cache-dependency-path targeting the spacetimedb subproject's
+        # lockfile so the cache key fingerprint actually represents
+        # what we install.
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: spacetimedb/package-lock.json
+
+      - name: Install module dependencies
+        # `npm ci` (not `npm install`) so the lockfile is the source of
+        # truth — fails if package.json and package-lock.json drift.
+        working-directory: spacetimedb
+        run: npm ci
+
       - name: Sanity-check the auth token is present
         # Fail fast with a clear message if the secret is missing.
         # Without this step, the install/login would still proceed and
