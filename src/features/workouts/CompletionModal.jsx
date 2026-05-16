@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { createPortal } from 'react-dom';
 import { todayStr } from '../../utils/helpers';
-import { calcExXP, getMuscleColor } from '../../utils/xp';
+import { calcWorkoutXP, getMuscleColor } from '../../utils/xp';
 import { formatXP } from '../../utils/format';
 import { S, FS } from '../../utils/tokens';
 
@@ -36,7 +36,7 @@ const CompletionModal = memo(function CompletionModal({
   setStatsPromptModal,
 }) {
   const wo = completionModal.workout;
-  const xp = wo.exercises.reduce((s, ex) => s + calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById), 0);
+  const xp = calcWorkoutXP(wo, profile.chosenClass, allExById);
   const firstEx = wo.exercises.map(e => allExById[e.exId]).find(Boolean);
   const woMgColor = getMuscleColor(firstEx?.muscleGroup);
   const accentColor = clsColor || "#b4ac9e";
