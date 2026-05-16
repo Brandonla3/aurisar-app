@@ -820,7 +820,7 @@ return (
       }}>
         <span style={{ fontSize: "1.05rem", flexShrink: 0 }}>{icon}</span>
         <span style={{ fontFamily: "'Inter',sans-serif", fontSize: ".62rem", color: "#b4ac9e", flex: 1 }}>{label}</span>
-        <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".95rem", fontWeight: 700, color: cls.color, filter: `drop-shadow(0 0 4px color-mix(in srgb, ${cls.color} 45%, transparent))` }}>{value}</span>
+        <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".95rem", fontWeight: 700, color: cls.glow, filter: `drop-shadow(0 0 5px color-mix(in srgb, ${cls.glow} 55%, transparent))` }}>{value}</span>
       </div>
     );
     return (
@@ -894,7 +894,7 @@ return (
                 <WhoopMiniChart
                   historyData={whoopHistory.recovery}
                   extractValue={p => p?.score?.recovery_score}
-                  maxVal={100} unit={"%"} clsColor={cls.color}
+                  maxVal={100} unit={"%"} clsColor={cls.glow}
                 />
               </div>
             )}
@@ -910,7 +910,7 @@ return (
                 <WhoopMiniChart
                   historyData={whoopHistory.sleep}
                   extractValue={p => p?.score?.sleep_performance_percentage}
-                  maxVal={100} unit={"%"} clsColor={cls.color}
+                  maxVal={100} unit={"%"} clsColor={cls.glow}
                 />
               </div>
             )}
@@ -938,7 +938,7 @@ return (
                 <WhoopMiniChart
                   historyData={whoopHistory.cycle}
                   extractValue={p => p?.score?.strain}
-                  maxVal={21} unit={""} clsColor={cls.color}
+                  maxVal={21} unit={""} clsColor={cls.glow}
                 />
               </div>
             )}
