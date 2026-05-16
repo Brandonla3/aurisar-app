@@ -748,23 +748,26 @@ export class BabylonWorldScene {
   // and called once right after the local character finishes loading.
   _dumpSceneMeshes(label = 'scene meshes') {
     const meshes = this.scene.meshes || [];
-    const rows = meshes.map(m => {
+    // eslint-disable-next-line no-console
+    console.log(`[BabylonWorldScene] === ${label}: count=${meshes.length} ===`);
+    // Anything whose top-level ancestor is one of these is expected. Anything
+    // else is a candidate for the "bone mesh" we're hunting.
+    const expectedTopLevel = (name) =>
+      /^(tile_|dun|local_root|remote_|mob_|skyBox|hdrSkyBox|imgPP|glow|lm_)/.test(name);
+    for (const m of meshes) {
       const parents = [];
       let p = m.parent;
-      while (p && parents.length < 4) { parents.push(p.name || '<unnamed>'); p = p.parent; }
-      return {
-        name:    m.name,
-        type:    m.getClassName?.() ?? typeof m,
-        enabled: m.isEnabled?.() ?? null,
-        visible: m.isVisible !== false,
-        pos:     m.position ? [m.position.x.toFixed(2), m.position.y.toFixed(2), m.position.z.toFixed(2)].join(', ') : '—',
-        parents: parents.join(' › ') || '<root>',
-      };
-    });
+      while (p && parents.length < 6) { parents.push(p.name || '<unnamed>'); p = p.parent; }
+      const top = parents[parents.length - 1] || m.name;
+      const flag = expectedTopLevel(top) ? '   ' : '*!*';
+      const pos = m.position
+        ? `(${m.position.x.toFixed(1)},${m.position.y.toFixed(1)},${m.position.z.toFixed(1)})`
+        : '—';
+      // eslint-disable-next-line no-console
+      console.log(`${flag} ${m.name.padEnd(40)} ${pos.padEnd(20)} parents: ${parents.join(' › ') || '<root>'}`);
+    }
     // eslint-disable-next-line no-console
-    console.log(`[BabylonWorldScene] ${label}: count=${rows.length}`);
-    // eslint-disable-next-line no-console
-    console.table(rows);
+    console.log(`[BabylonWorldScene] === end ${label} (rows flagged *!* don't belong to a known root) ===`);
   }
 
   // ── Async character bootstrap ──────────────────────────────────────────────
