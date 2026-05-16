@@ -96,8 +96,6 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
   const chartW = W - padL - padR;
   const colW = chartW / 7;
   const barW = Math.max(8, colW - 5);
-  const avgY = padT + chartH * (1 - Math.min(avg / maxVal, 1));
-
   return (
     <div style={{
       marginTop: 12,
@@ -158,10 +156,6 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
             </g>
           );
         })}
-        {numeric.length > 1 && (
-          <line x1={padL} y1={avgY} x2={W - padR} y2={avgY}
-            stroke={clsColor} strokeWidth={1} strokeDasharray="3,3" opacity={0.78} />
-        )}
       </svg>
     </div>
   );
