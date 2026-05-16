@@ -29,6 +29,7 @@ import LogEntryEditModal from './features/history/LogEntryEditModal';
 import RetroEditModal from './features/history/RetroEditModal';
 import QuestsTab from './features/quests/QuestsTab';
 import CharacterTab from './features/character/CharacterTab';
+import XpBarFlash from './features/profile/XpBarFlash';
 import { useAvatarConfig } from './features/avatar/useAvatarConfig.js';
 import MapOverlay from './features/character/MapOverlay';
 import WorkoutsTab from './features/workouts/WorkoutsTab';
@@ -621,7 +622,6 @@ function App() {
   const [pickerEquipFilter, setPickerEquipFilter] = useState("all");
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null); // "muscle"|"type"|"equip"|null
   const [pickerSelected, setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
-  const [pickerConfigOpen, setPickerConfigOpen] = useState(false); // show config panel in picker
   // Quests
   const [questCat, setQuestCat] = useState("All");
   // Calendar
@@ -2377,7 +2377,7 @@ function App() {
       loadLeaderboard();
       loadLeaderboardFilters();
     }
-  }, [activeTab]);
+  }, [activeTab, authUser?.id]);
   useEffect(() => {
     if (activeTab === 'leaderboard' && authUser && lbData !== null) {
       loadLeaderboard();
@@ -2824,8 +2824,14 @@ function App() {
     // Flush any debounced profile writes BEFORE invalidating auth — otherwise
     // a queued Supabase upsert lands as an unauthenticated request and a
     // queued localStorage write would rewrite the cache after the wipe below.
-    try { await flushSave(); } catch { /* noop */ }
-    await sb.auth.signOut();
+    // Cap the flush at 3 s so a slow/hung network write never blocks sign-out.
+    try {
+      await Promise.race([
+        flushSave(),
+        new Promise(resolve => setTimeout(resolve, 3000)),
+      ]);
+    } catch { /* noop */ }
+    try { await sb.auth.signOut(); } catch { /* noop */ }
     // Wipe locally-cached PII so a shared device can't leak data to the next user.
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -2980,7 +2986,8 @@ function App() {
     }));
     setXpFlash({
       amount: q.xp,
-      mult: 1
+      mult: 1,
+      prevXp: profile.xp
     });
     setTimeout(() => setXpFlash(null), 2200);
     showToast(`Quest complete! ${formatXP(q.xp, {
@@ -3066,7 +3073,8 @@ function App() {
     }));
     setXpFlash({
       amount: xpEarned,
-      mult: 1
+      mult: 1,
+      prevXp: profile.xp
     });
     setTimeout(() => setXpFlash(null), 2000);
     showToast(`Checked in! +${xpEarned} XP · ${newStreak} day streak 🔥`);
@@ -3158,7 +3166,8 @@ function App() {
     }));
     setXpFlash({
       amount: 125,
-      mult: 1
+      mult: 1,
+      prevXp: profile.xp
     });
     setTimeout(() => setXpFlash(null), 2000);
     const d = new Date(retroDate + "T12:00:00");
@@ -3395,7 +3404,8 @@ function App() {
         setXpFlash({
           amount: finalEarned + _ciResult.checkInXP,
           mult,
-          travel: travelActive
+          travel: travelActive,
+          prevXp: profile.xp
         });
         setTimeout(() => setXpFlash(null), 2000);
         const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
@@ -3538,7 +3548,8 @@ function App() {
       setXpFlash({
         amount: finalEarned + _ciResult.checkInXP,
         mult,
-        travel: travelActive
+        travel: travelActive,
+        prevXp: profile.xp
       });
       setTimeout(() => setXpFlash(null), 2000);
       showToast((travelActive && regionBoost > 1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost > 1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`) + ciSuffix);
@@ -3852,7 +3863,6 @@ function App() {
     setPickerEquipFilter("all");
     setPickerOpenDrop(null);
     setPickerSelected([]);
-    setPickerConfigOpen(false);
   }
   function pickerToggleEx(exId) {
     const exd = allExById[exId] || {};
@@ -3870,12 +3880,6 @@ function App() {
         hrZone: null
       }];
     });
-  }
-  function pickerUpdateEx(exId, field, val) {
-    setPickerSelected(prev => prev.map(e => e.exId === exId ? {
-      ...e,
-      [field]: val
-    } : e));
   }
   function commitPickerToWorkout() {
     if (pickerSelected.length === 0) return;
@@ -5154,9 +5158,9 @@ function App() {
       height: p.size,
       "--dur": `${p.duration}s`,
       "--dly": `${p.delay}s`
-    }} />)}{xpFlash && <div className={"xp-flash"}>{formatXP(xpFlash.amount, {
+    }} />)}{xpFlash && <><div className={"xp-flash"}>{formatXP(xpFlash.amount, {
         signed: true
-      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div>}{toast && <div className={"toast"} role={"status"} aria-live={"polite"} aria-atomic={"true"} onClick={() => setToast(null)}>{toast}</div>}{friendExBanner && <div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
+      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}{toast && <div className={"toast"} role={"status"} aria-live={"polite"} aria-atomic={"true"} onClick={() => setToast(null)}>{toast}</div>}{friendExBanner && <div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
 
     /* ══ INTRO ══════════════════════════════════ */}{screen === "intro" && <div className={"screen boot-screen"}><div className={"boot-title"}>{"AURISAR"}<span className={"boot-title-sub"}>{"FITNESS"}</span></div><div className={"boot-log"}><div className={"boot-bar-wrap"}><div className={"boot-bar"} style={{
             width: bootStep >= 4 ? "100%" : bootStep >= 3 ? "58%" : bootStep >= 2 ? "34%" : bootStep >= 1 ? "12%" : "2%"
@@ -5848,6 +5852,7 @@ function App() {
             lbWorldRanks={lbWorldRanks}
             lbLoading={lbLoading}
             profile={profile}
+            myPublicId={myPublicId}
             authUser={authUser}
           />
         )
@@ -6311,16 +6316,11 @@ function App() {
         pickerOpenDrop={pickerOpenDrop}
         setPickerOpenDrop={setPickerOpenDrop}
         pickerSelected={pickerSelected}
-        setPickerSelected={setPickerSelected}
-        pickerConfigOpen={pickerConfigOpen}
-        setPickerConfigOpen={setPickerConfigOpen}
         allExercises={allExercises}
         allExById={allExById}
-        profile={profile}
         closePicker={closePicker}
         openExEditor={openExEditor}
         pickerToggleEx={pickerToggleEx}
-        pickerUpdateEx={pickerUpdateEx}
         commitPickerToWorkout={commitPickerToWorkout}
       />
     )}

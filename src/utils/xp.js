@@ -132,6 +132,18 @@ function calcDayXP(day,classKey,exLookup) {
   return day.exercises.reduce((s,ex)=>s+calcExXP(ex.exId,ex.sets,ex.reps,classKey,exLookup),0);
 }
 
+// Mirrors the per-row loop in useWorkoutCompletion.js so the projected XP
+// shown in the Complete Deed modal matches the XP actually awarded on log.
+function calcWorkoutXP(workout,classKey,exLookup) {
+  if(!workout || !workout.exercises) return 0;
+  return workout.exercises.reduce((total,ex)=>{
+    const allRows=[{sets:ex.sets||3,reps:ex.reps||10,weightLbs:ex.weightLbs||null},...(ex.extraRows||[])];
+    const extraCount=(ex.extraRows||[]).length;
+    const exXp=allRows.reduce((s,row)=>s+calcExXP(ex.exId,row.sets||3,row.reps||10,classKey,exLookup,null,null,null,extraCount),0);
+    return total+exXp;
+  },0);
+}
+
 // ── PERSONAL BEST CALCULATOR ─────────────────────────────────────
 // Returns { exId: { type, value, display } }
 // Supports 7 PB types from the master exercise list:
@@ -365,6 +377,7 @@ export {
   calcExXP,
   calcPlanXP,
   calcDayXP,
+  calcWorkoutXP,
   calcExercisePBs,
   CLASS_FLAT,
   calcDecisionTreeBonus,

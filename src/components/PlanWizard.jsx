@@ -332,7 +332,6 @@ function PlanWizard(props) {
   const [pickerEquipFilter, setPickerEquipFilter] = useState("all");
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null);
   const [pickerSelected, setPickerSelected] = useState([]);
-  const [pickerConfigOpen, setPickerConfigOpen] = useState(false);
 
   // ── Body overflow effect ──
   useEffect(() => {
@@ -529,7 +528,7 @@ function PlanWizard(props) {
   function closePicker() {
     setExPickerOpen(false);
     setPickerSearch(""); if(pickerSearchRef.current) pickerSearchRef.current.value=""; setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
-    setPickerSelected([]); setPickerConfigOpen(false);
+    setPickerSelected([]);
   }
 
   const pickerToggleEx = useCallback((exId) => {
@@ -560,10 +559,6 @@ function PlanWizard(props) {
     }),
     [profile.units, profile.age, profile.runningPB, profile.exercisePBs]
   );
-
-  function pickerUpdateEx(exId, field, val) {
-    setPickerSelected(prev=>prev.map(e=>e.exId===exId?{...e,[field]:val}:e));
-  }
 
   function commitPickerToPlan() {
     if(pickerSelected.length===0) return;
@@ -1002,22 +997,20 @@ function PlanWizard(props) {
 
       {/* ── 4. EXERCISE PICKER PORTAL ── */}
       {exPickerOpen && createPortal(
-        <div className="ex-picker-backdrop" onClick={e=>{e.stopPropagation();if(!pickerConfigOpen)closePicker();}}>
+        <div className="ex-picker-backdrop" onClick={e=>{e.stopPropagation();closePicker();}}>
           <div className="ex-picker-sheet" onClick={e=>e.stopPropagation()} style={{maxHeight:"85vh"}}>
-            {!pickerConfigOpen ? (
-              <>
-                {/* -- BROWSE VIEW -- */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}>
-                  <div style={{fontFamily:"'Inter',sans-serif",fontSize:FS.fs72,fontWeight:600,color:"#8a8478"}}>
-                    {"Add to Plan"}{pickerSelected.length>0 && <span style={{color:"#b4ac9e",marginLeft:S.s6}}>{pickerSelected.length+" selected"}</span>}
-                  </div>
-                  <div style={{display:"flex",gap:S.s6}}>
-                    {pickerSelected.length>0 && <button className="btn btn-gold btn-xs" onClick={()=>setPickerConfigOpen(true)}>{"Configure & Add →"}</button>}
-                    <button className="btn btn-ghost btn-xs" onClick={()=>{closePicker();if(onOpenExEditor)onOpenExEditor("create",null);}}>{"✦ New Custom"}</button>
-                    <button className="btn btn-ghost btn-sm" onClick={closePicker}>{"✕"}</button>
-                  </div>
-                </div>
-                <div style={{marginBottom:S.s8}}>
+            {/* -- BROWSE VIEW -- */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}>
+              <div style={{fontFamily:"'Inter',sans-serif",fontSize:FS.fs72,fontWeight:600,color:"#8a8478"}}>
+                {"Add to Plan"}{pickerSelected.length>0 && <span style={{color:"#b4ac9e",marginLeft:S.s6}}>{pickerSelected.length+" selected"}</span>}
+              </div>
+              <div style={{display:"flex",gap:S.s6}}>
+                {pickerSelected.length>0 && <button className="btn btn-gold btn-xs" onClick={commitPickerToPlan}>{"＋ Add "+pickerSelected.length}</button>}
+                <button className="btn btn-ghost btn-xs" onClick={()=>{closePicker();if(onOpenExEditor)onOpenExEditor("create",null);}}>{"✦ New Custom"}</button>
+                <button className="btn btn-ghost btn-sm" onClick={closePicker}>{"✕"}</button>
+              </div>
+            </div>
+            <div style={{marginBottom:S.s8}}>
                   <input className="inp" style={{width:"100%",padding:"8px 12px",fontSize:FS.fs82}}
                     placeholder={"Search exercises…"} ref={pickerSearchRef}
                     onChange={e=>debouncedSetSearch(e.target.value)} autoFocus={true} />
@@ -1099,121 +1092,6 @@ function PlanWizard(props) {
                     </>
                   );
                 })()}
-              </>
-            ) : (
-              <>
-                {/* -- CONFIG VIEW -- */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>setPickerConfigOpen(false)}>{"← Back"}</button>
-                  <div className="sec" style={{margin:0,border:"none",padding:S.s0}}>{"Configure "}{pickerSelected.length}{" Exercise"}{pickerSelected.length!==1?"s":""}</div>
-                  <button className="btn btn-gold btn-sm" onClick={commitPickerToPlan}>{"Add to Plan ✓"}</button>
-                </div>
-                {pickerSelected.map((entry,idx)=>{
-                  const ex=allExById[entry.exId]; if(!ex) return null;
-                  const isCardio=ex.category==="cardio"||ex.category==="flexibility";
-                  const isTreadEx=ex.hasTreadmill||false;
-                  const noSets=NO_SETS_EX_IDS.has(ex.id);
-                  const metric=isMetric(profile.units);
-                  const wUnit=weightLabel(profile.units);
-                  const dUnit=distLabel(profile.units);
-                  return (
-                    <div key={entry.exId} style={{background:"rgba(45,42,36,.12)",border:"1px solid rgba(180,172,158,.05)",borderRadius:R.r10,padding:"10px 12px",marginBottom:S.s8}}>
-                      <div style={{display:"flex",alignItems:"center",gap:S.s8,marginBottom:S.s8}}>
-                        <span style={{fontSize:"1.1rem"}}>{ex.icon}</span>
-                        <span style={{fontSize:FS.fs82,color:"#d4cec4",flex:1}}>{ex.name}</span>
-                        <span style={{fontSize:FS.fs65,cursor:"pointer",color:UI_COLORS.danger}} onClick={()=>setPickerSelected(p=>p.filter(e=>e.exId!==entry.exId))}>{"✕"}</span>
-                      </div>
-                      {/* Top row -- category-specific */}
-                      {ex.id==="rest_day" ? <div style={{fontSize:FS.fs72,color:"#8a8478",fontStyle:"italic",padding:"6px 0"}}>{"🛌 No configuration needed"}</div> : null}
-                      {ex.id!=="rest_day" && (
-                        <div style={{display:"flex",gap:S.s6,flexWrap:"wrap",marginBottom:S.s6}}>
-                          {!noSets && !isCardio && (
-                            <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                              <label htmlFor={`pc-${entry.exId}-sets`}>Sets</label>
-                              <input id={`pc-${entry.exId}-sets`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric" value={entry.sets||""} onChange={e=>pickerUpdateEx(entry.exId,"sets",e.target.value)} placeholder="3" />
-                            </div>
-                          )}
-                          {isCardio ? (
-                            <>
-                              <div className="field" style={{flex:1.6,minWidth:70,marginBottom:S.s0}}>
-                                <label htmlFor={`pc-${entry.exId}-dur`}>Duration (HH:MM)</label>
-                                <input id={`pc-${entry.exId}-dur`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric"
-                                  value={entry._durHHMM||""}
-                                  onChange={e=>pickerUpdateEx(entry.exId,"_durHHMM",e.target.value)}
-                                  onBlur={e=>{const n=normalizeHHMM(e.target.value);pickerUpdateEx(entry.exId,"_durHHMM",n);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(n,entry._durSec||"")/60))));}}
-                                  placeholder="00:00" />
-                              </div>
-                              <div className="field" style={{flex:0.8,minWidth:50,marginBottom:S.s0}}>
-                                <label htmlFor={`pc-${entry.exId}-sec`}>Seconds</label>
-                                <input id={`pc-${entry.exId}-sec`} className="inp" style={{padding:"6px 8px",textAlign:"center"}} type="number" min="0" max="59"
-                                  value={entry._durSec||""}
-                                  onChange={e=>{pickerUpdateEx(entry.exId,"_durSec",e.target.value);pickerUpdateEx(entry.exId,"reps",String(Math.max(1,Math.floor(combineHHMMSec(entry._durHHMM||"",e.target.value)/60))));}}
-                                  placeholder="00" />
-                              </div>
-                              <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                                <label htmlFor={`pc-${entry.exId}-dist`}>Dist ({dUnit})</label>
-                                <input id={`pc-${entry.exId}-dist`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="decimal" value={entry.distanceMi||""} onChange={e=>pickerUpdateEx(entry.exId,"distanceMi",e.target.value)} placeholder="0" />
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                                <label htmlFor={`pc-${entry.exId}-reps`}>Reps</label>
-                                <input id={`pc-${entry.exId}-reps`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="numeric" value={entry.reps||""} onChange={e=>pickerUpdateEx(entry.exId,"reps",e.target.value)} placeholder="10" />
-                              </div>
-                              <div className="field" style={{flex:1,minWidth:60,marginBottom:S.s0}}>
-                                <label htmlFor={`pc-${entry.exId}-weight`}>Weight ({wUnit})</label>
-                                <input id={`pc-${entry.exId}-weight`} className="inp" style={{padding:"6px 8px"}} type="text" inputMode="decimal" value={entry.weightLbs||""} onChange={e=>pickerUpdateEx(entry.exId,"weightLbs",e.target.value)} placeholder="0" />
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      {/* Treadmill: Incline + Speed */}
-                      {ex.id!=="rest_day" && isTreadEx && (
-                        <div style={{display:"flex",gap:S.s6,marginBottom:S.s6}}>
-                          <div className="field" style={{flex:1,marginBottom:S.s0}}>
-                            <label>{"Incline (0.5–15)"}</label>
-                            <input className="inp" style={{padding:"6px 8px"}} type="number" min="0.5" max="15" step="0.5" value={entry.incline||""} onChange={e=>pickerUpdateEx(entry.exId,"incline",e.target.value?parseFloat(e.target.value):null)} placeholder={"—"} />
-                          </div>
-                          <div className="field" style={{flex:1,marginBottom:S.s0}}>
-                            <label>{"Speed (0.5–15)"}</label>
-                            <input className="inp" style={{padding:"6px 8px"}} type="number" min="0.5" max="15" step="0.5" value={entry.speed||""} onChange={e=>pickerUpdateEx(entry.exId,"speed",e.target.value?parseFloat(e.target.value):null)} placeholder={"—"} />
-                          </div>
-                        </div>
-                      )}
-                      {/* +Add Row */}
-                      {ex.id!=="rest_day" && (entry.extraRows||[]).map((row,ri)=>(
-                        <div key={ri} style={{display:"flex",gap:S.s4,marginBottom:S.s4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.r5,alignItems:"center",flexWrap:"wrap"}}>
-                          <span style={{fontSize:FS.fs55,color:"#9a8a78",flexShrink:0,minWidth:16}}>{isCardio?`I${ri+2}`:`S${ri+2}`}</span>
-                          {isCardio ? (
-                            <>
-                              <input className="inp" style={{flex:1.5,minWidth:50,padding:"4px 8px",fontSize:FS.fs72}} type="text" inputMode="numeric" placeholder="HH:MM"
-                                value={row.hhmm||""}
-                                onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}}
-                                onBlur={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],hhmm:normalizeHHMM(e.target.value)};pickerUpdateEx(entry.exId,"extraRows",rr);}} />
-                              <input className="inp" style={{flex:0.7,minWidth:36,padding:"4px 8px",fontSize:FS.fs72}} type="number" min="0" max="59" placeholder="Sec" value={row.sec||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sec:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />
-                              <input className="inp" style={{flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}} type="text" inputMode="decimal" placeholder={distLabel(profile.units)} value={row.distanceMi||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],distanceMi:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />
-                              {isTreadEx && <input className="inp" style={{flex:0.7,minWidth:34,padding:"4px 8px",fontSize:FS.fs72}} type="number" min="0.5" max="15" step="0.5" placeholder="Inc" value={row.incline||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />}
-                              {isTreadEx && <input className="inp" style={{flex:0.7,minWidth:34,padding:"4px 8px",fontSize:FS.fs72}} type="number" min="0.5" max="15" step="0.5" placeholder="Spd" value={row.speed||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />}
-                            </>
-                          ) : (
-                            <>
-                              {!noSets && <input className="inp" style={{flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}} type="text" inputMode="decimal" placeholder="Sets" value={row.sets||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />}
-                              <input className="inp" style={{flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}} type="text" inputMode="decimal" placeholder="Reps" value={row.reps||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],reps:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />
-                              <input className="inp" style={{flex:1,minWidth:40,padding:"4px 8px",fontSize:FS.fs72}} type="text" inputMode="decimal" placeholder={wUnit} value={row.weightLbs||""} onChange={e=>{const rr=[...(entry.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value};pickerUpdateEx(entry.exId,"extraRows",rr);}} />
-                            </>
-                          )}
-                          <button className="btn btn-danger btn-xs" style={{padding:"2px 4px",flexShrink:0}} onClick={()=>{const rr=(entry.extraRows||[]).filter((_,j)=>j!==ri);pickerUpdateEx(entry.exId,"extraRows",rr);}}>{"✕"}</button>
-                        </div>
-                      ))}
-                      {ex.id!=="rest_day" && <button className="btn btn-ghost btn-xs" style={{width:"100%",marginTop:S.s4,fontSize:FS.fs60,color:"#8a8478",borderStyle:"dashed"}}
-                        onClick={()=>{const rr=[...(entry.extraRows||[]),isCardio?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:"",reps:"",weightLbs:""}];pickerUpdateEx(entry.exId,"extraRows",rr);}}>{"＋ Add Row (e.g. "}{isCardio?"interval":"progressive set"}{")"}</button>}
-                    </div>
-                  );
-                })}
-              </>
-            )}
           </div>
         </div>,
         document.body

@@ -30,7 +30,7 @@ ASSETS = os.path.join(REPO, 'public', 'assets', 'characters')
 CLOTH  = os.path.join(ASSETS, 'clothing')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
-# Y-axis Up; meter scale. Measured from base_body.glb bones:
+# GLTF Y-up height values (local vertex Y = height, since the body mesh is in Y-up local space).
 #   Hips=0.921  LeftArm(shoulder)=1.362  LeftLeg(knee)=0.457  LeftFoot(ankle)=0.086  Toe=0.005
 TORSO_Y_MIN = 0.95
 TORSO_Y_MAX = 1.38   # cuts at shoulder line (was 1.50 — grabbed neck geometry)
@@ -105,6 +105,7 @@ def _duplicate_body_region(body, y_min, y_max,
         bpy.ops.object.mode_set(mode='OBJECT')
 
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
     return dup
 
 
@@ -120,6 +121,10 @@ def _bind_to_armature(obj, arm):
 
 def _decimate(obj, max_tris: int):
     bpy.context.view_layer.objects.active = obj
+    # Shape keys (from body duplicate) block modifier apply — remove them first.
+    if obj.data.shape_keys:
+        for key in list(obj.data.shape_keys.key_blocks):
+            obj.shape_key_remove(key)
     me = obj.data
     me.calc_loop_triangles()
     cur = len(me.loop_triangles)

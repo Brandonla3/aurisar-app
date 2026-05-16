@@ -70,25 +70,11 @@ function findBone(skeleton, name) {
 // ── CharacterAvatar ──────────────────────────────────────────────────────────
 
 export class CharacterAvatar {
-  constructor(id, username, config, scene, options = {}) {
+  constructor(id, username, config, scene) {
     this._id       = id;
     this._username = username;
     this._config   = mergeConfig(config);
     this._scene    = scene;
-
-    // Which non-body slot types to load. Defaulting to all-true preserves the
-    // existing avatar-creator behaviour; the world scene passes
-    // { clothing: false, species: false, gear: false } so the
-    // Blender-authored modular pieces (which currently render as broken
-    // skinned geometry attached to the player — the "bone mesh") stay out of
-    // gameplay until their skinning is fixed. Hair stays on by default
-    // because it renders cleanly.
-    this._loadSlots = {
-      hair:     options.loadHair     !== false,
-      clothing: options.loadClothing !== false,
-      species:  options.loadSpecies  !== false,
-      gear:     options.loadGear     !== false,
-    };
 
     this.root      = null;
     this.isMoving  = false;
@@ -111,8 +97,8 @@ export class CharacterAvatar {
 
   // ── Factory ────────────────────────────────────────────────────────────────
 
-  static async create(id, username, config, scene, assetLibrary, options = {}) {
-    const av = new CharacterAvatar(id, username, config, scene, options);
+  static async create(id, username, config, scene, assetLibrary) {
+    const av = new CharacterAvatar(id, username, config, scene);
     if (assetLibrary.hasBaseBody()) {
       await av._buildGLB(assetLibrary);
     } else {
@@ -179,31 +165,24 @@ export class CharacterAvatar {
     this._applyAllMorphs();
     this._applySkinMaterial();
 
-    // Attach modular pieces — each gated behind the per-slot loadout flags
-    // set in the constructor. World scene opts out of clothing/species/gear
-    // until the Blender-authored pieces' skin weights are fixed (they
-    // currently deform into a humanoid-shaped blob next to the player).
-    if (this._loadSlots.hair) {
-      await this._rebuildHair(assetLibrary);
+    // Attach modular pieces. The slot-gating workaround introduced earlier
+    // in this PR is gone now that main shipped the regenerated GLBs (correct
+    // GLTF Y-up → Blender Z-up axis, clean auto-weights). Loading is back to
+    // unconditional — the avatar in-world renders with full hair / clothing /
+    // species / gear loadout, same as the avatar creator.
+    await this._rebuildHair(assetLibrary);
+    for (const slot of CLOTHING_SLOTS) {
+      await this._rebuildClothingSlot(slot, assetLibrary);
     }
-    if (this._loadSlots.clothing) {
-      for (const slot of CLOTHING_SLOTS) {
-        await this._rebuildClothingSlot(slot, assetLibrary);
-      }
+    if (this._config.species.hornMesh) {
+      await this._rebuildHorns(assetLibrary);
     }
-    if (this._loadSlots.species) {
-      if (this._config.species.hornMesh) {
-        await this._rebuildHorns(assetLibrary);
-      }
-      if (this._config.species.tailMesh) {
-        await this._rebuildTail(assetLibrary);
-      }
+    if (this._config.species.tailMesh) {
+      await this._rebuildTail(assetLibrary);
     }
-    if (this._loadSlots.gear) {
-      for (const slot of GEAR_SLOTS) {
-        const meshName = this._config.gear[slot];
-        if (meshName) await this.setGear(slot, meshName, assetLibrary);
-      }
+    for (const slot of GEAR_SLOTS) {
+      const meshName = this._config.gear[slot];
+      if (meshName) await this.setGear(slot, meshName, assetLibrary);
     }
   }
 

@@ -232,7 +232,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     const ciSuffix = _ciResult.checkInApplied
       ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥`
       : "";
-    setXpFlash({ amount: totalXP + _ciResult.checkInXP, mult: 1 });
+    setXpFlash({ amount: totalXP + _ciResult.checkInXP, mult: 1, prevXp: profile.xp });
     setTimeout(() => setXpFlash(null), 2500);
     setPlanView("list");
     setActivePlan(null);

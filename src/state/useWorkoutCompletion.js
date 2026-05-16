@@ -171,7 +171,8 @@ export function useWorkoutCompletion({
         });
         setXpFlash({
           amount: totalXP + _ciResult.checkInXP,
-          mult: 1
+          mult: 1,
+          prevXp: profile.xp
         });
         setTimeout(() => setXpFlash(null), 2500);
         if (wo.makeReusable) {

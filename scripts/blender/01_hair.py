@@ -29,7 +29,8 @@ HAIR   = os.path.join(ASSETS, 'hair')
 BASE   = os.path.join(ASSETS, 'base_body.glb')
 
 # Head pivot measured from base_body.glb: Head bone head=1.462 tail=1.673 → center 1.567.
-HEAD_CENTER = Vector((0.0, 1.57, 0.0))
+# Blender Z = height (GLTF Y-up value). Blender Y = depth (negative = behind character).
+HEAD_CENTER = Vector((0.0, 0.0, 1.57))
 HEAD_RADIUS = 0.105
 
 
@@ -128,15 +129,15 @@ def _add_uv_sphere_cap(name: str, radius: float, height_scale: float = 0.6):
                                           location=HEAD_CENTER)
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (1.0, height_scale, 1.05)
+    obj.scale = (1.0, 1.05, height_scale)   # Z is height axis; compress to cap shape
     bpy.ops.object.transform_apply(scale=True)
-    # Delete bottom half (verts with y < HEAD_CENTER.y - 0.01)
+    # Delete bottom half (verts with z < HEAD_CENTER.z - 0.005)
     me = obj.data
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.object.mode_set(mode='OBJECT')
     for v in me.vertices:
-        if v.co.y < HEAD_CENTER.y - 0.005:
+        if v.co.z < HEAD_CENTER.z - 0.005:
             v.select = True
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.delete(type='VERT')
@@ -147,16 +148,16 @@ def _add_uv_sphere_cap(name: str, radius: float, height_scale: float = 0.6):
 def _extrude_strands(obj, count: int, length: float, jitter: float = 0.02):
     """Pseudo-strands: select bottom rim verts and extrude downward in chunks."""
     me = obj.data
-    rim_y = min(v.co.y for v in me.vertices) + 0.01
+    rim_z = min(v.co.z for v in me.vertices) + 0.01
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.object.mode_set(mode='OBJECT')
     for v in me.vertices:
-        if v.co.y <= rim_y:
+        if v.co.z <= rim_z:
             v.select = True
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.extrude_region_move(
-        TRANSFORM_OT_translate={'value': (0, -length, 0)})
+        TRANSFORM_OT_translate={'value': (0, 0, -length)})
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
@@ -164,7 +165,7 @@ def _add_ponytail(name='ponytail', length=0.30):
     """Single tail behind the head."""
     bpy.ops.mesh.primitive_cylinder_add(
         radius=0.025, depth=length,
-        location=HEAD_CENTER + Vector((0, -0.06, -0.10)))
+        location=HEAD_CENTER + Vector((0, -0.10, -0.06)))
     obj = bpy.context.active_object
     obj.name = name
     obj.rotation_euler = (math.radians(15), 0, 0)
@@ -175,7 +176,7 @@ def _add_ponytail(name='ponytail', length=0.30):
 def _add_bun(name='bun'):
     bpy.ops.mesh.primitive_uv_sphere_add(
         radius=0.06, segments=14, ring_count=10,
-        location=HEAD_CENTER + Vector((0, 0.04, -0.08)))
+        location=HEAD_CENTER + Vector((0, -0.08, 0.04)))
     obj = bpy.context.active_object
     obj.name = name
     return obj
@@ -187,7 +188,7 @@ def _add_braids(parent_name='braids'):
     for sign, suffix in ((-1, 'L'), (1, 'R')):
         bpy.ops.mesh.primitive_cylinder_add(
             radius=0.018, depth=0.32,
-            location=HEAD_CENTER + Vector((sign * 0.08, -0.18, -0.02)))
+            location=HEAD_CENTER + Vector((sign * 0.08, -0.02, -0.18)))
         o = bpy.context.active_object
         o.name = f'{parent_name}_{suffix}'
         # Slight twist via shear
@@ -199,7 +200,7 @@ def _add_braids(parent_name='braids'):
 
 def _add_mohawk(name='mohawk'):
     bpy.ops.mesh.primitive_cube_add(size=1.0,
-                                     location=HEAD_CENTER + Vector((0, 0.05, 0)))
+                                     location=HEAD_CENTER + Vector((0, 0, 0.05)))
     obj = bpy.context.active_object
     obj.name = name
     obj.scale = (0.04, 0.07, 0.16)
@@ -215,7 +216,7 @@ def _add_mohawk(name='mohawk'):
 
 def _add_afro(name='afro'):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.16, segments=18, ring_count=12,
-                                          location=HEAD_CENTER + Vector((0, 0.04, 0)))
+                                          location=HEAD_CENTER + Vector((0, 0, 0.04)))
     obj = bpy.context.active_object
     obj.name = name
     obj.scale = (1.05, 0.95, 1.05)
