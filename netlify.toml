@@ -5,6 +5,16 @@
 [functions]
   directory = "netlify/functions"
 
+# Stale Vite-hashed chunks (file no longer exists after a deploy) must
+# return a clean 404 instead of falling through to the SPA catch-all
+# below — otherwise the browser receives index.html for a JS request
+# and rejects the dynamic import with a MIME-type error. Default
+# shadowing (no `force`) means real, existing assets still serve
+# normally; this rule only fires when the file is gone.
+[[redirects]]
+  from = "/assets/*"
+  status = 404
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
