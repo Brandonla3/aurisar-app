@@ -117,9 +117,9 @@ class LightingManager {
     this._nightGround  = new BABYLON.Color3(0.10, 0.12, 0.18);
     this._dayGround    = new BABYLON.Color3(0.34, 0.36, 0.40);
     this._nightFog     = new BABYLON.Color3(0.06, 0.08, 0.12);
-    this._dayFog       = new BABYLON.Color3(0.74, 0.84, 0.96);
+    this._dayFog       = new BABYLON.Color3(0.62, 0.78, 0.94);  // bluer, less wash
     this._nightSky     = new BABYLON.Color3(0.06, 0.08, 0.18);
-    this._daySky       = new BABYLON.Color3(0.42, 0.58, 0.78);
+    this._daySky       = new BABYLON.Color3(0.32, 0.58, 0.92);  // more saturated daytime sky
     this._dungeonFog   = new BABYLON.Color3(0.06, 0.07, 0.085);
 
     this._setupCore();
@@ -209,8 +209,12 @@ class LightingManager {
 
   _setupCore() {
     this.scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    // KHR PBR Neutral preserves color saturation in midtones, where ACES
+    // visibly desaturated the sky (read as grey-white instead of blue) and
+    // ground (read as olive-grey instead of green). Both maps cost the same
+    // per pixel.
     this.scene.imageProcessingConfiguration.toneMappingType =
-      BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+      BABYLON.ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
 
     this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
 
@@ -288,13 +292,16 @@ class LightingManager {
     // due to missing half-float / float render-target extensions. Skip it
     // entirely on mobile and go straight to the lightweight fallback path.
     if (!this._isMobile) {
+      // High bloom threshold + low weight so daylight scene surfaces don't
+      // trigger bloom — only intentional emissives (portal, magic accents)
+      // pass the threshold. The earlier 0.88 threshold was lifted from a
+      // pre-PR tuning that assumed HDR + IBL; without IBL it bloomed the
+      // entire sky and character at midday.
       this.pipeOverworld = this._tryBuildPipeline('lm_overworld_pipe', {
-        bloomThreshold: 0.88, bloomWeight: 0.22, bloomScale: 0.5,
-        sharpenColor: 0.20, sharpenEdge: 0.15,
+        bloomThreshold: 1.20, bloomWeight: 0.12, bloomScale: 0.5,
       });
       this.pipeDungeon = this._tryBuildPipeline('lm_dungeon_pipe', {
-        bloomThreshold: 0.90, bloomWeight: 0.30, bloomScale: 0.5,
-        sharpenColor: 0.15, sharpenEdge: 0.10,
+        bloomThreshold: 0.95, bloomWeight: 0.25, bloomScale: 0.5,
       });
       this._noPipeline = !this.pipeOverworld && !this.pipeDungeon;
     } else {
@@ -327,12 +334,12 @@ class LightingManager {
       } catch (_) { /* skip bloom */ }
     }
 
-    // Ambient floor. On mobile there is no IBL from .env files, so this term
-    // is the sole contributor to shadowed-surface brightness — set it higher
-    // than the desktop value where IBL provides the ambient fill.
-    this.scene.ambientColor = this._isMobile
-      ? new BABYLON.Color3(0.40, 0.44, 0.50)
-      : new BABYLON.Color3(0.14, 0.16, 0.18);  // day baseline; night raised in _updateOverworld
+    // Ambient floor. The IBL .env files referenced by _loadEnvSafe
+    // (overworld_day / overworld_night / dungeon_dim) are not in /public/env,
+    // so scene.environmentTexture stays null on every device and the IBL fill
+    // desktop used to rely on never arrives. Day value is set here; night
+    // raises it dynamically in _updateOverworld so geometry stays readable.
+    this.scene.ambientColor = new BABYLON.Color3(0.14, 0.16, 0.20);
   }
 
   // Try HDR pipeline first (best quality), fall back to non-HDR (mobile-safe),
@@ -341,18 +348,16 @@ class LightingManager {
     for (const hdr of [true, false]) {
       try {
         const p = new BABYLON.DefaultRenderingPipeline(name, hdr, this.scene, [this.camera]);
-        p.samples        = hdr ? 2 : 1;   // 4× → 2×: ~35-50% GPU saving; difference imperceptible with FXAA
-        p.fxaaEnabled    = !hdr;          // FXAA is redundant on top of any MSAA — only enable on samples=1 fallback
+        // No MSAA — FXAA alone is ~10× cheaper on integrated GPUs and the
+        // difference is imperceptible at the camera distances used here.
+        p.samples        = 1;
+        p.fxaaEnabled    = true;
         p.bloomEnabled   = true;
         p.bloomThreshold = opts.bloomThreshold;
         p.bloomWeight    = opts.bloomWeight;
-        p.bloomKernel    = 32;            // unified — HDR no longer needs the 64-tap kernel
+        p.bloomKernel    = 16;            // halved — full pipeline cost
         p.bloomScale     = opts.bloomScale;
-        p.sharpenEnabled = hdr; // skip sharpen on the non-HDR fallback
-        if (hdr) {
-          p.sharpen.colorAmount = opts.sharpenColor;
-          p.sharpen.edgeAmount  = opts.sharpenEdge;
-        }
+        p.sharpenEnabled = false;         // sharpen was a marginal-quality, full-cost pass
         return p;
       } catch (_) { /* try next tier */ }
     }
@@ -412,30 +417,32 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
-    this.key.intensity = lerp(0.05, 2.4, dayFactor);
+    // Daytime key intensity stepped down again — the previous 1.4 still read
+    // too bright on lit characters after the tone-map swap let more color
+    // through. 1.0 sits in line with mobile games of this scale.
+    this.key.intensity = lerp(0.05, 1.0, dayFactor);
     lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
-    this.moon.intensity = lerp(0.0, 0.60, 1.0 - dayFactor);
+    this.moon.intensity = lerp(0.0, 0.30, 1.0 - dayFactor);
 
-    const fillMin = this._isMobile ? 0.50 : 0.30;
-    const fillMax = this._isMobile ? 0.80 : 0.55;
-    this.fillOverworld.intensity = lerp(fillMin, fillMax, dayFactor);
+    // Unified curve for desktop and mobile. Cut further from the previous
+    // pass — fill, exposure, and ambient all came down so direct sun no
+    // longer dominates the lit hemisphere of geometry.
+    this.fillOverworld.intensity = lerp(0.22, 0.28, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    const exposureMax = this._isMobile ? 1.30 : 1.18;
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.82, exposureMax, dayFactor);
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.88, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
     lerpColor3Into(this.scene.fogColor, this._nightFog, this._dayFog, dayFactor);
 
-    // Dynamic ambient: cooler/brighter at night so geometry is readable without IBL
-    if (!this._isMobile) {
-      this.scene.ambientColor.copyFromFloats(
-        lerp(0.30, 0.14, dayFactor),
-        lerp(0.33, 0.16, dayFactor),
-        lerp(0.42, 0.18, dayFactor)
-      );
-    }
+    // Dynamic ambient: raise at night to keep geometry readable when the key
+    // is dim; keep day-side low so the directional light still defines form.
+    this.scene.ambientColor.copyFromFloats(
+      lerp(0.24, 0.14, dayFactor),
+      lerp(0.26, 0.16, dayFactor),
+      lerp(0.32, 0.20, dayFactor)
+    );
 
     // Sky background — mutate clearColor in-place via scratch to avoid allocation
     lerpColor3Into(this._scratchColor, this._nightSky, this._daySky, dayFactor);
@@ -455,7 +462,7 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = this._isMobile ? 1.10 : 0.82;
+    this.scene.imageProcessingConfiguration.exposure = 0.98;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
     this.scene.fogDensity = 0.018;
@@ -692,10 +699,23 @@ export class BabylonWorldScene {
 
   _initSync() {
     this.engine = new BABYLON.Engine(this.canvas, true, {
-      preserveDrawingBuffer: true,
       stencil: true,
       adaptToDeviceRatio: true,
     });
+
+    // Desktop only: cap effective DPR. Uncapped, a 4K / Retina display renders
+    // at native device-pixel-ratio (often 2× or higher), quadrupling per-frame
+    // pixel work and tipping the HDR pipeline + shadow blur passes into
+    // mid-teen fps on integrated GPUs. Mobile is left at the device DPR — it
+    // already performs fine and capping there is a visible quality regression
+    // (Codex P2 on #193).
+    if (!this._isMobile) {
+      const dpr = Math.min(
+        (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+        1.5
+      );
+      this.engine.setHardwareScalingLevel(1 / dpr);
+    }
 
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
@@ -704,13 +724,14 @@ export class BabylonWorldScene {
     this._setupCamera();
 
     // Seed the day/night cycle from the device's real local time so the
-    // world matches the player's actual time of day, then run at real speed.
+    // world matches the player's actual time of day, then run at real speed
+    // (1 real-time second = 1 game-time second).
     const now = new Date();
     const realHour = now.getHours() + now.getMinutes() / 60;
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
       startTimeOfDay: realHour,
-      dayLengthSec: 86400, // one real second = one game second
+      dayLengthSec:   86400,
     });
 
     this._setupShadows();
@@ -745,7 +766,7 @@ export class BabylonWorldScene {
       this.playerInfo?.username ?? 'You',
       this.playerInfo?.avatarConfig ?? null,
       this.scene,
-      AssetLibrary
+      AssetLibrary,
     );
     this._local.root.position.set(0, 0, 0);
     // Flush remote updates that arrived while we were loading.
@@ -887,7 +908,9 @@ export class BabylonWorldScene {
       try {
         const sg = new BABYLON.ShadowGenerator(size, this._lm.key);
         sg.useBlurExponentialShadowMap = true;
-        sg.blurKernel = size >= 1024 ? 16 : 8;
+        // Blur kernel halved — the previous 16-tap pass was the second-largest
+        // per-frame GPU cost behind SSAO2. 8 taps is visually similar.
+        sg.blurKernel = size >= 1024 ? 8 : 4;
         sg.bias       = 0.0005;
         sg.normalBias = 0.02;
         this._shadowGen = sg;
@@ -904,21 +927,12 @@ export class BabylonWorldScene {
   // ── SSAO ───────────────────────────────────────────────────────────────────
 
   _setupSSAO() {
-    // SSAO2 can conflict with other render passes on mobile WebGL2 and produces
-    // incorrect (black) output on several iOS/Android implementations.
-    if (this._isMobile) return;
-    if (this.engine.webGLVersion < 2) return;
-    try {
-      const ssao = new BABYLON.SSAO2RenderingPipeline('ssao2', this.scene, {
-        ssaoRatio: 0.35, blurRatio: 0.75,
-      });
-      ssao.radius        = 2.0;
-      ssao.base          = 0.05;
-      ssao.totalStrength = 0.50;
-      this.scene.postProcessRenderPipelineManager
-        .attachCamerasToRenderPipeline('ssao2', this._camera);
-      this._ssao = ssao;
-    } catch (_) { /* SSAO2 unavailable — skip silently */ }
+    // SSAO2 is currently disabled. Combined with the HDR DefaultRenderingPipeline
+    // and blur-ESM shadows it was the dominant per-frame GPU cost on integrated
+    // GPUs, and the visual contribution at the camera angles used here is
+    // marginal. Re-enabling is a single early-return removal once we have
+    // budget to retune it.
+    return;
   }
 
   // ── Lighting profile (public compatibility wrapper) ────────────────────────
@@ -1492,7 +1506,7 @@ export class BabylonWorldScene {
       }
       const config = mergeConfig(parsedConfig);
       const rp = await CharacterAvatar.create(
-        row.identity, row.username, config, this.scene, AssetLibrary
+        row.identity, row.username, config, this.scene, AssetLibrary,
       );
       if (this._remotePlayers.has(key)) {
         rp.dispose(); // another update already spawned this player
