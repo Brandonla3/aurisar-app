@@ -275,7 +275,8 @@ const ProfileTab = memo(function ProfileTab({
   useEffect(() => {
     if (!authUser?.id) return;
     sb.from('whoop_tokens').select('user_id').eq('user_id', authUser.id).maybeSingle()
-      .then(({ data }) => setWhoopLinked(!!data));
+      .then(({ data, error }) => setWhoopLinked(!error && !!data))
+      .catch(() => setWhoopLinked(false));
   }, [authUser?.id]);
 
   async function loadWhoopData() {

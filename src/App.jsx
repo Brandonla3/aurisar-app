@@ -2824,8 +2824,14 @@ function App() {
     // Flush any debounced profile writes BEFORE invalidating auth — otherwise
     // a queued Supabase upsert lands as an unauthenticated request and a
     // queued localStorage write would rewrite the cache after the wipe below.
-    try { await flushSave(); } catch { /* noop */ }
-    await sb.auth.signOut();
+    // Cap the flush at 3 s so a slow/hung network write never blocks sign-out.
+    try {
+      await Promise.race([
+        flushSave(),
+        new Promise(resolve => setTimeout(resolve, 3000)),
+      ]);
+    } catch { /* noop */ }
+    try { await sb.auth.signOut(); } catch { /* noop */ }
     // Wipe locally-cached PII so a shared device can't leak data to the next user.
     try {
       localStorage.removeItem(STORAGE_KEY);
