@@ -622,7 +622,6 @@ function App() {
   const [pickerEquipFilter, setPickerEquipFilter] = useState("all");
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null); // "muscle"|"type"|"equip"|null
   const [pickerSelected, setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
-  const [pickerConfigOpen, setPickerConfigOpen] = useState(false); // show config panel in picker
   // Quests
   const [questCat, setQuestCat] = useState("All");
   // Calendar
@@ -3864,7 +3863,6 @@ function App() {
     setPickerEquipFilter("all");
     setPickerOpenDrop(null);
     setPickerSelected([]);
-    setPickerConfigOpen(false);
   }
   function pickerToggleEx(exId) {
     const exd = allExById[exId] || {};
@@ -3882,12 +3880,6 @@ function App() {
         hrZone: null
       }];
     });
-  }
-  function pickerUpdateEx(exId, field, val) {
-    setPickerSelected(prev => prev.map(e => e.exId === exId ? {
-      ...e,
-      [field]: val
-    } : e));
   }
   function commitPickerToWorkout() {
     if (pickerSelected.length === 0) return;
@@ -6324,16 +6316,11 @@ function App() {
         pickerOpenDrop={pickerOpenDrop}
         setPickerOpenDrop={setPickerOpenDrop}
         pickerSelected={pickerSelected}
-        setPickerSelected={setPickerSelected}
-        pickerConfigOpen={pickerConfigOpen}
-        setPickerConfigOpen={setPickerConfigOpen}
         allExercises={allExercises}
         allExById={allExById}
-        profile={profile}
         closePicker={closePicker}
         openExEditor={openExEditor}
         pickerToggleEx={pickerToggleEx}
-        pickerUpdateEx={pickerUpdateEx}
         commitPickerToWorkout={commitPickerToWorkout}
       />
     )}
