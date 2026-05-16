@@ -54,11 +54,11 @@ jobs:
     timeout-minutes: 10
     env:
       # The auth token must be created locally with `spacetime login`,
-      # then printed with `spacetime login show --include-token` and
-      # pasted into GitHub repo secrets as SPACETIMEDB_TOKEN. The token
-      # is account-scoped — anyone with it can publish to any of the
-      # owner's databases — so it belongs in repo secrets, never in the
-      # source tree or job env literally.
+      # then printed with `spacetime login show --token` and pasted
+      # into GitHub repo secrets as SPACETIMEDB_TOKEN. The token is
+      # account-scoped — anyone with it can publish to any of the
+      # owner's databases — so it belongs in repo secrets, never in
+      # the source tree or job env literally.
       SPACETIMEDB_TOKEN: ${{ secrets.SPACETIMEDB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
@@ -73,7 +73,7 @@ jobs:
             echo "::error::SPACETIMEDB_TOKEN repo secret is not set."
             echo "Create one with:"
             echo "  spacetime login                # locally, opens browser"
-            echo "  spacetime login show --include-token"
+            echo "  spacetime login show --token"
             echo "Then paste the token at Settings → Secrets and variables → Actions → New repository secret."
             exit 1
           fi
