@@ -175,15 +175,37 @@ jobs:
         # here means the freshly-deployed module is verified loadable
         # and the live world reflects the new manifest immediately —
         # rather than waiting for the first client connect to trigger
-        # it. Safe to call repeatedly; no-op if already current.
+        # it.
         #
-        # `--server maincloud` is required: `spacetime call` and `sql`
-        # use the CLI's selected default server when no flag is passed,
-        # and that default is NOT inherited from the preceding publish.
-        # On a fresh runner the default may be `local` (set by the
-        # installer), which would error with "database not found" — or
-        # worse, in a future setup, silently hit the wrong environment.
-        run: spacetime call --server maincloud aurisar-world seed_world
+        # Two non-obvious flags:
+        #
+        # `--server maincloud` — `spacetime call` and `sql` use the
+        # CLI's selected default server when no flag is passed, and
+        # that default is NOT inherited from the preceding publish. On
+        # a fresh runner the default may be `local` (set by the
+        # installer), which would error with "database not found".
+        #
+        # `--anonymous` — the token used by `spacetime login --token`
+        # authenticates the local CLI session to the cloud account
+        # service (good enough for `publish`, which is an account-
+        # scoped admin action) but the `call` endpoint authenticates
+        # the *caller identity* against the database, and that local
+        # identity isn't always pre-registered. The client SDK side-
+        # steps this because every WebSocket connection mints a fresh
+        # identity at handshake. `--anonymous` does the same for the
+        # CLI: skip the local identity and call as a fresh anonymous
+        # identity, which is the same trust level `useSpacetimeWorld`
+        # uses in the browser to call `seedWorld()` on every connect.
+        # Verified locally that seedWorld doesn't gate on ctx.sender,
+        # so anonymous callers are accepted.
+        #
+        # `continue-on-error: true` — if SpacetimeDB ever rotates its
+        # auth model and this stops working, we'd rather the deploy
+        # complete and the *next* user connect run seedWorld() via the
+        # client (existing fallback path in useSpacetimeWorld.js) than
+        # the whole deploy fail at the verification step.
+        continue-on-error: true
+        run: spacetime call --server maincloud --anonymous aurisar-world seed_world
 
       - name: Verify mob table
         # Read-only sanity check. We don't fail the job on row count
