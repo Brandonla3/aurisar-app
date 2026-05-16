@@ -1,4 +1,5 @@
 import React from 'react';
+import { isChunkLoadError } from '../utils/lazyWithRetry';
 
 // React class component because ErrorBoundary requires lifecycle methods.
 // Catches render-time errors anywhere below it in the tree, logs them, and
@@ -63,6 +64,26 @@ class ErrorBoundary extends React.Component {
       color: '#d4cec4',
     };
     const btnGold = { ...btn, background: 'linear-gradient(135deg,#c49428,#8a6010)', color: '#fff', borderColor: '#c49428' };
+
+    // Chunk-load failures usually mean the user's tab outlived a deploy and
+    // the JS bundle hash is gone. lazyWithRetry will have already auto-
+    // reloaded once — if we reach the boundary, the reload didn't help, so
+    // show a clear "refresh" prompt instead of the cryptic MIME message.
+    if (isChunkLoadError(error)) {
+      return (
+        <div style={wrap} role="alert" aria-live="assertive">
+          <div style={card}>
+            <div style={h}>Aurisar was updated.</div>
+            <div style={p}>
+              A new version is available. Tap reload to get the latest — your saved data is safe.
+            </div>
+            <div style={btnRow}>
+              <button type="button" style={btnGold} onClick={this.reload}>Reload</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={wrap} role="alert" aria-live="assertive">

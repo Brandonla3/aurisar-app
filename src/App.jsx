@@ -6,6 +6,7 @@ import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, UI_COLORS, MAP_REGIONS } from './data/constants';
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './utils/storage';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
@@ -61,16 +62,16 @@ import LoginScreen from './components/LoginScreen';
 import PrivacyPolicy from './components/PrivacyPolicy';
 // Heavy / route-scoped components are lazy-loaded so first paint doesn't pay for
 // recharts (~150KB), three.js (~600KB), or the landing page assets.
-const TrendsTab = React.lazy(() => import('./components/TrendsTab').then(m => ({
+const TrendsTab = lazyWithRetry(() => import('./components/TrendsTab').then(m => ({
   default: m.TrendsTab
 })));
-const PlanWizard = React.lazy(() => import('./components/PlanWizard'));
-const WorkoutNotificationMockup = React.lazy(() => import('./components/WorkoutNotificationMockup'));
-const LandingPage = React.lazy(() => import('./components/LandingPage').then(m => ({
+const PlanWizard = lazyWithRetry(() => import('./components/PlanWizard'));
+const WorkoutNotificationMockup = lazyWithRetry(() => import('./components/WorkoutNotificationMockup'));
+const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({
   default: m.LandingPage
 })));
-const AdminPage = React.lazy(() => import('./components/AdminPage'));
-const WorldOverlay = React.lazy(() => import('./features/world/WorldOverlay.jsx'));
+const AdminPage = lazyWithRetry(() => import('./components/AdminPage'));
+const WorldOverlay = lazyWithRetry(() => import('./features/world/WorldOverlay.jsx'));
 import PlansTabContainer from './components/PlansTabContainer';
 import LiveWorkoutBanner from './components/LiveWorkoutBanner';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
