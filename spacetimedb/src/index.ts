@@ -394,25 +394,36 @@ const MELEE_DAMAGE          = 25;             // 4 swings kills a 100-HP wolf
 const MELEE_COOLDOWN_MICROS = 300_000n;       // 300 ms between swings; client throttles at 350 ms so legit input has headroom
 
 /**
- * Idempotently seed mobs from the bundled per-tile gameplay manifest.
- * Called by the client on connect; safe to call repeatedly — each spawn
- * is keyed by a unique `spawnNetId` and we skip any net_id that already
- * has a row (alive or dead), so re-seeding after a server-side wipe
- * works cleanly.
+ * Idempotently seed mobs from the bundled per-tile gameplay manifest, and
+ * self-heal any stale rows left over from older module versions.
  *
- * Each manifest spawn point produces `max_alive` mob rows. The instance
- * index is suffixed onto the source `net_id` (e.g.
- * `SPAWN_MOB_WOLF_NEAR_NW_0`, `_1`) to keep each row uniquely
- * addressable while still letting tile-author logic group them.
+ * Called by the client on connect; safe to call repeatedly. Three passes:
  *
- * Slice 5c also bootstraps the AI tick schedule here if it's empty —
- * the live maincloud module was published before `init` existed, so
- * we lazy-initialize on first re-seed. Safe to call multiple times
- * (we count rows before inserting).
+ *   1. Bootstrap the AI tick scheduler if it doesn't exist yet. The live
+ *      maincloud module was published before `init` lifecycles, so we
+ *      lazy-init here.
+ *
+ *   2. Self-heal pass over existing mob rows. After the slice 5c schema
+ *      migration, rows that existed pre-migration have spawn_x/spawn_y/
+ *      aggro/leash/respawn_sec backfilled to ADD COLUMN defaults — the
+ *      AI tick would treat that as "leash anchor is world origin," which
+ *      is wrong for any wolf not actually spawned there. We fix in code:
+ *        • If a row's spawn_net_id isn't in the current manifest (e.g.
+ *          slice-5a's `SLICE5A_HARDCODED_WOLF`), delete it. It belongs
+ *          to a retired spawn definition.
+ *        • If a row's spawn_net_id IS in the manifest but its spawnX/Y
+ *          are zero (the ADD COLUMN default sentinel), update it in
+ *          place with the manifest's real coords and radii.
+ *      This pass keeps `seedWorld` the single source of truth for the
+ *      mob table's shape and avoids needing manual `DELETE FROM mob`
+ *      after schema-changing publishes.
+ *
+ *   3. Insert any manifest spawn points that aren't represented yet.
+ *      Net IDs are suffixed by instance index (e.g.
+ *      `SPAWN_MOB_WOLF_NEAR_NW_0`, `_1`) so each row stays unique.
  */
 export const seedWorld = spacetimedb.reducer({}, (ctx) => {
-  // Bootstrap the AI tick scheduler if missing. Calling this from seedWorld
-  // means the first post-publish `seedWorld` invocation also kicks off AI.
+  // 1. Bootstrap the AI tick scheduler if missing.
   if (ctx.db.mobAiTickSchedule.count() === 0n) {
     ctx.db.mobAiTickSchedule.insert({
       id: 0n,    // auto-inc replaces this
@@ -420,12 +431,46 @@ export const seedWorld = spacetimedb.reducer({}, (ctx) => {
     });
   }
 
-  // Pre-compute the set of already-seeded netIds. Iter is O(N) but the
-  // table is tiny — at slice 5b scale, the few tens of rows here cost
-  // microseconds.
+  // 2. Self-heal pass — repair rows from the slice-5b → 5c migration and
+  //    drop rows whose spawn definition no longer exists.
   const seeded = new Set<string>();
-  for (const row of ctx.db.mob.iter()) seeded.add(row.spawnNetId);
+  const toDelete: bigint[] = [];
+  for (const m of ctx.db.mob.iter()) {
+    const entry = spawnByNetId.get(m.spawnNetId);
+    if (!entry) {
+      // Legacy row (e.g. slice-5a hardcoded wolf, or a spawn point that
+      // was removed from a tile JSON since this row was inserted). The
+      // manifest is the source of truth — drop the orphan.
+      toDelete.push(m.mobId);
+      continue;
+    }
+    seeded.add(m.spawnNetId);
 
+    // ADD COLUMN backfill set spawnX/Y to 0. Real spawn anchors are
+    // always non-zero (the slice-5b tile is centered around STDB px
+    // ~(640, 1120), nowhere near origin). Use that to detect rows that
+    // need their per-mob AI metadata patched in.
+    if (m.spawnX === 0 && m.spawnY === 0) {
+      const xPx = Math.round(entry.spawn.position.x * PX_PER_M + WORLD_CENTER_PX);
+      const yPx = Math.round(entry.spawn.position.z * PX_PER_M + WORLD_CENTER_PX);
+      const aggroPx   = (entry.spawn.aggro_radius_m ?? SEED_WOLF_AGGRO_M) * PX_PER_M;
+      const leashPx   = (entry.spawn.leash_radius_m ?? SEED_WOLF_LEASH_M) * PX_PER_M;
+      const respawnSec = entry.spawn.respawn_sec ?? SEED_WOLF_RESPAWN_SEC;
+      ctx.db.mob.mobId.update({
+        ...m,
+        spawnX:        xPx,
+        spawnY:        yPx,
+        aggroRadiusPx: aggroPx,
+        leashRadiusPx: leashPx,
+        respawnSec,
+      });
+    }
+  }
+  for (const mobId of toDelete) {
+    ctx.db.mob.mobId.delete(mobId);
+  }
+
+  // 3. Insert any spawn points not already represented.
   let inserted = 0;
   for (const tile of tileGameplay) {
     for (const spawn of tile.spawns) {
