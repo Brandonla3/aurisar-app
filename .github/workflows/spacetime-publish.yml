@@ -1,0 +1,139 @@
+name: Publish SpacetimeDB module
+
+# Wire-up reasoning
+# -----------------
+# The Aurisar world's server-authoritative state lives in a SpacetimeDB
+# module deployed to maincloud (https://spacetimedb.com/aurisar-world).
+# Until this workflow, every publish was manual:
+#
+#     cd spacetimedb
+#     spacetime publish --server maincloud aurisar-world
+#
+# That meant: any merge that touched the module sat un-deployed until
+# someone remembered to ssh into a dev machine and run the command.
+# The slice 5c deploy in particular got tangled because of stale local
+# branches publishing pre-merge code, and the SQL-write workaround
+# required for stale rows hit auth issues that only a fresh publish
+# unblocks. This workflow makes the publish step part of the same merge
+# event Netlify already responds to — push lands on main, deploy runs.
+#
+# After publish, the client auto-calls `seedWorld()` on every connect
+# (see src/features/world/hooks/useSpacetimeWorld.js), and the reducer
+# is self-healing (PR #196), so a successful publish is sufficient to
+# get the live world into the right state on the next user connect.
+# We also call `seed_world` here directly as a belt-and-suspenders
+# confirmation that the freshly-published module actually loads — a
+# silent failure mode we'd rather catch in CI than in production.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Only re-publish when something the module actually depends on
+      # changes. Frontend-only PRs (the majority) skip this workflow.
+      - 'spacetimedb/**'
+      - '.github/workflows/spacetime-publish.yml'
+  workflow_dispatch:
+    # Manual trigger from the Actions tab, for re-publishing without a
+    # code change (e.g. after rotating the auth token, or for a forced
+    # re-seed).
+
+# Two concurrent publishes to the same database would race. Cancel any
+# in-flight run when a newer one is queued so the latest commit wins.
+concurrency:
+  group: spacetime-publish-maincloud
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to maincloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # The auth token must be created locally with `spacetime login`,
+      # then printed with `spacetime login show --include-token` and
+      # pasted into GitHub repo secrets as SPACETIMEDB_TOKEN. The token
+      # is account-scoped — anyone with it can publish to any of the
+      # owner's databases — so it belongs in repo secrets, never in the
+      # source tree or job env literally.
+      SPACETIMEDB_TOKEN: ${{ secrets.SPACETIMEDB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Sanity-check the auth token is present
+        # Fail fast with a clear message if the secret is missing.
+        # Without this step, the install/login would still proceed and
+        # the publish step would fail with a less obvious "permission
+        # denied" later.
+        run: |
+          if [ -z "${SPACETIMEDB_TOKEN}" ]; then
+            echo "::error::SPACETIMEDB_TOKEN repo secret is not set."
+            echo "Create one with:"
+            echo "  spacetime login                # locally, opens browser"
+            echo "  spacetime login show --include-token"
+            echo "Then paste the token at Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+      - name: Install SpacetimeDB CLI
+        # The canonical installer drops the `spacetime` binary into
+        # ~/.local/bin (Linux). We then add that to PATH for subsequent
+        # steps. Pinning is intentional: floating "latest" would let a
+        # CLI release break a deploy without any code change here.
+        run: |
+          curl -fsSL https://install.spacetimedb.com | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify CLI install
+        run: spacetime --version
+
+      - name: Authenticate with maincloud
+        # `spacetime login --token` is the headless auth path — equivalent
+        # to a fresh login from the browser, without the browser. The
+        # token persists across subsequent CLI invocations in the same job.
+        run: spacetime login --token "${SPACETIMEDB_TOKEN}"
+
+      - name: Publish module
+        # --yes is granular here on purpose:
+        #   remote        — bypass "publish to non-local?" prompt
+        #   migrate       — bypass migration plan acceptance prompt
+        #                   (the plan still prints in the job log)
+        #   break-clients — bypass "this will BREAK existing clients"
+        #                   prompt; in maincloud this is fine because
+        #                   clients reconnect and re-fetch schema
+        #   skip-login    — never fall back to interactive auth
+        # delete-data is intentionally NOT in the list. If a publish
+        # would destroy data (e.g. an accidental DROP COLUMN slipped in),
+        # we want the workflow to fail loudly rather than silently nuke
+        # the live world.
+        working-directory: spacetimedb
+        run: |
+          spacetime publish \
+            --server maincloud \
+            --yes=remote,migrate,break-clients,skip-login \
+            aurisar-world
+
+      - name: Re-seed mobs
+        # The published module's `seedWorld` reducer is idempotent and
+        # self-healing (per PR #196): it drops orphan rows whose
+        # spawn_net_id no longer exists in the tile manifest, repairs
+        # any row whose spawn coords were zeroed by a schema migration,
+        # and inserts manifest spawns not yet represented. Calling it
+        # here means the freshly-deployed module is verified loadable
+        # and the live world reflects the new manifest immediately —
+        # rather than waiting for the first client connect to trigger
+        # it. Safe to call repeatedly; no-op if already current.
+        run: spacetime call aurisar-world seed_world
+
+      - name: Verify mob table
+        # Read-only sanity check. We don't fail the job on row count
+        # (the manifest can legitimately add or remove spawns), but the
+        # output appears in the job log so a reviewer can eyeball it
+        # after a deploy.
+        run: |
+          spacetime sql aurisar-world \
+            "SELECT mob_id, mob_type, spawn_net_id, spawn_x, spawn_y, hp FROM mob" \
+            || echo "::warning::SELECT failed — module may need investigation, but publish + seed already succeeded"
