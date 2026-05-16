@@ -38,7 +38,8 @@ export default function XpBarFlash({ amount, mult, prevXp, cls }) {
           className="xp-bar-flash-fill"
           style={{
             width: (filled ? newPct : oldPct) + '%',
-            background: `linear-gradient(90deg, color-mix(in srgb,${cls.color} 50%,transparent), ${cls.color})`,
+            background: `linear-gradient(90deg, color-mix(in srgb,${cls.color} 60%,transparent), ${cls.glow || cls.color})`,
+            boxShadow: `0 0 8px ${cls.glow || cls.color}, 0 0 20px ${cls.color}88`,
           }}
         />
       </div>
