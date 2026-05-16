@@ -55,12 +55,13 @@ function WhoopFieldCard({ title, payload, rows }) {
   return (
     <div style={{
       padding: '10px 12px',
-      background: 'rgba(45,42,36,.18)',
+      background: 'rgba(45,42,36,.26)',
       borderRadius: 10,
-      border: '1px solid rgba(180,172,158,.07)',
+      border: '1px solid rgba(180,172,158,.18)',
+      boxShadow: '0 0 10px rgba(180,172,158,.1), 0 0 18px rgba(180,172,158,.04)',
       opacity: empty ? 0.55 : 1,
     }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#d4cec4', marginBottom: 6, letterSpacing: 0.4 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#ece7de', marginBottom: 6, letterSpacing: 0.4 }}>
         {title}
       </div>
       {empty ? (
@@ -69,8 +70,8 @@ function WhoopFieldCard({ title, payload, rows }) {
         <div style={{ display: 'grid', gap: 3 }}>
           {rows.map(([label, value]) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
-              <span style={{ color: '#8a8478' }}>{label}</span>
-              <span style={{ color: '#d4cec4', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{value}</span>
+              <span style={{ color: '#a8a09a' }}>{label}</span>
+              <span style={{ color: '#ece7de', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{value}</span>
             </div>
           ))}
         </div>
@@ -95,24 +96,32 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
   const chartW = W - padL - padR;
   const colW = chartW / 7;
   const barW = Math.max(8, colW - 5);
-  const avgY = padT + chartH * (1 - Math.min(avg / maxVal, 1));
-
   return (
     <div style={{
       marginTop: 12,
       padding: '10px 11px',
-      background: 'rgba(45,42,36,.12)',
+      background: 'rgba(45,42,36,.22)',
       borderRadius: 9,
-      border: '1px solid rgba(180,172,158,.05)',
+      border: '1px solid rgba(180,172,158,.16)',
+      boxShadow: '0 0 12px rgba(180,172,158,.08)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <span className="rpg-sec-title">7-Day Trend</span>
-        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.62rem', color: '#8a8478' }}>
+        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.62rem', color: '#a8a09a' }}>
           {'avg '}
           <span style={{ color: clsColor, fontWeight: 700 }}>{avg.toFixed(1)}{unit}</span>
         </span>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block' }}>
+        <defs>
+          <filter id="label-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="1.4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         {Array.from({ length: 7 }, (_, i) => {
           const p = points[i];
           const x = padL + i * colW + (colW - barW) / 2;
@@ -121,9 +130,9 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
             return (
               <g key={i}>
                 <rect x={x} y={padT + chartH - 2} width={barW} height={2} rx={1}
-                  fill="rgba(180,172,158,.06)" />
+                  fill="rgba(180,172,158,.08)" />
                 <text x={x + barW / 2} y={H - 3} textAnchor="middle"
-                  fontFamily="Inter,sans-serif" fontSize="7" fill="rgba(180,172,158,.25)">{emptyLabel}</text>
+                  fontFamily="Inter,sans-serif" fontSize="7" fill="rgba(180,172,158,.38)">{emptyLabel}</text>
               </g>
             );
           }
@@ -134,22 +143,19 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
           return (
             <g key={i}>
               <rect x={x} y={y} width={barW} height={barH} rx={2}
-                fill={`color-mix(in srgb, ${clsColor} 48%, transparent)`} />
+                fill={`color-mix(in srgb, ${clsColor} 72%, transparent)`} />
               <text x={x + barW / 2} y={Math.max(padT - 2, y - 2)} textAnchor="middle"
-                fontFamily="Inter,sans-serif" fontSize="6.5" fill={clsColor} opacity={0.8}>
+                fontFamily="Inter,sans-serif" fontSize="6.5" fill={clsColor} opacity={1}
+                filter="url(#label-glow)">
                 {valLabel}
               </text>
               <text x={x + barW / 2} y={H - 3} textAnchor="middle"
-                fontFamily="Inter,sans-serif" fontSize="7" fill="rgba(180,172,158,.4)">
+                fontFamily="Inter,sans-serif" fontSize="7" fill="rgba(180,172,158,.65)">
                 {DAY_ABBREVS[day]}
               </text>
             </g>
           );
         })}
-        {numeric.length > 1 && (
-          <line x1={padL} y1={avgY} x2={W - padR} y2={avgY}
-            stroke={clsColor} strokeWidth={1} strokeDasharray="3,3" opacity={0.55} />
-        )}
       </svg>
     </div>
   );
@@ -802,10 +808,13 @@ return (
        ══════════════════════════════════════════ */}
   {activeTab === "whoop" && (() => {
     const MRow = ({ icon, label, value }) => (
-      <div className={"cal-event-row"}>
+      <div className={"cal-event-row"} style={{
+        borderColor: 'rgba(180,172,158,.14)',
+        boxShadow: '0 0 6px rgba(180,172,158,.06)',
+      }}>
         <span style={{ fontSize: "1.05rem", flexShrink: 0 }}>{icon}</span>
-        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: ".62rem", color: "#8a8478", flex: 1 }}>{label}</span>
-        <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".95rem", fontWeight: 700, color: cls.color }}>{value}</span>
+        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: ".62rem", color: "#b4ac9e", flex: 1 }}>{label}</span>
+        <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".95rem", fontWeight: 700, color: cls.glow, filter: `drop-shadow(0 0 5px color-mix(in srgb, ${cls.glow} 55%, transparent))` }}>{value}</span>
       </div>
     );
     return (
@@ -879,7 +888,7 @@ return (
                 <WhoopMiniChart
                   historyData={whoopHistory.recovery}
                   extractValue={p => p?.score?.recovery_score}
-                  maxVal={100} unit={"%"} clsColor={cls.color}
+                  maxVal={100} unit={"%"} clsColor={cls.glow}
                 />
               </div>
             )}
@@ -895,7 +904,7 @@ return (
                 <WhoopMiniChart
                   historyData={whoopHistory.sleep}
                   extractValue={p => p?.score?.sleep_performance_percentage}
-                  maxVal={100} unit={"%"} clsColor={cls.color}
+                  maxVal={100} unit={"%"} clsColor={cls.glow}
                 />
               </div>
             )}
@@ -923,7 +932,7 @@ return (
                 <WhoopMiniChart
                   historyData={whoopHistory.cycle}
                   extractValue={p => p?.score?.strain}
-                  maxVal={21} unit={""} clsColor={cls.color}
+                  maxVal={21} unit={""} clsColor={cls.glow}
                 />
               </div>
             )}
