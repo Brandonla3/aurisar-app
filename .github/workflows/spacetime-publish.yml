@@ -79,12 +79,23 @@ jobs:
           fi
 
       - name: Install SpacetimeDB CLI
-        # The canonical installer drops the `spacetime` binary into
-        # ~/.local/bin (Linux). We then add that to PATH for subsequent
-        # steps. Pinning is intentional: floating "latest" would let a
-        # CLI release break a deploy without any code change here.
+        # Download the release tarball directly from GitHub instead of
+        # piping the canonical `curl https://install.spacetimedb.com |
+        # bash` installer. The installer calls `isatty(stdin)` early and
+        # bails with "IO error: not a terminal" in CI (no TTY), so the
+        # curl|bash path is unusable here regardless of stdin redirection
+        # tricks. Direct tarball is also better for CI hygiene: version
+        # is pinned, no third-party shell script runs, no GitHub action
+        # from a non-trusted publisher.
+        env:
+          SPACETIMEDB_VERSION: v2.2.0  # match the version Aurisar's local CLI ships
         run: |
-          curl -fsSL https://install.spacetimedb.com | bash
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o /tmp/spacetime.tar.gz \
+            "https://github.com/clockworklabs/SpacetimeDB/releases/download/${SPACETIMEDB_VERSION}/spacetime-x86_64-unknown-linux-gnu.tar.gz"
+          tar -xzf /tmp/spacetime.tar.gz -C "$HOME/.local/bin"
+          chmod +x "$HOME/.local/bin"/*
+          ls -la "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Verify CLI install
