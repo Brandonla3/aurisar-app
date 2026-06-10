@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "build:glb": "node scripts/build_glb_assets.mjs",
-    "build:gameplay": "node scripts/copy_gameplay_to_public.mjs"
+    "build:gameplay": "node scripts/copy_gameplay_to_public.mjs",
+    "bake:tiles": "node scripts/bake_ashwood_tiles.mjs",
+    "bake:heightmap": "node scripts/bake_ashwood_heightmap.mjs",
+    "verify:worldgen": "node scripts/verify_worldgen.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
@@ -17,6 +20,7 @@
     "ajv-formats": "^3.0.1",
     "babylonjs": "^9.7.0",
     "babylonjs-loaders": "^9.7.0",
+    "babylonjs-serializers": "^9.7.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-is": "^19.2.6",

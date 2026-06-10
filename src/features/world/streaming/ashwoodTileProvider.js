@@ -31,11 +31,16 @@ export class AshwoodTileProvider {
   /**
    * @param {object} config    world_build_config.json (tiling/streaming)
    * @param {object} worldgen  createWorldgen(ashwood_world.json) instance
+   * @param {object} options   { subdivisions?, bake? } — bake mode swaps the
+   *   textured/shader materials for plain vertex-color materials and skips
+   *   per-frame observables, so the provider runs under a Node NullEngine
+   *   and exports clean GLBs (scripts/bake_ashwood_tiles.mjs).
    */
   constructor(config, worldgen, options = {}) {
     this.params = streamingParams(config);
     this.wg = worldgen;
     this.subdivisions = options.subdivisions ?? DEFAULT_SUBDIVISIONS;
+    this.bake = options.bake ?? false;
     this._shared = null;
   }
 
@@ -43,18 +48,28 @@ export class AshwoodTileProvider {
     if (this._shared && this._shared.scene === scene) return this._shared;
 
     const ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
-    const grassTex = new BABYLON.Texture('/assets/textures/grasslight-big.jpg', scene);
-    grassTex.uScale = GRASS_REPEATS_PER_TILE;
-    grassTex.vScale = GRASS_REPEATS_PER_TILE;
-    ground.diffuseTexture = grassTex;          // modulated by biome vertex colors
-    const grassNm = new BABYLON.Texture('/assets/textures/grasslight-big-nm.jpg', scene);
-    grassNm.uScale = GRASS_REPEATS_PER_TILE;
-    grassNm.vScale = GRASS_REPEATS_PER_TILE;
-    grassNm.level = 0.85;
-    ground.bumpTexture = grassNm;
     ground.specularColor = new BABYLON.Color3(0, 0, 0);
+    if (!this.bake) {
+      const grassTex = new BABYLON.Texture('/assets/textures/grasslight-big.jpg', scene);
+      grassTex.uScale = GRASS_REPEATS_PER_TILE;
+      grassTex.vScale = GRASS_REPEATS_PER_TILE;
+      ground.diffuseTexture = grassTex;        // modulated by biome vertex colors
+      const grassNm = new BABYLON.Texture('/assets/textures/grasslight-big-nm.jpg', scene);
+      grassNm.uScale = GRASS_REPEATS_PER_TILE;
+      grassNm.vScale = GRASS_REPEATS_PER_TILE;
+      grassNm.level = 0.85;
+      ground.bumpTexture = grassNm;
+    }
 
-    const water = buildWaterMaterial(scene);
+    let water;
+    if (this.bake) {
+      water = new BABYLON.StandardMaterial('ashwood_water', scene);
+      water.diffuseColor = BABYLON.Color3.FromHexString('#29646a');
+      water.alpha = 0.84;
+      water.backFaceCulling = false;
+    } else {
+      water = buildWaterMaterial(scene);
+    }
 
     const bed = new BABYLON.StandardMaterial('ashwood_pondbed', scene);
     bed.diffuseColor  = new BABYLON.Color3(0.043, 0.10, 0.114);
