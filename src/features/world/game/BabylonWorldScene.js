@@ -1782,19 +1782,39 @@ export class BabylonWorldScene {
   // stone ring, glowing coals, rising embers, flickering point light.
 
   _handleCampfireInput() {
-    if (this._chatOpen || this._localDead) return;
     if (!this._keys['KeyF']) return;
+    this.requestBuildCampfire();
+  }
+
+  // Public entry shared by the F-key and the on-screen Fire action button.
+  // Returns 'built' on a successful reducer call, 'cooldown' if still within
+  // the 10s build window, or null when blocked (chat open / dead / no avatar).
+  requestBuildCampfire() {
+    if (this._chatOpen || this._localDead) return null;
     const now = performance.now();
     // matches the server-side build cadence so held keys don't spam reducer
     // calls that would just be dropped
-    if (now - this._lastCampfireBuildAt < 10_000) return;
+    if (now - this._lastCampfireBuildAt < 10_000) return 'cooldown';
     const root = this._local?.root;
-    if (!root) return;
+    if (!root) return null;
     this._lastCampfireBuildAt = now;
     const yaw = root.rotation.y; // avatar faces (sin(yaw), cos(yaw))
     const fx = root.position.x + Math.sin(yaw) * 2.2;
     const fz = root.position.z + Math.cos(yaw) * 2.2;
     this.callbacks.onBuildCampfire?.(toStdb(fx), toStdb(fz));
+    return 'built';
+  }
+
+  // Snapshot of burning campfires in world units. A campfire only exists in
+  // this map while it is lit — the server deletes the row when its burn timer
+  // ends — so "near a campfire" is equivalent to "near a lit campfire".
+  getCampfires() {
+    const out = [];
+    this._campfires.forEach((f) => {
+      const p = f.root?.position;
+      if (p) out.push({ x: p.x, z: p.z });
+    });
+    return out;
   }
 
   applyCampfireUpdate(row) {

@@ -21,7 +21,7 @@ const btn = {
 };
 const label = { fontSize: 9, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.02em' };
 
-export default function ActionButtons({ onMap, onInventory, onCooking, onMenu }) {
+export default function ActionButtons({ onMap, onInventory, onCooking, onCampfire, onMenu }) {
   return (
     <div
       style={{
@@ -37,6 +37,9 @@ export default function ActionButtons({ onMap, onInventory, onCooking, onMenu })
       </button>
       <button style={btn} onClick={onCooking} aria-label="Cooking">
         <span style={{ fontSize: 22 }}>🍳</span><span style={label}>Cook</span>
+      </button>
+      <button style={btn} onClick={onCampfire} aria-label="Build campfire">
+        <span style={{ fontSize: 22 }}>🔥</span><span style={label}>Fire</span>
       </button>
       <button style={btn} onClick={onMenu} aria-label="Menu">
         <span style={{ fontSize: 22 }}>☰</span><span style={label}>Menu</span>

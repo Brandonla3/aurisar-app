@@ -103,7 +103,10 @@ export function useInventory() {
   }, []);
 
   // Cook a recipe: validate, consume inputs, add output. Returns true on success.
-  const cook = useCallback((recipeId) => {
+  // Cooking requires a lit campfire; callers pass { nearFire } from the scene so
+  // the gate is enforced here too, not just in the panel UI.
+  const cook = useCallback((recipeId, { nearFire = true } = {}) => {
+    if (!nearFire) return false;
     const recipe = RECIPES.find((r) => r.id === recipeId);
     if (!recipe) return false;
     let ok = false;

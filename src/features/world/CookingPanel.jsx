@@ -3,17 +3,42 @@
  * greyed out with their missing ingredients. Cook consumes inputs → adds output.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import WorldModal from './ui/WorldModal.jsx';
 import { ITEMS } from './game/items.js';
 import { RECIPES, canCook } from './game/recipes.js';
 import { FONT, primaryBtn, ghostBtn } from './ui/panelTheme.js';
 
-export default function CookingPanel({ inv, onClose, onToast }) {
+// Cooking requires standing near a lit campfire. A campfire only exists in the
+// scene while it is burning, so proximity to any tracked campfire is enough.
+const NEAR_FIRE_RADIUS = 4.5;
+
+export default function CookingPanel({ inv, sceneRef, onClose, onToast }) {
   const counts = inv.counts;
+  const [nearFire, setNearFire] = useState(false);
+
+  // Poll the live scene for a nearby lit campfire. Cheap (a handful of fires,
+  // a few times a second) and avoids threading per-frame state through React.
+  useEffect(() => {
+    const check = () => {
+      const scene = sceneRef?.current;
+      const pose = scene?.getPose?.();
+      const fires = scene?.getCampfires?.() ?? [];
+      if (!pose) { setNearFire(false); return; }
+      const near = fires.some((f) => {
+        const dx = f.x - pose.x, dz = f.z - pose.z;
+        return dx * dx + dz * dz <= NEAR_FIRE_RADIUS * NEAR_FIRE_RADIUS;
+      });
+      setNearFire(near);
+    };
+    check();
+    const id = setInterval(check, 400);
+    return () => clearInterval(id);
+  }, [sceneRef]);
 
   const cook = (recipe) => {
-    if (inv.cook(recipe.id)) {
+    if (!nearFire) return;
+    if (inv.cook(recipe.id, { nearFire })) {
       onToast?.(`You cook ${ITEMS[recipe.output.id]?.name ?? recipe.name}.`);
     }
   };
@@ -23,9 +48,24 @@ export default function CookingPanel({ inv, onClose, onToast }) {
       <p style={{ color: '#94a3b8', fontSize: 12, margin: '0 0 12px', fontFamily: FONT }}>
         Combine gathered ingredients into food.
       </p>
+      {!nearFire && (
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '9px 12px', marginBottom: 12, borderRadius: 10,
+            background: 'rgba(120, 53, 15, 0.35)',
+            border: '1px solid rgba(240, 138, 60, 0.45)',
+            color: '#fbbf77', fontSize: 12, fontFamily: FONT,
+          }}
+        >
+          <span style={{ fontSize: 18 }}>🔥</span>
+          Stand near a lit campfire to cook. Build one with the Fire button or the F key.
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {RECIPES.map((recipe) => {
           const ok = canCook(recipe, counts);
+          const canCookNow = ok && nearFire;
           const out = ITEMS[recipe.output.id];
           return (
             <div
@@ -58,8 +98,8 @@ export default function CookingPanel({ inv, onClose, onToast }) {
                 </div>
               </div>
               <button
-                style={ok ? primaryBtn : { ...ghostBtn, cursor: 'not-allowed', opacity: 0.6 }}
-                disabled={!ok}
+                style={canCookNow ? primaryBtn : { ...ghostBtn, cursor: 'not-allowed', opacity: 0.6 }}
+                disabled={!canCookNow}
                 onClick={() => cook(recipe)}
               >
                 Cook

@@ -431,6 +431,7 @@ export default function WorldGame({ playerInfo }) {
           onMap={()       => openPanel('map')}
           onInventory={() => openPanel('inventory')}
           onCooking={()   => openPanel('cooking')}
+          onCampfire={()  => sceneRef.current?.requestBuildCampfire()}
           onMenu={()      => openPanel('menu')}
         />
       )}
@@ -445,7 +446,7 @@ export default function WorldGame({ playerInfo }) {
         <InventoryPanel inv={inv} onClose={closePanel} onToast={showToast} />
       )}
       {activePanel === 'cooking' && (
-        <CookingPanel inv={inv} onClose={closePanel} onToast={showToast} />
+        <CookingPanel inv={inv} sceneRef={sceneRef} onClose={closePanel} onToast={showToast} />
       )}
 
       {/* Game menu */}
