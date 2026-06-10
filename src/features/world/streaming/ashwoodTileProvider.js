@@ -47,14 +47,14 @@ export class AshwoodTileProvider {
     grassTex.uScale = GRASS_REPEATS_PER_TILE;
     grassTex.vScale = GRASS_REPEATS_PER_TILE;
     ground.diffuseTexture = grassTex;          // modulated by biome vertex colors
+    const grassNm = new BABYLON.Texture('/assets/textures/grasslight-big-nm.jpg', scene);
+    grassNm.uScale = GRASS_REPEATS_PER_TILE;
+    grassNm.vScale = GRASS_REPEATS_PER_TILE;
+    grassNm.level = 0.85;
+    ground.bumpTexture = grassNm;
     ground.specularColor = new BABYLON.Color3(0, 0, 0);
 
-    const water = new BABYLON.StandardMaterial('ashwood_water', scene);
-    water.diffuseColor  = new BABYLON.Color3(0.10, 0.25, 0.27);
-    water.emissiveColor = new BABYLON.Color3(0.03, 0.10, 0.12);
-    water.specularColor = new BABYLON.Color3(0.4, 0.45, 0.5);
-    water.alpha = 0.84;
-    water.backFaceCulling = false;
+    const water = buildWaterMaterial(scene);
 
     const bed = new BABYLON.StandardMaterial('ashwood_pondbed', scene);
     bed.diffuseColor  = new BABYLON.Color3(0.043, 0.10, 0.114);
@@ -73,6 +73,10 @@ export class AshwoodTileProvider {
     this._buildGround(meta, bounds, scene, shared, container);
     this._buildWater(meta, bounds, scene, shared, container);
 
+    // MeshBuilder already added everything to the scene at creation; the
+    // loader calls addAllToScene() next. Detach first so each mesh ends up
+    // in scene.meshes exactly once (double entries = double render).
+    container.removeAllFromScene();
     return container;
   }
 
@@ -89,7 +93,6 @@ export class AshwoodTileProvider {
       width: size,
       height: size,
       subdivisions: n,
-      updatable: false,
     }, scene);
 
     const positions = ground.getVerticesData(BABYLON.VertexBuffer.PositionKind);
@@ -134,8 +137,11 @@ export class AshwoodTileProvider {
       colors[i * 4 + 3] = 1;
     }
 
-    ground.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
-    ground.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals);
+    // setVerticesData replaces the GPU buffer outright — CreateGround's
+    // default buffers are non-updatable, so updateVerticesData would no-op
+    // and leave every tile flat.
+    ground.setVerticesData(BABYLON.VertexBuffer.PositionKind, positions, false);
+    ground.setVerticesData(BABYLON.VertexBuffer.NormalKind, normals, false);
     ground.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, false, 4);
     ground.refreshBoundingInfo();
 
@@ -186,6 +192,102 @@ export class AshwoodTileProvider {
     d.material = material;
     return d;
   }
+}
+
+// ── Ashwood water — dual-scrolled normal map, fresnel sky blend, sun glint.
+// Ported from the prototype's makeWaterMaterial() (lines ~869-912). Scene
+// EXP2 fog is applied manually (ShaderMaterial bypasses Babylon's fog).
+// Lighting state is read per-frame from scene.metadata.ashwood.lm.
+
+const WATER_VERT = `
+precision highp float;
+attribute vec3 position;
+uniform mat4 world;
+uniform mat4 worldViewProjection;
+varying vec3 vWp;
+void main() {
+  vec4 wp = world * vec4(position, 1.0);
+  vWp = wp.xyz;
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+const WATER_FRAG = `
+precision highp float;
+varying vec3 vWp;
+uniform sampler2D uN;
+uniform float t;
+uniform vec3 sunDir; uniform vec3 sunCol;
+uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyCol;
+uniform float night; uniform float alphaV;
+uniform vec3 cameraPosition;
+uniform vec3 vFogColor; uniform float fogDensity;
+vec2 nm(vec2 uv){ return texture2D(uN, uv).rg * 2.0 - 1.0; }
+void main() {
+  vec2 uv = vWp.xz * 0.055;
+  vec2 n1 = nm(uv + vec2(t * 0.020, t * 0.0125));
+  vec2 n2 = nm(uv * 1.73 - vec2(t * 0.016, t * 0.021));
+  vec3 n = normalize(vec3(n1.x + n2.x, 5.2, n1.y + n2.y));
+  vec3 V = normalize(cameraPosition - vWp);
+  float fres = pow(1.0 - max(dot(V, n), 0.0), 3.0);
+  vec3 col = mix(deep, shallow, clamp(0.4 + 0.35 * (n.x + n.z), 0.0, 1.0));
+  col = mix(col, skyCol, fres * 0.7);
+  vec3 R = reflect(-normalize(sunDir), n);
+  col += sunCol * pow(max(dot(R, V), 0.0), 130.0) * (2.0 * (1.0 - night) + 0.35);
+  col *= mix(1.0, 0.22, night * 0.9);
+  float dist = length(cameraPosition - vWp);
+  float fog = exp(-pow(dist * fogDensity, 2.0));
+  col = mix(vFogColor, col, clamp(fog, 0.0, 1.0));
+  gl_FragColor = vec4(col, clamp(alphaV + fres * 0.13, 0.0, 0.97));
+}
+`;
+
+function buildWaterMaterial(scene) {
+  BABYLON.Effect.ShadersStore['ashwoodWaterVertexShader'] = WATER_VERT;
+  BABYLON.Effect.ShadersStore['ashwoodWaterFragmentShader'] = WATER_FRAG;
+
+  const mat = new BABYLON.ShaderMaterial('ashwood_water', scene, 'ashwoodWater', {
+    attributes: ['position'],
+    uniforms: ['world', 'worldViewProjection', 'cameraPosition',
+               't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
+               'night', 'alphaV', 'vFogColor', 'fogDensity'],
+    samplers: ['uN'],
+    needAlphaBlending: true,
+  });
+  mat.backFaceCulling = false;
+
+  const normals = new BABYLON.Texture('/assets/textures/waternormals.jpg', scene);
+  normals.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
+  normals.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  mat.setTexture('uN', normals);
+
+  mat.setColor3('deep',    BABYLON.Color3.FromHexString('#0b2128'));
+  mat.setColor3('shallow', BABYLON.Color3.FromHexString('#29646a'));
+  mat.setColor3('skyCol',  BABYLON.Color3.FromHexString('#9db8c8'));
+  mat.setFloat('alphaV', 0.84);
+  mat.setFloat('night', 0);
+  mat.setFloat('t', 0);
+
+  const sunDir = new BABYLON.Vector3(0.4, 0.8, 0.3);
+  const sunCol = new BABYLON.Color3(1.0, 0.93, 0.8);
+  mat.setVector3('sunDir', sunDir);
+  mat.setColor3('sunCol', sunCol);
+
+  let t = 0;
+  scene.onBeforeRenderObservable.add(() => {
+    t += scene.getEngine().getDeltaTime() / 1000;
+    mat.setFloat('t', t);
+    mat.setColor3('vFogColor', scene.fogColor);
+    mat.setFloat('fogDensity', scene.fogDensity);
+    const lm = scene.metadata?.ashwood?.lm;
+    if (lm?.key) {
+      sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
+      mat.setVector3('sunDir', sunDir);
+      mat.setFloat('night', Math.max(0, Math.min(1, 1 - (lm.dayFactor ?? 1) * 1.5)));
+    }
+  });
+
+  return mat;
 }
 
 function wgHexToRgb(hex) {

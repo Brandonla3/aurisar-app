@@ -17,6 +17,7 @@
 import { AssetLibrary }    from './AssetLibrary.js';
 import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
+import { AshwoodSky }      from './AshwoodSky.js';
 import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
@@ -424,6 +425,10 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
+    // Published for AshwoodSky (sky dome + fog palette reads these).
+    this.dayFactor  = dayFactor;
+    this.duskFactor = sunset;
+
     // Daytime key intensity stepped down again — the previous 1.4 still read
     // too bright on lit characters after the tone-map swap let more color
     // through. 1.0 sits in line with mobile games of this scale.
@@ -652,10 +657,16 @@ const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggl
 
 // ── Main export ──────────────────────────────────────────────────────────────
 export class BabylonWorldScene {
-  constructor(canvas, playerInfo, callbacks) {
+  /**
+   * @param {object} options  { dayLengthSec?, startTimeOfDay? } — defaults
+   *   stay real-time-synced so all players roughly share lighting; the dev
+   *   world viewer overrides them for render iteration.
+   */
+  constructor(canvas, playerInfo, callbacks, options = {}) {
     this.canvas      = canvas;
     this.playerInfo  = playerInfo;
     this.callbacks   = callbacks;
+    this.options     = options;
 
     this._remotePlayers = new Map();
     this._mobs          = new Map(); // mobId(BigInt) -> { root, body, head, hpFill, hpBar, lastHp, maxHp, dead }
@@ -743,9 +754,19 @@ export class BabylonWorldScene {
     const realHour = now.getHours() + now.getMinutes() / 60;
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
-      startTimeOfDay: realHour,
-      dayLengthSec:   86400,
+      startTimeOfDay: this.options.startTimeOfDay ?? realHour,
+      dayLengthSec:   this.options.dayLengthSec   ?? 86400,
     });
+
+    // Ashwood sky dome + fog palette (registered after the LM so its fog
+    // writes win the frame). The metadata seam lets tile providers (water
+    // shader) read the lighting state without a direct reference.
+    this._sky = new AshwoodSky(this.scene, this._lm, this._worldgen,
+      () => this._local?.root?.position ?? null);
+    this.scene.metadata = {
+      ...(this.scene.metadata || {}),
+      ashwood: { lm: this._lm, worldgen: this._worldgen },
+    };
 
     this._setupShadows();
     this._setupSSAO();
@@ -1689,6 +1710,7 @@ export class BabylonWorldScene {
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();
     this._tileLoader?.dispose();
+    this._sky?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
     this.engine.dispose();

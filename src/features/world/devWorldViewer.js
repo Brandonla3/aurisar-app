@@ -23,10 +23,17 @@ if (typeof window !== 'undefined' && !window.BABYLON) {
 const canvas = document.getElementById('world-canvas');
 const hud = document.getElementById('hud');
 
+// ?tod=17.5 — start time of day (default mid-morning for pleasant light)
+// ?daylen=1200 — seconds per full day (default the prototype's 20-min cycle)
+const params = new URLSearchParams(location.search);
 const scene = new BabylonWorldScene(
   canvas,
   { username: 'viewer', classType: 'warrior', avatarColor: '#88aaff', avatarConfig: null },
   {}, // callbacks: onMove etc. — all optional, all no-ops here
+  {
+    startTimeOfDay: parseFloat(params.get('tod') ?? '10.5'),
+    dayLengthSec:   parseFloat(params.get('daylen') ?? '1200'),
+  },
 );
 
 // Tiny telemetry loop: position, terrain height, biome, fps, draw calls.
