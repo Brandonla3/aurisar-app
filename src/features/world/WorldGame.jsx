@@ -14,6 +14,13 @@ import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 import TestingHud             from './TestingHud.jsx';
+import { useInventory }       from './useInventory.js';
+import WorldMap               from './WorldMap.jsx';
+import GameMenu               from './GameMenu.jsx';
+import InventoryPanel         from './InventoryPanel.jsx';
+import CookingPanel           from './CookingPanel.jsx';
+import ActionButtons          from './ActionButtons.jsx';
+import { ITEMS }              from './game/items.js';
 
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
@@ -23,6 +30,22 @@ if (typeof window !== 'undefined' && !window.BABYLON) {
 
 const IS_TOUCH = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;
+
+// Persisted UI visibility prefs (minimap + action-button cluster). Default on.
+const UI_PREFS_KEY = 'aurisar.world.ui.v1';
+function loadUiPrefs() {
+  try {
+    const raw = localStorage.getItem(UI_PREFS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      return {
+        minimapVisible:    p.minimapVisible    !== false,
+        showActionButtons: p.showActionButtons !== false,
+      };
+    }
+  } catch { /* fall through */ }
+  return { minimapVisible: true, showActionButtons: true };
+}
 
 // Joystick geometry
 const JOY_BASE_R  = 48; // px — outer ring radius
@@ -155,6 +178,44 @@ export default function WorldGame({ playerInfo }) {
   // Updated by BabylonWorldScene's onLocalPlayerUpdate callback.
   const [localHp, setLocalHp] = useState({ hp: 100, maxHp: 100, dead: false, deadUntil: 0n });
 
+  // UI panels (single-modal) + visibility prefs + world model handle.
+  const [activePanel, setActivePanel] = useState(null); // 'map'|'menu'|'inventory'|'cooking'|null
+  const [uiPrefs, setUiPrefs] = useState(loadUiPrefs);
+  const [mapData, setMapData] = useState(null);
+  const [toast, setToast]     = useState(null); // { text, id }
+
+  const inv = useInventory();
+
+  const togglePanel = useCallback((name) => setActivePanel((p) => (p === name ? null : name)), []);
+  const openPanel   = useCallback((name) => setActivePanel(name), []);
+  const closePanel  = useCallback(() => setActivePanel(null), []);
+  const toggleMinimap = useCallback(
+    () => setUiPrefs((p) => ({ ...p, minimapVisible: !p.minimapVisible })), []);
+  const toggleActionButtons = useCallback(
+    () => setUiPrefs((p) => ({ ...p, showActionButtons: !p.showActionButtons })), []);
+  const showToast = useCallback((text) => setToast({ text, id: Date.now() }), []);
+
+  // Persist visibility prefs.
+  useEffect(() => {
+    try { localStorage.setItem(UI_PREFS_KEY, JSON.stringify(uiPrefs)); } catch { /* quota */ }
+  }, [uiPrefs]);
+
+  // Auto-dismiss toasts.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Chest looted (fired by the scene's proximity scan) → grant items + toast.
+  const onChestOpen = useCallback((chest) => {
+    const rolled = inv.openChest(chest);
+    if (rolled && rolled.length) {
+      const txt = rolled.map((r) => `${r.qty}× ${ITEMS[r.id]?.name ?? r.id}`).join(', ');
+      showToast(`Chest opened — found ${txt}`);
+    }
+  }, [inv, showToast]);
+
   const inputRef  = useRef(null);
   const joyTouchRef = useRef(null); // { id, baseX, baseY }
 
@@ -210,9 +271,11 @@ export default function WorldGame({ playerInfo }) {
     const scene = new BabylonWorldScene(
       canvasRef.current,
       playerInfo,
-      { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire, onLocalPlayerUpdate }
+      { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
+        onLocalPlayerUpdate, onChestOpen }
     );
     sceneRef.current = scene;
+    setMapData(scene.getMapData());
 
     return () => {
       scene.dispose();
@@ -231,6 +294,9 @@ export default function WorldGame({ playerInfo }) {
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onBuildCampfire = buildCampfire;
   }, [buildCampfire]);
+  useEffect(() => {
+    if (sceneRef.current) sceneRef.current.callbacks.onChestOpen = onChestOpen;
+  }, [onChestOpen]);
 
   // Scroll chat to bottom on new messages
   useEffect(() => {
@@ -326,12 +392,91 @@ export default function WorldGame({ playerInfo }) {
     return () => window.removeEventListener('keydown', handler, true);
   }, [chatOpen, openChat, closeChat]);
 
+  // Keyboard: UI hotkeys (map/inventory/cooking/menu/minimap). Capture phase +
+  // stopPropagation so they don't reach the scene's movement handler or
+  // WorldOverlay's Escape-exits-world handler. Ignored while typing in chat.
+  useEffect(() => {
+    const handler = (e) => {
+      if (chatOpen) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Escape') {
+        if (activePanel) { e.stopPropagation(); e.preventDefault(); closePanel(); }
+        return;
+      }
+      let handled = true;
+      switch (e.code) {
+        case 'KeyM': togglePanel('map');       break;
+        case 'KeyI': togglePanel('inventory'); break;
+        case 'KeyC': togglePanel('cooking');   break;
+        case 'KeyG': togglePanel('menu');      break;
+        case 'KeyN': toggleMinimap();          break;
+        default: handled = false;
+      }
+      if (handled) { e.stopPropagation(); e.preventDefault(); }
+    };
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [chatOpen, activePanel, togglePanel, toggleMinimap, closePanel]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={S.wrap}>
       <canvas ref={canvasRef} style={S.canvas} />
 
-      <TestingHud sceneRef={sceneRef} />
+      <TestingHud sceneRef={sceneRef} visible={uiPrefs.minimapVisible} mapData={mapData} />
+
+      {/* Action buttons (all devices; visibility toggled in the Menu) */}
+      {uiPrefs.showActionButtons && (
+        <ActionButtons
+          onMap={()       => openPanel('map')}
+          onInventory={() => openPanel('inventory')}
+          onCooking={()   => openPanel('cooking')}
+          onMenu={()      => openPanel('menu')}
+        />
+      )}
+
+      {/* World map */}
+      {activePanel === 'map' && mapData && (
+        <WorldMap mapData={mapData} sceneRef={sceneRef} onClose={closePanel} />
+      )}
+
+      {/* Inventory / Cooking */}
+      {activePanel === 'inventory' && (
+        <InventoryPanel inv={inv} onClose={closePanel} onToast={showToast} />
+      )}
+      {activePanel === 'cooking' && (
+        <CookingPanel inv={inv} onClose={closePanel} onToast={showToast} />
+      )}
+
+      {/* Game menu */}
+      {activePanel === 'menu' && (
+        <GameMenu
+          onClose={closePanel}
+          onOpenMap={()       => openPanel('map')}
+          onOpenInventory={() => openPanel('inventory')}
+          onOpenCooking={()   => openPanel('cooking')}
+          showActionButtons={uiPrefs.showActionButtons}
+          onToggleActionButtons={toggleActionButtons}
+          minimapVisible={uiPrefs.minimapVisible}
+          onToggleMinimap={toggleMinimap}
+        />
+      )}
+
+      {/* Transient toast (pickups, cooking, eating) */}
+      {toast && (
+        <div
+          style={{
+            position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 80, maxWidth: '80%',
+            background: 'rgba(15,23,42,0.92)', border: '1px solid rgba(240,208,96,0.4)',
+            borderRadius: 20, padding: '8px 16px', color: '#f0d060', fontSize: 13,
+            fontFamily: 'Inter, system-ui, sans-serif', textAlign: 'center',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5)', pointerEvents: 'none',
+          }}
+        >
+          {toast.text}
+        </div>
+      )}
 
       {/* Mobile: virtual joystick zone (left half, above canvas) */}
       {IS_TOUCH && (
@@ -458,12 +603,9 @@ export default function WorldGame({ playerInfo }) {
       {/* Controls hint — desktop only (mobile hint is self-evident from joystick) */}
       {!IS_TOUCH && (
         <div style={S.hint}>
-          WASD / ↑↓←→ move<br />
-          Space — attack<br />
-          F — build campfire<br />
-          Mouse drag — orbit camera<br />
-          Scroll — zoom<br />
-          ESC — exit world
+          WASD / ↑↓←→ move · Space attack · F campfire<br />
+          M map · I inventory · C cooking · G menu · N minimap<br />
+          Mouse drag orbit · Scroll zoom · ESC exit world
         </div>
       )}
     </div>

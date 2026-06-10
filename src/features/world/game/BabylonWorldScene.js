@@ -32,6 +32,7 @@ import {
   streamingParams,
 } from '../streaming/index.js';
 import { createWorldgen } from '../worldgen/index.js';
+import { locationLabelAt } from '../mapRender.js';
 // Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
 // validation runs in CI via src/features/world/config/validators.js.
 import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
@@ -659,6 +660,10 @@ const DUNGEON_ENTRANCE      = Object.freeze({ x: 0, z: -37 });
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
+// Chest pickup: walk within this radius of an unopened chest to loot it.
+const CHEST_OPEN_DIST_SQ = 2.5 * 2.5;
+const CHEST_SCAN_MS      = 250; // how often to scan (chest count is small)
+
 // ── Main export ──────────────────────────────────────────────────────────────
 export class BabylonWorldScene {
   /**
@@ -685,6 +690,8 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
+    this._openedChests  = new Set(); // chest indices already looted this session
+    this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
     this._spawning          = new Set(); // identity IDs currently being async-spawned
@@ -1016,6 +1023,32 @@ export class BabylonWorldScene {
     }
   }
 
+  // Client-side chest looting. Mirrors _checkDungeonProximity's squared-distance
+  // pattern but throttled to CHEST_SCAN_MS since chests don't move and the count
+  // is small. Walking onto an unopened chest fires onChestOpen({ id, seed }) once;
+  // React (useInventory) rolls deterministic loot from the seed.
+  _checkChestProximity() {
+    if (!this._local || this._localDead) return;
+    const chests = this._worldgen?.sites?.chests;
+    if (!chests || !chests.length) return;
+
+    const now = performance.now();
+    if (now - this._lastChestScanAt < CHEST_SCAN_MS) return;
+    this._lastChestScanAt = now;
+
+    const { x, z } = this._local.root.position;
+    for (let i = 0; i < chests.length; i++) {
+      if (this._openedChests.has(i)) continue;
+      const c = chests[i];
+      const dx = x - c.x;
+      const dz = z - c.z;
+      if (dx * dx + dz * dz < CHEST_OPEN_DIST_SQ) {
+        this._openedChests.add(i);
+        this.callbacks.onChestOpen?.({ id: i, seed: c.seed });
+      }
+    }
+  }
+
   // ── Tile streaming ─────────────────────────────────────────────────────────
   // World geometry comes from the tile streamer driven by
   // world_build_config.tiling_streaming. Tiles are generated on demand by
@@ -1145,6 +1178,7 @@ export class BabylonWorldScene {
     this._moveLocal(dt);
     this._local.update(dt);
     this._checkDungeonProximity();
+    this._checkChestProximity();
     this._streamTiles();
     this._handleAttackInput();
     this._handleCampfireInput();
@@ -1715,6 +1749,30 @@ export class BabylonWorldScene {
       });
     });
     return out;
+  }
+
+  // Read-only handle on the deterministic world model for the React map layer
+  // (minimap + World Map). Cached: same reference each call so React effects
+  // don't re-run. worldgen is built synchronously in the constructor.
+  getMapData() {
+    return (this._mapData ??= {
+      worldgen: this._worldgen,
+      config:   this._worldgen.config,
+      sites:    this._worldgen.sites,
+    });
+  }
+
+  // Chest manifest (world units) for optional map plotting.
+  getChests() {
+    return this._worldgen?.sites?.chests ?? [];
+  }
+
+  // Current named location for the minimap / map header readout. Combines the
+  // live dungeon state with the geographic label resolver in mapRender.
+  getLocation() {
+    const p = this._local?.root?.position;
+    if (!p) return '';
+    return locationLabelAt(this._worldgen, p.x, p.z, { inDungeon: this._inDungeon });
   }
 
   // ── Campfires ──────────────────────────────────────────────────────────────
