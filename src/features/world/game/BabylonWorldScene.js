@@ -17,18 +17,28 @@
 import { AssetLibrary }    from './AssetLibrary.js';
 import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
+import { AshwoodSky }        from './AshwoodSky.js';
+import { AshwoodGrass }      from './AshwoodGrass.js';
+import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
   GlbTileProvider,
-  ProceduralTileProvider,
   FallbackTileProvider,
+  AshwoodTileProvider,
   buildTileIndex,
   streamingParams,
 } from '../streaming/index.js';
+import { createWorldgen } from '../worldgen/index.js';
 // Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
 // validation runs in CI via src/features/world/config/validators.js.
 import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
+import ashwoodWorldConfig from '../config/ashwood_world.json' with { type: 'json' };
+
+// The authored flat tiles (T_03_03) predate the Ashwood heightfield and
+// would z-fight/clip against it. Re-enable once the Phase-5 bake pipeline
+// regenerates them from the heightfield itself.
+const USE_GLB_TILES = false;
 
 // ── Coordinate helpers ──────────────────────────────────────────────────────
 const SCALE       = 32;
@@ -417,6 +427,10 @@ class LightingManager {
     const dayFactor = clamp01((sunHeight + 0.08) / 0.22);
     const sunset    = clamp01(1 - Math.abs(sunHeight) / 0.22) * dayFactor;
 
+    // Published for AshwoodSky (sky dome + fog palette reads these).
+    this.dayFactor  = dayFactor;
+    this.duskFactor = sunset;
+
     // Daytime key intensity stepped down again — the previous 1.4 still read
     // too bright on lit characters after the tone-map swap let more color
     // through. 1.0 sits in line with mobile games of this scale.
@@ -645,10 +659,16 @@ const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggl
 
 // ── Main export ──────────────────────────────────────────────────────────────
 export class BabylonWorldScene {
-  constructor(canvas, playerInfo, callbacks) {
+  /**
+   * @param {object} options  { dayLengthSec?, startTimeOfDay? } — defaults
+   *   stay real-time-synced so all players roughly share lighting; the dev
+   *   world viewer overrides them for render iteration.
+   */
+  constructor(canvas, playerInfo, callbacks, options = {}) {
     this.canvas      = canvas;
     this.playerInfo  = playerInfo;
     this.callbacks   = callbacks;
+    this.options     = options;
 
     this._remotePlayers = new Map();
     this._mobs          = new Map(); // mobId(BigInt) -> { root, body, head, hpFill, hpBar, lastHp, maxHp, dead }
@@ -720,6 +740,12 @@ export class BabylonWorldScene {
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
 
+    // Pure-math Ashwood world model (heightfield, biomes, trails, sites).
+    // Deterministic from the canon seed — every client computes the same
+    // world, which multiplayer requires. All entity Y placement must go
+    // through this._worldgen.surfaceY(x, z); the server only knows 2D.
+    this._worldgen = createWorldgen(ashwoodWorldConfig);
+
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
 
@@ -730,15 +756,36 @@ export class BabylonWorldScene {
     const realHour = now.getHours() + now.getMinutes() / 60;
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
-      startTimeOfDay: realHour,
-      dayLengthSec:   86400,
+      startTimeOfDay: this.options.startTimeOfDay ?? realHour,
+      dayLengthSec:   this.options.dayLengthSec   ?? 86400,
     });
+
+    // Ashwood sky dome + fog palette (registered after the LM so its fog
+    // writes win the frame). The metadata seam lets tile providers (water
+    // shader) read the lighting state without a direct reference.
+    this._sky = new AshwoodSky(this.scene, this._lm, this._worldgen,
+      () => this._local?.root?.position ?? null);
+    this.scene.metadata = {
+      ...(this.scene.metadata || {}),
+      ashwood: {
+        lm: this._lm,
+        worldgen: this._worldgen,
+        castShadow: (mesh) => this._castShadow(mesh),
+      },
+    };
 
     this._setupShadows();
     this._setupSSAO();
 
     this._setupTileStreaming();
     this._buildDungeonEntrance();
+
+    // Player-following vegetation + ambient life (one draw call grass,
+    // billboard clouds/motes/fireflies).
+    const playerPos = () => this._local?.root?.position ?? null;
+    this._grass = new AshwoodGrass(this.scene, this._worldgen, playerPos);
+    this._atmosphere = new AshwoodAtmosphere(this.scene, this._worldgen, playerPos);
+
     this._bindKeys();
 
     // Render loop guards on _local until CharacterAvatar is ready
@@ -768,7 +815,7 @@ export class BabylonWorldScene {
       this.scene,
       AssetLibrary,
     );
-    this._local.root.position.set(0, 0, 0);
+    this._local.root.position.set(0, this._worldgen.surfaceY(0, 0), 0);
     // Flush remote updates that arrived while we were loading.
     // Mobs first — they can spawn independently of `_local` once
     // MobAssetLibrary is ready, and we want them visible ASAP.
@@ -965,18 +1012,17 @@ export class BabylonWorldScene {
 
   // ── Tile streaming ─────────────────────────────────────────────────────────
   // World geometry comes from the tile streamer driven by
-  // world_build_config.tiling_streaming. The primary GlbTileProvider loads
-  // authored .glb tiles from /assets/tiles/. Any tile whose .glb isn't
-  // present (404) falls back transparently to the ProceduralTileProvider,
-  // which builds a deterministic grass/tree/rock scatter from tile_id using
-  // the same RNG seed as the authored placeholders — so the boundary
-  // between authored and procedural tiles is visually seamless.
+  // world_build_config.tiling_streaming. Tiles are generated on demand by
+  // AshwoodTileProvider, which evaluates the deterministic Ashwood
+  // heightfield/biome math (src/features/world/worldgen/) per tile — the
+  // same model on every client. When USE_GLB_TILES is on, baked .glb tiles
+  // from /assets/tiles/ take priority and the provider is the 404 fallback.
 
   _setupTileStreaming() {
-    const provider = new FallbackTileProvider(
-      new GlbTileProvider(),
-      new ProceduralTileProvider(worldBuildConfig),
-    );
+    const ashwood = new AshwoodTileProvider(worldBuildConfig, this._worldgen);
+    const provider = USE_GLB_TILES
+      ? new FallbackTileProvider(new GlbTileProvider(), ashwood)
+      : ashwood;
     const params = streamingParams(worldBuildConfig);
     const tileIndex = buildTileIndex(params, {
       render:   (id) => `/assets/tiles/${id}_render.glb`,
@@ -997,20 +1043,23 @@ export class BabylonWorldScene {
 
     const stone = this._stdMat('dunGate', new BABYLON.Color3(0.32, 0.30, 0.38));
 
+    // Base the gate on the Ashwood terrain at the entrance.
+    const gy = this._worldgen.surfaceY(x, z);
+
     // Pillars
     const pL = BABYLON.MeshBuilder.CreateBox('dunPillarL', { width: 0.9, height: 5.2, depth: 0.9 }, this.scene);
-    pL.position.set(x - 2.1, 2.6, z);
+    pL.position.set(x - 2.1, gy + 2.6, z);
     pL.material = stone;
     this._castShadow(pL);
 
     const pR = BABYLON.MeshBuilder.CreateBox('dunPillarR', { width: 0.9, height: 5.2, depth: 0.9 }, this.scene);
-    pR.position.set(x + 2.1, 2.6, z);
+    pR.position.set(x + 2.1, gy + 2.6, z);
     pR.material = stone;
     this._castShadow(pR);
 
     // Lintel
     const lintel = BABYLON.MeshBuilder.CreateBox('dunLintel', { width: 5.1, height: 0.75, depth: 0.9 }, this.scene);
-    lintel.position.set(x, 5.575, z);
+    lintel.position.set(x, gy + 5.575, z);
     lintel.material = stone;
     this._castShadow(lintel);
 
@@ -1022,11 +1071,11 @@ export class BabylonWorldScene {
     portalMat.backFaceCulling = false;
 
     const portal = BABYLON.MeshBuilder.CreatePlane('dunPortal', { width: 3.3, height: 4.8 }, this.scene);
-    portal.position.set(x, 2.6, z);
+    portal.position.set(x, gy + 2.6, z);
     portal.material = portalMat;
 
     // Pulsing accent light in the gateway
-    const gLight = new BABYLON.PointLight('dunGateLight', new BABYLON.Vector3(x, 2.5, z), this.scene);
+    const gLight = new BABYLON.PointLight('dunGateLight', new BABYLON.Vector3(x, gy + 2.5, z), this.scene);
     gLight.diffuse   = new BABYLON.Color3(0.35, 0.20, 0.85);
     gLight.intensity = 18;
     gLight.range     = 9;
@@ -1043,7 +1092,7 @@ export class BabylonWorldScene {
 
     // Floating label
     const labelRoot = new BABYLON.TransformNode('dunEntranceLabelRoot', this.scene);
-    labelRoot.position.set(x, 6.8, z);
+    labelRoot.position.set(x, gy + 6.8, z);
     this._makeLabel('dunEntrance', 'Dungeon Entrance', labelRoot);
   }
 
@@ -1131,6 +1180,7 @@ export class BabylonWorldScene {
 
     m.root.position.x = toWorld(row.x);
     m.root.position.z = toWorld(row.y);
+    m.root.position.y = this._worldgen.surfaceY(m.root.position.x, m.root.position.z);
 
     // HP bar — scale fill to current/max ratio. Hide entire bar on death.
     m.maxHp = row.maxHp;
@@ -1383,9 +1433,15 @@ export class BabylonWorldScene {
     const speedScale = (joyActive && !w && !s && !a && !d) ? joyScale : 1;
     const pos = this._local.root.position;
     pos.addInPlace(this._moveDir.scale(speed * dt * speedScale));
-    pos.x = Math.max(-95, Math.min(95, pos.x));
-    pos.z = Math.max(-95, Math.min(95, pos.z));
-    pos.y = 0;
+    // Keep inside the Ashwood world disc (the prototype's keepInWorld) and
+    // stand on the terrain — height is a pure client-side function of (x,z).
+    const maxR = this._worldgen.config.radius - 2;
+    const rr = Math.hypot(pos.x, pos.z);
+    if (rr > maxR) {
+      pos.x *= maxR / rr;
+      pos.z *= maxR / rr;
+    }
+    pos.y = this._worldgen.surfaceY(pos.x, pos.z);
 
     const target = Math.atan2(this._moveDir.x, this._moveDir.z);
     this._local.root.rotation.y = this._lerpAngle(
@@ -1395,7 +1451,7 @@ export class BabylonWorldScene {
 
   _trackCamera() {
     const p = this._local.root.position;
-    this._camTarget.set(p.x, 1.2, p.z);
+    this._camTarget.set(p.x, p.y + 1.2, p.z);
     BABYLON.Vector3.LerpToRef(this._camera.target, this._camTarget, 0.12, this._camera.target);
   }
 
@@ -1468,6 +1524,8 @@ export class BabylonWorldScene {
       if (this._local) {
         this._local.root.position.x = toWorld(row.x);
         this._local.root.position.z = toWorld(row.y);
+        this._local.root.position.y = this._worldgen.surfaceY(
+          this._local.root.position.x, this._local.root.position.z);
         this._local.isMoving = false;
       }
     } else if (!isDead && this._localWasDead) {
@@ -1476,6 +1534,8 @@ export class BabylonWorldScene {
       if (this._local) {
         this._local.root.position.x = toWorld(row.x);
         this._local.root.position.z = toWorld(row.y);
+        this._local.root.position.y = this._worldgen.surfaceY(
+          this._local.root.position.x, this._local.root.position.z);
         this._local.isMoving = false;
       }
       // Reset our last-sent cache so the next movePlayer call doesn't
@@ -1513,7 +1573,11 @@ export class BabylonWorldScene {
       } else {
         rp._targetX = toWorld(row.x);
         rp._targetZ = toWorld(row.y);
-        rp.root.position.set(rp._targetX, 0, rp._targetZ);
+        rp.root.position.set(
+          rp._targetX,
+          this._worldgen.surfaceY(rp._targetX, rp._targetZ),
+          rp._targetZ,
+        );
         this._remotePlayers.set(key, rp);
       }
     } finally {
@@ -1535,7 +1599,7 @@ export class BabylonWorldScene {
     const f = 1 - Math.pow(0.04, dt / 100);
     rp.root.position.x = BABYLON.Scalar.Lerp(rp.root.position.x, rp._targetX, f);
     rp.root.position.z = BABYLON.Scalar.Lerp(rp.root.position.z, rp._targetZ, f);
-    rp.root.position.y = 0;
+    rp.root.position.y = this._worldgen.surfaceY(rp.root.position.x, rp.root.position.z);
   }
 
   // ── Name label ─────────────────────────────────────────────────────────────
@@ -1659,6 +1723,9 @@ export class BabylonWorldScene {
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();
     this._tileLoader?.dispose();
+    this._grass?.dispose();
+    this._atmosphere?.dispose();
+    this._sky?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
     this.engine.dispose();
