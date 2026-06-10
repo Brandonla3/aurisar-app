@@ -160,18 +160,19 @@ export function buildPropTemplates(scene, opts = {}) {
   // geometry + vertex colors). Each load is fallback-safe, so the trees look
   // exactly as before until the user drops the image files into public/.
   if (!opts.bake) {
-    // Bark: albedo (.jpg) + lossless normal (.png). Trunks are tall + thin, so
-    // the bark repeats vertically.
+    // Bark: albedo + normal. Trunks are tall + thin, so the bark repeats
+    // vertically. (Normals are .jpg to match common texture-pack downloads;
+    // re-saving an already-JPG normal as PNG recovers no quality.)
     applyOptionalTexture(bark, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
-    applyOptionalTexture(bark, 'bumpTexture',   `${TEX_BASE}/bark_normal.png`, scene, { uScale: 1, vScale: 3, level: 0.8 });
+    applyOptionalTexture(bark, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
     applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
-    applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.png`, scene, { uScale: 1, vScale: 3, level: 0.8 });
-    // Canopy foliage: shared leaf albedo (.jpg) + normal (.png). The blobs are
-    // small, so a couple of tiles per blob keep the leaf detail legible.
+    applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
+    // Canopy foliage: shared leaf albedo + normal. The blobs are small, so a
+    // couple of tiles per blob keep the leaf detail legible.
     // (Pine shares the leaf map; a dedicated pine_albedo can be wired later.)
     for (const m of [leaf, pine, fLeafM]) {
       applyOptionalTexture(m, 'diffuseTexture', `${TEX_BASE}/leaf_albedo.jpg`, scene, { uScale: 2, vScale: 2 });
-      applyOptionalTexture(m, 'bumpTexture',   `${TEX_BASE}/leaf_normal.png`, scene, { uScale: 2, vScale: 2, level: 0.6 });
+      applyOptionalTexture(m, 'bumpTexture',   `${TEX_BASE}/leaf_normal.jpg`, scene, { uScale: 2, vScale: 2, level: 0.6 });
     }
   }
 
