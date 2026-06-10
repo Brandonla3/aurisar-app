@@ -34,24 +34,34 @@ Ground rules for every item:
 
 ## Wildlife
 
-- [ ] **Crows** — `buildCrows` / `updateCrows`.
-- [ ] **Bats** (night, cave-adjacent) — `buildBats` / `updateBats`.
-- [ ] **Rabbits / critters** — `buildCritters` / `spawnAnimal` /
-  `updateAnimals` / `updateCritters`.
+- [x] **Crows** — `buildCrows` / `updateCrows`. *(AshwoodWildlife.js)*
+- [x] **Bats** (night, cave-adjacent) — `buildBats` / `updateBats`.
+  *(AshwoodWildlife.js)*
+- [x] **Rabbits / critters** — `buildCritters` / `updateCritters`.
+  *(AshwoodWildlife.js)*
 
 ## World dressing
 
-- [ ] **Ruins** — sites already exist in the manifest (`worldgen/sites.js`);
-  meshes not built. Reference: `spawnRuin`.
-- [ ] **Cave entrances** — same situation. Reference: `spawnCave`.
-- [ ] **Hub campfires and signposts** — `buildFire` / `buildPost` /
-  `updateFires`; not yet ported at all.
+- [x] **Ruins** — `spawnRuin` ported as thin instances in
+  `ashwoodPropMeshes.js` (walls, columns, archway, rubble).
+- [x] **Cave entrances** — `spawnCave` ported (boulder horseshoe, void dome,
+  stalagmites, crystals, glowing mushrooms, point light).
 
-## Gameplay-adjacent
+## Gameplay-adjacent (server/state decisions needed — not pure dressing)
 
 - [ ] **Wildwood tree collision** — `worldgen/forest.js` already computes a
   collision radius `r` per mature/giant tree (0 = walk-through sapling) but
   nothing consumes it; players currently walk through trunks.
+- [ ] **Player-built campfires** — `buildFire` / `updateFires` is a gameplay
+  action in the prototype (F key, costs 3 wood: log pile + stones + flickering
+  point light + ember particles). Needs inventory + multiplayer state, so it's
+  a feature, not dressing. *(Earlier revisions of this list mislabeled this
+  "hub campfires"; `buildPost` is the prototype's bloom post-processing
+  pipeline — already covered by the existing DefaultRenderingPipeline — and
+  there are no signposts in the reference.)*
+- [ ] **Huntable fauna** — deer/boar (`spawnAnimal` / `updateAnimals`) carry
+  hp/drops/health bars; these are server-side mob spawns in Aurisar's model,
+  not client dressing.
 
 ## Pipeline
 
