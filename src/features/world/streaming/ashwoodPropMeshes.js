@@ -58,10 +58,13 @@ class LeafSwayPlugin extends BABYLON.MaterialPluginBase {
 #ifdef ASH_LEAFSWAY
 {
   float ashPh = worldPos.x * 0.15 + worldPos.z * 0.17;
-  float ashK = ashSwayWind * clamp(positionUpdated.y + 0.6, 0.0, 2.5);
-  worldPos.x += (sin(ashSwayTime * 0.6 + ashPh) * 0.035
-               + sin(ashSwayTime * 2.3 + ashPh * 1.7) * 0.012) * ashK;
-  worldPos.z += cos(ashSwayTime * 0.5 + ashPh) * 0.03 * ashK;
+  // Height-weighted so trunks barely move and tall canopies swing; the cap was
+  // 2.5 (clamping out anything above ~knee height on a 6m tree) and is now 5.0
+  // so the whole crown actually rides the wind.
+  float ashK = ashSwayWind * clamp(positionUpdated.y + 0.6, 0.0, 5.0);
+  worldPos.x += (sin(ashSwayTime * 0.6 + ashPh) * 0.10
+               + sin(ashSwayTime * 2.3 + ashPh * 1.7) * 0.035) * ashK;
+  worldPos.z += cos(ashSwayTime * 0.5 + ashPh) * 0.09 * ashK;
 }
 #endif
 `,
@@ -108,7 +111,31 @@ function mergeKeep(name, meshes) {
 
 // ── templates (built once per scene, never rendered directly) ───────────────
 
-export function buildPropTemplates(scene) {
+// Optional surface texture loader with graceful 404 fallback. The album of
+// tree textures is user-supplied and may be absent; if a file is missing we
+// quietly drop the map and fall back to the flat diffuseColor (and existing
+// vertex tints) rather than throwing or rendering a broken-texture material.
+// Albedo authoring is desaturated so per-instance HSL tints still read.
+function applyOptionalTexture(material, prop, url, scene, { uScale = 1, vScale = 1, level } = {}) {
+  const tex = new BABYLON.Texture(
+    url, scene, false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
+    null,
+    () => {                 // onError → revert to flat-color fallback
+      if (material[prop] === tex) material[prop] = null;
+      tex.dispose();
+    },
+  );
+  tex.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
+  tex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  tex.uScale = uScale;
+  tex.vScale = vScale;
+  if (level != null) tex.level = level;
+  material[prop] = tex;
+}
+
+const TEX_BASE = '/assets/textures';
+
+export function buildPropTemplates(scene, opts = {}) {
   const mat = (name, hex) => {
     const m = new BABYLON.StandardMaterial(name, scene);
     m.diffuseColor = BABYLON.Color3.FromHexString(hex);
@@ -128,6 +155,25 @@ export function buildPropTemplates(scene) {
 
   // canopy + undergrowth foliage sways in the wind
   for (const m of [leaf, pine, bushM, fLeafM]) new LeafSwayPlugin(m);
+
+  // Optional surface textures. Skipped in bake mode (the GLB contract is plain
+  // geometry + vertex colors). Each load is fallback-safe, so the trees look
+  // exactly as before until the user drops the image files into public/.
+  if (!opts.bake) {
+    // Bark: albedo (.jpg) + lossless normal (.png). Trunks are tall + thin, so
+    // the bark repeats vertically.
+    applyOptionalTexture(bark, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
+    applyOptionalTexture(bark, 'bumpTexture',   `${TEX_BASE}/bark_normal.png`, scene, { uScale: 1, vScale: 3, level: 0.8 });
+    applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
+    applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.png`, scene, { uScale: 1, vScale: 3, level: 0.8 });
+    // Canopy foliage: shared leaf albedo (.jpg) + normal (.png). The blobs are
+    // small, so a couple of tiles per blob keep the leaf detail legible.
+    // (Pine shares the leaf map; a dedicated pine_albedo can be wired later.)
+    for (const m of [leaf, pine, fLeafM]) {
+      applyOptionalTexture(m, 'diffuseTexture', `${TEX_BASE}/leaf_albedo.jpg`, scene, { uScale: 2, vScale: 2 });
+      applyOptionalTexture(m, 'bumpTexture',   `${TEX_BASE}/leaf_normal.png`, scene, { uScale: 2, vScale: 2, level: 0.6 });
+    }
+  }
 
   const T = {};
 

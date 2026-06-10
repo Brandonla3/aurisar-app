@@ -83,7 +83,7 @@ export class AshwoodTileProvider {
 
   _ensureTemplates(scene) {
     if (this._templates && this._templatesScene === scene) return this._templates;
-    this._templates = buildPropTemplates(scene);
+    this._templates = buildPropTemplates(scene, { bake: this.bake });
     this._templatesScene = scene;
     return this._templates;
   }
