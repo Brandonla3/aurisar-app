@@ -22,6 +22,53 @@ import { parseTileId } from './tileMath.js';
 
 const rand = (rng, a, b) => a + rng() * (b - a);
 
+// ── leaf wind sway ──────────────────────────────────────────────────────────
+// The prototype rocks each canopy group ±0.012 rad per frame (updateTrees
+// ~3920). Canopies here are thin instances of shared templates, so per-frame
+// CPU rotation would mean rebuilding matrix buffers; instead a material
+// plugin displaces vertices in world space after the instance matrix is
+// applied (CUSTOM_VERTEX_UPDATE_WORLDPOS), giving every instance its own
+// phase from its world position. Time/wind come from the weather system's
+// metadata seam, so storms whip the canopies just like the grass.
+class LeafSwayPlugin extends BABYLON.MaterialPluginBase {
+  constructor(material) {
+    super(material, 'AshwoodLeafSway', 200, { ASH_LEAFSWAY: false });
+    this._enable(true);
+  }
+  getClassName() { return 'AshwoodLeafSwayPlugin'; }
+  prepareDefines(defines) { defines.ASH_LEAFSWAY = true; }
+  getUniforms() {
+    return {
+      ubo: [
+        { name: 'ashSwayTime', size: 1, type: 'float' },
+        { name: 'ashSwayWind', size: 1, type: 'float' },
+      ],
+      vertex: 'uniform float ashSwayTime;\nuniform float ashSwayWind;',
+    };
+  }
+  bindForSubMesh(uniformBuffer) {
+    const w = this._material?.getScene()?.metadata?.ashwood?.weather;
+    uniformBuffer.updateFloat('ashSwayTime', w?.time ?? performance.now() * 0.001);
+    uniformBuffer.updateFloat('ashSwayWind', Math.max(0.2, Math.min(3, w?.windStrength ?? 1)));
+  }
+  getCustomCode(shaderType) {
+    if (shaderType !== 'vertex') return null;
+    return {
+      CUSTOM_VERTEX_UPDATE_WORLDPOS: `
+#ifdef ASH_LEAFSWAY
+{
+  float ashPh = worldPos.x * 0.15 + worldPos.z * 0.17;
+  float ashK = ashSwayWind * clamp(positionUpdated.y + 0.6, 0.0, 2.5);
+  worldPos.x += (sin(ashSwayTime * 0.6 + ashPh) * 0.035
+               + sin(ashSwayTime * 2.3 + ashPh * 1.7) * 0.012) * ashK;
+  worldPos.z += cos(ashSwayTime * 0.5 + ashPh) * 0.03 * ashK;
+}
+#endif
+`,
+    };
+  }
+}
+
 // ── geometry helpers ────────────────────────────────────────────────────────
 
 // Displaced icosphere — the prototype's organic blob/boulder silhouette.
@@ -62,25 +109,25 @@ function mergeKeep(name, meshes) {
 // ── templates (built once per scene, never rendered directly) ───────────────
 
 export function buildPropTemplates(scene) {
-  const mat = (name, hex, flat = true) => {
+  const mat = (name, hex) => {
     const m = new BABYLON.StandardMaterial(name, scene);
     m.diffuseColor = BABYLON.Color3.FromHexString(hex);
     m.specularColor = new BABYLON.Color3(0, 0, 0);
-    if (flat) m.disableLighting = false;
     return m;
   };
 
   const bark   = mat('ash_bark', '#46331f');
-  const leaf   = mat('ash_leaf', '#4a6e29');
+  const leaf   = mat('ash_leaf', '#4a6e29'); // base; per-instance HSL tints multiply in
   const pine   = mat('ash_pine', '#9ab080');
-  leaf.useVertexColors = false;
   const rockM  = mat('ash_rock', '#8a8d88');
   const bushM  = mat('ash_bush', '#35451f');
   const wood   = mat('ash_wood', '#5a3b22');
-  const gold   = mat('ash_gold', '#caa050');
   const green  = mat('ash_green', '#ffffff'); // tinted per instance
   const fTrunkM = mat('ash_ftrunk', '#8a6a48');
   const fLeafM  = mat('ash_fleaf', '#ffffff'); // HSL variance per instance
+
+  // canopy + undergrowth foliage sways in the wind
+  for (const m of [leaf, pine, bushM, fLeafM]) new LeafSwayPlugin(m);
 
   const T = {};
 
@@ -160,7 +207,6 @@ export function buildPropTemplates(scene) {
     T.chest = mergeKeep('tpl_chest', [body, lid]);
     T.chest.material = wood;
   }
-  void gold;
 
   // Wildwood forest: trunk (unit, scaled (w,h,w)), leaf blob sphere, brush cone
   T.fTrunk = BABYLON.MeshBuilder.CreateCylinder('tpl_ftrunk', {

@@ -29,8 +29,11 @@ Ground rules for every item:
   shooting stars at night (`updateShootingStar`). *(AshwoodWeather.js; the
   grass shader reads the published windStrength. Thunder SFX still skipped —
   no overworld audio system yet.)*
-- [ ] **Forest leaf wind sway** — `updateTrees` in the reference; likely a
-  vertex-shader variant of the grass sway applied to canopy templates.
+- [x] **Forest leaf wind sway** — material plugin in `ashwoodPropMeshes.js`
+  injects world-space sway after the thin-instance matrix
+  (`CUSTOM_VERTEX_UPDATE_WORLDPOS`), driven by the weather system's
+  windStrength. *(The prototype's `updateTrees` tree-falling/fading is
+  woodcutting gameplay — server-side, not ported.)*
 - [ ] **Procedural bark/leaf textures** on props; **mountain rock/snow
   texture blending** on terrain.
 
@@ -72,13 +75,9 @@ Ground rules for every item:
 
 ## Cleanups from the Phase 4 review
 
-- [ ] `ashwoodPropMeshes.js:75` — `leaf.useVertexColors = false` is a no-op
-  (`useVertexColors` is a mesh property, not a `StandardMaterial` one);
-  per-instance broadleaf canopy tints currently *do* render. Move the flag to
-  the template mesh if uniform canopies were intended, otherwise delete it.
-- [ ] `ashwoodPropMeshes.js` — the `mat()` helper's `flat` parameter does
-  nothing; the `gold` material is created then `void`-ed (wire it up with
-  chest dressing or drop it).
+- [x] `ashwoodPropMeshes.js` — removed the no-op `leaf.useVertexColors`
+  line (per-instance canopy tints render, as they always did), the dead
+  `flat` parameter, and the unused `gold` material.
 - [ ] Perf watch: `AshwoodGrass._rebuild()` evaluates ~10k cells per 0.6 m of
   player movement — stagger across frames if mobile profiling shows hitches.
 - [ ] Perf watch: confirm the shadow generator render list doesn't grow with
