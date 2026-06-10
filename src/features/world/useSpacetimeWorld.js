@@ -12,8 +12,8 @@ const STDB_MODULE = import.meta.env.VITE_SPACETIMEDB_MODULE ?? 'aurisar-world';
 
 /**
  * @param {object|null} playerInfo  - { username, classType, avatarColor, avatarConfig }
- * @param {object}      callbacks   - { onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete }
- * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, setAvatarConfig, castAbility, identity }}
+ * @param {object}      callbacks   - { onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete, onCampfireUpsert, onCampfireDelete }
+ * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, setAvatarConfig, castAbility, buildCampfire, identity }}
  */
 export function useSpacetimeWorld(playerInfo, callbacks) {
   const connRef      = useRef(null);
@@ -55,6 +55,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     if (!conn) return;
     try {
       conn.reducers.castAbility(mobId);
+    } catch (_) { /* not connected yet */ }
+  }, []);
+
+  const buildCampfire = useCallback((x, y) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.buildCampfire(x, y);
     } catch (_) { /* not connected yet */ }
   }, []);
 
@@ -102,6 +110,16 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
               'SELECT * FROM mob',
             ]);
 
+          // Campfires ride a separate subscription: if the deployed module
+          // predates the campfire table (client deploy and module publish
+          // race on merge), only fires degrade — players/chat/mobs survive.
+          connection
+            .subscriptionBuilder()
+            .onError((ctx) => {
+              console.warn('[useSpacetimeWorld] campfire subscription failed (module not republished yet?):', ctx?.event);
+            })
+            .subscribe(['SELECT * FROM campfire']);
+
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {
             callbacksRef.current?.onPlayerUpdate?.(row);
@@ -130,6 +148,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           });
           connection.db.mob.onDelete((_ctx, row) => {
             callbacksRef.current?.onMobDelete?.(row);
+          });
+
+          // ── campfire table events ──
+          connection.db.campfire.onInsert((_ctx, row) => {
+            callbacksRef.current?.onCampfireUpsert?.(row);
+          });
+          connection.db.campfire.onDelete((_ctx, row) => {
+            callbacksRef.current?.onCampfireDelete?.(row);
           });
         })
         .onDisconnect((_ctx, err) => {
@@ -173,6 +199,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     sendChat,
     setAvatarConfig,
     castAbility,
+    buildCampfire,
     identity: connRef.current?.identity ?? null,
   };
 }

@@ -57,13 +57,16 @@ Ground rules for every item:
 - [ ] **Wildwood tree collision** — `worldgen/forest.js` already computes a
   collision radius `r` per mature/giant tree (0 = walk-through sapling) but
   nothing consumes it; players currently walk through trunks.
-- [ ] **Player-built campfires** — `buildFire` / `updateFires` is a gameplay
-  action in the prototype (F key, costs 3 wood: log pile + stones + flickering
-  point light + ember particles). Needs inventory + multiplayer state, so it's
-  a feature, not dressing. *(Earlier revisions of this list mislabeled this
-  "hub campfires"; `buildPost` is the prototype's bloom post-processing
-  pipeline — already covered by the existing DefaultRenderingPipeline — and
-  there are no signposts in the reference.)*
+- [x] **Player-built campfires** — `buildFire` / `updateFires` ported as a
+  full multiplayer feature: `campfire` table + `buildCampfire` reducer +
+  scheduled burnout server-side; F key client-side; every client renders
+  every burning fire (log pile, stone ring, coals, embers, flickering
+  light). **No wood cost yet** — the prototype charged 3 wood; add the cost
+  in `buildCampfire` when an inventory system lands. Burn time 3 min,
+  10 s build cooldown, 3 fires per player (oldest snuffed). *(`buildPost`
+  is the prototype's bloom post-processing pipeline — already covered by
+  the existing DefaultRenderingPipeline — and there are no signposts in
+  the reference.)*
 - [ ] **Huntable fauna** — deer/boar (`spawnAnimal` / `updateAnimals`) carry
   hp/drops/health bars; these are server-side mob spawns in Aurisar's model,
   not client dressing.

@@ -52,6 +52,18 @@ const SEED_WOLF_RESPAWN_SEC     = 25;                 // default if JSON omits
 const PLAYER_MAX_HP             = 100;
 const PLAYER_RESPAWN_MICROS     = 5_000_000n;         // 5 s death timer before snap to origin
 
+// ── Campfires ────────────────────────────────────────────────────────────────
+//
+// Players can build a campfire in front of them (prototype buildFire ~3008).
+// Fires are shared world state: every client renders every burning fire.
+// No wood cost yet — the prototype charged 3 wood, but there's no inventory
+// system; when one lands, add the cost check here.
+
+const CAMPFIRE_BURN_MICROS      = 180_000_000n;       // fires burn for 3 minutes
+const CAMPFIRE_COOLDOWN_MICROS  = 10_000_000n;        // min 10 s between builds per player
+const CAMPFIRE_MAX_PER_PLAYER   = 3;                  // oldest is snuffed when exceeded
+const CAMPFIRE_PLACE_RANGE_PX   = 3 * PX_PER_M;       // must be placed within 3 m of the builder
+
 // ── Spawn-point index for O(1) respawn lookups ───────────────────────────────
 //
 // `respawnMob` needs the original spawn point's world position + radii. Each
@@ -97,6 +109,12 @@ const playerRespawnQueueRow = t.row('PlayerRespawnQueueRow', {
   id:          t.u64().primaryKey().autoInc(),
   scheduledAt: t.scheduleAt(),
   identity:    t.identity(),   // payload — which player to revive
+});
+
+const campfireExpireQueueRow = t.row('CampfireExpireQueueRow', {
+  id:          t.u64().primaryKey().autoInc(),
+  scheduledAt: t.scheduleAt(),
+  campfireId:  t.u64(),        // payload — which fire burns out
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -216,6 +234,29 @@ const spacetimedb = schema({
   playerRespawnQueue: table(
     { scheduled: (): any => respawnPlayer },
     playerRespawnQueueRow,
+  ),
+
+  /**
+   * Player-built campfires — shared world dressing with a burn timer.
+   * Clients render every row (log pile + stones + flame light) and remove
+   * it when the scheduled expiry deletes the row.
+   */
+  campfire: table(
+    { public: true },
+    {
+      campfireId: t.u64().primaryKey(),
+      ownerId:    t.identity(),    // who built it
+      ownerName:  t.string(),      // denormalized for "X's campfire" UI
+      x:          t.f32(),         // STDB px (same coord system as player)
+      y:          t.f32(),
+      litAt:      t.u64(),         // micros since epoch — also the per-player build cooldown anchor
+      expiresAt:  t.u64(),         // micros since epoch when expireCampfire fires
+    }
+  ),
+
+  campfireExpireQueue: table(
+    { scheduled: (): any => expireCampfire },
+    campfireExpireQueueRow,
   ),
 
 });
@@ -382,6 +423,98 @@ export const sendChat = spacetimedb.reducer(
     });
 
     ctx.db.player.identity.update({ ...player, lastChatAt: nowMicros });
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMPFIRES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build a campfire at (x, y) STDB px. The client places it ~2.2 m in front
+ * of the avatar; the server only trusts that it's within arm's reach.
+ *
+ * Guards:
+ *   • dead players can't build
+ *   • placement must be within CAMPFIRE_PLACE_RANGE_PX of the builder
+ *   • per-player cooldown, anchored on the player's newest fire's litAt
+ *     (no player-table column needed: a fire always outlives the cooldown
+ *     window since CAMPFIRE_BURN >> CAMPFIRE_COOLDOWN)
+ *   • per-player cap — building past it snuffs the oldest fire (its queued
+ *     expiry then no-ops on the missing row)
+ *
+ * No wood cost until an inventory system exists (prototype charged 3 wood).
+ */
+export const buildCampfire = spacetimedb.reducer(
+  {
+    x: t.f32(),
+    y: t.f32(),
+  },
+  (ctx, { x, y }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return;
+
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return; // dead can't build
+
+    // Must be placed within reach of where the server thinks the player is.
+    const dx = x - player.x;
+    const dy = y - player.y;
+    if (dx * dx + dy * dy > CAMPFIRE_PLACE_RANGE_PX * CAMPFIRE_PLACE_RANGE_PX) return;
+
+    const fx = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
+    const fy = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
+
+    // Scan the caller's fires once for both the cooldown and the cap.
+    let count = 0;
+    let newestLitAt = 0n;
+    let oldest: { campfireId: bigint; litAt: bigint } | null = null;
+    for (const f of ctx.db.campfire.iter()) {
+      if (!f.ownerId.isEqual(player.identity)) continue;
+      count++;
+      if (f.litAt > newestLitAt) newestLitAt = f.litAt;
+      if (oldest === null || f.litAt < oldest.litAt) {
+        oldest = { campfireId: f.campfireId, litAt: f.litAt };
+      }
+    }
+    if (newestLitAt > 0n && nowMicros - newestLitAt < CAMPFIRE_COOLDOWN_MICROS) {
+      return; // dropped: over the build cadence
+    }
+    if (count >= CAMPFIRE_MAX_PER_PLAYER && oldest) {
+      ctx.db.campfire.campfireId.delete(oldest.campfireId);
+    }
+
+    const expiresAt = nowMicros + CAMPFIRE_BURN_MICROS;
+    const campfireId = nowMicros;
+    ctx.db.campfire.insert({
+      campfireId,
+      ownerId: player.identity,
+      ownerName: player.username,
+      x: fx,
+      y: fy,
+      litAt: nowMicros,
+      expiresAt,
+    });
+    ctx.db.campfireExpireQueue.insert({
+      id: 0n,    // auto-inc replaces this
+      scheduledAt: ScheduleAt.time(expiresAt),
+      campfireId,
+    });
+  }
+);
+
+/**
+ * Scheduled campfire burnout. Fires once at expiresAt; deleting an
+ * already-snuffed fire (cap eviction) is a silent no-op.
+ */
+export const expireCampfire = spacetimedb.reducer(
+  {
+    schedule: campfireExpireQueueRow,
+  },
+  (ctx, { schedule }) => {
+    const fire = ctx.db.campfire.campfireId.find(schedule.campfireId);
+    if (!fire) return;
+    ctx.db.campfire.campfireId.delete(schedule.campfireId);
   }
 );
 

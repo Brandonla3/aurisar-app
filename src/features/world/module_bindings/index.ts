@@ -34,6 +34,7 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import BuildCampfireReducer from "./build_campfire_reducer";
 import CastAbilityReducer from "./cast_ability_reducer";
 import MovePlayerReducer from "./move_player_reducer";
 import SeedWorldReducer from "./seed_world_reducer";
@@ -44,6 +45,7 @@ import SetPlayerInfoReducer from "./set_player_info_reducer";
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import CampfireRow from "./campfire_table";
 import ChatMessageRow from "./chat_message_table";
 import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
@@ -52,6 +54,17 @@ import PlayerRow from "./player_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  campfire: __table({
+    name: 'campfire',
+    indexes: [
+      { accessor: 'campfireId', name: 'campfire_campfire_id_idx_btree', algorithm: 'btree', columns: [
+        'campfireId',
+      ] },
+    ],
+    constraints: [
+      { name: 'campfire_campfire_id_key', constraint: 'unique', columns: ['campfireId'] },
+    ],
+  }, CampfireRow),
   chatMessage: __table({
     name: 'chat_message',
     indexes: [
@@ -85,6 +98,7 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("build_campfire", BuildCampfireReducer),
   __reducerSchema("cast_ability", CastAbilityReducer),
   __reducerSchema("move_player", MovePlayerReducer),
   __reducerSchema("seed_world", SeedWorldReducer),

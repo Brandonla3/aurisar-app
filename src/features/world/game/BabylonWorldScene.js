@@ -674,6 +674,8 @@ export class BabylonWorldScene {
 
     this._remotePlayers = new Map();
     this._mobs          = new Map(); // mobId(BigInt) -> { root, body, head, hpFill, hpBar, lastHp, maxHp, dead }
+    this._campfires     = new Map(); // campfireId(BigInt) -> { root, light, ps, ph }
+    this._lastCampfireBuildAt = 0;
     this._lastAttackAt  = 0;          // ms timestamp; throttles spacebar
     this._myIdentity    = null;
     this._keys          = {};
@@ -1145,6 +1147,7 @@ export class BabylonWorldScene {
     this._checkDungeonProximity();
     this._streamTiles();
     this._handleAttackInput();
+    this._handleCampfireInput();
     this._trackCamera();
     this._syncStdb();
 
@@ -1714,6 +1717,158 @@ export class BabylonWorldScene {
     return out;
   }
 
+  // ── Campfires ──────────────────────────────────────────────────────────────
+  // Shared world state: rows arrive from the `campfire` table (every client
+  // sees every burning fire) and disappear when the server's burn timer
+  // deletes them. Visual is the prototype's buildFire (~3008): log pile,
+  // stone ring, glowing coals, rising embers, flickering point light.
+
+  _handleCampfireInput() {
+    if (this._chatOpen || this._localDead) return;
+    if (!this._keys['KeyF']) return;
+    const now = performance.now();
+    // matches the server-side build cadence so held keys don't spam reducer
+    // calls that would just be dropped
+    if (now - this._lastCampfireBuildAt < 10_000) return;
+    const root = this._local?.root;
+    if (!root) return;
+    this._lastCampfireBuildAt = now;
+    const yaw = root.rotation.y; // avatar faces (sin(yaw), cos(yaw))
+    const fx = root.position.x + Math.sin(yaw) * 2.2;
+    const fz = root.position.z + Math.cos(yaw) * 2.2;
+    this.callbacks.onBuildCampfire?.(toStdb(fx), toStdb(fz));
+  }
+
+  applyCampfireUpdate(row) {
+    if (!this.scene) return;
+    if (this._campfires.has(row.campfireId)) return; // rows are immutable; inserts only
+    this._spawnCampfire(row);
+  }
+
+  _removeCampfire(campfireId) {
+    const f = this._campfires.get(campfireId);
+    if (!f) return;
+    f.ps.dispose();
+    f.light.dispose();
+    f.root.dispose(false, true);
+    this._campfires.delete(campfireId);
+    if (this._campfires.size === 0 && this._campfireObserver) {
+      this.scene.onBeforeRenderObservable.remove(this._campfireObserver);
+      this._campfireObserver = null;
+    }
+  }
+
+  _campfireMaterials() {
+    if (this._campfireShared) return this._campfireShared;
+    const mk = (name, hex) => {
+      const m = new BABYLON.StandardMaterial(name, this.scene);
+      m.diffuseColor = BABYLON.Color3.FromHexString(hex);
+      m.specularColor = new BABYLON.Color3(0, 0, 0);
+      return m;
+    };
+    const coal = mk('fire_coal', '#1a0d06');
+    coal.emissiveColor = BABYLON.Color3.FromHexString('#ff8030').scale(0.8);
+    // soft radial blob for the ember particles (same recipe as the
+    // atmosphere's motes/fireflies texture)
+    const tex = new BABYLON.DynamicTexture('fire_spark_tex', { width: 32, height: 32 }, this.scene, false);
+    tex.hasAlpha = true;
+    const c = tex.getContext();
+    const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 32, 32);
+    tex.update();
+    this._campfireShared = { wood: mk('fire_wood', '#3a2a18'), stone: mk('fire_stone', '#55585c'), coal, tex };
+    return this._campfireShared;
+  }
+
+  _spawnCampfire(row) {
+    const mats = this._campfireMaterials();
+    const wx = toWorld(row.x);
+    const wz = toWorld(row.y);
+    const gy = this._worldgen ? this._worldgen.surfaceY(wx, wz) : 0;
+
+    const root = new BABYLON.TransformNode(`campfire_${row.campfireId}`, this.scene);
+    root.position.set(wx, gy, wz);
+
+    // log pile: 5 horizontal logs fanned around the center
+    const logs = [];
+    for (let i = 0; i < 5; i++) {
+      const log = BABYLON.MeshBuilder.CreateCylinder(`cf_log${i}`, {
+        diameter: 0.2, height: 0.9, tessellation: 5,
+      }, this.scene);
+      log.rotation.z = Math.PI / 2;
+      log.rotation.y = i * (6.28 / 5);
+      log.position.y = 0.12;
+      logs.push(log);
+    }
+    const logPile = BABYLON.Mesh.MergeMeshes(logs, true, true, undefined, false, false);
+    logPile.name = `cf_logs_${row.campfireId}`;
+    logPile.material = mats.wood;
+    logPile.parent = root;
+    logPile.isPickable = false;
+    this._castShadow(logPile);
+
+    // stone ring
+    const stones = [];
+    for (let i = 0; i < 6; i++) {
+      const st = BABYLON.MeshBuilder.CreateIcoSphere(`cf_st${i}`, { radius: 0.18, subdivisions: 1 }, this.scene);
+      st.convertToFlatShadedMesh();
+      const a = i * 1.05;
+      st.position.set(Math.cos(a) * 0.6, 0.1, Math.sin(a) * 0.6);
+      stones.push(st);
+    }
+    const stoneRing = BABYLON.Mesh.MergeMeshes(stones, true, true, undefined, false, false);
+    stoneRing.name = `cf_stones_${row.campfireId}`;
+    stoneRing.material = mats.stone;
+    stoneRing.parent = root;
+    stoneRing.isPickable = false;
+
+    // glowing coal bed
+    const coals = BABYLON.MeshBuilder.CreateSphere(`cf_coals_${row.campfireId}`, { diameter: 0.5, segments: 4 }, this.scene);
+    coals.scaling.y = 0.35;
+    coals.position.y = 0.14;
+    coals.material = mats.coal;
+    coals.parent = root;
+    coals.isPickable = false;
+
+    // rising embers
+    const ps = new BABYLON.ParticleSystem(`cf_ps_${row.campfireId}`, 30, this.scene);
+    ps.particleTexture = mats.tex;
+    ps.emitter = new BABYLON.Vector3(wx, gy + 0.3, wz);
+    ps.minEmitBox = new BABYLON.Vector3(-0.2, 0, -0.2);
+    ps.maxEmitBox = new BABYLON.Vector3(0.2, 0.15, 0.2);
+    ps.color1 = BABYLON.Color4.FromHexString('#ff9a30ff');
+    ps.color2 = BABYLON.Color4.FromHexString('#ff5a18ff');
+    ps.colorDead = new BABYLON.Color4(0.2, 0.05, 0, 0);
+    ps.minSize = 0.1; ps.maxSize = 0.28;
+    ps.minLifeTime = 0.4; ps.maxLifeTime = 0.8;
+    ps.emitRate = 16;
+    ps.direction1 = new BABYLON.Vector3(-0.4, 1.5, -0.4);
+    ps.direction2 = new BABYLON.Vector3(0.4, 2.8, 0.4);
+    ps.gravity = new BABYLON.Vector3(0, -1.5, 0);
+    ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+    ps.start();
+
+    // flickering warm light
+    const light = new BABYLON.PointLight(`cf_light_${row.campfireId}`, new BABYLON.Vector3(wx, gy + 1.2, wz), this.scene);
+    light.diffuse = BABYLON.Color3.FromHexString('#ff8030');
+    light.range = 18;
+    light.intensity = 1.0;
+
+    this._campfires.set(row.campfireId, { root, light, ps, ph: Math.random() * 6.28 });
+
+    if (!this._campfireObserver) {
+      this._campfireObserver = this.scene.onBeforeRenderObservable.add(() => {
+        const t = performance.now() / 1000;
+        this._campfires.forEach((f) => {
+          f.light.intensity = 1.0 + Math.sin(t * 12 + f.ph) * 0.18 + Math.random() * 0.12;
+        });
+      });
+    }
+  }
+
   // ── Dispose ────────────────────────────────────────────────────────────────
 
   dispose() {
@@ -1723,6 +1878,7 @@ export class BabylonWorldScene {
     this._touchCleanup?.();
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     [...this._mobs.keys()].forEach(id => this._removeMob(id));
+    [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
     this._local?.dispose();
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();
