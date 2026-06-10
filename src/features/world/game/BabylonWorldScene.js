@@ -245,14 +245,27 @@ class LightingManager {
     this.envDungeon = null;
     this.skybox     = null;
 
-    this._loadEnvSafe(this.options.env.overworldDay).then(t => {
-      if (!t || this._disposed) return;
-      this.envDay = t;
-      if (this.profile === 'overworld' && !this._transition) {
-        this._setEnvironment(t, this.scene.environmentIntensity || 0.9);
-        if (!this.skybox) this.skybox = this.scene.createDefaultSkybox(t, true, 1500, 0.35);
-      }
-    });
+    // Prefer the configured day env; if it's absent, try the .hdr sibling so a
+    // user can drop in *either* overworld_day.env or overworld_day.hdr. When
+    // both are missing the AshwoodSky gradient dome stays the only sky.
+    const dayUrl = this.options.env.overworldDay;
+    this._loadEnvSafe(dayUrl)
+      .then(t => t ?? this._loadEnvSafe(dayUrl.replace(/\.env(\?|$)/i, '.hdr')))
+      .then(t => {
+        if (!t || this._disposed) return;
+        this.envDay = t;
+        if (this.profile === 'overworld' && !this._transition) {
+          this._setEnvironment(t, this.scene.environmentIntensity || 0.9);
+          if (!this.skybox) {
+            this.skybox = this.scene.createDefaultSkybox(t, true, 1500, 0.35);
+            // Keep the HDRI blue crisp — fog would wash the daytime sky grey.
+            if (this.skybox) {
+              this.skybox.applyFog = false;
+              if (this.skybox.material) this.skybox.material.fogEnabled = false;
+            }
+          }
+        }
+      });
     this._loadEnvSafe(this.options.env.overworldNight).then(t => {
       if (t && !this._disposed) this.envNight = t;
     });
@@ -378,10 +391,17 @@ class LightingManager {
   }
 
   _loadEnvSafe(url) {
+    if (!url) return Promise.resolve(null);
     return fetch(url, { method: 'HEAD' })
       .then(r => {
         const ct = r.headers.get('content-type') ?? '';
         if (!r.ok || ct.includes('text/html')) return null;
+        // Equirectangular .hdr panoramas load as an HDRCubeTexture; prefiltered
+        // .env DDS load as a CubeTexture. Both are cube textures downstream, so
+        // _setEnvironment / createDefaultSkybox treat them identically.
+        if (/\.hdr(\?|$)/i.test(url)) {
+          return new BABYLON.HDRCubeTexture(url, this.scene, 256, false, true, false, true);
+        }
         return BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
       })
       .catch(() => null);
@@ -447,7 +467,9 @@ class LightingManager {
     this.fillOverworld.intensity = lerp(0.22, 0.28, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.88, dayFactor);
+    // Day exposure pulled down slightly (was 0.88) so the HDRI skybox blue
+    // doesn't blow out behind the cross-faded gradient dome.
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.82, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);

@@ -35,7 +35,7 @@ precision highp float;
 varying vec3 vP;
 uniform vec3 topCol; uniform vec3 midCol; uniform vec3 botCol;
 uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 moonDir;
-uniform float night; uniform float dusk;
+uniform float night; uniform float dusk; uniform float skyAlpha;
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() {
   vec3 d = normalize(vP);
@@ -62,7 +62,10 @@ void main() {
     float tw = 0.6 + 0.4 * sin(s * 100.0);
     c += vec3(step(0.9955, s)) * night * tw * h;
   }
-  gl_FragColor = vec4(c, 1.0);
+  // skyAlpha cross-fades the dome over the HDRI skybox behind it: ~0 by day
+  // (HDRI shows through), rising through dusk, opaque at night (moon/stars/
+  // gradient own the sky). When no skybox exists it is forced to 1.
+  gl_FragColor = vec4(c, skyAlpha);
 }
 `;
 
@@ -102,11 +105,16 @@ export class AshwoodSky {
     this.material = new BABYLON.ShaderMaterial('ashwoodSkyMat', scene, 'ashwoodSky', {
       attributes: ['position'],
       uniforms: ['worldViewProjection', 'topCol', 'midCol', 'botCol',
-                 'sunDir', 'sunCol', 'moonDir', 'night', 'dusk'],
+                 'sunDir', 'sunCol', 'moonDir', 'night', 'dusk', 'skyAlpha'],
     });
     this.material.backFaceCulling = false;
     this.material.disableDepthWrite = true;
     this.material.fogEnabled = false;
+    // Alpha-blend the dome over the HDRI skybox (driven by the skyAlpha uniform
+    // each frame). Always on: at full night skyAlpha=1 → opaque-equivalent, and
+    // without a skybox the fallback forces skyAlpha=1 so the dome stays solid.
+    this.material.alphaMode = BABYLON.Constants.ALPHA_COMBINE;
+    this.material.needAlphaBlending = () => true;
 
     this.dome = BABYLON.MeshBuilder.CreateSphere('ashwoodSkyDome', {
       diameter: 1200,
@@ -163,6 +171,10 @@ export class AshwoodSky {
       1.0 * sunOn, (0.92 - 0.42 * dusk) * sunOn, (0.82 - 0.55 * dusk) * sunOn));
     m.setFloat('night', night);
     m.setFloat('dusk', dusk);
+    // Cross-fade: invisible by day (HDRI skybox shows), opaque at night. If no
+    // skybox loaded (env assets missing) the dome is the only sky → stay solid.
+    const hasSkybox = !!this.lm.skybox;
+    m.setFloat('skyAlpha', hasSkybox ? Math.max(0, Math.min(1, night + dusk)) : 1);
 
     // Fog: horizon color blended toward the biome fog at the player.
     const p = this.getPlayerPos?.();
