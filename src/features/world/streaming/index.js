@@ -12,3 +12,4 @@ export { TileLoader } from './tileLoader.js';
 export { GlbTileProvider, TileFetchError } from './glbTileProvider.js';
 export { ProceduralTileProvider } from './proceduralTileProvider.js';
 export { FallbackTileProvider } from './fallbackTileProvider.js';
+export { AshwoodTileProvider } from './ashwoodTileProvider.js';

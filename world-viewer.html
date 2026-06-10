@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ashwood World Viewer (dev)</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #world-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    #hud {
+      position: fixed; top: 10px; left: 10px; z-index: 5;
+      font: 12px/1.5 monospace; color: #cfd8c8;
+      background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 6px;
+      pointer-events: none; white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="world-canvas"></canvas>
+  <div id="hud">loading…</div>
+  <script type="module" src="/src/features/world/devWorldViewer.js"></script>
+</body>
+</html>
