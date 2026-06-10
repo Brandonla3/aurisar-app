@@ -125,7 +125,9 @@ export class AshwoodGrass {
     this.time += this.scene.getEngine().getDeltaTime() / 1000;
     const m = this.material;
     m.setFloat('uTime', this.time);
-    m.setFloat('uWind', 1);
+    // storm-swept blades: the weather system publishes wind strength
+    const wind = this.scene.metadata?.ashwood?.weather?.windStrength ?? 1;
+    m.setFloat('uWind', Math.max(0.2, Math.min(3, wind)));
     const lm = this.scene.metadata?.ashwood?.lm;
     m.setFloat('uLight', 0.35 + 0.65 * (lm?.dayFactor ?? 1));
     m.setColor3('vFogColor', this.scene.fogColor);

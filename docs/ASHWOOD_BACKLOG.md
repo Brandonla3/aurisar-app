@@ -25,8 +25,10 @@ Ground rules for every item:
   as dark walls under the tone-mapped pipeline (the disabled starting point
   is `AshwoodAtmosphere._buildClouds`). Reference: `buildClouds` /
   `updateClouds` (~line 1012).
-- [ ] **Weather** — rain and lightning (`buildRain` / `updateWeather`),
-  shooting stars at night (`updateShootingStar`).
+- [x] **Weather** — rain and lightning (`buildRain` / `updateWeather`),
+  shooting stars at night (`updateShootingStar`). *(AshwoodWeather.js; the
+  grass shader reads the published windStrength. Thunder SFX still skipped —
+  no overworld audio system yet.)*
 - [ ] **Forest leaf wind sway** — `updateTrees` in the reference; likely a
   vertex-shader variant of the grass sway applied to canopy templates.
 - [ ] **Procedural bark/leaf textures** on props; **mountain rock/snow

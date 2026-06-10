@@ -21,6 +21,7 @@ import { AshwoodSky }        from './AshwoodSky.js';
 import { AshwoodGrass }      from './AshwoodGrass.js';
 import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { AshwoodWildlife }   from './AshwoodWildlife.js';
+import { AshwoodWeather }    from './AshwoodWeather.js';
 import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
@@ -787,6 +788,7 @@ export class BabylonWorldScene {
     this._grass = new AshwoodGrass(this.scene, this._worldgen, playerPos);
     this._atmosphere = new AshwoodAtmosphere(this.scene, this._worldgen, playerPos);
     this._wildlife = new AshwoodWildlife(this.scene, this._worldgen, playerPos);
+    this._weather = new AshwoodWeather(this.scene, this._lm, playerPos);
 
     this._bindKeys();
 
@@ -1728,6 +1730,7 @@ export class BabylonWorldScene {
     this._grass?.dispose();
     this._atmosphere?.dispose();
     this._wildlife?.dispose();
+    this._weather?.dispose();
     this._sky?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
