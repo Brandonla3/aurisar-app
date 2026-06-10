@@ -17,7 +17,9 @@
 import { AssetLibrary }    from './AssetLibrary.js';
 import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
-import { AshwoodSky }      from './AshwoodSky.js';
+import { AshwoodSky }        from './AshwoodSky.js';
+import { AshwoodGrass }      from './AshwoodGrass.js';
+import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
@@ -765,7 +767,11 @@ export class BabylonWorldScene {
       () => this._local?.root?.position ?? null);
     this.scene.metadata = {
       ...(this.scene.metadata || {}),
-      ashwood: { lm: this._lm, worldgen: this._worldgen },
+      ashwood: {
+        lm: this._lm,
+        worldgen: this._worldgen,
+        castShadow: (mesh) => this._castShadow(mesh),
+      },
     };
 
     this._setupShadows();
@@ -773,6 +779,13 @@ export class BabylonWorldScene {
 
     this._setupTileStreaming();
     this._buildDungeonEntrance();
+
+    // Player-following vegetation + ambient life (one draw call grass,
+    // billboard clouds/motes/fireflies).
+    const playerPos = () => this._local?.root?.position ?? null;
+    this._grass = new AshwoodGrass(this.scene, this._worldgen, playerPos);
+    this._atmosphere = new AshwoodAtmosphere(this.scene, this._worldgen, playerPos);
+
     this._bindKeys();
 
     // Render loop guards on _local until CharacterAvatar is ready
@@ -1710,6 +1723,8 @@ export class BabylonWorldScene {
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();
     this._tileLoader?.dispose();
+    this._grass?.dispose();
+    this._atmosphere?.dispose();
     this._sky?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();

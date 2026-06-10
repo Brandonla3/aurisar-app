@@ -10,7 +10,8 @@
  *   1. biome seeds  (exact mirror of the prototype's buildBiomeSeeds, so the
  *      canon seed reproduces the reference world's macro biome layout)
  *   2. site manifest (fixed order documented in sites.js)
- * Never insert draws before or between these stages.
+ *   3. Wildwood forest sites (forest.js)
+ * Stages are append-only: never insert draws before or between them.
  */
 
 import { mulberry32, hash2, sstep, smoother } from './rng.js';
@@ -19,6 +20,7 @@ import { createHeightfield } from './heightfield.js';
 import { createBiomes } from './biomes.js';
 import { createTrails } from './trails.js';
 import { generateSites, sitesInBounds } from './sites.js';
+import { buildForestLayout, generateForestSites } from './forest.js';
 
 export { mulberry32, hash2, sstep, smoother, sitesInBounds };
 
@@ -38,6 +40,8 @@ export function createWorldgen(config) {
     ...biomes,
   };
 
+  wg.forest = buildForestLayout(config);
   wg.sites = generateSites(config, rng, wg);
+  Object.assign(wg.sites, generateForestSites(config, rng, wg, wg.forest));
   return wg;
 }

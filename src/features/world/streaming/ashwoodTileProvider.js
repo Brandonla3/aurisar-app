@@ -17,6 +17,7 @@
 /* global BABYLON */
 
 import { streamingParams, tileBounds } from './tileMath.js';
+import { buildPropTemplates, buildTileProps } from './ashwoodPropMeshes.js';
 
 // 96 → ~2.7m vertex spacing on a 256m tile (97² = 9.4k verts). The mountain
 // switchbacks (12-24u wide) and the lake rim read correctly at this density.
@@ -80,13 +81,29 @@ export class AshwoodTileProvider {
     return this._shared;
   }
 
+  _ensureTemplates(scene) {
+    if (this._templates && this._templatesScene === scene) return this._templates;
+    this._templates = buildPropTemplates(scene);
+    this._templatesScene = scene;
+    return this._templates;
+  }
+
   load(meta, scene) {
     const shared = this._ensureShared(scene);
+    const templates = this._ensureTemplates(scene);
     const container = new BABYLON.AssetContainer(scene);
     const bounds = tileBounds(meta.id, this.params);
 
     this._buildGround(meta, bounds, scene, shared, container);
     this._buildWater(meta, bounds, scene, shared, container);
+
+    const inBounds = (x, z) =>
+      x >= bounds.min.x && x < bounds.max.x && z >= bounds.min.z && z < bounds.max.z;
+    const castShadow = this.bake ? null : scene.metadata?.ashwood?.castShadow ?? null;
+    buildTileProps(
+      { ...meta, min: bounds.min, max: bounds.max },
+      scene, this.wg, templates, container, inBounds, castShadow,
+    );
 
     // MeshBuilder already added everything to the scene at creation; the
     // loader calls addAllToScene() next. Detach first so each mesh ends up
