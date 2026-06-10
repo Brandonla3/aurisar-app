@@ -144,6 +144,10 @@ def load_and_merge():
         if ex["id"] in db:
             d = map_db_row(db[ex["id"]])
             row["archived"] = d["archived"]
+            # secondaryPB and the logging defaults live only in the catalog
+            # database; loadExercises() does not patch them onto bundled
+            # exercises. They are included for audit completeness and the
+            # Data Dictionary notes that the app drops them at runtime.
             row["secondaryPB"] = d["secondaryPB"]
             for f in COMPARE_BUNDLE_WINS:
                 bv, dv = ex.get(f), d.get(f)
@@ -795,6 +799,7 @@ def main():
     ws5.append(["Column", "Meaning"])
     style_header(ws5, 2)
     dd = [
+        ("NOTE — catalog vs runtime", "This audit documents the full Aurisar catalog (both layers). A few catalog fields are not carried onto the in-app exercise object by the current loader: Default Sets/Reps/Duration and Secondary PB for every exercise, and XP Input Formula, Superset/Interval Eligible, Resistance Level, Primary PB Metric, and Mark As PB for database-only exercises. Those cells show the catalog data even though the app drops them at runtime."),
         ("Dup Group", "Exercises sharing a Dup Group ID are high-confidence duplicates of each other (same name after normalization, a parenthetical alias like 'Bodyweight Squat (air squat)' vs 'Air Squat', or an obvious spelling/format variant). Grouped rows are sorted adjacent and color-banded; all rows are kept."),
         ("Suggested Canonical", "Within a duplicate group, the member suggested to keep (prefers non-archived entries, presence in both catalog layers, and the most complete metadata)."),
         ("ID", "Unique exercise identifier (slug) used throughout the app."),
@@ -819,7 +824,7 @@ def main():
         ("Calisthenics / Olympic / Plyometric", "Movement style flags."),
         ("Tracks Weight / Distance / Incline-Speed / Resistance Level", "Which inputs the logging UI offers for this exercise."),
         ("Superset / Interval Eligible", "Whether the exercise can be used in supersets / interval blocks."),
-        ("Default Sets / Reps / Duration", "Pre-filled logging defaults, where defined."),
+        ("Default Sets / Reps / Duration", "Pre-filled logging defaults, where defined (catalog database field; the current app loader does not copy these onto runtime exercise objects)."),
         ("Archived", "The catalog database marks this exercise as archived/retired — but the app currently loads archived entries anyway, so these are still live in the app (flagged on the Inconsistencies tab)."),
         ("In App Bundle / In Database", "Which catalog layer(s) the exercise lives in. The app ships a bundled list and patches/extends it from the exercise database at startup; both layers together form the single Aurisar catalog audited here."),
         ("Issues", "All inconsistency findings touching this exercise (details on the Inconsistencies tab)."),
