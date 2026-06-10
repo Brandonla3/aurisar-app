@@ -62,14 +62,17 @@ export class AshwoodTileProvider {
       ground.bumpTexture = grassNm;
     }
 
-    let water;
+    let water, lakeWater;
     if (this.bake) {
       water = new BABYLON.StandardMaterial('ashwood_water', scene);
       water.diffuseColor = BABYLON.Color3.FromHexString('#29646a');
       water.alpha = 0.84;
       water.backFaceCulling = false;
+      lakeWater = water;
     } else {
-      water = buildWaterMaterial(scene);
+      water = buildWaterMaterial(scene, {});
+      // Lake gets its own material with a planar reflection at its surface level.
+      lakeWater = buildWaterMaterial(scene, { reflect: true, level: this.wg.config.lake.level });
     }
 
     const bed = new BABYLON.StandardMaterial('ashwood_pondbed', scene);
@@ -77,7 +80,7 @@ export class AshwoodTileProvider {
     bed.specularColor = new BABYLON.Color3(0, 0, 0);
     bed.backFaceCulling = false;
 
-    this._shared = { scene, ground, water, bed };
+    this._shared = { scene, ground, water, lakeWater, bed };
     return this._shared;
   }
 
@@ -185,8 +188,11 @@ export class AshwoodTileProvider {
     container.meshes.push(ground);
   }
 
-  // ── placeholder water: Mirrormere + pond discs (owned by the tile that
-  //    contains their center, so streaming adds each exactly once) ───────────
+  // ── water: Mirrormere + ponds (owned by the tile that contains their center,
+  //    so streaming adds each exactly once). Surfaces are dense radial grids so
+  //    the Gerstner vertex waves move the whole interior (a fan disc only has
+  //    rim + center verts). The lake gets a planar reflection; ponds keep the
+  //    upgraded waves + fresnel sky but no per-pond mirror. ──────────────────
   _buildWater(meta, bounds, scene, shared, container) {
     const wg = this.wg;
     const L = wg.config.lake;
@@ -195,7 +201,9 @@ export class AshwoodTileProvider {
       x >= bounds.min.x && x < bounds.max.x && z >= bounds.min.z && z < bounds.max.z;
 
     if (owns(L.x, L.z)) {
-      const surf = this._disc(`tile_${meta.id}_lake`, L.waterR, scene, shared.water);
+      // Dense surface (~3.8k verts) so waves ripple across the whole lake.
+      const surf = this._radialDisc(`tile_${meta.id}_lake`, L.waterR, scene,
+        shared.lakeWater ?? shared.water, 40, 96);
       surf.position.set(L.x, L.level, L.z);
       container.meshes.push(surf);
     }
@@ -203,27 +211,73 @@ export class AshwoodTileProvider {
     for (let i = 0; i < wg.sites.ponds.length; i++) {
       const p = wg.sites.ponds[i];
       if (!owns(p.x, p.z)) continue;
-      const lvl = wg.groundHeight(p.x, p.z) - 0.12;
+      const gh = wg.groundHeight(p.x, p.z);
+      const lvl = gh - 0.12;
 
-      const bedMesh = this._disc(`tile_${meta.id}_pondbed${i}`, p.r * 0.99, scene, shared.bed);
-      bedMesh.position.set(p.x, lvl - 0.18, p.z);
+      // Carved bowl bed: rim at ground height, smootherstep down to the centre,
+      // so the pond reads as a real basin under the translucent surface
+      // (lake beds are already carved into the terrain heightfield).
+      const bedMesh = this._bowl(`tile_${meta.id}_pondbed${i}`, p.r * 0.99, 0.7, scene, shared.bed);
+      bedMesh.position.set(p.x, gh, p.z);
       container.meshes.push(bedMesh);
 
-      const surf = this._disc(`tile_${meta.id}_pond${i}`, p.r, scene, shared.water);
+      const surf = this._radialDisc(`tile_${meta.id}_pond${i}`, p.r, scene, shared.water, 12, 48);
       surf.position.set(p.x, lvl, p.z);
       container.meshes.push(surf);
     }
   }
 
-  _disc(name, radius, scene, material) {
-    const d = BABYLON.MeshBuilder.CreateDisc(name, {
-      radius,
-      tessellation: 48,
-      sideOrientation: BABYLON.Mesh.DOUBLESIDE,
-    }, scene);
-    d.rotation.x = Math.PI / 2; // XY plane → XZ (horizontal)
-    d.material = material;
-    return d;
+  // Horizontal radial-grid disc with interior vertices (center + concentric
+  // rings). Material is double-sided (no back-face culling) so winding is moot.
+  _radialDisc(name, radius, scene, material, rings = 24, segs = 64) {
+    const positions = [0, 0, 0];
+    const indices = [];
+    for (let r = 1; r <= rings; r++) {
+      const rr = (r / rings) * radius;
+      for (let s = 0; s < segs; s++) {
+        const a = (s / segs) * Math.PI * 2;
+        positions.push(Math.cos(a) * rr, 0, Math.sin(a) * rr);
+      }
+    }
+    for (let s = 0; s < segs; s++) {       // inner cap (center → ring 1)
+      indices.push(0, 1 + s, 1 + ((s + 1) % segs));
+    }
+    for (let r = 1; r < rings; r++) {      // ring quads
+      const cur = 1 + (r - 1) * segs, nxt = 1 + r * segs;
+      for (let s = 0; s < segs; s++) {
+        const s1 = (s + 1) % segs;
+        indices.push(cur + s, nxt + s, cur + s1, cur + s1, nxt + s, nxt + s1);
+      }
+    }
+    const mesh = new BABYLON.Mesh(name, scene);
+    const vd = new BABYLON.VertexData();
+    vd.positions = positions;
+    vd.indices = indices;
+    const normals = [];
+    BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    vd.normals = normals;
+    vd.applyToMesh(mesh, false);
+    mesh.material = material;
+    mesh.isPickable = false;
+    return mesh;
+  }
+
+  // Carved basin: a radial disc displaced downward toward the center via a
+  // smootherstep (flat rim, deepest middle).
+  _bowl(name, radius, depth, scene, material, rings = 16, segs = 48) {
+    const mesh = this._radialDisc(name, radius, scene, material, rings, segs);
+    const pos = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    for (let i = 0; i < pos.length; i += 3) {
+      const r = Math.min(1, Math.hypot(pos[i], pos[i + 2]) / radius);
+      const ss = r * r * r * (r * (r * 6 - 15) + 10); // smootherstep, 0→1
+      pos[i + 1] = -depth * (1 - ss);                  // center deepest, rim flat
+    }
+    mesh.setVerticesData(BABYLON.VertexBuffer.PositionKind, pos, false);
+    const normals = [];
+    BABYLON.VertexData.ComputeNormals(pos, mesh.getIndices(), normals);
+    mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, normals, false);
+    mesh.refreshBoundingInfo();
+    return mesh;
   }
 }
 
@@ -236,19 +290,46 @@ const WATER_VERT = `
 precision highp float;
 attribute vec3 position;
 uniform mat4 world;
-uniform mat4 worldViewProjection;
+uniform mat4 viewProjection;
+uniform float t;
 varying vec3 vWp;
+varying vec3 vN;
+varying vec4 vClip;
+// Three directional sine waves (a cheap Gerstner-style sum). Height is
+// accumulated along with its analytic slope so the surface normal is exact —
+// no finite differencing, no extra vertex passes.
 void main() {
   vec4 wp = world * vec4(position, 1.0);
+  vec2 P = wp.xz;
+  float h = 0.0, dhdx = 0.0, dhdz = 0.0;
+  vec2 dirs[3];  float amp[3];  float len[3];  float spd[3];
+  dirs[0] = normalize(vec2( 1.0,  0.35)); amp[0] = 0.18; len[0] = 9.0; spd[0] = 1.1;
+  dirs[1] = normalize(vec2(-0.6,  1.0 )); amp[1] = 0.11; len[1] = 5.5; spd[1] = 1.6;
+  dirs[2] = normalize(vec2( 0.3, -1.0 )); amp[2] = 0.05; len[2] = 3.0; spd[2] = 2.3;
+  for (int i = 0; i < 3; i++) {
+    float k = 6.2831853 / len[i];
+    float ph = dot(dirs[i], P) * k + t * spd[i];
+    h += amp[i] * sin(ph);
+    float c = amp[i] * k * cos(ph);
+    dhdx += c * dirs[i].x; dhdz += c * dirs[i].y;
+  }
+  wp.y += h;
   vWp = wp.xyz;
-  gl_Position = worldViewProjection * vec4(position, 1.0);
+  vN = normalize(vec3(-dhdx, 1.0, -dhdz));
+  vClip = viewProjection * wp;
+  gl_Position = vClip;
 }
 `;
 
 const WATER_FRAG = `
 precision highp float;
 varying vec3 vWp;
+varying vec3 vN;
+varying vec4 vClip;
 uniform sampler2D uN;
+#ifdef REFLECT
+uniform sampler2D uReflection;
+#endif
 uniform float t;
 uniform vec3 sunDir; uniform vec3 sunCol;
 uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyCol;
@@ -258,13 +339,25 @@ uniform vec3 vFogColor; uniform float fogDensity;
 vec2 nm(vec2 uv){ return texture2D(uN, uv).rg * 2.0 - 1.0; }
 void main() {
   vec2 uv = vWp.xz * 0.055;
-  vec2 n1 = nm(uv + vec2(t * 0.020, t * 0.0125));
-  vec2 n2 = nm(uv * 1.73 - vec2(t * 0.016, t * 0.021));
-  vec3 n = normalize(vec3(n1.x + n2.x, 5.2, n1.y + n2.y));
+  vec2 d1 = nm(uv + vec2(t * 0.020, t * 0.0125));
+  vec2 d2 = nm(uv * 1.73 - vec2(t * 0.016, t * 0.021));
+  // Steeper ripple detail (constant was 5.2) layered onto the geometric wave
+  // normal from the vertex stage.
+  vec3 detail = normalize(vec3(d1.x + d2.x, 3.0, d1.y + d2.y));
+  vec3 n = normalize(vN + vec3(detail.x, 0.0, detail.z) * 0.5);
   vec3 V = normalize(cameraPosition - vWp);
   float fres = pow(1.0 - max(dot(V, n), 0.0), 3.0);
   vec3 col = mix(deep, shallow, clamp(0.4 + 0.35 * (n.x + n.z), 0.0, 1.0));
-  col = mix(col, skyCol, fres * 0.7);
+  vec3 skyRefl = skyCol;
+#ifdef REFLECT
+  // Planar reflection: project the fragment to screen space, nudge by the
+  // wave normal for a rippled mirror, fade out at night.
+  vec2 ruv = (vClip.xy / vClip.w) * 0.5 + 0.5;
+  ruv += n.xz * 0.04;
+  vec3 mir = texture2D(uReflection, clamp(ruv, 0.001, 0.999)).rgb;
+  skyRefl = mix(skyCol, mir, 0.85 * (1.0 - night));
+#endif
+  col = mix(col, skyRefl, clamp(fres, 0.0, 1.0) * 0.75);
   vec3 R = reflect(-normalize(sunDir), n);
   col += sunCol * pow(max(dot(R, V), 0.0), 130.0) * (2.0 * (1.0 - night) + 0.35);
   col *= mix(1.0, 0.22, night * 0.9);
@@ -275,16 +368,24 @@ void main() {
 }
 `;
 
-function buildWaterMaterial(scene) {
+// Base water colors (modulated toward night / dusk per frame on the CPU).
+const W_DEEP    = wgHexToRgb('#0b2128');
+const W_SHALLOW = wgHexToRgb('#29646a');
+const W_SKY     = wgHexToRgb('#9db8c8');
+const W_DUSK    = wgHexToRgb('#caa06a');  // golden cast pulled in at sunset
+
+function buildWaterMaterial(scene, opts = {}) {
   BABYLON.Effect.ShadersStore['ashwoodWaterVertexShader'] = WATER_VERT;
   BABYLON.Effect.ShadersStore['ashwoodWaterFragmentShader'] = WATER_FRAG;
 
-  const mat = new BABYLON.ShaderMaterial('ashwood_water', scene, 'ashwoodWater', {
+  const reflect = !!opts.reflect;
+  const mat = new BABYLON.ShaderMaterial(reflect ? 'ashwood_lakewater' : 'ashwood_water', scene, 'ashwoodWater', {
     attributes: ['position'],
-    uniforms: ['world', 'worldViewProjection', 'cameraPosition',
+    uniforms: ['world', 'viewProjection', 'cameraPosition',
                't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
                'night', 'alphaV', 'vFogColor', 'fogDensity'],
-    samplers: ['uN'],
+    samplers: reflect ? ['uN', 'uReflection'] : ['uN'],
+    defines: reflect ? ['#define REFLECT'] : [],
     needAlphaBlending: true,
   });
   mat.backFaceCulling = false;
@@ -293,6 +394,21 @@ function buildWaterMaterial(scene) {
   normals.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
   normals.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
   mat.setTexture('uN', normals);
+
+  if (reflect) {
+    // Planar reflection of the world above the water. renderList = null reflects
+    // the whole scene; MirrorTexture's clip plane drops sub-surface geometry, so
+    // the lake surface never reflects itself and streamed tiles need no syncing.
+    const mirror = new BABYLON.MirrorTexture('ashwoodWaterMirror', { ratio: 0.5 }, scene, true);
+    mirror.mirrorPlane = new BABYLON.Plane(0, -1, 0, opts.level ?? 0);
+    mirror.renderList = null;
+    mirror.level = 1.0;
+    mat.setTexture('uReflection', mirror);
+    if (!scene.customRenderTargets.includes(mirror)) scene.customRenderTargets.push(mirror);
+    scene.metadata = scene.metadata || {};
+    scene.metadata.ashwood = scene.metadata.ashwood || {};
+    scene.metadata.ashwood.waterMirror = mirror;
+  }
 
   mat.setColor3('deep',    BABYLON.Color3.FromHexString('#0b2128'));
   mat.setColor3('shallow', BABYLON.Color3.FromHexString('#29646a'));
@@ -306,6 +422,9 @@ function buildWaterMaterial(scene) {
   mat.setVector3('sunDir', sunDir);
   mat.setColor3('sunCol', sunCol);
 
+  // Scratch colors so the per-frame day/night tint allocates nothing.
+  const cDeep = new BABYLON.Color3(), cShallow = new BABYLON.Color3(), cSky = new BABYLON.Color3();
+
   let t = 0;
   scene.onBeforeRenderObservable.add(() => {
     t += scene.getEngine().getDeltaTime() / 1000;
@@ -313,11 +432,26 @@ function buildWaterMaterial(scene) {
     mat.setColor3('vFogColor', scene.fogColor);
     mat.setFloat('fogDensity', scene.fogDensity);
     const lm = scene.metadata?.ashwood?.lm;
+    let dayF = 1, dusk = 0;
     if (lm?.key) {
       sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
       mat.setVector3('sunDir', sunDir);
-      mat.setFloat('night', Math.max(0, Math.min(1, 1 - (lm.dayFactor ?? 1) * 1.5)));
+      dayF = lm.dayFactor ?? 1;
+      dusk = lm.duskFactor ?? 0;
+      mat.setFloat('night', Math.max(0, Math.min(1, 1 - dayF * 1.5)));
     }
+    // Day/night tint: darken toward night, warm the sky/shallow toward dusk.
+    const k = 0.30 + 0.70 * dayF;
+    cDeep.set(W_DEEP.r * k, W_DEEP.g * k, W_DEEP.b * k);
+    cShallow.set(W_SHALLOW.r * k, W_SHALLOW.g * k, W_SHALLOW.b * k);
+    cSky.set(
+      (W_SKY.r + (W_DUSK.r - W_SKY.r) * dusk * 0.6) * k,
+      (W_SKY.g + (W_DUSK.g - W_SKY.g) * dusk * 0.6) * k,
+      (W_SKY.b + (W_DUSK.b - W_SKY.b) * dusk * 0.6) * k,
+    );
+    mat.setColor3('deep', cDeep);
+    mat.setColor3('shallow', cShallow);
+    mat.setColor3('skyCol', cSky);
   });
 
   return mat;
