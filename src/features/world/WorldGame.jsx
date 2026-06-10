@@ -179,9 +179,18 @@ export default function WorldGame({ playerInfo }) {
     sceneRef.current?._removeMob(row.mobId);
   }, []);
 
-  const { connected, onlineCount, movePlayer, sendChat, castAbility, identity } =
+  const onCampfireUpsert = useCallback((row) => {
+    sceneRef.current?.applyCampfireUpdate(row);
+  }, []);
+
+  const onCampfireDelete = useCallback((row) => {
+    sceneRef.current?._removeCampfire(row.campfireId);
+  }, []);
+
+  const { connected, onlineCount, movePlayer, sendChat, castAbility, buildCampfire, identity } =
     useSpacetimeWorld(playerInfo, {
       onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
+      onCampfireUpsert, onCampfireDelete,
     });
 
   useEffect(() => {
@@ -201,7 +210,7 @@ export default function WorldGame({ playerInfo }) {
     const scene = new BabylonWorldScene(
       canvasRef.current,
       playerInfo,
-      { onMove: movePlayer, onCastAbility: castAbility, onLocalPlayerUpdate }
+      { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire, onLocalPlayerUpdate }
     );
     sceneRef.current = scene;
 
@@ -219,6 +228,9 @@ export default function WorldGame({ playerInfo }) {
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onCastAbility = castAbility;
   }, [castAbility]);
+  useEffect(() => {
+    if (sceneRef.current) sceneRef.current.callbacks.onBuildCampfire = buildCampfire;
+  }, [buildCampfire]);
 
   // Scroll chat to bottom on new messages
   useEffect(() => {
@@ -447,6 +459,8 @@ export default function WorldGame({ playerInfo }) {
       {!IS_TOUCH && (
         <div style={S.hint}>
           WASD / ↑↓←→ move<br />
+          Space — attack<br />
+          F — build campfire<br />
           Mouse drag — orbit camera<br />
           Scroll — zoom<br />
           ESC — exit world

@@ -103,6 +103,7 @@ export class AshwoodTileProvider {
     buildTileProps(
       { ...meta, min: bounds.min, max: bounds.max },
       scene, this.wg, templates, container, inBounds, castShadow,
+      { lights: !this.bake },
     );
 
     // MeshBuilder already added everything to the scene at creation; the

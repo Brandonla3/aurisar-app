@@ -1,10 +1,11 @@
 /**
  * ashwoodPropMeshes — template meshes + per-tile thin-instance builders for
  * all Ashwood props: overworld trees (broadleaf / pine / dead), rocks,
- * bushes, ground details, chests, the Wildwood forest (trunks, leaf blobs,
- * undergrowth, fallen logs) and per-tile understory.
+ * bushes, ground details, chests, ruins, caves, the Wildwood forest (trunks,
+ * leaf blobs, undergrowth, fallen logs) and per-tile understory.
  *
  * Recipes ported from the prototype (spawnTree ~2345, spawnRock ~2404,
+ * spawnRuin ~2441, spawnCave ~2491,
  * buildForest ~1639, buildUnderstory ~1076), simplified where a merged
  * template keeps the silhouette at a fraction of the draw calls. Every
  * scattered element is a thin instance of a shared template — a tile costs
@@ -20,6 +21,53 @@ import { mulberry32, hash2 } from '../worldgen/index.js';
 import { parseTileId } from './tileMath.js';
 
 const rand = (rng, a, b) => a + rng() * (b - a);
+
+// ── leaf wind sway ──────────────────────────────────────────────────────────
+// The prototype rocks each canopy group ±0.012 rad per frame (updateTrees
+// ~3920). Canopies here are thin instances of shared templates, so per-frame
+// CPU rotation would mean rebuilding matrix buffers; instead a material
+// plugin displaces vertices in world space after the instance matrix is
+// applied (CUSTOM_VERTEX_UPDATE_WORLDPOS), giving every instance its own
+// phase from its world position. Time/wind come from the weather system's
+// metadata seam, so storms whip the canopies just like the grass.
+class LeafSwayPlugin extends BABYLON.MaterialPluginBase {
+  constructor(material) {
+    super(material, 'AshwoodLeafSway', 200, { ASH_LEAFSWAY: false });
+    this._enable(true);
+  }
+  getClassName() { return 'AshwoodLeafSwayPlugin'; }
+  prepareDefines(defines) { defines.ASH_LEAFSWAY = true; }
+  getUniforms() {
+    return {
+      ubo: [
+        { name: 'ashSwayTime', size: 1, type: 'float' },
+        { name: 'ashSwayWind', size: 1, type: 'float' },
+      ],
+      vertex: 'uniform float ashSwayTime;\nuniform float ashSwayWind;',
+    };
+  }
+  bindForSubMesh(uniformBuffer) {
+    const w = this._material?.getScene()?.metadata?.ashwood?.weather;
+    uniformBuffer.updateFloat('ashSwayTime', w?.time ?? performance.now() * 0.001);
+    uniformBuffer.updateFloat('ashSwayWind', Math.max(0.2, Math.min(3, w?.windStrength ?? 1)));
+  }
+  getCustomCode(shaderType) {
+    if (shaderType !== 'vertex') return null;
+    return {
+      CUSTOM_VERTEX_UPDATE_WORLDPOS: `
+#ifdef ASH_LEAFSWAY
+{
+  float ashPh = worldPos.x * 0.15 + worldPos.z * 0.17;
+  float ashK = ashSwayWind * clamp(positionUpdated.y + 0.6, 0.0, 2.5);
+  worldPos.x += (sin(ashSwayTime * 0.6 + ashPh) * 0.035
+               + sin(ashSwayTime * 2.3 + ashPh * 1.7) * 0.012) * ashK;
+  worldPos.z += cos(ashSwayTime * 0.5 + ashPh) * 0.03 * ashK;
+}
+#endif
+`,
+    };
+  }
+}
 
 // ── geometry helpers ────────────────────────────────────────────────────────
 
@@ -61,25 +109,25 @@ function mergeKeep(name, meshes) {
 // ── templates (built once per scene, never rendered directly) ───────────────
 
 export function buildPropTemplates(scene) {
-  const mat = (name, hex, flat = true) => {
+  const mat = (name, hex) => {
     const m = new BABYLON.StandardMaterial(name, scene);
     m.diffuseColor = BABYLON.Color3.FromHexString(hex);
     m.specularColor = new BABYLON.Color3(0, 0, 0);
-    if (flat) m.disableLighting = false;
     return m;
   };
 
   const bark   = mat('ash_bark', '#46331f');
-  const leaf   = mat('ash_leaf', '#4a6e29');
+  const leaf   = mat('ash_leaf', '#4a6e29'); // base; per-instance HSL tints multiply in
   const pine   = mat('ash_pine', '#9ab080');
-  leaf.useVertexColors = false;
   const rockM  = mat('ash_rock', '#8a8d88');
   const bushM  = mat('ash_bush', '#35451f');
   const wood   = mat('ash_wood', '#5a3b22');
-  const gold   = mat('ash_gold', '#caa050');
   const green  = mat('ash_green', '#ffffff'); // tinted per instance
   const fTrunkM = mat('ash_ftrunk', '#8a6a48');
   const fLeafM  = mat('ash_fleaf', '#ffffff'); // HSL variance per instance
+
+  // canopy + undergrowth foliage sways in the wind
+  for (const m of [leaf, pine, bushM, fLeafM]) new LeafSwayPlugin(m);
 
   const T = {};
 
@@ -159,7 +207,6 @@ export function buildPropTemplates(scene) {
     T.chest = mergeKeep('tpl_chest', [body, lid]);
     T.chest.material = wood;
   }
-  void gold;
 
   // Wildwood forest: trunk (unit, scaled (w,h,w)), leaf blob sphere, brush cone
   T.fTrunk = BABYLON.MeshBuilder.CreateCylinder('tpl_ftrunk', {
@@ -174,6 +221,75 @@ export function buildPropTemplates(scene) {
   T.fBrush.material = bushM;
   T.log = BABYLON.MeshBuilder.CreateCylinder('tpl_log', { diameterTop: 1.2, diameterBottom: 1.4, height: 1, tessellation: 8 }, scene);
   T.log.material = fTrunkM;
+
+  // ── ruins & caves (prototype spawnRuin ~2441, spawnCave ~2491) ──
+  const stone   = mat('ash_stone', '#8c8b86');
+  const boulderM = mat('ash_boulder', '#ffffff'); // grey shades per instance
+
+  // unit stone box, center origin: walls, caps, arch legs, lintels
+  T.stoneBox = BABYLON.MeshBuilder.CreateBox('tpl_stonebox', { size: 1 }, scene);
+  T.stoneBox.material = stone;
+
+  // ruin column, unit height, center origin (toppled ones lie on their side)
+  T.column = BABYLON.MeshBuilder.CreateCylinder('tpl_column', {
+    diameterTop: 0.8, diameterBottom: 0.92, height: 1, tessellation: 10,
+  }, scene);
+  T.column.material = stone;
+
+  // plain boulder (no moss) — ruin rubble, cave ring, cave roof slab
+  T.boulder = displacedIcoSphere('tpl_boulder', scene, { base: 0.78, amp: 0.34, seed: 23 });
+  T.boulder.material = boulderM;
+
+  // stalagmite cone, unit radius/height, center origin
+  T.stalag = BABYLON.MeshBuilder.CreateCylinder('tpl_stalag', {
+    diameterTop: 0, diameterBottom: 2, height: 1, tessellation: 6,
+  }, scene);
+  T.stalag.convertToFlatShadedMesh();
+  T.stalag.material = mat('ash_stalag', '#5a5a60');
+
+  // eerie cave crystal — emissive teal cone
+  {
+    const crysM = new BABYLON.StandardMaterial('ash_crystal', scene);
+    crysM.diffuseColor  = BABYLON.Color3.FromHexString('#2a6b66');
+    crysM.emissiveColor = BABYLON.Color3.FromHexString('#39c8b0').scale(0.9);
+    crysM.specularColor = new BABYLON.Color3(0, 0, 0);
+    T.crystal = BABYLON.MeshBuilder.CreateCylinder('tpl_crystal', {
+      diameterTop: 0, diameterBottom: 2, height: 1, tessellation: 5,
+    }, scene);
+    T.crystal.convertToFlatShadedMesh();
+    T.crystal.material = crysM;
+  }
+
+  // glowing mushroom — stem + cap merged under one soft-emissive material
+  {
+    const shroomM = new BABYLON.StandardMaterial('ash_shroom', scene);
+    shroomM.diffuseColor  = BABYLON.Color3.FromHexString('#3aa0b8');
+    shroomM.emissiveColor = BABYLON.Color3.FromHexString('#2aa0c0').scale(0.6);
+    shroomM.specularColor = new BABYLON.Color3(0, 0, 0);
+    const stem = BABYLON.MeshBuilder.CreateCylinder('shs', { diameterTop: 0.08, diameterBottom: 0.1, height: 0.3, tessellation: 5 }, scene);
+    stem.position.y = 0.15;
+    const cap = BABYLON.MeshBuilder.CreateSphere('shc', { diameter: 0.28, segments: 4, slice: 0.6 }, scene);
+    cap.position.y = 0.3;
+    T.shroom = mergeKeep('tpl_shroom', [stem, cap]);
+    T.shroom.material = shroomM;
+  }
+
+  // cave void dome — inward-facing near-black hemisphere; the open mouth of
+  // the boulder ring reads as a real opening into darkness. Fog must not
+  // wash it out or the illusion breaks.
+  {
+    const voidM = new BABYLON.StandardMaterial('ash_cavevoid', scene);
+    voidM.diffuseColor  = BABYLON.Color3.FromHexString('#04050a');
+    voidM.emissiveColor = BABYLON.Color3.FromHexString('#04050a');
+    voidM.specularColor = new BABYLON.Color3(0, 0, 0);
+    voidM.disableLighting = true;
+    voidM.fogEnabled = false;
+    T.caveDome = BABYLON.MeshBuilder.CreateSphere('tpl_cavedome', {
+      diameter: 2, segments: 8, slice: 0.52,
+      sideOrientation: BABYLON.Mesh.BACKSIDE,
+    }, scene);
+    T.caveDome.material = voidM;
+  }
 
   for (const key of Object.keys(T)) {
     T[key].setEnabled(false);
@@ -222,14 +338,18 @@ function hslToRgb(h, s, l) {
 /**
  * Build all prop thin-instance meshes for one tile.
  * @param {function} inBounds  (x,z) => bool for this tile
+ * @param {object}   opts      { lights?: boolean } — cave point lights are
+ *   skipped in bake mode (the GLB contract is geometry + vertex colors).
  */
-export function buildTileProps(meta, scene, wg, templates, container, inBounds, castShadow) {
+export function buildTileProps(meta, scene, wg, templates, container, inBounds, castShadow, opts = {}) {
   const surfaceY = wg.surfaceY;
   const s = wg.sites;
   const acc = {
     trunk: new Acc(), blob: new Acc(), pineCanopy: new Acc(), deadCrown: new Acc(),
     rock: new Acc(), bush: new Acc(), tuft: new Acc(), fern: new Acc(),
     flower: new Acc(), chest: new Acc(),
+    stoneBox: new Acc(), column: new Acc(), boulder: new Acc(),
+    stalag: new Acc(), crystal: new Acc(), shroom: new Acc(), caveDome: new Acc(),
     fTrunk: new Acc(), fLeaf: new Acc(), fBrush: new Acc(), log: new Acc(),
   };
 
@@ -301,6 +421,110 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     acc.chest.push(c.x, surfaceY(c.x, c.z), c.z, 0, rng() * 6.28, 0, 1, 1, 1, null);
   }
 
+  // ── ruins: broken wall ring, columns, archway, rubble (spawnRuin) ──
+  // Loot chests / monster guards from the prototype are server-side concerns
+  // (the manifest already places chests); only the dressing renders here.
+  const RUBBLE = { r: 0.49, g: 0.486, b: 0.467 };  // #7d7c77
+  for (const u of s.ruins) {
+    if (!inBounds(u.x, u.z)) continue;
+    if (wg.inMountain(u.x, u.z)) continue;
+    const rng = mulberry32(u.seed);
+    const segs = 9, rr = rand(rng, 5.5, 7.5);
+    for (let i = 0; i < segs; i++) {
+      // draw every roll even for skipped gaps so layout is order-stable
+      const gap = rng() < 0.32;
+      const ang = (i / segs) * Math.PI * 2;
+      const wx = u.x + Math.cos(ang) * rr, wz = u.z + Math.sin(ang) * rr;
+      const wh = rand(rng, 1.0, 3.8), ww = rand(rng, 1.8, 3.0);
+      const wyaw = ang + Math.PI / 2 + rand(rng, -0.15, 0.15);
+      const cap = rng() < 0.5;
+      if (gap) continue;
+      const wy = surfaceY(wx, wz);
+      acc.stoneBox.push(wx, wy + wh / 2, wz, 0, wyaw, 0, ww, wh, 0.6, null);
+      if (cap) acc.stoneBox.push(wx, wy + wh + 0.45, wz, 0, wyaw, 0, ww * 0.5, 0.5, 0.7, null);
+    }
+    const ncol = 3 + ((rng() * 3) | 0);
+    for (let i = 0; i < ncol; i++) {
+      const a = rng() * 6.28, d = rand(rng, 1.5, 4.5);
+      const px = u.x + Math.cos(a) * d, pz = u.z + Math.sin(a) * d;
+      const pgy = surfaceY(px, pz);
+      const ch = rand(rng, 1.5, 4.0), toppled = rng() < 0.4;
+      if (toppled) acc.column.push(px, pgy + 0.42, pz, 0, rng() * 6.28, Math.PI / 2, 1, ch, 1, null);
+      else acc.column.push(px, pgy + ch / 2, pz, 0, 0, 0, 1, ch, 1, null);
+    }
+    // archway: two legs + lintel near the center
+    const aa = rng() * 6.28;
+    const ax = u.x + Math.cos(aa) * 2.2, az = u.z + Math.sin(aa) * 2.2;
+    for (const off of [-1, 1]) {
+      const lx = ax + Math.cos(aa + Math.PI / 2) * off;
+      const lz = az + Math.sin(aa + Math.PI / 2) * off;
+      acc.stoneBox.push(lx, surfaceY(lx, lz) + 1.6, lz, 0, aa + Math.PI / 2, 0, 0.5, 3.2, 0.5, null);
+    }
+    acc.stoneBox.push(ax, surfaceY(ax, az) + 3.4, az, 0, aa + Math.PI / 2, 0, 2.8, 0.6, 0.6, null);
+    for (let i = 0; i < 8; i++) {
+      const a = rng() * 6.28, d = rng() * 6;
+      const rx = u.x + Math.cos(a) * d, rz = u.z + Math.sin(a) * d;
+      const sc = rand(rng, 0.3, 0.7);
+      acc.boulder.push(rx, surfaceY(rx, rz) + 0.2, rz, 0, rng() * 6.28, 0, sc, sc, sc, RUBBLE);
+    }
+  }
+
+  // ── caves: boulder horseshoe, void dome, stalagmites, crystals (spawnCave) ──
+  const CAVE_RING = { r: 0.298, g: 0.298, b: 0.329 };  // #4c4c54
+  const CAVE_ROOF = { r: 0.243, g: 0.243, b: 0.275 };  // #3e3e46
+  for (const cv of s.caves) {
+    if (!inBounds(cv.x, cv.z)) continue;
+    if (wg.inMountain(cv.x, cv.z)) continue;
+    const rng = mulberry32(cv.seed);
+    const gy = surfaceY(cv.x, cv.z);
+    const facing = rng() * 6.28;
+    const ringR = 5.2;
+    for (let i = 0; i < 11; i++) {
+      const ang = (i / 11) * Math.PI * 2;
+      const br = rand(rng, 2.2, 3.4);
+      // keep a ~70° arc open at the entrance
+      const da = Math.abs((((ang - facing + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI);
+      if (da < 0.6) continue;
+      const bx = cv.x + Math.cos(ang) * ringR, bz = cv.z + Math.sin(ang) * ringR;
+      acc.boulder.push(bx, surfaceY(bx, bz) + br * 0.3, bz, 0, rng() * 6.28, 0, br, br * 1.4, br, CAVE_RING);
+    }
+    // back overhang slab
+    const ox = cv.x - Math.cos(facing) * 2.4, oz = cv.z - Math.sin(facing) * 2.4;
+    acc.boulder.push(ox, surfaceY(ox, oz) + 5.0, oz, 0, facing, 0, 4.2 * 1.4, 4.2 * 0.5, 4.2 * 1.4, CAVE_ROOF);
+    // dark void dome under the slab
+    acc.caveDome.push(cv.x, gy + 0.02, cv.z, 0, 0, 0, 3.8, 3.8 * 1.2, 3.8, null);
+    // stalagmites framing the entrance
+    for (let i = 0; i < 4; i++) {
+      const sa = facing + rand(rng, -0.85, 0.85), sd = rand(rng, 3.4, 4.6);
+      const sx = cv.x + Math.cos(sa) * sd, sz = cv.z + Math.sin(sa) * sd;
+      acc.stalag.push(sx, surfaceY(sx, sz) + 0.2, sz,
+        rand(rng, -0.12, 0.12), rng() * 6, rand(rng, -0.12, 0.12),
+        rand(rng, 0.22, 0.4), rand(rng, 1.1, 2.3), rand(rng, 0.22, 0.4), null);
+    }
+    // eerie crystals + glowing mushrooms
+    for (let i = 0; i < 5; i++) {
+      const a = rng() * 6.28, d = rand(rng, 0.5, 3.5);
+      const kx = cv.x + Math.cos(a) * d, kz = cv.z + Math.sin(a) * d;
+      acc.crystal.push(kx, surfaceY(kx, kz) + 0.4, kz,
+        rand(rng, -0.3, 0.3), rng() * 6, rand(rng, -0.3, 0.3),
+        rand(rng, 0.12, 0.26), rand(rng, 0.6, 1.4), rand(rng, 0.12, 0.26), null);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = rng() * 6.28, d = rand(rng, 0.5, 4);
+      const mx = cv.x + Math.cos(a) * d, mz = cv.z + Math.sin(a) * d;
+      acc.shroom.push(mx, surfaceY(mx, mz), mz, 0, rng() * 6.28, 0, 1, 1, 1, null);
+    }
+    if (opts.lights) {
+      const light = new BABYLON.PointLight(
+        `tile_${meta.id}_cavelight_${cv.seed}`,
+        new BABYLON.Vector3(cv.x, gy + 1.6, cv.z), scene);
+      light.diffuse = BABYLON.Color3.FromHexString('#66ccbb');
+      light.intensity = 0.8;
+      light.range = 16;
+      container.lights.push(light);
+    }
+  }
+
   // ── Wildwood forest (prototype buildForest) ──
   for (const t of s.forestTrees) {
     if (!inBounds(t.x, t.z)) continue;
@@ -370,6 +594,13 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   acc.fern.realize(`tile_${meta.id}_ferns`, templates.fern, scene, container, null);
   acc.flower.realize(`tile_${meta.id}_flowers`, templates.flower, scene, container, null);
   acc.chest.realize(`tile_${meta.id}_chests`, templates.chest, scene, container, castShadow);
+  acc.stoneBox.realize(`tile_${meta.id}_ruinstone`, templates.stoneBox, scene, container, castShadow);
+  acc.column.realize(`tile_${meta.id}_ruincols`, templates.column, scene, container, castShadow);
+  acc.boulder.realize(`tile_${meta.id}_boulders`, templates.boulder, scene, container, castShadow);
+  acc.stalag.realize(`tile_${meta.id}_stalags`, templates.stalag, scene, container, castShadow);
+  acc.crystal.realize(`tile_${meta.id}_crystals`, templates.crystal, scene, container, null);
+  acc.shroom.realize(`tile_${meta.id}_shrooms`, templates.shroom, scene, container, null);
+  acc.caveDome.realize(`tile_${meta.id}_cavedomes`, templates.caveDome, scene, container, null);
   acc.fTrunk.realize(`tile_${meta.id}_ftrunks`, templates.fTrunk, scene, container, castShadow);
   acc.fLeaf.realize(`tile_${meta.id}_fleaves`, templates.fLeaf, scene, container, castShadow);
   acc.fBrush.realize(`tile_${meta.id}_fbrush`, templates.fBrush, scene, container, null);

@@ -217,3 +217,14 @@ jobs:
           spacetime sql --server maincloud aurisar-world \
             "SELECT mob_id, mob_type, spawn_net_id, spawn_x, spawn_y, hp FROM mob" \
             || echo "::warning::SELECT failed — module may need investigation, but publish + seed already succeeded"
+
+      - name: Verify campfire table
+        # Proves the campfire schema (PR #215) is live. An empty result
+        # set is success — it means the table exists and is queryable;
+        # an error means the publish didn't carry the new schema.
+        # Anonymous SQL is rejected by maincloud (403), so this check
+        # has to live here, where the job is token-authenticated.
+        run: |
+          spacetime sql --server maincloud aurisar-world \
+            "SELECT campfire_id, owner_name, x, y, expires_at FROM campfire" \
+            || echo "::warning::campfire SELECT failed — the new table may not have published; check the migration plan in the publish step log"

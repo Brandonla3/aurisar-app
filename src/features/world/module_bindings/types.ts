@@ -10,6 +10,24 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const Campfire = __t.object("Campfire", {
+  campfireId: __t.u64(),
+  ownerId: __t.identity(),
+  ownerName: __t.string(),
+  x: __t.f32(),
+  y: __t.f32(),
+  litAt: __t.u64(),
+  expiresAt: __t.u64(),
+});
+export type Campfire = __Infer<typeof Campfire>;
+
+export const CampfireExpireQueueRow = __t.object("CampfireExpireQueueRow", {
+  id: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  campfireId: __t.u64(),
+});
+export type CampfireExpireQueueRow = __Infer<typeof CampfireExpireQueueRow>;
+
 export const ChatMessage = __t.object("ChatMessage", {
   id: __t.u64(),
   senderId: __t.identity(),
