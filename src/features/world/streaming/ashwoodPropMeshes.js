@@ -481,21 +481,28 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
         // Pure leaf cards — no geometric core at all. Density alone fills the
         // canopy: enough overlapping cards that interior gaps read as natural
         // light holes, not missing geometry.
-        const cards = 72 + ((rng() * 24) | 0);
+        const cards = 80 + ((rng() * 28) | 0);
+        const ccy = cy + 1.1;             // canopy (ellipsoid) center height
         for (let i = 0; i < cards; i++) {
-          const w = rand(rng, 2.6, 4.2);
+          const w = rand(rng, 2.3, 3.6);
           // uniform point in a flattened ellipsoid → rounded crown silhouette
-          // (a radius constant across the whole vertical span reads as a
-          // cylinder — the dreaded taquito)
           const ang = rng() * 6.28;
           const u = rng() * 2 - 1;
           const rad = Math.cbrt(rng());
           const sxz = Math.sqrt(1 - u * u) * rad;
+          const ox = Math.cos(ang) * sxz * 2.9, oy = u * rad * 2.2, oz = Math.sin(ang) * sxz * 2.9;
+          // Orient each card's leafy face OUTWARD (normal along the radial dir)
+          // so the camera sees leaves, not the edge-on slab — with jitter.
+          const len = Math.hypot(ox, oy, oz) || 1;
+          const ry = Math.atan2(ox / len, oz / len) + rand(rng, -0.45, 0.45);
+          const rx = -Math.asin(Math.max(-1, Math.min(1, oy / len))) + rand(rng, -0.35, 0.35);
+          const rz = rand(rng, -0.45, 0.45);
+          // Ambient occlusion: outer + upper cards brighter, inner/underside darker.
+          const ao = Math.min(1, 0.35 + 0.45 * rad + 0.25 * (u + 1) * 0.5);
           acc.leafCard.push(
-            t.x + Math.cos(ang) * sxz * 2.9, cy + 1.1 + u * rad * 2.2, t.z + Math.sin(ang) * sxz * 2.9,
-            rand(rng, -0.55, 0.55), rng() * 6.28, rand(rng, -0.55, 0.55),
+            t.x + ox, ccy + oy, t.z + oz, rx, ry, rz,
             w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
-            hslToRgb(0.25 + rng() * 0.06, 0.2, 0.82 + rng() * 0.14), // bright tint; texture carries the color
+            hslToRgb(0.25 + rng() * 0.05, 0.22, 0.40 + 0.46 * ao),
           );
         }
       } else {
@@ -673,21 +680,26 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
       // (Performance is explicitly out of scope this round; thin instances keep
       // this one draw call per tile regardless of card count.)
-      const cards = Math.min(96, (36 + cr * 7.5) | 0);
+      const cards = Math.min(110, (44 + cr * 8.5) | 0);
+      const ccy = cby + ch * 0.2;           // canopy (ellipsoid) center height
       for (let c = 0; c < cards; c++) {
         // uniform point in a flattened ellipsoid → rounded crown, not a column
         const ang = rng() * 6.28;
         const u = rng() * 2 - 1;
         const rad = Math.cbrt(rng());
         const sxz = Math.sqrt(1 - u * u) * rad;
-        const w = cr * rand(rng, 0.55, 0.9);
+        const w = cr * rand(rng, 0.5, 0.8);
+        const ox = Math.cos(ang) * sxz * cr, oy = u * rad * ch * 0.65, oz = Math.sin(ang) * sxz * cr;
+        // Outward-facing leafy side + jitter (see overworld broadleaf above).
+        const len = Math.hypot(ox, oy, oz) || 1;
+        const ry = Math.atan2(ox / len, oz / len) + rand(rng, -0.45, 0.45);
+        const rx = -Math.asin(Math.max(-1, Math.min(1, oy / len))) + rand(rng, -0.35, 0.35);
+        const rz = rand(rng, -0.45, 0.45);
+        const ao = Math.min(1, 0.35 + 0.45 * rad + 0.25 * (u + 1) * 0.5);
         acc.leafCard.push(
-          t.x + Math.cos(ang) * sxz * cr,
-          cby + ch * 0.2 + u * rad * ch * 0.65,
-          t.z + Math.sin(ang) * sxz * cr,
-          rand(rng, -0.55, 0.55), rng() * 6.28, rand(rng, -0.55, 0.55),
+          t.x + ox, ccy + oy, t.z + oz, rx, ry, rz,
           w, w * 0.55, w,
-          hslToRgb(hue, 0.22, 0.74 + rng() * 0.18),
+          hslToRgb(hue, 0.24, 0.36 + 0.46 * ao),
         );
       }
     } else {
