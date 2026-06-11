@@ -169,37 +169,58 @@ export function buildPropTemplates(scene, opts = {}) {
     applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
     applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
 
-    // Broadleaf canopy material: an alpha-cutout leaf card. The card's black
-    // background is keyed to transparency from luminance (the JPG has no alpha
-    // channel), then alpha-TESTED so there's no transparency-sorting cost.
+    // Broadleaf canopy material: an alpha-cutout leaf card. The source JPG has
+    // no alpha channel, so it is preprocessed once into a proper RGBA texture:
+    //  - alpha is a HARD key on "not black" (max channel), so dark/shadowed
+    //    leaves stay fully opaque (luminance keying made them semi-transparent
+    //    and the alpha test punched holes in them);
+    //  - the black background RGB is replaced with mid-leaf green, so mipmaps
+    //    average leaf→green instead of leaf→black. This is what stops whole
+    //    canopies evaporating at distance (mip alpha collapse) and kills the
+    //    dark edge fringe at the same time.
     leafCardMat = new BABYLON.StandardMaterial('ash_leafcard', scene);
     leafCardMat.diffuseColor  = new BABYLON.Color3(1, 1, 1); // per-instance tint multiplies
     leafCardMat.specularColor = new BABYLON.Color3(0, 0, 0);
     leafCardMat.backFaceCulling = false;
+    leafCardMat.twoSidedLighting = true; // back-facing cards take light too — no near-black flip side
     leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTMODE;
-    // Higher cutoff trims the black-background bleed (the dark fringe/halo) at
-    // leaf edges; the lost coverage is bought back with more/bigger cards.
-    leafCardMat.alphaCutOff = 0.32;
+    leafCardMat.alphaCutOff = 0.30;
+    leafCardMat.alpha = 0; // hidden until the processed texture is ready
     new LeafSwayPlugin(leafCardMat);
 
-    const sm = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
-    const card = new BABYLON.Texture(
-      `${TEX_BASE}/leaf_albedo.jpg`, scene, false, true, sm, null,
-      () => {                       // leaf art missing → flat-green solid cards
-        leafCardMat.diffuseTexture = null;
-        leafCardMat.opacityTexture = null;
-        leafCardMat.bumpTexture = null;
-        leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
-        leafCardMat.diffuseColor = BABYLON.Color3.FromHexString('#4a6e29');
-      });
-    card.wrapU = card.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE; // cards don't tile
-    leafCardMat.diffuseTexture = card;
-    // Opacity keyed from the (alpha-less) RGB luminance: black bg → transparent.
-    const op = new BABYLON.Texture(`${TEX_BASE}/leaf_albedo.jpg`, scene, false, true, sm);
-    op.wrapU = op.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
-    op.getAlphaFromRGB = true;
-    leafCardMat.opacityTexture = op;
+    const img = new Image();
+    img.onload = () => {
+      const W = img.width, H = img.height;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const c2 = cv.getContext('2d');
+      c2.drawImage(img, 0, 0);
+      const id = c2.getImageData(0, 0, W, H);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const m = Math.max(d[i], d[i + 1], d[i + 2]) / 255;
+        const a = Math.max(0, Math.min(1, (m - 0.06) / 0.10)); // black → 0, leaf → 1
+        d[i + 3] = (a * 255) | 0;
+        if (a < 0.5) { d[i] = 58; d[i + 1] = 92; d[i + 2] = 38; } // bg → mid-green for clean mips
+      }
+      c2.putImageData(id, 0, 0);
+      const tex = new BABYLON.DynamicTexture('ash_leafcard_tex', { width: W, height: H }, scene, true);
+      tex.hasAlpha = true;
+      tex.getContext().drawImage(cv, 0, 0);
+      tex.update();
+      tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE; // cards don't tile
+      leafCardMat.diffuseTexture = tex;   // alpha test reads the baked alpha
+      leafCardMat.alpha = 1;
+    };
+    img.onerror = () => {               // leaf art missing → flat-green solid cards
+      leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      leafCardMat.diffuseColor = BABYLON.Color3.FromHexString('#4a6e29');
+      leafCardMat.alpha = 1;
+    };
+    img.src = `${TEX_BASE}/leaf_albedo.jpg`;
+
     // Optional leaf surface relief.
+    const sm = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
     const ln = new BABYLON.Texture(
       `${TEX_BASE}/leaf_normal.jpg`, scene, false, true, sm, null,
       () => { if (leafCardMat.bumpTexture === ln) leafCardMat.bumpTexture = null; ln.dispose(); });
@@ -463,10 +484,15 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
         const cards = 72 + ((rng() * 24) | 0);
         for (let i = 0; i < cards; i++) {
           const w = rand(rng, 2.6, 4.2);
+          // uniform point in a flattened ellipsoid → rounded crown silhouette
+          // (a radius constant across the whole vertical span reads as a
+          // cylinder — the dreaded taquito)
           const ang = rng() * 6.28;
-          const rr = Math.sqrt(rng()) * 2.7;             // fills the whole volume
+          const u = rng() * 2 - 1;
+          const rad = Math.cbrt(rng());
+          const sxz = Math.sqrt(1 - u * u) * rad;
           acc.leafCard.push(
-            t.x + Math.cos(ang) * rr, cy + rand(rng, -1.0, 3.2), t.z + Math.sin(ang) * rr,
+            t.x + Math.cos(ang) * sxz * 2.9, cy + 1.1 + u * rad * 2.2, t.z + Math.sin(ang) * sxz * 2.9,
             rand(rng, -0.55, 0.55), rng() * 6.28, rand(rng, -0.55, 0.55),
             w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
             hslToRgb(0.25 + rng() * 0.06, 0.2, 0.82 + rng() * 0.14), // bright tint; texture carries the color
@@ -649,13 +675,16 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       // this one draw call per tile regardless of card count.)
       const cards = Math.min(96, (36 + cr * 7.5) | 0);
       for (let c = 0; c < cards; c++) {
+        // uniform point in a flattened ellipsoid → rounded crown, not a column
         const ang = rng() * 6.28;
-        const rr = cr * Math.sqrt(rng());                  // fills the whole volume
+        const u = rng() * 2 - 1;
+        const rad = Math.cbrt(rng());
+        const sxz = Math.sqrt(1 - u * u) * rad;
         const w = cr * rand(rng, 0.55, 0.9);
         acc.leafCard.push(
-          t.x + Math.cos(ang) * rr,
-          cby + rand(rng, -0.45, 0.85) * ch,
-          t.z + Math.sin(ang) * rr,
+          t.x + Math.cos(ang) * sxz * cr,
+          cby + ch * 0.2 + u * rad * ch * 0.65,
+          t.z + Math.sin(ang) * sxz * cr,
           rand(rng, -0.55, 0.55), rng() * 6.28, rand(rng, -0.55, 0.55),
           w, w * 0.55, w,
           hslToRgb(hue, 0.22, 0.74 + rng() * 0.18),
