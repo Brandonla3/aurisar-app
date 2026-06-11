@@ -177,7 +177,9 @@ export function buildPropTemplates(scene, opts = {}) {
     leafCardMat.specularColor = new BABYLON.Color3(0, 0, 0);
     leafCardMat.backFaceCulling = false;
     leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTMODE;
-    leafCardMat.alphaCutOff = 0.18;
+    // Higher cutoff trims the black-background bleed (the dark fringe/halo) at
+    // leaf edges; the lost coverage is bought back with more/bigger cards.
+    leafCardMat.alphaCutOff = 0.32;
     new LeafSwayPlugin(leafCardMat);
 
     const sm = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
@@ -199,6 +201,7 @@ export function buildPropTemplates(scene, opts = {}) {
       `${TEX_BASE}/leaf_normal.jpg`, scene, false, true, sm, null,
       () => { if (leafCardMat.bumpTexture === ln) leafCardMat.bumpTexture = null; ln.dispose(); });
     ln.wrapU = ln.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    ln.level = 0.5; // soften relief so wrong-facing edge normals don't darken leaves
     leafCardMat.bumpTexture = ln;
   }
 
@@ -451,27 +454,29 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     } else {
       const cy = gy + th * 0.92;
       if (templates.leafCard) {
-        // Alpha-cutout leaf cards filling the canopy volume, over a few small
-        // dark core blobs. The core gives depth and is the graceful fallback:
-        // if the leaf art is missing the cards go invisible and the core stays.
-        const cores = 2 + ((rng() * 2) | 0);
+        // A fuller green core fills gaps between cards (so you don't see sky/
+        // dark through sparse foliage) and is the graceful fallback if the leaf
+        // art is missing. Mid-green, not dark, so it reads as dense foliage.
+        const cores = 3 + ((rng() * 2) | 0);
         for (let i = 0; i < cores; i++) {
-          const br = rand(rng, 1.3, 2.0);
+          const br = rand(rng, 1.9, 3.0);
           acc.blob.push(
-            t.x + rand(rng, -0.8, 0.8), cy + rand(rng, -0.3, 1.0), t.z + rand(rng, -0.8, 0.8),
+            t.x + rand(rng, -1.0, 1.0), cy + rand(rng, -0.3, 1.4), t.z + rand(rng, -1.0, 1.0),
             rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
             br, br * rand(rng, 0.8, 1.05), br,
-            hslToRgb(0.28 + rng() * 0.04, 0.4, 0.16 + rng() * 0.06),
+            hslToRgb(0.28 + rng() * 0.04, 0.42, 0.30 + rng() * 0.08),
           );
         }
-        const cards = 10 + ((rng() * 5) | 0);
+        // Many overlapping cards across a wider, taller volume so the canopy
+        // silhouette reads full rather than thin/sparse.
+        const cards = 18 + ((rng() * 8) | 0);
         for (let i = 0; i < cards; i++) {
-          const w = rand(rng, 2.2, 3.6);
+          const w = rand(rng, 3.0, 4.4);
           acc.leafCard.push(
-            t.x + rand(rng, -1.6, 1.6), cy + rand(rng, -0.6, 2.2), t.z + rand(rng, -1.6, 1.6),
+            t.x + rand(rng, -2.1, 2.1), cy + rand(rng, -0.8, 2.8), t.z + rand(rng, -2.1, 2.1),
             rand(rng, -0.5, 0.5), rng() * 6.28, rand(rng, -0.5, 0.5),
             w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
-            hslToRgb(0.25 + rng() * 0.06, 0.25, 0.62 + rng() * 0.16), // light tint (texture carries the color)
+            hslToRgb(0.25 + rng() * 0.06, 0.2, 0.82 + rng() * 0.14), // bright tint; texture carries the color
           );
         }
       } else {
