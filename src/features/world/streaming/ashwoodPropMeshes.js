@@ -185,9 +185,12 @@ export function buildPropTemplates(scene, opts = {}) {
     const sm = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
     const card = new BABYLON.Texture(
       `${TEX_BASE}/leaf_albedo.jpg`, scene, false, true, sm, null,
-      () => {                       // no leaf art → hide cards; the core blob remains
-        leafCardMat.alpha = 0;
-        leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      () => {                       // leaf art missing → flat-green solid cards
+        leafCardMat.diffuseTexture = null;
+        leafCardMat.opacityTexture = null;
+        leafCardMat.bumpTexture = null;
+        leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+        leafCardMat.diffuseColor = BABYLON.Color3.FromHexString('#4a6e29');
       });
     card.wrapU = card.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE; // cards don't tile
     leafCardMat.diffuseTexture = card;
@@ -454,29 +457,17 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     } else {
       const cy = gy + th * 0.92;
       if (templates.leafCard) {
-        // Cards OWN the silhouette; the cores are small gap-fillers strictly
-        // inside the card shell (a core larger than the card cloud pokes out
-        // as a bare faceted icosphere and reads as the old geometric canopy).
-        const cores = 2;
-        for (let i = 0; i < cores; i++) {
-          const br = rand(rng, 1.2, 1.7);
-          acc.blob.push(
-            t.x + rand(rng, -0.7, 0.7), cy + rand(rng, 0.0, 1.0), t.z + rand(rng, -0.7, 0.7),
-            rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
-            br, br * rand(rng, 0.8, 1.0), br,
-            hslToRgb(0.28 + rng() * 0.04, 0.42, 0.30 + rng() * 0.08),
-          );
-        }
-        // Cards placed as a loose shell — biased outward from the canopy
-        // center so the leafy edges form the outline, dense enough to overlap.
-        const cards = 24 + ((rng() * 8) | 0);
+        // Pure leaf cards — no geometric core at all. Density alone fills the
+        // canopy: enough overlapping cards that interior gaps read as natural
+        // light holes, not missing geometry.
+        const cards = 72 + ((rng() * 24) | 0);
         for (let i = 0; i < cards; i++) {
-          const w = rand(rng, 3.2, 4.6);
+          const w = rand(rng, 2.6, 4.2);
           const ang = rng() * 6.28;
-          const rr = 1.0 + Math.sqrt(rng()) * 1.7;       // outward bias, max ~2.7
+          const rr = Math.sqrt(rng()) * 2.7;             // fills the whole volume
           acc.leafCard.push(
-            t.x + Math.cos(ang) * rr, cy + rand(rng, -0.8, 3.0), t.z + Math.sin(ang) * rr,
-            rand(rng, -0.5, 0.5), rng() * 6.28, rand(rng, -0.5, 0.5),
+            t.x + Math.cos(ang) * rr, cy + rand(rng, -1.0, 3.2), t.z + Math.sin(ang) * rr,
+            rand(rng, -0.55, 0.55), rng() * 6.28, rand(rng, -0.55, 0.55),
             w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
             hslToRgb(0.25 + rng() * 0.06, 0.2, 0.82 + rng() * 0.14), // bright tint; texture carries the color
           );
@@ -653,29 +644,19 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     const cr = t.w * (2.6 + rng() * 1.8) + t.h * 0.12;
     const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
     if (templates.leafCard) {
-      // Same card-over-core treatment as the overworld broadleafs, scaled by
-      // the canopy radius — otherwise the Wildwood stays a wall of smooth
-      // geometric spheres behind the carded overworld trees.
-      for (let c = 0; c < 3; c++) {
-        const ang = rng() * 6.28, spread = cr * (0.1 + rng() * 0.35);
-        const bs = cr * (0.38 + rng() * 0.18);
-        acc.fLeaf.push(
-          t.x + Math.cos(ang) * spread, cby + (c / 3 - 0.2) * ch * 0.7, t.z + Math.sin(ang) * spread,
-          rng() * 0.3, rng() * 6.28, rng() * 0.3,
-          bs, bs * (0.8 + rng() * 0.2), bs,
-          hslToRgb(hue, 0.38 + rng() * 0.12, 0.28 + rng() * 0.08),
-        );
-      }
-      const cards = Math.min(34, 12 + (cr * 2.5) | 0);
+      // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
+      // (Performance is explicitly out of scope this round; thin instances keep
+      // this one draw call per tile regardless of card count.)
+      const cards = Math.min(96, (36 + cr * 7.5) | 0);
       for (let c = 0; c < cards; c++) {
         const ang = rng() * 6.28;
-        const rr = cr * (0.35 + Math.sqrt(rng()) * 0.65);   // outward bias to the rim
-        const w = cr * rand(rng, 0.7, 1.05);
+        const rr = cr * Math.sqrt(rng());                  // fills the whole volume
+        const w = cr * rand(rng, 0.55, 0.9);
         acc.leafCard.push(
           t.x + Math.cos(ang) * rr,
-          cby + rand(rng, -0.35, 0.75) * ch,
+          cby + rand(rng, -0.45, 0.85) * ch,
           t.z + Math.sin(ang) * rr,
-          rand(rng, -0.5, 0.5), rng() * 6.28, rand(rng, -0.5, 0.5),
+          rand(rng, -0.55, 0.55), rng() * 6.28, rand(rng, -0.55, 0.55),
           w, w * 0.55, w,
           hslToRgb(hue, 0.22, 0.74 + rng() * 0.18),
         );
