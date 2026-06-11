@@ -454,26 +454,28 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     } else {
       const cy = gy + th * 0.92;
       if (templates.leafCard) {
-        // A fuller green core fills gaps between cards (so you don't see sky/
-        // dark through sparse foliage) and is the graceful fallback if the leaf
-        // art is missing. Mid-green, not dark, so it reads as dense foliage.
-        const cores = 3 + ((rng() * 2) | 0);
+        // Cards OWN the silhouette; the cores are small gap-fillers strictly
+        // inside the card shell (a core larger than the card cloud pokes out
+        // as a bare faceted icosphere and reads as the old geometric canopy).
+        const cores = 2;
         for (let i = 0; i < cores; i++) {
-          const br = rand(rng, 1.9, 3.0);
+          const br = rand(rng, 1.2, 1.7);
           acc.blob.push(
-            t.x + rand(rng, -1.0, 1.0), cy + rand(rng, -0.3, 1.4), t.z + rand(rng, -1.0, 1.0),
+            t.x + rand(rng, -0.7, 0.7), cy + rand(rng, 0.0, 1.0), t.z + rand(rng, -0.7, 0.7),
             rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
-            br, br * rand(rng, 0.8, 1.05), br,
+            br, br * rand(rng, 0.8, 1.0), br,
             hslToRgb(0.28 + rng() * 0.04, 0.42, 0.30 + rng() * 0.08),
           );
         }
-        // Many overlapping cards across a wider, taller volume so the canopy
-        // silhouette reads full rather than thin/sparse.
-        const cards = 18 + ((rng() * 8) | 0);
+        // Cards placed as a loose shell — biased outward from the canopy
+        // center so the leafy edges form the outline, dense enough to overlap.
+        const cards = 24 + ((rng() * 8) | 0);
         for (let i = 0; i < cards; i++) {
-          const w = rand(rng, 3.0, 4.4);
+          const w = rand(rng, 3.2, 4.6);
+          const ang = rng() * 6.28;
+          const rr = 1.0 + Math.sqrt(rng()) * 1.7;       // outward bias, max ~2.7
           acc.leafCard.push(
-            t.x + rand(rng, -2.1, 2.1), cy + rand(rng, -0.8, 2.8), t.z + rand(rng, -2.1, 2.1),
+            t.x + Math.cos(ang) * rr, cy + rand(rng, -0.8, 3.0), t.z + Math.sin(ang) * rr,
             rand(rng, -0.5, 0.5), rng() * 6.28, rand(rng, -0.5, 0.5),
             w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
             hslToRgb(0.25 + rng() * 0.06, 0.2, 0.82 + rng() * 0.14), // bright tint; texture carries the color
@@ -649,19 +651,49 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     const cby = y + t.h * (0.72 + rng() * 0.08);
     const ch = t.h * (0.5 + rng() * 0.15);
     const cr = t.w * (2.6 + rng() * 1.8) + t.h * 0.12;
-    for (let c = 0; c < 7; c++) {
-      const layer = c / 7, ang = rng() * 6.28;
-      const spread = cr * (0.2 + rng() * 0.9);
-      const k = 0.45 + (1 - layer) * 0.45;
-      const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
-      acc.fLeaf.push(
-        t.x + Math.cos(ang) * spread * k,
-        cby + (layer - 0.25) * ch + (rng() - 0.5) * ch * 0.2,
-        t.z + Math.sin(ang) * spread * k,
-        rng() * 0.3, rng() * 6.28, rng() * 0.3,
-        cr * (0.65 + rng() * 0.55), cr * (0.45 + rng() * 0.45), cr * (0.65 + rng() * 0.55),
-        hslToRgb(hue, 0.34 + rng() * 0.16, 0.24 + rng() * 0.14),
-      );
+    const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
+    if (templates.leafCard) {
+      // Same card-over-core treatment as the overworld broadleafs, scaled by
+      // the canopy radius — otherwise the Wildwood stays a wall of smooth
+      // geometric spheres behind the carded overworld trees.
+      for (let c = 0; c < 3; c++) {
+        const ang = rng() * 6.28, spread = cr * (0.1 + rng() * 0.35);
+        const bs = cr * (0.38 + rng() * 0.18);
+        acc.fLeaf.push(
+          t.x + Math.cos(ang) * spread, cby + (c / 3 - 0.2) * ch * 0.7, t.z + Math.sin(ang) * spread,
+          rng() * 0.3, rng() * 6.28, rng() * 0.3,
+          bs, bs * (0.8 + rng() * 0.2), bs,
+          hslToRgb(hue, 0.38 + rng() * 0.12, 0.28 + rng() * 0.08),
+        );
+      }
+      const cards = Math.min(34, 12 + (cr * 2.5) | 0);
+      for (let c = 0; c < cards; c++) {
+        const ang = rng() * 6.28;
+        const rr = cr * (0.35 + Math.sqrt(rng()) * 0.65);   // outward bias to the rim
+        const w = cr * rand(rng, 0.7, 1.05);
+        acc.leafCard.push(
+          t.x + Math.cos(ang) * rr,
+          cby + rand(rng, -0.35, 0.75) * ch,
+          t.z + Math.sin(ang) * rr,
+          rand(rng, -0.5, 0.5), rng() * 6.28, rand(rng, -0.5, 0.5),
+          w, w * 0.55, w,
+          hslToRgb(hue, 0.22, 0.74 + rng() * 0.18),
+        );
+      }
+    } else {
+      for (let c = 0; c < 7; c++) {
+        const layer = c / 7, ang = rng() * 6.28;
+        const spread = cr * (0.2 + rng() * 0.9);
+        const k = 0.45 + (1 - layer) * 0.45;
+        acc.fLeaf.push(
+          t.x + Math.cos(ang) * spread * k,
+          cby + (layer - 0.25) * ch + (rng() - 0.5) * ch * 0.2,
+          t.z + Math.sin(ang) * spread * k,
+          rng() * 0.3, rng() * 6.28, rng() * 0.3,
+          cr * (0.65 + rng() * 0.55), cr * (0.45 + rng() * 0.45), cr * (0.65 + rng() * 0.55),
+          hslToRgb(hue, 0.34 + rng() * 0.16, 0.24 + rng() * 0.14),
+        );
+      }
     }
   }
   for (const b of s.forestBrush ?? []) {
