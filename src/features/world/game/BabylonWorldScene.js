@@ -32,6 +32,7 @@ import {
   streamingParams,
 } from '../streaming/index.js';
 import { createWorldgen } from '../worldgen/index.js';
+import { locationLabelAt } from '../mapRender.js';
 // Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
 // validation runs in CI via src/features/world/config/validators.js.
 import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
@@ -163,6 +164,9 @@ class LightingManager {
   setCombatMode(enabled) { this.combatMode = !!enabled; }
 
   setTimeOfDay(hours24) { this.timeOfDay = ((hours24 % 24) + 24) % 24; }
+  // Testing aid: when frozen, _updateOverworld stops advancing the clock so a
+  // chosen time of day holds steady.
+  setTimeFrozen(f) { this._timeFrozen = !!f; }
 
   addDungeonTorch(position, opts = {}) {
     if (this._dungeonTorches.length >= this.options.maxDungeonTorches) {
@@ -244,14 +248,27 @@ class LightingManager {
     this.envDungeon = null;
     this.skybox     = null;
 
-    this._loadEnvSafe(this.options.env.overworldDay).then(t => {
-      if (!t || this._disposed) return;
-      this.envDay = t;
-      if (this.profile === 'overworld' && !this._transition) {
-        this._setEnvironment(t, this.scene.environmentIntensity || 0.9);
-        if (!this.skybox) this.skybox = this.scene.createDefaultSkybox(t, true, 1500, 0.35);
-      }
-    });
+    // Prefer the configured day env; if it's absent, try the .hdr sibling so a
+    // user can drop in *either* overworld_day.env or overworld_day.hdr. When
+    // both are missing the AshwoodSky gradient dome stays the only sky.
+    const dayUrl = this.options.env.overworldDay;
+    this._loadEnvSafe(dayUrl)
+      .then(t => t ?? this._loadEnvSafe(dayUrl.replace(/\.env(\?|$)/i, '.hdr')))
+      .then(t => {
+        if (!t || this._disposed) return;
+        this.envDay = t;
+        if (this.profile === 'overworld' && !this._transition) {
+          this._setEnvironment(t, this.scene.environmentIntensity || 0.9);
+          if (!this.skybox) {
+            this.skybox = this.scene.createDefaultSkybox(t, true, 1500, 0.35);
+            // Keep the HDRI blue crisp — fog would wash the daytime sky grey.
+            if (this.skybox) {
+              this.skybox.applyFog = false;
+              if (this.skybox.material) this.skybox.material.fogEnabled = false;
+            }
+          }
+        }
+      });
     this._loadEnvSafe(this.options.env.overworldNight).then(t => {
       if (t && !this._disposed) this.envNight = t;
     });
@@ -377,10 +394,17 @@ class LightingManager {
   }
 
   _loadEnvSafe(url) {
+    if (!url) return Promise.resolve(null);
     return fetch(url, { method: 'HEAD' })
       .then(r => {
         const ct = r.headers.get('content-type') ?? '';
         if (!r.ok || ct.includes('text/html')) return null;
+        // Equirectangular .hdr panoramas load as an HDRCubeTexture; prefiltered
+        // .env DDS load as a CubeTexture. Both are cube textures downstream, so
+        // _setEnvironment / createDefaultSkybox treat them identically.
+        if (/\.hdr(\?|$)/i.test(url)) {
+          return new BABYLON.HDRCubeTexture(url, this.scene, 256, false, true, false, true);
+        }
         return BABYLON.CubeTexture.CreateFromPrefilteredData(url, this.scene);
       })
       .catch(() => null);
@@ -409,7 +433,7 @@ class LightingManager {
   }
 
   _updateOverworld(dt) {
-    this.timeOfDay = (this.timeOfDay + dt * this._hoursPerSec) % 24;
+    if (!this._timeFrozen) this.timeOfDay = (this.timeOfDay + dt * this._hoursPerSec) % 24;
 
     const phase    = this.timeOfDay / 24;
     const sunTheta = phase * Math.PI * 2 - Math.PI / 2;
@@ -446,7 +470,9 @@ class LightingManager {
     this.fillOverworld.intensity = lerp(0.22, 0.28, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.88, dayFactor);
+    // Day exposure pulled down slightly (was 0.88) so the HDRI skybox blue
+    // doesn't blow out behind the cross-faded gradient dome.
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.82, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -659,6 +685,10 @@ const DUNGEON_ENTRANCE      = Object.freeze({ x: 0, z: -37 });
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
+// Chest pickup: walk within this radius of an unopened chest to loot it.
+const CHEST_OPEN_DIST_SQ = 2.5 * 2.5;
+const CHEST_SCAN_MS      = 250; // how often to scan (chest count is small)
+
 // ── Main export ──────────────────────────────────────────────────────────────
 export class BabylonWorldScene {
   /**
@@ -685,6 +715,8 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
+    this._openedChests  = new Set(); // chest indices already looted this session
+    this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
     this._spawning          = new Set(); // identity IDs currently being async-spawned
@@ -1016,6 +1048,32 @@ export class BabylonWorldScene {
     }
   }
 
+  // Client-side chest looting. Mirrors _checkDungeonProximity's squared-distance
+  // pattern but throttled to CHEST_SCAN_MS since chests don't move and the count
+  // is small. Walking onto an unopened chest fires onChestOpen({ id, seed }) once;
+  // React (useInventory) rolls deterministic loot from the seed.
+  _checkChestProximity() {
+    if (!this._local || this._localDead) return;
+    const chests = this._worldgen?.sites?.chests;
+    if (!chests || !chests.length) return;
+
+    const now = performance.now();
+    if (now - this._lastChestScanAt < CHEST_SCAN_MS) return;
+    this._lastChestScanAt = now;
+
+    const { x, z } = this._local.root.position;
+    for (let i = 0; i < chests.length; i++) {
+      if (this._openedChests.has(i)) continue;
+      const c = chests[i];
+      const dx = x - c.x;
+      const dz = z - c.z;
+      if (dx * dx + dz * dz < CHEST_OPEN_DIST_SQ) {
+        this._openedChests.add(i);
+        this.callbacks.onChestOpen?.({ id: i, seed: c.seed });
+      }
+    }
+  }
+
   // ── Tile streaming ─────────────────────────────────────────────────────────
   // World geometry comes from the tile streamer driven by
   // world_build_config.tiling_streaming. Tiles are generated on demand by
@@ -1145,6 +1203,7 @@ export class BabylonWorldScene {
     this._moveLocal(dt);
     this._local.update(dt);
     this._checkDungeonProximity();
+    this._checkChestProximity();
     this._streamTiles();
     this._handleAttackInput();
     this._handleCampfireInput();
@@ -1717,6 +1776,30 @@ export class BabylonWorldScene {
     return out;
   }
 
+  // Read-only handle on the deterministic world model for the React map layer
+  // (minimap + World Map). Cached: same reference each call so React effects
+  // don't re-run. worldgen is built synchronously in the constructor.
+  getMapData() {
+    return (this._mapData ??= {
+      worldgen: this._worldgen,
+      config:   this._worldgen.config,
+      sites:    this._worldgen.sites,
+    });
+  }
+
+  // Chest manifest (world units) for optional map plotting.
+  getChests() {
+    return this._worldgen?.sites?.chests ?? [];
+  }
+
+  // Current named location for the minimap / map header readout. Combines the
+  // live dungeon state with the geographic label resolver in mapRender.
+  getLocation() {
+    const p = this._local?.root?.position;
+    if (!p) return '';
+    return locationLabelAt(this._worldgen, p.x, p.z, { inDungeon: this._inDungeon });
+  }
+
   // ── Campfires ──────────────────────────────────────────────────────────────
   // Shared world state: rows arrive from the `campfire` table (every client
   // sees every burning fire) and disappear when the server's burn timer
@@ -1724,19 +1807,50 @@ export class BabylonWorldScene {
   // stone ring, glowing coals, rising embers, flickering point light.
 
   _handleCampfireInput() {
-    if (this._chatOpen || this._localDead) return;
     if (!this._keys['KeyF']) return;
+    this.requestBuildCampfire();
+  }
+
+  // Public entry shared by the F-key and the on-screen Fire action button.
+  // Returns 'built' on a successful reducer call, 'cooldown' if still within
+  // the 10s build window, or null when blocked (chat open / dead / no avatar).
+  requestBuildCampfire() {
+    if (this._chatOpen || this._localDead) return null;
     const now = performance.now();
     // matches the server-side build cadence so held keys don't spam reducer
     // calls that would just be dropped
-    if (now - this._lastCampfireBuildAt < 10_000) return;
+    if (now - this._lastCampfireBuildAt < 10_000) return 'cooldown';
     const root = this._local?.root;
-    if (!root) return;
+    if (!root) return null;
     this._lastCampfireBuildAt = now;
     const yaw = root.rotation.y; // avatar faces (sin(yaw), cos(yaw))
     const fx = root.position.x + Math.sin(yaw) * 2.2;
     const fz = root.position.z + Math.cos(yaw) * 2.2;
     this.callbacks.onBuildCampfire?.(toStdb(fx), toStdb(fz));
+    return 'built';
+  }
+
+  // ── Day/night testing controls ─────────────────────────────────────────────
+  // Scrub or freeze the time of day (hours, 0–24). Freezing holds the lighting
+  // steady so foliage/water/sky can be evaluated at a chosen time.
+  setTimeOfDay(hours, freeze = true) {
+    if (!this._lm) return;
+    this._lm.setTimeOfDay(hours);
+    this._lm.setTimeFrozen(freeze);
+  }
+  setDayNightFrozen(frozen) { this._lm?.setTimeFrozen(frozen); }
+  getTimeOfDay() { return this._lm?.timeOfDay ?? 12; }
+
+  // Snapshot of burning campfires in world units. A campfire only exists in
+  // this map while it is lit — the server deletes the row when its burn timer
+  // ends — so "near a campfire" is equivalent to "near a lit campfire".
+  getCampfires() {
+    const out = [];
+    this._campfires.forEach((f) => {
+      const p = f.root?.position;
+      if (p) out.push({ x: p.x, z: p.z });
+    });
+    return out;
   }
 
   applyCampfireUpdate(row) {

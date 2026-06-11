@@ -58,10 +58,13 @@ class LeafSwayPlugin extends BABYLON.MaterialPluginBase {
 #ifdef ASH_LEAFSWAY
 {
   float ashPh = worldPos.x * 0.15 + worldPos.z * 0.17;
-  float ashK = ashSwayWind * clamp(positionUpdated.y + 0.6, 0.0, 2.5);
-  worldPos.x += (sin(ashSwayTime * 0.6 + ashPh) * 0.035
-               + sin(ashSwayTime * 2.3 + ashPh * 1.7) * 0.012) * ashK;
-  worldPos.z += cos(ashSwayTime * 0.5 + ashPh) * 0.03 * ashK;
+  // Height-weighted so trunks barely move and tall canopies swing; the cap was
+  // 2.5 (clamping out anything above ~knee height on a 6m tree) and is now 5.0
+  // so the whole crown actually rides the wind.
+  float ashK = ashSwayWind * clamp(positionUpdated.y + 0.6, 0.0, 5.0);
+  worldPos.x += (sin(ashSwayTime * 0.6 + ashPh) * 0.10
+               + sin(ashSwayTime * 2.3 + ashPh * 1.7) * 0.035) * ashK;
+  worldPos.z += cos(ashSwayTime * 0.5 + ashPh) * 0.09 * ashK;
 }
 #endif
 `,
@@ -108,7 +111,31 @@ function mergeKeep(name, meshes) {
 
 // ── templates (built once per scene, never rendered directly) ───────────────
 
-export function buildPropTemplates(scene) {
+// Optional surface texture loader with graceful 404 fallback. The album of
+// tree textures is user-supplied and may be absent; if a file is missing we
+// quietly drop the map and fall back to the flat diffuseColor (and existing
+// vertex tints) rather than throwing or rendering a broken-texture material.
+// Albedo authoring is desaturated so per-instance HSL tints still read.
+function applyOptionalTexture(material, prop, url, scene, { uScale = 1, vScale = 1, level } = {}) {
+  const tex = new BABYLON.Texture(
+    url, scene, false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
+    null,
+    () => {                 // onError → revert to flat-color fallback
+      if (material[prop] === tex) material[prop] = null;
+      tex.dispose();
+    },
+  );
+  tex.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
+  tex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  tex.uScale = uScale;
+  tex.vScale = vScale;
+  if (level != null) tex.level = level;
+  material[prop] = tex;
+}
+
+const TEX_BASE = '/assets/textures';
+
+export function buildPropTemplates(scene, opts = {}) {
   const mat = (name, hex) => {
     const m = new BABYLON.StandardMaterial(name, scene);
     m.diffuseColor = BABYLON.Color3.FromHexString(hex);
@@ -129,6 +156,79 @@ export function buildPropTemplates(scene) {
   // canopy + undergrowth foliage sways in the wind
   for (const m of [leaf, pine, bushM, fLeafM]) new LeafSwayPlugin(m);
 
+  // Bark surface texture (tileable). The leaf art is a cutout *card*, not a
+  // tiling texture, so it is NOT applied to the solid blob/cone canopies — it
+  // drives the alpha-cutout leaf quads built below. Skipped in bake mode (the
+  // GLB contract is plain geometry + vertex colors); each load is fallback-safe.
+  let leafCardMat = null;
+  if (!opts.bake) {
+    // Bark: albedo + normal. Trunks are tall + thin, so the bark repeats
+    // vertically. (Normals are .jpg to match the supplied texture pack.)
+    applyOptionalTexture(bark, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
+    applyOptionalTexture(bark, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
+    applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
+    applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
+
+    // Broadleaf canopy material: an alpha-cutout leaf card. The source JPG has
+    // no alpha channel, so it is preprocessed once into a proper RGBA texture:
+    //  - alpha is a HARD key on "not black" (max channel), so dark/shadowed
+    //    leaves stay fully opaque (luminance keying made them semi-transparent
+    //    and the alpha test punched holes in them);
+    //  - the black background RGB is replaced with mid-leaf green, so mipmaps
+    //    average leaf→green instead of leaf→black. This is what stops whole
+    //    canopies evaporating at distance (mip alpha collapse) and kills the
+    //    dark edge fringe at the same time.
+    leafCardMat = new BABYLON.StandardMaterial('ash_leafcard', scene);
+    leafCardMat.diffuseColor  = new BABYLON.Color3(1, 1, 1); // per-instance tint multiplies
+    leafCardMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    leafCardMat.backFaceCulling = false;
+    leafCardMat.twoSidedLighting = true; // back-facing cards take light too — no near-black flip side
+    leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTMODE;
+    leafCardMat.alphaCutOff = 0.30;
+    leafCardMat.alpha = 0; // hidden until the processed texture is ready
+    new LeafSwayPlugin(leafCardMat);
+
+    const img = new Image();
+    img.onload = () => {
+      const W = img.width, H = img.height;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const c2 = cv.getContext('2d');
+      c2.drawImage(img, 0, 0);
+      const id = c2.getImageData(0, 0, W, H);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const m = Math.max(d[i], d[i + 1], d[i + 2]) / 255;
+        const a = Math.max(0, Math.min(1, (m - 0.06) / 0.10)); // black → 0, leaf → 1
+        d[i + 3] = (a * 255) | 0;
+        if (a < 0.5) { d[i] = 58; d[i + 1] = 92; d[i + 2] = 38; } // bg → mid-green for clean mips
+      }
+      c2.putImageData(id, 0, 0);
+      const tex = new BABYLON.DynamicTexture('ash_leafcard_tex', { width: W, height: H }, scene, true);
+      tex.hasAlpha = true;
+      tex.getContext().drawImage(cv, 0, 0);
+      tex.update();
+      tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE; // cards don't tile
+      leafCardMat.diffuseTexture = tex;   // alpha test reads the baked alpha
+      leafCardMat.alpha = 1;
+    };
+    img.onerror = () => {               // leaf art missing → flat-green solid cards
+      leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      leafCardMat.diffuseColor = BABYLON.Color3.FromHexString('#4a6e29');
+      leafCardMat.alpha = 1;
+    };
+    img.src = `${TEX_BASE}/leaf_albedo.jpg`;
+
+    // Optional leaf surface relief.
+    const sm = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
+    const ln = new BABYLON.Texture(
+      `${TEX_BASE}/leaf_normal.jpg`, scene, false, true, sm, null,
+      () => { if (leafCardMat.bumpTexture === ln) leafCardMat.bumpTexture = null; ln.dispose(); });
+    ln.wrapU = ln.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    ln.level = 0.5; // soften relief so wrong-facing edge normals don't darken leaves
+    leafCardMat.bumpTexture = ln;
+  }
+
   const T = {};
 
   // overworld tree trunk: unit height, scaled (w, h, w) per instance
@@ -138,9 +238,19 @@ export function buildPropTemplates(scene) {
   T.trunk.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.5, 0));
   T.trunk.material = bark;
 
-  // broadleaf canopy blob (instanced 4-6× per tree)
+  // broadleaf canopy blob — still used as a darker inner core under the leaf
+  // cards (and as the full canopy in bake mode / if the leaf art is missing)
   T.blob = displacedIcoSphere('tpl_blob', scene, { base: 0.8, amp: 0.3, seed: 17 });
   T.blob.material = leaf;
+
+  // broadleaf leaf card: a single quad; the ~1.83:1 aspect of the card is set
+  // per-instance via (sx, sy) scale. Only exists when the leaf art loaded.
+  if (leafCardMat) {
+    T.leafCard = BABYLON.MeshBuilder.CreatePlane('tpl_leafcard', {
+      size: 1, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
+    }, scene);
+    T.leafCard.material = leafCardMat;
+  }
 
   // pine canopy: 5 stacked cones merged, unit-ish (≈2.4 wide, ≈6 tall)
   {
@@ -345,7 +455,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   const surfaceY = wg.surfaceY;
   const s = wg.sites;
   const acc = {
-    trunk: new Acc(), blob: new Acc(), pineCanopy: new Acc(), deadCrown: new Acc(),
+    trunk: new Acc(), blob: new Acc(), leafCard: new Acc(), pineCanopy: new Acc(), deadCrown: new Acc(),
     rock: new Acc(), bush: new Acc(), tuft: new Acc(), fern: new Acc(),
     flower: new Acc(), chest: new Acc(),
     stoneBox: new Acc(), column: new Acc(), boulder: new Acc(),
@@ -366,16 +476,47 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     } else if (t.kind === 'dead') {
       acc.deadCrown.push(t.x, gy + th * 0.5, t.z, 0, yaw, 0, 1, th / 7, 1, null);
     } else {
-      const blobs = 4 + ((rng() * 3) | 0);
       const cy = gy + th * 0.92;
-      for (let i = 0; i < blobs; i++) {
-        const br = rand(rng, 1.6, 2.7);
-        acc.blob.push(
-          t.x + rand(rng, -1.3, 1.3), cy + rand(rng, -0.4, 1.9), t.z + rand(rng, -1.3, 1.3),
-          rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
-          br, br * rand(rng, 0.8, 1.1), br,
-          hslToRgb(0.28 + rng() * 0.04, 0.4, 0.22 + rng() * 0.1),
-        );
+      if (templates.leafCard) {
+        // Pure leaf cards — no geometric core at all. Density alone fills the
+        // canopy: enough overlapping cards that interior gaps read as natural
+        // light holes, not missing geometry.
+        const cards = 150 + ((rng() * 60) | 0);   // dense shell (perf out of scope)
+        const ccy = cy + 1.1;             // canopy (ellipsoid) center height
+        for (let i = 0; i < cards; i++) {
+          const w = rand(rng, 2.5, 3.9);
+          // point in a flattened ellipsoid, biased toward the OUTER shell so the
+          // surface packs tight and few sky gaps show through
+          const ang = rng() * 6.28;
+          const u = rng() * 2 - 1;
+          const rad = 0.45 + 0.55 * Math.cbrt(rng());
+          const sxz = Math.sqrt(1 - u * u) * rad;
+          const ox = Math.cos(ang) * sxz * 2.9, oy = u * rad * 2.2, oz = Math.sin(ang) * sxz * 2.9;
+          // Orient each card's leafy face OUTWARD (normal along the radial dir)
+          // so the camera sees leaves, not the edge-on slab — with jitter.
+          const len = Math.hypot(ox, oy, oz) || 1;
+          const ry = Math.atan2(ox / len, oz / len) + rand(rng, -0.45, 0.45);
+          const rx = -Math.asin(Math.max(-1, Math.min(1, oy / len))) + rand(rng, -0.35, 0.35);
+          const rz = rand(rng, -0.45, 0.45);
+          // Ambient occlusion: outer + upper cards brighter, inner/underside darker.
+          const ao = Math.min(1, 0.35 + 0.45 * rad + 0.25 * (u + 1) * 0.5);
+          acc.leafCard.push(
+            t.x + ox, ccy + oy, t.z + oz, rx, ry, rz,
+            w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
+            hslToRgb(0.25 + rng() * 0.05, 0.22, 0.40 + 0.46 * ao),
+          );
+        }
+      } else {
+        const blobs = 4 + ((rng() * 3) | 0);
+        for (let i = 0; i < blobs; i++) {
+          const br = rand(rng, 1.6, 2.7);
+          acc.blob.push(
+            t.x + rand(rng, -1.3, 1.3), cy + rand(rng, -0.4, 1.9), t.z + rand(rng, -1.3, 1.3),
+            rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
+            br, br * rand(rng, 0.8, 1.1), br,
+            hslToRgb(0.28 + rng() * 0.04, 0.4, 0.22 + rng() * 0.1),
+          );
+        }
       }
     }
   }
@@ -535,19 +676,47 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     const cby = y + t.h * (0.72 + rng() * 0.08);
     const ch = t.h * (0.5 + rng() * 0.15);
     const cr = t.w * (2.6 + rng() * 1.8) + t.h * 0.12;
-    for (let c = 0; c < 7; c++) {
-      const layer = c / 7, ang = rng() * 6.28;
-      const spread = cr * (0.2 + rng() * 0.9);
-      const k = 0.45 + (1 - layer) * 0.45;
-      const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
-      acc.fLeaf.push(
-        t.x + Math.cos(ang) * spread * k,
-        cby + (layer - 0.25) * ch + (rng() - 0.5) * ch * 0.2,
-        t.z + Math.sin(ang) * spread * k,
-        rng() * 0.3, rng() * 6.28, rng() * 0.3,
-        cr * (0.65 + rng() * 0.55), cr * (0.45 + rng() * 0.45), cr * (0.65 + rng() * 0.55),
-        hslToRgb(hue, 0.34 + rng() * 0.16, 0.24 + rng() * 0.14),
-      );
+    const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
+    if (templates.leafCard) {
+      // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
+      // (Performance is explicitly out of scope this round; thin instances keep
+      // this one draw call per tile regardless of card count.)
+      const cards = Math.min(220, (90 + cr * 16) | 0);
+      const ccy = cby + ch * 0.2;           // canopy (ellipsoid) center height
+      for (let c = 0; c < cards; c++) {
+        // flattened ellipsoid, outer-shell biased → dense rounded crown
+        const ang = rng() * 6.28;
+        const u = rng() * 2 - 1;
+        const rad = 0.45 + 0.55 * Math.cbrt(rng());
+        const sxz = Math.sqrt(1 - u * u) * rad;
+        const w = cr * rand(rng, 0.5, 0.8);
+        const ox = Math.cos(ang) * sxz * cr, oy = u * rad * ch * 0.65, oz = Math.sin(ang) * sxz * cr;
+        // Outward-facing leafy side + jitter (see overworld broadleaf above).
+        const len = Math.hypot(ox, oy, oz) || 1;
+        const ry = Math.atan2(ox / len, oz / len) + rand(rng, -0.45, 0.45);
+        const rx = -Math.asin(Math.max(-1, Math.min(1, oy / len))) + rand(rng, -0.35, 0.35);
+        const rz = rand(rng, -0.45, 0.45);
+        const ao = Math.min(1, 0.35 + 0.45 * rad + 0.25 * (u + 1) * 0.5);
+        acc.leafCard.push(
+          t.x + ox, ccy + oy, t.z + oz, rx, ry, rz,
+          w, w * 0.55, w,
+          hslToRgb(hue, 0.24, 0.36 + 0.46 * ao),
+        );
+      }
+    } else {
+      for (let c = 0; c < 7; c++) {
+        const layer = c / 7, ang = rng() * 6.28;
+        const spread = cr * (0.2 + rng() * 0.9);
+        const k = 0.45 + (1 - layer) * 0.45;
+        acc.fLeaf.push(
+          t.x + Math.cos(ang) * spread * k,
+          cby + (layer - 0.25) * ch + (rng() - 0.5) * ch * 0.2,
+          t.z + Math.sin(ang) * spread * k,
+          rng() * 0.3, rng() * 6.28, rng() * 0.3,
+          cr * (0.65 + rng() * 0.55), cr * (0.45 + rng() * 0.45), cr * (0.65 + rng() * 0.55),
+          hslToRgb(hue, 0.34 + rng() * 0.16, 0.24 + rng() * 0.14),
+        );
+      }
     }
   }
   for (const b of s.forestBrush ?? []) {
@@ -586,6 +755,9 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
 
   acc.trunk.realize(`tile_${meta.id}_trunks`, templates.trunk, scene, container, castShadow);
   acc.blob.realize(`tile_${meta.id}_blobs`, templates.blob, scene, container, castShadow);
+  // Leaf cards skip shadow casting — alpha-tested cards would otherwise drop
+  // solid square shadows unless the shadow map is also alpha-aware.
+  if (templates.leafCard) acc.leafCard.realize(`tile_${meta.id}_leafcards`, templates.leafCard, scene, container, null);
   acc.pineCanopy.realize(`tile_${meta.id}_pines`, templates.pineCanopy, scene, container, castShadow);
   acc.deadCrown.realize(`tile_${meta.id}_dead`, templates.deadCrown, scene, container, castShadow);
   acc.rock.realize(`tile_${meta.id}_rocks`, templates.rock, scene, container, castShadow);
