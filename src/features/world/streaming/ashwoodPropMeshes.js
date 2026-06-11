@@ -156,24 +156,50 @@ export function buildPropTemplates(scene, opts = {}) {
   // canopy + undergrowth foliage sways in the wind
   for (const m of [leaf, pine, bushM, fLeafM]) new LeafSwayPlugin(m);
 
-  // Optional surface textures. Skipped in bake mode (the GLB contract is plain
-  // geometry + vertex colors). Each load is fallback-safe, so the trees look
-  // exactly as before until the user drops the image files into public/.
+  // Bark surface texture (tileable). The leaf art is a cutout *card*, not a
+  // tiling texture, so it is NOT applied to the solid blob/cone canopies — it
+  // drives the alpha-cutout leaf quads built below. Skipped in bake mode (the
+  // GLB contract is plain geometry + vertex colors); each load is fallback-safe.
+  let leafCardMat = null;
   if (!opts.bake) {
     // Bark: albedo + normal. Trunks are tall + thin, so the bark repeats
-    // vertically. (Normals are .jpg to match common texture-pack downloads;
-    // re-saving an already-JPG normal as PNG recovers no quality.)
+    // vertically. (Normals are .jpg to match the supplied texture pack.)
     applyOptionalTexture(bark, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
     applyOptionalTexture(bark, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
     applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
     applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
-    // Canopy foliage: shared leaf albedo + normal. The blobs are small, so a
-    // couple of tiles per blob keep the leaf detail legible.
-    // (Pine shares the leaf map; a dedicated pine_albedo can be wired later.)
-    for (const m of [leaf, pine, fLeafM]) {
-      applyOptionalTexture(m, 'diffuseTexture', `${TEX_BASE}/leaf_albedo.jpg`, scene, { uScale: 2, vScale: 2 });
-      applyOptionalTexture(m, 'bumpTexture',   `${TEX_BASE}/leaf_normal.jpg`, scene, { uScale: 2, vScale: 2, level: 0.6 });
-    }
+
+    // Broadleaf canopy material: an alpha-cutout leaf card. The card's black
+    // background is keyed to transparency from luminance (the JPG has no alpha
+    // channel), then alpha-TESTED so there's no transparency-sorting cost.
+    leafCardMat = new BABYLON.StandardMaterial('ash_leafcard', scene);
+    leafCardMat.diffuseColor  = new BABYLON.Color3(1, 1, 1); // per-instance tint multiplies
+    leafCardMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    leafCardMat.backFaceCulling = false;
+    leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTMODE;
+    leafCardMat.alphaCutOff = 0.18;
+    new LeafSwayPlugin(leafCardMat);
+
+    const sm = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
+    const card = new BABYLON.Texture(
+      `${TEX_BASE}/leaf_albedo.jpg`, scene, false, true, sm, null,
+      () => {                       // no leaf art → hide cards; the core blob remains
+        leafCardMat.alpha = 0;
+        leafCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      });
+    card.wrapU = card.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE; // cards don't tile
+    leafCardMat.diffuseTexture = card;
+    // Opacity keyed from the (alpha-less) RGB luminance: black bg → transparent.
+    const op = new BABYLON.Texture(`${TEX_BASE}/leaf_albedo.jpg`, scene, false, true, sm);
+    op.wrapU = op.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    op.getAlphaFromRGB = true;
+    leafCardMat.opacityTexture = op;
+    // Optional leaf surface relief.
+    const ln = new BABYLON.Texture(
+      `${TEX_BASE}/leaf_normal.jpg`, scene, false, true, sm, null,
+      () => { if (leafCardMat.bumpTexture === ln) leafCardMat.bumpTexture = null; ln.dispose(); });
+    ln.wrapU = ln.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    leafCardMat.bumpTexture = ln;
   }
 
   const T = {};
@@ -185,9 +211,19 @@ export function buildPropTemplates(scene, opts = {}) {
   T.trunk.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.5, 0));
   T.trunk.material = bark;
 
-  // broadleaf canopy blob (instanced 4-6× per tree)
+  // broadleaf canopy blob — still used as a darker inner core under the leaf
+  // cards (and as the full canopy in bake mode / if the leaf art is missing)
   T.blob = displacedIcoSphere('tpl_blob', scene, { base: 0.8, amp: 0.3, seed: 17 });
   T.blob.material = leaf;
+
+  // broadleaf leaf card: a single quad; the ~1.83:1 aspect of the card is set
+  // per-instance via (sx, sy) scale. Only exists when the leaf art loaded.
+  if (leafCardMat) {
+    T.leafCard = BABYLON.MeshBuilder.CreatePlane('tpl_leafcard', {
+      size: 1, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
+    }, scene);
+    T.leafCard.material = leafCardMat;
+  }
 
   // pine canopy: 5 stacked cones merged, unit-ish (≈2.4 wide, ≈6 tall)
   {
@@ -392,7 +428,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   const surfaceY = wg.surfaceY;
   const s = wg.sites;
   const acc = {
-    trunk: new Acc(), blob: new Acc(), pineCanopy: new Acc(), deadCrown: new Acc(),
+    trunk: new Acc(), blob: new Acc(), leafCard: new Acc(), pineCanopy: new Acc(), deadCrown: new Acc(),
     rock: new Acc(), bush: new Acc(), tuft: new Acc(), fern: new Acc(),
     flower: new Acc(), chest: new Acc(),
     stoneBox: new Acc(), column: new Acc(), boulder: new Acc(),
@@ -413,16 +449,42 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     } else if (t.kind === 'dead') {
       acc.deadCrown.push(t.x, gy + th * 0.5, t.z, 0, yaw, 0, 1, th / 7, 1, null);
     } else {
-      const blobs = 4 + ((rng() * 3) | 0);
       const cy = gy + th * 0.92;
-      for (let i = 0; i < blobs; i++) {
-        const br = rand(rng, 1.6, 2.7);
-        acc.blob.push(
-          t.x + rand(rng, -1.3, 1.3), cy + rand(rng, -0.4, 1.9), t.z + rand(rng, -1.3, 1.3),
-          rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
-          br, br * rand(rng, 0.8, 1.1), br,
-          hslToRgb(0.28 + rng() * 0.04, 0.4, 0.22 + rng() * 0.1),
-        );
+      if (templates.leafCard) {
+        // Alpha-cutout leaf cards filling the canopy volume, over a few small
+        // dark core blobs. The core gives depth and is the graceful fallback:
+        // if the leaf art is missing the cards go invisible and the core stays.
+        const cores = 2 + ((rng() * 2) | 0);
+        for (let i = 0; i < cores; i++) {
+          const br = rand(rng, 1.3, 2.0);
+          acc.blob.push(
+            t.x + rand(rng, -0.8, 0.8), cy + rand(rng, -0.3, 1.0), t.z + rand(rng, -0.8, 0.8),
+            rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
+            br, br * rand(rng, 0.8, 1.05), br,
+            hslToRgb(0.28 + rng() * 0.04, 0.4, 0.16 + rng() * 0.06),
+          );
+        }
+        const cards = 10 + ((rng() * 5) | 0);
+        for (let i = 0; i < cards; i++) {
+          const w = rand(rng, 2.2, 3.6);
+          acc.leafCard.push(
+            t.x + rand(rng, -1.6, 1.6), cy + rand(rng, -0.6, 2.2), t.z + rand(rng, -1.6, 1.6),
+            rand(rng, -0.5, 0.5), rng() * 6.28, rand(rng, -0.5, 0.5),
+            w, w * 0.55, w,    // card aspect ≈ 1.83:1; z (plane depth) unused
+            hslToRgb(0.25 + rng() * 0.06, 0.25, 0.62 + rng() * 0.16), // light tint (texture carries the color)
+          );
+        }
+      } else {
+        const blobs = 4 + ((rng() * 3) | 0);
+        for (let i = 0; i < blobs; i++) {
+          const br = rand(rng, 1.6, 2.7);
+          acc.blob.push(
+            t.x + rand(rng, -1.3, 1.3), cy + rand(rng, -0.4, 1.9), t.z + rand(rng, -1.3, 1.3),
+            rand(rng, 0, 3), rand(rng, 0, 6), rand(rng, 0, 3),
+            br, br * rand(rng, 0.8, 1.1), br,
+            hslToRgb(0.28 + rng() * 0.04, 0.4, 0.22 + rng() * 0.1),
+          );
+        }
       }
     }
   }
@@ -633,6 +695,9 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
 
   acc.trunk.realize(`tile_${meta.id}_trunks`, templates.trunk, scene, container, castShadow);
   acc.blob.realize(`tile_${meta.id}_blobs`, templates.blob, scene, container, castShadow);
+  // Leaf cards skip shadow casting — alpha-tested cards would otherwise drop
+  // solid square shadows unless the shadow map is also alpha-aware.
+  if (templates.leafCard) acc.leafCard.realize(`tile_${meta.id}_leafcards`, templates.leafCard, scene, container, null);
   acc.pineCanopy.realize(`tile_${meta.id}_pines`, templates.pineCanopy, scene, container, castShadow);
   acc.deadCrown.realize(`tile_${meta.id}_dead`, templates.deadCrown, scene, container, castShadow);
   acc.rock.realize(`tile_${meta.id}_rocks`, templates.rock, scene, container, castShadow);
