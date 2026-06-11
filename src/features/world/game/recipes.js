@@ -5,6 +5,8 @@
  * one `output` food item. Consumed by useInventory.cook() and CookingPanel.
  */
 
+import { ITEMS } from './items.js';
+
 export const RECIPES = [
   {
     id: 'stew',
@@ -34,10 +36,16 @@ export const RECIPES = [
 
 /**
  * Can this recipe be cooked given the current counts map ({ itemId: count })?
+ * Requires both enough inputs AND room in the output stack — otherwise cooking
+ * would consume the ingredients while clampStack silently drops the full output.
  * @param {object} recipe
  * @param {Record<string, number>} counts
  * @returns {boolean}
  */
 export function canCook(recipe, counts) {
-  return recipe.inputs.every((inp) => (counts[inp.id] ?? 0) >= inp.qty);
+  const hasInputs = recipe.inputs.every((inp) => (counts[inp.id] ?? 0) >= inp.qty);
+  if (!hasInputs) return false;
+  const out = recipe.output;
+  const cap = ITEMS[out.id]?.stack ?? 99;
+  return (counts[out.id] ?? 0) < cap; // room for at least part of the output
 }

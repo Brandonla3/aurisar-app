@@ -184,7 +184,7 @@ export default function WorldGame({ playerInfo }) {
   const [mapData, setMapData] = useState(null);
   const [toast, setToast]     = useState(null); // { text, id }
 
-  const inv = useInventory();
+  const inv = useInventory(playerInfo?.username);
 
   const togglePanel = useCallback((name) => setActivePanel((p) => (p === name ? null : name)), []);
   const openPanel   = useCallback((name) => setActivePanel(name), []);

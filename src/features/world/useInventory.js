@@ -15,14 +15,22 @@ import { ITEMS, CHEST_LOOT } from './game/items.js';
 import { RECIPES, canCook } from './game/recipes.js';
 import { mulberry32 } from './worldgen/rng.js';
 
-const STORAGE_KEY = 'aurisar.world.inventory.v1';
+const STORAGE_PREFIX = 'aurisar.world.inventory.v1';
+
+// Scope the save to the player so a second character/account on the same device
+// doesn't inherit the first one's items + opened-chest ids. Falls back to a
+// shared anonymous key when no player id is available.
+function storageKey(playerId) {
+  const id = String(playerId ?? '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+  return id ? `${STORAGE_PREFIX}.${id}` : `${STORAGE_PREFIX}.anon`;
+}
 
 // One-time starting kit, granted when no save exists yet.
 const STARTING_KIT = { berry: 3, rawMeat: 1, herb: 2 };
 
-function loadState() {
+function loadState(key) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
@@ -50,17 +58,26 @@ export function rollChestLoot(seed) {
   return rolled;
 }
 
-export function useInventory() {
-  const [state, setState] = useState(loadState);
+export function useInventory(playerId) {
+  const [state, setState] = useState(() => loadState(storageKey(playerId)));
+  const keyRef = useRef(storageKey(playerId));
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
-  // Persist (debounced) on every change.
+  // Reload from the correct slot if the player id resolves/changes after mount.
+  useEffect(() => {
+    const key = storageKey(playerId);
+    if (key === keyRef.current) return;
+    keyRef.current = key;
+    setState(loadState(key));
+  }, [playerId]);
+
+  // Persist (debounced) on every change, into the player-scoped slot.
   const saveTimer = useRef(null);
   useEffect(() => {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* quota */ }
+      try { localStorage.setItem(keyRef.current, JSON.stringify(state)); } catch { /* quota */ }
     }, 250);
     return () => clearTimeout(saveTimer.current);
   }, [state]);
