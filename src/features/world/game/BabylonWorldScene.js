@@ -164,6 +164,9 @@ class LightingManager {
   setCombatMode(enabled) { this.combatMode = !!enabled; }
 
   setTimeOfDay(hours24) { this.timeOfDay = ((hours24 % 24) + 24) % 24; }
+  // Testing aid: when frozen, _updateOverworld stops advancing the clock so a
+  // chosen time of day holds steady.
+  setTimeFrozen(f) { this._timeFrozen = !!f; }
 
   addDungeonTorch(position, opts = {}) {
     if (this._dungeonTorches.length >= this.options.maxDungeonTorches) {
@@ -430,7 +433,7 @@ class LightingManager {
   }
 
   _updateOverworld(dt) {
-    this.timeOfDay = (this.timeOfDay + dt * this._hoursPerSec) % 24;
+    if (!this._timeFrozen) this.timeOfDay = (this.timeOfDay + dt * this._hoursPerSec) % 24;
 
     const phase    = this.timeOfDay / 24;
     const sunTheta = phase * Math.PI * 2 - Math.PI / 2;
@@ -1826,6 +1829,17 @@ export class BabylonWorldScene {
     this.callbacks.onBuildCampfire?.(toStdb(fx), toStdb(fz));
     return 'built';
   }
+
+  // ── Day/night testing controls ─────────────────────────────────────────────
+  // Scrub or freeze the time of day (hours, 0–24). Freezing holds the lighting
+  // steady so foliage/water/sky can be evaluated at a chosen time.
+  setTimeOfDay(hours, freeze = true) {
+    if (!this._lm) return;
+    this._lm.setTimeOfDay(hours);
+    this._lm.setTimeFrozen(freeze);
+  }
+  setDayNightFrozen(frozen) { this._lm?.setTimeFrozen(frozen); }
+  getTimeOfDay() { return this._lm?.timeOfDay ?? 12; }
 
   // Snapshot of burning campfires in world units. A campfire only exists in
   // this map while it is lit — the server deletes the row when its burn timer

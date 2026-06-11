@@ -452,6 +452,7 @@ export default function WorldGame({ playerInfo }) {
       {/* Game menu */}
       {activePanel === 'menu' && (
         <GameMenu
+          sceneRef={sceneRef}
           onClose={closePanel}
           onOpenMap={()       => openPanel('map')}
           onOpenInventory={() => openPanel('inventory')}

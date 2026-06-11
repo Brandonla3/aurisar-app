@@ -4,7 +4,7 @@
  * Works on all devices.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import WorldModal from './ui/WorldModal.jsx';
 import { HOTKEYS } from './game/hotkeys.js';
 import { FONT, ghostBtn } from './ui/panelTheme.js';
@@ -42,8 +42,62 @@ function Toggle({ label, on, onClick }) {
   );
 }
 
+// Testing aid: scrub / freeze the day-night cycle so foliage, water and sky can
+// be evaluated at a fixed time. Setting any time freezes the clock; Resume lets
+// it run again.
+function TimeOfDayControl({ sceneRef }) {
+  const [hours, setHours] = useState(12);
+  const [frozen, setFrozen] = useState(false);
+
+  // Reflect the live clock when the menu opens (without freezing it).
+  useEffect(() => {
+    const t = sceneRef?.current?.getTimeOfDay?.();
+    if (typeof t === 'number') setHours(t);
+  }, [sceneRef]);
+
+  const set = (h) => {
+    setHours(h);
+    setFrozen(true);
+    sceneRef?.current?.setTimeOfDay?.(h, true);
+  };
+  const resume = () => {
+    setFrozen(false);
+    sceneRef?.current?.setDayNightFrozen?.(false);
+  };
+
+  const label = `${String(Math.floor(hours)).padStart(2, '0')}:${String(Math.round((hours % 1) * 60)).padStart(2, '0')}`;
+  const preset = { ...ghostBtn, padding: '4px 10px', fontSize: 12 };
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#94a3b8', fontFamily: FONT, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        Time of day · testing
+      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <input
+          type="range" min={0} max={24} step={0.25} value={hours}
+          onChange={(e) => set(parseFloat(e.target.value))}
+          style={{ flex: 1, accentColor: '#c49428' }}
+          aria-label="Time of day"
+        />
+        <span style={{
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: frozen ? '#fbbf77' : '#7dd3fc',
+          minWidth: 44, textAlign: 'right',
+        }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button style={preset} onClick={() => set(8)}>🌅 Morning</button>
+        <button style={preset} onClick={() => set(12.5)}>☀️ Noon</button>
+        <button style={preset} onClick={() => set(18.5)}>🌇 Dusk</button>
+        <button style={preset} onClick={() => set(0)}>🌙 Night</button>
+        <button style={{ ...preset, color: frozen ? '#cbd5e1' : '#7ee787' }} onClick={resume}>▶ Resume cycle</button>
+      </div>
+    </div>
+  );
+}
+
 export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCooking,
-  showActionButtons, onToggleActionButtons, minimapVisible, onToggleMinimap }) {
+  showActionButtons, onToggleActionButtons, minimapVisible, onToggleMinimap, sceneRef }) {
   return (
     <WorldModal title="Menu" onClose={onClose} width={420}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -56,6 +110,8 @@ export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCo
         <Toggle label="Show action buttons" on={showActionButtons} onClick={onToggleActionButtons} />
         <Toggle label="Show minimap" on={minimapVisible} onClick={onToggleMinimap} />
       </div>
+
+      <TimeOfDayControl sceneRef={sceneRef} />
 
       <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#94a3b8', fontFamily: FONT, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         Controls
