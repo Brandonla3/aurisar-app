@@ -481,14 +481,15 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
         // Pure leaf cards — no geometric core at all. Density alone fills the
         // canopy: enough overlapping cards that interior gaps read as natural
         // light holes, not missing geometry.
-        const cards = 80 + ((rng() * 28) | 0);
+        const cards = 150 + ((rng() * 60) | 0);   // dense shell (perf out of scope)
         const ccy = cy + 1.1;             // canopy (ellipsoid) center height
         for (let i = 0; i < cards; i++) {
-          const w = rand(rng, 2.3, 3.6);
-          // uniform point in a flattened ellipsoid → rounded crown silhouette
+          const w = rand(rng, 2.5, 3.9);
+          // point in a flattened ellipsoid, biased toward the OUTER shell so the
+          // surface packs tight and few sky gaps show through
           const ang = rng() * 6.28;
           const u = rng() * 2 - 1;
-          const rad = Math.cbrt(rng());
+          const rad = 0.45 + 0.55 * Math.cbrt(rng());
           const sxz = Math.sqrt(1 - u * u) * rad;
           const ox = Math.cos(ang) * sxz * 2.9, oy = u * rad * 2.2, oz = Math.sin(ang) * sxz * 2.9;
           // Orient each card's leafy face OUTWARD (normal along the radial dir)
@@ -680,13 +681,13 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
       // (Performance is explicitly out of scope this round; thin instances keep
       // this one draw call per tile regardless of card count.)
-      const cards = Math.min(110, (44 + cr * 8.5) | 0);
+      const cards = Math.min(220, (90 + cr * 16) | 0);
       const ccy = cby + ch * 0.2;           // canopy (ellipsoid) center height
       for (let c = 0; c < cards; c++) {
-        // uniform point in a flattened ellipsoid → rounded crown, not a column
+        // flattened ellipsoid, outer-shell biased → dense rounded crown
         const ang = rng() * 6.28;
         const u = rng() * 2 - 1;
-        const rad = Math.cbrt(rng());
+        const rad = 0.45 + 0.55 * Math.cbrt(rng());
         const sxz = Math.sqrt(1 - u * u) * rad;
         const w = cr * rand(rng, 0.5, 0.8);
         const ox = Math.cos(ang) * sxz * cr, oy = u * rad * ch * 0.65, oz = Math.sin(ang) * sxz * cr;
