@@ -1,5 +1,6 @@
 import React, { memo, useState } from 'react';
 import AvatarCreator from '../avatar/AvatarCreator.jsx';
+import CharacterTurntable from '../avatar/CharacterTurntable.jsx';
 import { UI_COLORS } from '../../data/constants';
 import { calcCharStats } from '../../utils/xp';
 import { ClassIcon } from '../../components/ClassIcon';
@@ -117,8 +118,17 @@ const CharacterTab = memo(function CharacterTab({
       {
         /* ══ AVATAR SUB-TAB ══════════════════════════ */
       }{charSubTab === "avatar" && <div>
-        <div className={"char-section"} style={{ textAlign: "center", padding: "40px 24px" }}>
-          <div style={{ fontSize: "2.6rem", marginBottom: S.s14 }}>{"⚔️"}</div>
+        <div className={"char-section"} style={{ textAlign: "center", padding: "20px 16px 28px" }}>
+          {/* P1: live auto-rotating review of the saved avatar (drag to spin,
+              pinch/scroll to zoom). Falls back to the static card until the
+              user has a saved config. */}
+          {avatarConfig ? (
+            <div style={{ height: 280, marginBottom: S.s14 }}>
+              <CharacterTurntable config={avatarConfig} />
+            </div>
+          ) : (
+            <div style={{ fontSize: "2.6rem", margin: `20px 0 ${S.s14}px` }}>{"⚔️"}</div>
+          )}
           <div style={{ fontSize: FS.fs95, color: "#b4ac9e", fontWeight: 600, marginBottom: S.s8, letterSpacing: ".02em" }}>
             {"Appearance"}
           </div>

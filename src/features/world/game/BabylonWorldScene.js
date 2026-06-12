@@ -36,7 +36,11 @@ import { locationLabelAt } from '../mapRender.js';
 // Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
 // validation runs in CI via src/features/world/config/validators.js.
 import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
-import ashwoodWorldConfig from '../config/ashwood_world.json' with { type: 'json' };
+// P1: zone 1 ("Eastvale Reach") replaces Ashwood as the playable map.
+// ashwood_world.json stays in the repo as a dev/test world — swap the
+// import to get it back locally.
+import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
+import { NpcSystem } from '../systems/NpcSystem.js';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
 // would z-fight/clip against it. Re-enable once the Phase-5 bake pipeline
@@ -776,11 +780,11 @@ export class BabylonWorldScene {
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
 
-    // Pure-math Ashwood world model (heightfield, biomes, trails, sites).
+    // Pure-math world model (heightfield, biomes, trails, sites).
     // Deterministic from the canon seed — every client computes the same
     // world, which multiplayer requires. All entity Y placement must go
     // through this._worldgen.surfaceY(x, z); the server only knows 2D.
-    this._worldgen = createWorldgen(ashwoodWorldConfig);
+    this._worldgen = createWorldgen(zone1WorldConfig);
 
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
@@ -861,6 +865,44 @@ export class BabylonWorldScene {
     for (const row of pendingMobs) this.applyMobUpdate(row);
     const pending = this._pendingUpdates.splice(0);
     for (const row of pending) this.applyPlayerUpdate(row);
+
+    // P1: content-defined hub NPCs. Not load-critical — quest UI degrades
+    // to the quest log if a model fails. Markers set by React may have
+    // arrived before init finished; re-apply them.
+    this._npcs = new NpcSystem(this.scene, this._worldgen, AssetLibrary);
+    this._npcs.init()
+      .then(() => {
+        if (this._pendingNpcMarkers) this._npcs?.setMarkers(this._pendingNpcMarkers);
+      })
+      .catch((err) => console.warn('[NpcSystem] init failed:', err));
+  }
+
+  /** React → scene: per-NPC quest markers ('!' / '?' / null). */
+  setNpcMarkers(markers) {
+    this._pendingNpcMarkers = markers;
+    this._npcs?.setMarkers(markers);
+  }
+
+  /** Local player position in world meters (for waypoint checks). */
+  getLocalPosition() {
+    const p = this._local?.root?.position;
+    return p ? { x: p.x, z: p.z } : null;
+  }
+
+  // Throttled proximity scan for the "Talk" prompt. Fires the callback only
+  // on change so React state stays quiet while idle.
+  _pollNearbyNpc() {
+    const now = performance.now();
+    if (now - (this._lastNpcPoll ?? 0) < 200) return;
+    this._lastNpcPoll = now;
+    const p = this._local?.root?.position;
+    if (!p || !this._npcs) return;
+    const npc = this._npcs.nearestInRange(p.x, p.z, 5);
+    const id = npc?.id ?? null;
+    if (id !== this._nearbyNpcId) {
+      this._nearbyNpcId = id;
+      this.callbacks.onNearbyNpc?.(id);
+    }
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
@@ -1214,6 +1256,10 @@ export class BabylonWorldScene {
       this._lerpRemote(rp, dt);
       rp.update(dt);
     });
+
+    // NPCs: idle animation pump + proximity scan for the talk prompt.
+    this._npcs?.update(dt);
+    this._pollNearbyNpc();
 
     // Make mob HP bars face the camera each frame.
     this._mobs.forEach(m => { m.hpBar?.lookAt(this._camera.position); });
@@ -1993,6 +2039,8 @@ export class BabylonWorldScene {
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     [...this._mobs.keys()].forEach(id => this._removeMob(id));
     [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
+    this._npcs?.dispose();
+    this._npcs = null;
     this._local?.dispose();
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();

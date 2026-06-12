@@ -9,44 +9,16 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
-import { CHARACTER_ASSET_BASE, MANIFEST } from '../world/game/AssetLibrary.js';
+import { createCharacterAssetCache } from '../world/game/AssetLibrary.js';
 import { CharacterAvatar } from '../world/game/CharacterAvatar.js';
 import { mergeConfig }     from '../world/game/avatarSchema.js';
 
 if (typeof window !== 'undefined' && !window.BABYLON) window.BABYLON = BABYLON;
 
-// Dedicated AssetLibrary instance for the preview scene
-const PreviewAssets = {
-  _containers: new Map(),
-  _ready: false,
-
-  async init(scene) {
-    // The world's AssetLibrary containers belong to a different Babylon
-    // scene — the preview loads its own copies, but from the SAME
-    // MANIFEST imported from AssetLibrary.js (single source of truth).
-    this._scene = scene;
-    const BASE = CHARACTER_ASSET_BASE;
-    const load = async (key, path) => {
-      try {
-        const parts = path.lastIndexOf('/');
-        const dir  = parts >= 0 ? BASE + path.slice(0, parts + 1) : BASE;
-        const file = parts >= 0 ? path.slice(parts + 1) : path;
-        const c = await BABYLON.SceneLoader.LoadAssetContainerAsync(dir, file, scene);
-        this._containers.set(key, c);
-      } catch { /* asset not present yet */ }
-    };
-    await load('base_body', MANIFEST['base_body']);
-    await Promise.all(
-      Object.entries(MANIFEST)
-        .filter(([k]) => k !== 'base_body')
-        .map(([k, p]) => load(k, p))
-    );
-    this._ready = true;
-  },
-  getContainer(key) { return this._containers.get(key) ?? null; },
-  hasBaseBody()     { return this._containers.has('base_body'); },
-  dispose() { this._containers.forEach(c => c.dispose()); this._containers.clear(); },
-};
+// Dedicated asset cache for the preview scene — the world's AssetLibrary
+// containers belong to a different Babylon scene, so the preview loads its
+// own copies from the same shared MANIFEST.
+const PreviewAssets = createCharacterAssetCache();
 
 export default function AvatarPreview({ config, onAvatarReady, style }) {
   const canvasRef  = useRef(null);

@@ -24,7 +24,11 @@ const BASE = '/assets/mobs/';
 // path. Keys must align with the `mobType` string the server emits; missing
 // files load silently and `_spawnMob` falls back to primitives.
 const MANIFEST = {
-  wolf: 'wolf.glb',
+  wolf:   'wolf.glb',
+  // P1 quest mobs — GLBs not authored yet; they load silently when the
+  // files land (CC0 placeholder pass) and fall back to primitives until then.
+  boar:   'boar.glb',
+  bandit: 'bandit.glb',
 };
 
 const _containers = new Map();

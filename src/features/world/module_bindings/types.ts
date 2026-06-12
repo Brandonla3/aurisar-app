@@ -91,6 +91,16 @@ export const Player = __t.object("Player", {
 });
 export type Player = __Infer<typeof Player>;
 
+export const PlayerQuest = __t.object("PlayerQuest", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  questId: __t.string(),
+  state: __t.u8(),
+  countsJson: __t.string(),
+  acceptedAt: __t.u64(),
+});
+export type PlayerQuest = __Infer<typeof PlayerQuest>;
+
 export const PlayerRespawnQueueRow = __t.object("PlayerRespawnQueueRow", {
   id: __t.u64(),
   scheduledAt: __t.scheduleAt(),

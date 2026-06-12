@@ -15,7 +15,10 @@ export const ZONES: ZoneDef[] = [
     key: 'zone1',
     name: 'Eastvale Reach', // placeholder
     levelBand: [1, 12],
-    originOffsetM: { x: 3000, z: 0 },
+    // Zone 1 lives at the world origin (it replaces Ashwood in place, and
+    // movePlayer's ±1000 m bounds assume the origin region). Zones 2+ get
+    // k·3000 m offsets in P5, when per-zone bounds + travel land.
+    originOffsetM: { x: 0, z: 0 },
     worldConfig: 'zone1_world.json',
     spawnPos: { x: 0, z: 0 },
     graveyardPos: { x: -40, z: 20 },

@@ -7,9 +7,11 @@
 export const HOTKEYS = [
   { keys: 'WASD / ↑↓←→', action: 'Move' },
   { keys: 'Space',        action: 'Attack nearest enemy' },
+  { keys: 'E',            action: 'Talk to nearby NPC' },
   { keys: 'F',            action: 'Build campfire' },
   { keys: 'Enter',        action: 'Chat  (/w for world chat)' },
   { keys: 'M',            action: 'World map' },
+  { keys: 'L',            action: 'Quest log' },
   { keys: 'I',            action: 'Inventory' },
   { keys: 'C',            action: 'Cooking' },
   { keys: 'G',            action: 'Game menu' },
