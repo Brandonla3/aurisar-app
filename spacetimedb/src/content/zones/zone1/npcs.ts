@@ -3,62 +3,92 @@
 // Regenerate with: npm run sync:content
 
 /**
- * zone1/npcs.ts — hub NPCs for zone 1. All names/copy are placeholders
- * for the story pass; only ids are load-bearing. Positions are zone-local
- * meters around the hub at (0, 0).
+ * zone1/npcs.ts — Eastbrook's NPCs, copied verbatim from
+ * world-of-claudecraft zone-1 (MIT; see public/assets/ATTRIBUTION.md).
+ * Positions/facings/greetings are theirs 1:1.
+ *
+ * questIds list only the quests the current server supports (kill
+ * objectives). The collect-objective quests (q_boars, q_spiders,
+ * q_supplies, the Aldric collect chain) and the dungeon quests activate
+ * with P4 (server inventory) and P7 (Hollow Crypt).
  */
 import type { NpcDef } from '../../types';
 
 export const NPCS: NpcDef[] = [
   {
-    id: 'npc_z1_marshal',
+    id: 'marshal_redbrook',
     zoneId: 1,
-    name: 'Marshal Veyra', // placeholder
-    title: 'Hub Marshal',
-    pos: { x: 3, z: 5 },
+    name: 'Marshal Redbrook',
+    title: 'Town Marshal',
+    pos: { x: 4, z: 6 },
     facingRad: Math.PI,
-    questIds: ['q1_wolves_at_the_walls', 'q1_scout_the_ruins', 'q1_bandit_threat'],
-    greeting:
-      'Walls hold because people hold them, $C. There is work if you want it.', // placeholder
+    questIds: ['q_wolves', 'q_greyjaw', 'q_bandits', 'q_ringleader'],
+    greeting: 'Keep your blade close, $C. The Vale is not what it was.',
   },
   {
-    id: 'npc_z1_provisioner',
+    id: 'trader_wilkes',
     zoneId: 1,
-    name: 'Provisioner Haln', // placeholder
+    name: 'Trader Wilkes',
     title: 'Provisioner',
     pos: { x: -7, z: 3 },
     facingRad: Math.PI / 2,
     questIds: [],
-    greeting: 'Fresh bread, clean water, fair prices. What can I get you, $N?', // placeholder
+    greeting: 'Fresh bread, clean water, fair prices. What can I get you?',
+    vendorItemIds: ['baked_bread', 'spring_water', 'roasted_boar', 'tough_jerky'],
+  },
+  {
+    id: 'apothecary_lin',
+    zoneId: 1,
+    name: 'Apothecary Lin',
+    title: 'Herbalist',
+    pos: { x: 11, z: -3 },
+    facingRad: -Math.PI / 2,
+    questIds: [],
+    greeting: 'Careful where you step in the eastern woods, friend.',
+  },
+  {
+    id: 'brother_aldric',
+    zoneId: 1,
+    name: 'Brother Aldric',
+    title: 'Priest of the Vale',
+    pos: { x: -14, z: -10 },
+    facingRad: 0.8,
+    questIds: ['q_bones'],
+    greeting: 'The Light keep you. Even the dead find no rest here of late.',
+  },
+  {
+    id: 'smith_haldren',
+    zoneId: 1,
+    name: 'Smith Haldren',
+    title: 'Armorer & Weaponsmith',
+    pos: { x: 7, z: 16.5 },
+    facingRad: -2.7,
+    questIds: [],
+    greeting: 'Mind the sparks, $C. Good steel is the difference between a scar and a grave.',
     vendorItemIds: [
-      'baked_bread',
-      'spring_water',
-      'worn_shortsword',
-      'hunting_bow',
-      'gnarled_staff',
-      'padded_vest',
-      'travelers_boots',
+      'eastbrook_arming_sword', 'bronzework_mace', 'vale_carving_knife', 'hickory_shortstaff',
+      'eastbrook_chain_vest', 'valespun_robe', 'tanned_leather_jerkin',
+      'hobnail_boots', 'eastbrook_wool_trousers',
     ],
   },
   {
-    id: 'npc_z1_huntmaster',
+    id: 'fisherman_brandt',
     zoneId: 1,
-    name: 'Huntmaster Odo', // placeholder
-    title: 'Huntmaster',
-    pos: { x: 8, z: -4 },
-    facingRad: -Math.PI / 2,
-    questIds: ['q1_boar_cull', 'q1_the_old_camp'],
-    greeting: 'The wilds feed those who respect them — and bury those who don’t.', // placeholder
+    name: 'Fisherman Brandt',
+    title: 'Old Salt',
+    pos: { x: -16, z: 6 },
+    facingRad: -0.75,
+    questIds: ['q_murlocs'],
+    greeting: 'Grlmurlgrl— sorry, been listening to those fish-men too long.',
   },
   {
-    id: 'npc_z1_gatewarden',
+    id: 'foreman_odell',
     zoneId: 1,
-    name: 'Gatewarden Sel', // placeholder
-    title: 'Gatewarden',
-    pos: { x: 0, z: 440 },
-    facingRad: 0,
-    questIds: [],
-    greeting:
-      'The north pass is closed to anyone the road would chew up. Train first.', // placeholder — soft level gate
+    name: 'Foreman Odell',
+    title: 'Mine Foreman',
+    pos: { x: -4, z: -14 },
+    facingRad: -2.14,
+    questIds: ['q_mine'],
+    greeting: "Whole dig's crawling with those candle-headed vermin!",
   },
 ];

@@ -40,6 +40,8 @@ import worldBuildConfig from '../config/world_build_config.json' with { type: 'j
 // import to get it back locally.
 import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
+import { PropsSystem } from '../systems/PropsSystem.js';
+import { MOBS as MOB_DEFS } from '../content/index';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
 // would z-fight/clip against it. Re-enable once the Phase-5 bake pipeline
@@ -874,6 +876,11 @@ export class BabylonWorldScene {
         if (this._pendingNpcMarkers) this._npcs?.setMarkers(this._pendingNpcMarkers);
       })
       .catch((err) => console.warn('[NpcSystem] init failed:', err));
+
+    // Eastbrook settlement + camp props (CC0 GLBs). Independent of NPC
+    // loading; missing files skip silently.
+    this._props = new PropsSystem(this.scene, this._worldgen);
+    this._props.init().catch((err) => console.warn('[PropsSystem] init failed:', err));
   }
 
   /** React → scene: per-NPC quest markers ('!' / '?' / null). */
@@ -1373,19 +1380,29 @@ export class BabylonWorldScene {
   // wolf.glb is available (e.g., asset deleted, build:glb not yet run).
   // Wolf faces +Z; later AI slice can `root.rotation.y = atan2(vx, vz)`.
   _buildMobVisualPrimitive(row, visual) {
-    // Bandits are humanoid — the quadruped silhouette reads wrong for them.
-    if (row.mobType === 'bandit') {
-      this._buildHumanoidPrimitive(row, visual);
+    // Bipedal families read wrong as quadrupeds — use the humanoid
+    // composite with a per-family palette.
+    const family = MOB_DEFS[row.mobType]?.family ?? 'beast';
+    const HUMANOID_TINTS = {
+      humanoid: { leather: [0.23, 0.18, 0.14], cloth: [0.16, 0.16, 0.20], skin: [0.62, 0.48, 0.36] },
+      kobold:   { leather: [0.35, 0.24, 0.10], cloth: [0.30, 0.20, 0.08], skin: [0.61, 0.39, 0.05] },
+      undead:   { leather: [0.55, 0.57, 0.55], cloth: [0.35, 0.37, 0.36], skin: [0.84, 0.86, 0.86] },
+      murloc:   { leather: [0.20, 0.45, 0.28], cloth: [0.15, 0.35, 0.22], skin: [0.32, 0.75, 0.50] },
+    };
+    if (HUMANOID_TINTS[family]) {
+      this._buildHumanoidPrimitive(row, visual, HUMANOID_TINTS[family]);
       return;
     }
 
-    // Per-type palette + proportions on the shared quadruped composite.
-    // Placeholder until the CC0 creature GLBs land in public/assets/mobs/.
+    // Quadruped composite with a per-type palette. Placeholder whenever a
+    // mob type's GLB is missing from public/assets/mobs/.
     const LOOKS = {
-      wolf: { body: [0.28, 0.26, 0.24], pale: [0.55, 0.50, 0.44], dark: [0.12, 0.11, 0.10], scale: [1, 1, 1] },
-      boar: { body: [0.38, 0.27, 0.18], pale: [0.66, 0.58, 0.46], dark: [0.20, 0.13, 0.08], scale: [1.25, 0.85, 1.05] },
+      forest_wolf: { body: [0.28, 0.26, 0.24], pale: [0.55, 0.50, 0.44], dark: [0.12, 0.11, 0.10], scale: [1, 1, 1] },
+      old_greyjaw: { body: [0.20, 0.21, 0.22], pale: [0.45, 0.46, 0.46], dark: [0.10, 0.10, 0.10], scale: [1.25, 1.25, 1.25] },
+      wild_boar:   { body: [0.38, 0.27, 0.18], pale: [0.66, 0.58, 0.46], dark: [0.20, 0.13, 0.08], scale: [1.25, 0.85, 1.05] },
+      webwood_spider: { body: [0.29, 0.14, 0.35], pale: [0.45, 0.30, 0.50], dark: [0.12, 0.06, 0.15], scale: [1.1, 0.6, 1.1] },
     };
-    const look = LOOKS[row.mobType] ?? LOOKS.wolf;
+    const look = LOOKS[row.mobType] ?? LOOKS.forest_wolf;
     visual.scaling.set(look.scale[0], look.scale[1], look.scale[2]);
 
     const bodyMat = this._stdMat(`mob_${row.mobType}_body`, new BABYLON.Color3(...look.body));
@@ -1455,13 +1472,14 @@ export class BabylonWorldScene {
     tail.material = bodyMat;
   }
 
-  // Hooded-humanoid primitive (bandits). Same placeholder posture as the
-  // quadruped: static composite under `visual`, swapped out the moment a
-  // GLB lands in public/assets/mobs/.
-  _buildHumanoidPrimitive(row, visual) {
-    const leather = this._stdMat('mob_bandit_leather', new BABYLON.Color3(0.23, 0.18, 0.14));
-    const cloth   = this._stdMat('mob_bandit_cloth',   new BABYLON.Color3(0.16, 0.16, 0.20));
-    const skin    = this._stdMat('mob_bandit_skin',    new BABYLON.Color3(0.62, 0.48, 0.36));
+  // Hooded-humanoid primitive (bipedal families). Same placeholder posture
+  // as the quadruped: static composite under `visual`, swapped out the
+  // moment a GLB lands in public/assets/mobs/.
+  _buildHumanoidPrimitive(row, visual, tints) {
+    const family  = MOB_DEFS[row.mobType]?.family ?? 'humanoid';
+    const leather = this._stdMat(`mob_${family}_leather`, new BABYLON.Color3(...tints.leather));
+    const cloth   = this._stdMat(`mob_${family}_cloth`,   new BABYLON.Color3(...tints.cloth));
+    const skin    = this._stdMat(`mob_${family}_skin`,    new BABYLON.Color3(...tints.skin));
 
     // Torso
     const torso = BABYLON.MeshBuilder.CreateBox(`mob_torso_${row.mobId}`, {
@@ -2114,6 +2132,8 @@ export class BabylonWorldScene {
     [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
     this._npcs?.dispose();
     this._npcs = null;
+    this._props?.dispose();
+    this._props = null;
     this._local?.dispose();
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();

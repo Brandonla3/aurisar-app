@@ -13,17 +13,21 @@ export const ZONES: ZoneDef[] = [
   {
     id: 1,
     key: 'zone1',
-    name: 'Eastvale Reach', // placeholder
-    levelBand: [1, 12],
+    // Eastbrook Vale — copied from world-of-claudecraft zone 1. Names are
+    // theirs as working placeholders; the story pass renames freely.
+    name: 'Eastbrook Vale',
+    levelBand: [1, 7],
     // Zone 1 lives at the world origin (it replaces Ashwood in place, and
     // movePlayer's ±1000 m bounds assume the origin region). Zones 2+ get
     // k·3000 m offsets in P5, when per-zone bounds + travel land.
     originOffsetM: { x: 0, z: 0 },
     worldConfig: 'zone1_world.json',
     spawnPos: { x: 0, z: 0 },
-    graveyardPos: { x: -40, z: 20 },
+    graveyardPos: { x: -12, z: -14 },
     gates: [
-      { id: 'z1_north_pass', pos: { x: 0, z: 450 }, toZoneId: 2, toGateId: 'z2_south_pass' },
+      // Their zone 2 (Mirefen Marsh) begins past z=180; the pass placement
+      // matches their northern ridge road.
+      { id: 'z1_north_pass', pos: { x: 0, z: 170 }, toZoneId: 2, toGateId: 'z2_south_pass' },
     ],
   },
   // Zone 2 (levels 12–24) and zone 3 (levels 24–35) land in P5.
