@@ -15,7 +15,8 @@
 
 /* global BABYLON */
 
-const BASE = '/assets/characters/';
+export const CHARACTER_ASSET_BASE = '/assets/characters/';
+const BASE = CHARACTER_ASSET_BASE;
 
 // Keys → relative paths under BASE.
 // Hair keys must match `HAIR_STYLES` keys in src/features/avatar/panels/HairPanel.jsx.
@@ -23,7 +24,9 @@ const BASE = '/assets/characters/';
 // Missing files load silently (see _load below); a Blender-authored .glb can land
 // later with no other code change. See public/assets/characters/README.md for the
 // export contract.
-const MANIFEST = {
+// Exported as the single source of truth — AvatarPreview's PreviewAssets
+// imports this same object instead of keeping its own copy.
+export const MANIFEST = {
   // Base bodies — neutral default + gendered variants. Selected via
   // CharacterAvatar._resolveBaseBody based on config.body.gender.
   base_body:            'base_body.glb',

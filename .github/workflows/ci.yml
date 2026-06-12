@@ -25,6 +25,12 @@ jobs:
       - name: Vulnerability audit (fail on high+)
         run: npm audit --audit-level=high --omit=dev
 
+      - name: World content mirror up to date
+        run: npm run sync:content:check
+
+      - name: Tests
+        run: npm test
+
       - name: Build
         run: npm run build
         env:
