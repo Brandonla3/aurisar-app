@@ -22,7 +22,6 @@ import { AshwoodGrass }      from './AshwoodGrass.js';
 import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { AshwoodWildlife }   from './AshwoodWildlife.js';
 import { AshwoodWeather }    from './AshwoodWeather.js';
-import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
   GlbTileProvider,
@@ -1748,9 +1747,11 @@ export class BabylonWorldScene {
       if (row.avatarConfig) {
         try { parsedConfig = JSON.parse(row.avatarConfig); } catch { parsedConfig = null; }
       }
-      const config = mergeConfig(parsedConfig);
+      // Pass the RAW parsed config — CharacterAvatar merges defaults itself,
+      // and null must stay null so unconfigured players render as the bare
+      // base-body GLB (no default clothing).
       const rp = await CharacterAvatar.create(
-        row.identity, row.username, config, this.scene, AssetLibrary,
+        row.identity, row.username, parsedConfig, this.scene, AssetLibrary,
       );
       if (this._remotePlayers.has(key)) {
         rp.dispose(); // another update already spawned this player

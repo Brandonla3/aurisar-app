@@ -73,6 +73,11 @@ export class CharacterAvatar {
   constructor(id, username, config, scene) {
     this._id       = id;
     this._username = username;
+    // No config = the bare base-body GLB, full stop. Default hair/clothing
+    // only applies to avatars with an EXPLICIT config (saved player configs,
+    // NPCs, the avatar creator) — an unconfigured player must render as the
+    // plain test GLB, not in starter clothes.
+    this._bareBody = config == null;
     this._config   = mergeConfig(config);
     this._scene    = scene;
 
@@ -179,6 +184,9 @@ export class CharacterAvatar {
     // Apply morph targets and materials from stored config
     this._applyAllMorphs();
     this._applySkinMaterial();
+
+    // Unconfigured avatars stop here: bare base-body GLB, no modular pieces.
+    if (this._bareBody) return;
 
     // Attach modular pieces. The slot-gating workaround introduced earlier
     // in this PR is gone now that main shipped the regenerated GLBs (correct
