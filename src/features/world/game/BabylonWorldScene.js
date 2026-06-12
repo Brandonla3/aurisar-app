@@ -1318,11 +1318,11 @@ export class BabylonWorldScene {
   }
 
   _spawnMob(row) {
-    // GLB path first; primitive fallback only for known mob types (wolf
-    // today). Unknown mob types with no GLB return null so the row stays
-    // invisible until either a GLB is authored or a primitive case is added.
+    // GLB path first; EVERY mob type gets a primitive fallback otherwise
+    // (quadruped with a per-type palette, humanoid for bandits). A server
+    // row must never be invisible — its AI can still attack and quests
+    // need it killable. (Codex P1 on #219.)
     const hasGlb = MobAssetLibrary.hasContainer(row.mobType);
-    if (!hasGlb && row.mobType !== 'wolf') return null;
 
     const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);
     // Visual subtree — everything that should hide on death lives under here.
@@ -1374,9 +1374,24 @@ export class BabylonWorldScene {
   // wolf.glb is available (e.g., asset deleted, build:glb not yet run).
   // Wolf faces +Z; later AI slice can `root.rotation.y = atan2(vx, vz)`.
   _buildMobVisualPrimitive(row, visual) {
-    const bodyMat = this._stdMat('mobWolfBody',  new BABYLON.Color3(0.28, 0.26, 0.24));
-    const pale    = this._stdMat('mobWolfPale',  new BABYLON.Color3(0.55, 0.50, 0.44));
-    const dark    = this._stdMat('mobWolfDark',  new BABYLON.Color3(0.12, 0.11, 0.10));
+    // Bandits are humanoid — the quadruped silhouette reads wrong for them.
+    if (row.mobType === 'bandit') {
+      this._buildHumanoidPrimitive(row, visual);
+      return;
+    }
+
+    // Per-type palette + proportions on the shared quadruped composite.
+    // Placeholder until the CC0 creature GLBs land in public/assets/mobs/.
+    const LOOKS = {
+      wolf: { body: [0.28, 0.26, 0.24], pale: [0.55, 0.50, 0.44], dark: [0.12, 0.11, 0.10], scale: [1, 1, 1] },
+      boar: { body: [0.38, 0.27, 0.18], pale: [0.66, 0.58, 0.46], dark: [0.20, 0.13, 0.08], scale: [1.25, 0.85, 1.05] },
+    };
+    const look = LOOKS[row.mobType] ?? LOOKS.wolf;
+    visual.scaling.set(look.scale[0], look.scale[1], look.scale[2]);
+
+    const bodyMat = this._stdMat(`mob_${row.mobType}_body`, new BABYLON.Color3(...look.body));
+    const pale    = this._stdMat(`mob_${row.mobType}_pale`, new BABYLON.Color3(...look.pale));
+    const dark    = this._stdMat(`mob_${row.mobType}_dark`, new BABYLON.Color3(...look.dark));
 
     // Torso
     const body = BABYLON.MeshBuilder.CreateBox(`mob_body_${row.mobId}`, {
@@ -1439,6 +1454,63 @@ export class BabylonWorldScene {
     tail.position.set(0, 0.75, -0.62);
     tail.rotation.x = -Math.PI / 4;
     tail.material = bodyMat;
+  }
+
+  // Hooded-humanoid primitive (bandits). Same placeholder posture as the
+  // quadruped: static composite under `visual`, swapped out the moment a
+  // GLB lands in public/assets/mobs/.
+  _buildHumanoidPrimitive(row, visual) {
+    const leather = this._stdMat('mob_bandit_leather', new BABYLON.Color3(0.23, 0.18, 0.14));
+    const cloth   = this._stdMat('mob_bandit_cloth',   new BABYLON.Color3(0.16, 0.16, 0.20));
+    const skin    = this._stdMat('mob_bandit_skin',    new BABYLON.Color3(0.62, 0.48, 0.36));
+
+    // Torso
+    const torso = BABYLON.MeshBuilder.CreateBox(`mob_torso_${row.mobId}`, {
+      width: 0.52, height: 0.70, depth: 0.30,
+    }, this.scene);
+    torso.parent = visual;
+    torso.position.set(0, 1.05, 0);
+    torso.material = leather;
+    this._castShadow(torso);
+
+    // Head + hood
+    const head = BABYLON.MeshBuilder.CreateBox(`mob_head_${row.mobId}`, {
+      width: 0.28, height: 0.28, depth: 0.28,
+    }, this.scene);
+    head.parent = visual;
+    head.position.set(0, 1.56, 0);
+    head.material = skin;
+    this._castShadow(head);
+
+    const hood = BABYLON.MeshBuilder.CreateCylinder(`mob_hood_${row.mobId}`, {
+      diameterTop: 0.06, diameterBottom: 0.40, height: 0.34, tessellation: 6,
+    }, this.scene);
+    hood.parent = visual;
+    hood.position.set(0, 1.74, -0.02);
+    hood.material = cloth;
+
+    // Legs
+    for (const sign of [-1, 1]) {
+      const leg = BABYLON.MeshBuilder.CreateCylinder(`mob_hleg_${row.mobId}_${sign}`, {
+        diameter: 0.16, height: 0.70, tessellation: 6,
+      }, this.scene);
+      leg.parent = visual;
+      leg.position.set(sign * 0.14, 0.35, 0);
+      leg.material = cloth;
+      this._castShadow(leg);
+    }
+
+    // Arms
+    for (const sign of [-1, 1]) {
+      const arm = BABYLON.MeshBuilder.CreateCylinder(`mob_arm_${row.mobId}_${sign}`, {
+        diameter: 0.13, height: 0.60, tessellation: 6,
+      }, this.scene);
+      arm.parent = visual;
+      arm.position.set(sign * 0.34, 1.10, 0);
+      arm.rotation.z = sign * 0.12;
+      arm.material = leather;
+      this._castShadow(arm);
+    }
   }
 
   // HP bar — two flat planes (bg + fill) parented to the mob root. The
