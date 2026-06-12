@@ -195,6 +195,10 @@ export default function WorldGame({ playerInfo }) {
   // P1 quests/NPCs: which NPC is in talk range, and who we're talking to.
   const [nearbyNpcId,   setNearbyNpcId]   = useState(null);
   const [dialogueNpcId, setDialogueNpcId] = useState(null);
+  // Flips when the Babylon scene exists so effects that push state INTO the
+  // scene (NPC markers) re-run — the quest-marker effect otherwise fires
+  // before sceneRef is set and never again while disconnected.
+  const [sceneReady, setSceneReady] = useState(false);
 
   const inv = useInventory(playerInfo?.username);
 
@@ -287,8 +291,9 @@ export default function WorldGame({ playerInfo }) {
 
   // NPC quest markers (! / ?) follow quest state into the 3D scene.
   useEffect(() => {
+    if (!sceneReady) return;
     sceneRef.current?.setNpcMarkers(buildNpcMarkers(Object.keys(NPCS), myQuests));
-  }, [myQuests]);
+  }, [myQuests, sceneReady]);
 
   // Auto-report 'find' objectives: when standing inside an unvisited
   // waypoint of an active quest, tell the server (which re-validates the
@@ -340,10 +345,12 @@ export default function WorldGame({ playerInfo }) {
     );
     sceneRef.current = scene;
     setMapData(scene.getMapData());
+    setSceneReady(true);
 
     return () => {
       scene.dispose();
       sceneRef.current = null;
+      setSceneReady(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

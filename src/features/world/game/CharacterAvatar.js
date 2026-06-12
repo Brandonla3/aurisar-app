@@ -140,6 +140,21 @@ export class CharacterAvatar {
     this._nodes    = inst.rootNodes;
     this._skeleton = inst.skeletons[0] ?? null;
 
+    // Index the body's transform nodes by their unprefixed glTF names.
+    // Modular pieces (hair/clothing/tail/gear) relink their skeleton bones
+    // onto these nodes — see _bindInstanceToRig for why.
+    this._rigNodeByName = new Map();
+    const bodyPrefix = `${this._id}_body_`;
+    const allBodyNodes = inst.rootNodes.flatMap(n => [
+      n, ...(n.getChildTransformNodes ? n.getChildTransformNodes(false) : []),
+    ]);
+    for (const node of allBodyNodes) {
+      const short = node.name.startsWith(bodyPrefix)
+        ? node.name.slice(bodyPrefix.length)
+        : node.name;
+      if (!this._rigNodeByName.has(short)) this._rigNodeByName.set(short, node);
+    }
+
     // Collect all skinned meshes from the hierarchy
     this._bodyMeshes = inst.rootNodes.flatMap(n =>
       n.getChildMeshes ? n.getChildMeshes(false) : []
@@ -183,6 +198,61 @@ export class CharacterAvatar {
     for (const slot of GEAR_SLOTS) {
       const meshName = this._config.gear[slot];
       if (meshName) await this.setGear(slot, meshName, assetLibrary);
+    }
+  }
+
+  /**
+   * Retarget a modular piece's skeleton(s) onto the body rig.
+   *
+   * glTF skinned vertices index into the PIECE's own joint list, so the
+   * old `mesh.skeleton = bodySkeleton` reassignment scrambles deformation
+   * whenever a piece's joint ORDER differs from the body's (vertices end
+   * up weighted to the wrong bones — the "crumpled clothing at the feet"
+   * bug). Instead each piece keeps its own skeleton (correct indices +
+   * inverse binds) and every bone is relinked by NAME to the body's
+   * animated transform node, so the piece follows the body pose exactly,
+   * independent of joint order.
+   */
+  _bindInstanceToRig(inst) {
+    this._normalizePieceOrientation(inst);
+    if (!this._rigNodeByName?.size) return;
+    for (const skel of inst.skeletons ?? []) {
+      for (const bone of skel.bones) {
+        const node = this._rigNodeByName.get(bone.name);
+        if (node) bone.linkTransformNode(node);
+      }
+    }
+  }
+
+  /**
+   * Heal mis-oriented piece exports. The rig's bind space runs along -Z
+   * (head at z≈-1.7; the armature node's +90° X rotation stands it up),
+   * and the hair set is authored that way — but the clothing set shipped
+   * with a 90° X object-rotation left UNAPPLIED to the vertex data, so
+   * its geometry runs along -Y instead. Skin weights are correct, so the
+   * skinned result is the garment rotated 90° at the hips — the
+   * "crumpled clothing at the avatar's feet" bug.
+   *
+   * Detect the wrong dominant axis per mesh and bake the +90° X
+   * correction into positions+normals. Correctly exported pieces fail
+   * the check and pass through untouched, so re-exported assets can land
+   * later with no code change.
+   */
+  _normalizePieceOrientation(inst) {
+    const meshes = inst.rootNodes.flatMap(n =>
+      n.getChildMeshes ? n.getChildMeshes(false) : []
+    );
+    for (const mesh of meshes) {
+      if (!mesh.getBoundingInfo) continue;
+      const bb = mesh.getBoundingInfo().boundingBox;
+      const centerY = (bb.maximum.y + bb.minimum.y) / 2;
+      const centerZ = (bb.maximum.z + bb.minimum.z) / 2;
+      const extentY = bb.maximum.y - bb.minimum.y;
+      const extentZ = bb.maximum.z - bb.minimum.z;
+      if (Math.abs(centerY) > Math.abs(centerZ) && extentY >= extentZ) {
+        mesh.bakeTransformIntoVertices(BABYLON.Matrix.RotationX(Math.PI / 2));
+        mesh.refreshBoundingInfo();
+      }
     }
   }
 
@@ -345,9 +415,8 @@ export class CharacterAvatar {
       name => `${this._id}_hair_${name}`, false
     );
     inst.rootNodes.forEach(n => { n.parent = this.root; });
-    // Reassign skeleton so hair skinning follows the body rig
-    inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
-      .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
+    // Relink the hair's bones onto the body rig (order-independent).
+    this._bindInstanceToRig(inst);
     this._applyHairColor(inst);
     this._slots['hair'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
@@ -412,8 +481,7 @@ export class CharacterAvatar {
       .some(m => m.skeleton);
     if (tailHasSkin && this._skeleton) {
       inst.rootNodes.forEach(n => { n.parent = this.root; });
-      inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
-        .forEach(m => { m.skeleton = this._skeleton; });
+      this._bindInstanceToRig(inst);
     } else {
       const hipsBone = findBone(this._skeleton, BONES.hips);
       const refMesh  = this._bodyMeshes[0] ?? null;
@@ -444,9 +512,8 @@ export class CharacterAvatar {
       name => `${this._id}_${slot}_${name}`, false
     );
     inst.rootNodes.forEach(n => { n.parent = this.root; });
-    // Reassign skeleton so clothing skinning follows the body rig
-    inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
-      .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
+    // Relink the clothing's bones onto the body rig (order-independent).
+    this._bindInstanceToRig(inst);
     // Tint the GLB's blank material so the piece doesn't render pure white.
     tintInstance(inst, CLOTHING_DEFAULTS[slot] ?? CLOTHING_DEFAULTS.top);
     this._slots[`clothing_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
@@ -465,18 +532,15 @@ export class CharacterAvatar {
       name => `${this._id}_gear_${slot}_${name}`, false
     );
     // Armor pieces are authored as skinned meshes bound to the shared MPFB rig
-    // (same pattern as clothing): parent to character root, then re-point each
-    // child mesh's skeleton at the body rig so animations drive the armor too.
+    // (same pattern as clothing): parent to character root, then relink each
+    // piece's bones onto the body rig so animations drive the armor too.
+    // The piece KEEPS its own skeleton (vertex bone-indices reference its own
+    // joint list — see _bindInstanceToRig), so the old dispose-duplicate-
+    // skeletons step is gone; _disposeSlot tears the piece down whole.
     // TODO(weapons): when rigid weapon assets land, detect meshes without skin
     // weights and fall back to attachToBone(rightHand) for those.
     inst.rootNodes.forEach(n => { n.parent = this.root; });
-    inst.rootNodes.flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
-      .forEach(m => { if (this._skeleton) m.skeleton = this._skeleton; });
-    // Each gear GLB ships with its own copy of the armature (needed so the GLB
-    // can encode skin weights). After rebinding meshes to the body skeleton,
-    // dispose the duplicate to keep the scene's skeleton count flat as more
-    // gear loads — important when thousands of pieces are equipped over time.
-    (inst.skeletons ?? []).forEach(s => s.dispose?.());
+    this._bindInstanceToRig(inst);
     // Gear ships through the same blank-material pipeline as clothing — tint
     // so it doesn't render white. Steel/iron baseline; per-piece colors can
     // ride on the config later.
