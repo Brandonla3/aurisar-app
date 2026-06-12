@@ -9,7 +9,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
-import { AssetLibrary }    from '../world/game/AssetLibrary.js';
+import { CHARACTER_ASSET_BASE, MANIFEST } from '../world/game/AssetLibrary.js';
 import { CharacterAvatar } from '../world/game/CharacterAvatar.js';
 import { mergeConfig }     from '../world/game/avatarSchema.js';
 
@@ -21,52 +21,11 @@ const PreviewAssets = {
   _ready: false,
 
   async init(scene) {
-    // Reuse the same manifest as AssetLibrary
-    const { AssetLibrary: AL } = await import('../world/game/AssetLibrary.js');
-    // If the world scene already loaded containers they're separate Babylon scenes —
-    // preview needs its own. We do a lightweight re-init.
+    // The world's AssetLibrary containers belong to a different Babylon
+    // scene — the preview loads its own copies, but from the SAME
+    // MANIFEST imported from AssetLibrary.js (single source of truth).
     this._scene = scene;
-    // Import just the manifest logic
-    const BASE = '/assets/characters/';
-    // Mirror of AssetLibrary.js MANIFEST — keep in sync.
-    // `hair_shaved` is intentionally absent: it renders as no mesh.
-    const MANIFEST = {
-      base_body:            'base_body.glb',
-      base_body_male:       'base_body_male.glb',
-      base_body_female:     'base_body_female.glb',
-      'hair/hair_short':    'hair/hair_short.glb',
-      'hair/hair_long':     'hair/hair_long.glb',
-      'hair/hair_braids':   'hair/hair_braids.glb',
-      'hair/hair_ponytail': 'hair/hair_ponytail.glb',
-      'hair/hair_bun':      'hair/hair_bun.glb',
-      'hair/hair_wavy':     'hair/hair_wavy.glb',
-      'hair/hair_afro':     'hair/hair_afro.glb',
-      'hair/hair_mohawk':   'hair/hair_mohawk.glb',
-      'clothing/top_tunic':           'clothing/top_tunic.glb',
-      'clothing/top_robe':            'clothing/top_robe.glb',
-      'clothing/top_cloth_shirt':     'clothing/top_cloth_shirt.glb',
-      'clothing/top_gambeson':        'clothing/top_gambeson.glb',
-      'clothing/top_leather_vest':    'clothing/top_leather_vest.glb',
-      'clothing/top_chainmail':       'clothing/top_chainmail.glb',
-      'clothing/bottom_trousers':     'clothing/bottom_trousers.glb',
-      'clothing/bottom_kilt':         'clothing/bottom_kilt.glb',
-      'clothing/bottom_leather_pants':'clothing/bottom_leather_pants.glb',
-      'clothing/bottom_breeches':     'clothing/bottom_breeches.glb',
-      'clothing/bottom_cloth_skirt':  'clothing/bottom_cloth_skirt.glb',
-      'clothing/bottom_leggings':     'clothing/bottom_leggings.glb',
-      'clothing/shoes_boots':         'clothing/shoes_boots.glb',
-      'clothing/shoes_sandals':       'clothing/shoes_sandals.glb',
-      'clothing/shoes_greaves':       'clothing/shoes_greaves.glb',
-      'clothing/shoes_leather_wraps': 'clothing/shoes_leather_wraps.glb',
-      'species/horns_small':    'species/horns_small.glb',
-      'species/horns_large':    'species/horns_large.glb',
-      'species/horns_curved':   'species/horns_curved.glb',
-      'species/tail_short':     'species/tail_short.glb',
-      'species/tail_long':      'species/tail_long.glb',
-      'species/tail_fluffy':    'species/tail_fluffy.glb',
-      // Gear — auto-skinned via scripts/blender/04_import_armor.py. Keep
-      // in sync with AssetLibrary.js MANIFEST.
-    };
+    const BASE = CHARACTER_ASSET_BASE;
     const load = async (key, path) => {
       try {
         const parts = path.lastIndexOf('/');

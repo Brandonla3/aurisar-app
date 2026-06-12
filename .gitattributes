@@ -1,0 +1,5 @@
+# World content + its generated server mirror are compared byte-for-byte
+# by scripts/sync_world_content.mjs (--check). Pin them to LF so
+# core.autocrlf=true Windows checkouts don't break the equality test.
+src/features/world/content/** text eol=lf
+spacetimedb/src/content/** text eol=lf
