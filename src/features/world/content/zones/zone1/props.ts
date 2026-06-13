@@ -25,7 +25,7 @@ export const ZONE1_PROPS = {
 
   stalls: [
     { x: -8.5, z: 3,    rot: Math.PI / 2 },
-    { x: 9.5,  z: 17.5, rot: -2.7, smithy: true }, // Smith Haldren's smithy
+    { x: 9.5,  z: 17.5, rot: -2.7, smithy: true }, // the smith's smithy
   ] as StallProp[],
 
   campfires: [

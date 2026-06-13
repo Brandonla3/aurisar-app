@@ -43,6 +43,6 @@ export const ZONE1_ITEMS: ItemDef[] = [
   { id: 'quilted_trousers', name: 'Quilted Trousers', icon: '👖', type: 'armor', stack: 1, quality: 'uncommon', slot: 'legs', gameStats: { armor: 8 } },
 
   // ── Quest rewards (active questline) ───────────────────────────────
-  { id: 'redbrook_blade', name: 'Redbrook Blade', icon: '⚔️', type: 'weapon', stack: 1, quality: 'uncommon', slot: 'mainHand', gameStats: { weaponDmgMin: 5, weaponDmgMax: 9, weaponSpeedSec: 2.5, STR: 1 }, minLevel: 3 },
+  { id: 'marshals_blade', name: "Marshal's Blade", icon: '⚔️', type: 'weapon', stack: 1, quality: 'uncommon', slot: 'mainHand', gameStats: { weaponDmgMin: 5, weaponDmgMax: 9, weaponSpeedSec: 2.5, STR: 1 }, minLevel: 3 },
   { id: 'militia_vest',   name: 'Militia Vest',   icon: '🦺', type: 'armor', stack: 1, quality: 'uncommon', slot: 'chest', gameStats: { armor: 16, CON: 1 }, minLevel: 5 },
 ];

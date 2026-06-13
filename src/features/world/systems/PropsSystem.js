@@ -222,7 +222,7 @@ export class PropsSystem {
       }
     }
 
-    // ── Fallen Chapel ruin ring ────────────────────────────────────
+    // ── Mourner's Rest ruin ring ───────────────────────────────────
     for (const r of P.ruinRings) {
       for (let i = 0; i < r.columns; i++) {
         const ang = (i / r.columns) * Math.PI * 2;
@@ -240,7 +240,7 @@ export class PropsSystem {
       this._place('column_broken', r.x + 1.5, r.z - 2.2, { uniform: 1.5, uniformY: 0.9, rotY: 2.6 });
     }
 
-    // ── Copper Dig mine entrance (composed) ────────────────────────
+    // ── Rustvein Dig mine entrance (composed) ──────────────────────
     for (const m of P.mines) {
       const cos = Math.cos(m.rot);
       const sin = Math.sin(m.rot);
@@ -262,7 +262,7 @@ export class PropsSystem {
       this._place('ore_rocks', ore.x, ore.z, { uniform: 1.4 });
     }
 
-    // ── Mirror Lake dock (composed) ────────────────────────────────
+    // ── Stillmere dock (composed) ──────────────────────────────────
     for (const d of P.docks) {
       const cos = Math.cos(d.rot);
       const sin = Math.sin(d.rot);

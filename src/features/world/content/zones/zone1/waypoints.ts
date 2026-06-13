@@ -1,18 +1,19 @@
 /**
- * zone1/waypoints.ts — zone-1 points of interest, modeled on the
- * reference design's starter zone. Used for map labels and future 'find'
- * objectives (none of the zone-1 quests use 'find'; the POIs anchor the
- * world map + minimap). Labels are placeholder copy.
+ * zone1/waypoints.ts — zone-1 points of interest. Original Aurisar
+ * placeholder names; the layout is modeled on the reference design's
+ * starter zone. Used for map labels and future 'find' objectives (none of
+ * the zone-1 quests use 'find' yet; the POIs anchor the world map +
+ * minimap).
  */
 import type { WaypointDef } from '../../types';
 
 export const WAYPOINTS: WaypointDef[] = [
-  { id: 'poi_town',          zoneId: 1, pos: { x: 0, z: -3 },    radiusM: 26, label: 'Town' },
-  { id: 'poi_wolf_run',      zoneId: 1, pos: { x: -2, z: 70 },   radiusM: 20, label: 'Wolf Run' },
-  { id: 'poi_boar_meadow',   zoneId: 1, pos: { x: 65, z: 0 },    radiusM: 20, label: 'Boar Meadow' },
-  { id: 'poi_mirror_lake',   zoneId: 1, pos: { x: -88, z: 82 },  radiusM: 24, label: 'Mirror Lake' },
-  { id: 'poi_webwood',       zoneId: 1, pos: { x: -60, z: 4 },   radiusM: 20, label: 'Webwood' },
-  { id: 'poi_copper_dig',    zoneId: 1, pos: { x: -84, z: -64 }, radiusM: 18, label: 'Copper Dig' },
-  { id: 'poi_bandit_camp',   zoneId: 1, pos: { x: 76, z: -76 },  radiusM: 22, label: 'Bandit Camp' },
-  { id: 'poi_fallen_chapel', zoneId: 1, pos: { x: 80, z: 80 },   radiusM: 16, label: 'Fallen Chapel' },
+  { id: 'poi_oakrest',      zoneId: 1, pos: { x: 0, z: -3 },    radiusM: 26, label: 'Oakrest' },
+  { id: 'poi_greywood_run', zoneId: 1, pos: { x: -2, z: 70 },   radiusM: 20, label: 'Greywood Run' },
+  { id: 'poi_tuskfield',    zoneId: 1, pos: { x: 65, z: 0 },    radiusM: 20, label: 'Tuskfield' },
+  { id: 'poi_stillmere',    zoneId: 1, pos: { x: -88, z: 82 },  radiusM: 24, label: 'Stillmere' },
+  { id: 'poi_gloomweb',     zoneId: 1, pos: { x: -60, z: 4 },   radiusM: 20, label: 'Gloomweb' },
+  { id: 'poi_rustvein_dig', zoneId: 1, pos: { x: -84, z: -64 }, radiusM: 18, label: 'Rustvein Dig' },
+  { id: 'poi_gallows_rise', zoneId: 1, pos: { x: 76, z: -76 },  radiusM: 22, label: 'Gallows Rise' },
+  { id: 'poi_mourners_rest',zoneId: 1, pos: { x: 80, z: 80 },   radiusM: 16, label: "Mourner's Rest" },
 ];

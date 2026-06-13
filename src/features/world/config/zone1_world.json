@@ -14,7 +14,7 @@
     "mountain": { "x": -300, "z": -300, "r": 200, "margin": 208, "peakH": 90 }
   },
   "lake": {
-    "name": "Mirror Lake",
+    "name": "Stillmere",
     "x": -92, "z": 88,
     "bowlR": 30, "blend": 18, "depth": 2.6,
     "level": -0.5, "lip": 0.06, "waterR": 27
@@ -41,10 +41,10 @@
   "trailHalfWidth": 3.1,
   "biomes": [
     { "name": "Meadow", "ground": [0.80, 0.86, 0.50], "fog": "#b0b482", "grass": 1.0,  "grassCol": [0.30, 0.46, 0.16], "treeSkip": 0.80, "trees": ["broadleaf"], "rockSkip": 0.72, "danger": 0.15 },
-    { "name": "Northwood",      "ground": [0.42, 0.55, 0.26], "fog": "#55663c", "grass": 0.85, "grassCol": [0.15, 0.30, 0.10], "treeSkip": 0.00, "trees": ["broadleaf", "broadleaf", "pine"], "rockSkip": 0.60, "danger": 0.5 },
-    { "name": "Vale Hills",     "ground": [0.66, 0.64, 0.56], "fog": "#8e96a2", "grass": 0.30, "grassCol": [0.34, 0.40, 0.22], "treeSkip": 0.55, "trees": ["pine"], "rockSkip": 0.00, "danger": 0.4 },
-    { "name": "Webwood",        "ground": [0.40, 0.46, 0.30], "fog": "#5d6a54", "grass": 0.30, "grassCol": [0.24, 0.33, 0.16], "treeSkip": 0.50, "trees": ["dead", "dead", "pine"], "rockSkip": 0.70, "danger": 0.7 },
-    { "name": "Chapel Rise",    "ground": [0.52, 0.48, 0.45], "fog": "#6e6056", "grass": 0.00, "grassCol": [0.30, 0.27, 0.22], "treeSkip": 0.50, "trees": ["dead"], "rockSkip": 0.40, "danger": 1.0 }
+    { "name": "Greywood",       "ground": [0.42, 0.55, 0.26], "fog": "#55663c", "grass": 0.85, "grassCol": [0.15, 0.30, 0.10], "treeSkip": 0.00, "trees": ["broadleaf", "broadleaf", "pine"], "rockSkip": 0.60, "danger": 0.5 },
+    { "name": "Highlands",      "ground": [0.66, 0.64, 0.56], "fog": "#8e96a2", "grass": 0.30, "grassCol": [0.34, 0.40, 0.22], "treeSkip": 0.55, "trees": ["pine"], "rockSkip": 0.00, "danger": 0.4 },
+    { "name": "Gloomweb",       "ground": [0.40, 0.46, 0.30], "fog": "#5d6a54", "grass": 0.30, "grassCol": [0.24, 0.33, 0.16], "treeSkip": 0.50, "trees": ["dead", "dead", "pine"], "rockSkip": 0.70, "danger": 0.7 },
+    { "name": "Mourner's Rise", "ground": [0.52, 0.48, 0.45], "fog": "#6e6056", "grass": 0.00, "grassCol": [0.30, 0.27, 0.22], "treeSkip": 0.50, "trees": ["dead"], "rockSkip": 0.40, "danger": 1.0 }
   ],
   "biomeRing": [1, 2, 3, 4, 1, 2, 3, 4, 1, 3],
   "scatter": {

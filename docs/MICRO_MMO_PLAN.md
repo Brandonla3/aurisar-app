@@ -84,7 +84,7 @@ Full original plan: `C:\Users\brand\.claude\plans\i-need-you-to-shiny-quokka.md`
 | P1 | Zone 1 map/town, NPCs, dialogue, quest system, CharacterTurntable | ✅ in PR #219 |
 | P2 | Progression bridge: `playerProgress` + `syncProgress(fitnessXp)`, baseline reset, copper/template rewards, Supabase mirror v1 | ⬜ next |
 | P3 | Combat core (`playerCombat`/effects/casts + tick gating, `castAbilityV2`, hotbar/targeting/fx) + all 11 class kits | ⬜ |
-| P4 | Server inventory/loot/equipment/vendors; fitness perks live; collect-objective quests activate (q_boars, q_spiders, q_supplies, Aldric chain) | ⬜ |
+| P4 | Server inventory/loot/equipment/vendors; fitness perks live; collect-objective quests activate (q_boars, q_spiders, q_supplies, Edran chain) | ⬜ |
 | P5 | Zones 2–3 (reference zones 2 & 3), zone travel, per-zone bounds/graveyards | ⬜ |
 | P6 | Parties, trading, dueling | ⬜ |
 | P7 | Hollow Crypt dungeon (instances via `instance_id`), q_sexton/q_hollow activate | ⬜ |
@@ -103,25 +103,27 @@ Full original plan: `C:\Users\brand\.claude\plans\i-need-you-to-shiny-quokka.md`
   mob AI generalized to per-`MobDef` stats; `setPlayerInfo` class
   allow-list = the 11 real Aurisar classes.
 
-**Zone 1 — modeled on the reference design's starter zone**:
-- 7 NPCs verbatim (Marshal Redbrook, Trader Wilkes, Apothecary Lin,
-  Brother Aldric, Smith Haldren, Fisherman Brandt, Foreman Odell).
-- 9-mob roster (forest_wolf … old_greyjaw, gorrak) at their 12 exact
-  camp coordinates; CC0 creature GLBs as stand-ins + family-shaped
-  primitive fallbacks.
+**Zone 1 — modeled on the reference design's starter zone** (original
+Aurisar placeholder names throughout):
+- 7 NPCs (Marshal Halwin, Trader Pell, Apothecary Yarrow, Brother Edran,
+  Smith Dorn, Fisher Maelis, Foreman Bram).
+- 9-mob roster (forest_wolf … old_greyjaw, gorrak) at the 12 camp
+  coordinates; CC0 creature GLBs as stand-ins + family-shaped primitive
+  fallbacks.
 - Kill-objective questline active now: q_wolves → q_greyjaw / q_bandits
-  → q_ringleader, q_murlocs, q_mine, q_bones (verbatim text/rewards).
-  Collect + dungeon quests staged in comments (P4/P7).
+  → q_ringleader, q_murlocs, q_mine, q_bones. Collect + dungeon quests
+  staged in comments (P4/P7).
+- POIs (original names): Oakrest (hub), Greywood Run, Tuskfield,
+  Stillmere, Gloomweb, Rustvein Dig, Gallows Rise, Mourner's Rest.
 - Geography in `src/features/world/config/zone1_world.json`: hub plateau
-  r26 at origin, graveyard (−12,−14), Mirror Lake (−92,88), their 6 road
-  polylines, their 8 POIs. (Their Three.js terrain renderer can't be
-  transplanted — our heightfield reproduces their geography; everything
-  ON it is their data.)
-- **PropsSystem** (`systems/PropsSystem.js`) builds the town from their
-  verbatim placement data (`content/zones/zone1/props.ts`): houses, inn,
-  chapel + bell tower, well, market stalls + smithy clutter, fences,
-  bonfires, bandit tents/crates, murloc mud huts, Fallen Chapel ruin
-  ring, Copper Dig mine entrance, Mirror Lake dock. 34 CC0 prop GLBs in
+  r26 at origin, graveyard (−12,−14), lake (−92,88), 6 road polylines,
+  8 POIs. (The reference Three.js terrain renderer isn't transplanted —
+  our heightfield reproduces the geography; layout/props are the carry-over.)
+- **PropsSystem** (`systems/PropsSystem.js`) builds the town from the
+  placement data (`content/zones/zone1/props.ts`): houses, inn, chapel +
+  bell tower, well, market stalls + smithy clutter, fences, bonfires,
+  bandit tents/crates, murloc mud huts, Mourner's Rest ruin ring,
+  Rustvein Dig mine entrance, Stillmere dock. 34 CC0 prop GLBs in
   `public/assets/props/` (+7 creatures in `public/assets/mobs/`),
   attribution in `public/assets/ATTRIBUTION.md`.
 
@@ -145,6 +147,9 @@ CharacterTurntable on the Character tab (mobile review surface).
 - **Quest accepting only works after merge** — the PR's Netlify preview
   runs the new client against the pre-P1 prod module. Post-merge, CI
   republishes; first `seedWorld` migrates mobs to the zone-1 camps.
+- POI/NPC/biome labels are original Aurisar placeholders; some mob and
+  item flavor words (e.g. "Webwood Lurker", "webwood_silk") still echo
+  earlier area names — purely cosmetic, owned by the story-rewrite pass.
 - Local dev: `spacetime` CLI v2.5 IS installed
   (`%USERPROFILE%\AppData\Local\SpacetimeDB`). Regenerate bindings from
   `spacetimedb/`: `spacetime generate --lang typescript --module-path .
@@ -156,7 +161,7 @@ CharacterTurntable on the Character tab (mobile review surface).
   clean.
 - The legacy "Hollow Crypt" portal still sits ~38 m south of the hub
   (pre-existing `_buildDungeonEntrance`); P7 relocates dungeons under the
-  Fallen Chapel.
+  Mourner's Rest.
 - No LoS / tree collision yet (accepted; backlog), `chat_message`
   unbounded (P8 cleanup), inventory still localStorage until P4.
 - Their coordinate frame was carried 1:1 (their +x=west vs ours = map
