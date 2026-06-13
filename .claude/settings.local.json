@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python3 -c:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "PowerShell(npm install -D vitest)"
     ]
   }
 }

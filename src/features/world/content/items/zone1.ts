@@ -1,25 +1,26 @@
 /**
- * items/eastbrook.ts — zone 1 (Eastbrook Vale) item set, copied from
- * world-of-claudecraft's zone-1 content (MIT; see public/assets/ATTRIBUTION.md).
- * Stats are light placeholders — full equipment stats land with P4 tuning.
+ * items/zone1.ts — zone 1 item set, modeled on the reference design's
+ * starter zone (see public/assets/ATTRIBUTION.md). Names are working
+ * placeholders the story pass rewrites. Stats are light placeholders —
+ * full equipment stats land with P4 tuning.
  */
 import type { ItemDef } from '../types';
 
-export const EASTBROOK_ITEMS: ItemDef[] = [
-  // ── Trader Wilkes' provisions ──────────────────────────────────────
+export const ZONE1_ITEMS: ItemDef[] = [
+  // ── Provisioner's goods ────────────────────────────────────────────
   { id: 'roasted_boar', name: 'Roasted Boar', icon: '🍖', type: 'consumable', stack: 20, quality: 'common', heal: 25, vendorPriceCopper: 18 },
   { id: 'tough_jerky',  name: 'Tough Jerky',  icon: '🥓', type: 'consumable', stack: 20, quality: 'common', heal: 12, vendorPriceCopper: 8 },
 
-  // ── Smith Haldren's wares ──────────────────────────────────────────
-  { id: 'eastbrook_arming_sword', name: 'Eastbrook Arming Sword', icon: '🗡️', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 4, weaponDmgMax: 7, weaponSpeedSec: 2.4 }, vendorPriceCopper: 220 },
-  { id: 'bronzework_mace',        name: 'Bronzework Mace',        icon: '🔨', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 5, weaponDmgMax: 8, weaponSpeedSec: 2.8 }, vendorPriceCopper: 240 },
-  { id: 'vale_carving_knife',     name: 'Vale Carving Knife',     icon: '🔪', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 2, weaponDmgMax: 5, weaponSpeedSec: 1.8 }, vendorPriceCopper: 180 },
-  { id: 'hickory_shortstaff',     name: 'Hickory Shortstaff',     icon: '🪄', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 4, weaponDmgMax: 6, weaponSpeedSec: 3.0, INT: 1 }, vendorPriceCopper: 200 },
-  { id: 'eastbrook_chain_vest',   name: 'Eastbrook Chain Vest',   icon: '🦺', type: 'armor', stack: 1, quality: 'common', slot: 'chest', gameStats: { armor: 14 }, vendorPriceCopper: 260 },
-  { id: 'valespun_robe',          name: 'Valespun Robe',          icon: '🥻', type: 'armor', stack: 1, quality: 'common', slot: 'chest', gameStats: { armor: 6, INT: 1 }, vendorPriceCopper: 210 },
-  { id: 'tanned_leather_jerkin',  name: 'Tanned Leather Jerkin',  icon: '🧥', type: 'armor', stack: 1, quality: 'common', slot: 'chest', gameStats: { armor: 10, DEX: 1 }, vendorPriceCopper: 230 },
-  { id: 'hobnail_boots',          name: 'Hobnail Boots',          icon: '🥾', type: 'armor', stack: 1, quality: 'common', slot: 'feet', gameStats: { armor: 5 }, vendorPriceCopper: 140 },
-  { id: 'eastbrook_wool_trousers',name: 'Eastbrook Wool Trousers',icon: '👖', type: 'armor', stack: 1, quality: 'common', slot: 'legs', gameStats: { armor: 6 }, vendorPriceCopper: 150 },
+  // ── Smith's wares ──────────────────────────────────────────────────
+  { id: 'arming_sword',     name: 'Arming Sword',     icon: '🗡️', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 4, weaponDmgMax: 7, weaponSpeedSec: 2.4 }, vendorPriceCopper: 220 },
+  { id: 'bronzework_mace',  name: 'Bronzework Mace',  icon: '🔨', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 5, weaponDmgMax: 8, weaponSpeedSec: 2.8 }, vendorPriceCopper: 240 },
+  { id: 'carving_knife',    name: 'Carving Knife',    icon: '🔪', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 2, weaponDmgMax: 5, weaponSpeedSec: 1.8 }, vendorPriceCopper: 180 },
+  { id: 'hickory_shortstaff', name: 'Hickory Shortstaff', icon: '🪄', type: 'weapon', stack: 1, quality: 'common', slot: 'mainHand', gameStats: { weaponDmgMin: 4, weaponDmgMax: 6, weaponSpeedSec: 3.0, INT: 1 }, vendorPriceCopper: 200 },
+  { id: 'chain_vest',       name: 'Chain Vest',       icon: '🦺', type: 'armor', stack: 1, quality: 'common', slot: 'chest', gameStats: { armor: 14 }, vendorPriceCopper: 260 },
+  { id: 'spun_robe',        name: 'Spun Robe',        icon: '🥻', type: 'armor', stack: 1, quality: 'common', slot: 'chest', gameStats: { armor: 6, INT: 1 }, vendorPriceCopper: 210 },
+  { id: 'tanned_leather_jerkin', name: 'Tanned Leather Jerkin', icon: '🧥', type: 'armor', stack: 1, quality: 'common', slot: 'chest', gameStats: { armor: 10, DEX: 1 }, vendorPriceCopper: 230 },
+  { id: 'hobnail_boots',    name: 'Hobnail Boots',    icon: '🥾', type: 'armor', stack: 1, quality: 'common', slot: 'feet', gameStats: { armor: 5 }, vendorPriceCopper: 140 },
+  { id: 'wool_trousers',    name: 'Wool Trousers',    icon: '👖', type: 'armor', stack: 1, quality: 'common', slot: 'legs', gameStats: { armor: 6 }, vendorPriceCopper: 150 },
 
   // ── Mob loot / junk (loot tables activate with P4 server inventory) ─
   { id: 'wolf_fang',      name: 'Wolf Fang',          icon: '🦷', type: 'misc', stack: 20, quality: 'common', vendorPriceCopper: 6 },

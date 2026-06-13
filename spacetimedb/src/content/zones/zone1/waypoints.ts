@@ -3,15 +3,15 @@
 // Regenerate with: npm run sync:content
 
 /**
- * zone1/waypoints.ts — Eastbrook Vale points of interest, verbatim from
- * world-of-claudecraft zone-1. Used for map labels and future 'find'
+ * zone1/waypoints.ts — zone-1 points of interest, modeled on the
+ * reference design's starter zone. Used for map labels and future 'find'
  * objectives (none of the zone-1 quests use 'find'; the POIs anchor the
- * world map + minimap).
+ * world map + minimap). Labels are placeholder copy.
  */
 import type { WaypointDef } from '../../types';
 
 export const WAYPOINTS: WaypointDef[] = [
-  { id: 'poi_eastbrook',     zoneId: 1, pos: { x: 0, z: -3 },    radiusM: 26, label: 'Eastbrook' },
+  { id: 'poi_town',          zoneId: 1, pos: { x: 0, z: -3 },    radiusM: 26, label: 'Town' },
   { id: 'poi_wolf_run',      zoneId: 1, pos: { x: -2, z: 70 },   radiusM: 20, label: 'Wolf Run' },
   { id: 'poi_boar_meadow',   zoneId: 1, pos: { x: 65, z: 0 },    radiusM: 20, label: 'Boar Meadow' },
   { id: 'poi_mirror_lake',   zoneId: 1, pos: { x: -88, z: 82 },  radiusM: 24, label: 'Mirror Lake' },

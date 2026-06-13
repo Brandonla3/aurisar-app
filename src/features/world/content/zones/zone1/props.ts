@@ -1,8 +1,8 @@
 /**
- * zone1/props.ts — Eastbrook settlement + camp dressing, positions copied
- * verbatim from world-of-claudecraft zone-1 (MIT; see
- * public/assets/ATTRIBUTION.md). Consumed client-side by
- * systems/PropsSystem.js; the server ignores props entirely.
+ * zone1/props.ts — hub settlement + camp dressing, positions modeled on
+ * the reference design's starter zone (see public/assets/ATTRIBUTION.md).
+ * Consumed client-side by systems/PropsSystem.js; the server ignores
+ * props entirely.
  */
 
 export interface BuildingProp { kind: 'house' | 'inn' | 'chapel'; x: number; z: number; w: number; d: number; rot: number }

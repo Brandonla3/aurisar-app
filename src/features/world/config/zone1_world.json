@@ -1,10 +1,10 @@
 {
   "meta": {
-    "name": "Eastbrook Vale — Zone 1",
+    "name": "Zone One",
     "version": 2,
-    "source": "Copied from world-of-claudecraft zone 1 (Eastbrook Vale, MIT) — hub, camps, roads, lake, and POIs carried over 1:1. See public/assets/ATTRIBUTION.md.",
+    "source": "Modeled on the reference design's starter zone — hub, camps, roads, lake, and POIs. See public/assets/ATTRIBUTION.md.",
     "units": "1 unit = 1 meter = 32 SpacetimeDB px; world origin = Babylon (0,0) = STDB (1600,1600)",
-    "notes": "Playable vale spans ±180 around the Eastbrook hub at the origin. Content anchors (verbatim from their zone1.ts): hub (0,0) r26, graveyard (-12,-14), Mirror Lake (-92,88) r30, Wolf Run (-2,70), Boar Meadow (65,0), Webwood (-60,4), Copper Dig (-84,-64), Bandit Camp (76,-76), Fallen Chapel (80,80). Settlement props placed by systems/PropsSystem.js from content/zones/zone1/props.ts."
+    "notes": "Playable region spans ±180 around the hub at the origin. Content anchors: hub (0,0) r26, graveyard (-12,-14), lake (-92,88) r30, wolf camp (-2,70), boar meadow (65,0), webwood (-60,4), mine (-84,-64), bandit camp (76,-76), ruined chapel (80,80). Settlement props placed by systems/PropsSystem.js from content/zones/zone1/props.ts."
   },
   "seed": 20260612,
   "radius": 520,
@@ -40,7 +40,7 @@
   ],
   "trailHalfWidth": 3.1,
   "biomes": [
-    { "name": "Eastbrook Vale", "ground": [0.80, 0.86, 0.50], "fog": "#b0b482", "grass": 1.0,  "grassCol": [0.30, 0.46, 0.16], "treeSkip": 0.80, "trees": ["broadleaf"], "rockSkip": 0.72, "danger": 0.15 },
+    { "name": "Meadow", "ground": [0.80, 0.86, 0.50], "fog": "#b0b482", "grass": 1.0,  "grassCol": [0.30, 0.46, 0.16], "treeSkip": 0.80, "trees": ["broadleaf"], "rockSkip": 0.72, "danger": 0.15 },
     { "name": "Northwood",      "ground": [0.42, 0.55, 0.26], "fog": "#55663c", "grass": 0.85, "grassCol": [0.15, 0.30, 0.10], "treeSkip": 0.00, "trees": ["broadleaf", "broadleaf", "pine"], "rockSkip": 0.60, "danger": 0.5 },
     { "name": "Vale Hills",     "ground": [0.66, 0.64, 0.56], "fog": "#8e96a2", "grass": 0.30, "grassCol": [0.34, 0.40, 0.22], "treeSkip": 0.55, "trees": ["pine"], "rockSkip": 0.00, "danger": 0.4 },
     { "name": "Webwood",        "ground": [0.40, 0.46, 0.30], "fog": "#5d6a54", "grass": 0.30, "grassCol": [0.24, 0.33, 0.16], "treeSkip": 0.50, "trees": ["dead", "dead", "pine"], "rockSkip": 0.70, "danger": 0.7 },

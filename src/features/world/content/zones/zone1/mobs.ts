@@ -1,12 +1,12 @@
 /**
- * zone1/mobs.ts — Eastbrook Vale mob roster + camp spawns, copied from
- * world-of-claudecraft's zone-1 content (MIT; see public/assets/ATTRIBUTION.md).
+ * zone1/mobs.ts — zone-1 mob roster + camp spawns, modeled on the
+ * reference design's starter zone (see public/assets/ATTRIBUTION.md).
  *
- * Adaptations from the source (noted per the porting contract):
- *  - Their per-level stat formulas are baked at each mob's mid level
- *    (our MobDef is flat until P3's level-scaled combat).
- *  - moveSpeedMps scaled by ~0.55 — their mobs run 8 yd/s against a
- *    7 yd/s player; our player moves slower, so the ratio is preserved
+ * Adaptations from the reference (noted per the porting contract):
+ *  - Per-level stat formulas are baked at each mob's mid level (our
+ *    MobDef is flat until P3's level-scaled combat).
+ *  - moveSpeedMps scaled by ~0.55 — the reference mobs run 8 yd/s against
+ *    a 7 yd/s player; our player moves slower, so the ratio is preserved
  *    rather than the absolute value.
  *  - Loot tables ship now but only roll once P4's server inventory lands.
  */
@@ -205,8 +205,8 @@ export const MOBS: MobDef[] = [
   },
 ];
 
-// Camp positions are verbatim from claudecraft zone1 (their coordinate
-// frame carried over 1:1 — relative layout is identical).
+// Camp positions follow the reference zone-1 layout (coordinate frame
+// carried over 1:1 — relative layout is identical).
 export const SPAWNS: SpawnDef[] = [
   // Wolf runs (north woods)
   { netId: 'z1_wolves_a',   mobType: 'forest_wolf',    zoneId: 1, pos: { x: -15, z: 55 },  count: 7, radiusM: 22 },

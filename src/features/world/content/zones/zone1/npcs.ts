@@ -1,12 +1,12 @@
 /**
- * zone1/npcs.ts — Eastbrook's NPCs, copied verbatim from
- * world-of-claudecraft zone-1 (MIT; see public/assets/ATTRIBUTION.md).
- * Positions/facings/greetings are theirs 1:1.
+ * zone1/npcs.ts — the hub NPCs. Layout and placeholder copy are modeled
+ * on the reference design's starter zone (see public/assets/ATTRIBUTION.md);
+ * the story pass rewrites names and dialogue freely.
  *
  * questIds list only the quests the current server supports (kill
  * objectives). The collect-objective quests (q_boars, q_spiders,
  * q_supplies, the Aldric collect chain) and the dungeon quests activate
- * with P4 (server inventory) and P7 (Hollow Crypt).
+ * with P4 (server inventory) and P7 (the crypt dungeon).
  */
 import type { NpcDef } from '../../types';
 
@@ -62,9 +62,9 @@ export const NPCS: NpcDef[] = [
     questIds: [],
     greeting: 'Mind the sparks, $C. Good steel is the difference between a scar and a grave.',
     vendorItemIds: [
-      'eastbrook_arming_sword', 'bronzework_mace', 'vale_carving_knife', 'hickory_shortstaff',
-      'eastbrook_chain_vest', 'valespun_robe', 'tanned_leather_jerkin',
-      'hobnail_boots', 'eastbrook_wool_trousers',
+      'arming_sword', 'bronzework_mace', 'carving_knife', 'hickory_shortstaff',
+      'chain_vest', 'spun_robe', 'tanned_leather_jerkin',
+      'hobnail_boots', 'wool_trousers',
     ],
   },
   {

@@ -35,9 +35,9 @@ import { locationLabelAt } from '../mapRender.js';
 // Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
 // validation runs in CI via src/features/world/config/validators.js.
 import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
-// P1: zone 1 ("Eastvale Reach") replaces Ashwood as the playable map.
-// ashwood_world.json stays in the repo as a dev/test world — swap the
-// import to get it back locally.
+// P1: zone 1 replaces Ashwood as the playable map. ashwood_world.json
+// stays in the repo as a dev/test world — swap the import to get it back
+// locally.
 import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
 import { PropsSystem } from '../systems/PropsSystem.js';
@@ -877,7 +877,7 @@ export class BabylonWorldScene {
       })
       .catch((err) => console.warn('[NpcSystem] init failed:', err));
 
-    // Eastbrook settlement + camp props (CC0 GLBs). Independent of NPC
+    // Hub settlement + camp props (CC0 GLBs). Independent of NPC
     // loading; missing files skip silently.
     this._props = new PropsSystem(this.scene, this._worldgen);
     this._props.init().catch((err) => console.warn('[PropsSystem] init failed:', err));

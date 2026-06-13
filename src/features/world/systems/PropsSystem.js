@@ -1,11 +1,11 @@
 /**
- * PropsSystem — places the Eastbrook settlement + camp dressing from
- * content/zones/zone1/props.ts using the CC0 GLBs copied from
- * world-of-claudecraft (public/assets/props/; see ATTRIBUTION.md).
+ * PropsSystem — places the hub settlement + camp dressing from
+ * content/zones/zone1/props.ts using the CC0 GLBs under
+ * public/assets/props/ (see ATTRIBUTION.md).
  *
  * Pure client visuals: deterministic from content data, no server rows,
  * no collision (tree/prop collision is a tracked backlog item). Placement
- * rules mirror their src/render/props.ts: buildings scaled to authored
+ * rules follow the reference layout: buildings scaled to authored
  * w×h×d footprints, fences segmented along lines, ruin rings alternating
  * intact/broken columns, composed mine entrance and dock.
  */
@@ -52,7 +52,7 @@ const MANIFEST = {
   cart: 'cart.glb',
 };
 
-// House heights from their props.ts (houseHeight table).
+// House heights from the reference layout (houseHeight table).
 const HOUSE_KINDS = ['house_1', 'house_2', 'blacksmith'];
 const HOUSE_HEIGHT = { house_1: 8.0, house_2: 7.6, inn: 7.6, blacksmith: 6.6 };
 
@@ -140,7 +140,7 @@ export class PropsSystem {
     // ── Buildings ──────────────────────────────────────────────────
     for (const b of P.buildings) {
       if (b.kind === 'chapel') {
-        // Their chapel = bell tower (rear) + small hall (front).
+        // Chapel = bell tower (rear) + small hall (front).
         this._place('bell_tower', b.x, b.z - 0.75 * Math.cos(b.rot), {
           fit: { w: b.w * 0.98, h: 10.6, d: b.d * 0.72 }, rotY: b.rot,
         });

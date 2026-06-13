@@ -1,8 +1,8 @@
 # Aurisar Micro-MMO — Plan & Progress
 
-Porting the **concept** of [world-of-claudecraft](https://github.com/levy-street/world-of-claudecraft)
-(MIT — a WoW-Classic-style micro-MMO: zones, NPCs, quests, classes, loot,
-parties, dungeons) into Aurisar's existing Babylon.js 3D world on
+Porting the **concept** of a reference micro-MMO design (an MIT-licensed
+open-source project — WoW-Classic-style: zones, NPCs, quests, classes,
+loot, parties, dungeons) into Aurisar's existing Babylon.js 3D world on
 SpacetimeDB. Story/names/art are working placeholders the owner rewrites;
 systems and layout are the deliverable.
 
@@ -15,10 +15,11 @@ systems and layout are the deliverable.
 1. **End-state = full micro-MMO**: quests/NPCs/dialogue, XP/leveling, all
    ability kits, loot/equipment, vendors, parties, trading, dueling,
    instanced dungeons. Built so content is easy to iterate on.
-2. **Copy Claudecraft zones VERBATIM** as working placeholders — NPC
-   names, quest text, positions, camps, props. Never invent substitutes.
-   Zone 1 = their Eastbrook Vale (done). Zone 2/3 = their Mirefen Marsh /
-   Thornpeak Heights (P5), same extraction method.
+2. **Reference the design's zones faithfully** as working placeholders —
+   NPC layouts, quest structure, positions, camps, props. Don't invent
+   parallel substitutes; carry the reference layout over and let the story
+   pass rewrite names/copy. Zone 1 done. Zones 2/3 follow in P5 with the
+   same method.
 3. **XP comes ONLY from the fitness app.** `GAME_XP_ENABLED = false` in
    `src/features/world/content/formulas/xp.ts` gates every in-game XP
    path (built + tested, but off). World level =
@@ -34,7 +35,7 @@ systems and layout are the deliverable.
    dedup table, designed in plan §2b).
 5. **Zone level bands cap at 35**: zone 1 ≈ 1–7 (their band), zone 2/3
    land in P5 up to ~35. Players can reach fitness level 100.
-6. **Classes**: all 9 Claudecraft kits mapped onto Aurisar's 11 classes
+6. **Classes**: all 9 reference class kits mapped onto Aurisar's 11 classes
    (approved): warrior→Warrior, gladiator→Paladin, warden→Hunter,
    phantom→Rogue, tempest→Shaman, warlord→Priest-as-battle-leader,
    druid→Druid, oracle→Mage, alchemist→Warlock; titan/striker = derived
@@ -45,7 +46,7 @@ systems and layout are the deliverable.
 8. **Mobile-lite**: explore/talk/non-combat quests on mobile; combat
    desktop-first. Avatar customize + CharacterTurntable review fully
    mobile.
-9. **Art**: Claudecraft's CC0 assets as placeholders
+9. **Art**: CC0 placeholder assets
    (`public/assets/ATTRIBUTION.md`); swap-in-place by filename is the
    contract for the custom Blender/Unreal art pass.
 10. **The main/test character renders as the bare base-body GLB.**
@@ -80,11 +81,11 @@ Full original plan: `C:\Users\brand\.claude\plans\i-need-you-to-shiny-quokka.md`
 | Phase | Scope | Status |
 |---|---|---|
 | P0 | Content package + sync bridge + vitest + MANIFEST dedupe | ✅ merged (PR #218) |
-| P1 | Eastbrook Vale map/town, NPCs, dialogue, quest system, CharacterTurntable | ✅ in PR #219 |
+| P1 | Zone 1 map/town, NPCs, dialogue, quest system, CharacterTurntable | ✅ in PR #219 |
 | P2 | Progression bridge: `playerProgress` + `syncProgress(fitnessXp)`, baseline reset, copper/template rewards, Supabase mirror v1 | ⬜ next |
 | P3 | Combat core (`playerCombat`/effects/casts + tick gating, `castAbilityV2`, hotbar/targeting/fx) + all 11 class kits | ⬜ |
 | P4 | Server inventory/loot/equipment/vendors; fitness perks live; collect-objective quests activate (q_boars, q_spiders, q_supplies, Aldric chain) | ⬜ |
-| P5 | Zones 2–3 (copy Mirefen Marsh + Thornpeak Heights), zone travel, per-zone bounds/graveyards | ⬜ |
+| P5 | Zones 2–3 (reference zones 2 & 3), zone travel, per-zone bounds/graveyards | ⬜ |
 | P6 | Parties, trading, dueling | ⬜ |
 | P7 | Hollow Crypt dungeon (instances via `instance_id`), q_sexton/q_hollow activate | ⬜ |
 | P8 | Procedural WebAudio, authored icons, mobile perf, meshopt compression, chat cleanup | ⬜ |
@@ -102,7 +103,7 @@ Full original plan: `C:\Users\brand\.claude\plans\i-need-you-to-shiny-quokka.md`
   mob AI generalized to per-`MobDef` stats; `setPlayerInfo` class
   allow-list = the 11 real Aurisar classes.
 
-**Zone 1 = Eastbrook Vale, copied 1:1** from their `zone1.ts`:
+**Zone 1 — modeled on the reference design's starter zone**:
 - 7 NPCs verbatim (Marshal Redbrook, Trader Wilkes, Apothecary Lin,
   Brother Aldric, Smith Haldren, Fisherman Brandt, Foreman Odell).
 - 9-mob roster (forest_wolf … old_greyjaw, gorrak) at their 12 exact
@@ -143,7 +144,7 @@ CharacterTurntable on the Character tab (mobile review surface).
 
 - **Quest accepting only works after merge** — the PR's Netlify preview
   runs the new client against the pre-P1 prod module. Post-merge, CI
-  republishes; first `seedWorld` migrates mobs to the Eastbrook camps.
+  republishes; first `seedWorld` migrates mobs to the zone-1 camps.
 - Local dev: `spacetime` CLI v2.5 IS installed
   (`%USERPROFILE%\AppData\Local\SpacetimeDB`). Regenerate bindings from
   `spacetimedb/`: `spacetime generate --lang typescript --module-path .

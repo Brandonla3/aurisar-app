@@ -1,6 +1,7 @@
 /**
- * zone1/quests.ts — the Eastbrook Vale questline, copied verbatim from
- * world-of-claudecraft zone-1 (MIT; see public/assets/ATTRIBUTION.md).
+ * zone1/quests.ts — the zone-1 questline, modeled on the reference
+ * design's starter zone (see public/assets/ATTRIBUTION.md). All text is
+ * placeholder copy the story pass rewrites.
  *
  * ACTIVE NOW (kill objectives — what the current server supports):
  *   q_wolves → q_greyjaw / q_bandits → q_ringleader · q_murlocs ·
@@ -26,7 +27,7 @@ export const QUESTS: QuestDef[] = [
     name: 'Wolves at the Door',
     giverNpcId: 'marshal_redbrook',
     turnInNpcId: 'marshal_redbrook',
-    text: 'The forest wolves grow bold, snapping at travelers on the north road. Thin their numbers, $N. Slay 8 Forest Wolves and Eastbrook will breathe easier.',
+    text: 'The forest wolves grow bold, snapping at travelers on the north road. Thin their numbers, $N. Slay 8 Forest Wolves and the town will breathe easier.',
     completionText: 'Fine work. The road feels safer already.',
     objectives: [
       { type: 'kill', mobType: 'forest_wolf', count: 8, label: 'Forest Wolf slain' },
@@ -98,7 +99,7 @@ export const QUESTS: QuestDef[] = [
     turnInNpcId: 'marshal_redbrook',
     requiresQuestId: 'q_bandits',
     text: 'The bandits answer to one man: Gorrak the Ruthless. Cut off the head and the body will scatter. He skulks at the heart of their camp. End him, $N.',
-    completionText: 'Gorrak is dead? Then the Vale is free of his shadow. You have done Eastbrook a great service.',
+    completionText: 'Gorrak is dead? Then the valley is free of his shadow. You have done the town a great service.',
     objectives: [
       { type: 'kill', mobType: 'gorrak', count: 1, label: 'Gorrak the Ruthless slain' },
     ],
