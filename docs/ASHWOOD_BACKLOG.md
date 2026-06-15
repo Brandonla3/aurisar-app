@@ -85,3 +85,56 @@ Ground rules for every item:
   player movement — stagger across frames if mobile profiling shows hitches.
 - [ ] Perf watch: confirm the shadow generator render list doesn't grow with
   tile churn over long sessions (prop clones register as casters per tile).
+
+## Tree branch structure (follow-up to PR #216)
+
+PR #216 replaced the solid icosphere canopies with alpha-cutout **leaf cards**
+(`src/features/world/streaming/ashwoodPropMeshes.js`): a dense, outer-shell
+ellipsoid of textured quads over a bare trunk, outward-facing with AO vertex
+tint. It reads as a full leaf mass but lacks the internal **twiggy branch
+structure** of a real broadleaf (see the hazelnut reference). This item adds it.
+
+**Where it lives:** `ashwoodPropMeshes.js`
+- `buildPropTemplates(scene, opts)` — shared templates + materials (`bark`,
+  `leafCardMat`).
+- `buildTileProps(...)` — per-tile thin instances. Broadleaf = `acc.trunk` +
+  `acc.leafCard`; Wildwood forest = `acc.fTrunk` + `acc.leafCard`.
+- `Acc.push(px,py,pz, rx,ry,rz, sx,sy,sz, col)` → one thin instance;
+  `acc.X.realize(name, template, scene, container, castShadow)` → one draw call.
+- **Determinism is load-bearing:** every per-tree value comes from
+  `mulberry32(t.seed)`. Per the ground rules above, new RNG draws must be an
+  **append-only stage** in a fixed order, or clients desync.
+
+**Steps:**
+- [ ] **Template + accumulator** — add `T.branch` (tapered unit-length cylinder
+  along +Y, ~6 sides) using the existing `bark` material so it inherits the
+  bark texture; add `acc.branch = new Acc()` + a guarded `realize` (cast shadows).
+- [ ] **Arbitrary-direction helper** — `Acc.push` takes Euler angles, awkward for
+  arbitrary branch directions. Add `Acc.pushDir(px,py,pz, dir, length, radius,
+  col)` composing the matrix from `BABYLON.Quaternion.FromUnitVectorsToRef(
+  Vector3.Up(), dir, q)`.
+- [ ] **Generate branches (broadleaf + forest)** — from the upper third of the
+  trunk, emit 4–6 primary branches (direction outward + upward, length ~60–80%
+  into the canopy ellipsoid), cylinder placed at the branch midpoint. Optional
+  one level of thinner/shorter secondary twigs. Let tips poke slightly past the
+  leaf shell so they read through the gaps.
+- [ ] **Anchor leaf cards to branch tips (the realism multiplier)** — replace the
+  pure-ellipsoid scatter with Gaussian leaf-card clusters around stored branch-tip
+  positions, so leaves grow *from* branches while keeping the dense outer shell.
+- [ ] **Bake mode** — branches are plain geometry + bark, so GLB-safe and may
+  render in both the live and bake paths (bark falls back to vertex-color brown
+  in bake). Leaf-card anchoring only applies where `templates.leafCard` exists;
+  the bake / no-art fallback keeps today's blob recipe.
+
+**Tuning knobs to expose:** primary-branch count, secondary-twig toggle/count,
+radius taper, tip overshoot beyond the leaf shell, leaf-cluster spread.
+
+**Verify:** `npm run build` + `npm run lint`; visually at Menu → ☀️ Noon on the
+preview (overworld broadleafs *and* Wildwood forest, plus a from-below view —
+branches should read through the canopy without looking like bare sticks).
+
+**Out of scope:** pines (cones) and dead trees (bare branches) — separate
+systems; only revisit with a needle texture. Performance is not a concern this
+round (still one thin-instance draw call per template per tile). The day/night
+**Time of day · testing** control (Menu) added in #216 is the tool for
+evaluating lighting-sensitive passes like this.
