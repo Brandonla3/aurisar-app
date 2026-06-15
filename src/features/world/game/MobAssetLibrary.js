@@ -23,8 +23,21 @@ const BASE = '/assets/mobs/';
 // Mob type (matches `mob.mob_type` in the SpacetimeDB module) → relative .glb
 // path. Keys must align with the `mobType` string the server emits; missing
 // files load silently and `_spawnMob` falls back to primitives.
+// Zone-1 roster → CC0 stand-in models under public/assets/mobs/ (see
+// public/assets/ATTRIBUTION.md). Several types share a file; missing
+// files fall back to family-shaped primitives.
 const MANIFEST = {
-  wolf: 'wolf.glb',
+  forest_wolf:    'wolf.glb',
+  old_greyjaw:    'wolf.glb',
+  wild_boar:      'bull.glb',
+  webwood_spider: 'spider.glb',
+  mudfin_murloc:  'glubevolved.glb',
+  tunnel_rat:     'goblin.glb',
+  vale_bandit:    'tribal.glb',
+  restless_bones: 'skeleton_minion.glb',
+  gorrak:         'orcenemy.glb',
+  // Legacy type (pre-zone-1 rows during the deploy window).
+  wolf:           'wolf.glb',
 };
 
 const _containers = new Map();

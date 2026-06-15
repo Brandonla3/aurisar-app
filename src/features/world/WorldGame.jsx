@@ -20,7 +20,15 @@ import GameMenu               from './GameMenu.jsx';
 import InventoryPanel         from './InventoryPanel.jsx';
 import CookingPanel           from './CookingPanel.jsx';
 import ActionButtons          from './ActionButtons.jsx';
+import DialoguePanel          from './hud/DialoguePanel.jsx';
+import QuestLogPanel          from './hud/QuestLogPanel.jsx';
+import QuestTracker           from './hud/QuestTracker.jsx';
 import { ITEMS }              from './game/items.js';
+import { NPCS, QUESTS, WAYPOINTS } from './content/index';
+import {
+  QUEST_STATE, useQuestRows, myQuestsFrom, buildNpcMarkers, parseCounts,
+} from './hooks/useQuests.js';
+import { CLASSES }            from '../../data/exercises.js';
 
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
@@ -179,10 +187,18 @@ export default function WorldGame({ playerInfo }) {
   const [localHp, setLocalHp] = useState({ hp: 100, maxHp: 100, dead: false, deadUntil: 0n });
 
   // UI panels (single-modal) + visibility prefs + world model handle.
-  const [activePanel, setActivePanel] = useState(null); // 'map'|'menu'|'inventory'|'cooking'|null
+  const [activePanel, setActivePanel] = useState(null); // 'map'|'menu'|'inventory'|'cooking'|'quests'|null
   const [uiPrefs, setUiPrefs] = useState(loadUiPrefs);
   const [mapData, setMapData] = useState(null);
   const [toast, setToast]     = useState(null); // { text, id }
+
+  // P1 quests/NPCs: which NPC is in talk range, and who we're talking to.
+  const [nearbyNpcId,   setNearbyNpcId]   = useState(null);
+  const [dialogueNpcId, setDialogueNpcId] = useState(null);
+  // Flips when the Babylon scene exists so effects that push state INTO the
+  // scene (NPC markers) re-run — the quest-marker effect otherwise fires
+  // before sceneRef is set and never again while disconnected.
+  const [sceneReady, setSceneReady] = useState(false);
 
   const inv = useInventory(playerInfo?.username);
 
@@ -248,11 +264,64 @@ export default function WorldGame({ playerInfo }) {
     sceneRef.current?._removeCampfire(row.campfireId);
   }, []);
 
-  const { connected, onlineCount, movePlayer, sendChat, castAbility, buildCampfire, identity } =
-    useSpacetimeWorld(playerInfo, {
-      onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
-      onCampfireUpsert, onCampfireDelete,
-    });
+  const onNearbyNpc = useCallback((npcId) => {
+    setNearbyNpcId(npcId);
+    // Walking out of range of the NPC we're talking to closes the dialogue
+    // (the server would reject its accept/turn-in calls anyway).
+    setDialogueNpcId((prev) => (prev && prev !== npcId ? null : prev));
+  }, []);
+
+  // Quest rows (identity-free handlers — filtered to ours below once
+  // useSpacetimeWorld hands us the identity).
+  const { onQuestUpsert, onQuestDelete, rows: questRows } = useQuestRows();
+
+  const {
+    connected, onlineCount, movePlayer, sendChat, castAbility, buildCampfire,
+    acceptQuest, abandonQuest, turnInQuest, reachWaypoint, identity,
+  } = useSpacetimeWorld(playerInfo, {
+    onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
+    onCampfireUpsert, onCampfireDelete, onQuestUpsert, onQuestDelete,
+  });
+
+  const myQuests = React.useMemo(
+    () => myQuestsFrom(questRows, identity),
+    [questRows, identity],
+  );
+  const className = CLASSES[playerInfo?.classType]?.name;
+
+  // NPC quest markers (! / ?) follow quest state into the 3D scene.
+  useEffect(() => {
+    if (!sceneReady) return;
+    sceneRef.current?.setNpcMarkers(buildNpcMarkers(Object.keys(NPCS), myQuests));
+  }, [myQuests, sceneReady]);
+
+  // Auto-report 'find' objectives: when standing inside an unvisited
+  // waypoint of an active quest, tell the server (which re-validates the
+  // radius; double-sends are idempotent).
+  useEffect(() => {
+    const t = setInterval(() => {
+      const pos = sceneRef.current?.getLocalPosition?.();
+      if (!pos) return;
+      for (const [questId, row] of myQuests) {
+        if (row.state !== QUEST_STATE.ACTIVE) continue;
+        const quest = QUESTS[questId];
+        if (!quest) continue;
+        const counts = parseCounts(row, quest);
+        quest.objectives.forEach((obj, i) => {
+          if (obj.type !== 'find' || (counts[i] ?? 0) >= 1) return;
+          const wp = WAYPOINTS[obj.targetId];
+          if (!wp) return;
+          const dx = pos.x - wp.pos.x;
+          const dz = pos.z - wp.pos.z;
+          if (dx * dx + dz * dz <= wp.radiusM * wp.radiusM) {
+            reachWaypoint(questId, i);
+          }
+        });
+      }
+    }, 1200);
+    return () => clearInterval(t);
+  }, [myQuests, reachWaypoint]);
+
 
   useEffect(() => {
     if (identity) sceneRef.current?.setMyIdentity(identity);
@@ -272,14 +341,16 @@ export default function WorldGame({ playerInfo }) {
       canvasRef.current,
       playerInfo,
       { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
-        onLocalPlayerUpdate, onChestOpen }
+        onLocalPlayerUpdate, onChestOpen, onNearbyNpc }
     );
     sceneRef.current = scene;
     setMapData(scene.getMapData());
+    setSceneReady(true);
 
     return () => {
       scene.dispose();
       sceneRef.current = null;
+      setSceneReady(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -400,6 +471,7 @@ export default function WorldGame({ playerInfo }) {
       if (chatOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Escape') {
+        if (dialogueNpcId) { e.stopPropagation(); e.preventDefault(); setDialogueNpcId(null); return; }
         if (activePanel) { e.stopPropagation(); e.preventDefault(); closePanel(); }
         return;
       }
@@ -409,14 +481,20 @@ export default function WorldGame({ playerInfo }) {
         case 'KeyI': togglePanel('inventory'); break;
         case 'KeyC': togglePanel('cooking');   break;
         case 'KeyG': togglePanel('menu');      break;
+        case 'KeyL': togglePanel('quests');    break;
         case 'KeyN': toggleMinimap();          break;
+        case 'KeyE':
+          if (nearbyNpcId && !dialogueNpcId) setDialogueNpcId(nearbyNpcId);
+          else if (dialogueNpcId) setDialogueNpcId(null);
+          else handled = false;
+          break;
         default: handled = false;
       }
       if (handled) { e.stopPropagation(); e.preventDefault(); }
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [chatOpen, activePanel, togglePanel, toggleMinimap, closePanel]);
+  }, [chatOpen, activePanel, togglePanel, toggleMinimap, closePanel, nearbyNpcId, dialogueNpcId]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -429,12 +507,16 @@ export default function WorldGame({ playerInfo }) {
       {uiPrefs.showActionButtons && (
         <ActionButtons
           onMap={()       => openPanel('map')}
+          onQuests={()    => openPanel('quests')}
           onInventory={() => openPanel('inventory')}
           onCooking={()   => openPanel('cooking')}
           onCampfire={()  => sceneRef.current?.requestBuildCampfire()}
           onMenu={()      => openPanel('menu')}
         />
       )}
+
+      {/* P1: active-quest tracker (hidden while any modal is open) */}
+      {!activePanel && !dialogueNpcId && <QuestTracker myQuests={myQuests} />}
 
       {/* World map */}
       {activePanel === 'map' && mapData && (
@@ -447,6 +529,48 @@ export default function WorldGame({ playerInfo }) {
       )}
       {activePanel === 'cooking' && (
         <CookingPanel inv={inv} sceneRef={sceneRef} onClose={closePanel} onToast={showToast} />
+      )}
+
+      {/* P1: quest log */}
+      {activePanel === 'quests' && (
+        <QuestLogPanel
+          myQuests={myQuests}
+          onAbandonQuest={abandonQuest}
+          onClose={closePanel}
+        />
+      )}
+
+      {/* P1: NPC dialogue */}
+      {dialogueNpcId && (
+        <DialoguePanel
+          npcId={dialogueNpcId}
+          myQuests={myQuests}
+          playerName={playerInfo?.username}
+          className={className}
+          onAcceptQuest={(qid) => { acceptQuest(qid); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
+          onTurnInQuest={(qid) => { turnInQuest(qid); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
+          onClose={() => setDialogueNpcId(null)}
+        />
+      )}
+
+      {/* P1: talk prompt when an NPC is in range (tap-friendly) */}
+      {nearbyNpcId && !dialogueNpcId && !activePanel && (
+        <button
+          onClick={() => setDialogueNpcId(nearbyNpcId)}
+          aria-label={`Talk to ${NPCS[nearbyNpcId]?.name ?? 'NPC'}`}
+          style={{
+            position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20, display: 'flex', alignItems: 'center', gap: 8,
+            background: 'rgba(15,23,42,0.88)', border: '1px solid rgba(240,208,96,0.5)',
+            borderRadius: 22, padding: '9px 18px', color: '#f0d060',
+            fontSize: 13.5, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
+            cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span>💬</span>
+          <span>Talk to {NPCS[nearbyNpcId]?.name ?? 'NPC'}{!IS_TOUCH && ' (E)'}</span>
+        </button>
       )}
 
       {/* Game menu */}
@@ -605,8 +729,8 @@ export default function WorldGame({ playerInfo }) {
       {/* Controls hint — desktop only (mobile hint is self-evident from joystick) */}
       {!IS_TOUCH && (
         <div style={S.hint}>
-          WASD / ↑↓←→ move · Space attack · F campfire<br />
-          M map · I inventory · C cooking · G menu · N minimap<br />
+          WASD / ↑↓←→ move · Space attack · E talk · F campfire<br />
+          M map · L quests · I inventory · C cooking · G menu · N minimap<br />
           Mouse drag orbit · Scroll zoom · ESC exit world
         </div>
       )}

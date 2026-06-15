@@ -22,7 +22,16 @@
 
 import { schema, table, t } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
-import { tileGameplay, type SpawnPoint } from './gameplay/index.js';
+import {
+  CLASS_IDS,
+  MOBS,
+  NPCS,
+  QUESTS,
+  SPAWNS,
+  WAYPOINTS,
+  ZONES_BY_ID,
+} from './content/index.js';
+import type { MobDef, QuestDef, SpawnDef } from './content/types.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -39,18 +48,22 @@ const WORLD_MAX_PX = WORLD_CENTER_PX + WORLD_HALF_PX - PLAYER_HALF_PX; // 33568
 const PX_PER_M                  = 32;
 const AI_TICK_MICROS            = 250_000n;   // 4 Hz mob AI tick
 const AI_TICK_DT_SEC            = 0.25;
-const WOLF_MOVE_SPEED_PX_PER_S  = 3 * PX_PER_M;       // 3 m/s (slower than player so they're outrunnable)
-const WOLF_MOVE_STEP_PX         = WOLF_MOVE_SPEED_PX_PER_S * AI_TICK_DT_SEC;  // 24 px / tick
-const WOLF_MELEE_RANGE_PX       = 2 * PX_PER_M;       // 2 m bite range
-const WOLF_ATTACK_DAMAGE        = 10;
-const WOLF_ATTACK_CD_MICROS     = 1_500_000n;         // 1.5 s between bites → 6.67 dps
-const SEED_WOLF_HP              = 100;
-const SEED_WOLF_AGGRO_M         = 18;                 // default if JSON omits
-const SEED_WOLF_LEASH_M         = 35;                 // default if JSON omits
-const SEED_WOLF_RESPAWN_SEC     = 25;                 // default if JSON omits
+const WOLF_MELEE_RANGE_PX       = 2 * PX_PER_M;       // 2 m melee range (all mob types, until P3)
+// Legacy column defaults — the mob table's ADD COLUMN defaults were
+// published with these values; they must not change (migration contract).
+// Live stats now come from the content package per mobType.
+const SEED_WOLF_AGGRO_M         = 18;
+const SEED_WOLF_LEASH_M         = 35;
+const SEED_WOLF_RESPAWN_SEC     = 25;
 
 const PLAYER_MAX_HP             = 100;
 const PLAYER_RESPAWN_MICROS     = 5_000_000n;         // 5 s death timer before snap to origin
+
+// ── P1 quests / NPCs ─────────────────────────────────────────────────────────
+const INTERACT_RANGE_PX         = 6 * PX_PER_M;       // talk/accept/turn-in must be within 6 m of the NPC
+const QUEST_STATE_ACTIVE        = 0;
+const QUEST_STATE_READY         = 1;
+const QUEST_STATE_DONE          = 2;
 
 // ── Campfires ────────────────────────────────────────────────────────────────
 //
@@ -69,20 +82,50 @@ const CAMPFIRE_PLACE_RANGE_PX   = 3 * PX_PER_M;       // must be placed within 3
 // `respawnMob` needs the original spawn point's world position + radii. Each
 // mob row stores its spawn metadata directly (spawnX/Y, aggro/leash, respawnSec)
 // so the AI tick is self-contained, but on respawn we need the *spawn point's*
-// values again to insert a fresh row. We build a map from `${net_id}_${i}` →
-// {spawnPoint, instanceIndex} at module load. Cost: ~10 entries, microseconds.
+// values again to insert a fresh row.
+//
+// P1: the seeding source is the shared content package (SPAWNS + MOBS in
+// src/content/, mirrored from src/features/world/content/) — tile-JSON spawns
+// (gameplay/) are retired; seedWorld's self-heal pass deletes their live rows
+// because their netIds no longer appear in this map.
 
 interface SpawnEntry {
-  spawn:         SpawnPoint;
+  spawn:         SpawnDef;
+  mobDef:        MobDef;
   instanceIndex: number;
 }
 const spawnByNetId = new Map<string, SpawnEntry>();
-for (const tile of tileGameplay) {
-  for (const spawn of tile.spawns) {
-    for (let i = 0; i < spawn.max_alive; i++) {
-      spawnByNetId.set(`${spawn.net_id}_${i}`, { spawn, instanceIndex: i });
-    }
+for (const spawn of SPAWNS) {
+  const mobDef = MOBS[spawn.mobType];
+  if (!mobDef) continue; // validateContent() catches this at authoring time
+  for (let i = 0; i < spawn.count; i++) {
+    spawnByNetId.set(`${spawn.netId}_${i}`, { spawn, mobDef, instanceIndex: i });
   }
+}
+
+/**
+ * Content positions are zone-local meters; zones share one STDB px plane
+ * offset by their manifest originOffsetM (zone 1 = origin for now).
+ */
+function contentPosToPx(zoneId: number, pos: { x: number; z: number }): { x: number; y: number } {
+  const zone = ZONES_BY_ID[zoneId];
+  const ox = zone ? zone.originOffsetM.x : 0;
+  const oz = zone ? zone.originOffsetM.z : 0;
+  return {
+    x: Math.round((pos.x + ox) * PX_PER_M + WORLD_CENTER_PX),
+    y: Math.round((pos.z + oz) * PX_PER_M + WORLD_CENTER_PX),
+  };
+}
+
+/**
+ * Deterministic scatter for the i-th instance of a spawn family — a
+ * golden-angle ring inside the camp radius. No RNG (reducers must stay
+ * deterministic), but instances spread instead of stacking on one point.
+ */
+function spawnInstanceOffsetM(i: number, radiusM: number): { dx: number; dz: number } {
+  const angle = i * 2.399963; // golden angle in radians
+  const r = radiusM * (0.35 + 0.65 * ((i % 5) / 5));
+  return { dx: Math.cos(angle) * r, dz: Math.sin(angle) * r };
 }
 
 // ── Scheduled-table row builders ─────────────────────────────────────────────
@@ -259,6 +302,33 @@ const spacetimedb = schema({
     campfireExpireQueueRow,
   ),
 
+  /**
+   * P1 — per-player quest progress. One row per (player, quest) pair from
+   * acceptance onward; rows persist after completion so prerequisites and
+   * once-only acceptance can be checked.
+   *
+   * state: 0 = active, 1 = ready (objectives met, awaiting turn-in),
+   *        2 = done (turned in).
+   * countsJson: JSON array parallel to the QuestDef.objectives array,
+   *        e.g. '[3,0]'. Kill counts increment in castAbility's kill path;
+   *        find objectives flip 0→1 in reachWaypoint.
+   *
+   * Public: clients subscribe and filter to their own identity (same
+   * trust posture as the player table at this scale). Lookups iterate —
+   * row count stays tiny (players × quests in a zone).
+   */
+  playerQuest: table(
+    { public: true },
+    {
+      id:         t.u64().primaryKey().autoInc(),
+      owner:      t.identity(),
+      questId:    t.string(),
+      state:      t.u8(),
+      countsJson: t.string(),
+      acceptedAt: t.u64(),
+    }
+  ),
+
 });
 
 export default spacetimedb;
@@ -281,9 +351,10 @@ export const setPlayerInfo = spacetimedb.reducer(
   (ctx, { username, classType, avatarColor, avatarConfig }) => {
     const identity = ctx.sender;
 
-    // Validate inputs
+    // Validate inputs. Class ids come from the shared content package —
+    // the same 11 Aurisar classes the fitness app defines.
     const safeName = username.trim().slice(0, 32) || 'Adventurer';
-    const safeClass = ['warrior', 'mage', 'archer', 'rogue'].includes(classType)
+    const safeClass = (CLASS_IDS as string[]).includes(classType)
       ? classType
       : 'warrior';
     const safeAvatarConfig = avatarConfig.length <= 4096 ? avatarConfig : '';
@@ -564,57 +635,31 @@ export const seedWorld = spacetimedb.reducer({}, (ctx) => {
     });
   }
 
-  // 2. Self-heal pass — repair rows from the slice-5b → 5c migration and
-  //    drop rows whose spawn definition no longer exists.
+  // 2. Self-heal pass — drop rows whose spawn definition no longer exists.
+  //    This is also the migration path away from the retired tile-JSON
+  //    spawns: their netIds aren't in the content-built spawnByNetId map,
+  //    so their live rows get deleted here and content spawns take over.
   const seeded = new Set<string>();
   const toDelete: bigint[] = [];
   for (const m of ctx.db.mob.iter()) {
     const entry = spawnByNetId.get(m.spawnNetId);
     if (!entry) {
-      // Legacy row (e.g. slice-5a hardcoded wolf, or a spawn point that
-      // was removed from a tile JSON since this row was inserted). The
-      // manifest is the source of truth — drop the orphan.
       toDelete.push(m.mobId);
       continue;
     }
     seeded.add(m.spawnNetId);
-
-    // ADD COLUMN backfill set spawnX/Y to 0. Real spawn anchors are
-    // always non-zero (the slice-5b tile is centered around STDB px
-    // ~(640, 1120), nowhere near origin). Use that to detect rows that
-    // need their per-mob AI metadata patched in.
-    if (m.spawnX === 0 && m.spawnY === 0) {
-      const xPx = Math.round(entry.spawn.position.x * PX_PER_M + WORLD_CENTER_PX);
-      const yPx = Math.round(entry.spawn.position.z * PX_PER_M + WORLD_CENTER_PX);
-      const aggroPx   = (entry.spawn.aggro_radius_m ?? SEED_WOLF_AGGRO_M) * PX_PER_M;
-      const leashPx   = (entry.spawn.leash_radius_m ?? SEED_WOLF_LEASH_M) * PX_PER_M;
-      const respawnSec = entry.spawn.respawn_sec ?? SEED_WOLF_RESPAWN_SEC;
-      ctx.db.mob.mobId.update({
-        ...m,
-        spawnX:        xPx,
-        spawnY:        yPx,
-        aggroRadiusPx: aggroPx,
-        leashRadiusPx: leashPx,
-        respawnSec,
-      });
-    }
   }
   for (const mobId of toDelete) {
     ctx.db.mob.mobId.delete(mobId);
   }
 
-  // 3. Insert any spawn points not already represented.
+  // 3. Insert any content spawn instances not already represented.
   let inserted = 0;
-  for (const tile of tileGameplay) {
-    for (const spawn of tile.spawns) {
-      for (let i = 0; i < spawn.max_alive; i++) {
-        const netId = `${spawn.net_id}_${i}`;
-        if (seeded.has(netId)) continue;
-        insertMobFromSpawn(ctx, spawn, netId, inserted);
-        seeded.add(netId);
-        inserted++;
-      }
-    }
+  for (const [netId, entry] of spawnByNetId) {
+    if (seeded.has(netId)) continue;
+    insertMobFromSpawn(ctx, entry, netId, inserted);
+    seeded.add(netId);
+    inserted++;
   }
 });
 
@@ -674,6 +719,9 @@ export const castAbility = spacetimedb.reducer(
         spawnNetId: mob.spawnNetId,
       });
       ctx.db.mob.mobId.delete(mobId);
+      // P1 quest hook: kill credit goes to whoever lands the killing blow
+      // (tap rights / party sharing arrive with P3/P6).
+      creditKillToQuests(ctx, player.identity, mob.mobType);
     } else {
       ctx.db.mob.mobId.update({ ...mob, hp: newHp });
     }
@@ -727,9 +775,14 @@ export const tickMobAI = spacetimedb.reducer(
 
     for (const mob of ctx.db.mob.iter()) {
       if (mob.hp <= 0) continue;
-      // Only wolves have AI for now — keeps future mob types inert until
-      // they get their own behavior.
-      if (mob.mobType !== 'wolf') continue;
+      // Per-type stats come from the shared content package. Unknown types
+      // (content removed between publishes) stay inert until self-healed.
+      const mobDef = MOBS[mob.mobType];
+      if (!mobDef) continue;
+      const moveStepPx = mobDef.moveSpeedMps * PX_PER_M * AI_TICK_DT_SEC;
+      const attackCdMicros = BigInt(Math.round(mobDef.attackSpeedSec * 1_000_000));
+      // Deterministic mid-roll damage until P3's seeded combat rolls land.
+      const attackDamage = Math.round((mobDef.dmgMin + mobDef.dmgMax) / 2);
 
       // 1. Leash check — if past leash radius, return home regardless of aggro.
       const homeDx = mob.x - mob.spawnX;
@@ -745,7 +798,7 @@ export const tickMobAI = spacetimedb.reducer(
       if (mob.state === 'returning' || homeDistSq > leashSq) {
         // Walk straight back to spawn point. Continue in 'returning' until
         // we're close enough to snap home.
-        const stepArrived = stepToward(mob.x, mob.y, mob.spawnX, mob.spawnY, WOLF_MOVE_STEP_PX);
+        const stepArrived = stepToward(mob.x, mob.y, mob.spawnX, mob.spawnY, moveStepPx);
         nextX = stepArrived.x;
         nextY = stepArrived.y;
         if (stepArrived.arrived) {
@@ -772,14 +825,14 @@ export const tickMobAI = spacetimedb.reducer(
           // Chase. Step toward the target.
           const meleeSq = WOLF_MELEE_RANGE_PX * WOLF_MELEE_RANGE_PX;
           if (nearestDistSq <= meleeSq) {
-            // In bite range — try to land a hit instead of moving.
-            if (now - mob.lastAttackAt >= WOLF_ATTACK_CD_MICROS) {
-              applyWolfBite(ctx, nearest.identity, now);
+            // In melee range — try to land a hit instead of moving.
+            if (now - mob.lastAttackAt >= attackCdMicros) {
+              applyMobHit(ctx, nearest.identity, now, attackDamage);
               nextLastAttackAt = now;
             }
             // Don't step — we're already in melee.
           } else {
-            const step = stepToward(mob.x, mob.y, nearest.x, nearest.y, WOLF_MOVE_STEP_PX);
+            const step = stepToward(mob.x, mob.y, nearest.x, nearest.y, moveStepPx);
             nextX = step.x;
             nextY = step.y;
           }
@@ -830,7 +883,7 @@ export const respawnMob = spacetimedb.reducer(
       if (m.spawnNetId === spawnNetId) return;
     }
 
-    insertMobFromSpawn(ctx, entry.spawn, spawnNetId, 0);
+    insertMobFromSpawn(ctx, entry, spawnNetId, 0);
   }
 );
 
@@ -935,18 +988,18 @@ function stepToward(x: number, y: number, tx: number, ty: number, maxStep: numbe
 }
 
 /**
- * Apply a wolf bite to a player by identity. Handles lethal damage by
+ * Apply a mob melee hit to a player by identity. Handles lethal damage by
  * setting hp=0, scheduling respawn, and stamping deadUntil.
  *
  * Idempotent if called twice in the same tick for the same target — second
  * call sees hp<=0 and returns early.
  */
-function applyWolfBite(ctx: any, targetIdentity: any, nowMicros: bigint): void {
+function applyMobHit(ctx: any, targetIdentity: any, nowMicros: bigint, damage: number): void {
   const player = ctx.db.player.identity.find(targetIdentity);
   if (!player) return;
   if (player.hp <= 0) return; // already dead
 
-  const newHp = player.hp - WOLF_ATTACK_DAMAGE;
+  const newHp = player.hp - damage;
   if (newHp <= 0) {
     const respawnAt = nowMicros + PLAYER_RESPAWN_MICROS;
     ctx.db.player.identity.update({
@@ -965,8 +1018,196 @@ function applyWolfBite(ctx: any, targetIdentity: any, nowMicros: bigint): void {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// QUESTS (P1)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Quest/NPC/waypoint *definitions* live in the bundled content package
+// (src/content/, mirrored from src/features/world/content/). Only per-player
+// progress is table state. Rewards (copper/items/template unlocks) are
+// granted at turn-in starting in P2/P4 — in P1 a turn-in just completes the
+// quest; gameXp is gated off by GAME_XP_ENABLED in the content formulas.
+
+function findQuestRow(ctx: any, identity: any, questId: string): any | null {
+  for (const q of ctx.db.playerQuest.iter()) {
+    if (q.questId === questId && q.owner.isEqual(identity)) return q;
+  }
+  return null;
+}
+
+function objectiveTarget(obj: QuestDef['objectives'][number]): number {
+  return obj.type === 'find' ? 1 : obj.count;
+}
+
+function parseCounts(json: string, len: number): number[] {
+  try {
+    const arr = JSON.parse(json);
+    if (Array.isArray(arr) && arr.length === len) {
+      return arr.map((n) => Math.max(0, Number(n) || 0));
+    }
+  } catch {
+    // malformed row — treat as fresh progress
+  }
+  return new Array(len).fill(0);
+}
+
+function questIsReady(quest: QuestDef, counts: number[]): boolean {
+  return quest.objectives.every((obj, i) => (counts[i] ?? 0) >= objectiveTarget(obj));
+}
+
+function playerInRangeOfNpc(player: { x: number; y: number }, npcId: string): boolean {
+  const npc = NPCS[npcId];
+  if (!npc) return false;
+  const px = contentPosToPx(npc.zoneId, npc.pos);
+  const dx = player.x - px.x;
+  const dy = player.y - px.y;
+  return dx * dx + dy * dy <= INTERACT_RANGE_PX * INTERACT_RANGE_PX;
+}
+
 /**
- * Build a fresh mob row from a SpawnPoint definition and insert it.
+ * Accept a quest from its giver NPC. Quests are once-only: any existing
+ * row (active, ready, or done) blocks re-acceptance. minLevel enforcement
+ * arrives with playerProgress in P2.
+ */
+export const acceptQuest = spacetimedb.reducer(
+  { questId: t.string() },
+  (ctx, { questId }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const quest: QuestDef | undefined = QUESTS[questId];
+    if (!quest) return;
+    if (findQuestRow(ctx, ctx.sender, questId)) return; // already taken/done
+
+    if (quest.requiresQuestId) {
+      const prereq = findQuestRow(ctx, ctx.sender, quest.requiresQuestId);
+      if (!prereq || prereq.state !== QUEST_STATE_DONE) return;
+    }
+    if (!playerInRangeOfNpc(player, quest.giverNpcId)) return;
+
+    ctx.db.playerQuest.insert({
+      id: 0n, // auto-inc replaces this
+      owner: ctx.sender,
+      questId,
+      state: QUEST_STATE_ACTIVE,
+      countsJson: JSON.stringify(new Array(quest.objectives.length).fill(0)),
+      acceptedAt: nowMicros,
+    });
+  }
+);
+
+/** Abandon an in-progress quest (done quests are immutable history). */
+export const abandonQuest = spacetimedb.reducer(
+  { questId: t.string() },
+  (ctx, { questId }) => {
+    const row = findQuestRow(ctx, ctx.sender, questId);
+    if (!row || row.state === QUEST_STATE_DONE) return;
+    ctx.db.playerQuest.id.delete(row.id);
+  }
+);
+
+/**
+ * Turn in a ready quest at its turn-in NPC. Progress is recomputed from
+ * counts server-side — the stored `ready` state is a cache, not trusted.
+ */
+export const turnInQuest = spacetimedb.reducer(
+  { questId: t.string() },
+  (ctx, { questId }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const quest: QuestDef | undefined = QUESTS[questId];
+    if (!quest) return;
+    const row = findQuestRow(ctx, ctx.sender, questId);
+    if (!row || row.state === QUEST_STATE_DONE) return;
+
+    const counts = parseCounts(row.countsJson, quest.objectives.length);
+    if (!questIsReady(quest, counts)) return;
+    if (!playerInRangeOfNpc(player, quest.turnInNpcId)) return;
+
+    // P2 grants copper/template unlocks here; P4 grants items. gameXp is
+    // gated by GAME_XP_ENABLED (off) per the fitness-only-XP decision.
+    ctx.db.playerQuest.id.update({ ...row, state: QUEST_STATE_DONE });
+  }
+);
+
+/**
+ * Complete a 'find' objective: the client reports arrival, the server
+ * validates the player actually stands inside the waypoint radius (+2 m
+ * tolerance for interpolation slop).
+ */
+export const reachWaypoint = spacetimedb.reducer(
+  { questId: t.string(), objectiveIdx: t.u32() },
+  (ctx, { questId, objectiveIdx }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const quest: QuestDef | undefined = QUESTS[questId];
+    if (!quest) return;
+    const obj = quest.objectives[objectiveIdx];
+    if (!obj || obj.type !== 'find') return;
+
+    const row = findQuestRow(ctx, ctx.sender, questId);
+    if (!row || row.state !== QUEST_STATE_ACTIVE) return;
+
+    const wp = WAYPOINTS[obj.targetId];
+    if (!wp) return;
+    const px = contentPosToPx(wp.zoneId, wp.pos);
+    const rangePx = (wp.radiusM + 2) * PX_PER_M;
+    const dx = player.x - px.x;
+    const dy = player.y - px.y;
+    if (dx * dx + dy * dy > rangePx * rangePx) return;
+
+    const counts = parseCounts(row.countsJson, quest.objectives.length);
+    if (counts[objectiveIdx] >= 1) return; // already found
+    counts[objectiveIdx] = 1;
+
+    ctx.db.playerQuest.id.update({
+      ...row,
+      countsJson: JSON.stringify(counts),
+      state: questIsReady(quest, counts) ? QUEST_STATE_READY : QUEST_STATE_ACTIVE,
+    });
+  }
+);
+
+/**
+ * Kill-credit hook, called from castAbility's kill path. Increments every
+ * matching kill objective on the killer's active quests and promotes rows
+ * to 'ready' when all objectives are met.
+ */
+function creditKillToQuests(ctx: any, identity: any, mobType: string): void {
+  for (const row of ctx.db.playerQuest.iter()) {
+    if (row.state !== QUEST_STATE_ACTIVE) continue;
+    if (!row.owner.isEqual(identity)) continue;
+    const quest: QuestDef | undefined = QUESTS[row.questId];
+    if (!quest) continue;
+
+    const counts = parseCounts(row.countsJson, quest.objectives.length);
+    let changed = false;
+    quest.objectives.forEach((obj, i) => {
+      if (obj.type === 'kill' && obj.mobType === mobType && counts[i] < obj.count) {
+        counts[i]++;
+        changed = true;
+      }
+    });
+    if (!changed) continue;
+
+    ctx.db.playerQuest.id.update({
+      ...row,
+      countsJson: JSON.stringify(counts),
+      state: questIsReady(quest, counts) ? QUEST_STATE_READY : QUEST_STATE_ACTIVE,
+    });
+  }
+}
+
+/**
+ * Build a fresh mob row from a content SpawnEntry and insert it.
  * Used by both `seedWorld` (initial spawn) and `respawnMob` (post-death).
  *
  * `instanceCounter` is added to the timestamp to keep `mobId` unique across
@@ -975,35 +1216,31 @@ function applyWolfBite(ctx: any, targetIdentity: any, nowMicros: bigint): void {
  */
 function insertMobFromSpawn(
   ctx: any,
-  spawn: SpawnPoint,
+  entry: SpawnEntry,
   netId: string,
   instanceCounter: number,
 ): void {
-  // Gameplay JSON positions are absolute world meters. STDB px =
-  // worldUnits * 32 + WORLD_CENTER_PX. position.y is vertical (Babylon Y)
-  // and is ignored — mobs walk on the ground plane; position.z maps to
-  // mob.y (the world's Z axis on the ground plane).
-  const xPx = Math.round(spawn.position.x * PX_PER_M + WORLD_CENTER_PX);
-  const yPx = Math.round(spawn.position.z * PX_PER_M + WORLD_CENTER_PX);
-
-  const aggroPx = (spawn.aggro_radius_m ?? SEED_WOLF_AGGRO_M) * PX_PER_M;
-  const leashPx = (spawn.leash_radius_m ?? SEED_WOLF_LEASH_M) * PX_PER_M;
-  const respawnSec = spawn.respawn_sec ?? SEED_WOLF_RESPAWN_SEC;
+  const { spawn, mobDef, instanceIndex } = entry;
+  const offset = spawnInstanceOffsetM(instanceIndex, spawn.radiusM);
+  const px = contentPosToPx(spawn.zoneId, {
+    x: spawn.pos.x + offset.dx,
+    z: spawn.pos.z + offset.dz,
+  });
 
   ctx.db.mob.insert({
     mobId:         ctx.timestamp.microsSinceUnixEpoch + BigInt(instanceCounter),
-    mobType:       spawn.mob_type,
-    x:             xPx,
-    y:             yPx,
-    hp:            SEED_WOLF_HP,
-    maxHp:         SEED_WOLF_HP,
+    mobType:       spawn.mobType,
+    x:             px.x,
+    y:             px.y,
+    hp:            mobDef.maxHp,
+    maxHp:         mobDef.maxHp,
     state:         'alive',
     spawnNetId:    netId,
-    spawnX:        xPx,
-    spawnY:        yPx,
-    aggroRadiusPx: aggroPx,
-    leashRadiusPx: leashPx,
-    respawnSec,
+    spawnX:        px.x,
+    spawnY:        px.y,
+    aggroRadiusPx: mobDef.aggroRadiusM * PX_PER_M,
+    leashRadiusPx: mobDef.leashRadiusM * PX_PER_M,
+    respawnSec:    mobDef.respawnSec,
     lastAttackAt:  0n,
   });
 }

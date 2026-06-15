@@ -22,7 +22,6 @@ import { AshwoodGrass }      from './AshwoodGrass.js';
 import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { AshwoodWildlife }   from './AshwoodWildlife.js';
 import { AshwoodWeather }    from './AshwoodWeather.js';
-import { mergeConfig }     from './avatarSchema.js';
 import {
   TileLoader,
   GlbTileProvider,
@@ -36,7 +35,13 @@ import { locationLabelAt } from '../mapRender.js';
 // Direct JSON import: keeps ajv out of the world-runtime bundle. Schema
 // validation runs in CI via src/features/world/config/validators.js.
 import worldBuildConfig from '../config/world_build_config.json' with { type: 'json' };
-import ashwoodWorldConfig from '../config/ashwood_world.json' with { type: 'json' };
+// P1: zone 1 replaces Ashwood as the playable map. ashwood_world.json
+// stays in the repo as a dev/test world — swap the import to get it back
+// locally.
+import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
+import { NpcSystem } from '../systems/NpcSystem.js';
+import { PropsSystem } from '../systems/PropsSystem.js';
+import { MOBS as MOB_DEFS } from '../content/index';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
 // would z-fight/clip against it. Re-enable once the Phase-5 bake pipeline
@@ -776,11 +781,11 @@ export class BabylonWorldScene {
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
 
-    // Pure-math Ashwood world model (heightfield, biomes, trails, sites).
+    // Pure-math world model (heightfield, biomes, trails, sites).
     // Deterministic from the canon seed — every client computes the same
     // world, which multiplayer requires. All entity Y placement must go
     // through this._worldgen.surfaceY(x, z); the server only knows 2D.
-    this._worldgen = createWorldgen(ashwoodWorldConfig);
+    this._worldgen = createWorldgen(zone1WorldConfig);
 
     // Camera must exist before LightingManager — its pipelines need a target
     this._setupCamera();
@@ -861,6 +866,49 @@ export class BabylonWorldScene {
     for (const row of pendingMobs) this.applyMobUpdate(row);
     const pending = this._pendingUpdates.splice(0);
     for (const row of pending) this.applyPlayerUpdate(row);
+
+    // P1: content-defined hub NPCs. Not load-critical — quest UI degrades
+    // to the quest log if a model fails. Markers set by React may have
+    // arrived before init finished; re-apply them.
+    this._npcs = new NpcSystem(this.scene, this._worldgen, AssetLibrary);
+    this._npcs.init()
+      .then(() => {
+        if (this._pendingNpcMarkers) this._npcs?.setMarkers(this._pendingNpcMarkers);
+      })
+      .catch((err) => console.warn('[NpcSystem] init failed:', err));
+
+    // Hub settlement + camp props (CC0 GLBs). Independent of NPC
+    // loading; missing files skip silently.
+    this._props = new PropsSystem(this.scene, this._worldgen);
+    this._props.init().catch((err) => console.warn('[PropsSystem] init failed:', err));
+  }
+
+  /** React → scene: per-NPC quest markers ('!' / '?' / null). */
+  setNpcMarkers(markers) {
+    this._pendingNpcMarkers = markers;
+    this._npcs?.setMarkers(markers);
+  }
+
+  /** Local player position in world meters (for waypoint checks). */
+  getLocalPosition() {
+    const p = this._local?.root?.position;
+    return p ? { x: p.x, z: p.z } : null;
+  }
+
+  // Throttled proximity scan for the "Talk" prompt. Fires the callback only
+  // on change so React state stays quiet while idle.
+  _pollNearbyNpc() {
+    const now = performance.now();
+    if (now - (this._lastNpcPoll ?? 0) < 200) return;
+    this._lastNpcPoll = now;
+    const p = this._local?.root?.position;
+    if (!p || !this._npcs) return;
+    const npc = this._npcs.nearestInRange(p.x, p.z, 5);
+    const id = npc?.id ?? null;
+    if (id !== this._nearbyNpcId) {
+      this._nearbyNpcId = id;
+      this.callbacks.onNearbyNpc?.(id);
+    }
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
@@ -1215,6 +1263,10 @@ export class BabylonWorldScene {
       rp.update(dt);
     });
 
+    // NPCs: idle animation pump + proximity scan for the talk prompt.
+    this._npcs?.update(dt);
+    this._pollNearbyNpc();
+
     // Make mob HP bars face the camera each frame.
     this._mobs.forEach(m => { m.hpBar?.lookAt(this._camera.position); });
   }
@@ -1272,11 +1324,11 @@ export class BabylonWorldScene {
   }
 
   _spawnMob(row) {
-    // GLB path first; primitive fallback only for known mob types (wolf
-    // today). Unknown mob types with no GLB return null so the row stays
-    // invisible until either a GLB is authored or a primitive case is added.
+    // GLB path first; EVERY mob type gets a primitive fallback otherwise
+    // (quadruped with a per-type palette, humanoid for bandits). A server
+    // row must never be invisible — its AI can still attack and quests
+    // need it killable. (Codex P1 on #219.)
     const hasGlb = MobAssetLibrary.hasContainer(row.mobType);
-    if (!hasGlb && row.mobType !== 'wolf') return null;
 
     const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);
     // Visual subtree — everything that should hide on death lives under here.
@@ -1328,9 +1380,34 @@ export class BabylonWorldScene {
   // wolf.glb is available (e.g., asset deleted, build:glb not yet run).
   // Wolf faces +Z; later AI slice can `root.rotation.y = atan2(vx, vz)`.
   _buildMobVisualPrimitive(row, visual) {
-    const bodyMat = this._stdMat('mobWolfBody',  new BABYLON.Color3(0.28, 0.26, 0.24));
-    const pale    = this._stdMat('mobWolfPale',  new BABYLON.Color3(0.55, 0.50, 0.44));
-    const dark    = this._stdMat('mobWolfDark',  new BABYLON.Color3(0.12, 0.11, 0.10));
+    // Bipedal families read wrong as quadrupeds — use the humanoid
+    // composite with a per-family palette.
+    const family = MOB_DEFS[row.mobType]?.family ?? 'beast';
+    const HUMANOID_TINTS = {
+      humanoid: { leather: [0.23, 0.18, 0.14], cloth: [0.16, 0.16, 0.20], skin: [0.62, 0.48, 0.36] },
+      kobold:   { leather: [0.35, 0.24, 0.10], cloth: [0.30, 0.20, 0.08], skin: [0.61, 0.39, 0.05] },
+      undead:   { leather: [0.55, 0.57, 0.55], cloth: [0.35, 0.37, 0.36], skin: [0.84, 0.86, 0.86] },
+      murloc:   { leather: [0.20, 0.45, 0.28], cloth: [0.15, 0.35, 0.22], skin: [0.32, 0.75, 0.50] },
+    };
+    if (HUMANOID_TINTS[family]) {
+      this._buildHumanoidPrimitive(row, visual, HUMANOID_TINTS[family]);
+      return;
+    }
+
+    // Quadruped composite with a per-type palette. Placeholder whenever a
+    // mob type's GLB is missing from public/assets/mobs/.
+    const LOOKS = {
+      forest_wolf: { body: [0.28, 0.26, 0.24], pale: [0.55, 0.50, 0.44], dark: [0.12, 0.11, 0.10], scale: [1, 1, 1] },
+      old_greyjaw: { body: [0.20, 0.21, 0.22], pale: [0.45, 0.46, 0.46], dark: [0.10, 0.10, 0.10], scale: [1.25, 1.25, 1.25] },
+      wild_boar:   { body: [0.38, 0.27, 0.18], pale: [0.66, 0.58, 0.46], dark: [0.20, 0.13, 0.08], scale: [1.25, 0.85, 1.05] },
+      webwood_spider: { body: [0.29, 0.14, 0.35], pale: [0.45, 0.30, 0.50], dark: [0.12, 0.06, 0.15], scale: [1.1, 0.6, 1.1] },
+    };
+    const look = LOOKS[row.mobType] ?? LOOKS.forest_wolf;
+    visual.scaling.set(look.scale[0], look.scale[1], look.scale[2]);
+
+    const bodyMat = this._stdMat(`mob_${row.mobType}_body`, new BABYLON.Color3(...look.body));
+    const pale    = this._stdMat(`mob_${row.mobType}_pale`, new BABYLON.Color3(...look.pale));
+    const dark    = this._stdMat(`mob_${row.mobType}_dark`, new BABYLON.Color3(...look.dark));
 
     // Torso
     const body = BABYLON.MeshBuilder.CreateBox(`mob_body_${row.mobId}`, {
@@ -1393,6 +1470,64 @@ export class BabylonWorldScene {
     tail.position.set(0, 0.75, -0.62);
     tail.rotation.x = -Math.PI / 4;
     tail.material = bodyMat;
+  }
+
+  // Hooded-humanoid primitive (bipedal families). Same placeholder posture
+  // as the quadruped: static composite under `visual`, swapped out the
+  // moment a GLB lands in public/assets/mobs/.
+  _buildHumanoidPrimitive(row, visual, tints) {
+    const family  = MOB_DEFS[row.mobType]?.family ?? 'humanoid';
+    const leather = this._stdMat(`mob_${family}_leather`, new BABYLON.Color3(...tints.leather));
+    const cloth   = this._stdMat(`mob_${family}_cloth`,   new BABYLON.Color3(...tints.cloth));
+    const skin    = this._stdMat(`mob_${family}_skin`,    new BABYLON.Color3(...tints.skin));
+
+    // Torso
+    const torso = BABYLON.MeshBuilder.CreateBox(`mob_torso_${row.mobId}`, {
+      width: 0.52, height: 0.70, depth: 0.30,
+    }, this.scene);
+    torso.parent = visual;
+    torso.position.set(0, 1.05, 0);
+    torso.material = leather;
+    this._castShadow(torso);
+
+    // Head + hood
+    const head = BABYLON.MeshBuilder.CreateBox(`mob_head_${row.mobId}`, {
+      width: 0.28, height: 0.28, depth: 0.28,
+    }, this.scene);
+    head.parent = visual;
+    head.position.set(0, 1.56, 0);
+    head.material = skin;
+    this._castShadow(head);
+
+    const hood = BABYLON.MeshBuilder.CreateCylinder(`mob_hood_${row.mobId}`, {
+      diameterTop: 0.06, diameterBottom: 0.40, height: 0.34, tessellation: 6,
+    }, this.scene);
+    hood.parent = visual;
+    hood.position.set(0, 1.74, -0.02);
+    hood.material = cloth;
+
+    // Legs
+    for (const sign of [-1, 1]) {
+      const leg = BABYLON.MeshBuilder.CreateCylinder(`mob_hleg_${row.mobId}_${sign}`, {
+        diameter: 0.16, height: 0.70, tessellation: 6,
+      }, this.scene);
+      leg.parent = visual;
+      leg.position.set(sign * 0.14, 0.35, 0);
+      leg.material = cloth;
+      this._castShadow(leg);
+    }
+
+    // Arms
+    for (const sign of [-1, 1]) {
+      const arm = BABYLON.MeshBuilder.CreateCylinder(`mob_arm_${row.mobId}_${sign}`, {
+        diameter: 0.13, height: 0.60, tessellation: 6,
+      }, this.scene);
+      arm.parent = visual;
+      arm.position.set(sign * 0.34, 1.10, 0);
+      arm.rotation.z = sign * 0.12;
+      arm.material = leather;
+      this._castShadow(arm);
+    }
   }
 
   // HP bar — two flat planes (bg + fill) parented to the mob root. The
@@ -1630,9 +1765,11 @@ export class BabylonWorldScene {
       if (row.avatarConfig) {
         try { parsedConfig = JSON.parse(row.avatarConfig); } catch { parsedConfig = null; }
       }
-      const config = mergeConfig(parsedConfig);
+      // Pass the RAW parsed config — CharacterAvatar merges defaults itself,
+      // and null must stay null so unconfigured players render as the bare
+      // base-body GLB (no default clothing).
       const rp = await CharacterAvatar.create(
-        row.identity, row.username, config, this.scene, AssetLibrary,
+        row.identity, row.username, parsedConfig, this.scene, AssetLibrary,
       );
       if (this._remotePlayers.has(key)) {
         rp.dispose(); // another update already spawned this player
@@ -1993,6 +2130,10 @@ export class BabylonWorldScene {
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     [...this._mobs.keys()].forEach(id => this._removeMob(id));
     [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
+    this._npcs?.dispose();
+    this._npcs = null;
+    this._props?.dispose();
+    this._props = null;
     this._local?.dispose();
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();

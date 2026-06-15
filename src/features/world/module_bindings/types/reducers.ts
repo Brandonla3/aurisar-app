@@ -6,19 +6,27 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AbandonQuestReducer from "../abandon_quest_reducer";
+import AcceptQuestReducer from "../accept_quest_reducer";
 import BuildCampfireReducer from "../build_campfire_reducer";
 import CastAbilityReducer from "../cast_ability_reducer";
 import MovePlayerReducer from "../move_player_reducer";
+import ReachWaypointReducer from "../reach_waypoint_reducer";
 import SeedWorldReducer from "../seed_world_reducer";
 import SendChatReducer from "../send_chat_reducer";
 import SetAvatarConfigReducer from "../set_avatar_config_reducer";
 import SetPlayerInfoReducer from "../set_player_info_reducer";
+import TurnInQuestReducer from "../turn_in_quest_reducer";
 
+export type AbandonQuestParams = __Infer<typeof AbandonQuestReducer>;
+export type AcceptQuestParams = __Infer<typeof AcceptQuestReducer>;
 export type BuildCampfireParams = __Infer<typeof BuildCampfireReducer>;
 export type CastAbilityParams = __Infer<typeof CastAbilityReducer>;
 export type MovePlayerParams = __Infer<typeof MovePlayerReducer>;
+export type ReachWaypointParams = __Infer<typeof ReachWaypointReducer>;
 export type SeedWorldParams = __Infer<typeof SeedWorldReducer>;
 export type SendChatParams = __Infer<typeof SendChatReducer>;
 export type SetAvatarConfigParams = __Infer<typeof SetAvatarConfigReducer>;
 export type SetPlayerInfoParams = __Infer<typeof SetPlayerInfoReducer>;
+export type TurnInQuestParams = __Infer<typeof TurnInQuestReducer>;
 

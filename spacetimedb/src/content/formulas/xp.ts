@@ -101,7 +101,7 @@ export function mobKillXp(mobLevel: number, playerLevel: number): number {
 /**
  * Per-member multiplier on mob XP when grouped (the split happens first;
  * groups of 3+ get a bonus so partying never feels like a tax).
- * Index by member count (claudecraft-parity values).
+ * Index by member count (vanilla-parity values).
  */
 export const PARTY_XP_MULT: readonly number[] = [1, 1, 1, 1.166, 1.3, 1.43];
 

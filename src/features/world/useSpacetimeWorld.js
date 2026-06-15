@@ -66,6 +66,40 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch (_) { /* not connected yet */ }
   }, []);
 
+  // ── P1 quest reducers ──────────────────────────────────────────────────────
+
+  const acceptQuest = useCallback((questId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.acceptQuest(questId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const abandonQuest = useCallback((questId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.abandonQuest(questId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const turnInQuest = useCallback((questId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.turnInQuest(questId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const reachWaypoint = useCallback((questId, objectiveIdx) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.reachWaypoint(questId, objectiveIdx);
+    } catch { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -120,6 +154,16 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             })
             .subscribe(['SELECT * FROM campfire']);
 
+          // Quests ride their own subscription for the same module-version
+          // tolerance: a client deployed before the P1 module publish just
+          // loses quest UI, nothing else.
+          connection
+            .subscriptionBuilder()
+            .onError((ctx) => {
+              console.warn('[useSpacetimeWorld] player_quest subscription failed (module not republished yet?):', ctx?.event);
+            })
+            .subscribe(['SELECT * FROM player_quest']);
+
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {
             callbacksRef.current?.onPlayerUpdate?.(row);
@@ -156,6 +200,18 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           });
           connection.db.campfire.onDelete((_ctx, row) => {
             callbacksRef.current?.onCampfireDelete?.(row);
+          });
+
+          // ── player_quest table events (optional chaining: bindings may
+          //    predate the table during a deploy race) ──
+          connection.db.playerQuest?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onQuestUpsert?.(row);
+          });
+          connection.db.playerQuest?.onUpdate((_ctx, _oldRow, row) => {
+            callbacksRef.current?.onQuestUpsert?.(row);
+          });
+          connection.db.playerQuest?.onDelete((_ctx, row) => {
+            callbacksRef.current?.onQuestDelete?.(row);
           });
         })
         .onDisconnect((_ctx, err) => {
@@ -200,6 +256,10 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     setAvatarConfig,
     castAbility,
     buildCampfire,
+    acceptQuest,
+    abandonQuest,
+    turnInQuest,
+    reachWaypoint,
     identity: connRef.current?.identity ?? null,
   };
 }

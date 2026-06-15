@@ -91,6 +91,49 @@ async function _load(key, path, scene) {
   }
 }
 
+/**
+ * Factory for standalone character-asset caches. The world's singleton
+ * (below) can't be shared across Babylon scenes — AvatarPreview and
+ * CharacterTurntable each spin up their own engine, so each needs its own
+ * containers loaded from the SAME MANIFEST.
+ */
+export function createCharacterAssetCache() {
+  const containers = new Map();
+  let ready = false;
+  const cache = {
+    async init(scene) {
+      const load = async (key, path) => {
+        try {
+          const parts = path.lastIndexOf('/');
+          const dir   = parts >= 0 ? BASE + path.slice(0, parts + 1) : BASE;
+          const file  = parts >= 0 ? path.slice(parts + 1) : path;
+          const c = await BABYLON.SceneLoader.LoadAssetContainerAsync(dir, file, scene);
+          containers.set(key, c);
+        } catch {
+          // Asset not yet present — skip silently
+        }
+      };
+      await load('base_body', MANIFEST['base_body']);
+      await Promise.all(
+        Object.entries(MANIFEST)
+          .filter(([k]) => k !== 'base_body')
+          .map(([k, p]) => load(k, p))
+      );
+      ready = true;
+    },
+    getContainer(key) { return containers.get(key) ?? null; },
+    hasBaseBody()     { return containers.has('base_body'); },
+    isReady()         { return ready; },
+    get _ready()      { return ready; },
+    dispose() {
+      containers.forEach(c => c.dispose());
+      containers.clear();
+      ready = false;
+    },
+  };
+  return cache;
+}
+
 export const AssetLibrary = {
   /**
    * Load all known GLBs.  Missing files are skipped; only base_body is required

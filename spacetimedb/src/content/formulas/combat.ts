@@ -114,7 +114,7 @@ export const CRIT_MULT = 1.5;
 
 export const ARMOR_DR_CAP = 0.75;
 
-/** Claudecraft/vanilla armor formula, capped at 75% reduction. */
+/** Vanilla-style armor formula, capped at 75% reduction. */
 export function armorDR(armor: number, attackerLevel: number): number {
   if (armor <= 0) return 0;
   const dr = armor / (armor + 85 * attackerLevel + 400);

@@ -157,10 +157,15 @@ export interface LootEntry {
 }
 
 // ── Mobs ─────────────────────────────────────────────────────────────
+export type MobFamily =
+  | 'beast' | 'spider' | 'murloc' | 'kobold' | 'humanoid' | 'undead';
+
 export interface MobDef {
   /** Matches the server `mob.mobType` column. */
   mobType: string;
   name: string;
+  /** Drives the client primitive fallback shape (humanoid vs quadruped). */
+  family: MobFamily;
   level: number;
   maxHp: number;
   dmgMin: number;
