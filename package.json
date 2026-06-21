@@ -18,18 +18,18 @@
     "verify:worldgen": "node scripts/verify_worldgen.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.1",
+    "@supabase/supabase-js": "^2.108.2",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "babylonjs": "^9.12.0",
-    "babylonjs-loaders": "^9.12.0",
-    "babylonjs-serializers": "^9.12.0",
+    "babylonjs": "^9.13.0",
+    "babylonjs-loaders": "^9.13.0",
+    "babylonjs-serializers": "^9.13.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-is": "^19.2.7",
     "react-window": "^2.2.7",
     "recharts": "^3.8.1",
-    "spacetimedb": "^2.5.0",
+    "spacetimedb": "^2.6.0",
     "three": "^0.184.0"
   },
   "devDependencies": {
@@ -43,8 +43,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.6.0",
-    "sharp": "^0.35.1",
+    "sharp": "^0.35.2",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }
