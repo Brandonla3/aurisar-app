@@ -141,7 +141,7 @@ class LightingManager {
     this._scratchColor = new BABYLON.Color3();
     this._nightDiffuse = new BABYLON.Color3(1.0, 0.72, 0.48);
     this._dayDiffuse   = new BABYLON.Color3(1.0, 0.97, 0.92);
-    this._nightGround  = new BABYLON.Color3(0.10, 0.12, 0.18);
+    this._nightGround  = new BABYLON.Color3(0.20, 0.22, 0.28);
     this._dayGround    = new BABYLON.Color3(0.34, 0.36, 0.40);
     this._nightFog     = new BABYLON.Color3(0.06, 0.08, 0.12);
     this._dayFog       = new BABYLON.Color3(0.62, 0.78, 0.94);  // bluer, less wash
@@ -350,8 +350,8 @@ class LightingManager {
     this.key.intensity = 2.2;
 
     this.moon = new BABYLON.DirectionalLight('lm_moon', new BABYLON.Vector3(0.3, -1, 0.2), this.scene);
-    this.moon.diffuse  = new BABYLON.Color3(0.55, 0.62, 0.9);
-    this.moon.specular = new BABYLON.Color3(0.25, 0.3, 0.45);
+    this.moon.diffuse  = new BABYLON.Color3(0.62, 0.68, 0.92);
+    this.moon.specular = new BABYLON.Color3(0.32, 0.36, 0.5);
     this.moon.intensity = 0.0;
 
     this.fillOverworld = new BABYLON.HemisphericLight('lm_fill_overworld', new BABYLON.Vector3(0, 1, 0), this.scene);
@@ -538,17 +538,22 @@ class LightingManager {
     // through. 1.0 sits in line with mobile games of this scale.
     this.key.intensity = lerp(0.05, 1.0, dayFactor);
     lerpColor3Into(this.key.diffuse, this._nightDiffuse, this._dayDiffuse, clamp01(dayFactor * 1.25));
-    this.moon.intensity = lerp(0.0, 0.30, 1.0 - dayFactor);
+    // Moon ceiling raised (was 0.30) — night targets a "bright dusk" rather
+    // than true darkness so players can actually see to play.
+    this.moon.intensity = lerp(0.0, 0.70, 1.0 - dayFactor);
 
-    // Unified curve for desktop and mobile. Cut further from the previous
-    // pass — fill, exposure, and ambient all came down so direct sun no
-    // longer dominates the lit hemisphere of geometry.
-    this.fillOverworld.intensity = lerp(0.22, 0.28, dayFactor);
+    // Unified curve for desktop and mobile. Night-side floor raised (was
+    // 0.22) alongside the moon/ambient/exposure lift below; day-side (0.28)
+    // is untouched.
+    this.fillOverworld.intensity = lerp(0.42, 0.28, dayFactor);
     lerpColor3Into(this.fillOverworld.groundColor, this._nightGround, this._dayGround, dayFactor);
 
     // Day exposure pulled down slightly (was 0.88) so the HDRI skybox blue
-    // doesn't blow out behind the cross-faded gradient dome.
-    this.scene.imageProcessingConfiguration.exposure = lerp(0.78, 0.82, dayFactor);
+    // doesn't blow out behind the cross-faded gradient dome. Night-side
+    // raised (was 0.78) so tone-mapped brightness compensates for the
+    // dimmer actual scene lighting at night — part of the "bright dusk"
+    // night target.
+    this.scene.imageProcessingConfiguration.exposure = lerp(0.92, 0.82, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
     this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
@@ -556,10 +561,11 @@ class LightingManager {
 
     // Dynamic ambient: raise at night to keep geometry readable when the key
     // is dim; keep day-side low so the directional light still defines form.
+    // Night-side values raised further (were 0.24/0.26/0.32) for playability.
     this.scene.ambientColor.copyFromFloats(
-      lerp(0.24, 0.14, dayFactor),
-      lerp(0.26, 0.16, dayFactor),
-      lerp(0.32, 0.20, dayFactor)
+      lerp(0.38, 0.14, dayFactor),
+      lerp(0.40, 0.16, dayFactor),
+      lerp(0.46, 0.20, dayFactor)
     );
 
     // Sky background — mutate clearColor in-place via scratch to avoid allocation

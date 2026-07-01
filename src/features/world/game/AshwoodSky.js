@@ -55,8 +55,11 @@ void main() {
   // like real atmosphere (steep near the horizon, saturating quickly toward
   // the zenith) in place of the previous linear-ish clamp(h*1.3). Same
   // artist-tuned topCol/midCol/botCol drive the palette — only the blend
-  // curve between them changes.
-  float zenith = 1.0 - exp(-max(h, 0.0) * 2.2);
+  // curve between them changes. Steeper than the initial pass (3.4 vs 2.2)
+  // so more of the frame reaches the richer top blue sooner — the camera's
+  // ~51 deg downward pitch means most of a normal shot sits at low h, where
+  // the old curve lingered near the paler horizon color too long.
+  float zenith = 1.0 - exp(-max(h, 0.0) * 3.4);
   vec3 c = h < 0.0 ? mix(midCol, botCol, clamp(-h * 3.0, 0.0, 1.0))
                    : mix(midCol, topCol, zenith);
 
@@ -99,16 +102,28 @@ void main() {
 }
 `;
 
-// Ashwood palette (prototype updateDayNight)
-const N_TOP = { r: 0x0a / 255, g: 0x10 / 255, b: 0x20 / 255 };
-const D_TOP = { r: 0x35 / 255, g: 0x63 / 255, b: 0x9f / 255 };
-const N_BOT = { r: 0x14 / 255, g: 0x16 / 255, b: 0x1f / 255 };
-const D_BOT = { r: 0xc9 / 255, g: 0xd8 / 255, b: 0xe6 / 255 };
+// Ashwood palette (prototype updateDayNight). Day and night colors were
+// bumped brighter/more saturated from the original prototype values — the
+// original D_BOT (#c9d8e6) read as near-white at the camera's ~51 deg
+// downward pitch (most of a normal shot sits near the horizon, not the
+// zenith), and the original N_TOP/N_BOT read as near-black, too dark to
+// play by. Night now targets a "bright dusk" rather than true darkness.
+const N_TOP = { r: 0x1e / 255, g: 0x2c / 255, b: 0x4a / 255 };
+const D_TOP = { r: 0x2b / 255, g: 0x5a / 255, b: 0xac / 255 };
+const N_BOT = { r: 0x30 / 255, g: 0x34 / 255, b: 0x44 / 255 };
+const D_BOT = { r: 0x86 / 255, g: 0xb2 / 255, b: 0xdd / 255 };
 const GOLD  = { r: 0xe8 / 255, g: 0x93 / 255, b: 0x4a / 255 };
 
 const FOG_DENSITY_DAY   = 0.0060;
-const FOG_DENSITY_NIGHT = 0.0078;
-const BIOME_FOG_BLEND   = 0.4;     // prototype updateBiomeFog blend
+// Night fog used to be denser than day fog (0.0078 vs 0.0060) — backwards
+// for playability, since it fogged out distant terrain sooner exactly when
+// the scene is already dimmer. Now lighter than day fog.
+const FOG_DENSITY_NIGHT = 0.0045;
+// Biome-tinted horizon fog blend, dynamic per weather (see _update): weak on
+// clear days so the sky reads blue, stronger while raining/overcast for
+// atmosphere.
+const BIOME_FOG_BLEND_CLEAR = 0.16;
+const BIOME_FOG_BLEND_WET   = 0.55;
 
 function mixInto(out, a, b, t) {
   out.r = a.r + (b.r - a.r) * t;
@@ -206,14 +221,20 @@ export class AshwoodSky {
     const hasSkybox = !!this.lm.skybox;
     m.setFloat('skyAlpha', hasSkybox ? Math.max(0, Math.min(1, night + dusk)) : 1);
 
-    // Fog: horizon color blended toward the biome fog at the player.
+    // Fog: horizon color blended toward the biome fog at the player. Blend
+    // strength scales with weather wetness (same wet signal AshwoodGrass
+    // already reads for wind) — a clear day stays close to the sky's own
+    // horizon color instead of being pulled toward the biome's ground tint,
+    // while rain/overcast leans harder into it for atmosphere.
     const p = this.getPlayerPos?.();
     let fr = this._bot.r, fg = this._bot.g, fb = this._bot.b;
     if (p) {
+      const wet = this.scene.metadata?.ashwood?.weather?.wet ?? 0;
+      const blend = BIOME_FOG_BLEND_CLEAR + (BIOME_FOG_BLEND_WET - BIOME_FOG_BLEND_CLEAR) * wet;
       this.wg.biomeFogAt(p.x, p.z, this._biome);
-      fr += (this._biome.r - fr) * BIOME_FOG_BLEND;
-      fg += (this._biome.g - fg) * BIOME_FOG_BLEND;
-      fb += (this._biome.b - fb) * BIOME_FOG_BLEND;
+      fr += (this._biome.r - fr) * blend;
+      fg += (this._biome.g - fg) * blend;
+      fb += (this._biome.b - fb) * blend;
       // biome fog colors are daylit tones — pull them down with the night
       const k = 0.25 + 0.75 * dayF;
       fr *= k; fg *= k; fb *= k;
