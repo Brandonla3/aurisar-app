@@ -106,6 +106,7 @@ class LightingManager {
     this.engine = engine;
 
     this._isMobile = options.isMobile ?? false;
+    this._qualityTier = options.qualityTier ?? (this._isMobile ? 'mobile' : 'high');
 
     this.options = {
       dayLengthSec:  options.dayLengthSec  ?? 900,
@@ -114,6 +115,14 @@ class LightingManager {
         overworldDay:   options.env?.overworldDay   ?? '/env/overworld_day.env',
         overworldNight: options.env?.overworldNight ?? '/env/overworld_night.env',
         dungeon:        options.env?.dungeon        ?? '/env/dungeon_dim.env',
+      },
+      // Optional color-grading LUTs (.3dl / .cube). When the file is absent the
+      // HEAD guard in _loadColorGradingSafe no-ops and the scene renders with
+      // tone mapping only — dropping a LUT into /public activates grading with
+      // zero code change. Overworld = warm/vibrant, dungeon = cold/desaturated.
+      colorGrading: {
+        overworld: options.colorGrading?.overworld ?? '/luts/overworld.3dl',
+        dungeon:   options.colorGrading?.dungeon   ?? '/luts/dungeon.3dl',
       },
       maxDungeonTorches:      options.maxDungeonTorches      ?? 12,
       maxDungeonMagicAccents: options.maxDungeonMagicAccents ?? 10,
@@ -220,6 +229,8 @@ class LightingManager {
     this._disposePipeline(this.pipeDungeon);
     this._imagePP?.dispose();
     this._glowLayer?.dispose();
+    this._lutOverworld?.dispose();
+    this._lutDungeon?.dispose();
 
     [this.envDay, this.envNight, this.envDungeon].forEach(t => t?.dispose());
 
@@ -283,6 +294,43 @@ class LightingManager {
 
     this._dungeonTorches = [];
     this._dungeonMagic   = [];
+
+    // Color-grading LUTs. Applied inside the shared imageProcessingConfiguration
+    // block, so a single 3D-texture tap grades BOTH the desktop pipeline and the
+    // mobile ImageProcessingPostProcess path — grading works on every tier. The
+    // active LUT is swapped per zone in _updateOverworld / _updateDungeon.
+    this._lutOverworld = null;
+    this._lutDungeon   = null;
+    this._loadColorGradingSafe(this.options.colorGrading.overworld).then(t => {
+      if (!t || this._disposed) return;
+      this._lutOverworld = t;
+      if (this.profile === 'overworld') this._applyColorGrading(t);
+    });
+    this._loadColorGradingSafe(this.options.colorGrading.dungeon).then(t => {
+      if (t && !this._disposed) this._lutDungeon = t;
+    });
+  }
+
+  // HEAD-guarded LUT loader — mirrors _loadEnvSafe so a missing LUT file (or the
+  // Vite SPA HTML fallback) silently no-ops instead of throwing a texture error.
+  _loadColorGradingSafe(url) {
+    if (!url) return Promise.resolve(null);
+    return fetch(url, { method: 'HEAD' })
+      .then(r => {
+        const ct = r.headers.get('content-type') ?? '';
+        if (!r.ok || ct.includes('text/html')) return null;
+        const lut = new BABYLON.ColorGradingTexture(url, this.scene);
+        return lut;
+      })
+      .catch(() => null);
+  }
+
+  // Enable grading with the given LUT on the shared image-processing config.
+  _applyColorGrading(lut) {
+    if (!lut) return;
+    const ipc = this.scene.imageProcessingConfiguration;
+    ipc.colorGradingTexture = lut;
+    ipc.colorGradingEnabled = true;
   }
 
   _setupOverworldRig() {
@@ -392,6 +440,18 @@ class LightingManager {
         p.bloomKernel    = 16;            // halved — full pipeline cost
         p.bloomScale     = opts.bloomScale;
         p.sharpenEnabled = false;         // sharpen was a marginal-quality, full-cost pass
+
+        // High tier only: subtle cinematic polish. Grain breaks up flat-color
+        // banding in the sky/fog; a gentle vignette focuses the eye on the
+        // third-person character. Both are cheap and skipped on 'low'/'mobile'.
+        if (this._qualityTier === 'high') {
+          p.grainEnabled     = true;
+          p.grain.intensity  = 6;
+          p.grain.animated   = true;
+          p.imageProcessing.vignetteEnabled = true;
+          p.imageProcessing.vignetteWeight  = 1.4;
+          p.imageProcessing.vignetteColor   = new BABYLON.Color4(0, 0, 0, 0);
+        }
         return p;
       } catch (_) { /* try next tier */ }
     }
@@ -547,6 +607,11 @@ class LightingManager {
 
     this._setPipelineEnabled(this.pipeOverworld, overworld);
     this._setPipelineEnabled(this.pipeDungeon,  !overworld);
+
+    // Swap the color-grading LUT to match the zone mood (no-op until the LUT
+    // asset for the active zone has loaded).
+    const lut = overworld ? this._lutOverworld : this._lutDungeon;
+    if (lut) this._applyColorGrading(lut);
 
     for (const l of this._dungeonTorches) l.setEnabled(!overworld);
     for (const l of this._dungeonMagic)   l.setEnabled(!overworld);
@@ -778,6 +843,14 @@ export class BabylonWorldScene {
       this.engine.setHardwareScalingLevel(1 / dpr);
     }
 
+    // Quality tier: single source of truth for how expensive an effect stack a
+    // device gets. 'mobile' → no HDR pipeline (GlowLayer fallback), classic
+    // shadow map, no SSAO. 'low' → desktop lacking float/MRT render targets:
+    // pipeline still builds (non-HDR) but SSAO2/CSM are skipped. 'high' →
+    // desktop with the render-target support SSAO2 + cascaded shadows need.
+    // Overridable via options.qualityTier for QA/forcing a tier.
+    this._qualityTier = this._resolveQualityTier();
+
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
 
@@ -797,6 +870,7 @@ export class BabylonWorldScene {
     const realHour = now.getHours() + now.getMinutes() / 60;
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
+      qualityTier: this._qualityTier,
       startTimeOfDay: this.options.startTimeOfDay ?? realHour,
       dayLengthSec:   this.options.dayLengthSec   ?? 86400,
     });
@@ -912,6 +986,21 @@ export class BabylonWorldScene {
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
+
+  // Resolve the device quality tier. Mobile is always its own tier (the
+  // DefaultRenderingPipeline is skipped there regardless). On desktop, SSAO2
+  // and cascaded shadows both need float/half-float render targets and MRT;
+  // where those are missing we drop to 'low' so those effects are skipped but
+  // the rest of the stack still runs.
+  _resolveQualityTier() {
+    if (this.options.qualityTier) return this.options.qualityTier;
+    if (this._isMobile) return 'mobile';
+    const caps = this.engine?.getCaps?.() ?? null;
+    const canHeavy = !!caps &&
+      (caps.textureHalfFloatRender || caps.textureFloatRender) &&
+      !!caps.drawBuffersExtension;
+    return canHeavy ? 'high' : 'low';
+  }
 
   _setupCamera() {
     const cam = new BABYLON.ArcRotateCamera(
@@ -1036,6 +1125,31 @@ export class BabylonWorldScene {
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
+    // High tier: cascaded shadow maps. Multiple cascades pack resolution near
+    // the third-person character where it reads, and hold up across the
+    // streamed terrain instead of one blurry map. stabilizeCascades is the
+    // critical setting for this camera — it kills the shadow "swimming" that
+    // an ArcRotateCamera orbit would otherwise cause. shadowMaxZ is capped to
+    // the fog horizon so cascades don't waste texels on invisible distance.
+    if (this._qualityTier === 'high') {
+      try {
+        const csm = new BABYLON.CascadedShadowGenerator(2048, this._lm.key);
+        csm.numCascades              = 4;
+        csm.lambda                   = 0.8;   // logarithmic split (near detail)
+        csm.stabilizeCascades        = true;
+        csm.shadowMaxZ               = 80;
+        csm.cascadeBlendPercentage   = 0.1;
+        csm.depthClamp               = true;
+        csm.usePercentageCloserFiltering = true;
+        csm.filteringQuality         = BABYLON.ShadowGenerator.QUALITY_MEDIUM;
+        csm.bias                     = 0.001;
+        csm.normalBias               = 0.02;
+        this._shadowGen = csm;
+        return;
+      } catch { /* fall through to the classic single-map path */ }
+    }
+
+    // Low / mobile (or CSM construction failure): classic single shadow map.
     // Start at 1024 — 4× cheaper shadow pass vs 2048 with minimal visual difference.
     for (const size of [1024, 512]) {
       try {
@@ -1060,12 +1174,30 @@ export class BabylonWorldScene {
   // ── SSAO ───────────────────────────────────────────────────────────────────
 
   _setupSSAO() {
-    // SSAO2 is currently disabled. Combined with the HDR DefaultRenderingPipeline
-    // and blur-ESM shadows it was the dominant per-frame GPU cost on integrated
-    // GPUs, and the visual contribution at the camera angles used here is
-    // marginal. Re-enabling is a single early-return removal once we have
-    // budget to retune it.
-    return;
+    // High tier only. SSAO2 needs the float/MRT render targets that the mobile
+    // path can't rely on, so it is skipped on 'low' and 'mobile'. The previous
+    // disable was a blanket perf cut; the retune below halves the AO buffer
+    // (ssaoRatio 0.5), drops to 8 samples, and caps maxZ at the fog horizon so
+    // distant tiles pay no AO cost — the combination that made it affordable.
+    if (this._qualityTier !== 'high') { this._ssao = null; return; }
+
+    try {
+      const ssao = new BABYLON.SSAO2RenderingPipeline(
+        'ssao', this.scene,
+        { ssaoRatio: 0.5, blurRatio: 1 },
+        [this._camera]
+      );
+      ssao.radius        = 1.2;   // world units — small contact-AO radius
+      ssao.totalStrength = 1.0;
+      ssao.expensiveBlur = false;
+      ssao.samples       = 8;
+      ssao.maxZ          = 60;    // matches fog falloff
+      ssao.minZAspect    = 0.2;
+      this._ssao = ssao;
+    } catch {
+      // SSAO2 unavailable (missing GPU support) — scene still renders.
+      this._ssao = null;
+    }
   }
 
   // ── Lighting profile (public compatibility wrapper) ────────────────────────
@@ -2143,6 +2275,8 @@ export class BabylonWorldScene {
     this._wildlife?.dispose();
     this._weather?.dispose();
     this._sky?.dispose();
+    this._ssao?.dispose();
+    this._shadowGen?.dispose();
     this._lm?.dispose();
     this.engine.stopRenderLoop();
     this.engine.dispose();
