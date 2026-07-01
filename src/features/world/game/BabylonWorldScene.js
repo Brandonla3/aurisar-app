@@ -307,7 +307,12 @@ class LightingManager {
       if (this.profile === 'overworld') this._applyColorGrading(t);
     });
     this._loadColorGradingSafe(this.options.colorGrading.dungeon).then(t => {
-      if (t && !this._disposed) this._lutDungeon = t;
+      if (!t || this._disposed) return;
+      this._lutDungeon = t;
+      // If it arrives while the player is already underground, apply it now —
+      // otherwise the dungeon would keep the overworld grade until the next
+      // zone switch.
+      if (this.profile === 'dungeon') this._applyColorGrading(t);
     });
   }
 
@@ -325,12 +330,18 @@ class LightingManager {
       .catch(() => null);
   }
 
-  // Enable grading with the given LUT on the shared image-processing config.
+  // Apply (or clear) grading on the shared image-processing config. Passing a
+  // null LUT disables grading — so a zone whose LUT is absent or still loading
+  // renders with tone mapping only instead of inheriting the other zone's grade.
   _applyColorGrading(lut) {
-    if (!lut) return;
     const ipc = this.scene.imageProcessingConfiguration;
-    ipc.colorGradingTexture = lut;
-    ipc.colorGradingEnabled = true;
+    if (lut) {
+      ipc.colorGradingTexture = lut;
+      ipc.colorGradingEnabled = true;
+    } else {
+      ipc.colorGradingTexture = null;
+      ipc.colorGradingEnabled = false;
+    }
   }
 
   _setupOverworldRig() {
@@ -608,10 +619,10 @@ class LightingManager {
     this._setPipelineEnabled(this.pipeOverworld, overworld);
     this._setPipelineEnabled(this.pipeDungeon,  !overworld);
 
-    // Swap the color-grading LUT to match the zone mood (no-op until the LUT
-    // asset for the active zone has loaded).
-    const lut = overworld ? this._lutOverworld : this._lutDungeon;
-    if (lut) this._applyColorGrading(lut);
+    // Swap the color-grading LUT to match the zone mood. Passing the (possibly
+    // null) target-zone LUT clears grading when that zone's asset is missing or
+    // still loading, so a zone never inherits the other zone's grade.
+    this._applyColorGrading(overworld ? this._lutOverworld : this._lutDungeon);
 
     for (const l of this._dungeonTorches) l.setEnabled(!overworld);
     for (const l of this._dungeonMagic)   l.setEnabled(!overworld);
