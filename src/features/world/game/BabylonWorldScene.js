@@ -897,6 +897,7 @@ export class BabylonWorldScene {
         lm: this._lm,
         worldgen: this._worldgen,
         castShadow: (mesh) => this._castShadow(mesh),
+        qualityTier: this._qualityTier,
       },
     };
 
