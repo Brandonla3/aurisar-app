@@ -1030,11 +1030,16 @@ export class BabylonWorldScene {
       this.scene
     );
     cam.lowerRadiusLimit     = 2.5;
-    cam.upperRadiusLimit     = 22;
+    cam.upperRadiusLimit     = 34;
     cam.lowerBetaLimit       = 0.25;
+    // Initial cap only — _trackCamera raises it dynamically (terrain-aware)
+    // every frame so the player can tilt up past the horizon to see the sky
+    // without the camera dipping under the ground.
     cam.upperBetaLimit       = Math.PI / 2.1;
     cam.wheelPrecision       = 60;
-    cam.wheelDeltaPercentage = 0.01;
+    // 0.01 (1%/notch) needed ~120 wheel notches for a full zoom-out — read
+    // as "zoom doesn't work". 5%/notch covers the range in ~2 flicks.
+    cam.wheelDeltaPercentage = 0.05;
     cam.panningSensibility   = 0;
     cam.minZ                 = 0.1;
 
@@ -1104,7 +1109,7 @@ export class BabylonWorldScene {
         const dist = Math.hypot(dx, dy);
         const delta = this._pinchTouch.lastDist - dist;
         cam.radius = Math.max(cam.lowerRadiusLimit,
-                     Math.min(cam.upperRadiusLimit, cam.radius + delta * 0.05));
+                     Math.min(cam.upperRadiusLimit, cam.radius + delta * 0.075));
         this._pinchTouch.lastDist = dist;
         e.preventDefault();
       }
@@ -1804,6 +1809,20 @@ export class BabylonWorldScene {
     const p = this._local.root.position;
     this._camTarget.set(p.x, p.y + 1.2, p.z);
     BABYLON.Vector3.LerpToRef(this._camera.target, this._camTarget, 0.12, this._camera.target);
+
+    // Terrain-aware look-up limit. beta = PI/2 is horizontal; the old fixed
+    // cap of PI/2.1 meant the camera could never tilt above the horizon, so
+    // the upper sky was unviewable and an upward drag hit a dead stop. The
+    // cap is now the beta at which the camera would sink to ~0.4 m above the
+    // terrain under it (cos(beta) = camY-targetY over radius, solved for the
+    // ground height) — zoomed in this allows ~110 deg+ of upward tilt for sky
+    // gazing, and it tightens automatically as the radius grows so the camera
+    // never clips under the ground. One surfaceY sample + acos per frame.
+    const cam = this._camera;
+    const camPos = cam.globalPosition;
+    const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
+    const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
+    cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
   }
 
   _syncStdb() {

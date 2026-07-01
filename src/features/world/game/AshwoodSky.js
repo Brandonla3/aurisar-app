@@ -202,7 +202,10 @@ export class AshwoodSky {
     mixInto(this._top, N_TOP, D_TOP, dayF);
     mixInto(this._bot, N_BOT, D_BOT, dayF);
     mixInto(this._bot, this._bot, GOLD, dusk * 0.7);
-    mixInto(this._mid, this._top, this._bot, 0.55);
+    // Mid sits closer to the saturated top blue (was 0.55 toward bot) — mid
+    // is what fills most of the visible band at normal camera pitches, so
+    // weighting it toward bot muted the whole sky toward the pale horizon.
+    mixInto(this._mid, this._top, this._bot, 0.38);
 
     const m = this.material;
     m.setColor3('topCol', this._c3.copyFromFloats(this._top.r, this._top.g, this._top.b));
