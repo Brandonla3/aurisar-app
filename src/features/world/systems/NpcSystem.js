@@ -34,14 +34,17 @@ function hashId(id) {
 
 function npcAvatarConfig(npc) {
   const h = hashId(npc.id);
+  // Unsigned shifts throughout: h is a full uint32, and `h >> n` reads it as
+  // SIGNED — ids hashing ≥ 2^31 (trader_pell, foreman_bram) produced negative
+  // indices, an undefined skin tone, and a spawn-killing hexToColor3 crash.
   return {
     version: 1,
     body: { gender: h % 2 ? 'male' : 'female' },
-    skin: { tone: TONES[(h >> 6) % TONES.length] },
+    skin: { tone: TONES[(h >>> 6) % TONES.length] },
     hair: { style: HAIR_STYLES[h % HAIR_STYLES.length], color: '#3b2a1a' },
     clothing: {
-      top:    TOPS[(h >> 2) % TOPS.length],
-      bottom: BOTTOMS[(h >> 4) % BOTTOMS.length],
+      top:    TOPS[(h >>> 2) % TOPS.length],
+      bottom: BOTTOMS[(h >>> 4) % BOTTOMS.length],
       shoes:  'shoes_boots',
     },
   };

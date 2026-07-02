@@ -1363,26 +1363,6 @@ export class BabylonWorldScene {
     this._makeLabel('dunEntrance', 'Dungeon Entrance', labelRoot);
   }
 
-  // ── Post-processing (PBR character material template) ──────────────────────
-  // Helper for when humanoids get authored albedo/normal/ORM textures.
-
-  _createCharacterPBR(name, texBasePath) {
-    const mat = new BABYLON.PBRMaterial(name, this.scene);
-    mat.albedoTexture   = new BABYLON.Texture(`${texBasePath}/albedo.png`, this.scene);
-    mat.bumpTexture     = new BABYLON.Texture(`${texBasePath}/normal.png`, this.scene);
-    mat.metallicTexture = new BABYLON.Texture(`${texBasePath}/orm.png`, this.scene);
-    mat.useAmbientOcclusionFromMetallicTextureRed = true;
-    mat.useRoughnessFromMetallicTextureGreen      = true;
-    mat.useMetallnessFromMetallicTextureBlue      = true;
-    mat.roughness            = 1.0;
-    mat.metallic             = 1.0;
-    mat.environmentIntensity = 1.0;
-    mat.indexOfRefraction    = 1.5;
-    mat.albedoColor          = BABYLON.Color3.White();
-    mat.backFaceCulling      = true;
-    return mat;
-  }
-
   // ── Input ──────────────────────────────────────────────────────────────────
 
   _bindKeys() {

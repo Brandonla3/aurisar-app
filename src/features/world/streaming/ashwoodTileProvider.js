@@ -48,13 +48,27 @@ export class AshwoodTileProvider {
   _ensureShared(scene) {
     if (this._shared && this._shared.scene === scene) return this._shared;
 
-    const ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
-    ground.specularColor = new BABYLON.Color3(0, 0, 0);
-    if (!this.bake) {
+    // Runtime terrain is PBR: real energy-conserving light response, picks up
+    // the IBL .env reflections the moment those assets land, and specular AA
+    // (Kaplanyan roughness widening) kills the vertex-normal shimmer on
+    // distant slopes. Rough dielectric (metallic 0) so grass reads matte;
+    // specularIntensity is pulled down since there is no authored roughness
+    // map to break up the sheen. Bake mode keeps the plain vertex-color
+    // StandardMaterial — the GLB export contract.
+    let ground;
+    if (this.bake) {
+      ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
+      ground.specularColor = new BABYLON.Color3(0, 0, 0);
+    } else {
+      ground = new BABYLON.PBRMaterial('ashwood_ground', scene);
+      ground.metallic = 0;
+      ground.roughness = 0.95;
+      ground.specularIntensity = 0.4;
+      ground.enableSpecularAntiAliasing = true;
       const grassTex = new BABYLON.Texture('/assets/textures/grasslight-big.jpg', scene);
       grassTex.uScale = GRASS_REPEATS_PER_TILE;
       grassTex.vScale = GRASS_REPEATS_PER_TILE;
-      ground.diffuseTexture = grassTex;        // modulated by biome vertex colors
+      ground.albedoTexture = grassTex;        // modulated by biome vertex colors
       const grassNm = new BABYLON.Texture('/assets/textures/grasslight-big-nm.jpg', scene);
       grassNm.uScale = GRASS_REPEATS_PER_TILE;
       grassNm.vScale = GRASS_REPEATS_PER_TILE;

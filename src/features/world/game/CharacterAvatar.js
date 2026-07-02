@@ -52,7 +52,35 @@ const SPECIES_DEFAULTS = {
 function tintInstance(inst, color) {
   inst.rootNodes
     .flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
-    .forEach(m => { if (m.material) m.material.albedoColor = color; });
+    .forEach(m => {
+      if (!m.material) return;
+      m.material.albedoColor = color;
+      // GLB pieces load as PBRMaterial; widen roughness under high-frequency
+      // curvature so skinned edges don't sparkle as the rig animates.
+      if ('enableSpecularAntiAliasing' in m.material) {
+        m.material.enableSpecularAntiAliasing = true;
+      }
+    });
+}
+
+// ── Optional authored skin maps ──────────────────────────────────────────────
+// Baked character textures (Phase 1 asset pipeline) are user-supplied and may
+// not exist yet. Each map loads with a graceful 404 fallback (same pattern as
+// the tree textures in ashwoodPropMeshes): a missing file quietly reverts to
+// the flat albedo tint instead of rendering a broken material. invertY=false —
+// these are authored against the glTF UV convention of the body meshes.
+const SKIN_TEX_BASE = '/assets/textures/character/skin';
+
+function applyOptionalPBRTexture(material, prop, url, scene, onLoad) {
+  const tex = new BABYLON.Texture(
+    url, scene, false, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
+    onLoad ?? null,
+    () => {                 // onError → drop the map, keep the tint fallback
+      if (material[prop] === tex) material[prop] = null;
+      tex.dispose();
+    },
+  );
+  material[prop] = tex;
 }
 
 function findMorph(manager, name) {
@@ -397,13 +425,41 @@ export class CharacterAvatar {
   _applySkinMaterial() {
     if (!this._bodyMeshes.length) return;
     const color = hexToColor3(this._config.skin.tone);
-    // Tint the first material found on skin meshes — actual PBR skin texture
-    // will replace this once baked textures are available.
     for (const mesh of this._bodyMeshes) {
       if (mesh.material) {
         mesh.material.albedoColor = color;
+        this._wireSkinPBR(mesh.material);
       }
     }
+  }
+
+  /**
+   * One-time PBR wiring per body material: matte dielectric response tuned
+   * for skin, specular AA, and the albedo/normal/ORM maps if the authored
+   * textures exist. Materials are SHARED across avatar instances
+   * (instantiateModelsToScene cloneMaterials=false), so this runs once per
+   * material, not per avatar — guarded via material.metadata. The skin-tone
+   * tint above keeps multiplying into albedo whether or not maps load.
+   */
+  _wireSkinPBR(mat) {
+    if (!(mat instanceof BABYLON.PBRMaterial) || mat.metadata?.ashSkinWired) return;
+    (mat.metadata ??= {}).ashSkinWired = true;
+
+    mat.metallic  = 0;
+    mat.roughness = 0.65;
+    mat.enableSpecularAntiAliasing = true;
+
+    applyOptionalPBRTexture(mat, 'albedoTexture', `${SKIN_TEX_BASE}/albedo.png`, this._scene);
+    applyOptionalPBRTexture(mat, 'bumpTexture',   `${SKIN_TEX_BASE}/normal.png`, this._scene);
+    // ORM (occlusion/roughness/metallic packed). The scalar metallic/roughness
+    // above act as multipliers once a metallicTexture is present, so they are
+    // reset to 1 on successful load to hand full control to the map; on 404
+    // the onError path drops the texture and the scalars keep governing.
+    applyOptionalPBRTexture(mat, 'metallicTexture', `${SKIN_TEX_BASE}/orm.png`, this._scene,
+      () => { mat.metallic = 1; mat.roughness = 1; });
+    mat.useAmbientOcclusionFromMetallicTextureRed = true;
+    mat.useRoughnessFromMetallicTextureGreen      = true;
+    mat.useMetallnessFromMetallicTextureBlue      = true;
   }
 
   // ── Hair ───────────────────────────────────────────────────────────────────
@@ -430,10 +486,7 @@ export class CharacterAvatar {
   }
 
   _applyHairColor(inst) {
-    const color = hexToColor3(this._config.hair.color);
-    inst.rootNodes
-      .flatMap(n => n.getChildMeshes ? n.getChildMeshes(false) : [])
-      .forEach(m => { if (m.material) m.material.albedoColor = color; });
+    tintInstance(inst, hexToColor3(this._config.hair.color));
   }
 
   // ── Horns ──────────────────────────────────────────────────────────────────
