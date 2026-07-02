@@ -178,7 +178,15 @@ export class AshwoodSky {
     this._biome = { r: 0, g: 0, b: 0 };
     this._sunDir = new BABYLON.Vector3();
     this._moonDir = new BABYLON.Vector3();
-    this._c3 = new BABYLON.Color3();
+    // One scratch Color3 PER uniform. ShaderMaterial.setColor3 stores the
+    // object by REFERENCE and reads it only when the effect binds at render
+    // time — a single shared scratch made topCol/midCol/botCol/sunCol all
+    // bind to the last value written (sunCol), flattening the whole sky to
+    // one color: warm cream by day, pure black at night.
+    this._c3Top = new BABYLON.Color3();
+    this._c3Mid = new BABYLON.Color3();
+    this._c3Bot = new BABYLON.Color3();
+    this._c3Sun = new BABYLON.Color3();
 
     this._observer = scene.onBeforeRenderObservable.add(() => this._update());
   }
@@ -208,14 +216,14 @@ export class AshwoodSky {
     mixInto(this._mid, this._top, this._bot, 0.38);
 
     const m = this.material;
-    m.setColor3('topCol', this._c3.copyFromFloats(this._top.r, this._top.g, this._top.b));
-    m.setColor3('midCol', this._c3.copyFromFloats(this._mid.r, this._mid.g, this._mid.b));
-    m.setColor3('botCol', this._c3.copyFromFloats(this._bot.r, this._bot.g, this._bot.b));
+    m.setColor3('topCol', this._c3Top.copyFromFloats(this._top.r, this._top.g, this._top.b));
+    m.setColor3('midCol', this._c3Mid.copyFromFloats(this._mid.r, this._mid.g, this._mid.b));
+    m.setColor3('botCol', this._c3Bot.copyFromFloats(this._bot.r, this._bot.g, this._bot.b));
     m.setVector3('sunDir', this._sunDir);
     m.setVector3('moonDir', this._moonDir);
     // Sun disc color warms through the golden hour; vanishes below horizon.
     const sunOn = dayF > 0.03 ? 1 : 0;
-    m.setColor3('sunCol', this._c3.copyFromFloats(
+    m.setColor3('sunCol', this._c3Sun.copyFromFloats(
       1.0 * sunOn, (0.92 - 0.42 * dusk) * sunOn, (0.82 - 0.55 * dusk) * sunOn));
     m.setFloat('night', night);
     m.setFloat('dusk', dusk);
