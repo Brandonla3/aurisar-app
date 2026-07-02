@@ -822,8 +822,9 @@ export class BabylonWorldScene {
     // Mobile touch state — written by setJoystick() from WorldGame's React layer
     this._joyDx = 0;
     this._joyDy = 0;
-    // Camera drag touch (right-half of screen, managed internally)
-    this._camTouch = null; // { id, lastX, lastY }
+    // Camera touches (right-half of screen, managed internally by
+    // _bindTouchControls): pointerId → {x, y}. 1 pointer orbits, 2 pinch-zoom.
+    this._camTouches = new Map();
 
     // Pre-allocated movement scratch vectors — avoids 4 allocations per frame
     this._moveFwd   = new BABYLON.Vector3();
@@ -1062,68 +1063,57 @@ export class BabylonWorldScene {
   _bindTouchControls(cam) {
     const canvas = this.canvas;
 
-    // Track a second touch for pinch-zoom
-    this._pinchTouch = null; // { id, lastDist }
+    // Right-half pointers, insertion-ordered: pointerId → {x, y}. One pointer
+    // orbits, two pinch-zoom. The previous version tracked the two fingers
+    // asymmetrically (a "camera" finger + a "pinch" finger) and only zoomed
+    // when the SECOND finger moved — anchoring it and moving the first read
+    // as "zoom is stuck" — and lifting the first finger mid-pinch cleared
+    // both trackers while the second was still on the glass, dead-ending the
+    // gesture until every finger lifted. Both fingers are now equal peers:
+    // distance is recomputed on either finger's move, and when one lifts the
+    // survivor keeps orbiting seamlessly (its stored position is current, so
+    // there's no positional jump either).
+    const touches = this._camTouches;
+    touches.clear();
+    let pinchDist = 0;
+
+    const distance = () => {
+      const [a, b] = touches.values();
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
 
     const onDown = (e) => {
-      const rect   = canvas.getBoundingClientRect();
-      const cx     = e.clientX - rect.left;
-      const isRight = cx >= rect.width / 2;
-
-      if (isRight) {
-        if (!this._camTouch && !this._pinchTouch) {
-          this._camTouch = { id: e.pointerId, lastX: e.clientX, lastY: e.clientY };
-          canvas.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        } else if (this._camTouch && !this._pinchTouch) {
-          // Second finger on right = start pinch
-          const dx = e.clientX - this._camTouch.lastX;
-          const dy = e.clientY - this._camTouch.lastY;
-          this._pinchTouch = {
-            id: e.pointerId,
-            lastDist: Math.hypot(dx, dy),
-          };
-          canvas.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        }
-      }
-      // Left-half touches are captured by the React joystick overlay,
-      // so they never reach the canvas.
+      const rect = canvas.getBoundingClientRect();
+      // Left-half touches belong to the React joystick overlay; a 3rd+
+      // right-half finger is ignored rather than hijacking the pinch.
+      if (e.clientX - rect.left < rect.width / 2 || touches.size >= 2) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) pinchDist = distance();
+      canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
     };
 
     const onMove = (e) => {
-      if (this._camTouch && e.pointerId === this._camTouch.id) {
-        if (!this._pinchTouch) {
-          const dx = e.clientX - this._camTouch.lastX;
-          const dy = e.clientY - this._camTouch.lastY;
-          cam.alpha -= dx * 0.006;
-          cam.beta   = Math.max(cam.lowerBetaLimit,
-                       Math.min(cam.upperBetaLimit, cam.beta + dy * 0.006));
-        }
-        this._camTouch.lastX = e.clientX;
-        this._camTouch.lastY = e.clientY;
-        e.preventDefault();
-      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
-        const dx   = e.clientX - this._camTouch.lastX;
-        const dy   = e.clientY - this._camTouch.lastY;
-        const dist = Math.hypot(dx, dy);
-        const delta = this._pinchTouch.lastDist - dist;
-        cam.radius = Math.max(cam.lowerRadiusLimit,
-                     Math.min(cam.upperRadiusLimit, cam.radius + delta * 0.075));
-        this._pinchTouch.lastDist = dist;
-        e.preventDefault();
+      const t = touches.get(e.pointerId);
+      if (!t) return;
+      if (touches.size === 1) {
+        cam.alpha -= (e.clientX - t.x) * 0.006;
+        cam.beta   = Math.max(cam.lowerBetaLimit,
+                     Math.min(cam.upperBetaLimit, cam.beta + (e.clientY - t.y) * 0.006));
       }
+      t.x = e.clientX;
+      t.y = e.clientY;
+      if (touches.size === 2) {
+        const dist = distance();
+        cam.radius = Math.max(cam.lowerRadiusLimit,
+                     Math.min(cam.upperRadiusLimit, cam.radius + (pinchDist - dist) * 0.075));
+        pinchDist = dist;
+      }
+      e.preventDefault();
     };
 
     const onUp = (e) => {
-      if (this._camTouch && e.pointerId === this._camTouch.id) {
-        this._camTouch  = null;
-        this._pinchTouch = null;
-        e.preventDefault();
-      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
-        this._pinchTouch = null;
-        e.preventDefault();
-      }
+      if (touches.delete(e.pointerId)) e.preventDefault();
     };
 
     canvas.addEventListener('pointerdown',   onDown, { passive: false });
