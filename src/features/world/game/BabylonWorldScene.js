@@ -19,7 +19,6 @@ import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
 import { AshwoodSky }        from './AshwoodSky.js';
 import { AshwoodGrass }      from './AshwoodGrass.js';
-import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { AshwoodWildlife }   from './AshwoodWildlife.js';
 import { AshwoodWeather }    from './AshwoodWeather.js';
 import {
@@ -914,11 +913,12 @@ export class BabylonWorldScene {
     this._setupTileStreaming();
     this._buildDungeonEntrance();
 
-    // Player-following vegetation + ambient life (one draw call grass,
-    // billboard clouds/motes/fireflies).
+    // Player-following vegetation + ambient life (one draw call grass).
+    // The old AshwoodAtmosphere billboard motes/fireflies are gone — the
+    // glowing orbs orbiting the player read as visual bugs, and clouds now
+    // live in the AshwoodSky dome shader.
     const playerPos = () => this._local?.root?.position ?? null;
     this._grass = new AshwoodGrass(this.scene, this._worldgen, playerPos);
-    this._atmosphere = new AshwoodAtmosphere(this.scene, this._worldgen, playerPos);
     this._wildlife = new AshwoodWildlife(this.scene, this._worldgen, playerPos);
     this._weather = new AshwoodWeather(this.scene, this._lm, playerPos);
 
@@ -2158,8 +2158,7 @@ export class BabylonWorldScene {
     };
     const coal = mk('fire_coal', '#1a0d06');
     coal.emissiveColor = BABYLON.Color3.FromHexString('#ff8030').scale(0.8);
-    // soft radial blob for the ember particles (same recipe as the
-    // atmosphere's motes/fireflies texture)
+    // soft radial blob for the ember particles
     const tex = new BABYLON.DynamicTexture('fire_spark_tex', { width: 32, height: 32 }, this.scene, false);
     tex.hasAlpha = true;
     const c = tex.getContext();
@@ -2278,7 +2277,6 @@ export class BabylonWorldScene {
     MobAssetLibrary.dispose();
     this._tileLoader?.dispose();
     this._grass?.dispose();
-    this._atmosphere?.dispose();
     this._wildlife?.dispose();
     this._weather?.dispose();
     this._sky?.dispose();

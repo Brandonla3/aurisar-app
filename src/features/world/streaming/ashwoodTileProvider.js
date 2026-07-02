@@ -85,8 +85,11 @@ export class AshwoodTileProvider {
       lakeWater = water;
     } else {
       water = buildWaterMaterial(scene, {});
-      // Lake gets its own material with a planar reflection at its surface level.
-      lakeWater = buildWaterMaterial(scene, { reflect: true, level: this.wg.config.lake.level });
+      // Lake material adds a planar reflection at its surface level — but the
+      // MirrorTexture is a second render of the whole scene, so it's gated to
+      // the high tier. Low/mobile lakes keep the waves + fresnel sky blend.
+      const reflect = (scene.metadata?.ashwood?.qualityTier ?? 'high') === 'high';
+      lakeWater = buildWaterMaterial(scene, { reflect, level: this.wg.config.lake.level });
     }
 
     const bed = new BABYLON.StandardMaterial('ashwood_pondbed', scene);
@@ -219,6 +222,13 @@ export class AshwoodTileProvider {
       const surf = this._radialDisc(`tile_${meta.id}_lake`, L.waterR, scene,
         shared.lakeWater ?? shared.water, 40, 96);
       surf.position.set(L.x, L.level, L.z);
+      // Depth-based shore factor: the lakebed is carved into the terrain
+      // heightfield, so water depth under each vertex comes straight from
+      // surfaceY — foam hugs the real (irregular) shoreline, not the disc rim.
+      if (!this.bake) {
+        this._applyShore(surf, (lx, lz) =>
+          1 - clamp01((L.level - wg.surfaceY(L.x + lx, L.z + lz)) / 1.2));
+      }
       container.meshes.push(surf);
     }
 
@@ -237,8 +247,31 @@ export class AshwoodTileProvider {
 
       const surf = this._radialDisc(`tile_${meta.id}_pond${i}`, p.r, scene, shared.water, 12, 48);
       surf.position.set(p.x, lvl, p.z);
+      // Ponds are NOT carved into the heightfield (the bowl above fakes the
+      // basin), so shore depth uses the same analytic bowl profile instead
+      // of surfaceY: depth(r) = bowlDepth·(1 − smootherstep) − 0.12.
+      if (!this.bake) {
+        const bowlR = p.r * 0.99;
+        this._applyShore(surf, (lx, lz) => {
+          const r = Math.min(1, Math.hypot(lx, lz) / bowlR);
+          const ss = r * r * r * (r * (r * 6 - 15) + 10);
+          return 1 - clamp01((0.7 * (1 - ss) - 0.12) / 0.45);
+        });
+      }
       container.meshes.push(surf);
     }
+  }
+
+  // Per-vertex 'shore' attribute for the water shader's foam band: 0 in deep
+  // water rising to 1 where the surface meets land. shoreAt takes LOCAL disc
+  // coordinates (the mesh is translated to the water body's center).
+  _applyShore(mesh, shoreAt) {
+    const pos = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const shore = new Float32Array(pos.length / 3);
+    for (let i = 0; i < shore.length; i++) {
+      shore[i] = shoreAt(pos[i * 3], pos[i * 3 + 2]);
+    }
+    mesh.setVerticesData('shore', shore, false, 1);
   }
 
   // Horizontal radial-grid disc with interior vertices (center + concentric
@@ -303,12 +336,14 @@ export class AshwoodTileProvider {
 const WATER_VERT = `
 precision highp float;
 attribute vec3 position;
+attribute float shore;
 uniform mat4 world;
 uniform mat4 viewProjection;
 uniform float t;
 varying vec3 vWp;
 varying vec3 vN;
 varying vec4 vClip;
+varying float vShore;
 // Three directional sine waves (a cheap Gerstner-style sum). Height is
 // accumulated along with its analytic slope so the surface normal is exact —
 // no finite differencing, no extra vertex passes.
@@ -330,6 +365,7 @@ void main() {
   wp.y += h;
   vWp = wp.xyz;
   vN = normalize(vec3(-dhdx, 1.0, -dhdz));
+  vShore = shore;
   vClip = viewProjection * wp;
   gl_Position = vClip;
 }
@@ -340,6 +376,7 @@ precision highp float;
 varying vec3 vWp;
 varying vec3 vN;
 varying vec4 vClip;
+varying float vShore;
 uniform sampler2D uN;
 #ifdef REFLECT
 uniform sampler2D uReflection;
@@ -375,10 +412,21 @@ void main() {
   vec3 R = reflect(-normalize(sunDir), n);
   col += sunCol * pow(max(dot(R, V), 0.0), 130.0) * (2.0 * (1.0 - night) + 0.35);
   col *= mix(1.0, 0.22, night * 0.9);
+  // Shoreline foam: vShore (0 deep → 1 at the waterline, baked per vertex
+  // from real water depth) drives a noise-broken band. The same normal map
+  // supplies the breakup so no new texture is needed; a slow sine breathes
+  // the band in and out like lapping wash. Two thresholds: a soft wash and
+  // a bright crest right at the shore. Added before fog so it hazes out
+  // with distance like the rest of the surface.
+  float foamN = nm(vWp.xz * 0.13 + vec2(t * 0.03, -t * 0.022)).x * 0.5 + 0.5;
+  float edge = vShore + (foamN - 0.5) * 0.34 + sin(t * 1.1 + vShore * 9.0) * 0.05;
+  float foam = smoothstep(0.68, 0.9, edge) * 0.55 + smoothstep(0.9, 1.0, edge) * 0.45;
+  foam *= mix(1.0, 0.3, night);
+  col = mix(col, vec3(0.92, 0.96, 0.97) * mix(1.0, 0.35, night), clamp(foam, 0.0, 1.0));
   float dist = length(cameraPosition - vWp);
   float fog = exp(-pow(dist * fogDensity, 2.0));
   col = mix(vFogColor, col, clamp(fog, 0.0, 1.0));
-  gl_FragColor = vec4(col, clamp(alphaV + fres * 0.13, 0.0, 0.97));
+  gl_FragColor = vec4(col, clamp(alphaV + fres * 0.13 + foam * 0.25, 0.0, 0.97));
 }
 `;
 
@@ -394,7 +442,7 @@ function buildWaterMaterial(scene, opts = {}) {
 
   const reflect = !!opts.reflect;
   const mat = new BABYLON.ShaderMaterial(reflect ? 'ashwood_lakewater' : 'ashwood_water', scene, 'ashwoodWater', {
-    attributes: ['position'],
+    attributes: ['position', 'shore'],
     uniforms: ['world', 'viewProjection', 'cameraPosition',
                't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
                'night', 'alphaV', 'vFogColor', 'fogDensity'],
@@ -469,6 +517,10 @@ function buildWaterMaterial(scene, opts = {}) {
   });
 
   return mat;
+}
+
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 function wgHexToRgb(hex) {
