@@ -19,6 +19,7 @@ const RADIUS = 30;
 const VERT = `
 precision highp float;
 attribute vec3 position;
+attribute vec3 normal;
 attribute vec4 color;
 #include<instancesDeclaration>
 uniform mat4 viewProjection;
@@ -26,6 +27,7 @@ uniform float uTime;
 uniform float uWind;
 varying vec4 vCol;
 varying vec3 vWp;
+varying vec3 vN;
 void main() {
   #include<instancesVertex>
   vec3 p = position;
@@ -36,7 +38,19 @@ void main() {
   p.z += cos(uTime * 1.3 + ph) * 0.35 * hq * uWind;
   vec4 wp = finalWorld * vec4(p, 1.0);
   vWp = wp.xyz;
-  vCol = color;
+
+  // Vertical AO: darken the base (ground contact), brighten the tip — reads
+  // as ambient occlusion for one extra multiply, no extra draw/pass.
+  float ao = mix(0.55, 1.15, clamp(position.y / 0.55, 0.0, 1.0));
+  vCol = vec4(color.rgb * ao, color.a);
+
+  // Approximate world-space normal: baked per-triangle flat normals (computed
+  // once in JS at blade-geometry build time) rotated by the instance's world
+  // matrix. Instance scale is mildly non-uniform (y differs from x/z), so
+  // this 3x3 rotation isn't a true inverse-transpose normal matrix, but at
+  // blade scale the skew is imperceptible and far cheaper per-instance.
+  vN = normalize(mat3(finalWorld) * normal);
+
   gl_Position = viewProjection * wp;
 }
 `;
@@ -45,12 +59,29 @@ const FRAG = `
 precision highp float;
 varying vec4 vCol;
 varying vec3 vWp;
+varying vec3 vN;
 uniform float uLight;
 uniform vec3 cameraPosition;
 uniform vec3 vFogColor;
 uniform float fogDensity;
+uniform vec3 uSunDir;        // world-space direction toward the sun
+uniform float uBackStrength; // 0 on low/mobile tier, >0 on high tier
 void main() {
-  vec3 c = vCol.rgb * uLight;
+  vec3 N = normalize(vN);
+  vec3 L = normalize(uSunDir);
+  float ndl = dot(N, L);
+  // Wrapped diffuse: lets blades catch light even when N faces mostly away
+  // from the sun — real grass never reads as flat-shaded/fully unlit.
+  float wrap = clamp((ndl + 0.5) / 1.5, 0.0, 1.0);
+  float lambert = mix(0.55, 1.0, wrap);
+
+  vec3 V = normalize(cameraPosition - vWp);
+  // Translucency / backlight: blades glow when the sun sits behind them from
+  // the camera's viewpoint — the "glowing grass" look at golden hour. Zero
+  // on low/mobile tier (uBackStrength), so this is a free no-op there.
+  float back = pow(clamp(dot(-V, L), 0.0, 1.0), 2.0) * uBackStrength;
+
+  vec3 c = vCol.rgb * uLight * lambert + vCol.rgb * back;
   float dist = length(cameraPosition - vWp);
   float fog = exp(-pow(dist * fogDensity, 2.0));
   c = mix(vFogColor, c, clamp(fog, 0.0, 1.0));
@@ -76,7 +107,25 @@ function bladeGeometry() {
   }
   const indices = [];
   for (let i = 0; i < positions.length / 3; i++) indices.push(i);
-  return { positions, indices };
+
+  // Flat per-triangle normals (cross of two edges). No vertices are shared
+  // between triangles here, so each triangle's 3 unique vertices simply take
+  // that triangle's face normal — real geometric lighting for the blade with
+  // no averaging pass needed.
+  const normals = new Array(positions.length).fill(0);
+  for (let t = 0; t < indices.length; t += 3) {
+    const i0 = indices[t] * 3, i1 = indices[t + 1] * 3, i2 = indices[t + 2] * 3;
+    const ax = positions[i0], ay = positions[i0 + 1], az = positions[i0 + 2];
+    const bx = positions[i1], by = positions[i1 + 1], bz = positions[i1 + 2];
+    const cx = positions[i2], cy = positions[i2 + 1], cz = positions[i2 + 2];
+    const ux = bx - ax, uy = by - ay, uz = bz - az;
+    const vx = cx - ax, vy = cy - ay, vz = cz - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const idx of [i0, i1, i2]) { normals[idx] = nx; normals[idx + 1] = ny; normals[idx + 2] = nz; }
+  }
+  return { positions, indices, normals };
 }
 
 export class AshwoodGrass {
@@ -87,6 +136,7 @@ export class AshwoodGrass {
     this.lastX = 1e9;
     this.lastZ = 1e9;
     this.time = 0;
+    this._sunDir = new BABYLON.Vector3(0, 1, 0); // safe default before lm.key is read
 
     BABYLON.Effect.ShadersStore['ashwoodGrassVertexShader'] = VERT;
     BABYLON.Effect.ShadersStore['ashwoodGrassFragmentShader'] = FRAG;
@@ -95,17 +145,19 @@ export class AshwoodGrass {
       // world0-3 MUST be declared for (thin) instancing — without them the
       // instancesVertex include reads unbound attributes and instance
       // matrices come out as garbage (blades stretched across the sky).
-      attributes: ['position', 'color', 'world0', 'world1', 'world2', 'world3'],
+      attributes: ['position', 'normal', 'color', 'world0', 'world1', 'world2', 'world3'],
       uniforms: ['viewProjection', 'world', 'cameraPosition',
-                 'uTime', 'uWind', 'uLight', 'vFogColor', 'fogDensity'],
+                 'uTime', 'uWind', 'uLight', 'vFogColor', 'fogDensity',
+                 'uSunDir', 'uBackStrength'],
     });
     this.material.backFaceCulling = false;
 
-    const { positions, indices } = bladeGeometry();
+    const { positions, indices, normals } = bladeGeometry();
     this.mesh = new BABYLON.Mesh('ashwoodGrass', scene);
     const vd = new BABYLON.VertexData();
     vd.positions = positions;
     vd.indices = indices;
+    vd.normals = normals;
     vd.applyToMesh(this.mesh);
     this.mesh.material = this.material;
     this.mesh.isPickable = false;
@@ -132,6 +184,16 @@ export class AshwoodGrass {
     m.setFloat('uLight', 0.35 + 0.65 * (lm?.dayFactor ?? 1));
     m.setColor3('vFogColor', this.scene.fogColor);
     m.setFloat('fogDensity', this.scene.fogDensity);
+
+    if (lm?.key) {
+      this._sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
+      this._sunDir.normalize();
+    }
+    m.setVector3('uSunDir', this._sunDir);
+    // High tier only — cheap to always set, the shader multiplies by 0 on
+    // low/mobile so the term is a free no-op there.
+    const tier = this.scene.metadata?.ashwood?.qualityTier;
+    m.setFloat('uBackStrength', tier === 'high' ? 0.5 : 0.0);
     if (Math.abs(p.x - this.lastX) + Math.abs(p.z - this.lastZ) > CELL) this._rebuild(p.x, p.z);
   }
 
