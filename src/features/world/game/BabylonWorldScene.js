@@ -42,6 +42,7 @@ import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
 import { PropsSystem } from '../systems/PropsSystem.js';
 import { CastleSystem } from '../castle/CastleSystem.js';
+import { ENTRY as CASTLE_ENTRY } from '../castle/castlePlan.js';
 import { MOBS as MOB_DEFS } from '../content/index';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -1921,6 +1922,19 @@ export class BabylonWorldScene {
 
   /** React → scene: press-E on a castle door prompt. */
   useDoor(id) { this._castle?.useDoor(id); }
+
+  /** Menu testing aid: drop the player in front of the castle gates,
+   *  facing them (inside the press-E prompt radius). forceExit resets
+   *  interior state without its own teleport, so the single teleport
+   *  below covers both the outside and inside starting cases. */
+  fastTravelToCastle() {
+    if (!this._local || !this._worldgen) return;
+    this._castle?.forceExit();
+    const g = CASTLE_ENTRY.gateWorld;
+    const gy = this._worldgen.surfaceY(g.x, g.z);
+    this._teleportLocal(g.x, gy, g.z, Math.PI / 2); // face the gates (+x)
+    this._castleCameraSet({ x: g.x, y: gy + 1.2, z: g.z }, Math.PI / 2, false);
+  }
 
   _trackCamera() {
     const p = this._local.root.position;
