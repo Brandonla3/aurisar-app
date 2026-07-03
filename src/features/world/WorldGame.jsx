@@ -354,10 +354,7 @@ export default function WorldGame({ playerInfo, onExit }) {
       canvasRef.current,
       playerInfo,
       { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
-        onLocalPlayerUpdate, onChestOpen, onNearbyNpc,
-        // Dragging to orbit the camera while chat is open means "done
-        // chatting" — close it rather than silently eating the drag.
-        onCanvasInteract: closeChat }
+        onLocalPlayerUpdate, onChestOpen, onNearbyNpc }
     );
     sceneRef.current = scene;
     setMapData(scene.getMapData());
@@ -414,10 +411,6 @@ export default function WorldGame({ playerInfo, onExit }) {
 
     const onDown = (e) => {
       if (joyTouchRef.current) return; // already tracking one finger
-      // Chat blocks movement while open (see BabylonWorldScene._moveLocal) —
-      // reaching for the joystick clearly means "I'm done chatting", so
-      // close it instead of silently eating the touch.
-      if (sceneRef.current?.isChatOpen?.()) closeChat();
       e.preventDefault();
       const rect  = zone.getBoundingClientRect();
       const baseX = e.clientX - rect.left;

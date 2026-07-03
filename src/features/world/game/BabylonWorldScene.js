@@ -1087,10 +1087,6 @@ export class BabylonWorldScene {
       // Left-half touches belong to the React joystick overlay; a 3rd+
       // right-half finger is ignored rather than hijacking the pinch.
       if (e.clientX - rect.left < rect.width / 2 || touches.size >= 2) return;
-      // Reaching for the camera-drag zone while chat is open means "I'm
-      // done chatting" — close it instead of silently eating the drag
-      // (movement/camera reads are gated on _chatOpen while it's true).
-      if (this._chatOpen) this.callbacks.onCanvasInteract?.();
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.size === 2) pinchDist = distance();
       canvas.setPointerCapture(e.pointerId);
@@ -1722,7 +1718,9 @@ export class BabylonWorldScene {
   }
 
   _moveLocal(dt) {
-    if (this._chatOpen) { this._local.isMoving = false; return; }
+    // Chat no longer blocks movement — only WASD is gated while typing (see
+    // _bindKeys), so keyboard input can't leak into the chat box, but the
+    // touch joystick (and any already-held keys) keep moving the player.
     if (this._localDead) { this._local.isMoving = false; return; }   // slice 5c: dead can't walk
 
     const w = this._keys['KeyW'] || this._keys['ArrowUp'];
@@ -1993,10 +1991,6 @@ export class BabylonWorldScene {
   setChatOpen(open) {
     this._chatOpen = open;
     if (open) this._keys = {};
-  }
-
-  isChatOpen() {
-    return this._chatOpen;
   }
 
   // ── Utilities ──────────────────────────────────────────────────────────────
