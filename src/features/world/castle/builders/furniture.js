@@ -9,17 +9,51 @@
 
 /* global BABYLON */
 
-import { LEVELS, ROOMS, WALL_T } from '../castlePlan.js';
+import {
+  LEVELS, ROOMS, DOORS, WALL_T, ROOMS_BY_ID, doorStripRect,
+} from '../castlePlan.js';
 import { box, cyl } from './mergeUtil.js';
 import { hash2 } from '../../worldgen/rng.js';
 
 const G = (level) => `L${level}`;
+
+// ── Doorway clearance ────────────────────────────────────────────────────────
+// No furniture may sit in front of a doorway: every piece checks its
+// footprint against the door approach zones before building. Pieces that
+// would block simply don't spawn (rooms are large; the loss is invisible).
+const DOOR_ZONES = (() => {
+  const byLevel = new Map();
+  for (const d of DOORS) {
+    if (d.b === 'EXTERIOR') continue;
+    const level = ROOMS_BY_ID[d.a].level;
+    const r = doorStripRect(d, 2.8); // reach well past the wall on both sides
+    const grow = 1.0;
+    const rect = { x0: r.x0 - grow, z0: r.z0 - grow, x1: r.x1 + grow, z1: r.z1 + grow };
+    if (!byLevel.has(level)) byLevel.set(level, []);
+    byLevel.get(level).push(rect);
+  }
+  return byLevel;
+})();
+
+/** True when a piece with half-extent `half` at local (x, z) keeps every
+ *  doorway approach clear. */
+function doorClear(level, x, z, half = 0.9) {
+  const zones = DOOR_ZONES.get(level);
+  if (!zones) return true;
+  for (const r of zones) {
+    if (x + half > r.x0 && x - half < r.x1 && z + half > r.z0 && z - half < r.z1) {
+      return false;
+    }
+  }
+  return true;
+}
 
 // ── Individual pieces ────────────────────────────────────────────────────────
 
 export function createBed(ctx, level, x, z, ax, az, royal = false) {
   const fy = LEVELS[level].y;
   const w = royal ? 2.6 : 1.7, d = royal ? 3.0 : 2.3;
+  if (!doorClear(level, x, z, Math.max(w, d) / 2 + 0.3)) return;
   const wx = x + ax, wz = z + az;
   // frame + legs
   ctx.add(box(ctx.scene, `bed_${level}`, wx, fy + 0.42, wz, w, 0.28, d), 'woodDark', G(level));
@@ -44,6 +78,7 @@ export function createBed(ctx, level, x, z, ax, az, royal = false) {
 }
 
 export function createChest(ctx, level, x, z, ax, az, rotY = 0, gold = false) {
+  if (!doorClear(level, x, z, 0.9)) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
   const body = box(ctx.scene, `chest_${level}`, wx, fy + 0.34, wz, 1.15, 0.6, 0.7);
@@ -63,6 +98,7 @@ export function createChest(ctx, level, x, z, ax, az, rotY = 0, gold = false) {
 }
 
 export function createDesk(ctx, level, x, z, ax, az, rotY = 0) {
+  if (!doorClear(level, x, z, 1.3)) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
   const top = box(ctx.scene, `desk_${level}`, wx, fy + 0.78, wz, 1.6, 0.08, 0.85);
@@ -78,6 +114,7 @@ export function createDesk(ctx, level, x, z, ax, az, rotY = 0) {
 }
 
 export function createWardrobe(ctx, level, x, z, ax, az) {
+  if (!doorClear(level, x, z, 1.1)) return;
   const fy = LEVELS[level].y;
   ctx.add(box(ctx.scene, `ward_${level}`, x + ax, fy + 1.1, z + az, 1.5, 2.2, 0.7), 'woodDark', G(level));
   ctx.add(box(ctx.scene, `wardTrim_${level}`, x + ax, fy + 2.24, z + az, 1.6, 0.1, 0.8), 'woodDark', G(level));
@@ -85,6 +122,7 @@ export function createWardrobe(ctx, level, x, z, ax, az) {
 }
 
 export function createBookcase(ctx, level, x, z, ax, az, w = 2.2) {
+  if (!doorClear(level, x, z, w / 2 + 0.3)) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
   ctx.add(box(ctx.scene, `bookc_${level}`, wx, fy + 1.35, wz, w, 2.7, 0.45), 'woodDark', G(level));
@@ -95,6 +133,7 @@ export function createBookcase(ctx, level, x, z, ax, az, w = 2.2) {
 }
 
 export function createTable(ctx, level, x, z, ax, az, w, d, withBenches = false) {
+  if (!doorClear(level, x, z, Math.max(w, d) / 2 + (withBenches ? 0.9 : 0.3))) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
   ctx.add(box(ctx.scene, `table_${level}`, wx, fy + 0.82, wz, w, 0.1, d), 'woodDark', G(level));
@@ -112,6 +151,7 @@ export function createTable(ctx, level, x, z, ax, az, w, d, withBenches = false)
 }
 
 export function createBarrel(ctx, level, x, z, ax, az) {
+  if (!doorClear(level, x, z, 0.7)) return;
   const fy = LEVELS[level].y;
   const b = cyl(ctx.scene, `barrel_${level}`, x + ax, fy + 0.55, z + az, 1.1, 0.85, 12);
   ctx.add(b, 'woodDark', G(level));
@@ -123,6 +163,7 @@ export function createBarrel(ctx, level, x, z, ax, az) {
 }
 
 export function createCrate(ctx, level, x, z, ax, az, s = 0.8, rot = 0) {
+  if (!doorClear(level, x, z, s / 2 + 0.3)) return;
   const fy = LEVELS[level].y;
   const c = box(ctx.scene, `crate_${level}`, x + ax, fy + s / 2, z + az, s, s, s);
   c.rotation.y = rot;
@@ -199,8 +240,9 @@ function fitKitchen(ctx, room, ax, az) {
   const { x0, z0, x1, z1 } = room.rect;
   const level = room.level;
   const fy = LEVELS[level].y;
-  // counters along the west wall
+  // counters along the west wall (skipping doorway approaches)
   for (let z = z0 + 2; z <= z1 - 3; z += 2.2) {
+    if (!doorClear(level, x0 + 1.0, z, 1.3)) continue;
     ctx.add(box(ctx.scene, `counter_${level}`, x0 + 1.0 + ax, fy + 0.5, z + az, 1.5, 1.0, 2.0), 'stone', G(level));
     ctx.add(box(ctx.scene, `counterTop_${level}`, x0 + 1.0 + ax, fy + 1.03, z + az, 1.6, 0.07, 2.1), 'woodDark', G(level));
   }
@@ -250,6 +292,7 @@ function fitBathroom(ctx, room, ax, az) {
   ctx.add(box(ctx.scene, `mirror_${level}`, x0 + 1.4 + ax, fy + 2.0, z0 + 0.47 + az, 0.74, 1.04, 0.03), 'windowCool', G(level));
   // privacy screen: three angled panels
   for (let i = 0; i < 3; i++) {
+    if (!doorClear(level, x1 - 1.6 + i * 0.55, z0 + 2.2 + i * 0.3, 0.7)) continue;
     const p = box(ctx.scene, `screen_${level}`, x1 - 1.6 + i * 0.55 + ax, fy + 1.0, z0 + 2.2 + i * 0.3 + az, 0.06, 2.0, 0.85);
     p.rotation.y = 0.5 - i * 0.45;
     ctx.add(p, 'woodDark', G(level));
@@ -266,7 +309,9 @@ function fitDining(ctx, room, ax, az) {
   createTable(ctx, level, cx, cz - 3.4, ax, az, 11, 1.8, true);
   // sideboard on the east wall
   const fy = LEVELS[level].y;
-  ctx.add(box(ctx.scene, `sideb_${level}`, x1 - 0.9 + ax, fy + 0.6, cz + az, 0.8, 1.2, 5.5), 'woodDark', G(level));
+  if (doorClear(level, x1 - 0.9, cz, 3.0)) {
+    ctx.add(box(ctx.scene, `sideb_${level}`, x1 - 0.9 + ax, fy + 0.6, cz + az, 0.8, 1.2, 5.5), 'woodDark', G(level));
+  }
   void z0; void z1;
 }
 
@@ -316,6 +361,7 @@ function fitSitting(ctx, room, ax, az) {
   createTable(ctx, level, cx, cz, ax, az, 1.6, 1.0);
   // armchairs around the table
   for (const [dx, dz, r] of [[-1.8, 0, Math.PI / 2], [1.8, 0, -Math.PI / 2], [0, 1.8, Math.PI], [0, -1.8, 0]]) {
+    if (!doorClear(level, cx + dx, cz + dz, 0.7)) continue;
     const seat = box(ctx.scene, `arm_${level}`, cx + dx + ax, fy + 0.42, cz + dz + az, 0.8, 0.35, 0.8);
     seat.rotation.y = r;
     ctx.add(seat, 'redFabric', G(level));
@@ -434,12 +480,12 @@ function fitBallroom(ctx, room, ax, az) {
     ctx.add(box(ctx.scene, `ballSide_${level}`, x0 + dx + ax, fy + 0.55, z1 - 1.2 + az, 3.2, 1.1, 0.9), 'woodDark', G(level));
   }
   // hanging banners between the tall windows (west + south walls)
-  for (let i = 0; i < 5; i++) {
-    const bz = room.rect.z0 + 3 + i * 5;
-    if (bz > room.rect.z1 - 2) break;
-    const b = box(ctx.scene, `banner_${level}`, x0 + 0.45 + ax, fy + 7.2, bz + az, 0.06, 3.4, 1.2);
+  for (let i = 0; i < 6; i++) {
+    const bz = room.rect.z0 + 4 + i * 6.5;
+    if (bz > room.rect.z1 - 3) break;
+    const b = box(ctx.scene, `banner_${level}`, x0 + 0.45 + ax, fy + 9.6, bz + az, 0.06, 4.6, 1.5);
     ctx.add(b, i % 2 === 0 ? 'redFabric' : 'blueFabric', G(level));
-    ctx.add(box(ctx.scene, `bannerRod_${level}`, x0 + 0.45 + ax, fy + 8.95, bz + az, 0.1, 0.08, 1.5), 'gold', G(level));
+    ctx.add(box(ctx.scene, `bannerRod_${level}`, x0 + 0.45 + ax, fy + 11.95, bz + az, 0.1, 0.1, 1.8), 'gold', G(level));
   }
 }
 

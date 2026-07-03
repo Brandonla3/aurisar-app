@@ -14,7 +14,7 @@ import {
   LEVELS, ROOMS, DOORS, VOIDS, STAIRS, LOCAL_BOUNDS,
   WALL_T, SLAB_T, stairRects, doorLevel,
 } from '../castlePlan.js';
-import { box, slabBox, rectSubtract, cyl } from './mergeUtil.js';
+import { box, slabBox, rectSubtract, cyl, archTube } from './mergeUtil.js';
 import { hash2 } from '../../worldgen/rng.js';
 
 // Which room kinds read as "royal" (marble floors, cornices) vs wood vs raw.
@@ -35,7 +35,7 @@ const FANCY_KINDS = new Set([
   'entrance', 'ballroom', 'gallery', 'royal', 'master', 'library', 'sitting',
   'dining', 'stairHall', 'treasury',
 ]);
-const DOOR_H = { single: 2.7, double: 3.4, iron: 2.5 };
+const DOOR_H = { single: 3.2, double: 4.4, iron: 3.0 };
 
 const doorHeight = (d) => (d.iron ? DOOR_H.iron : d.double ? DOOR_H.double : DOOR_H.single);
 const wallMatFor = (level) => WALL_MAT_BY_LEVEL[level];
@@ -276,14 +276,9 @@ export function createDoor(ctx, level, line, door, ax, az) {
   // lintel band
   put(at, mid, L.y + dh + 0.16, WALL_T + 0.22, 0.34, w + 0.6, frameMat);
   if (door.arch) {
-    // decorative arch: half torus flattened against the wall
-    const arch = BABYLON.MeshBuilder.CreateTorus(`arch_${door.id}`, {
-      diameter: w + 0.4, thickness: 0.26, tessellation: 20,
-    }, ctx.scene);
-    // stand the ring upright in the wall plane: ring axis must run along the
-    // wall's normal ('x' lines run along z -> axis x; 'z' lines -> axis z)
-    if (line.axis === 'x') arch.rotation.z = Math.PI / 2;
-    else arch.rotation.x = Math.PI / 2;
+    // decorative semicircular arch springing from the lintel
+    const arch = archTube(ctx.scene, `arch_${door.id}`, w + 0.4, 0.28, 18);
+    if (line.axis === 'x') arch.rotation.y = Math.PI / 2;
     arch.position = line.axis === 'x'
       ? new BABYLON.Vector3(at + ax, L.y + dh + 0.3, mid + az)
       : new BABYLON.Vector3(mid + ax, L.y + dh + 0.3, at + az);
@@ -305,13 +300,13 @@ export function createDoor(ctx, level, line, door, ax, az) {
 function placeWindows(ctx, level, line, lo, hi, room, sideIn, wallH, ax, az) {
   const L = LEVELS[level];
   const tall = room.kind === 'ballroom';
-  const winH = tall ? 4.6 : 2.4;
-  const winW = tall ? 1.7 : 1.3;
-  const spacing = tall ? 5.5 : 4.5;
+  const winH = tall ? 7.0 : 3.2;
+  const winW = tall ? 2.1 : 1.7;
+  const spacing = tall ? 7.0 : 5.5;
   const len = hi - lo;
   const n = Math.floor(len / spacing);
   if (n < 1) return;
-  const y0 = L.y + (tall ? 2.2 : 1.35) + winH / 2;
+  const y0 = L.y + (tall ? 2.4 : 1.5) + winH / 2;
   if (y0 + winH / 2 > L.y + wallH - 0.3) return;
   for (let i = 0; i < n; i++) {
     const v = lo + (i + 0.5) * (len / n);
@@ -339,15 +334,12 @@ export function createWindow(ctx, level, line, v, yC, w, h, sideIn, ax, az) {
   put(at + faceOff, v + w / 2 + 0.1, yC, 0.12, h + 0.2, 0.18, frameMat);
   put(at + faceOff, v, yC - h / 2 - 0.12, 0.2, 0.16, w + 0.5, frameMat);
   put(at + faceOff, v, yC + h / 2 + 0.1, 0.12, 0.16, w + 0.36, frameMat);
-  // arch cap
-  const arch = BABYLON.MeshBuilder.CreateTorus(`winArch_${level}`, {
-    diameter: w + 0.15, thickness: 0.13, tessellation: 14,
-  }, ctx.scene);
-  if (line.axis === 'x') arch.rotation.z = Math.PI / 2;
-  else arch.rotation.x = Math.PI / 2;
+  // semicircular arch cap
+  const arch = archTube(ctx.scene, `winArch_${level}`, w + 0.15, 0.14, 12);
+  if (line.axis === 'x') arch.rotation.y = Math.PI / 2;
   arch.position = line.axis === 'x'
-    ? new BABYLON.Vector3(at + faceOff + ax, yC + h / 2 + 0.12, v + az)
-    : new BABYLON.Vector3(v + ax, yC + h / 2 + 0.12, at + faceOff + az);
+    ? new BABYLON.Vector3(at + faceOff + ax, yC + h / 2 + 0.1, v + az)
+    : new BABYLON.Vector3(v + ax, yC + h / 2 + 0.1, at + faceOff + az);
   ctx.add(arch, frameMat, G(level));
   // glass: warm glow pane + iron mullion cross
   put(at + faceOff * 0.9, v, yC, 0.03, h, w, 'windowGlow');
@@ -409,15 +401,17 @@ export function dressStructuralRooms(ctx, ax, az) {
     }
 
     if (room.kind === 'ballroom') {
-      const tallH = 10.6;
-      // colonnade supporting the gallery edge (gallery strip starts at z=0)
-      for (let x = x0 + 3; x <= x1 - 2.5; x += 5.2) {
-        createColumn(ctx, room.level, x, -0.7, L.clear + 5.2, ax, az, 'marble', 0.8);
+      // heights derive from the level table: colonnade meets the gallery
+      // slab; the great columns rise to the f4 slab through the void
+      const galleryH = LEVELS[3].y - SLAB_T - L.y;
+      const tallH = LEVELS[4].y - SLAB_T - L.y - 0.2;
+      for (let x = x0 + 4; x <= x1 - 3.5; x += 7.2) {
+        createColumn(ctx, room.level, x, -0.9, galleryH, ax, az, 'marble', 0.9);
       }
       // twin rows of full-height columns down the hall
-      for (let x = x0 + 5; x <= x1 - 5; x += 6.4) {
-        createColumn(ctx, room.level, x, cz - 6, tallH, ax, az, 'marble', 1.05);
-        createColumn(ctx, room.level, x, cz + 2, tallH, ax, az, 'marble', 1.05);
+      for (let x = x0 + 7; x <= x1 - 7; x += 8.8) {
+        createColumn(ctx, room.level, x, cz - 8, tallH, ax, az, 'marble', 1.2);
+        createColumn(ctx, room.level, x, cz + 3, tallH, ax, az, 'marble', 1.2);
       }
       // dais at the west end
       ctx.add(slabBox(ctx.scene, 'dais',

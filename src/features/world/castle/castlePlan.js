@@ -27,26 +27,34 @@ export const SLAB_T     = 0.6;   // floor slab thickness (slab top = level y)
 // Interior-local bounds (nav grid + slab extents). Interior anchor keeps the
 // far edge at x = 840 + 33 = 873 m — inside the server clamp (x <= 999 m,
 // spacetimedb WORLD_MAX_PX) with >120 m headroom. Enforced by castlePlan.test.
-export const LOCAL_BOUNDS = Object.freeze({ x0: -33, z0: -25, x1: 33, z1: 25 });
+// Every XZ dimension below is authored at base scale and multiplied by
+// PLAN_SCALE on export — hallways, rooms, doors and stairs all grow
+// together, and the nav grid + builders only ever see the scaled plan.
+export const PLAN_SCALE = 1.4;
+const SXZ = PLAN_SCALE;
+export const LOCAL_BOUNDS = Object.freeze({
+  x0: -33 * SXZ, z0: -25 * SXZ, x1: 33 * SXZ, z1: 25 * SXZ,
+});
 
 // ── Levels ───────────────────────────────────────────────────────────────────
 // Dungeon is the lowest floor of a raised stack (not below y=0): the flat
 // terrain plane at y=0 east of x=500 would slice any true basement. Its
 // "underground" feel comes from lighting + materials, not absolute Y.
 // clear = wall height; chosen so walls meet the next level's slab exactly
-// (y + clear === nextY - SLAB_T) — no gaps, no overdraw.
+// (y + clear === nextY - SLAB_T) — no gaps, no overdraw. Generous heights:
+// the third-person camera needs headroom, and the brief demands tall rooms.
 export const LEVELS = Object.freeze([
-  { id: 'dungeon', y: 0.6,  clear: 5.4 }, // 0 — cells, vault, guard post
-  { id: 'ground',  y: 6.6,  clear: 6.0 }, // 1 — entrance, kitchen, dining, servants
-  { id: 'f2',      y: 13.2, clear: 5.2 }, // 2 — ballroom (double height), guests, baths
-  { id: 'f3',      y: 19.0, clear: 5.2 }, // 3 — master suites, library, gallery
-  { id: 'f4',      y: 24.8, clear: 5.2 }, // 4 — royal suite, treasury, tower rooms
+  { id: 'dungeon', y: 0.6,  clear: 7.4 }, // 0 — cells, vault, guard post
+  { id: 'ground',  y: 8.6,  clear: 8.0 }, // 1 — entrance, kitchen, dining, servants
+  { id: 'f2',      y: 17.2, clear: 6.8 }, // 2 — ballroom (double height), guests, baths
+  { id: 'f3',      y: 24.6, clear: 6.8 }, // 3 — master suites, library, gallery
+  { id: 'f4',      y: 32.0, clear: 6.8 }, // 4 — royal suite, treasury, tower rooms
 ]);
 
 // ── Rooms ────────────────────────────────────────────────────────────────────
 // kind drives fit-out (furniture/fixtures) and material palette in the
 // builders. Rooms on a level tile edge-to-edge; walls sit on shared edges.
-export const ROOMS = Object.freeze([
+const RAW_ROOMS = [
   // ═══ DUNGEON (level 0) ═════════════════════════════════════════════════════
   { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24, z1: 4  }, kind: 'dungeonHall' },
   { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,  z1: 16 }, kind: 'cells' },
@@ -95,14 +103,18 @@ export const ROOMS = Object.freeze([
   { id: 'guardChamber', level: 4, rect: { x0: -12, z0: -22, x1: 8,   z1: -2 }, kind: 'sitting' },
   { id: 'towerRoom',    level: 4, rect: { x0: 8,   z0: -22, x1: 24,  z1: -2 }, kind: 'sitting' },
   { id: 'towerTop',     level: 4, rect: { x0: 24,  z0: -6,  x1: 32,  z1: 6  }, kind: 'observatory' },
-]);
+];
+export const ROOMS = Object.freeze(RAW_ROOMS.map((r) => ({
+  ...r,
+  rect: { x0: r.rect.x0 * SXZ, z0: r.rect.z0 * SXZ, x1: r.rect.x1 * SXZ, z1: r.rect.z1 * SXZ },
+})));
 
 // ── Doors ────────────────────────────────────────────────────────────────────
 // Openings between two rooms sharing an edge. edge: 'x' means the shared
 // wall line runs along z at x = at (door crosses it); 'z' means the wall
 // line runs along x at z = at. lo..hi is the opening extent along the line.
 // b: 'EXTERIOR' marks the main gate (teleport interface, not a nav strip).
-export const DOORS = Object.freeze([
+const RAW_DOORS = [
   // dungeon
   { id: 'd_cellsN',  a: 'dCorridor', b: 'cellBlockN', edge: 'z', at: 4,  lo: -14, hi: -11 },
   { id: 'd_cellsS',  a: 'dCorridor', b: 'cellBlockS', edge: 'z', at: -4, lo: -14, hi: -11 },
@@ -145,7 +157,10 @@ export const DOORS = Object.freeze([
   { id: 'f4_guard',  a: 'corridor4', b: 'guardChamber', edge: 'z', at: -2, lo: -5,  hi: -1 },
   { id: 'f4_tower',  a: 'corridor4', b: 'towerRoom',    edge: 'z', at: -2, lo: 14,  hi: 17 },
   { id: 'f4_ttop',   a: 'towerRoom', b: 'towerTop',     edge: 'x', at: 24, lo: -5,  hi: -2 },
-]);
+];
+export const DOORS = Object.freeze(RAW_DOORS.map((d) => ({
+  ...d, at: d.at * SXZ, lo: d.lo * SXZ, hi: d.hi * SXZ,
+})));
 
 // ── Stairs ───────────────────────────────────────────────────────────────────
 // U-shaped switchbacks. Two lanes run along `axis` (u); lanes are offset
@@ -156,7 +171,7 @@ export const DOORS = Object.freeze([
 // arrival is the upper-floor cells adjacent to lane B at u < u0.
 // Successive grand stairs alternate v0 so their plan-view footprints never
 // overlap — each nav cell holds at most one ramp per level grid.
-export const STAIRS = Object.freeze([
+const RAW_STAIRS = [
   // dungeon <-> ground, in d/gVestibule; runs along x, arrival faces the door
   { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.6, runLen: 4.2, landingD: 2.2,
     laneW: 2.4, gap: 0.5, v0: -4.0 },
@@ -167,25 +182,30 @@ export const STAIRS = Object.freeze([
     laneW: 2.8, gap: 0.8, v0: 17 },
   { id: 'grand3', lo: 3, hi: 4, axis: 'z', u0: 6, runLen: 8, landingD: 3.6,
     laneW: 2.8, gap: 0.8, v0: 10 },
-]);
+];
+export const STAIRS = Object.freeze(RAW_STAIRS.map((st) => ({
+  ...st,
+  u0: st.u0 * SXZ, runLen: st.runLen * SXZ, landingD: st.landingD * SXZ,
+  laneW: st.laneW * SXZ, gap: st.gap * SXZ, v0: st.v0 * SXZ,
+})));
 
 // ── Double-height voids ──────────────────────────────────────────────────────
 // Rect holes cut from a level's floor slab (and nav grid) to open vertical
 // space to the level below. The ballroom void gives it an ~11 m ceiling;
 // gallery3's remaining strip (z 0..4) is the royal balcony over it.
 export const VOIDS = Object.freeze([
-  { level: 3, rect: { x0: -32, z0: -22, x1: 4, z1: 0 }, over: 'ballroom' },
+  { level: 3, rect: { x0: -32 * SXZ, z0: -22 * SXZ, x1: 4 * SXZ, z1: 0 }, over: 'ballroom' },
 ]);
 
 // ── Exterior shell + world placement ─────────────────────────────────────────
 export const EXTERIOR = Object.freeze({
   site: { x: 150, z: 20 },     // overworld terrain site (rolling meadow east of hub)
   facing: 'west',              // gates face -x, toward the hub / east trail
-  halfW: 28, halfD: 25,        // shell footprint half-extents
-  wallH: 26,                   // curtain-wall top (4 storeys)
-  towerR: 5.5, towerH: 33,     // corner towers
-  keep: { halfW: 13, halfD: 10, h: 31 },  // raised central keep block
-  gate: { z: 20, width: 5.2, height: 7.5 }, // gate centered on west wall at site.z
+  halfW: 34, halfD: 30,        // shell footprint half-extents
+  wallH: 30,                   // curtain-wall top (4 storeys)
+  towerR: 6.5, towerH: 39,     // corner towers
+  keep: { halfW: 16, halfD: 12, h: 36 },  // raised central keep block
+  gate: { z: 20, width: 6.4, height: 9 }, // gate centered on west wall at site.z
 });
 
 export const INTERIOR_ANCHOR = Object.freeze({ x: 840, z: 0 });
@@ -194,10 +214,10 @@ export const INTERIOR_ANCHOR = Object.freeze({ x: 840, z: 0 });
 // so CastleSystem and tests share them).
 export const ENTRY = Object.freeze({
   // just inside the main gate, facing east into the entrance hall
-  spawnLocal: { x: -29.5, z: 0 },
+  spawnLocal: { x: -29.5 * SXZ, z: 0 },
   spawnFacing: Math.PI / 2, // avatar yaw: +x
   // exit hotspot inside (by the gate) and return spot outside the shell gates
-  exitHotspotLocal: { x: -30.5, z: 0 },
+  exitHotspotLocal: { x: -30.5 * SXZ, z: 0 },
   gateWorld: { x: EXTERIOR.site.x - EXTERIOR.halfW - 3.5, z: EXTERIOR.gate.z },
 });
 
@@ -338,7 +358,7 @@ export function buildLightAnchors() {
       case 'ballroom': {
         // three great chandeliers down the long axis + wall sconces
         for (const t of [0.22, 0.5, 0.78]) {
-          add('chandelier', room.level, x0 + t * w, cz, L.y + 8.4, 4);
+          add('chandelier', room.level, x0 + t * w, cz, L.y + 10.5, 4);
         }
         for (const t of [0.2, 0.5, 0.8]) {
           add('torch', room.level, x0 + t * w, z0 + 0.4, torchY);

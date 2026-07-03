@@ -176,9 +176,40 @@ export class CastleSystem {
       this._intMeshes = mergeCollector(ctx, this._intRoot);
       this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 3 : 6);
       this._pool.setIncludedMeshes(this._intMeshes);
+      this._spawnInteriorLights();
     }
     this._intRoot.setEnabled(false);
     this._built = true;
+  }
+
+  _spawnInteriorLights() {
+    // Scoped warm ambient: hemispheric light that ONLY castle meshes see.
+    // This is what keeps room corners readable between torch pools without
+    // touching the overworld look (and without more point lights).
+    const amb = new BABYLON.HemisphericLight('castleAmbient',
+      new BABYLON.Vector3(0, 1, 0), this.scene);
+    amb.diffuse = new BABYLON.Color3(0.52, 0.47, 0.40);
+    amb.groundColor = new BABYLON.Color3(0.30, 0.25, 0.20);
+    amb.intensity = 0.55;
+    amb.includedOnlyMeshes = [...this._intMeshes];
+    this._ambLight = amb;
+
+    // Dedicated character light: the avatar is a PBR-material GLB, which
+    // needs ~10x the intensity Standard materials do — the pooled lights
+    // barely register on it (the "why is my character pitch black" bug).
+    // Scoped to the avatar only, follows the player, active while inside.
+    const cl = new BABYLON.PointLight('castleCharLight', BABYLON.Vector3.Zero(), this.scene);
+    cl.diffuse = new BABYLON.Color3(1.0, 0.85, 0.65);
+    cl.specular = new BABYLON.Color3(0.25, 0.2, 0.14);
+    cl.intensity = 0;
+    cl.range = 9;
+    cl.includedOnlyMeshes = [];
+    this._charLight = cl;
+    this._charObs = this.scene.onBeforeRenderObservable.add(() => {
+      if (!this._inside || !this._charLight) return;
+      const p = this._host.getPlayerPos();
+      if (p) this._charLight.position.set(p.x + 0.5, p.y + 2.4, p.z + 0.5);
+    });
   }
 
   _spawnGateTorchLights(positions, extMeshes) {
@@ -283,11 +314,15 @@ export class CastleSystem {
       const pos = this._host.getPlayerPos();
       return pos ? { pos, level: this._moodLevel >= 0 ? this._moodLevel : null } : null;
     });
-    // the avatar rides the pool light too — otherwise the character is a
-    // black silhouette (pool lights are scoped to castle meshes only)
+    // light the character: refresh the avatar mesh list (it can change on
+    // equip) into the dedicated PBR-strength character light and the ambient
     const avatarMeshes = this._host.getAvatarMeshes?.() ?? [];
-    if (avatarMeshes.length && this._intMeshes) {
-      this._pool?.setIncludedMeshes([...this._intMeshes, ...avatarMeshes]);
+    if (this._charLight) {
+      this._charLight.includedOnlyMeshes = avatarMeshes;
+      this._charLight.intensity = 26;
+    }
+    if (avatarMeshes.length && this._ambLight && this._intMeshes) {
+      this._ambLight.includedOnlyMeshes = [...this._intMeshes, ...avatarMeshes];
     }
     this._clearPrompt();
     this._host.onZoneChange?.('castle');
@@ -315,6 +350,7 @@ export class CastleSystem {
   }
 
   _settleOutside() {
+    if (this._charLight) this._charLight.intensity = 0;
     this._lm.setDungeonMood?.(null);
     this._lm.setZone('overworld', 0.8);
     this._pool?.setActive(false);
@@ -334,6 +370,14 @@ export class CastleSystem {
     this._disposed = true;
     this._pool?.dispose();
     this._pool = null;
+    if (this._charObs) {
+      this.scene.onBeforeRenderObservable.remove(this._charObs);
+      this._charObs = null;
+    }
+    this._charLight?.dispose();
+    this._charLight = null;
+    this._ambLight?.dispose();
+    this._ambLight = null;
     if (this._gateObs) {
       this.scene.onBeforeRenderObservable.remove(this._gateObs);
       this._gateObs = null;

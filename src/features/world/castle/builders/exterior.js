@@ -10,7 +10,7 @@
 /* global BABYLON */
 
 import { EXTERIOR } from '../castlePlan.js';
-import { box, cyl } from './mergeUtil.js';
+import { box, cyl, archTube } from './mergeUtil.js';
 import { hash2 } from '../../worldgen/rng.js';
 
 const EG = 'EXT'; // single merge group — the shell is one visual object
@@ -58,14 +58,10 @@ function windowRows(ctx, face /* {x0,z0,x1,z1 along wall} */, baseY, floors, nor
       const gl = box(ctx.scene, 'extWinGlass', x + nx * 0.14, y, z + nz * 0.14,
         Math.abs(nx) > 0.5 ? 0.06 : 1.1, 2.1, Math.abs(nx) > 0.5 ? 1.1 : 0.06);
       ctx.add(gl, lit ? 'windowGlow' : 'windowCool', EG);
-      // arch cap
-      const arch = BABYLON.MeshBuilder.CreateTorus('extWinArch', {
-        diameter: 1.25, thickness: 0.14, tessellation: 12,
-      }, ctx.scene);
-      // ring axis along the wall normal so the arch stands in the wall plane
-      if (Math.abs(nx) > 0.5) arch.rotation.z = Math.PI / 2;
-      else arch.rotation.x = Math.PI / 2;
-      arch.position.set(x + nx * 0.05, y + 1.32, z + nz * 0.05);
+      // semicircular arch cap standing in the wall plane
+      const arch = archTube(ctx.scene, 'extWinArch', 1.25, 0.15, 10);
+      if (Math.abs(nx) > 0.5) arch.rotation.y = Math.PI / 2;
+      arch.position.set(x + nx * 0.05, y + 1.3, z + nz * 0.05);
       ctx.add(arch, 'extStone', EG);
     }
   }
@@ -187,11 +183,9 @@ export function createCastleExterior(ctx, worldgen) {
   // gate arch surround + lintel
   const gateFloor = gy(gx - 2, gz);
   ctx.add(box(ctx.scene, 'gateLintel', gx, gateFloor + E.gate.height + 1.2, gz, 3.0, 2.4, E.gate.width + 3.2), 'extStone', EG);
-  const gArch = BABYLON.MeshBuilder.CreateTorus('gateArch', {
-    diameter: E.gate.width + 1.4, thickness: 0.65, tessellation: 24,
-  }, ctx.scene);
-  gArch.rotation.z = Math.PI / 2; // ring axis along x — faces the west approach
-  gArch.position.set(gx - 1.3, gateFloor + E.gate.height - 0.4, gz);
+  const gArch = archTube(ctx.scene, 'gateArch', E.gate.width + 1.4, 0.7, 20);
+  gArch.rotation.y = Math.PI / 2; // stands in the west wall plane
+  gArch.position.set(gx - 1.3, gateFloor + E.gate.height - 0.3, gz);
   ctx.add(gArch, 'stone', EG);
   // the great double doors (closed — entry is the press-E teleport)
   for (const s of [-1, 1]) {

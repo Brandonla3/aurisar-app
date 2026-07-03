@@ -118,6 +118,24 @@ export function rectSubtract(baseRects, holes) {
   return rects.filter((r) => r.x1 - r.x0 > 0.01 && r.z1 - r.z0 > 0.01);
 }
 
+/**
+ * Semicircular arch tube in the XY plane (feet at y=0, apex at y=width/2),
+ * centered on x. A full CreateTorus ring was used before — its bottom half
+ * hung down across every doorway like a sagging garland. Rotate .y by PI/2
+ * for arches standing in a YZ wall plane.
+ */
+export function archTube(scene, name, width, thickness, tessellation = 18) {
+  const r = width / 2;
+  const path = [];
+  for (let i = 0; i <= tessellation; i++) {
+    const a = (i / tessellation) * Math.PI;
+    path.push(new BABYLON.Vector3(-Math.cos(a) * r, Math.sin(a) * r, 0));
+  }
+  return BABYLON.MeshBuilder.CreateTube(name, {
+    path, radius: thickness / 2, tessellation: 10, cap: BABYLON.Mesh.CAP_ALL,
+  }, scene);
+}
+
 /** Cylinder helper. */
 export function cyl(scene, name, cx, cy, cz, height, diameter, tessellation = 16) {
   const c = BABYLON.MeshBuilder.CreateCylinder(name, { height, diameter, tessellation }, scene);

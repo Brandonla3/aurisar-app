@@ -1888,10 +1888,10 @@ export class BabylonWorldScene {
         this._savedUpperRadius = cam.upperRadiusLimit;
         this._savedLowerRadius = cam.lowerRadiusLimit;
       }
-      cam.upperRadiusLimit = 13; // the big halls deserve a real zoom range
-      // let the wall-march pull the camera very close in tight quarters
-      // (standing near a wall with the orbit behind it)
-      cam.lowerRadiusLimit = 1.4;
+      cam.upperRadiusLimit = 15; // the big halls deserve a real zoom range
+      // the wall-march may collapse the orbit to a near-first-person close-up
+      // in tight quarters — better than clipping through a wall
+      cam.lowerRadiusLimit = 0.9;
       if (cam.radius > 8) cam.radius = 7;
     } else if (this._savedUpperRadius != null) {
       cam.upperRadiusLimit = this._savedUpperRadius;
@@ -1972,7 +1972,7 @@ export class BabylonWorldScene {
         }
         if (clampedT > 0) {
           if (this._camFreeRadius == null) this._camFreeRadius = cam.radius;
-          cam.radius = Math.max(cam.lowerRadiusLimit, desired * clampedT - 0.3);
+          cam.radius = Math.max(cam.lowerRadiusLimit, desired * clampedT - 0.45);
         } else if (this._camFreeRadius != null) {
           cam.radius = Math.min(this._camFreeRadius, cam.upperRadiusLimit);
           this._camFreeRadius = null;
