@@ -1745,7 +1745,9 @@ export class BabylonWorldScene {
   }
 
   _moveLocal(dt) {
-    if (this._chatOpen) { this._local.isMoving = false; return; }
+    // Chat no longer blocks movement — only WASD is gated while typing (see
+    // _bindKeys), so keyboard input can't leak into the chat box, but the
+    // touch joystick (and any already-held keys) keep moving the player.
     if (this._localDead) { this._local.isMoving = false; return; }   // slice 5c: dead can't walk
 
     const w = this._keys['KeyW'] || this._keys['ArrowUp'];

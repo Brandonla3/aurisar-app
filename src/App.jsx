@@ -6971,7 +6971,7 @@ function App() {
     )
 
     /* ══ WORLD OVERLAY ══════════════════════════ */}{activeTab === "world" && (
-      <React.Suspense fallback={<div style={{position:"fixed",top:0,right:0,bottom:0,left:0,zIndex:9999,background:"#000",display:"flex",alignItems:"center",justifyContent:"center",color:"#8a8478",fontFamily:"Inter,sans-serif",fontSize:".85rem",letterSpacing:".08em"}}>{"ENTERING WORLD…"}</div>}>
+      <React.Suspense fallback={<div style={{position:"fixed",top:0,right:0,bottom:0,left:0,zIndex:9999,background:"#000"}} />}>
         <WorldOverlay
           onClose={() => setActiveTab(prevTab || "workout")}
           username={profile?.username}

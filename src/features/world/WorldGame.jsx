@@ -19,7 +19,7 @@ import WorldMap               from './WorldMap.jsx';
 import GameMenu               from './GameMenu.jsx';
 import InventoryPanel         from './InventoryPanel.jsx';
 import CookingPanel           from './CookingPanel.jsx';
-import ActionButtons          from './ActionButtons.jsx';
+import ActionButtons, { actionBtnStyle, actionBtnLabelStyle } from './ActionButtons.jsx';
 import DialoguePanel          from './hud/DialoguePanel.jsx';
 import QuestLogPanel          from './hud/QuestLogPanel.jsx';
 import QuestTracker           from './hud/QuestTracker.jsx';
@@ -79,26 +79,39 @@ const S = {
     pointerEvents: 'none',
   },
   onlineCount: {
-    position: 'absolute', top: 12, right: 14,
+    // Cleared left of the circular minimap (top-right, ~168px wide incl. offset).
+    position: 'absolute', top: 12, right: 178,
     color: '#4ade80', fontSize: 11,
     fontFamily: 'Inter, system-ui, sans-serif',
     textShadow: '0 0 6px #4ade8088', pointerEvents: 'none',
   },
-  chatWrap: {
-    position: 'absolute', bottom: 14, left: 14,
+  // Bottom-right toolbar: chat (bubble or expanded input) + action buttons,
+  // read as one control strip.
+  bottomBar: {
+    position: 'absolute', bottom: 14, right: 12, zIndex: 15,
+    display: 'flex', flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    maxWidth: 'calc(100% - 24px)',
+    // Chat bubble + all 6 action buttons don't fit in ~360-390px of phone
+    // width — scroll instead of silently clipping buttons off the left edge
+    // (the parent has overflow:hidden, so anything past maxWidth is
+    // otherwise unreachable, not just visually cut off).
+    overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+  },
+  chatLogWrap: {
+    position: 'absolute', bottom: 74, right: 12,
     width: IS_TOUCH ? 240 : 340, zIndex: 10,
     fontFamily: 'Inter, system-ui, sans-serif',
   },
   chatLog: {
     background: 'rgba(0,0,0,0.5)', borderRadius: 8,
-    padding: '6px 10px', marginBottom: 6,
+    padding: '6px 10px',
     maxHeight: 100, overflowY: 'auto',
     fontSize: 12, color: '#cbd5e1', lineHeight: '1.55',
     backdropFilter: 'blur(4px)',
   },
   chatRow: { marginBottom: 2 },
   chatSender: { color: '#7dd3fc', fontWeight: 600 },
-  chatInput: { display: 'flex', gap: 6 },
+  chatInput: { display: 'flex', gap: 6, width: IS_TOUCH ? 240 : 340 },
   input: {
     flex: 1, background: 'rgba(15,23,42,0.9)',
     border: '1px solid #334155', borderRadius: 8,
@@ -111,8 +124,13 @@ const S = {
     color: '#fff', fontSize: 12, padding: '5px 12px',
     cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
   },
+  cancelBtn: {
+    background: 'rgba(30,41,59,0.9)', border: '1px solid #334155', borderRadius: 8,
+    color: '#94a3b8', fontSize: 12, padding: '5px 10px',
+    cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+  },
   hint: {
-    position: 'absolute', bottom: 14, right: 14,
+    position: 'absolute', bottom: 74, right: 12,
     color: '#475569', fontSize: 10,
     fontFamily: 'Inter, system-ui, sans-serif',
     textAlign: 'right', lineHeight: '1.6', pointerEvents: 'none',
@@ -171,7 +189,7 @@ const S = {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function WorldGame({ playerInfo }) {
+export default function WorldGame({ playerInfo, onExit }) {
   const canvasRef  = useRef(null);
   const sceneRef   = useRef(null);
   const logEndRef  = useRef(null);
@@ -374,6 +392,22 @@ export default function WorldGame({ playerInfo }) {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // ── Chat open/close ───────────────────────────────────────────────────────
+  const openChat = useCallback(() => {
+    setChatOpen(true);
+    sceneRef.current?.setChatOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }, []);
+
+  const closeChat = useCallback(() => {
+    setChatOpen(false);
+    setChatInput('');
+    sceneRef.current?.setChatOpen(false);
+    // Drop the on-screen keyboard focus so mobile browsers don't eat the
+    // next tap as a "dismiss keyboard" gesture instead of a game input.
+    inputRef.current?.blur();
+  }, []);
+
   // ── Virtual joystick (mobile only) ───────────────────────────────────────
   useEffect(() => {
     if (!IS_TOUCH) return;
@@ -429,19 +463,6 @@ export default function WorldGame({ playerInfo }) {
       zone.removeEventListener('pointerup',     onUp,   { passive: false });
       zone.removeEventListener('pointercancel', onUp,   { passive: false });
     };
-  }, []);
-
-  // ── Chat open/close ───────────────────────────────────────────────────────
-  const openChat = useCallback(() => {
-    setChatOpen(true);
-    sceneRef.current?.setChatOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 30);
-  }, []);
-
-  const closeChat = useCallback(() => {
-    setChatOpen(false);
-    setChatInput('');
-    sceneRef.current?.setChatOpen(false);
   }, []);
 
   const submitChat = useCallback(() => {
@@ -502,18 +523,6 @@ export default function WorldGame({ playerInfo }) {
       <canvas ref={canvasRef} style={S.canvas} />
 
       <TestingHud sceneRef={sceneRef} visible={uiPrefs.minimapVisible} mapData={mapData} />
-
-      {/* Action buttons (all devices; visibility toggled in the Menu) */}
-      {uiPrefs.showActionButtons && (
-        <ActionButtons
-          onMap={()       => openPanel('map')}
-          onQuests={()    => openPanel('quests')}
-          onInventory={() => openPanel('inventory')}
-          onCooking={()   => openPanel('cooking')}
-          onCampfire={()  => sceneRef.current?.requestBuildCampfire()}
-          onMenu={()      => openPanel('menu')}
-        />
-      )}
 
       {/* P1: active-quest tracker (hidden while any modal is open) */}
       {!activePanel && !dialogueNpcId && <QuestTracker myQuests={myQuests} />}
@@ -585,6 +594,7 @@ export default function WorldGame({ playerInfo }) {
           onToggleActionButtons={toggleActionButtons}
           minimapVisible={uiPrefs.minimapVisible}
           onToggleMinimap={toggleMinimap}
+          onExit={onExit}
         />
       )}
 
@@ -635,9 +645,9 @@ export default function WorldGame({ playerInfo }) {
         <div style={S.statusBadge}>Connecting to Aurisar World…</div>
       )}
 
-      {/* Online count — nudge left on mobile to clear the Exit button */}
+      {/* Online count */}
       {connected && (
-        <div style={{ ...S.onlineCount, right: IS_TOUCH ? 120 : 14 }}>
+        <div style={S.onlineCount}>
           ● {onlineCount} online
         </div>
       )}
@@ -669,9 +679,9 @@ export default function WorldGame({ playerInfo }) {
         </div>
       )}
 
-      {/* Chat */}
-      <div style={S.chatWrap}>
-        {chatMessages.length > 0 && (
+      {/* Chat message log — floats above the bottom bar whenever there's history */}
+      {chatMessages.length > 0 && (
+        <div style={S.chatLogWrap}>
           <div style={S.chatLog}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={S.chatRow}>
@@ -681,8 +691,12 @@ export default function WorldGame({ playerInfo }) {
             ))}
             <div ref={logEndRef} />
           </div>
-        )}
+        </div>
+      )}
 
+      {/* Bottom-right toolbar — chat (bubble or expanded input) sits right
+          next to the action buttons so they read as one control strip. */}
+      <div style={S.bottomBar}>
         {chatOpen ? (
           <div style={S.chatInput}>
             <input
@@ -697,32 +711,26 @@ export default function WorldGame({ playerInfo }) {
               }}
             />
             <button style={S.sendBtn} onClick={submitChat}>Send</button>
+            <button style={S.cancelBtn} onClick={closeChat} aria-label="Cancel chat">✕</button>
           </div>
-        ) : IS_TOUCH ? (
-          <button
-            onClick={openChat}
-            aria-label="Open chat"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(15,23,42,0.75)',
-              backdropFilter: 'blur(6px)',
-              WebkitBackdropFilter: 'blur(6px)',
-              border: '1px solid rgba(148,163,184,0.20)',
-              borderRadius: 20,
-              color: '#94a3b8', fontSize: 12,
-              fontFamily: 'Inter, system-ui, sans-serif',
-              minHeight: 36, padding: '0 14px',
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <span>💬</span>
-            <span>Chat</span>
-          </button>
         ) : (
-          <div style={{ color: '#475569', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}>
-            Press <kbd style={{ color: '#7dd3fc' }}>Enter</kbd> to chat · <kbd style={{ color: '#7dd3fc' }}>/w</kbd> world chat
-          </div>
+          <>
+            {IS_TOUCH && (
+              <button style={actionBtnStyle} onClick={openChat} aria-label="Open chat">
+                <span style={{ fontSize: 22 }}>💬</span>
+                <span style={actionBtnLabelStyle}>Chat</span>
+              </button>
+            )}
+            <ActionButtons
+              expanded={uiPrefs.showActionButtons}
+              onMap={()       => openPanel('map')}
+              onQuests={()    => openPanel('quests')}
+              onInventory={() => openPanel('inventory')}
+              onCooking={()   => openPanel('cooking')}
+              onCampfire={()  => sceneRef.current?.requestBuildCampfire()}
+              onMenu={()      => openPanel('menu')}
+            />
+          </>
         )}
       </div>
 
@@ -731,7 +739,7 @@ export default function WorldGame({ playerInfo }) {
         <div style={S.hint}>
           WASD / ↑↓←→ move · Space attack · E talk · F campfire<br />
           M map · L quests · I inventory · C cooking · G menu · N minimap<br />
-          Mouse drag orbit · Scroll zoom · ESC exit world
+          Enter chat · Mouse drag orbit · Scroll zoom · ESC exit world
         </div>
       )}
     </div>
