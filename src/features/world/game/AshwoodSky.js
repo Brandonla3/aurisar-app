@@ -1,10 +1,14 @@
 /**
- * AshwoodSky — gradient sky dome + Ashwood day/night palette.
+ * AshwoodSky — gradient sky dome + Ashwood day/night palette + FBM clouds.
  *
  * Ports the prototype's sky ShaderMaterial (sun disc + halo, golden-hour
  * horizon band, moon, twinkling stars — public/reference/ashwood.html lines
  * ~712-744) and the sky/fog color curves from its updateDayNight()
- * (lines ~1970-2001) to Babylon.
+ * (lines ~1970-2001) to Babylon. The cloud deck is an FBM layer inside this
+ * same dome shader — zero extra draw calls, and it can't read as the "dark
+ * billboard walls" the old plane-based clouds did under tone mapping (why
+ * AshwoodAtmosphere's billboard clouds were left disabled and then removed).
+ * Cover tracks the weather system's wetness; drift speed tracks its wind.
  *
  * Division of labor with LightingManager: the LM keeps driving the actual
  * lights, exposure and ambient from its own day/night phase; this module
@@ -36,7 +40,26 @@ varying vec3 vP;
 uniform vec3 topCol; uniform vec3 midCol; uniform vec3 botCol;
 uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 moonDir;
 uniform float night; uniform float dusk; uniform float skyAlpha;
+uniform float cloudTime; uniform float cloudCover;
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+// Value noise + 5-octave FBM for the cloud deck. Cheap enough to run on
+// every tier — a handful of hash/mix ops on sky pixels only.
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i),               h21(i + vec2(1.0, 0.0)), u.x),
+             mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) {
+    v += a * vnoise(p);
+    p = p * 2.03 + vec2(17.3, 9.1);
+    a *= 0.5;
+  }
+  return v;
+}
 
 // Normalized Henyey-Greenstein phase function (integrates to 1 over the
 // sphere) — gives Mie forward-scattering its correct asymmetric falloff: a
@@ -95,10 +118,36 @@ void main() {
     float tw = 0.6 + 0.4 * sin(s * 100.0);
     c += vec3(step(0.9955, s)) * night * tw * h;
   }
+
+  // ── FBM cloud deck ──
+  // Flat cloud layer: project the view ray onto a plane above the camera, so
+  // clouds foreshorten toward the horizon like a real overcast deck. Applied
+  // AFTER sun/moon/stars so dense cover genuinely occludes them.
+  float cloudA = 0.0;
+  if (h > 0.015) {
+    vec2 cuv = d.xz / (h + 0.14) * 0.5 + vec2(cloudTime * 0.01, cloudTime * 0.0035);
+    float den = fbm(cuv);
+    // Coverage remap: weather-driven cloudCover slides the FBM threshold, so
+    // clear days keep scattered puffs and storms close the deck.
+    float cov = smoothstep(1.0 - cloudCover - 0.16, 1.0 - cloudCover + 0.24, den);
+    cov *= smoothstep(0.015, 0.12, h);            // dissolve at the horizon line
+    // Self-shadowing: sample density displaced toward the sun's azimuth —
+    // thicker cloud between this point and the sun reads darker.
+    float toSun = fbm(cuv + sunN.xz * 0.35);
+    float shade = clamp(0.62 + (den - toSun) * 1.8, 0.35, 1.1);
+    // Day: warm white. Night: dark slate that still reads against the stars.
+    vec3 cloudCol = mix(vec3(1.02, 1.0, 0.97), vec3(0.16, 0.18, 0.24), night) * shade;
+    cloudCol += vec3(1.0, 0.5, 0.22) * dusk * pow(az, 2.0) * 0.55;   // sunset underlighting
+    cloudCol += sunCol * pow(sd, 6.0) * 0.25 * (1.0 - night);        // silver lining near sun
+    cloudA = cov * 0.85;
+    c = mix(c, cloudCol, cloudA);
+  }
+
   // skyAlpha cross-fades the dome over the HDRI skybox behind it: ~0 by day
   // (HDRI shows through), rising through dusk, opaque at night (moon/stars/
-  // gradient own the sky). When no skybox exists it is forced to 1.
-  gl_FragColor = vec4(c, skyAlpha);
+  // gradient own the sky). When no skybox exists it is forced to 1. Cloud
+  // pixels keep their own opacity so the deck still shows over the HDRI.
+  gl_FragColor = vec4(c, max(skyAlpha, cloudA));
 }
 `;
 
@@ -150,7 +199,8 @@ export class AshwoodSky {
     this.material = new BABYLON.ShaderMaterial('ashwoodSkyMat', scene, 'ashwoodSky', {
       attributes: ['position'],
       uniforms: ['worldViewProjection', 'topCol', 'midCol', 'botCol',
-                 'sunDir', 'sunCol', 'moonDir', 'night', 'dusk', 'skyAlpha'],
+                 'sunDir', 'sunCol', 'moonDir', 'night', 'dusk', 'skyAlpha',
+                 'cloudTime', 'cloudCover'],
     });
     this.material.backFaceCulling = false;
     this.material.disableDepthWrite = true;
@@ -187,6 +237,12 @@ export class AshwoodSky {
     this._c3Mid = new BABYLON.Color3();
     this._c3Bot = new BABYLON.Color3();
     this._c3Sun = new BABYLON.Color3();
+
+    // Cloud deck state: drift accumulates with wind speed (storms race, calm
+    // days crawl); cover eases toward the weather's wetness so the deck
+    // closes as rain builds and breaks up after.
+    this._cloudTime = 0;
+    this._cloudCover = 0.38;
 
     this._observer = scene.onBeforeRenderObservable.add(() => this._update());
   }
@@ -227,6 +283,16 @@ export class AshwoodSky {
       1.0 * sunOn, (0.92 - 0.42 * dusk) * sunOn, (0.82 - 0.55 * dusk) * sunOn));
     m.setFloat('night', night);
     m.setFloat('dusk', dusk);
+
+    // Cloud deck: drift with the wind, thicken toward overcast as wetness
+    // rises (0.38 baseline scattered cover → ~0.72 storm deck).
+    const dt = this.scene.getEngine().getDeltaTime() / 1000;
+    const weather = this.scene.metadata?.ashwood?.weather;
+    this._cloudTime += dt * (0.5 + (weather?.windStrength ?? 1) * 0.5);
+    const coverTarget = 0.38 + (weather?.wet ?? 0) * 0.34;
+    this._cloudCover += (coverTarget - this._cloudCover) * Math.min(1, dt * 0.2);
+    m.setFloat('cloudTime', this._cloudTime);
+    m.setFloat('cloudCover', this._cloudCover);
     // Cross-fade: invisible by day (HDRI skybox shows), opaque at night. If no
     // skybox loaded (env assets missing) the dome is the only sky → stay solid.
     const hasSkybox = !!this.lm.skybox;

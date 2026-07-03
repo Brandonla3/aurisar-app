@@ -16,6 +16,7 @@
 
 /* global BABYLON */
 
+import { hash2 } from '../worldgen/index.js';
 import { streamingParams, tileBounds } from './tileMath.js';
 import { buildPropTemplates, buildTileProps } from './ashwoodPropMeshes.js';
 
@@ -48,13 +49,27 @@ export class AshwoodTileProvider {
   _ensureShared(scene) {
     if (this._shared && this._shared.scene === scene) return this._shared;
 
-    const ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
-    ground.specularColor = new BABYLON.Color3(0, 0, 0);
-    if (!this.bake) {
+    // Runtime terrain is PBR: real energy-conserving light response, picks up
+    // the IBL .env reflections the moment those assets land, and specular AA
+    // (Kaplanyan roughness widening) kills the vertex-normal shimmer on
+    // distant slopes. Rough dielectric (metallic 0) so grass reads matte;
+    // specularIntensity is pulled down since there is no authored roughness
+    // map to break up the sheen. Bake mode keeps the plain vertex-color
+    // StandardMaterial — the GLB export contract.
+    let ground;
+    if (this.bake) {
+      ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
+      ground.specularColor = new BABYLON.Color3(0, 0, 0);
+    } else {
+      ground = new BABYLON.PBRMaterial('ashwood_ground', scene);
+      ground.metallic = 0;
+      ground.roughness = 0.95;
+      ground.specularIntensity = 0.4;
+      ground.enableSpecularAntiAliasing = true;
       const grassTex = new BABYLON.Texture('/assets/textures/grasslight-big.jpg', scene);
       grassTex.uScale = GRASS_REPEATS_PER_TILE;
       grassTex.vScale = GRASS_REPEATS_PER_TILE;
-      ground.diffuseTexture = grassTex;        // modulated by biome vertex colors
+      ground.albedoTexture = grassTex;        // modulated by biome vertex colors
       const grassNm = new BABYLON.Texture('/assets/textures/grasslight-big-nm.jpg', scene);
       grassNm.uScale = GRASS_REPEATS_PER_TILE;
       grassNm.vScale = GRASS_REPEATS_PER_TILE;
@@ -71,8 +86,11 @@ export class AshwoodTileProvider {
       lakeWater = water;
     } else {
       water = buildWaterMaterial(scene, {});
-      // Lake gets its own material with a planar reflection at its surface level.
-      lakeWater = buildWaterMaterial(scene, { reflect: true, level: this.wg.config.lake.level });
+      // Lake material adds a planar reflection at its surface level — but the
+      // MirrorTexture is a second render of the whole scene, so it's gated to
+      // the high tier. Low/mobile lakes keep the waves + fresnel sky blend.
+      const reflect = (scene.metadata?.ashwood?.qualityTier ?? 'high') === 'high';
+      lakeWater = buildWaterMaterial(scene, { reflect, level: this.wg.config.lake.level });
     }
 
     const bed = new BABYLON.StandardMaterial('ashwood_pondbed', scene);
@@ -80,7 +98,21 @@ export class AshwoodTileProvider {
     bed.specularColor = new BABYLON.Color3(0, 0, 0);
     bed.backFaceCulling = false;
 
-    this._shared = { scene, ground, water, lakeWater, bed };
+    // Beach decal material. The terrain's sand vertex tint alone can't read
+    // as sand — vertex colors MULTIPLY the green grass albedo texture, so a
+    // bright tan tint lands on olive. The visible beach is this untextured
+    // sand ring draped over the shore instead (vertex alpha fades it into
+    // the grass); the vertex tint still colors the lakebed shallows under
+    // the water. Runtime-only: bake keeps plain vertex-color terrain.
+    let beach = null;
+    if (!this.bake) {
+      beach = new BABYLON.StandardMaterial('ashwood_beach', scene);
+      beach.diffuseColor  = BABYLON.Color3.FromHexString(
+        this.wg.config.colors.beachSand ?? '#d8bf8c');
+      beach.specularColor = new BABYLON.Color3(0, 0, 0);
+    }
+
+    this._shared = { scene, ground, water, lakeWater, bed, beach };
     return this._shared;
   }
 
@@ -141,6 +173,7 @@ export class AshwoodTileProvider {
     const bc = { r: 0, g: 0, b: 0 };
     const silt = wgHexToRgb(wg.config.colors.lakebedSilt);
     const dirt = wgHexToRgb(wg.config.colors.trailDirt);
+    const sand = wgHexToRgb(wg.config.colors.beachSand ?? '#d8bf8c');
 
     for (let i = 0; i < count; i++) {
       const wx = cx + positions[i * 3];
@@ -157,8 +190,16 @@ export class AshwoodTileProvider {
       normals[i * 3 + 1] = inv;
       normals[i * 3 + 2] = -dhdz * inv;
 
-      // Ported ground-color pass: biome IDW blend → lakebed silt → trail dirt.
+      // Ported ground-color pass: biome IDW blend → beach sand → lakebed
+      // silt → trail dirt. Sand goes on before silt so the beach band rings
+      // the waterline and stays visible through the shallows, while deeper
+      // water still darkens to silt. A touch of hash mottling keeps the
+      // strip from reading as a flat painted ring.
       wg.biomeColorAt(wx, wz, bc);
+      const sh = wg.lakeShoreAt(wx, wz);
+      if (sh > 0) {
+        lerpRgb(bc, sand, sh * (0.78 + 0.16 * hash2(wx * 0.9, wz * 0.9)));
+      }
       const wd = wg.lakeWaterDepthAt(wx, wz);
       if (wd > 0) {
         const k = Math.min(1, wd / 1.8);
@@ -205,6 +246,14 @@ export class AshwoodTileProvider {
       const surf = this._radialDisc(`tile_${meta.id}_lake`, L.waterR, scene,
         shared.lakeWater ?? shared.water, 40, 96);
       surf.position.set(L.x, L.level, L.z);
+      // Depth-based shore factor: the lakebed is carved into the terrain
+      // heightfield, so water depth under each vertex comes straight from
+      // surfaceY — foam hugs the real (irregular) shoreline, not the disc rim.
+      if (!this.bake) {
+        this._applyShore(surf, (lx, lz) =>
+          1 - clamp01((L.level - wg.surfaceY(L.x + lx, L.z + lz)) / 1.2));
+        container.meshes.push(this._beachRing(`tile_${meta.id}_beach`, L, scene, shared.beach));
+      }
       container.meshes.push(surf);
     }
 
@@ -223,12 +272,97 @@ export class AshwoodTileProvider {
 
       const surf = this._radialDisc(`tile_${meta.id}_pond${i}`, p.r, scene, shared.water, 12, 48);
       surf.position.set(p.x, lvl, p.z);
+      // Ponds are NOT carved into the heightfield (the bowl above fakes the
+      // basin), so shore depth uses the same analytic bowl profile instead
+      // of surfaceY: depth(r) = bowlDepth·(1 − smootherstep) − 0.12.
+      if (!this.bake) {
+        const bowlR = p.r * 0.99;
+        this._applyShore(surf, (lx, lz) => {
+          const r = Math.min(1, Math.hypot(lx, lz) / bowlR);
+          const ss = r * r * r * (r * (r * 6 - 15) + 10);
+          return 1 - clamp01((0.7 * (1 - ss) - 0.12) / 0.45);
+        });
+      }
       container.meshes.push(surf);
     }
   }
 
+  // Sandy beach: an annulus draped over the terrain around the lake
+  // waterline, from just under the water's edge out to where lakeShoreAt
+  // fades to 0. Vertex alpha IS the shore factor, so the sand dissolves into
+  // the grass at its outer edge and follows the height-based band on its
+  // way there; hash mottling keeps the strip from reading flat. Sits 5cm
+  // above the terrain to avoid z-fighting; the inner rings continue under
+  // the water surface so the glassy shallows reveal a wet sand shelf.
+  // A damp contact band darkens the sand at and just above the waterline —
+  // wet soil/mud that dries out by ~+0.4m, broken up by a second hash so
+  // the drying edge reads as patchy erosion, not a painted stripe.
+  _beachRing(name, L, scene, material, rings = 24, segs = 96) {
+    const wg = this.wg;
+    const rIn = L.waterR - 4;
+    const rOut = L.bowlR + 10;
+    const positions = [];
+    const colors = [];
+    const indices = [];
+    for (let r = 0; r <= rings; r++) {
+      const rr = rIn + (r / rings) * (rOut - rIn);
+      for (let s = 0; s < segs; s++) {
+        const a = (s / segs) * Math.PI * 2;
+        const lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
+        const wx = L.x + lx, wz = L.z + lz;
+        const sy = wg.surfaceY(wx, wz);
+        positions.push(lx, sy + 0.05, lz);
+        const damp = clamp01(1 - (sy - L.level - 0.04) / 0.35);
+        const wet = 1 - 0.42 * damp * (0.7 + 0.3 * hash2(wx * 3.3, wz * 3.3));
+        const m = (0.9 + 0.14 * hash2(wx * 1.7, wz * 1.7)) * wet;
+        // Inner edge fades over 2.5m so the submerged shelf has no hard rim.
+        colors.push(m, m, m, wg.lakeShoreAt(wx, wz) * clamp01((rr - rIn) / 2.5));
+      }
+    }
+    for (let r = 0; r < rings; r++) {
+      const cur = r * segs, nxt = (r + 1) * segs;
+      for (let s = 0; s < segs; s++) {
+        const s1 = (s + 1) % segs;
+        indices.push(cur + s, nxt + s, cur + s1, cur + s1, nxt + s, nxt + s1);
+      }
+    }
+    const mesh = new BABYLON.Mesh(name, scene);
+    const vd = new BABYLON.VertexData();
+    vd.positions = positions;
+    vd.indices = indices;
+    const normals = [];
+    BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    vd.normals = normals;
+    vd.colors = colors;
+    vd.applyToMesh(mesh, false);
+    mesh.hasVertexAlpha = true;   // alpha-blend the fade-out edge
+    // Both this ring and the water disc are centered on the lake, so
+    // Babylon's distance sort between the two transparent meshes is
+    // ambiguous and flips with the camera. Explicit alphaIndex pins the
+    // order: sand first, water (and its foam) always composited on top.
+    mesh.alphaIndex = 1;
+    mesh.position.set(L.x, 0, L.z);
+    mesh.material = material;
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    return mesh;
+  }
+
+  // Per-vertex 'shore' attribute for the water shader's foam band: 0 in deep
+  // water rising to 1 where the surface meets land. shoreAt takes LOCAL disc
+  // coordinates (the mesh is translated to the water body's center).
+  _applyShore(mesh, shoreAt) {
+    const pos = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const shore = new Float32Array(pos.length / 3);
+    for (let i = 0; i < shore.length; i++) {
+      shore[i] = shoreAt(pos[i * 3], pos[i * 3 + 2]);
+    }
+    mesh.setVerticesData('shore', shore, false, 1);
+  }
+
   // Horizontal radial-grid disc with interior vertices (center + concentric
   // rings). Material is double-sided (no back-face culling) so winding is moot.
+  // alphaIndex 2 keeps translucent water above the alphaIndex-1 beach ring.
   _radialDisc(name, radius, scene, material, rings = 24, segs = 64) {
     const positions = [0, 0, 0];
     const indices = [];
@@ -257,6 +391,7 @@ export class AshwoodTileProvider {
     BABYLON.VertexData.ComputeNormals(positions, indices, normals);
     vd.normals = normals;
     vd.applyToMesh(mesh, false);
+    mesh.alphaIndex = 2;
     mesh.material = material;
     mesh.isPickable = false;
     return mesh;
@@ -289,12 +424,14 @@ export class AshwoodTileProvider {
 const WATER_VERT = `
 precision highp float;
 attribute vec3 position;
+attribute float shore;
 uniform mat4 world;
 uniform mat4 viewProjection;
 uniform float t;
 varying vec3 vWp;
 varying vec3 vN;
 varying vec4 vClip;
+varying float vShore;
 // Three directional sine waves (a cheap Gerstner-style sum). Height is
 // accumulated along with its analytic slope so the surface normal is exact —
 // no finite differencing, no extra vertex passes.
@@ -316,6 +453,7 @@ void main() {
   wp.y += h;
   vWp = wp.xyz;
   vN = normalize(vec3(-dhdx, 1.0, -dhdz));
+  vShore = shore;
   vClip = viewProjection * wp;
   gl_Position = vClip;
 }
@@ -326,6 +464,7 @@ precision highp float;
 varying vec3 vWp;
 varying vec3 vN;
 varying vec4 vClip;
+varying float vShore;
 uniform sampler2D uN;
 #ifdef REFLECT
 uniform sampler2D uReflection;
@@ -361,10 +500,28 @@ void main() {
   vec3 R = reflect(-normalize(sunDir), n);
   col += sunCol * pow(max(dot(R, V), 0.0), 130.0) * (2.0 * (1.0 - night) + 0.35);
   col *= mix(1.0, 0.22, night * 0.9);
+  // Shore contact — deliberately foamless. vShore (0 deep → 1 at the
+  // waterline, baked per vertex from real water depth) is roughened by the
+  // scrolling normal map so the transition wanders organically instead of
+  // tracing a clean circle. Two effects replace the old white foam crest:
+  //  - low soft ripple bands travelling shoreward (two incommensurate
+  //    phases so the laps feel irregular, faded out again just before the
+  //    waterline so the contact itself stays gentle);
+  //  - a transparency ramp: over the last ~half meter of depth the water
+  //    thins to glass, revealing the wet sand shelf, pebbles and reeds
+  //    beneath instead of ending in a hard edge.
+  float shoreN = nm(vWp.xz * 0.13 + vec2(t * 0.03, -t * 0.022)).x * 0.5 + 0.5;
+  float sEdge = clamp(vShore + (shoreN - 0.5) * 0.3, 0.0, 1.0);
+  float lap = max(sin(sEdge * 24.0 - t * 1.6), 0.0) * 0.6
+            + max(sin(sEdge * 11.0 - t * 0.9 + shoreN * 4.0), 0.0) * 0.4;
+  lap *= smoothstep(0.55, 0.85, sEdge) * (1.0 - smoothstep(0.92, 1.0, sEdge));
+  col += vec3(0.07, 0.085, 0.09) * lap * (1.0 - night * 0.7);
   float dist = length(cameraPosition - vWp);
   float fog = exp(-pow(dist * fogDensity, 2.0));
   col = mix(vFogColor, col, clamp(fog, 0.0, 1.0));
-  gl_FragColor = vec4(col, clamp(alphaV + fres * 0.13, 0.0, 0.97));
+  float shallow = smoothstep(0.6, 0.96, sEdge);
+  float a = mix(clamp(alphaV + fres * 0.13, 0.0, 0.97), 0.05, shallow);
+  gl_FragColor = vec4(col, clamp(a + lap * 0.06, 0.0, 0.97));
 }
 `;
 
@@ -380,7 +537,7 @@ function buildWaterMaterial(scene, opts = {}) {
 
   const reflect = !!opts.reflect;
   const mat = new BABYLON.ShaderMaterial(reflect ? 'ashwood_lakewater' : 'ashwood_water', scene, 'ashwoodWater', {
-    attributes: ['position'],
+    attributes: ['position', 'shore'],
     uniforms: ['world', 'viewProjection', 'cameraPosition',
                't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
                'night', 'alphaV', 'vFogColor', 'fogDensity'],
@@ -455,6 +612,10 @@ function buildWaterMaterial(scene, opts = {}) {
   });
 
   return mat;
+}
+
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 function wgHexToRgb(hex) {

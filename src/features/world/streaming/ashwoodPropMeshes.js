@@ -463,9 +463,17 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     fTrunk: new Acc(), fLeaf: new Acc(), fBrush: new Acc(), log: new Acc(),
   };
 
+  // The Wildwood circle genuinely overlaps the lake bowl (its edge reaches
+  // ~25m from the lake center — inside the water), so vegetation is culled
+  // off the beach band at render time. A pure client-side filter: sites stay
+  // untouched, so the deterministic manifest (and anything server-anchored
+  // to it) is unaffected.
+  const onBeach = (x, z) => wg.lakeShoreAt?.(x, z) > 0.05;
+
   // ── overworld trees (prototype spawnTree) ──
   for (const t of s.trees) {
     if (!inBounds(t.x, t.z)) continue;
+    if (onBeach(t.x, t.z)) continue;
     const rng = mulberry32(t.seed);
     const gy = surfaceY(t.x, t.z);
     const th = rand(rng, 5, 8.5), tr = rand(rng, 0.3, 0.55);
@@ -534,6 +542,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // ── bushes ──
   for (const b of s.bushes) {
     if (!inBounds(b.x, b.z)) continue;
+    if (onBeach(b.x, b.z)) continue;
     const rng = mulberry32(b.seed);
     const sc = rand(rng, 0.5, 1.1);
     acc.bush.push(b.x, surfaceY(b.x, b.z), b.z, 0, rng() * 6.28, 0, sc, sc, sc, null);
@@ -542,6 +551,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // ── ground details: fern / mushroom-tuft / flower by biome ──
   for (const d of s.details) {
     if (!inBounds(d.x, d.z)) continue;
+    if (onBeach(d.x, d.z)) continue;
     const rng = mulberry32(d.seed);
     const gy = surfaceY(d.x, d.z);
     const pick = rng();
@@ -669,6 +679,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // ── Wildwood forest (prototype buildForest) ──
   for (const t of s.forestTrees) {
     if (!inBounds(t.x, t.z)) continue;
+    if (onBeach(t.x, t.z)) continue;
     const rng = mulberry32(t.seed);
     const y = surfaceY(t.x, t.z);
     acc.fTrunk.push(t.x, y, t.z, t.lean, t.yaw, t.lean * 0.6, t.w, t.h, t.w,
@@ -721,6 +732,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   }
   for (const b of s.forestBrush ?? []) {
     if (!inBounds(b.x, b.z)) continue;
+    if (onBeach(b.x, b.z)) continue;
     const rng = mulberry32(b.seed);
     acc.fBrush.push(b.x, surfaceY(b.x, b.z), b.z, 0, rng() * 6.28, 0,
       b.sc * (0.8 + rng() * 0.6), b.sc, b.sc * (0.8 + rng() * 0.6),
@@ -728,6 +740,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   }
   for (const l of s.forestLogs ?? []) {
     if (!inBounds(l.x, l.z)) continue;
+    if (onBeach(l.x, l.z)) continue;
     acc.log.push(l.x, surfaceY(l.x, l.z) + 0.55, l.z, 0, l.yaw, Math.PI / 2, 1, l.len, 1, null);
   }
 
@@ -743,6 +756,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       if (x * x + z * z > R2 * 0.94) continue;
       if (wg.inMountain(x, z) || wg.inForest(x, z)) continue;
       if (wg.lakeWaterDepthAt(x, z) > 0.02) continue;
+      if (wg.lakeShoreAt?.(x, z) > 0.4) continue; // keep the beach strip bare
       const bi = wg.biomeAt(x, z);
       if (rng() > bi.grass * 0.85 + 0.08) continue;
       if (wg.trailDirtAt(x, z) > 0.1) continue;
@@ -750,6 +764,50 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       const gc = bi.grassCol;
       const col2 = { r: gc[0] * 1.3 + 0.08 * rng(), g: gc[1] * 1.3 + 0.1 * rng(), b: gc[2] * 1.2 };
       acc.tuft.push(x, surfaceY(x, z), z, 0, rng() * 6.28, 0, sc, sc * (0.8 + rng() * 0.7), sc, col2);
+    }
+  }
+
+  // ── lake shoreline dressing: pebbles straddling the contact line, reed
+  //    clusters rooted in the shallows. Client cosmetics like the
+  //    understory — but seeded from the world seed alone (not the tile), so
+  //    the same global point set is generated in every tile and filtered by
+  //    inBounds. All rng draws are unconditional (before any continue) to
+  //    keep the sequence identical no matter which tile is building. ──
+  {
+    const L = wg.config.lake;
+    const rng = mulberry32((wg.config.seed ^ 0x0b3ac4) >>> 0);
+    for (let i = 0; i < 130; i++) {                       // pebbles
+      const ang = rng() * 6.283;
+      const rr = L.waterR + (rng() * 2 - 1) * 5;
+      const rx = rand(rng, 0, 0.5), ry = rng() * 6.28, rz = rand(rng, 0, 0.5);
+      const sc = rand(rng, 0.05, 0.2);
+      const sy = rand(rng, 0.55, 0.9);
+      const shade = 0.42 + 0.26 * rng();
+      const x = L.x + Math.cos(ang) * rr, z = L.z + Math.sin(ang) * rr;
+      if (!inBounds(x, z)) continue;
+      const h = surfaceY(x, z) - L.level;
+      if (h < -0.45 || h > 0.6) continue;                 // waterline strip only
+      acc.boulder.push(x, surfaceY(x, z) + sc * 0.35, z, rx, ry, rz,
+        sc, sc * sy, sc, { r: shade, g: shade * 0.97, b: shade * 0.88 });
+    }
+    for (let i = 0; i < 26; i++) {                        // reed patches
+      const ang = rng() * 6.283;
+      const rr = L.waterR + (rng() * 2 - 1) * 2.2;
+      const cx2 = L.x + Math.cos(ang) * rr, cz2 = L.z + Math.sin(ang) * rr;
+      const count = 4 + ((rng() * 5) | 0);
+      for (let k = 0; k < count; k++) {
+        const px = cx2 + (rng() * 2 - 1) * 1.2;
+        const pz = cz2 + (rng() * 2 - 1) * 1.2;
+        const w = rand(rng, 0.10, 0.18);
+        const ht = rand(rng, 0.9, 1.7);
+        const yaw = rng() * 6.28;
+        const g = rng() * 0.07;
+        if (!inBounds(px, pz)) continue;
+        const h = surfaceY(px, pz) - L.level;
+        if (h < -0.5 || h > 0.15) continue;               // rooted in the shallows
+        acc.tuft.push(px, surfaceY(px, pz), pz, 0, yaw, 0, w, ht, w,
+          { r: 0.16 + g, g: 0.31 + g, b: 0.13 });
+      }
     }
   }
 

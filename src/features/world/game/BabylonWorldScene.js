@@ -19,7 +19,6 @@ import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
 import { AshwoodSky }        from './AshwoodSky.js';
 import { AshwoodGrass }      from './AshwoodGrass.js';
-import { AshwoodAtmosphere } from './AshwoodAtmosphere.js';
 import { AshwoodWildlife }   from './AshwoodWildlife.js';
 import { AshwoodWeather }    from './AshwoodWeather.js';
 import {
@@ -822,8 +821,9 @@ export class BabylonWorldScene {
     // Mobile touch state — written by setJoystick() from WorldGame's React layer
     this._joyDx = 0;
     this._joyDy = 0;
-    // Camera drag touch (right-half of screen, managed internally)
-    this._camTouch = null; // { id, lastX, lastY }
+    // Camera touches (right-half of screen, managed internally by
+    // _bindTouchControls): pointerId → {x, y}. 1 pointer orbits, 2 pinch-zoom.
+    this._camTouches = new Map();
 
     // Pre-allocated movement scratch vectors — avoids 4 allocations per frame
     this._moveFwd   = new BABYLON.Vector3();
@@ -913,11 +913,12 @@ export class BabylonWorldScene {
     this._setupTileStreaming();
     this._buildDungeonEntrance();
 
-    // Player-following vegetation + ambient life (one draw call grass,
-    // billboard clouds/motes/fireflies).
+    // Player-following vegetation + ambient life (one draw call grass).
+    // The old AshwoodAtmosphere billboard motes/fireflies are gone — the
+    // glowing orbs orbiting the player read as visual bugs, and clouds now
+    // live in the AshwoodSky dome shader.
     const playerPos = () => this._local?.root?.position ?? null;
     this._grass = new AshwoodGrass(this.scene, this._worldgen, playerPos);
-    this._atmosphere = new AshwoodAtmosphere(this.scene, this._worldgen, playerPos);
     this._wildlife = new AshwoodWildlife(this.scene, this._worldgen, playerPos);
     this._weather = new AshwoodWeather(this.scene, this._lm, playerPos);
 
@@ -1062,68 +1063,57 @@ export class BabylonWorldScene {
   _bindTouchControls(cam) {
     const canvas = this.canvas;
 
-    // Track a second touch for pinch-zoom
-    this._pinchTouch = null; // { id, lastDist }
+    // Right-half pointers, insertion-ordered: pointerId → {x, y}. One pointer
+    // orbits, two pinch-zoom. The previous version tracked the two fingers
+    // asymmetrically (a "camera" finger + a "pinch" finger) and only zoomed
+    // when the SECOND finger moved — anchoring it and moving the first read
+    // as "zoom is stuck" — and lifting the first finger mid-pinch cleared
+    // both trackers while the second was still on the glass, dead-ending the
+    // gesture until every finger lifted. Both fingers are now equal peers:
+    // distance is recomputed on either finger's move, and when one lifts the
+    // survivor keeps orbiting seamlessly (its stored position is current, so
+    // there's no positional jump either).
+    const touches = this._camTouches;
+    touches.clear();
+    let pinchDist = 0;
+
+    const distance = () => {
+      const [a, b] = touches.values();
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
 
     const onDown = (e) => {
-      const rect   = canvas.getBoundingClientRect();
-      const cx     = e.clientX - rect.left;
-      const isRight = cx >= rect.width / 2;
-
-      if (isRight) {
-        if (!this._camTouch && !this._pinchTouch) {
-          this._camTouch = { id: e.pointerId, lastX: e.clientX, lastY: e.clientY };
-          canvas.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        } else if (this._camTouch && !this._pinchTouch) {
-          // Second finger on right = start pinch
-          const dx = e.clientX - this._camTouch.lastX;
-          const dy = e.clientY - this._camTouch.lastY;
-          this._pinchTouch = {
-            id: e.pointerId,
-            lastDist: Math.hypot(dx, dy),
-          };
-          canvas.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        }
-      }
-      // Left-half touches are captured by the React joystick overlay,
-      // so they never reach the canvas.
+      const rect = canvas.getBoundingClientRect();
+      // Left-half touches belong to the React joystick overlay; a 3rd+
+      // right-half finger is ignored rather than hijacking the pinch.
+      if (e.clientX - rect.left < rect.width / 2 || touches.size >= 2) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) pinchDist = distance();
+      canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
     };
 
     const onMove = (e) => {
-      if (this._camTouch && e.pointerId === this._camTouch.id) {
-        if (!this._pinchTouch) {
-          const dx = e.clientX - this._camTouch.lastX;
-          const dy = e.clientY - this._camTouch.lastY;
-          cam.alpha -= dx * 0.006;
-          cam.beta   = Math.max(cam.lowerBetaLimit,
-                       Math.min(cam.upperBetaLimit, cam.beta + dy * 0.006));
-        }
-        this._camTouch.lastX = e.clientX;
-        this._camTouch.lastY = e.clientY;
-        e.preventDefault();
-      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
-        const dx   = e.clientX - this._camTouch.lastX;
-        const dy   = e.clientY - this._camTouch.lastY;
-        const dist = Math.hypot(dx, dy);
-        const delta = this._pinchTouch.lastDist - dist;
-        cam.radius = Math.max(cam.lowerRadiusLimit,
-                     Math.min(cam.upperRadiusLimit, cam.radius + delta * 0.075));
-        this._pinchTouch.lastDist = dist;
-        e.preventDefault();
+      const t = touches.get(e.pointerId);
+      if (!t) return;
+      if (touches.size === 1) {
+        cam.alpha -= (e.clientX - t.x) * 0.006;
+        cam.beta   = Math.max(cam.lowerBetaLimit,
+                     Math.min(cam.upperBetaLimit, cam.beta + (e.clientY - t.y) * 0.006));
       }
+      t.x = e.clientX;
+      t.y = e.clientY;
+      if (touches.size === 2) {
+        const dist = distance();
+        cam.radius = Math.max(cam.lowerRadiusLimit,
+                     Math.min(cam.upperRadiusLimit, cam.radius + (pinchDist - dist) * 0.075));
+        pinchDist = dist;
+      }
+      e.preventDefault();
     };
 
     const onUp = (e) => {
-      if (this._camTouch && e.pointerId === this._camTouch.id) {
-        this._camTouch  = null;
-        this._pinchTouch = null;
-        e.preventDefault();
-      } else if (this._pinchTouch && e.pointerId === this._pinchTouch.id) {
-        this._pinchTouch = null;
-        e.preventDefault();
-      }
+      if (touches.delete(e.pointerId)) e.preventDefault();
     };
 
     canvas.addEventListener('pointerdown',   onDown, { passive: false });
@@ -1361,26 +1351,6 @@ export class BabylonWorldScene {
     const labelRoot = new BABYLON.TransformNode('dunEntranceLabelRoot', this.scene);
     labelRoot.position.set(x, gy + 6.8, z);
     this._makeLabel('dunEntrance', 'Dungeon Entrance', labelRoot);
-  }
-
-  // ── Post-processing (PBR character material template) ──────────────────────
-  // Helper for when humanoids get authored albedo/normal/ORM textures.
-
-  _createCharacterPBR(name, texBasePath) {
-    const mat = new BABYLON.PBRMaterial(name, this.scene);
-    mat.albedoTexture   = new BABYLON.Texture(`${texBasePath}/albedo.png`, this.scene);
-    mat.bumpTexture     = new BABYLON.Texture(`${texBasePath}/normal.png`, this.scene);
-    mat.metallicTexture = new BABYLON.Texture(`${texBasePath}/orm.png`, this.scene);
-    mat.useAmbientOcclusionFromMetallicTextureRed = true;
-    mat.useRoughnessFromMetallicTextureGreen      = true;
-    mat.useMetallnessFromMetallicTextureBlue      = true;
-    mat.roughness            = 1.0;
-    mat.metallic             = 1.0;
-    mat.environmentIntensity = 1.0;
-    mat.indexOfRefraction    = 1.5;
-    mat.albedoColor          = BABYLON.Color3.White();
-    mat.backFaceCulling      = true;
-    return mat;
   }
 
   // ── Input ──────────────────────────────────────────────────────────────────
@@ -2188,8 +2158,7 @@ export class BabylonWorldScene {
     };
     const coal = mk('fire_coal', '#1a0d06');
     coal.emissiveColor = BABYLON.Color3.FromHexString('#ff8030').scale(0.8);
-    // soft radial blob for the ember particles (same recipe as the
-    // atmosphere's motes/fireflies texture)
+    // soft radial blob for the ember particles
     const tex = new BABYLON.DynamicTexture('fire_spark_tex', { width: 32, height: 32 }, this.scene, false);
     tex.hasAlpha = true;
     const c = tex.getContext();
@@ -2308,7 +2277,6 @@ export class BabylonWorldScene {
     MobAssetLibrary.dispose();
     this._tileLoader?.dispose();
     this._grass?.dispose();
-    this._atmosphere?.dispose();
     this._wildlife?.dispose();
     this._weather?.dispose();
     this._sky?.dispose();

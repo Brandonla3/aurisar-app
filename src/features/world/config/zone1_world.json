@@ -64,6 +64,7 @@
   },
   "colors": {
     "lakebedSilt": "#18241e",
-    "trailDirt": "#6e5638"
+    "trailDirt": "#6e5638",
+    "beachSand": "#d8bf8c"
   }
 }
