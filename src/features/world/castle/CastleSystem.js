@@ -127,6 +127,56 @@ export class CastleSystem {
     return L.y + L.clear - 0.3;
   }
 
+  /** Camera LOS vs the exterior shell: distance from the orbit target along
+   *  dir before the ray enters wall / tower / gatehouse / keep mass, or
+   *  maxDist when clear. Outdoor counterpart of the interior nav march —
+   *  without it, orbiting near the walls (the gate front especially) buries
+   *  the camera inside the masonry, where dragging appears dead and only
+   *  zoom visibly changes anything. Analytic point tests against the same
+   *  footprint resolveShellCollision uses, plus the two gate turrets that
+   *  protrude past the wall line. */
+  shellCameraOpenDist(tx, ty, tz, dirX, dirY, dirZ, maxDist) {
+    const E = EXTERIOR;
+    const rr = E.halfW + E.halfD + maxDist; // quick reject: ray can't reach
+    if ((tx - E.site.x) ** 2 + (tz - E.site.z) ** 2 > rr * rr) return maxDist;
+    if (this._siteBaseY == null) {
+      this._siteBaseY = this._worldgen.surfaceY(E.site.x, E.site.z);
+    }
+    const m = 0.5; // camera skin
+    const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
+    const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
+    const wallTop = this._siteBaseY + E.wallH + 2.2; // + battlements
+    const cyls = [];
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      cyls.push([E.site.x + dx * E.halfW, E.site.z + dz * E.halfD,
+        (E.towerR + m) ** 2, this._siteBaseY + E.towerH + 1]);
+    }
+    for (const s of [-1, 1]) {
+      cyls.push([E.site.x - E.halfW, E.gate.z + s * (E.gate.width / 2 + 1.6),
+        (3.2 + m) ** 2, wallTop + 6]);
+    }
+    const blocked = (x, y, z) => {
+      for (const [cx, cz, r2, top] of cyls) {
+        if (y < top && (x - cx) ** 2 + (z - cz) ** 2 < r2) return true;
+      }
+      if (x > x0 && x < x1 && z > z0 && z < z1) {
+        if (y < wallTop) return true;
+        if (y < this._siteBaseY + E.keep.h + 1 &&
+            Math.abs(x - E.site.x) < E.keep.halfW + m &&
+            Math.abs(z - E.site.z) < E.keep.halfD + m) return true;
+      }
+      return false;
+    };
+    const steps = Math.max(2, Math.ceil(maxDist / 0.4));
+    for (let k = 1; k <= steps; k++) {
+      const d = (k / steps) * maxDist;
+      if (blocked(tx + dirX * d, ty + dirY * d, tz + dirZ * d)) {
+        return Math.max(0, d - 0.4);
+      }
+    }
+    return maxDist;
+  }
+
   async init() {
     if (this._disposed) return;
     this._mats = createCastleMaterials(this.scene);

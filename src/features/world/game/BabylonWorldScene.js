@@ -1952,47 +1952,65 @@ export class BabylonWorldScene {
     const cam = this._camera;
     const camPos = cam.globalPosition;
     if (this._castle?.isInside()) {
-      // ── Memoryless third-person camera (the WoW model) ──────────────────
-      // The rendered orbit distance is min(userRadius, lineOfSight) computed
-      // fresh every frame. userRadius belongs to the PLAYER: it only ever
-      // changes by the zoom delta the engine applied since our last write,
-      // so no wall interaction can steal the zoom, and the camera can never
-      // sit beyond (or inside) a wall — there is no state to get stuck.
+      // interior: LOS against the nav grids (walls, floors, ceilings)
       const nav = this._castle.nav;
-      if (this._camUserRadius == null) {
-        this._camUserRadius = cam.radius;
-        this._lastCamWritten = cam.radius;
-      } else {
-        const delta = cam.radius - this._lastCamWritten; // user zoom since last frame
-        if (delta !== 0) {
-          this._camUserRadius = Math.min(cam.upperRadiusLimit,
-            Math.max(cam.lowerRadiusLimit, this._camUserRadius + delta));
+      const castle = this._castle;
+      this._camLosClamp((tx, ty, tz, dirX, dirY, dirZ, maxD) => {
+        const steps = Math.max(2, Math.ceil(maxD / 0.35));
+        for (let k = 1; k <= steps; k++) {
+          const d = (k / steps) * maxD;
+          const sx = tx + dirX * d, sy = ty + dirY * d, sz = tz + dirZ * d;
+          if (!nav.isOpenBelow(sx, sz, sy) ||
+              sy > castle.ceilingYAt(sx, sz, ty)) {
+            return d - 0.4;
+          }
         }
-      }
-      const tx = cam.target.x, ty = cam.target.y, tz = cam.target.z;
-      const dirX = Math.cos(cam.alpha) * Math.sin(cam.beta);
-      const dirY = Math.cos(cam.beta);
-      const dirZ = Math.sin(cam.alpha) * Math.sin(cam.beta);
-      let open = this._camUserRadius;
-      const steps = Math.max(2, Math.ceil(this._camUserRadius / 0.35));
-      for (let k = 1; k <= steps; k++) {
-        const d = (k / steps) * this._camUserRadius;
-        const sx = tx + dirX * d, sy = ty + dirY * d, sz = tz + dirZ * d;
-        if (!nav.isOpenBelow(sx, sz, sy) ||
-            sy > this._castle.ceilingYAt(sx, sz, ty)) {
-          open = Math.max(cam.lowerRadiusLimit, d - 0.4);
-          break;
-        }
-      }
-      const write = Math.min(this._camUserRadius, open);
-      cam.radius = write;
-      this._lastCamWritten = write;
+        return maxD;
+      });
     } else {
       // outdoors: terrain-aware upward tilt cap (pre-castle behavior)
       const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
       const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
       cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
+      // castle shell LOS — near the walls (the fast-travel gate spot is
+      // metres from the gatehouse) half the orbit sphere sits inside the
+      // masonry; without this the view fills with wall and dragging
+      // appears dead while only zoom visibly changes anything
+      if (this._castle) {
+        this._camLosClamp((tx, ty, tz, dirX, dirY, dirZ, maxD) =>
+          this._castle.shellCameraOpenDist(tx, ty, tz, dirX, dirY, dirZ, maxD));
+      }
     }
+  }
+
+  /** ── Memoryless third-person camera clamp (the WoW model) ──────────────
+   *  The rendered orbit distance is min(userRadius, openDist) computed
+   *  fresh every frame. userRadius belongs to the PLAYER: it only ever
+   *  changes by the zoom delta the engine applied since our last write,
+   *  so no wall interaction can steal the zoom, and the camera can never
+   *  sit beyond (or inside) blocking mass — there is no state to get
+   *  stuck. openDistFn(tx,ty,tz, dirX,dirY,dirZ, maxDist) returns how far
+   *  the orbit ray stays clear. */
+  _camLosClamp(openDistFn) {
+    const cam = this._camera;
+    if (this._camUserRadius == null) {
+      this._camUserRadius = cam.radius;
+    } else {
+      const delta = cam.radius - this._lastCamWritten; // user zoom since last frame
+      if (delta !== 0) {
+        this._camUserRadius = Math.min(cam.upperRadiusLimit,
+          Math.max(cam.lowerRadiusLimit, this._camUserRadius + delta));
+      }
+    }
+    const tx = cam.target.x, ty = cam.target.y, tz = cam.target.z;
+    const dirX = Math.cos(cam.alpha) * Math.sin(cam.beta);
+    const dirY = Math.cos(cam.beta);
+    const dirZ = Math.sin(cam.alpha) * Math.sin(cam.beta);
+    const open = openDistFn(tx, ty, tz, dirX, dirY, dirZ, this._camUserRadius);
+    const write = Math.min(this._camUserRadius,
+      Math.max(cam.lowerRadiusLimit, open));
+    cam.radius = write;
+    this._lastCamWritten = write;
   }
 
   _syncStdb() {
