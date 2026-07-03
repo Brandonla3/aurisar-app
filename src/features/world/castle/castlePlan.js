@@ -33,8 +33,10 @@ export const LOCAL_BOUNDS = Object.freeze({ x0: -33, z0: -25, x1: 33, z1: 25 });
 // Dungeon is the lowest floor of a raised stack (not below y=0): the flat
 // terrain plane at y=0 east of x=500 would slice any true basement. Its
 // "underground" feel comes from lighting + materials, not absolute Y.
+// clear = wall height; chosen so walls meet the next level's slab exactly
+// (y + clear === nextY - SLAB_T) — no gaps, no overdraw.
 export const LEVELS = Object.freeze([
-  { id: 'dungeon', y: 0.6,  clear: 4.2 }, // 0 — cells, vault, guard post
+  { id: 'dungeon', y: 0.6,  clear: 5.4 }, // 0 — cells, vault, guard post
   { id: 'ground',  y: 6.6,  clear: 6.0 }, // 1 — entrance, kitchen, dining, servants
   { id: 'f2',      y: 13.2, clear: 5.2 }, // 2 — ballroom (double height), guests, baths
   { id: 'f3',      y: 19.0, clear: 5.2 }, // 3 — master suites, library, gallery
