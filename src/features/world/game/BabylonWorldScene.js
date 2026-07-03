@@ -1846,6 +1846,8 @@ export class BabylonWorldScene {
         pos.x *= maxR / rr;
         pos.z *= maxR / rr;
       }
+      // the castle's exterior walls are solid — no walking into the shell
+      this._castle?.resolveShellCollision(prevX, prevZ, pos);
       pos.y = this._worldgen.surfaceY(pos.x, pos.z);
     }
 
@@ -1886,16 +1888,21 @@ export class BabylonWorldScene {
         this._savedUpperRadius = cam.upperRadiusLimit;
         this._savedLowerRadius = cam.lowerRadiusLimit;
       }
-      cam.upperRadiusLimit = 8;
+      cam.upperRadiusLimit = 13; // the big halls deserve a real zoom range
       // let the wall-march pull the camera very close in tight quarters
       // (standing near a wall with the orbit behind it)
       cam.lowerRadiusLimit = 1.4;
-      if (cam.radius > 7) cam.radius = 6;
+      if (cam.radius > 8) cam.radius = 7;
     } else if (this._savedUpperRadius != null) {
       cam.upperRadiusLimit = this._savedUpperRadius;
       cam.lowerRadiusLimit = this._savedLowerRadius ?? 2.5;
       this._savedUpperRadius = null;
       this._savedLowerRadius = null;
+      // restore the pre-occlusion zoom the wall-march may have clamped
+      if (this._camFreeRadius != null) {
+        cam.radius = Math.min(this._camFreeRadius, cam.upperRadiusLimit);
+        this._camFreeRadius = null;
+      }
     }
     if (target) {
       this._camTarget.set(target.x, target.y, target.z);
@@ -1936,18 +1943,39 @@ export class BabylonWorldScene {
       const cosCeil = Math.max(-1, Math.min(1, (ceilY - cam.target.y) / cam.radius));
       cam.lowerBetaLimit = Math.max(0.25, Math.acos(cosCeil));
       // wall-occlusion: march target→camera through the nav grid in ~0.35 m
-      // steps (walls are 0.5 m — coarser sampling steps right over them);
-      // pull the camera in front of the first blocked cell
+      // steps (walls are 0.5 m — coarser sampling steps right over them).
+      // The march always measures the player's DESIRED radius (saved before
+      // the first clamp), so zoom is restored the moment the line of sight
+      // clears — a naive Math.min() ratchets the camera in and never lets
+      // the player zoom back out.
+      // wheel input while clamped edits the DESIRED radius, so zoom stays
+      // responsive even when a wall is holding the camera in
+      if (this._camFreeRadius != null && Math.abs(cam.inertialRadiusOffset) > 0.001) {
+        this._camFreeRadius = Math.min(cam.upperRadiusLimit,
+          Math.max(cam.lowerRadiusLimit, this._camFreeRadius + cam.inertialRadiusOffset));
+      }
+      const desired = this._camFreeRadius ?? cam.radius;
       const dx = camPos.x - cam.target.x, dz = camPos.z - cam.target.z;
       const horiz = Math.hypot(dx, dz);
-      if (horiz > 0.8) {
-        const steps = Math.min(24, Math.ceil(horiz / 0.35));
+      if (horiz > 0.5 && desired > cam.lowerRadiusLimit + 0.05) {
+        const scale = desired / cam.radius; // march to the desired orbit, not the clamped one
+        const mx = dx * scale, mz = dz * scale;
+        const marchLen = horiz * scale;
+        const steps = Math.min(32, Math.max(2, Math.ceil(marchLen / 0.35)));
+        let clampedT = 0;
         for (let k = 1; k <= steps; k++) {
           const t = k / steps;
-          if (!nav.isOpenBelow(cam.target.x + dx * t, cam.target.z + dz * t, cam.target.y)) {
-            cam.radius = Math.min(cam.radius, Math.max(cam.lowerRadiusLimit, cam.radius * t - 0.3));
+          if (!nav.isOpenBelow(cam.target.x + mx * t, cam.target.z + mz * t, cam.target.y)) {
+            clampedT = t;
             break;
           }
+        }
+        if (clampedT > 0) {
+          if (this._camFreeRadius == null) this._camFreeRadius = cam.radius;
+          cam.radius = Math.max(cam.lowerRadiusLimit, desired * clampedT - 0.3);
+        } else if (this._camFreeRadius != null) {
+          cam.radius = Math.min(this._camFreeRadius, cam.upperRadiusLimit);
+          this._camFreeRadius = null;
         }
       }
     } else {

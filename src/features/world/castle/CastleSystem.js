@@ -20,7 +20,7 @@
 /* global BABYLON */
 
 import {
-  CASTLE_PLAN, LEVELS, INTERIOR_ANCHOR, ENTRY, buildLightAnchors,
+  CASTLE_PLAN, LEVELS, INTERIOR_ANCHOR, ENTRY, EXTERIOR, buildLightAnchors,
 } from './castlePlan.js';
 import { buildNav } from './castleNav.js';
 import { createCastleMaterials } from './builders/materials.js';
@@ -33,9 +33,9 @@ import { createCastleExterior } from './builders/exterior.js';
 import { CastleLightPool } from './CastleLightPool.js';
 import { hash2 } from '../worldgen/rng.js';
 
-const ENTER_DIST_SQ = 3.2 * 3.2;
-const EXIT_PROMPT_DIST_SQ = 3.2 * 3.2;
-const LEAVE_DIST_SQ = 4.8 * 4.8;   // hysteresis
+const ENTER_DIST_SQ = 5.0 * 5.0;
+const EXIT_PROMPT_DIST_SQ = 3.4 * 3.4;
+const LEAVE_DIST_SQ = 7.0 * 7.0;   // hysteresis
 const PROX_MS = 200;
 const MOOD_MS = 300;
 
@@ -47,15 +47,15 @@ const MOOD_MS = 300;
 const WARM_MOOD = {
   fogColor: [0.095, 0.062, 0.038],
   fogDensity: 0.008,
-  exposure: 0.92,
-  fill: 0.22, // neutral hemispheric lift so warm pools don't monochrome the room
+  exposure: 1.08,
+  fill: 0.45, // neutral hemispheric lift so warm pools don't monochrome the room
   noGrading: true, // the cold dungeon LUT mutes the royal reds/golds
 };
 const DUNGEON_MOOD = {
   fogColor: [0.045, 0.05, 0.062],
-  fogDensity: 0.02,
-  exposure: 0.94,
-  fill: 0.16,
+  fogDensity: 0.018,
+  exposure: 1.0,
+  fill: 0.25,
 };
 
 export class CastleSystem {
@@ -92,6 +92,32 @@ export class CastleSystem {
   }
 
   isInside() { return this._inside; }
+
+  /**
+   * Overworld collision against the exterior shell: the walls are real.
+   * Blocks CROSSING INTO the footprint (rect + the four tower circles)
+   * with the same axis-slide feel as the interior nav; a player already
+   * inside (older save, edge case) can always walk out.
+   */
+  resolveShellCollision(prevX, prevZ, pos) {
+    const E = EXTERIOR;
+    const m = 0.7; // player radius + skin
+    const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
+    const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
+    const tr = E.towerR + m;
+    const blocked = (x, z) => {
+      if (x > x0 && x < x1 && z > z0 && z < z1) return true;
+      for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const tx = E.site.x + dx * E.halfW, tz = E.site.z + dz * E.halfD;
+        if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < tr * tr) return true;
+      }
+      return false;
+    };
+    if (!blocked(pos.x, pos.z) || blocked(prevX, prevZ)) return;
+    if (!blocked(pos.x, prevZ)) { pos.z = prevZ; return; }       // slide along x
+    if (!blocked(prevX, pos.z)) { pos.x = prevX; return; }       // slide along z
+    pos.x = prevX; pos.z = prevZ;                                 // fully blocked
+  }
 
   /** Ceiling height over (x, z) for the camera clamp while inside. */
   ceilingYAt(x, z, refY) {
@@ -156,8 +182,9 @@ export class CastleSystem {
   }
 
   _spawnGateTorchLights(positions, extMeshes) {
-    // two real flickering lights at the gate (campfire precedent — LM-
-    // independent), scoped to the shell so world shaders never recompile
+    // two steady lights at the gate, scoped to the shell so world shaders
+    // never recompile. Deliberately NOT flickering: the shell is one merged
+    // facade, so any modulation reads as every window strobing at once.
     for (const p of positions) {
       const l = new BABYLON.PointLight('castleGateTorch', p, this.scene);
       l.diffuse = new BABYLON.Color3(1.0, 0.55, 0.2);
@@ -165,14 +192,6 @@ export class CastleSystem {
       l.range = 11;
       l.includedOnlyMeshes = [...extMeshes];
       this._gateLights.push({ l, ph: hash2(p.x, p.z) * 6.28 });
-    }
-    if (this._gateLights.length && !this._gateObs) {
-      this._gateObs = this.scene.onBeforeRenderObservable.add(() => {
-        const t = performance.now() / 1000;
-        for (const g of this._gateLights) {
-          g.l.intensity = 2.2 * (1 + Math.sin(t * 7.3 + g.ph) * 0.2 + Math.sin(t * 17.1 + g.ph) * 0.08);
-        }
-      });
     }
   }
 

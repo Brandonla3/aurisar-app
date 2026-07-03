@@ -75,7 +75,7 @@ function mat(scene, name, { diffuse, texture = null, specular = [0.03, 0.03, 0.0
     // faint self-glow floor: interiors between torch pools stay readable
     // (never pitch black) without washing out the lighting mood
     m.emissiveColor = new BABYLON.Color3(
-      diffuse[0] * 0.05, diffuse[1] * 0.05, diffuse[2] * 0.055);
+      diffuse[0] * 0.09, diffuse[1] * 0.09, diffuse[2] * 0.10);
   }
   if (alpha < 1) m.alpha = alpha;
   m.backFaceCulling = backFace;
