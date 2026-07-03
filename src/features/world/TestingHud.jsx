@@ -1,22 +1,18 @@
 /**
- * TestingHud — compass strip + minimap overlay.
+ * TestingHud — circular minimap overlay with an integrated compass.
  *
  * Reads pose + mobs from the scene each animation frame and updates DOM/canvas
  * imperatively (no React re-renders) so it's cheap to leave on permanently.
  *
- * Compass: top-center horizontal strip showing cardinal letters that scroll
- * based on camera-forward yaw.
- * Minimap: top-right canvas showing the actual baked terrain (biome colors)
- * centered on the player, with the 8x8 tile grid, POI markers, live mobs (red
- * dots), the player (triangle), and the world bounds. A header shows the
- * player's current location; +/- and the mouse wheel zoom the view.
+ * Minimap: top-right circular canvas showing the actual baked terrain (biome
+ * colors) centered on the player, with the 8x8 tile grid, POI markers, live
+ * mobs (red dots), the player (triangle), and the world bounds. A compass
+ * strip sits directly on top of the circle showing the cardinal letters that
+ * scroll based on camera-forward yaw; +/- and the mouse wheel zoom the view.
  */
 
 import { useEffect, useRef } from 'react';
-import {
-  streamingParams,
-  worldToTile,
-} from './streaming/index.js';
+import { streamingParams } from './streaming/index.js';
 import worldBuildConfig from './config/world_build_config.json';
 import { buildWorldMapCanvas, drawMapMarkers, locationLabelAt } from './mapRender.js';
 
@@ -29,22 +25,17 @@ const BAKE_SIZE = 512;             // terrain bake resolution
 
 const PARAMS = streamingParams(worldBuildConfig);
 
-// 8-point compass labels positioned at 0/45/90/... deg clockwise from +Z (south).
+// Cardinal-only compass labels positioned at 0/90/180/270 deg clockwise from +Z (south).
 const COMPASS_POINTS = [
-  { label: 'S',  yawDeg:    0 },
-  { label: 'SW', yawDeg:   45 },
-  { label: 'W',  yawDeg:   90 },
-  { label: 'NW', yawDeg:  135 },
-  { label: 'N',  yawDeg:  180 },
-  { label: 'NE', yawDeg: -135 },
-  { label: 'E',  yawDeg:  -90 },
-  { label: 'SE', yawDeg:  -45 },
+  { label: 'S', yawDeg:    0 },
+  { label: 'W', yawDeg:   90 },
+  { label: 'N', yawDeg:  180 },
+  { label: 'E', yawDeg:  -90 },
 ];
 
 export default function TestingHud({ sceneRef, visible = true, mapData = null }) {
   const compassRef = useRef(null);
   const canvasRef  = useRef(null);
-  const coordsRef  = useRef(null);
   const headerRef  = useRef(null);
   const bakedRef   = useRef(null);
   const viewRadiusRef = useRef(DEFAULT_VIEW_RADIUS_M);
@@ -53,8 +44,7 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
     if (!visible) return;
     const compass = compassRef.current;
     const canvas  = canvasRef.current;
-    const coords  = coordsRef.current;
-    if (!compass || !canvas || !coords) return;
+    if (!compass || !canvas) return;
 
     const ctx = canvas.getContext('2d');
     canvas.width  = MAP_SIZE_PX * window.devicePixelRatio;
@@ -95,7 +85,6 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
         viewRadius: viewRadiusRef.current,
         mapData,
       });
-      _renderCoords(coords, pose);
       if (headerRef.current) {
         const loc = scene.getLocation?.()
           || (mapData && locationLabelAt(mapData.worldgen, pose.x, pose.z));
@@ -120,99 +109,94 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
   };
 
   return (
-    <>
-      {/* Compass strip — top center */}
+    /* Minimap — hugs the top-right corner of the screen */
+    <div
+      style={{
+        position:      'absolute',
+        top:           '8px',
+        right:         '8px',
+        display:       'flex',
+        flexDirection: 'column',
+        alignItems:    'center',
+        pointerEvents: 'auto',
+        userSelect:    'none',
+        zIndex:         20,
+      }}
+    >
+      {/* Header — current location */}
+      <div
+        ref={headerRef}
+        style={{
+          marginBottom: '2px',
+          fontFamily:   'Cinzel, Inter, serif',
+          fontSize:     '11px',
+          fontWeight:   700,
+          color:        '#f0d060',
+          textAlign:    'center',
+          letterSpacing:'0.03em',
+          maxWidth:     `${MAP_SIZE_PX}px`,
+          overflow:     'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace:   'nowrap',
+          textShadow:   '0 1px 3px rgba(0,0,0,0.85)',
+        }}
+      >Aurisar</div>
+
+      {/* Compass strip — sits directly on top of the circular map */}
       <div
         ref={compassRef}
         style={{
-          position:      'absolute',
-          top:           '12px',
-          left:          '50%',
-          transform:     'translateX(-50%)',
-          width:         '220px',
-          height:        '28px',
+          position:      'relative',
+          width:         `${MAP_SIZE_PX}px`,
+          height:        '20px',
           background:    'rgba(8, 10, 14, 0.55)',
           border:        '1px solid rgba(255, 255, 255, 0.18)',
-          borderRadius:  '6px',
+          borderRadius:  '8px 8px 0 0',
           overflow:      'hidden',
           fontFamily:    'monospace',
-          fontSize:      '14px',
+          fontSize:      '13px',
           letterSpacing: '0.05em',
           color:         'rgba(255, 255, 255, 0.92)',
           pointerEvents: 'none',
-          userSelect:    'none',
-          zIndex:        20,
         }}
       />
-      {/* Minimap — top right, nudged below the Exit button */}
-      <div
-        style={{
-          position:     'absolute',
-          top:          '64px',
-          right:        '12px',
-          padding:      '6px',
-          background:   'rgba(8, 10, 14, 0.55)',
-          border:       '1px solid rgba(255, 255, 255, 0.18)',
-          borderRadius: '6px',
-          pointerEvents:'auto',
-          userSelect:   'none',
-          zIndex:        20,
-        }}
-      >
-        {/* Header — current location */}
-        <div
-          ref={headerRef}
+
+      <div style={{ position: 'relative' }}>
+        <canvas
+          ref={canvasRef}
           style={{
-            marginBottom: '4px',
-            fontFamily:   'Cinzel, Inter, serif',
-            fontSize:     '11px',
-            fontWeight:   700,
-            color:        '#f0d060',
-            textAlign:    'center',
-            letterSpacing:'0.03em',
-            maxWidth:     `${MAP_SIZE_PX}px`,
-            overflow:     'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace:   'nowrap',
-          }}
-        >Aurisar</div>
-        <div style={{ position: 'relative' }}>
-          <canvas ref={canvasRef} style={{ display: 'block', borderRadius: 4 }} />
-          {/* Zoom controls */}
-          <div style={{ position: 'absolute', bottom: 4, right: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <button
-              style={zoomBtn}
-              aria-label="Zoom in minimap"
-              onClick={() => { viewRadiusRef.current = Math.max(MIN_VIEW_RADIUS, viewRadiusRef.current / 1.3); }}
-            >＋</button>
-            <button
-              style={zoomBtn}
-              aria-label="Zoom out minimap"
-              onClick={() => { viewRadiusRef.current = Math.min(MAX_VIEW_RADIUS, viewRadiusRef.current * 1.3); }}
-            >－</button>
-          </div>
-        </div>
-        <div
-          ref={coordsRef}
-          style={{
-            marginTop:  '4px',
-            fontFamily: 'monospace',
-            fontSize:   '10px',
-            color:      'rgba(255, 255, 255, 0.78)',
-            textAlign:  'center',
+            display:      'block',
+            borderRadius: '50%',
+            border:       '2px solid rgba(240, 208, 96, 0.5)',
+            boxShadow:    '0 4px 14px rgba(0,0,0,0.5)',
           }}
         />
+        {/* Zoom controls */}
+        <div style={{ position: 'absolute', bottom: -6, right: -6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <button
+            style={zoomBtn}
+            aria-label="Zoom in minimap"
+            onClick={() => { viewRadiusRef.current = Math.max(MIN_VIEW_RADIUS, viewRadiusRef.current / 1.3); }}
+          >＋</button>
+          <button
+            style={zoomBtn}
+            aria-label="Zoom out minimap"
+            onClick={() => { viewRadiusRef.current = Math.min(MAX_VIEW_RADIUS, viewRadiusRef.current * 1.3); }}
+          >－</button>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
 // Imperative compass renderer — draws absolute-positioned cardinal letters
-// shifted horizontally based on the camera-forward yaw.
+// shifted horizontally based on the camera-forward yaw. Sized to sit flush
+// on top of the (equally wide) circular minimap.
 function _renderCompass(host, yaw) {
+  const width = MAP_SIZE_PX;
   const yawDeg = yaw * 180 / Math.PI;
-  const pxPerDeg = 220 / 90; // 90deg of arc spans the strip
-  const center = 220 / 2;
+  const pxPerDeg = width / 90; // 90deg of arc spans the strip
+  const center = width / 2;
 
   let html = '';
   for (const { label, yawDeg: pYaw } of COMPASS_POINTS) {
@@ -220,11 +204,10 @@ function _renderCompass(host, yaw) {
     while (delta > 180)  delta -= 360;
     while (delta < -180) delta += 360;
     const px = center + delta * pxPerDeg;
-    if (px < -10 || px > 230) continue; // off-screen
-    const isCardinal = label.length === 1;
-    html += `<span style="position:absolute; top:6px; left:${px - 8}px; width:16px; text-align:center; color:${isCardinal ? '#ffffff' : 'rgba(255,255,255,0.55)'}; font-weight:${isCardinal ? 600 : 400}">${label}</span>`;
+    if (px < -10 || px > width + 10) continue; // off-screen
+    html += `<span style="position:absolute; top:3px; left:${px - 8}px; width:16px; text-align:center; color:#ffffff; font-weight:600">${label}</span>`;
   }
-  html += `<span style="position:absolute; top:0; left:${center - 0.5}px; width:1px; height:28px; background:rgba(255, 220, 120, 0.85)"></span>`;
+  html += `<span style="position:absolute; top:0; left:${center - 0.5}px; width:1px; height:20px; background:rgba(255, 220, 120, 0.85)"></span>`;
   host.innerHTML = html;
 }
 
@@ -357,15 +340,4 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData }) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
-}
-
-function _renderCoords(host, pose) {
-  const tile = worldToTile(pose.x, pose.z, PARAMS);
-  const distW = Math.max(0, pose.x - PARAMS.minX);
-  const distE = Math.max(0, PARAMS.maxX - pose.x);
-  const distN = Math.max(0, pose.z - PARAMS.minZ);
-  const distS = Math.max(0, PARAMS.maxZ - pose.z);
-  const nearest = Math.min(distW, distE, distN, distS);
-  host.innerHTML = `<div>${tile} · (${pose.x.toFixed(0)}, ${pose.z.toFixed(0)})</div>` +
-    `<div style="opacity:0.7">edge: ${Math.round(nearest)}m</div>`;
 }

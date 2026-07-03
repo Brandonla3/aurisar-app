@@ -79,7 +79,8 @@ const S = {
     pointerEvents: 'none',
   },
   onlineCount: {
-    position: 'absolute', top: 12, right: 14,
+    // Cleared left of the circular minimap (top-right, ~168px wide incl. offset).
+    position: 'absolute', top: 12, right: 178,
     color: '#4ade80', fontSize: 11,
     fontFamily: 'Inter, system-ui, sans-serif',
     textShadow: '0 0 6px #4ade8088', pointerEvents: 'none',
