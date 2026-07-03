@@ -743,6 +743,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       if (x * x + z * z > R2 * 0.94) continue;
       if (wg.inMountain(x, z) || wg.inForest(x, z)) continue;
       if (wg.lakeWaterDepthAt(x, z) > 0.02) continue;
+      if (wg.lakeShoreAt?.(x, z) > 0.4) continue; // keep the beach strip bare
       const bi = wg.biomeAt(x, z);
       if (rng() > bi.grass * 0.85 + 0.08) continue;
       if (wg.trailDirtAt(x, z) > 0.1) continue;

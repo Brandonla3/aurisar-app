@@ -37,6 +37,21 @@ export function createHeightfield(config, zones) {
     return d < L.bowlR + L.blend ? Math.max(0, L.level - groundHeight(x, z)) : 0;
   }
 
+  /** Sandy-shore factor at (x,z): 1 on the beach strip hugging the lake
+   *  waterline, fading to 0 by ~1.1m above water level, so the band follows
+   *  the real shore contour (wide on gentle banks, narrow on steep ones).
+   *  Also 1 below the waterline — the renderer's silt tint overrides where
+   *  there is actual water, leaving sand visible through the shallows.
+   *  A radial fade caps the band on very flat banks (the bowl's blend ring
+   *  can sit barely above water level for 15m+, which would otherwise read
+   *  as a desert, not a beach). */
+  function lakeShoreAt(x, z) {
+    const d = Math.hypot(x - L.x, z - L.z);
+    if (d >= L.bowlR + 10) return 0;
+    return (1 - sstep(0.35, 1.1, groundHeight(x, z) - L.level))
+         * (1 - sstep(L.bowlR + 4, L.bowlR + 10, d));
+  }
+
   /** Rolling base terrain (lake carved in). Flat east of x=500 (interiors). */
   function groundHeight(x, z) {
     if (x > 500) return 0;
@@ -94,5 +109,5 @@ export function createHeightfield(config, zones) {
     return groundHeight(x, z) + mtnH(x, z);
   }
 
-  return { lakeShape, lakeWaterDepthAt, groundHeight, mtnH, surfaceY };
+  return { lakeShape, lakeWaterDepthAt, lakeShoreAt, groundHeight, mtnH, surfaceY };
 }

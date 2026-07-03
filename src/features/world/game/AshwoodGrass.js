@@ -221,6 +221,7 @@ export class AshwoodGrass {
         if (bi.grass <= 0 || hash2(gx + 3, gz + 9) > bi.grass) continue;
         if (wg.trailDirtAt(wx, wz) > 0.22) continue;
         if (wg.lakeWaterDepthAt(wx, wz) > 0.02) continue;
+        if (wg.lakeShoreAt(wx, wz) > 0.4) continue; // bare beach sand strip
         if (wg.inForest(wx, wz)) continue; // forest floor has its own brush
         const sc = 0.7 + hash2(gx + 5, gz - 3) * 0.95;
         BABYLON.Quaternion.FromEulerAnglesToRef(0, h1 * 6.28, 0, q);
