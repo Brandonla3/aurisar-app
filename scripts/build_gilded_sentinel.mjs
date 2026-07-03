@@ -25,11 +25,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(__dirname, 'assets', 'gilded_sentinel');
 const OUT = path.join(__dirname, '..', 'public', 'assets', 'characters', 'gilded_sentinel.glb');
 
-// Source clip file → animation name baked into the output. The character's
-// own bundled clip becomes "Idle" (a near-static rest pose Meshy ships with
-// the mesh); the rest keep descriptive names. CharacterAvatar plays "Idle"
-// for stationary characters and cross-fades to "Walk" when moving.
+// Source clip file → animation name baked into the output. "Idle" is the
+// authored looping idle; the rest keep descriptive names. CharacterAvatar
+// plays "Idle" for stationary characters and cross-fades to "Walk" when
+// moving. The character's own bundled clip is a near-static rest pose — it's
+// renamed "RestPose" below so it doesn't win the /idle/i resolver.
 const ANIM_FILES = [
+  { file: 'idle.glb',        name: 'Idle' },
   { file: 'walking.glb',     name: 'Walk' },
   { file: 'running.glb',     name: 'Run' },
   { file: 'run_03.glb',      name: 'Run2' },
@@ -43,9 +45,11 @@ const baseRoot = base.getRoot();
 const baseNodes = baseRoot.listNodes();
 const buffer = baseRoot.listBuffers()[0];
 
-// Rename the character's bundled clip so it reads as the idle loop.
+// The character's bundled clip is a near-static rest pose. Rename it so it
+// doesn't shadow the authored looping "Idle" clip merged in below (the
+// idle/walk resolver takes the first /idle/i match).
 const bundled = baseRoot.listAnimations()[0];
-if (bundled) bundled.setName('Idle');
+if (bundled) bundled.setName('RestPose');
 
 for (const { file, name } of ANIM_FILES) {
   const src = await io.read(path.join(SRC, file));
