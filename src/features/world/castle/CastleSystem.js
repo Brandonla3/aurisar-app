@@ -46,13 +46,16 @@ const MOOD_MS = 300;
 // (same call-time-only rule as the rest of the world code).
 const WARM_MOOD = {
   fogColor: [0.095, 0.062, 0.038],
-  fogDensity: 0.012,
-  exposure: 1.02,
+  fogDensity: 0.008,
+  exposure: 0.92,
+  fill: 0.22, // neutral hemispheric lift so warm pools don't monochrome the room
+  noGrading: true, // the cold dungeon LUT mutes the royal reds/golds
 };
 const DUNGEON_MOOD = {
   fogColor: [0.045, 0.05, 0.062],
   fogDensity: 0.02,
   exposure: 0.94,
+  fill: 0.16,
 };
 
 export class CastleSystem {
@@ -101,18 +104,22 @@ export class CastleSystem {
   async init() {
     if (this._disposed) return;
     this._mats = createCastleMaterials(this.scene);
-    const yieldFrame = () => new Promise((r) => setTimeout(r, 0));
+    // yield between build chunks via the render loop, NOT setTimeout —
+    // browsers throttle timers under heavy rAF load (a 1.6 s build was
+    // stretching to ~28 s of throttled waits in headless profiling)
+    const yieldFrame = () => new Promise((r) =>
+      this.scene.onAfterRenderObservable.addOnce(() => r()));
 
     // ── exterior shell on the terrain (always visible) ──
     this._extRoot = new BABYLON.TransformNode('castle_exterior', this.scene);
     {
       const ctx = createCollector(this.scene, this._mats);
       const { gateTorchPositions } = createCastleExterior(ctx, this._worldgen);
-      mergeCollector(ctx, this._extRoot, (mesh, group, matKey) => {
+      const extMeshes = mergeCollector(ctx, this._extRoot, (mesh, group, matKey) => {
         // shadow casters: stone masses only (windows/flames don't cast)
         if (matKey.includes('Stone') || matKey === 'stone') this._host.castShadow?.(mesh);
       });
-      this._spawnGateTorchLights(gateTorchPositions);
+      this._spawnGateTorchLights(gateTorchPositions, extMeshes);
     }
     if (this._disposed) return;
     await yieldFrame();
@@ -140,27 +147,30 @@ export class CastleSystem {
         ...a, x: a.x + ax, z: a.z + az,
       }));
       createFixturesFromAnchors(ctx, anchors, 0, 0); // anchors already world-space
-      mergeCollector(ctx, this._intRoot);
+      this._intMeshes = mergeCollector(ctx, this._intRoot);
       this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 3 : 6);
+      this._pool.setIncludedMeshes(this._intMeshes);
     }
     this._intRoot.setEnabled(false);
     this._built = true;
   }
 
-  _spawnGateTorchLights(positions) {
-    // two real flickering lights at the gate (campfire precedent — LM-independent)
+  _spawnGateTorchLights(positions, extMeshes) {
+    // two real flickering lights at the gate (campfire precedent — LM-
+    // independent), scoped to the shell so world shaders never recompile
     for (const p of positions) {
       const l = new BABYLON.PointLight('castleGateTorch', p, this.scene);
       l.diffuse = new BABYLON.Color3(1.0, 0.55, 0.2);
-      l.intensity = 14;
+      l.intensity = 2.2;
       l.range = 11;
+      l.includedOnlyMeshes = [...extMeshes];
       this._gateLights.push({ l, ph: hash2(p.x, p.z) * 6.28 });
     }
     if (this._gateLights.length && !this._gateObs) {
       this._gateObs = this.scene.onBeforeRenderObservable.add(() => {
         const t = performance.now() / 1000;
         for (const g of this._gateLights) {
-          g.l.intensity = 14 * (1 + Math.sin(t * 7.3 + g.ph) * 0.2 + Math.sin(t * 17.1 + g.ph) * 0.08);
+          g.l.intensity = 2.2 * (1 + Math.sin(t * 7.3 + g.ph) * 0.2 + Math.sin(t * 17.1 + g.ph) * 0.08);
         }
       });
     }
@@ -250,7 +260,16 @@ export class CastleSystem {
     this._lm.setZone('dungeon', 0.6);
     this._moodLevel = -1; // force a mood refresh on the next tick
     this._lm.setDungeonMood?.(WARM_MOOD);
-    this._pool?.setActive(true, () => this._host.getPlayerPos());
+    this._pool?.setActive(true, () => {
+      const pos = this._host.getPlayerPos();
+      return pos ? { pos, level: this._moodLevel >= 0 ? this._moodLevel : null } : null;
+    });
+    // the avatar rides the pool light too — otherwise the character is a
+    // black silhouette (pool lights are scoped to castle meshes only)
+    const avatarMeshes = this._host.getAvatarMeshes?.() ?? [];
+    if (avatarMeshes.length && this._intMeshes) {
+      this._pool?.setIncludedMeshes([...this._intMeshes, ...avatarMeshes]);
+    }
     this._clearPrompt();
     this._host.onZoneChange?.('castle');
   }

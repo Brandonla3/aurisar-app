@@ -62,8 +62,9 @@ function windowRows(ctx, face /* {x0,z0,x1,z1 along wall} */, baseY, floors, nor
       const arch = BABYLON.MeshBuilder.CreateTorus('extWinArch', {
         diameter: 1.25, thickness: 0.14, tessellation: 12,
       }, ctx.scene);
-      arch.rotation.x = Math.PI / 2;
-      if (Math.abs(nx) > 0.5) arch.rotation.y = Math.PI / 2;
+      // ring axis along the wall normal so the arch stands in the wall plane
+      if (Math.abs(nx) > 0.5) arch.rotation.z = Math.PI / 2;
+      else arch.rotation.x = Math.PI / 2;
       arch.position.set(x + nx * 0.05, y + 1.32, z + nz * 0.05);
       ctx.add(arch, 'extStone', EG);
     }
@@ -189,9 +190,7 @@ export function createCastleExterior(ctx, worldgen) {
   const gArch = BABYLON.MeshBuilder.CreateTorus('gateArch', {
     diameter: E.gate.width + 1.4, thickness: 0.65, tessellation: 24,
   }, ctx.scene);
-  gArch.rotation.x = Math.PI / 2;
-  gArch.rotation.y = Math.PI / 2;
-  gArch.scaling.y = 1.3;
+  gArch.rotation.z = Math.PI / 2; // ring axis along x — faces the west approach
   gArch.position.set(gx - 1.3, gateFloor + E.gate.height - 0.4, gz);
   ctx.add(gArch, 'stone', EG);
   // the great double doors (closed — entry is the press-E teleport)

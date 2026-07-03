@@ -20,9 +20,13 @@ export function createCollector(scene, mats) {
 
   return {
     scene, mats,
-    /** Register a primitive for merging under (group, matKey). */
+    /** Register a primitive for merging under (group, matKey). Primitives
+     *  are disabled immediately — thousands of unmerged draw calls must
+     *  never hit a render frame during the chunked build (that cost 20+ s
+     *  of software-GL frames before this guard). */
     add(mesh, matKey, group = 'g') {
       mesh.material = mats[matKey];
+      mesh.setEnabled(false);
       const key = `${group}|${matKey}`;
       let arr = buckets.get(key);
       if (!arr) { arr = []; buckets.set(key, arr); }
@@ -51,10 +55,14 @@ export function mergeCollector(collector, root, onMerged = null) {
     if (!meshes.length) continue;
     const [group, matKey] = key.split('|');
     const material = collector.mats[matKey];
+    // disabled meshes never compute world matrices on their own — force it
+    // so MergeMeshes bakes the real transforms
+    for (const m of meshes) m.computeWorldMatrix(true);
     const merged = meshes.length === 1
       ? meshes[0]
       : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, false);
     if (!merged) continue;
+    merged.setEnabled(true);
     merged.name = `castle_${group}_${matKey}`;
     merged.material = material;
     merged.isPickable = false;

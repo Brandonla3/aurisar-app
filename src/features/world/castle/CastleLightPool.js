@@ -14,17 +14,20 @@
 
 import { hash2 } from '../worldgen/rng.js';
 
+// StandardMaterial point lights attenuate LINEARLY with range — against
+// the castle's bright materials (marble/plaster diffuse ~0.8) anything
+// above ~4 blows whole rooms out to white. Warm pools, no overexposure.
 const KIND_STYLE = {
-  torch:      { color: [1.0, 0.58, 0.22], intensity: 26, range: 10, flicker: 0.20, speed: 8.0 },
-  chandelier: { color: [1.0, 0.66, 0.30], intensity: 38, range: 15, flicker: 0.08, speed: 3.0 },
-  fireplace:  { color: [1.0, 0.45, 0.14], intensity: 34, range: 12, flicker: 0.24, speed: 6.5 },
-  candle:     { color: [1.0, 0.72, 0.40], intensity: 12, range: 7,  flicker: 0.15, speed: 5.0 },
-  brazier:    { color: [1.0, 0.50, 0.16], intensity: 30, range: 11, flicker: 0.22, speed: 7.0 },
+  torch:      { color: [1.0, 0.70, 0.42], intensity: 1.6, range: 10, flicker: 0.20, speed: 8.0 },
+  chandelier: { color: [1.0, 0.78, 0.52], intensity: 2.2, range: 17, flicker: 0.08, speed: 3.0 },
+  fireplace:  { color: [1.0, 0.55, 0.26], intensity: 1.8, range: 12, flicker: 0.24, speed: 6.5 },
+  candle:     { color: [1.0, 0.80, 0.52], intensity: 0.7, range: 7,  flicker: 0.15, speed: 5.0 },
+  brazier:    { color: [1.0, 0.60, 0.28], intensity: 1.6, range: 11, flicker: 0.22, speed: 7.0 },
 };
 
 const RETHINK_MS = 250;   // anchor re-ranking cadence
 const FADE_MS    = 320;   // cross-fade on reassignment
-const Y_WINDOW   = 5.2;   // only anchors on the player's floor (± one landing)
+const Y_WINDOW   = 12;    // vertical sanity cap (ballroom chandeliers hang ~8 m up)
 
 export class CastleLightPool {
   /**
@@ -57,6 +60,13 @@ export class CastleLightPool {
     this._playerPos = null;
   }
 
+  /** Restrict pool lights to the castle's merged meshes: world materials
+   *  never see these lights (no scene-wide shader recompiles when the pool
+   *  is created) and castle materials are guaranteed to pick them. */
+  setIncludedMeshes(meshes) {
+    for (const s of this._lights) s.light.includedOnlyMeshes = [...meshes];
+  }
+
   /** Hand the pool the live player position provider; toggles with interior mode. */
   setActive(active, playerPosFn = null) {
     this._active = active;
@@ -66,10 +76,13 @@ export class CastleLightPool {
     }
   }
 
-  _think(p) {
-    // rank anchors near the player, same-floor first
+  _think(p, level) {
+    // rank anchors near the player — SAME LEVEL only. Point lights don't
+    // shadow, so an anchor on another floor would bleed straight through
+    // the slab; level filtering is the occlusion model.
     const ranked = [];
     for (const a of this.anchors) {
+      if (level != null && a.level != null && a.level !== level) continue;
       const dy = Math.abs(a.y - (p.y + 1.4));
       if (dy > Y_WINDOW) continue;
       const d2 = (a.x - p.x) ** 2 + (a.z - p.z) ** 2;
@@ -103,10 +116,11 @@ export class CastleLightPool {
     const now = performance.now();
     const dt = this.scene.getEngine().getDeltaTime();
     if (this._active && this._playerPos) {
-      const p = this._playerPos();
+      const st = this._playerPos(); // { pos, level } | Vector3 | null
+      const p = st?.pos ?? st;
       if (p && now - this._lastThink > RETHINK_MS) {
         this._lastThink = now;
-        this._think(p);
+        this._think(p, st?.level ?? null);
       }
     }
     const t = now * 0.001;

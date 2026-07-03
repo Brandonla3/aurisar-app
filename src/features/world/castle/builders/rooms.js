@@ -280,9 +280,10 @@ export function createDoor(ctx, level, line, door, ax, az) {
     const arch = BABYLON.MeshBuilder.CreateTorus(`arch_${door.id}`, {
       diameter: w + 0.4, thickness: 0.26, tessellation: 20,
     }, ctx.scene);
-    arch.rotation.x = Math.PI / 2;
-    if (line.axis === 'z') arch.rotation.y = Math.PI / 2;
-    arch.scaling.y = 1.15;
+    // stand the ring upright in the wall plane: ring axis must run along the
+    // wall's normal ('x' lines run along z -> axis x; 'z' lines -> axis z)
+    if (line.axis === 'x') arch.rotation.z = Math.PI / 2;
+    else arch.rotation.x = Math.PI / 2;
     arch.position = line.axis === 'x'
       ? new BABYLON.Vector3(at + ax, L.y + dh + 0.3, mid + az)
       : new BABYLON.Vector3(mid + ax, L.y + dh + 0.3, at + az);
@@ -342,8 +343,8 @@ export function createWindow(ctx, level, line, v, yC, w, h, sideIn, ax, az) {
   const arch = BABYLON.MeshBuilder.CreateTorus(`winArch_${level}`, {
     diameter: w + 0.15, thickness: 0.13, tessellation: 14,
   }, ctx.scene);
-  arch.rotation.x = Math.PI / 2;
-  if (line.axis === 'z') arch.rotation.y = Math.PI / 2;
+  if (line.axis === 'x') arch.rotation.z = Math.PI / 2;
+  else arch.rotation.x = Math.PI / 2;
   arch.position = line.axis === 'x'
     ? new BABYLON.Vector3(at + faceOff + ax, yC + h / 2 + 0.12, v + az)
     : new BABYLON.Vector3(v + ax, yC + h / 2 + 0.12, at + faceOff + az);

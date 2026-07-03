@@ -184,7 +184,14 @@ class LightingManager {
    * state itself. { fogColor: [r,g,b], fogDensity, exposure } | null.
    * The LM stays the sole writer of scene fog/exposure.
    */
-  setDungeonMood(mood) { this._dungeonMood = mood ?? null; }
+  setDungeonMood(mood) {
+    this._dungeonMood = mood ?? null;
+    // moods can opt out of the dungeon LUT (noGrading); re-apply live when
+    // the profile is already settled on dungeon
+    if (this.profile === 'dungeon' && !this._transition) {
+      this._applyColorGrading(this._dungeonMood?.noGrading ? null : this._lutDungeon);
+    }
+  }
 
   setTimeOfDay(hours24) { this.timeOfDay = ((hours24 % 24) + 24) % 24; }
   // Testing aid: when frozen, _updateOverworld stops advancing the clock so a
@@ -602,6 +609,7 @@ class LightingManager {
     const mood = this._dungeonMood;
     this.scene.imageProcessingConfiguration.exposure = mood?.exposure ?? 0.98;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
+    this.fillDungeon.intensity = mood?.fill ?? 0.12;
 
     this.scene.fogDensity = mood?.fogDensity ?? 0.018;
     if (mood?.fogColor) {
@@ -646,7 +654,9 @@ class LightingManager {
     // Swap the color-grading LUT to match the zone mood. Passing the (possibly
     // null) target-zone LUT clears grading when that zone's asset is missing or
     // still loading, so a zone never inherits the other zone's grade.
-    this._applyColorGrading(overworld ? this._lutOverworld : this._lutDungeon);
+    this._applyColorGrading(overworld
+      ? this._lutOverworld
+      : (this._dungeonMood?.noGrading ? null : this._lutDungeon));
 
     for (const l of this._dungeonTorches) l.setEnabled(!overworld);
     for (const l of this._dungeonMagic)   l.setEnabled(!overworld);
@@ -1024,6 +1034,7 @@ export class BabylonWorldScene {
       isMobile: this._isMobile,
       castShadow: (m) => this._castShadow(m),
       getPlayerPos: () => this._local?.root?.position ?? null,
+      getAvatarMeshes: () => this._local?.root?.getChildMeshes?.() ?? [],
       teleportPlayer: (x, y, z, yaw) => this._teleportLocal(x, y, z, yaw),
       cameraEnter: (t, yaw) => this._castleCameraSet(t, yaw, true),
       cameraExit: (t = null, yaw = 0) => this._castleCameraSet(t, yaw, false),
@@ -1871,12 +1882,20 @@ export class BabylonWorldScene {
   _castleCameraSet(target, yaw, interior) {
     const cam = this._camera;
     if (interior) {
-      if (this._savedUpperRadius == null) this._savedUpperRadius = cam.upperRadiusLimit;
+      if (this._savedUpperRadius == null) {
+        this._savedUpperRadius = cam.upperRadiusLimit;
+        this._savedLowerRadius = cam.lowerRadiusLimit;
+      }
       cam.upperRadiusLimit = 8;
+      // let the wall-march pull the camera very close in tight quarters
+      // (standing near a wall with the orbit behind it)
+      cam.lowerRadiusLimit = 1.4;
       if (cam.radius > 7) cam.radius = 6;
     } else if (this._savedUpperRadius != null) {
       cam.upperRadiusLimit = this._savedUpperRadius;
+      cam.lowerRadiusLimit = this._savedLowerRadius ?? 2.5;
       this._savedUpperRadius = null;
+      this._savedLowerRadius = null;
     }
     if (target) {
       this._camTarget.set(target.x, target.y, target.z);
@@ -1916,15 +1935,17 @@ export class BabylonWorldScene {
       const ceilY = this._castle.ceilingYAt(p.x, p.z, p.y);
       const cosCeil = Math.max(-1, Math.min(1, (ceilY - cam.target.y) / cam.radius));
       cam.lowerBetaLimit = Math.max(0.25, Math.acos(cosCeil));
-      // wall-occlusion: march target→camera through the nav grid; pull the
-      // camera in front of the first blocked cell (cheap — 4 grid reads)
+      // wall-occlusion: march target→camera through the nav grid in ~0.35 m
+      // steps (walls are 0.5 m — coarser sampling steps right over them);
+      // pull the camera in front of the first blocked cell
       const dx = camPos.x - cam.target.x, dz = camPos.z - cam.target.z;
       const horiz = Math.hypot(dx, dz);
       if (horiz > 0.8) {
-        for (let k = 1; k <= 4; k++) {
-          const t = k / 4;
+        const steps = Math.min(24, Math.ceil(horiz / 0.35));
+        for (let k = 1; k <= steps; k++) {
+          const t = k / steps;
           if (!nav.isOpenBelow(cam.target.x + dx * t, cam.target.z + dz * t, cam.target.y)) {
-            cam.radius = Math.min(cam.radius, Math.max(cam.lowerRadiusLimit, cam.radius * t - 0.25));
+            cam.radius = Math.min(cam.radius, Math.max(cam.lowerRadiusLimit, cam.radius * t - 0.3));
             break;
           }
         }
