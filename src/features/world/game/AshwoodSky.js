@@ -285,11 +285,15 @@ export class AshwoodSky {
     m.setFloat('dusk', dusk);
 
     // Cloud deck: drift with the wind, thicken toward overcast as wetness
-    // rises (0.38 baseline scattered cover → ~0.72 storm deck).
+    // rises (0.38 baseline scattered cover → ~0.72 storm deck). While the
+    // Phase 6 volumetric layer is active this deck fades to a thin high haze
+    // instead — two cloud layers at once read as visual noise.
     const dt = this.scene.getEngine().getDeltaTime() / 1000;
     const weather = this.scene.metadata?.ashwood?.weather;
     this._cloudTime += dt * (0.5 + (weather?.windStrength ?? 1) * 0.5);
-    const coverTarget = 0.38 + (weather?.wet ?? 0) * 0.34;
+    const coverTarget = this.scene.metadata?.ashwood?.volumetricClouds
+      ? 0.06
+      : 0.38 + (weather?.wet ?? 0) * 0.34;
     this._cloudCover += (coverTarget - this._cloudCover) * Math.min(1, dt * 0.2);
     m.setFloat('cloudTime', this._cloudTime);
     m.setFloat('cloudCover', this._cloudCover);
