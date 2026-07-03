@@ -463,9 +463,17 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     fTrunk: new Acc(), fLeaf: new Acc(), fBrush: new Acc(), log: new Acc(),
   };
 
+  // The Wildwood circle genuinely overlaps the lake bowl (its edge reaches
+  // ~25m from the lake center — inside the water), so vegetation is culled
+  // off the beach band at render time. A pure client-side filter: sites stay
+  // untouched, so the deterministic manifest (and anything server-anchored
+  // to it) is unaffected.
+  const onBeach = (x, z) => wg.lakeShoreAt?.(x, z) > 0.05;
+
   // ── overworld trees (prototype spawnTree) ──
   for (const t of s.trees) {
     if (!inBounds(t.x, t.z)) continue;
+    if (onBeach(t.x, t.z)) continue;
     const rng = mulberry32(t.seed);
     const gy = surfaceY(t.x, t.z);
     const th = rand(rng, 5, 8.5), tr = rand(rng, 0.3, 0.55);
@@ -534,6 +542,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // ── bushes ──
   for (const b of s.bushes) {
     if (!inBounds(b.x, b.z)) continue;
+    if (onBeach(b.x, b.z)) continue;
     const rng = mulberry32(b.seed);
     const sc = rand(rng, 0.5, 1.1);
     acc.bush.push(b.x, surfaceY(b.x, b.z), b.z, 0, rng() * 6.28, 0, sc, sc, sc, null);
@@ -542,6 +551,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // ── ground details: fern / mushroom-tuft / flower by biome ──
   for (const d of s.details) {
     if (!inBounds(d.x, d.z)) continue;
+    if (onBeach(d.x, d.z)) continue;
     const rng = mulberry32(d.seed);
     const gy = surfaceY(d.x, d.z);
     const pick = rng();
@@ -669,6 +679,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // ── Wildwood forest (prototype buildForest) ──
   for (const t of s.forestTrees) {
     if (!inBounds(t.x, t.z)) continue;
+    if (onBeach(t.x, t.z)) continue;
     const rng = mulberry32(t.seed);
     const y = surfaceY(t.x, t.z);
     acc.fTrunk.push(t.x, y, t.z, t.lean, t.yaw, t.lean * 0.6, t.w, t.h, t.w,
@@ -721,6 +732,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   }
   for (const b of s.forestBrush ?? []) {
     if (!inBounds(b.x, b.z)) continue;
+    if (onBeach(b.x, b.z)) continue;
     const rng = mulberry32(b.seed);
     acc.fBrush.push(b.x, surfaceY(b.x, b.z), b.z, 0, rng() * 6.28, 0,
       b.sc * (0.8 + rng() * 0.6), b.sc, b.sc * (0.8 + rng() * 0.6),
@@ -728,6 +740,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   }
   for (const l of s.forestLogs ?? []) {
     if (!inBounds(l.x, l.z)) continue;
+    if (onBeach(l.x, l.z)) continue;
     acc.log.push(l.x, surfaceY(l.x, l.z) + 0.55, l.z, 0, l.yaw, Math.PI / 2, 1, l.len, 1, null);
   }
 
