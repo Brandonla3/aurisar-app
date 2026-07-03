@@ -192,7 +192,7 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
    * gallery railing still counts as open), so the third-person camera only
    * clamps against true wall mass.
    */
-  function isOpenBelow(wx, wz, refY, depth = 12) {
+  function isOpenBelow(wx, wz, refY, depth = 16) {
     const x = wx - anchor.x, z = wz - anchor.z;
     if (x < b.x0 || x >= b.x1 || z < b.z0 || z >= b.z1) return false;
     const idx = rowOf(z) * cols + colOf(x);

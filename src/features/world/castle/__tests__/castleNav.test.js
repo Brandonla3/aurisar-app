@@ -7,7 +7,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { buildNav, roomCenterWorld } from '../castleNav.js';
 import {
   CASTLE_PLAN, LEVELS, ROOMS, STAIRS, ENTRY, INTERIOR_ANCHOR,
-  NAV_CELL, STEP_UP, stairRects,
+  NAV_CELL, STEP_UP, PLAN_SCALE, stairRects,
 } from '../castlePlan.js';
 
 let nav;
@@ -52,9 +52,9 @@ describe('castleNav', () => {
 
   it('outside every room is blocked (wall mass)', () => {
     // dead pocket between corridor1 (z1=-4) and storeRoom (z0=-6), scaled
-    expect(nav.surfaceAt(22 * 1.4 + AX, -5 * 1.4 + AZ, LEVELS[1].y)).toBeNull();
+    expect(nav.surfaceAt(22 * PLAN_SCALE + AX, -5 * PLAN_SCALE + AZ, LEVELS[1].y)).toBeNull();
     // outside the footprint entirely
-    expect(nav.surfaceAt(AX - 55, AZ, LEVELS[1].y)).toBeNull();
+    expect(nav.surfaceAt(AX - 70, AZ, LEVELS[1].y)).toBeNull();
   });
 
   it('a synthetic agent walks every stair with no step gap > STEP_UP', () => {
@@ -156,9 +156,9 @@ describe('castleNav', () => {
 
   it('nearestWalkable recovers a stranded position', () => {
     // a point in wall mass near the corridor
-    const p = nav.nearestWalkable(22 * 1.4 + AX, -5 * 1.4 + AZ, LEVELS[1].y, 8);
+    const p = nav.nearestWalkable(22 * PLAN_SCALE + AX, -5 * PLAN_SCALE + AZ, LEVELS[1].y, 8);
     expect(p).toBeTruthy();
-    expect(Math.hypot(p.x - (22 * 1.4 + AX), p.z - (-5 * 1.4 + AZ))).toBeLessThan(8);
+    expect(Math.hypot(p.x - (22 * PLAN_SCALE + AX), p.z - (-5 * PLAN_SCALE + AZ))).toBeLessThan(8);
   });
 
   it('grid rasterization keeps door strips passable at walking width', () => {

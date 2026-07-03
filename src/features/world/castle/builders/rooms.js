@@ -35,7 +35,7 @@ const FANCY_KINDS = new Set([
   'entrance', 'ballroom', 'gallery', 'royal', 'master', 'library', 'sitting',
   'dining', 'stairHall', 'treasury',
 ]);
-const DOOR_H = { single: 3.2, double: 4.4, iron: 3.0 };
+const DOOR_H = { single: 3.8, double: 5.4, iron: 3.4 };
 
 const doorHeight = (d) => (d.iron ? DOOR_H.iron : d.double ? DOOR_H.double : DOOR_H.single);
 const wallMatFor = (level) => WALL_MAT_BY_LEVEL[level];
@@ -310,9 +310,9 @@ export function createDoor(ctx, level, line, door, ax, az) {
 function placeWindows(ctx, level, line, lo, hi, room, sideIn, wallH, ax, az) {
   const L = LEVELS[level];
   const tall = room.kind === 'ballroom';
-  const winH = tall ? 7.0 : 3.2;
-  const winW = tall ? 2.1 : 1.7;
-  const spacing = tall ? 7.0 : 5.5;
+  const winH = tall ? 9.0 : 4.2;
+  const winW = tall ? 2.4 : 1.9;
+  const spacing = tall ? 8.0 : 6.0;
   const len = hi - lo;
   const n = Math.floor(len / spacing);
   if (n < 1) return;

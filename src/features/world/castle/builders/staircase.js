@@ -150,6 +150,26 @@ export function createGrandStaircase(ctx, st, ax, az) {
     }
   }
 
+  // reference look: monumental flanking columns with gold capitals at the
+  // stair mouth and at the landing corners (grand stairs only)
+  if (grand) {
+    const colH = Math.min(LEVELS[st.hi].y - LEVELS[st.lo].y + 2.5, 12);
+    const mouths = [];
+    if (st.axis === 'z') {
+      mouths.push([laneA.x0 - 0.7, st.u0 - 0.7], [laneB.x1 + 0.7, st.u0 - 0.7]);
+      mouths.push([laneA.x0 - 0.7, st.u0 + st.runLen + st.landingD + 0.7],
+        [laneB.x1 + 0.7, st.u0 + st.runLen + st.landingD + 0.7]);
+    } else {
+      mouths.push([st.u0 - 0.7, laneA.z0 - 0.7], [st.u0 - 0.7, laneB.z1 + 0.7]);
+    }
+    for (const [mx, mz] of mouths) {
+      const yB = LEVELS[st.lo].y;
+      ctx.add(box(ctx.scene, `stCol_${st.id}`, mx + ax, yB + 0.4, mz + az, 1.5, 0.8, 1.5), 'marbleDark', group);
+      ctx.add(cyl(ctx.scene, `stCol_${st.id}`, mx + ax, yB + colH / 2, mz + az, colH, 1.1, 14), 'marble', group);
+      ctx.add(box(ctx.scene, `stColCap_${st.id}`, mx + ax, yB + colH - 0.35, mz + az, 1.7, 0.7, 1.7), 'gold', group);
+    }
+  }
+
   // newel posts with gold orbs at the stair mouth (grand stairs only)
   if (grand) {
     for (const rect of [laneA, laneB]) {

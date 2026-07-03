@@ -30,7 +30,7 @@ export const SLAB_T     = 0.6;   // floor slab thickness (slab top = level y)
 // Every XZ dimension below is authored at base scale and multiplied by
 // PLAN_SCALE on export — hallways, rooms, doors and stairs all grow
 // together, and the nav grid + builders only ever see the scaled plan.
-export const PLAN_SCALE = 1.4;
+export const PLAN_SCALE = 1.75;
 const SXZ = PLAN_SCALE;
 export const LOCAL_BOUNDS = Object.freeze({
   x0: -33 * SXZ, z0: -25 * SXZ, x1: 33 * SXZ, z1: 25 * SXZ,
@@ -44,11 +44,11 @@ export const LOCAL_BOUNDS = Object.freeze({
 // (y + clear === nextY - SLAB_T) — no gaps, no overdraw. Generous heights:
 // the third-person camera needs headroom, and the brief demands tall rooms.
 export const LEVELS = Object.freeze([
-  { id: 'dungeon', y: 0.6,  clear: 7.4 }, // 0 — cells, vault, guard post
-  { id: 'ground',  y: 8.6,  clear: 8.0 }, // 1 — entrance, kitchen, dining, servants
-  { id: 'f2',      y: 17.2, clear: 6.8 }, // 2 — ballroom (double height), guests, baths
-  { id: 'f3',      y: 24.6, clear: 6.8 }, // 3 — master suites, library, gallery
-  { id: 'f4',      y: 32.0, clear: 6.8 }, // 4 — royal suite, treasury, tower rooms
+  { id: 'dungeon', y: 0.6,  clear: 9.8 },  // 0 — cells, vault, guard post
+  { id: 'ground',  y: 11.0, clear: 10.4 }, // 1 — entrance, kitchen, dining, servants
+  { id: 'f2',      y: 22.0, clear: 9.0 },  // 2 — ballroom (double height), guests, baths
+  { id: 'f3',      y: 31.6, clear: 9.0 },  // 3 — master suites, library, gallery
+  { id: 'f4',      y: 41.2, clear: 9.0 },  // 4 — royal suite, treasury, tower rooms
 ]);
 
 // ── Rooms ────────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ const RAW_DOORS = [
   { id: 'g_serv',    a: 'corridor1',   b: 'servantHall', edge: 'z', at: -4,  lo: 12,  hi: 15 },
   { id: 'g_vest',    a: 'corridor1',   b: 'gVestibule',  edge: 'x', at: 24,  lo: -2,  hi: 2, arch: true },
   { id: 'g_store',   a: 'gVestibule',  b: 'storeRoom',   edge: 'z', at: -6,  lo: 26,  hi: 29 },
-  { id: 'g_kstair',  a: 'kitchen',     b: 'stairHall1',  edge: 'x', at: 8,   lo: 8,   hi: 11 },
+  { id: 'g_kstair',  a: 'kitchen',     b: 'stairHall1',  edge: 'x', at: 8,   lo: 4.6, hi: 7.4 }, // opens onto the south walkway
   { id: 'g_dserv',   a: 'diningHall',  b: 'servantHall', edge: 'x', at: 8,   lo: -14, hi: -11 },
   // floor 2
   { id: 'f2_ballW',  a: 'ballroom',   b: 'corridor2',  edge: 'z', at: 4,   lo: -20, hi: -16, double: true, arch: true },
@@ -139,7 +139,7 @@ const RAW_DOORS = [
   { id: 'f2_guestW', a: 'corridor2',  b: 'guestWest',  edge: 'z', at: 12,  lo: -27, hi: -24 },
   { id: 'f2_guestE', a: 'corridor2',  b: 'guestEast',  edge: 'z', at: 12,  lo: -14, hi: -11 },
   { id: 'f2_bath',   a: 'corridor2',  b: 'bathroom2',  edge: 'z', at: 12,  lo: -1,  hi: 2 },
-  { id: 'f2_stair',  a: 'corridor2',  b: 'stairHall2', edge: 'x', at: 8,   lo: 6,   hi: 10, double: true, arch: true },
+  { id: 'f2_stair',  a: 'corridor2',  b: 'stairHall2', edge: 'x', at: 8,   lo: 4.6, hi: 7.4, double: true, arch: true }, // south walkway
   { id: 'f2_sit',    a: 'stairHall2', b: 'sittingRoom', edge: 'z', at: 4,  lo: 12,  hi: 15 },
   { id: 'f2_guestS', a: 'sittingRoom', b: 'guestSouth', edge: 'z', at: -10, lo: 12, hi: 15 },
   { id: 'f2_linen',  a: 'sittingRoom', b: 'linenRoom',  edge: 'x', at: 24,  lo: -2, hi: 2 },
@@ -174,14 +174,17 @@ export const DOORS = Object.freeze(RAW_DOORS.map((d) => ({
 const RAW_STAIRS = [
   // dungeon <-> ground, in d/gVestibule; runs along x, arrival faces the door
   { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.6, runLen: 4.2, landingD: 2.2,
-    laneW: 2.4, gap: 0.5, v0: -4.0 },
-  // the monumental grand stairwell — one U per floor pair, alternating west/east
-  { id: 'grand1', lo: 1, hi: 2, axis: 'z', u0: 6, runLen: 8, landingD: 3.6,
-    laneW: 2.8, gap: 0.8, v0: 10 },
-  { id: 'grand2', lo: 2, hi: 3, axis: 'z', u0: 6, runLen: 8, landingD: 3.6,
-    laneW: 2.8, gap: 0.8, v0: 17 },
-  { id: 'grand3', lo: 3, hi: 4, axis: 'z', u0: 6, runLen: 8, landingD: 3.6,
-    laneW: 2.8, gap: 0.8, v0: 10 },
+    laneW: 2.6, gap: 0.5, v0: -4.0 },
+  // the monumental grand stairwell (reference: cathedral-wide marble flights).
+  // Consecutive stairs alternate v0 so footprints stay disjoint per grid.
+  // u0 8 leaves a wide south walkway (z 4..8) inside every stair hall —
+  // all doors into the halls open onto FLOOR, never onto ramps or shafts.
+  { id: 'grand1', lo: 1, hi: 2, axis: 'z', u0: 8, runLen: 9, landingD: 4.2,
+    laneW: 3.4, gap: 0.8, v0: 8.3 },
+  { id: 'grand2', lo: 2, hi: 3, axis: 'z', u0: 8, runLen: 9, landingD: 4.2,
+    laneW: 3.4, gap: 0.8, v0: 16.1 },
+  { id: 'grand3', lo: 3, hi: 4, axis: 'z', u0: 8, runLen: 9, landingD: 4.2,
+    laneW: 3.4, gap: 0.8, v0: 8.3 },
 ];
 export const STAIRS = Object.freeze(RAW_STAIRS.map((st) => ({
   ...st,
@@ -358,7 +361,7 @@ export function buildLightAnchors() {
       case 'ballroom': {
         // three great chandeliers down the long axis + wall sconces
         for (const t of [0.22, 0.5, 0.78]) {
-          add('chandelier', room.level, x0 + t * w, cz, L.y + 10.5, 4);
+          add('chandelier', room.level, x0 + t * w, cz, L.y + 13.5, 4);
         }
         for (const t of [0.2, 0.5, 0.8]) {
           add('torch', room.level, x0 + t * w, z0 + 0.4, torchY);

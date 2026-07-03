@@ -1892,42 +1892,30 @@ export class BabylonWorldScene {
         this._savedUpperRadius = cam.upperRadiusLimit;
         this._savedLowerRadius = cam.lowerRadiusLimit;
       }
-      cam.upperRadiusLimit = 15; // the big halls deserve a real zoom range
-      cam.lowerRadiusLimit = 0.9; // collision can push to a near close-up
-      cam.checkCollisions = true;
-      cam.collisionRadius = new BABYLON.Vector3(0.55, 0.55, 0.55);
-      // static generous tilt window — the old per-frame floor/ceiling caps
-      // could go degenerate on stairs and lock rotation entirely
-      cam.lowerBetaLimit = 0.2;
+      cam.upperRadiusLimit = 18; // the big halls deserve a real zoom range
+      cam.lowerRadiusLimit = 0.9; // LOS clamp can pull to a near close-up
+      // static generous tilt window — per-frame floor/ceiling caps could go
+      // degenerate on stairs and lock rotation entirely
+      cam.lowerBetaLimit = 0.35;
       cam.upperBetaLimit = 1.54;
-      if (cam.radius > 5.5) cam.radius = 5; // start close; player zooms freely after
+      if (cam.radius > 6.5) cam.radius = 6; // start close; player zooms freely after
+      this._camUserRadius = cam.radius;
+      this._lastCamWritten = cam.radius;
     } else if (this._savedUpperRadius != null) {
-      cam.checkCollisions = false;
       cam.upperRadiusLimit = this._savedUpperRadius;
       cam.lowerRadiusLimit = this._savedLowerRadius ?? 2.5;
       cam.lowerBetaLimit = 0.25;
       this._savedUpperRadius = null;
       this._savedLowerRadius = null;
+      this._camUserRadius = null;
+      this._lastCamWritten = null;
+      cam.radius = Math.min(9, cam.upperRadiusLimit);
     }
     if (target) {
       this._camTarget.set(target.x, target.y, target.z);
       cam.target.copyFrom(this._camTarget);
       cam.alpha = -Math.PI / 2 - yaw; // orbit behind the avatar's new facing
       cam.beta = Math.PI / 3.5;
-      // collision mode GLIDES the camera from its previous position (it
-      // would sweep across the world on a door teleport and recompute the
-      // radius from wherever it got stopped) — suspend it for two frames so
-      // the pose snap lands, then hand control back to the engine
-      if (cam.checkCollisions) {
-        cam.checkCollisions = false;
-        let n = 0;
-        const obs = this.scene.onAfterRenderObservable.add(() => {
-          if (++n >= 2) {
-            this.scene.onAfterRenderObservable.remove(obs);
-            if (this._castle?.isInside()) cam.checkCollisions = true;
-          }
-        });
-      }
     }
   }
 
@@ -1949,10 +1937,44 @@ export class BabylonWorldScene {
     // never clips under the ground. One surfaceY sample + acos per frame.
     const cam = this._camera;
     const camPos = cam.globalPosition;
-    // Indoors the engine's camera collision (proxy boxes under the castle's
-    // interior root) owns wall handling — nothing to do per frame. Outdoors
-    // keep the terrain-aware upward tilt cap.
-    if (!this._castle?.isInside()) {
+    if (this._castle?.isInside()) {
+      // ── Memoryless third-person camera (the WoW model) ──────────────────
+      // The rendered orbit distance is min(userRadius, lineOfSight) computed
+      // fresh every frame. userRadius belongs to the PLAYER: it only ever
+      // changes by the zoom delta the engine applied since our last write,
+      // so no wall interaction can steal the zoom, and the camera can never
+      // sit beyond (or inside) a wall — there is no state to get stuck.
+      const nav = this._castle.nav;
+      if (this._camUserRadius == null) {
+        this._camUserRadius = cam.radius;
+        this._lastCamWritten = cam.radius;
+      } else {
+        const delta = cam.radius - this._lastCamWritten; // user zoom since last frame
+        if (delta !== 0) {
+          this._camUserRadius = Math.min(cam.upperRadiusLimit,
+            Math.max(cam.lowerRadiusLimit, this._camUserRadius + delta));
+        }
+      }
+      const tx = cam.target.x, ty = cam.target.y, tz = cam.target.z;
+      const dirX = Math.cos(cam.alpha) * Math.sin(cam.beta);
+      const dirY = Math.cos(cam.beta);
+      const dirZ = Math.sin(cam.alpha) * Math.sin(cam.beta);
+      let open = this._camUserRadius;
+      const steps = Math.max(2, Math.ceil(this._camUserRadius / 0.35));
+      for (let k = 1; k <= steps; k++) {
+        const d = (k / steps) * this._camUserRadius;
+        const sx = tx + dirX * d, sy = ty + dirY * d, sz = tz + dirZ * d;
+        if (!nav.isOpenBelow(sx, sz, sy) ||
+            sy > this._castle.ceilingYAt(sx, sz, ty)) {
+          open = Math.max(cam.lowerRadiusLimit, d - 0.4);
+          break;
+        }
+      }
+      const write = Math.min(this._camUserRadius, open);
+      cam.radius = write;
+      this._lastCamWritten = write;
+    } else {
+      // outdoors: terrain-aware upward tilt cap (pre-castle behavior)
       const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
       const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
       cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));

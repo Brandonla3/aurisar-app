@@ -27,7 +27,7 @@ const KIND_STYLE = {
 
 const RETHINK_MS = 250;   // anchor re-ranking cadence
 const FADE_MS    = 320;   // cross-fade on reassignment
-const Y_WINDOW   = 12;    // vertical sanity cap (ballroom chandeliers hang ~8 m up)
+const Y_WINDOW   = 16;    // vertical sanity cap (ballroom chandeliers hang ~13 m up)
 
 export class CastleLightPool {
   /**
