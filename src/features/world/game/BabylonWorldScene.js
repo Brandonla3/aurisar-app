@@ -284,10 +284,14 @@ class LightingManager {
           }
         }
       });
-    this._loadEnvSafe(this.options.env.overworldNight).then(t => {
+    // Night/dungeon get the same .env → .hdr fallback as day (the authored
+    // Phase 0 assets ship as .hdr; HDRCubeTexture prefilters them on load).
+    const envOrHdr = (url) => this._loadEnvSafe(url)
+      .then(t => t ?? this._loadEnvSafe(url.replace(/\.env(\?|$)/i, '.hdr')));
+    envOrHdr(this.options.env.overworldNight).then(t => {
       if (t && !this._disposed) this.envNight = t;
     });
-    this._loadEnvSafe(this.options.env.dungeon).then(t => {
+    envOrHdr(this.options.env.dungeon).then(t => {
       if (t && !this._disposed) this.envDungeon = t;
     });
 
