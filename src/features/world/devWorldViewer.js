@@ -25,6 +25,7 @@ const hud = document.getElementById('hud');
 
 // ?tod=17.5 — start time of day (default mid-morning for pleasant light)
 // ?daylen=1200 — seconds per full day (default the prototype's 20-min cycle)
+// ?pos=140,20 — spawn position override (e.g. the Castle Ashwood approach)
 const params = new URLSearchParams(location.search);
 const scene = new BabylonWorldScene(
   canvas,
@@ -36,16 +37,34 @@ const scene = new BabylonWorldScene(
   },
 );
 
+// Spawn override once the avatar exists (castle testing: ?pos=140,20).
+const posParam = params.get('pos');
+if (posParam) {
+  const [px, pz] = posParam.split(',').map(Number);
+  if (Number.isFinite(px) && Number.isFinite(pz)) {
+    const t = setInterval(() => {
+      const root = scene._local?.root;
+      if (!root) return;
+      clearInterval(t);
+      root.position.set(px, scene._worldgen.surfaceY(px, pz), pz);
+      scene._camera.target.copyFrom(root.position);
+    }, 100);
+  }
+}
+
 // Tiny telemetry loop: position, terrain height, biome, fps, draw calls.
 setInterval(() => {
   const p = scene._local?.root?.position;
   if (!p) return;
   const wg = scene._worldgen;
   const fps = scene.engine.getFps().toFixed(0);
+  const inside = scene._castle?.isInside?.() ?? false;
   hud.textContent =
     `pos   ${p.x.toFixed(1)}, ${p.y.toFixed(2)}, ${p.z.toFixed(1)}\n` +
-    `biome ${wg.biomeAt(p.x, p.z).name}\n` +
-    `fps   ${fps}`;
+    `biome ${inside ? 'Castle Ashwood' : wg.biomeAt(p.x, p.z).name}\n` +
+    `fps   ${fps}\n` +
+    `mesh  ${scene.scene.getActiveMeshes().length} active / ${scene.scene.meshes.length}\n` +
+    `light ${scene.scene.lights.length}`;
 }, 250);
 
 window.__worldScene = scene; // console access for debugging

@@ -185,6 +185,26 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
     return surfaceAt(wx, wz, refY + STEP_UP) != null;
   }
 
+  /**
+   * Camera-permissive openness: true when ANY surface exists at (x, z) from
+   * refY+1 down to refY-depth. Unlike surfaceAt, this sees across
+   * double-height voids and stair shafts (the ballroom floor far below the
+   * gallery railing still counts as open), so the third-person camera only
+   * clamps against true wall mass.
+   */
+  function isOpenBelow(wx, wz, refY, depth = 12) {
+    const x = wx - anchor.x, z = wz - anchor.z;
+    if (x < b.x0 || x >= b.x1 || z < b.z0 || z >= b.z1) return false;
+    const idx = rowOf(z) * cols + colOf(x);
+    for (let li = 0; li < grids.length; li++) {
+      const v = grids[li][idx];
+      if (v === 0) continue;
+      const y = v === 1 ? LEVELS[li].y : stairYCache[v - 2](x, z);
+      if (y != null && y <= refY + 1 && y >= refY - depth) return true;
+    }
+    return false;
+  }
+
   /** Level index the player is on given their current Y (nearest floor below). */
   function levelAtY(y) {
     let best = 0;
@@ -215,7 +235,7 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
 
   return {
     anchor, cols, rows, grids,
-    surfaceAt, resolveMove, isOpen, levelAtY, nearestWalkable,
+    surfaceAt, resolveMove, isOpen, isOpenBelow, levelAtY, nearestWalkable,
     // exposed for tests
     _local: { colOf, rowOf, cellX, cellZ },
   };

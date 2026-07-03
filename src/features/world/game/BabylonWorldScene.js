@@ -41,6 +41,7 @@ import worldBuildConfig from '../config/world_build_config.json' with { type: 'j
 import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
 import { PropsSystem } from '../systems/PropsSystem.js';
+import { CastleSystem } from '../castle/CastleSystem.js';
 import { MOBS as MOB_DEFS } from '../content/index';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -176,6 +177,14 @@ class LightingManager {
   }
 
   setCombatMode(enabled) { this.combatMode = !!enabled; }
+
+  /**
+   * Interior mood override for the dungeon profile — lets an interior
+   * (Castle Ashwood) warm or darken the rig without touching scene-global
+   * state itself. { fogColor: [r,g,b], fogDensity, exposure } | null.
+   * The LM stays the sole writer of scene fog/exposure.
+   */
+  setDungeonMood(mood) { this._dungeonMood = mood ?? null; }
 
   setTimeOfDay(hours24) { this.timeOfDay = ((hours24 % 24) + 24) % 24; }
   // Testing aid: when frozen, _updateOverworld stops advancing the clock so a
@@ -590,11 +599,16 @@ class LightingManager {
     // key stays *enabled* so ShadowGenerator keeps casting shadows.
     this.key.intensity = 0;
 
-    this.scene.imageProcessingConfiguration.exposure = 0.98;
+    const mood = this._dungeonMood;
+    this.scene.imageProcessingConfiguration.exposure = mood?.exposure ?? 0.98;
     this.scene.imageProcessingConfiguration.contrast = 1.12;
 
-    this.scene.fogDensity = 0.018;
-    this.scene.fogColor.copyFrom(this._dungeonFog);
+    this.scene.fogDensity = mood?.fogDensity ?? 0.018;
+    if (mood?.fogColor) {
+      this.scene.fogColor.copyFromFloats(mood.fogColor[0], mood.fogColor[1], mood.fogColor[2]);
+    } else {
+      this.scene.fogColor.copyFrom(this._dungeonFog);
+    }
 
     this._setEnvironment(this.envDungeon, 0.35);
   }
@@ -1001,6 +1015,22 @@ export class BabylonWorldScene {
     // loading; missing files skip silently.
     this._props = new PropsSystem(this.scene, this._worldgen);
     this._props.init().catch((err) => console.warn('[PropsSystem] init failed:', err));
+
+    // Castle Ashwood: exterior shell on the terrain + enterable interior
+    // "instance" in the flat far-east interiors region. Built async,
+    // chunked per level, so first render never blocks. While the player is
+    // inside, castle nav replaces the terrain snap in _moveLocal.
+    this._castle = new CastleSystem(this.scene, this._worldgen, this._lm, {
+      isMobile: this._isMobile,
+      castShadow: (m) => this._castShadow(m),
+      getPlayerPos: () => this._local?.root?.position ?? null,
+      teleportPlayer: (x, y, z, yaw) => this._teleportLocal(x, y, z, yaw),
+      cameraEnter: (t, yaw) => this._castleCameraSet(t, yaw, true),
+      cameraExit: (t = null, yaw = 0) => this._castleCameraSet(t, yaw, false),
+      onZoneChange: (zone) => this.callbacks.onZoneChange?.(zone),
+      onNearbyDoor: (info) => this.callbacks.onNearbyDoor?.(info),
+    });
+    this._castle.init().catch((err) => console.warn('[CastleSystem] init failed:', err));
   }
 
   /** React → scene: per-NPC quest markers ('!' / '?' / null). */
@@ -1252,6 +1282,7 @@ export class BabylonWorldScene {
 
   _checkDungeonProximity() {
     if (!this._local) return;
+    if (this._castle?.isInside()) return; // castle owns the lighting profile
     const { x, z } = this._local.root.position;
     const dx = x - DUNGEON_ENTRANCE.x;
     const dz = z - DUNGEON_ENTRANCE.z;
@@ -1404,6 +1435,7 @@ export class BabylonWorldScene {
     this._local.update(dt);
     this._checkDungeonProximity();
     this._checkChestProximity();
+    this._castle?.checkProximity();
     this._streamTiles();
     this._handleAttackInput();
     this._handleCampfireInput();
@@ -1787,22 +1819,75 @@ export class BabylonWorldScene {
 
     const speedScale = (joyActive && !w && !s && !a && !d) ? joyScale : 1;
     const pos = this._local.root.position;
+    const prevX = pos.x, prevZ = pos.z;
     pos.addInPlace(this._moveDir.scale(speed * dt * speedScale));
-    // Keep inside the Ashwood world disc (the prototype's keepInWorld) and
-    // stand on the terrain — height is a pure client-side function of (x,z).
-    const maxR = this._worldgen.config.radius - 2;
-    const rr = Math.hypot(pos.x, pos.z);
-    if (rr > maxR) {
-      pos.x *= maxR / rr;
-      pos.z *= maxR / rr;
+    if (this._castle?.isInside()) {
+      // Castle interior: the nav grid owns walls, floors and stairs. The
+      // radial world clamp is intentionally bypassed — the interior sits at
+      // x≈840, far outside the overworld disc; its walls are the containment.
+      this._castle.nav.resolveMove(prevX, prevZ, pos);
+    } else {
+      // Keep inside the Ashwood world disc (the prototype's keepInWorld) and
+      // stand on the terrain — height is a pure client-side function of (x,z).
+      const maxR = this._worldgen.config.radius - 2;
+      const rr = Math.hypot(pos.x, pos.z);
+      if (rr > maxR) {
+        pos.x *= maxR / rr;
+        pos.z *= maxR / rr;
+      }
+      pos.y = this._worldgen.surfaceY(pos.x, pos.z);
     }
-    pos.y = this._worldgen.surfaceY(pos.x, pos.z);
 
     const target = Math.atan2(this._moveDir.x, this._moveDir.z);
     this._local.root.rotation.y = this._lerpAngle(
       this._local.root.rotation.y, target, 0.18
     );
   }
+
+  // ── Castle bridge ───────────────────────────────────────────────────────────
+
+  /** Ground height for entity pinning: castle nav while inside, else terrain. */
+  _groundYFor(x, z, currentY) {
+    if (this._castle?.isInside()) {
+      const s = this._castle.nav.surfaceAt(x, z, currentY + 0.5);
+      if (s) return s.y;
+    }
+    return this._worldgen.surfaceY(x, z);
+  }
+
+  /** Instant client-side teleport (castle door). _lastPos is left at the old
+   *  position so _syncStdb's moved-enough check fires immediately and the
+   *  server learns the new position on the next tick. */
+  _teleportLocal(x, y, z, yaw) {
+    if (!this._local) return;
+    this._local.root.position.set(x, y, z);
+    this._local.root.rotation.y = yaw;
+    this._local.isMoving = false;
+    this._streamTiles();
+  }
+
+  /** Snap the camera across a castle enter/exit (never lerp 700 m) and
+   *  clamp/restore the orbit radius for indoor framing. */
+  _castleCameraSet(target, yaw, interior) {
+    const cam = this._camera;
+    if (interior) {
+      if (this._savedUpperRadius == null) this._savedUpperRadius = cam.upperRadiusLimit;
+      cam.upperRadiusLimit = 8;
+      if (cam.radius > 7) cam.radius = 6;
+    } else if (this._savedUpperRadius != null) {
+      cam.upperRadiusLimit = this._savedUpperRadius;
+      this._savedUpperRadius = null;
+    }
+    if (target) {
+      this._camTarget.set(target.x, target.y, target.z);
+      cam.target.copyFrom(this._camTarget);
+      cam.alpha = -Math.PI / 2 - yaw; // orbit behind the avatar's new facing
+      cam.beta = Math.PI / 3.5;
+    }
+  }
+
+  /** React → scene: press-E on a castle door prompt. */
+  useDoor(id) { this._castle?.useDoor(id); }
 
   _trackCamera() {
     const p = this._local.root.position;
@@ -1819,9 +1904,37 @@ export class BabylonWorldScene {
     // never clips under the ground. One surfaceY sample + acos per frame.
     const cam = this._camera;
     const camPos = cam.globalPosition;
-    const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
-    const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
-    cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
+    if (this._castle?.isInside()) {
+      const nav = this._castle.nav;
+      // floor-aware upward tilt cap (same formula, nav floor instead of terrain)
+      const s = nav.surfaceAt(camPos.x, camPos.z, cam.target.y + 0.5);
+      const groundY = (s ? s.y : p.y) + 0.4;
+      const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
+      cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
+      // ceiling-aware downward tilt cap: camY = targetY + r·cos(beta) must
+      // stay below the current room's ceiling
+      const ceilY = this._castle.ceilingYAt(p.x, p.z, p.y);
+      const cosCeil = Math.max(-1, Math.min(1, (ceilY - cam.target.y) / cam.radius));
+      cam.lowerBetaLimit = Math.max(0.25, Math.acos(cosCeil));
+      // wall-occlusion: march target→camera through the nav grid; pull the
+      // camera in front of the first blocked cell (cheap — 4 grid reads)
+      const dx = camPos.x - cam.target.x, dz = camPos.z - cam.target.z;
+      const horiz = Math.hypot(dx, dz);
+      if (horiz > 0.8) {
+        for (let k = 1; k <= 4; k++) {
+          const t = k / 4;
+          if (!nav.isOpenBelow(cam.target.x + dx * t, cam.target.z + dz * t, cam.target.y)) {
+            cam.radius = Math.min(cam.radius, Math.max(cam.lowerRadiusLimit, cam.radius * t - 0.25));
+            break;
+          }
+        }
+      }
+    } else {
+      if (cam.lowerBetaLimit !== 0.25) cam.lowerBetaLimit = 0.25;
+      const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
+      const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
+      cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
+    }
   }
 
   _syncStdb() {
@@ -1893,13 +2006,19 @@ export class BabylonWorldScene {
       if (this._local) {
         this._local.root.position.x = toWorld(row.x);
         this._local.root.position.z = toWorld(row.y);
-        this._local.root.position.y = this._worldgen.surfaceY(
-          this._local.root.position.x, this._local.root.position.z);
+        // castle-aware: dying on an upper floor pins the corpse to that
+        // floor, not to the flat terrain under the interior region
+        this._local.root.position.y = this._groundYFor(
+          this._local.root.position.x, this._local.root.position.z,
+          this._local.root.position.y);
         this._local.isMoving = false;
       }
     } else if (!isDead && this._localWasDead) {
       // Just respawned — server moved us to origin, snap the local avatar
       // there too so movement input picks up from the new position.
+      // Leaving the castle interior first resets lighting, camera limits
+      // and the light pool so the player is never stranded in interior mode.
+      this._castle?.forceExit();
       if (this._local) {
         this._local.root.position.x = toWorld(row.x);
         this._local.root.position.z = toWorld(row.y);
@@ -1911,6 +2030,13 @@ export class BabylonWorldScene {
       // get suppressed by the "barely moved" diff check.
       this._lastPos = { x: this._local?.root?.position?.x ?? 0,
                         z: this._local?.root?.position?.z ?? 0 };
+      // Snap the camera to the respawn point — the 0.12 target lerp would
+      // otherwise sweep it across the world from wherever we died.
+      if (this._local) {
+        const rp = this._local.root.position;
+        this._camTarget.set(rp.x, rp.y + 1.2, rp.z);
+        this._camera.target.copyFrom(this._camTarget);
+      }
     }
     this._localDead    = isDead;
     this._localWasDead = isDead;
@@ -2102,6 +2228,9 @@ export class BabylonWorldScene {
   getLocation() {
     const p = this._local?.root?.position;
     if (!p) return '';
+    if (this._castle?.isInside()) {
+      return this._worldgen.config?.interiors?.ashwoodCastle?.name ?? 'Castle Ashwood';
+    }
     return locationLabelAt(this._worldgen, p.x, p.z, { inDungeon: this._inDungeon });
   }
 
@@ -2323,6 +2452,8 @@ export class BabylonWorldScene {
     this._npcs = null;
     this._props?.dispose();
     this._props = null;
+    this._castle?.dispose();
+    this._castle = null;
     this._local?.dispose();
     AssetLibrary.dispose();
     MobAssetLibrary.dispose();

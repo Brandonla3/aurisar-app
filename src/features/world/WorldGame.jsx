@@ -212,6 +212,7 @@ export default function WorldGame({ playerInfo, onExit }) {
 
   // P1 quests/NPCs: which NPC is in talk range, and who we're talking to.
   const [nearbyNpcId,   setNearbyNpcId]   = useState(null);
+  const [nearbyDoor,    setNearbyDoor]    = useState(null); // castle door prompt
   const [dialogueNpcId, setDialogueNpcId] = useState(null);
   // Flips when the Babylon scene exists so effects that push state INTO the
   // scene (NPC markers) re-run — the quest-marker effect otherwise fires
@@ -281,6 +282,9 @@ export default function WorldGame({ playerInfo, onExit }) {
   const onCampfireDelete = useCallback((row) => {
     sceneRef.current?._removeCampfire(row.campfireId);
   }, []);
+
+  // Castle door prompt (fired by CastleSystem's proximity scan).
+  const onNearbyDoor = useCallback((info) => setNearbyDoor(info), []);
 
   const onNearbyNpc = useCallback((npcId) => {
     setNearbyNpcId(npcId);
@@ -359,7 +363,7 @@ export default function WorldGame({ playerInfo, onExit }) {
       canvasRef.current,
       playerInfo,
       { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
-        onLocalPlayerUpdate, onChestOpen, onNearbyNpc }
+        onLocalPlayerUpdate, onChestOpen, onNearbyNpc, onNearbyDoor }
     );
     sceneRef.current = scene;
     setMapData(scene.getMapData());
@@ -505,7 +509,8 @@ export default function WorldGame({ playerInfo, onExit }) {
         case 'KeyL': togglePanel('quests');    break;
         case 'KeyN': toggleMinimap();          break;
         case 'KeyE':
-          if (nearbyNpcId && !dialogueNpcId) setDialogueNpcId(nearbyNpcId);
+          if (nearbyDoor && !dialogueNpcId) sceneRef.current?.useDoor(nearbyDoor.id);
+          else if (nearbyNpcId && !dialogueNpcId) setDialogueNpcId(nearbyNpcId);
           else if (dialogueNpcId) setDialogueNpcId(null);
           else handled = false;
           break;
@@ -515,7 +520,7 @@ export default function WorldGame({ playerInfo, onExit }) {
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [chatOpen, activePanel, togglePanel, toggleMinimap, closePanel, nearbyNpcId, dialogueNpcId]);
+  }, [chatOpen, activePanel, togglePanel, toggleMinimap, closePanel, nearbyNpcId, dialogueNpcId, nearbyDoor]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -562,8 +567,28 @@ export default function WorldGame({ playerInfo, onExit }) {
         />
       )}
 
+      {/* Castle door prompt (tap-friendly; E on desktop) */}
+      {nearbyDoor && !dialogueNpcId && !activePanel && (
+        <button
+          onClick={() => sceneRef.current?.useDoor(nearbyDoor.id)}
+          aria-label={nearbyDoor.label}
+          style={{
+            position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20, display: 'flex', alignItems: 'center', gap: 8,
+            background: 'rgba(15,23,42,0.88)', border: '1px solid rgba(240,208,96,0.5)',
+            borderRadius: 22, padding: '9px 18px', color: '#f0d060',
+            fontSize: 13.5, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
+            cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span>🏰</span>
+          <span>{nearbyDoor.label}{!IS_TOUCH && ' (E)'}</span>
+        </button>
+      )}
+
       {/* P1: talk prompt when an NPC is in range (tap-friendly) */}
-      {nearbyNpcId && !dialogueNpcId && !activePanel && (
+      {!nearbyDoor && nearbyNpcId && !dialogueNpcId && !activePanel && (
         <button
           onClick={() => setDialogueNpcId(nearbyNpcId)}
           aria-label={`Talk to ${NPCS[nearbyNpcId]?.name ?? 'NPC'}`}

@@ -90,6 +90,14 @@ export class CastleSystem {
 
   isInside() { return this._inside; }
 
+  /** Ceiling height over (x, z) for the camera clamp while inside. */
+  ceilingYAt(x, z, refY) {
+    const s = this.nav.surfaceAt(x, z, refY + 0.5);
+    const level = s ? s.level : this.nav.levelAtY(refY);
+    const L = LEVELS[level];
+    return L.y + L.clear - 0.3;
+  }
+
   async init() {
     if (this._disposed) return;
     this._mats = createCastleMaterials(this.scene);
@@ -253,7 +261,7 @@ export class CastleSystem {
     const g = ENTRY.gateWorld;
     const gy = this._worldgen.surfaceY(g.x, g.z);
     this._host.teleportPlayer(g.x, gy, g.z, -Math.PI / 2); // face away from the gate
-    this._host.cameraEnter({ x: g.x, y: gy + 1.2, z: g.z }, -Math.PI / 2);
+    this._host.cameraExit({ x: g.x, y: gy + 1.2, z: g.z }, -Math.PI / 2);
     this._settleOutside();
     this._host.onZoneChange?.('overworld');
   }
