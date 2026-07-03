@@ -21,6 +21,7 @@ import { AshwoodSky }        from './AshwoodSky.js';
 import { AshwoodGrass }      from './AshwoodGrass.js';
 import { AshwoodWildlife }   from './AshwoodWildlife.js';
 import { AshwoodWeather }    from './AshwoodWeather.js';
+import { AshwoodVolumetricClouds } from './AshwoodVolumetricClouds.js';
 import {
   TileLoader,
   GlbTileProvider,
@@ -284,10 +285,14 @@ class LightingManager {
           }
         }
       });
-    this._loadEnvSafe(this.options.env.overworldNight).then(t => {
+    // Night/dungeon get the same .env → .hdr fallback as day (the authored
+    // Phase 0 assets ship as .hdr; HDRCubeTexture prefilters them on load).
+    const envOrHdr = (url) => this._loadEnvSafe(url)
+      .then(t => t ?? this._loadEnvSafe(url.replace(/\.env(\?|$)/i, '.hdr')));
+    envOrHdr(this.options.env.overworldNight).then(t => {
       if (t && !this._disposed) this.envNight = t;
     });
-    this._loadEnvSafe(this.options.env.dungeon).then(t => {
+    envOrHdr(this.options.env.dungeon).then(t => {
       if (t && !this._disposed) this.envDungeon = t;
     });
 
@@ -766,6 +771,19 @@ class LightingManager {
   _disposePipeline(pipe) { if (pipe) pipe.dispose(); }
 }
 
+// Persisted graphics prefs (currently just the Phase 6 volumetric-clouds
+// opt-in). Read at scene init and written by setVolumetricClouds, so the
+// choice sticks across sessions and the dev viewer alike.
+const GFX_PREFS_KEY = 'aurisar.world.gfx.v1';
+function loadGfxPrefs() {
+  try { return JSON.parse(localStorage.getItem(GFX_PREFS_KEY)) ?? {}; }
+  catch { return {}; }
+}
+function saveGfxPrefs(prefs) {
+  try { localStorage.setItem(GFX_PREFS_KEY, JSON.stringify(prefs)); }
+  catch { /* quota / private mode */ }
+}
+
 // ── Dungeon entrance constants ───────────────────────────────────────────────
 const DUNGEON_ENTRANCE      = Object.freeze({ x: 0, z: -37 });
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
@@ -909,6 +927,15 @@ export class BabylonWorldScene {
 
     this._setupShadows();
     this._setupSSAO();
+
+    // Phase 6 (opt-in): raymarched volumetric clouds. High tier only, off by
+    // default, persisted via the graphics prefs — the game-menu toggle calls
+    // setVolumetricClouds(). Created after the metadata seam exists (its
+    // observer reads lm/weather from there).
+    this._volClouds = null;
+    if (this._qualityTier === 'high' && loadGfxPrefs().volumetricClouds) {
+      this.setVolumetricClouds(true);
+    }
 
     this._setupTileStreaming();
     this._buildDungeonEntrance();
@@ -2119,6 +2146,28 @@ export class BabylonWorldScene {
   setDayNightFrozen(frozen) { this._lm?.setTimeFrozen(frozen); }
   getTimeOfDay() { return this._lm?.timeOfDay ?? 12; }
 
+  // ── Graphics settings (game menu) ──────────────────────────────────────────
+
+  // Raymarched clouds cost real GPU time — only offered where the rest of the
+  // high-tier stack (SSAO2, CSM) already runs.
+  supportsVolumetricClouds() { return this._qualityTier === 'high'; }
+  getVolumetricClouds() { return !!this._volClouds; }
+
+  setVolumetricClouds(on) {
+    saveGfxPrefs({ ...loadGfxPrefs(), volumetricClouds: !!on });
+    if (on && !this._volClouds && this._qualityTier === 'high') {
+      this._volClouds = new AshwoodVolumetricClouds(this.scene);
+    } else if (!on && this._volClouds) {
+      this._volClouds.dispose();
+      this._volClouds = null;
+    }
+    // AshwoodSky reads this each frame and fades its 2D deck to a thin haze
+    // while the volumetric layer is active, so clouds never double up.
+    if (this.scene.metadata?.ashwood) {
+      this.scene.metadata.ashwood.volumetricClouds = !!this._volClouds;
+    }
+  }
+
   // Snapshot of burning campfires in world units. A campfire only exists in
   // this map while it is lit — the server deletes the row when its burn timer
   // ends — so "near a campfire" is equivalent to "near a lit campfire".
@@ -2281,6 +2330,7 @@ export class BabylonWorldScene {
     this._grass?.dispose();
     this._wildlife?.dispose();
     this._weather?.dispose();
+    this._volClouds?.dispose();
     this._sky?.dispose();
     this._ssao?.dispose();
     this._shadowGen?.dispose();

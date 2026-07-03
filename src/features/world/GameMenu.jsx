@@ -96,6 +96,34 @@ function TimeOfDayControl({ sceneRef }) {
   );
 }
 
+// Volumetric clouds (Phase 6) — high graphics tier only; the scene hides the
+// toggle entirely on devices that don't run the high-tier stack. State lives
+// in BabylonWorldScene (persisted to localStorage), the menu just mirrors it.
+function VolumetricCloudsToggle({ sceneRef }) {
+  // Ref reads happen in the effect (not during render) — mirrors the live
+  // scene state when the menu opens.
+  const [state, setState] = useState({ supported: false, on: false });
+  useEffect(() => {
+    const s = sceneRef?.current;
+    setState({
+      supported: s?.supportsVolumetricClouds?.() ?? false,
+      on: s?.getVolumetricClouds?.() ?? false,
+    });
+  }, [sceneRef]);
+  if (!state.supported) return null;
+  return (
+    <Toggle
+      label="Volumetric clouds"
+      on={state.on}
+      onClick={() => {
+        const next = !state.on;
+        setState((p) => ({ ...p, on: next }));
+        sceneRef?.current?.setVolumetricClouds?.(next);
+      }}
+    />
+  );
+}
+
 export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCooking,
   showActionButtons, onToggleActionButtons, minimapVisible, onToggleMinimap, sceneRef, onExit }) {
   return (
@@ -112,6 +140,7 @@ export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCo
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
         <Toggle label="Show action buttons" on={showActionButtons} onClick={onToggleActionButtons} />
         <Toggle label="Show minimap" on={minimapVisible} onClick={onToggleMinimap} />
+        <VolumetricCloudsToggle sceneRef={sceneRef} />
         <button
           onClick={onExit}
           style={{
