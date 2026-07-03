@@ -97,7 +97,7 @@ function TimeOfDayControl({ sceneRef }) {
 }
 
 export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCooking,
-  showActionButtons, onToggleActionButtons, minimapVisible, onToggleMinimap, sceneRef }) {
+  showActionButtons, onToggleActionButtons, minimapVisible, onToggleMinimap, sceneRef, onExit }) {
   return (
     <WorldModal title="Menu" onClose={onClose} width={420}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -106,9 +106,25 @@ export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCo
         <button style={ghostBtn} onClick={onOpenCooking}>🍳 Cooking</button>
       </div>
 
+      <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#94a3b8', fontFamily: FONT, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        Settings
+      </h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
         <Toggle label="Show action buttons" on={showActionButtons} onClick={onToggleActionButtons} />
         <Toggle label="Show minimap" on={minimapVisible} onClick={onToggleMinimap} />
+        <button
+          onClick={onExit}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '100%', padding: '9px 12px', borderRadius: 9, minHeight: 40,
+            background: 'rgba(127, 29, 29, 0.35)',
+            border: '1px solid rgba(248, 113, 113, 0.4)',
+            color: '#fca5a5', fontSize: 13, fontWeight: 600, fontFamily: FONT,
+            cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Exit World
+        </button>
       </div>
 
       <TimeOfDayControl sceneRef={sceneRef} />

@@ -171,7 +171,7 @@ const S = {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function WorldGame({ playerInfo }) {
+export default function WorldGame({ playerInfo, onExit }) {
   const canvasRef  = useRef(null);
   const sceneRef   = useRef(null);
   const logEndRef  = useRef(null);
@@ -585,6 +585,7 @@ export default function WorldGame({ playerInfo }) {
           onToggleActionButtons={toggleActionButtons}
           minimapVisible={uiPrefs.minimapVisible}
           onToggleMinimap={toggleMinimap}
+          onExit={onExit}
         />
       )}
 
@@ -635,9 +636,9 @@ export default function WorldGame({ playerInfo }) {
         <div style={S.statusBadge}>Connecting to Aurisar World…</div>
       )}
 
-      {/* Online count — nudge left on mobile to clear the Exit button */}
+      {/* Online count */}
       {connected && (
-        <div style={{ ...S.onlineCount, right: IS_TOUCH ? 120 : 14 }}>
+        <div style={S.onlineCount}>
           ● {onlineCount} online
         </div>
       )}
