@@ -767,6 +767,50 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     }
   }
 
+  // ── lake shoreline dressing: pebbles straddling the contact line, reed
+  //    clusters rooted in the shallows. Client cosmetics like the
+  //    understory — but seeded from the world seed alone (not the tile), so
+  //    the same global point set is generated in every tile and filtered by
+  //    inBounds. All rng draws are unconditional (before any continue) to
+  //    keep the sequence identical no matter which tile is building. ──
+  {
+    const L = wg.config.lake;
+    const rng = mulberry32((wg.config.seed ^ 0x0b3ac4) >>> 0);
+    for (let i = 0; i < 130; i++) {                       // pebbles
+      const ang = rng() * 6.283;
+      const rr = L.waterR + (rng() * 2 - 1) * 5;
+      const rx = rand(rng, 0, 0.5), ry = rng() * 6.28, rz = rand(rng, 0, 0.5);
+      const sc = rand(rng, 0.05, 0.2);
+      const sy = rand(rng, 0.55, 0.9);
+      const shade = 0.42 + 0.26 * rng();
+      const x = L.x + Math.cos(ang) * rr, z = L.z + Math.sin(ang) * rr;
+      if (!inBounds(x, z)) continue;
+      const h = surfaceY(x, z) - L.level;
+      if (h < -0.45 || h > 0.6) continue;                 // waterline strip only
+      acc.boulder.push(x, surfaceY(x, z) + sc * 0.35, z, rx, ry, rz,
+        sc, sc * sy, sc, { r: shade, g: shade * 0.97, b: shade * 0.88 });
+    }
+    for (let i = 0; i < 26; i++) {                        // reed patches
+      const ang = rng() * 6.283;
+      const rr = L.waterR + (rng() * 2 - 1) * 2.2;
+      const cx2 = L.x + Math.cos(ang) * rr, cz2 = L.z + Math.sin(ang) * rr;
+      const count = 4 + ((rng() * 5) | 0);
+      for (let k = 0; k < count; k++) {
+        const px = cx2 + (rng() * 2 - 1) * 1.2;
+        const pz = cz2 + (rng() * 2 - 1) * 1.2;
+        const w = rand(rng, 0.10, 0.18);
+        const ht = rand(rng, 0.9, 1.7);
+        const yaw = rng() * 6.28;
+        const g = rng() * 0.07;
+        if (!inBounds(px, pz)) continue;
+        const h = surfaceY(px, pz) - L.level;
+        if (h < -0.5 || h > 0.15) continue;               // rooted in the shallows
+        acc.tuft.push(px, surfaceY(px, pz), pz, 0, yaw, 0, w, ht, w,
+          { r: 0.16 + g, g: 0.31 + g, b: 0.13 });
+      }
+    }
+  }
+
   acc.trunk.realize(`tile_${meta.id}_trunks`, templates.trunk, scene, container, castShadow);
   acc.blob.realize(`tile_${meta.id}_blobs`, templates.blob, scene, container, castShadow);
   // Leaf cards skip shadow casting — alpha-tested cards would otherwise drop

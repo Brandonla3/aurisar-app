@@ -293,8 +293,11 @@ export class AshwoodTileProvider {
   // the grass at its outer edge and follows the height-based band on its
   // way there; hash mottling keeps the strip from reading flat. Sits 5cm
   // above the terrain to avoid z-fighting; the inner rings continue under
-  // the water surface so the shallows have a sandy shelf under the foam.
-  _beachRing(name, L, scene, material, rings = 16, segs = 96) {
+  // the water surface so the glassy shallows reveal a wet sand shelf.
+  // A damp contact band darkens the sand at and just above the waterline —
+  // wet soil/mud that dries out by ~+0.4m, broken up by a second hash so
+  // the drying edge reads as patchy erosion, not a painted stripe.
+  _beachRing(name, L, scene, material, rings = 24, segs = 96) {
     const wg = this.wg;
     const rIn = L.waterR - 4;
     const rOut = L.bowlR + 10;
@@ -307,8 +310,11 @@ export class AshwoodTileProvider {
         const a = (s / segs) * Math.PI * 2;
         const lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
         const wx = L.x + lx, wz = L.z + lz;
-        positions.push(lx, wg.surfaceY(wx, wz) + 0.05, lz);
-        const m = 0.9 + 0.14 * hash2(wx * 1.7, wz * 1.7);
+        const sy = wg.surfaceY(wx, wz);
+        positions.push(lx, sy + 0.05, lz);
+        const damp = clamp01(1 - (sy - L.level - 0.04) / 0.35);
+        const wet = 1 - 0.42 * damp * (0.7 + 0.3 * hash2(wx * 3.3, wz * 3.3));
+        const m = (0.9 + 0.14 * hash2(wx * 1.7, wz * 1.7)) * wet;
         // Inner edge fades over 2.5m so the submerged shelf has no hard rim.
         colors.push(m, m, m, wg.lakeShoreAt(wx, wz) * clamp01((rr - rIn) / 2.5));
       }
@@ -494,21 +500,28 @@ void main() {
   vec3 R = reflect(-normalize(sunDir), n);
   col += sunCol * pow(max(dot(R, V), 0.0), 130.0) * (2.0 * (1.0 - night) + 0.35);
   col *= mix(1.0, 0.22, night * 0.9);
-  // Shoreline foam: vShore (0 deep → 1 at the waterline, baked per vertex
-  // from real water depth) drives a noise-broken band. The same normal map
-  // supplies the breakup so no new texture is needed; a slow sine breathes
-  // the band in and out like lapping wash. Two thresholds: a soft wash and
-  // a bright crest right at the shore. Added before fog so it hazes out
-  // with distance like the rest of the surface.
-  float foamN = nm(vWp.xz * 0.13 + vec2(t * 0.03, -t * 0.022)).x * 0.5 + 0.5;
-  float edge = vShore + (foamN - 0.5) * 0.34 + sin(t * 1.1 + vShore * 9.0) * 0.05;
-  float foam = smoothstep(0.68, 0.9, edge) * 0.55 + smoothstep(0.9, 1.0, edge) * 0.45;
-  foam *= mix(1.0, 0.3, night);
-  col = mix(col, vec3(0.92, 0.96, 0.97) * mix(1.0, 0.35, night), clamp(foam, 0.0, 1.0));
+  // Shore contact — deliberately foamless. vShore (0 deep → 1 at the
+  // waterline, baked per vertex from real water depth) is roughened by the
+  // scrolling normal map so the transition wanders organically instead of
+  // tracing a clean circle. Two effects replace the old white foam crest:
+  //  - low soft ripple bands travelling shoreward (two incommensurate
+  //    phases so the laps feel irregular, faded out again just before the
+  //    waterline so the contact itself stays gentle);
+  //  - a transparency ramp: over the last ~half meter of depth the water
+  //    thins to glass, revealing the wet sand shelf, pebbles and reeds
+  //    beneath instead of ending in a hard edge.
+  float shoreN = nm(vWp.xz * 0.13 + vec2(t * 0.03, -t * 0.022)).x * 0.5 + 0.5;
+  float sEdge = clamp(vShore + (shoreN - 0.5) * 0.3, 0.0, 1.0);
+  float lap = max(sin(sEdge * 24.0 - t * 1.6), 0.0) * 0.6
+            + max(sin(sEdge * 11.0 - t * 0.9 + shoreN * 4.0), 0.0) * 0.4;
+  lap *= smoothstep(0.55, 0.85, sEdge) * (1.0 - smoothstep(0.92, 1.0, sEdge));
+  col += vec3(0.07, 0.085, 0.09) * lap * (1.0 - night * 0.7);
   float dist = length(cameraPosition - vWp);
   float fog = exp(-pow(dist * fogDensity, 2.0));
   col = mix(vFogColor, col, clamp(fog, 0.0, 1.0));
-  gl_FragColor = vec4(col, clamp(alphaV + fres * 0.13 + foam * 0.25, 0.0, 0.97));
+  float shallow = smoothstep(0.6, 0.96, sEdge);
+  float a = mix(clamp(alphaV + fres * 0.13, 0.0, 0.97), 0.05, shallow);
+  gl_FragColor = vec4(col, clamp(a + lap * 0.06, 0.0, 0.97));
 }
 `;
 
