@@ -1087,6 +1087,10 @@ export class BabylonWorldScene {
       // Left-half touches belong to the React joystick overlay; a 3rd+
       // right-half finger is ignored rather than hijacking the pinch.
       if (e.clientX - rect.left < rect.width / 2 || touches.size >= 2) return;
+      // Reaching for the camera-drag zone while chat is open means "I'm
+      // done chatting" — close it instead of silently eating the drag
+      // (movement/camera reads are gated on _chatOpen while it's true).
+      if (this._chatOpen) this.callbacks.onCanvasInteract?.();
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.size === 2) pinchDist = distance();
       canvas.setPointerCapture(e.pointerId);
@@ -1989,6 +1993,10 @@ export class BabylonWorldScene {
   setChatOpen(open) {
     this._chatOpen = open;
     if (open) this._keys = {};
+  }
+
+  isChatOpen() {
+    return this._chatOpen;
   }
 
   // ── Utilities ──────────────────────────────────────────────────────────────
