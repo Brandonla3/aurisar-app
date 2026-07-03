@@ -91,6 +91,11 @@ const S = {
     position: 'absolute', bottom: 14, right: 12, zIndex: 15,
     display: 'flex', flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     maxWidth: 'calc(100% - 24px)',
+    // Chat bubble + all 6 action buttons don't fit in ~360-390px of phone
+    // width — scroll instead of silently clipping buttons off the left edge
+    // (the parent has overflow:hidden, so anything past maxWidth is
+    // otherwise unreachable, not just visually cut off).
+    overflowX: 'auto', WebkitOverflowScrolling: 'touch',
   },
   chatLogWrap: {
     position: 'absolute', bottom: 74, right: 12,
@@ -716,16 +721,15 @@ export default function WorldGame({ playerInfo, onExit }) {
                 <span style={actionBtnLabelStyle}>Chat</span>
               </button>
             )}
-            {uiPrefs.showActionButtons && (
-              <ActionButtons
-                onMap={()       => openPanel('map')}
-                onQuests={()    => openPanel('quests')}
-                onInventory={() => openPanel('inventory')}
-                onCooking={()   => openPanel('cooking')}
-                onCampfire={()  => sceneRef.current?.requestBuildCampfire()}
-                onMenu={()      => openPanel('menu')}
-              />
-            )}
+            <ActionButtons
+              expanded={uiPrefs.showActionButtons}
+              onMap={()       => openPanel('map')}
+              onQuests={()    => openPanel('quests')}
+              onInventory={() => openPanel('inventory')}
+              onCooking={()   => openPanel('cooking')}
+              onCampfire={()  => sceneRef.current?.requestBuildCampfire()}
+              onMenu={()      => openPanel('menu')}
+            />
           </>
         )}
       </div>

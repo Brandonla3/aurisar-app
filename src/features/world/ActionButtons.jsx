@@ -1,9 +1,12 @@
 /**
  * ActionButtons — row of round action buttons (Map / Quests / Bag / Cook /
- * Fire / Menu). Rendered on all devices; visibility is controlled by the
- * caller (Menu toggle). Unpositioned — the caller (WorldGame) places this
- * row inside the bottom-right toolbar, alongside the chat bubble, so both
- * read as one control strip.
+ * Fire / Menu). Unpositioned — the caller (WorldGame) places this row inside
+ * the bottom-right toolbar, alongside the chat bubble, so both read as one
+ * control strip.
+ *
+ * Menu always renders, even when `expanded` is false (the "Show action
+ * buttons" toggle lives inside Menu's Settings section, as does Exit World —
+ * hiding Menu along with the rest would strand touch users with no way back).
  */
 
 import React from 'react';
@@ -22,24 +25,28 @@ export const actionBtnStyle = {
 };
 export const actionBtnLabelStyle = { fontSize: 9, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.02em' };
 
-export default function ActionButtons({ onMap, onQuests, onInventory, onCooking, onCampfire, onMenu }) {
+export default function ActionButtons({ expanded, onMap, onQuests, onInventory, onCooking, onCampfire, onMenu }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
-      <button style={actionBtnStyle} onClick={onMap} aria-label="World map">
-        <span style={{ fontSize: 22 }}>🗺</span><span style={actionBtnLabelStyle}>Map</span>
-      </button>
-      <button style={actionBtnStyle} onClick={onQuests} aria-label="Quest log">
-        <span style={{ fontSize: 22 }}>📜</span><span style={actionBtnLabelStyle}>Quests</span>
-      </button>
-      <button style={actionBtnStyle} onClick={onInventory} aria-label="Inventory">
-        <span style={{ fontSize: 22 }}>🎒</span><span style={actionBtnLabelStyle}>Bag</span>
-      </button>
-      <button style={actionBtnStyle} onClick={onCooking} aria-label="Cooking">
-        <span style={{ fontSize: 22 }}>🍳</span><span style={actionBtnLabelStyle}>Cook</span>
-      </button>
-      <button style={actionBtnStyle} onClick={onCampfire} aria-label="Build campfire">
-        <span style={{ fontSize: 22 }}>🔥</span><span style={actionBtnLabelStyle}>Fire</span>
-      </button>
+      {expanded && (
+        <>
+          <button style={actionBtnStyle} onClick={onMap} aria-label="World map">
+            <span style={{ fontSize: 22 }}>🗺</span><span style={actionBtnLabelStyle}>Map</span>
+          </button>
+          <button style={actionBtnStyle} onClick={onQuests} aria-label="Quest log">
+            <span style={{ fontSize: 22 }}>📜</span><span style={actionBtnLabelStyle}>Quests</span>
+          </button>
+          <button style={actionBtnStyle} onClick={onInventory} aria-label="Inventory">
+            <span style={{ fontSize: 22 }}>🎒</span><span style={actionBtnLabelStyle}>Bag</span>
+          </button>
+          <button style={actionBtnStyle} onClick={onCooking} aria-label="Cooking">
+            <span style={{ fontSize: 22 }}>🍳</span><span style={actionBtnLabelStyle}>Cook</span>
+          </button>
+          <button style={actionBtnStyle} onClick={onCampfire} aria-label="Build campfire">
+            <span style={{ fontSize: 22 }}>🔥</span><span style={actionBtnLabelStyle}>Fire</span>
+          </button>
+        </>
+      )}
       <button style={actionBtnStyle} onClick={onMenu} aria-label="Menu">
         <span style={{ fontSize: 22 }}>☰</span><span style={actionBtnLabelStyle}>Menu</span>
       </button>
