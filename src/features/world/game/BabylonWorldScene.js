@@ -1880,7 +1880,11 @@ export class BabylonWorldScene {
   }
 
   /** Snap the camera across a castle enter/exit (never lerp 700 m) and
-   *  clamp/restore the orbit radius for indoor framing. */
+   *  switch wall handling. Indoors the ENGINE's camera collision takes
+   *  over (against the castle's invisible proxy boxes): it slides the view
+   *  along walls and recovers by itself, and it never mutates radius/beta
+   *  state — so zoom and orbit cannot get stuck. No per-frame camera math.
+   */
   _castleCameraSet(target, yaw, interior) {
     const cam = this._camera;
     if (interior) {
@@ -1889,26 +1893,41 @@ export class BabylonWorldScene {
         this._savedLowerRadius = cam.lowerRadiusLimit;
       }
       cam.upperRadiusLimit = 15; // the big halls deserve a real zoom range
-      // the wall-march may collapse the orbit to a near-first-person close-up
-      // in tight quarters — better than clipping through a wall
-      cam.lowerRadiusLimit = 0.9;
-      if (cam.radius > 8) cam.radius = 7;
+      cam.lowerRadiusLimit = 0.9; // collision can push to a near close-up
+      cam.checkCollisions = true;
+      cam.collisionRadius = new BABYLON.Vector3(0.55, 0.55, 0.55);
+      // static generous tilt window — the old per-frame floor/ceiling caps
+      // could go degenerate on stairs and lock rotation entirely
+      cam.lowerBetaLimit = 0.2;
+      cam.upperBetaLimit = 1.54;
+      if (cam.radius > 5.5) cam.radius = 5; // start close; player zooms freely after
     } else if (this._savedUpperRadius != null) {
+      cam.checkCollisions = false;
       cam.upperRadiusLimit = this._savedUpperRadius;
       cam.lowerRadiusLimit = this._savedLowerRadius ?? 2.5;
+      cam.lowerBetaLimit = 0.25;
       this._savedUpperRadius = null;
       this._savedLowerRadius = null;
-      // restore the pre-occlusion zoom the wall-march may have clamped
-      if (this._camFreeRadius != null) {
-        cam.radius = Math.min(this._camFreeRadius, cam.upperRadiusLimit);
-        this._camFreeRadius = null;
-      }
     }
     if (target) {
       this._camTarget.set(target.x, target.y, target.z);
       cam.target.copyFrom(this._camTarget);
       cam.alpha = -Math.PI / 2 - yaw; // orbit behind the avatar's new facing
       cam.beta = Math.PI / 3.5;
+      // collision mode GLIDES the camera from its previous position (it
+      // would sweep across the world on a door teleport and recompute the
+      // radius from wherever it got stopped) — suspend it for two frames so
+      // the pose snap lands, then hand control back to the engine
+      if (cam.checkCollisions) {
+        cam.checkCollisions = false;
+        let n = 0;
+        const obs = this.scene.onAfterRenderObservable.add(() => {
+          if (++n >= 2) {
+            this.scene.onAfterRenderObservable.remove(obs);
+            if (this._castle?.isInside()) cam.checkCollisions = true;
+          }
+        });
+      }
     }
   }
 
@@ -1930,56 +1949,10 @@ export class BabylonWorldScene {
     // never clips under the ground. One surfaceY sample + acos per frame.
     const cam = this._camera;
     const camPos = cam.globalPosition;
-    if (this._castle?.isInside()) {
-      const nav = this._castle.nav;
-      // floor-aware upward tilt cap (same formula, nav floor instead of terrain)
-      const s = nav.surfaceAt(camPos.x, camPos.z, cam.target.y + 0.5);
-      const groundY = (s ? s.y : p.y) + 0.4;
-      const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
-      cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
-      // ceiling-aware downward tilt cap: camY = targetY + r·cos(beta) must
-      // stay below the current room's ceiling
-      const ceilY = this._castle.ceilingYAt(p.x, p.z, p.y);
-      const cosCeil = Math.max(-1, Math.min(1, (ceilY - cam.target.y) / cam.radius));
-      cam.lowerBetaLimit = Math.max(0.25, Math.acos(cosCeil));
-      // wall-occlusion: march target→camera through the nav grid in ~0.35 m
-      // steps (walls are 0.5 m — coarser sampling steps right over them).
-      // The march always measures the player's DESIRED radius (saved before
-      // the first clamp), so zoom is restored the moment the line of sight
-      // clears — a naive Math.min() ratchets the camera in and never lets
-      // the player zoom back out.
-      // wheel input while clamped edits the DESIRED radius, so zoom stays
-      // responsive even when a wall is holding the camera in
-      if (this._camFreeRadius != null && Math.abs(cam.inertialRadiusOffset) > 0.001) {
-        this._camFreeRadius = Math.min(cam.upperRadiusLimit,
-          Math.max(cam.lowerRadiusLimit, this._camFreeRadius + cam.inertialRadiusOffset));
-      }
-      const desired = this._camFreeRadius ?? cam.radius;
-      const dx = camPos.x - cam.target.x, dz = camPos.z - cam.target.z;
-      const horiz = Math.hypot(dx, dz);
-      if (horiz > 0.5 && desired > cam.lowerRadiusLimit + 0.05) {
-        const scale = desired / cam.radius; // march to the desired orbit, not the clamped one
-        const mx = dx * scale, mz = dz * scale;
-        const marchLen = horiz * scale;
-        const steps = Math.min(32, Math.max(2, Math.ceil(marchLen / 0.35)));
-        let clampedT = 0;
-        for (let k = 1; k <= steps; k++) {
-          const t = k / steps;
-          if (!nav.isOpenBelow(cam.target.x + mx * t, cam.target.z + mz * t, cam.target.y)) {
-            clampedT = t;
-            break;
-          }
-        }
-        if (clampedT > 0) {
-          if (this._camFreeRadius == null) this._camFreeRadius = cam.radius;
-          cam.radius = Math.max(cam.lowerRadiusLimit, desired * clampedT - 0.45);
-        } else if (this._camFreeRadius != null) {
-          cam.radius = Math.min(this._camFreeRadius, cam.upperRadiusLimit);
-          this._camFreeRadius = null;
-        }
-      }
-    } else {
-      if (cam.lowerBetaLimit !== 0.25) cam.lowerBetaLimit = 0.25;
+    // Indoors the engine's camera collision (proxy boxes under the castle's
+    // interior root) owns wall handling — nothing to do per frame. Outdoors
+    // keep the terrain-aware upward tilt cap.
+    if (!this._castle?.isInside()) {
       const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
       const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
       cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));

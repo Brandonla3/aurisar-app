@@ -17,9 +17,14 @@
 export function createCollector(scene, mats) {
   const buckets = new Map(); // `${group}|${matKey}` -> mesh[]
   const dynamic = [];        // meshes excluded from merging (animated later)
+  const colliders = [];      // {cx,cy,cz,w,h,d} — invisible camera-collision boxes
 
   return {
-    scene, mats,
+    scene, mats, colliders,
+    /** Record an invisible collision proxy (camera-vs-wall/floor/ceiling). */
+    addCollider(cx, cy, cz, w, h, d) {
+      colliders.push({ cx, cy, cz, w, h, d });
+    },
     /** Register a primitive for merging under (group, matKey). Primitives
      *  are disabled immediately — thousands of unmerged draw calls must
      *  never hit a render frame during the chunked build (that cost 20+ s

@@ -173,6 +173,22 @@ export class CastleSystem {
         ...a, x: a.x + ax, z: a.z + az,
       }));
       createFixturesFromAnchors(ctx, anchors, 0, 0); // anchors already world-space
+      // invisible camera-collision proxies (walls/slabs recorded during the
+      // build). The camera collides against ~250 simple boxes instead of the
+      // merged render meshes — cheap, and Babylon's collision response never
+      // touches the player's zoom, so the camera can't get "stuck".
+      for (const c of ctx.colliders) {
+        const b = BABYLON.MeshBuilder.CreateBox('castleCamCol', {
+          width: c.w, height: c.h, depth: c.d,
+        }, this.scene);
+        b.position.set(c.cx, c.cy, c.cz);
+        b.isVisible = false;
+        b.isPickable = false;
+        b.checkCollisions = true;
+        b.parent = this._intRoot;
+        b.freezeWorldMatrix();
+      }
+      ctx.colliders.length = 0;
       this._intMeshes = mergeCollector(ctx, this._intRoot);
       this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 3 : 6);
       this._pool.setIncludedMeshes(this._intMeshes);

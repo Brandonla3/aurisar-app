@@ -213,8 +213,8 @@ export const INTERIOR_ANCHOR = Object.freeze({ x: 840, z: 0 });
 // Where the player lands when entering / exiting (world coords derived here
 // so CastleSystem and tests share them).
 export const ENTRY = Object.freeze({
-  // just inside the main gate, facing east into the entrance hall
-  spawnLocal: { x: -29.5 * SXZ, z: 0 },
+  // inside the gate with room behind for the third-person orbit
+  spawnLocal: { x: -26.5 * SXZ, z: 0 },
   spawnFacing: Math.PI / 2, // avatar yaw: +x
   // exit hotspot inside (by the gate) and return spot outside the shell gates
   exitHotspotLocal: { x: -30.5 * SXZ, z: 0 },

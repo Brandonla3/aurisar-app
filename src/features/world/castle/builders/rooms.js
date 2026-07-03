@@ -58,12 +58,18 @@ export function createFloorSlabs(ctx, ax, az) {
     rects.forEach((r, i) => {
       ctx.add(slabBox(ctx.scene, `slab_${li}_${i}`, r, LEVELS[li].y, SLAB_T, ax, az),
         li === 0 ? 'darkStone' : 'stone', G(li));
+      ctx.addCollider?.((r.x0 + r.x1) / 2 + ax, LEVELS[li].y - SLAB_T / 2, (r.z0 + r.z1) / 2 + az,
+        r.x1 - r.x0, SLAB_T, r.z1 - r.z0);
     });
   }
   // roof cap
   const top = LEVELS[LEVELS.length - 1];
   ctx.add(slabBox(ctx.scene, 'slab_roof', LOCAL_BOUNDS, top.y + top.clear + SLAB_T, SLAB_T, ax, az),
     'stone', G(LEVELS.length - 1));
+  ctx.addCollider?.((LOCAL_BOUNDS.x0 + LOCAL_BOUNDS.x1) / 2 + ax,
+    top.y + top.clear + SLAB_T / 2,
+    (LOCAL_BOUNDS.z0 + LOCAL_BOUNDS.z1) / 2 + az,
+    LOCAL_BOUNDS.x1 - LOCAL_BOUNDS.x0, SLAB_T, LOCAL_BOUNDS.z1 - LOCAL_BOUNDS.z0);
 }
 
 /** Per-room floor overlays: the visible marble/wood/darkstone surfaces. */
@@ -243,13 +249,17 @@ export function createWallsForLevel(ctx, level, ax, az) {
   }
 }
 
-/** One wall box on a line segment from yBase up h meters. */
+/** One wall box on a line segment from yBase up h meters. Also records an
+ *  identical invisible collision proxy — Babylon's camera collision slides
+ *  the orbit camera along these instead of clipping through rooms. */
 export function createWall(ctx, level, line, lo, hi, yBase, h, matKey, ax, az) {
   if (h <= 0.02) return null;
   const len = hi - lo + WALL_T; // overlap corners by half a wall each side
   const m = line.axis === 'x'
     ? box(ctx.scene, `wall_${level}`, line.at + ax, yBase + h / 2, (lo + hi) / 2 + az, WALL_T, h, len)
     : box(ctx.scene, `wall_${level}`, (lo + hi) / 2 + ax, yBase + h / 2, line.at + az, len, h, WALL_T);
+  if (line.axis === 'x') ctx.addCollider?.(line.at + ax, yBase + h / 2, (lo + hi) / 2 + az, WALL_T, h, len);
+  else ctx.addCollider?.((lo + hi) / 2 + ax, yBase + h / 2, line.at + az, len, h, WALL_T);
   return ctx.add(m, matKey, G(level));
 }
 
