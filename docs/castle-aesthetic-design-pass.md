@@ -21,7 +21,7 @@ The helper file follows the existing castle style:
 
 ## Implementation wiring
 
-`CastleSystem.js` now imports:
+`CastleSystem.js` imports:
 
 ```js
 import {
@@ -30,14 +30,14 @@ import {
 } from './builders/aestheticPolish.js';
 ```
 
-The exterior build now captures `baseY` from `createCastleExterior(...)` and applies the polish before the exterior merge:
+The exterior build captures `baseY` from `createCastleExterior(...)` and applies the polish before the exterior merge:
 
 ```js
 const { gateTorchPositions, baseY } = createCastleExterior(ctx, this._worldgen);
 createCastleExteriorPolish(ctx, this._worldgen, baseY);
 ```
 
-The interior build now applies hero props after furniture is placed:
+The interior build applies hero props after furniture is placed:
 
 ```js
 createAllFurniture(ctx, ax, az);
