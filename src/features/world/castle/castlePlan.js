@@ -56,22 +56,22 @@ export const LEVELS = Object.freeze([
 // builders. Rooms on a level tile edge-to-edge; walls sit on shared edges.
 const RAW_ROOMS = [
   // ═══ DUNGEON (level 0) ═════════════════════════════════════════════════════
-  { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24, z1: 4  }, kind: 'dungeonHall' },
-  { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,  z1: 16 }, kind: 'cells' },
-  { id: 'cellBlockS',  level: 0, rect: { x0: -24, z0: -16, x1: 2,  z1: -4 }, kind: 'cells' },
-  { id: 'guardPost',   level: 0, rect: { x0: 2,   z0: 4,   x1: 24, z1: 16 }, kind: 'guard' },
-  { id: 'dVault',      level: 0, rect: { x0: 2,   z0: -16, x1: 24, z1: -4 }, kind: 'vault' },
-  { id: 'dVestibule',  level: 0, rect: { x0: 24,  z0: -6,  x1: 32, z1: 6  }, kind: 'dungeonHall' },
+  { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24,   z1: 4  }, kind: 'dungeonHall' },
+  { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,    z1: 16 }, kind: 'cells' },
+  { id: 'cellBlockS',  level: 0, rect: { x0: -24, z0: -16, x1: 2,    z1: -4 }, kind: 'cells' },
+  { id: 'guardPost',   level: 0, rect: { x0: 2,   z0: 4,   x1: 24,   z1: 16 }, kind: 'guard' },
+  { id: 'dVault',      level: 0, rect: { x0: 2,   z0: -16, x1: 24,   z1: -4 }, kind: 'vault' },
+  { id: 'dVestibule',  level: 0, rect: { x0: 24,  z0: -6,  x1: 32.8, z1: 6  }, kind: 'dungeonHall' },
 
   // ═══ GROUND / FLOOR 1 (level 1) — entrance, kitchens, dining, servants ═════
-  { id: 'entranceHall', level: 1, rect: { x0: -32, z0: -12, x1: -12, z1: 12 }, kind: 'entrance' },
-  { id: 'corridor1',    level: 1, rect: { x0: -12, z0: -4,  x1: 24,  z1: 4  }, kind: 'corridor' },
-  { id: 'kitchen',      level: 1, rect: { x0: -12, z0: 4,   x1: 8,   z1: 22 }, kind: 'kitchen' },
-  { id: 'stairHall1',   level: 1, rect: { x0: 8,   z0: 4,   x1: 24,  z1: 22 }, kind: 'stairHall' },
-  { id: 'diningHall',   level: 1, rect: { x0: -12, z0: -22, x1: 8,   z1: -4 }, kind: 'dining' },
-  { id: 'servantHall',  level: 1, rect: { x0: 8,   z0: -22, x1: 20,  z1: -4 }, kind: 'servant' },
-  { id: 'storeRoom',    level: 1, rect: { x0: 20,  z0: -22, x1: 32,  z1: -6 }, kind: 'storage' },
-  { id: 'gVestibule',   level: 1, rect: { x0: 24,  z0: -6,  x1: 32,  z1: 6  }, kind: 'stairHall' },
+  { id: 'entranceHall', level: 1, rect: { x0: -32, z0: -12, x1: -12,  z1: 12 }, kind: 'entrance' },
+  { id: 'corridor1',    level: 1, rect: { x0: -12, z0: -4,  x1: 24,   z1: 4  }, kind: 'corridor' },
+  { id: 'kitchen',      level: 1, rect: { x0: -12, z0: 4,   x1: 8,    z1: 22 }, kind: 'kitchen' },
+  { id: 'stairHall1',   level: 1, rect: { x0: 8,   z0: 4,   x1: 24,   z1: 22 }, kind: 'stairHall' },
+  { id: 'diningHall',   level: 1, rect: { x0: -12, z0: -22, x1: 8,    z1: -4 }, kind: 'dining' },
+  { id: 'servantHall',  level: 1, rect: { x0: 8,   z0: -22, x1: 20,   z1: -4 }, kind: 'servant' },
+  { id: 'storeRoom',    level: 1, rect: { x0: 20,  z0: -22, x1: 32,   z1: -6 }, kind: 'storage' },
+  { id: 'gVestibule',   level: 1, rect: { x0: 24,  z0: -6,  x1: 32.8, z1: 6  }, kind: 'stairHall' },
 
   // ═══ FLOOR 2 (level 2) — ballroom, guest rooms, sitting room, bath ═════════
   { id: 'ballroom',    level: 2, rect: { x0: -32, z0: -22, x1: 4,  z1: 4  }, kind: 'ballroom' },
@@ -122,7 +122,7 @@ const RAW_DOORS = [
   { id: 'd_vault',   a: 'dCorridor', b: 'dVault',     edge: 'z', at: -4, lo: 10,  hi: 13, iron: true },
   { id: 'd_vest',    a: 'dCorridor', b: 'dVestibule', edge: 'x', at: 24, lo: -2,  hi: 2, arch: true },
   // ground
-  { id: 'g_gate',    a: 'entranceHall', b: 'EXTERIOR',   edge: 'x', at: -32, lo: -2.2, hi: 2.2, double: true },
+  { id: 'g_gate',    a: 'entranceHall', b: 'EXTERIOR',   edge: 'x', at: -32, lo: -2.2, hi: 2.2, double: true, sealed: true },
   { id: 'g_entr',    a: 'entranceHall', b: 'corridor1',  edge: 'x', at: -12, lo: -2.2, hi: 2.2, double: true, arch: true },
   { id: 'g_kitch',   a: 'corridor1',   b: 'kitchen',     edge: 'z', at: 4,   lo: -6,  hi: -3 },
   { id: 'g_stair',   a: 'corridor1',   b: 'stairHall1',  edge: 'z', at: 4,   lo: 14,  hi: 18, double: true, arch: true },
@@ -172,9 +172,9 @@ export const DOORS = Object.freeze(RAW_DOORS.map((d) => ({
 // Successive grand stairs alternate v0 so their plan-view footprints never
 // overlap — each nav cell holds at most one ramp per level grid.
 const RAW_STAIRS = [
-  // dungeon <-> ground, in d/gVestibule; runs along x, arrival faces the door
-  { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.6, runLen: 4.2, landingD: 2.2,
-    laneW: 2.6, gap: 0.5, v0: -4.0 },
+  // dungeon <-> ground, in d/gVestibule; lane A now centers on the vestibule door
+  { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.4, runLen: 5.0, landingD: 2.4,
+    laneW: 2.6, gap: 0.5, v0: -1.3 },
   // the monumental grand stairwell (reference: cathedral-wide marble flights).
   // Consecutive stairs alternate v0 so footprints stay disjoint per grid.
   // u0 8 leaves a wide south walkway (z 4..8) inside every stair hall —
@@ -317,120 +317,120 @@ export function doorLevel(door) {
 }
 
 // ── Light anchors (derived, deterministic) ───────────────────────────────────
-// A restrained set of warm glow points: a couple of wall sconces per room plus
-// a centrepiece (chandelier / fireplace / brazier). Deliberately sparse — the
-// themed ambient (CastleSystem's AMBIENT_PALETTES) is the always-on base that
-// lights every room corner-to-corner; these fires are accents, few enough that
-// the pool keeps them ALL lit at once so they never brighten as you approach.
-// Wall torches skip door openings so none float in a doorway. Every anchor
-// also gets an emissive flame/glow mesh (always on, all merged, cheap).
-// kind: torch | chandelier | fireplace | candle | brazier.
+// ~120 warm glow points. ONLY CastleLightPool ever turns the nearest few
+// into real PointLights; every anchor also gets an emissive flame/glow mesh
+// from the builders. kind: torch | chandelier | fireplace | candle | brazier.
 // priority: higher wins when ranking pool assignment at equal distance.
-const _roomLevel = new Map(ROOMS.map((r) => [r.id, r.level]));
-
-// True if (x, z) on `level` sits in (or just beside) a door opening — used to
-// keep wall sconces out of doorways.
-function _inDoorway(level, x, z, margin = 2.0) {
-  for (const d of DOORS) {
-    if (d.b === 'EXTERIOR' || _roomLevel.get(d.a) !== level) continue;
-    if (d.edge === 'x') {
-      if (Math.abs(x - d.at) < 3 && z > d.lo - margin && z < d.hi + margin) return true;
-    } else if (Math.abs(z - d.at) < 3 && x > d.lo - margin && x < d.hi + margin) return true;
-  }
-  return false;
-}
-
 export function buildLightAnchors() {
   const anchors = [];
   const add = (kind, level, x, z, y, priority = 1) =>
     anchors.push({ kind, level, x, z, y, priority });
 
-  // A few wall torches on a room's two long walls, at inset fractions, each
-  // skipped if it would land in a doorway. `fracs` controls how many.
-  const wallTorches = (level, x0, z0, x1, z1, y, fracs = [0.24, 0.76], pr = 1) => {
-    const w = x1 - x0, d = z1 - z0;
-    const along = w >= d ? 'x' : 'z';
-    for (const f of fracs) {
-      if (along === 'x') {
-        const x = x0 + f * w;
-        if (!_inDoorway(level, x, z0 + 0.4)) add('torch', level, x, z0 + 0.4, y, pr);
-        if (!_inDoorway(level, x, z1 - 0.4)) add('torch', level, x, z1 - 0.4, y, pr);
-      } else {
-        const z = z0 + f * d;
-        if (!_inDoorway(level, x0 + 0.4, z)) add('torch', level, x0 + 0.4, z, y, pr);
-        if (!_inDoorway(level, x1 - 0.4, z)) add('torch', level, x1 - 0.4, z, y, pr);
-      }
-    }
-  };
-
   for (const room of ROOMS) {
     const L = LEVELS[room.level];
     const { x0, z0, x1, z1 } = room.rect;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    const w = x1 - x0; // used by the ballroom's long-axis chandelier spacing
+    const w = x1 - x0, d = z1 - z0;
     const torchY = L.y + 2.5;
-    const ceilY = L.y + L.clear - 1.5; // chandelier hang height
 
     switch (room.kind) {
-      case 'corridor': case 'gallery':
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
+      case 'corridor': case 'gallery': {
+        // paired wall torches marching down the long axis
+        const along = w >= d ? 'x' : 'z';
+        const len = along === 'x' ? w : d;
+        const n = Math.max(2, Math.floor(len / 7));
+        for (let i = 0; i < n; i++) {
+          const t = (i + 0.5) / n;
+          if (along === 'x') {
+            add('torch', room.level, x0 + t * w, z0 + 0.4, torchY);
+            add('torch', room.level, x0 + t * w, z1 - 0.4, torchY);
+          } else {
+            add('torch', room.level, x0 + 0.4, z0 + t * d, torchY);
+            add('torch', room.level, x1 - 0.4, z0 + t * d, torchY);
+          }
+        }
         break;
+      }
       case 'entrance':
         add('chandelier', room.level, cx, cz, L.y + L.clear - 1.6, 3);
-        wallTorches(room.level, x0, z0, x1, z1, torchY);
+        add('torch', room.level, x0 + 0.4, cz - 6, torchY);
+        add('torch', room.level, x0 + 0.4, cz + 6, torchY);
+        add('torch', room.level, cx, z0 + 0.4, torchY);
+        add('torch', room.level, cx, z1 - 0.4, torchY);
         break;
-      case 'ballroom':
-        for (const t of [0.2, 0.5, 0.8]) {
+      case 'ballroom': {
+        // three great chandeliers down the long axis + wall sconces
+        for (const t of [0.22, 0.5, 0.78]) {
           add('chandelier', room.level, x0 + t * w, cz, L.y + 13.5, 4);
         }
-        wallTorches(room.level, x0, z0, x1, z1, torchY);
+        for (const t of [0.2, 0.5, 0.8]) {
+          add('torch', room.level, x0 + t * w, z0 + 0.4, torchY);
+          add('torch', room.level, x0 + 0.4, z0 + t * d, torchY);
+        }
         break;
+      }
       case 'dining':
-        add('chandelier', room.level, cx - 4, cz, ceilY, 3);
-        add('chandelier', room.level, cx + 4, cz, ceilY, 3);
+        add('chandelier', room.level, cx - 4, cz, L.y + L.clear - 1.5, 3);
+        add('chandelier', room.level, cx + 4, cz, L.y + L.clear - 1.5, 3);
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
         break;
       case 'kitchen':
         add('fireplace', room.level, cx, z1 - 0.7, L.y + 1.0, 3); // great hearth
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
+        add('torch', room.level, x0 + 0.4, cz, torchY);
+        add('torch', room.level, x1 - 0.4, cz - 4, torchY);
         break;
       case 'stairHall':
         add('chandelier', room.level, cx, cz, L.y + L.clear - 1.4, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
+        add('torch', room.level, x0 + 0.4, z0 + 2, torchY);
+        add('torch', room.level, x1 - 0.4, z1 - 2, torchY);
         break;
       case 'master': case 'royal':
-        add('chandelier', room.level, cx, cz, ceilY, 2);
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
+        add('candle', room.level, cx + 3, cz + 3, L.y + 1.1);
+        add('candle', room.level, cx - 3, cz - 3, L.y + 1.1);
         break;
       case 'bedroom': case 'sitting':
-        add('chandelier', room.level, cx, cz, ceilY, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
+        add('candle', room.level, cx, cz - 2, L.y + 1.1);
+        add('torch', room.level, x0 + 0.4, cz, torchY);
         break;
       case 'library':
-        add('chandelier', room.level, cx, cz, ceilY, 2);
+        add('chandelier', room.level, cx, cz, L.y + L.clear - 1.5, 2);
+        add('candle', room.level, cx - 4, cz, L.y + 1.1);
+        add('candle', room.level, cx + 4, cz, L.y + 1.1);
         break;
       case 'bathroom':
         add('candle', room.level, cx, cz, L.y + 1.1);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
+        add('torch', room.level, x0 + 0.4, cz, torchY);
         break;
       case 'treasury':
-        add('chandelier', room.level, cx, cz, ceilY, 2);
+        add('candle', room.level, cx - 3, cz, L.y + 1.3, 2);
+        add('candle', room.level, cx + 3, cz, L.y + 1.3, 2);
+        add('torch', room.level, cx, z0 + 0.4, torchY);
         break;
       case 'observatory':
-        add('chandelier', room.level, cx, cz, ceilY, 2);
+        add('candle', room.level, cx, cz, L.y + 1.1);
         break;
-      case 'dungeonHall': case 'cells':
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5], 2);
+      case 'dungeonHall': case 'cells': {
+        // sparse — the dungeon stays dark between pools of torchlight
+        const along = w >= d ? 'x' : 'z';
+        const len = along === 'x' ? w : d;
+        const n = Math.max(1, Math.floor(len / 12));
+        for (let i = 0; i < n; i++) {
+          const t = (i + 0.5) / n;
+          if (along === 'x') add('torch', room.level, x0 + t * w, z0 + 0.4, torchY, 2);
+          else               add('torch', room.level, x0 + 0.4, z0 + t * d, torchY, 2);
+        }
         break;
+      }
       case 'guard':
         add('brazier', room.level, cx, cz, L.y + 0.9, 3);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5], 2);
         break;
       case 'vault':
-        add('brazier', room.level, cx, cz, L.y + 0.9, 2);
+        add('torch', room.level, cx, z1 - 0.4, torchY, 2);
+        add('candle', room.level, cx, cz, L.y + 1.0);
         break;
       case 'storage': case 'servant':
-        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
+        add('torch', room.level, cx, z1 - 0.4, torchY);
         break;
     }
   }
