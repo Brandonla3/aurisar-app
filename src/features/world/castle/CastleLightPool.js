@@ -17,12 +17,17 @@ import { hash2 } from '../worldgen/rng.js';
 // StandardMaterial point lights attenuate LINEARLY with range — against
 // the castle's bright materials (marble/plaster diffuse ~0.8) anything
 // above ~4 blows whole rooms out to white. Warm pools, no overexposure.
+//
+// The castle now carries a bright themed ambient base (see CastleSystem's
+// AMBIENT_PALETTES), so these torches are ACCENTS, not the light source:
+// intensities are pulled ~30% below the old values so they read as warm
+// highlights on the cool royal base without blowing out near-field surfaces.
 const KIND_STYLE = {
-  torch:      { color: [1.0, 0.70, 0.42], intensity: 2.4, range: 11, flicker: 0.16, speed: 8.0 },
-  chandelier: { color: [1.0, 0.78, 0.52], intensity: 3.0, range: 18, flicker: 0.06, speed: 3.0 },
-  fireplace:  { color: [1.0, 0.55, 0.26], intensity: 2.4, range: 13, flicker: 0.20, speed: 6.5 },
-  candle:     { color: [1.0, 0.80, 0.52], intensity: 1.0, range: 8,  flicker: 0.12, speed: 5.0 },
-  brazier:    { color: [1.0, 0.60, 0.28], intensity: 2.2, range: 12, flicker: 0.18, speed: 7.0 },
+  torch:      { color: [1.0, 0.70, 0.42], intensity: 1.6, range: 10, flicker: 0.16, speed: 8.0 },
+  chandelier: { color: [1.0, 0.78, 0.52], intensity: 2.0, range: 13, flicker: 0.06, speed: 3.0 },
+  fireplace:  { color: [1.0, 0.55, 0.26], intensity: 2.1, range: 12, flicker: 0.20, speed: 6.5 },
+  candle:     { color: [1.0, 0.80, 0.52], intensity: 0.7, range: 8,  flicker: 0.12, speed: 5.0 },
+  brazier:    { color: [1.0, 0.60, 0.28], intensity: 1.5, range: 11, flicker: 0.18, speed: 7.0 },
 };
 
 const RETHINK_MS = 250;   // anchor re-ranking cadence

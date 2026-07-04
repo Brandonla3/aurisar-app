@@ -84,10 +84,13 @@ function mat(scene, name, { diffuse, texture = null, specular = [0.03, 0.03, 0.0
   m.specularColor = new BABYLON.Color3(...specular);
   if (emissive) m.emissiveColor = new BABYLON.Color3(...emissive);
   else if (lit) {
-    // faint self-glow floor: interiors between torch pools stay readable
-    // (never pitch black) without washing out the lighting mood
+    // faint self-glow floor: a last-resort "never pitch black" guard. The
+    // castle's bright themed ambient (CastleSystem AMBIENT_PALETTES) now owns
+    // room brightness, so this is kept low — a high floor would flatten the
+    // ambient's directional shading — and biased slightly cool to sit under
+    // the royal stone theme rather than fighting it.
     m.emissiveColor = new BABYLON.Color3(
-      diffuse[0] * 0.09, diffuse[1] * 0.09, diffuse[2] * 0.10);
+      diffuse[0] * 0.05, diffuse[1] * 0.055, diffuse[2] * 0.065);
   }
   if (alpha < 1) m.alpha = alpha;
   m.backFaceCulling = backFace;
@@ -107,19 +110,22 @@ export function createCastleMaterials(scene) {
       uv: 0.18,
     }),
     stone: mat(scene, 'castle_stone', {
-      diffuse: [1.0, 0.97, 0.92],
-      texture: T('castle_tex_stone', [0.52, 0.49, 0.45], [0.38, 0.36, 0.34], 'stone', 23),
+      // cooled toward blue-grey for the "royal stone" identity (was warm-white);
+      // wood/fabric stay warm so warm rooms keep their character
+      diffuse: [0.90, 0.94, 1.0],
+      texture: T('castle_tex_stone', [0.44, 0.48, 0.55], [0.32, 0.35, 0.42], 'stone', 23),
       uv: 0.3,
     }),
     darkStone: mat(scene, 'castle_darkStone', {
-      diffuse: [0.85, 0.86, 0.90],
-      texture: T('castle_tex_darkStone', [0.26, 0.25, 0.26], [0.15, 0.15, 0.17], 'stone', 37),
+      diffuse: [0.82, 0.85, 0.92],
+      texture: T('castle_tex_darkStone', [0.30, 0.34, 0.42], [0.18, 0.21, 0.27], 'stone', 37),
       uv: 0.28,
     }),
     marble: mat(scene, 'castle_marble', {
-      diffuse: [1.0, 0.99, 0.96],
-      texture: T('castle_tex_marble', [0.78, 0.76, 0.71], [0.92, 0.91, 0.88], 'marble', 5),
-      specular: [0.32, 0.32, 0.30], uv: 0.2,
+      // cool royal marble (was warm ivory)
+      diffuse: [0.90, 0.95, 1.0],
+      texture: T('castle_tex_marble', [0.72, 0.77, 0.85], [0.86, 0.90, 0.98], 'marble', 5),
+      specular: [0.32, 0.32, 0.34], uv: 0.2,
     }),
     marbleDark: mat(scene, 'castle_marbleDark', {
       diffuse: [0.95, 0.95, 1.0],
@@ -201,8 +207,11 @@ export function createCastleMaterials(scene) {
       diffuse: [0.25, 0.42, 0.48], specular: [0.5, 0.55, 0.6], alpha: 0.72,
     }),
     plaster: mat(scene, 'castle_plaster', {
-      diffuse: [1.0, 0.97, 0.9],
-      texture: T('castle_tex_plaster', [0.62, 0.58, 0.50], [0.54, 0.50, 0.44], 'plaster', 83),
+      // neutral-cool plaster: reads cool under the ballroom's ROYAL ambient
+      // yet stays neutral in the warm upper rooms (their wood floors + WARM
+      // ambient + warm torch accents carry the warmth)
+      diffuse: [0.94, 0.96, 0.98],
+      texture: T('castle_tex_plaster', [0.56, 0.57, 0.58], [0.48, 0.50, 0.53], 'plaster', 83),
       uv: 0.25,
     }),
   };
