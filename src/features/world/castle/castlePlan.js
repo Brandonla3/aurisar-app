@@ -317,33 +317,49 @@ export function doorLevel(door) {
 }
 
 // ── Light anchors (derived, deterministic) ───────────────────────────────────
-// Dense warm glow points — a genuinely torch-lit castle. Every room is ringed
-// with wall torches and the grander rooms hang a chandelier; the dungeon is
-// fully lined with torches + braziers. CastleLightPool turns the nearest few
-// into real PointLights each frame; every anchor also gets an emissive
-// flame/glow mesh from the builders (cheap, all merged). The themed ambient is
-// the always-on base — this is the fire that layers warm, flickering light on
-// top of it. kind: torch | chandelier | fireplace | candle | brazier.
+// A restrained set of warm glow points: a couple of wall sconces per room plus
+// a centrepiece (chandelier / fireplace / brazier). Deliberately sparse — the
+// themed ambient (CastleSystem's AMBIENT_PALETTES) is the always-on base that
+// lights every room corner-to-corner; these fires are accents, few enough that
+// the pool keeps them ALL lit at once so they never brighten as you approach.
+// Wall torches skip door openings so none float in a doorway. Every anchor
+// also gets an emissive flame/glow mesh (always on, all merged, cheap).
+// kind: torch | chandelier | fireplace | candle | brazier.
 // priority: higher wins when ranking pool assignment at equal distance.
+const _roomLevel = new Map(ROOMS.map((r) => [r.id, r.level]));
+
+// True if (x, z) on `level` sits in (or just beside) a door opening — used to
+// keep wall sconces out of doorways.
+function _inDoorway(level, x, z, margin = 2.0) {
+  for (const d of DOORS) {
+    if (d.b === 'EXTERIOR' || _roomLevel.get(d.a) !== level) continue;
+    if (d.edge === 'x') {
+      if (Math.abs(x - d.at) < 3 && z > d.lo - margin && z < d.hi + margin) return true;
+    } else if (Math.abs(z - d.at) < 3 && x > d.lo - margin && x < d.hi + margin) return true;
+  }
+  return false;
+}
+
 export function buildLightAnchors() {
   const anchors = [];
   const add = (kind, level, x, z, y, priority = 1) =>
     anchors.push({ kind, level, x, z, y, priority });
 
-  // Evenly spaced wall torches around a room's perimeter, inset off each wall.
-  const wallTorches = (level, x0, z0, x1, z1, y, spacing = 6, pr = 1) => {
+  // A few wall torches on a room's two long walls, at inset fractions, each
+  // skipped if it would land in a doorway. `fracs` controls how many.
+  const wallTorches = (level, x0, z0, x1, z1, y, fracs = [0.24, 0.76], pr = 1) => {
     const w = x1 - x0, d = z1 - z0;
-    const nx = Math.max(1, Math.round(w / spacing));
-    const nz = Math.max(1, Math.round(d / spacing));
-    for (let i = 0; i < nx; i++) {
-      const x = x0 + ((i + 0.5) / nx) * w;
-      add('torch', level, x, z0 + 0.4, y, pr);
-      add('torch', level, x, z1 - 0.4, y, pr);
-    }
-    for (let j = 0; j < nz; j++) {
-      const z = z0 + ((j + 0.5) / nz) * d;
-      add('torch', level, x0 + 0.4, z, y, pr);
-      add('torch', level, x1 - 0.4, z, y, pr);
+    const along = w >= d ? 'x' : 'z';
+    for (const f of fracs) {
+      if (along === 'x') {
+        const x = x0 + f * w;
+        if (!_inDoorway(level, x, z0 + 0.4)) add('torch', level, x, z0 + 0.4, y, pr);
+        if (!_inDoorway(level, x, z1 - 0.4)) add('torch', level, x, z1 - 0.4, y, pr);
+      } else {
+        const z = z0 + f * d;
+        if (!_inDoorway(level, x0 + 0.4, z)) add('torch', level, x0 + 0.4, z, y, pr);
+        if (!_inDoorway(level, x1 - 0.4, z)) add('torch', level, x1 - 0.4, z, y, pr);
+      }
     }
   };
 
@@ -357,74 +373,64 @@ export function buildLightAnchors() {
 
     switch (room.kind) {
       case 'corridor': case 'gallery':
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
         break;
       case 'entrance':
         add('chandelier', room.level, cx, cz, L.y + L.clear - 1.6, 3);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5);
+        wallTorches(room.level, x0, z0, x1, z1, torchY);
         break;
-      case 'ballroom': {
-        // three great chandeliers down the long axis + a full ring of sconces
-        for (const t of [0.18, 0.5, 0.82]) {
+      case 'ballroom':
+        for (const t of [0.2, 0.5, 0.8]) {
           add('chandelier', room.level, x0 + t * w, cz, L.y + 13.5, 4);
         }
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5);
+        wallTorches(room.level, x0, z0, x1, z1, torchY);
         break;
-      }
       case 'dining':
         add('chandelier', room.level, cx - 4, cz, ceilY, 3);
         add('chandelier', room.level, cx + 4, cz, ceilY, 3);
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
       case 'kitchen':
         add('fireplace', room.level, cx, z1 - 0.7, L.y + 1.0, 3); // great hearth
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
         break;
       case 'stairHall':
         add('chandelier', room.level, cx, cz, L.y + L.clear - 1.4, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
         break;
       case 'master': case 'royal':
         add('chandelier', room.level, cx, cz, ceilY, 2);
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
       case 'bedroom': case 'sitting':
         add('chandelier', room.level, cx, cz, ceilY, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
         break;
       case 'library':
         add('chandelier', room.level, cx, cz, ceilY, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
       case 'bathroom':
         add('candle', room.level, cx, cz, L.y + 1.1);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
         break;
       case 'treasury':
         add('chandelier', room.level, cx, cz, ceilY, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5, 2);
         break;
       case 'observatory':
         add('chandelier', room.level, cx, cz, ceilY, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
       case 'dungeonHall': case 'cells':
-        // the dungeon is now fully torch-lined (still cold-blue from the
-        // ambient — the fire adds warm pools, no longer a dark pit)
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5], 2);
         break;
       case 'guard':
         add('brazier', room.level, cx, cz, L.y + 0.9, 3);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5], 2);
         break;
       case 'vault':
         add('brazier', room.level, cx, cz, L.y + 0.9, 2);
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6, 2);
         break;
       case 'storage': case 'servant':
-        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, [0.5]);
         break;
     }
   }
