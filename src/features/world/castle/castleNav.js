@@ -141,15 +141,22 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
     for (let li = 0; li < grids.length; li++) {
       const v = grids[li][idx];
       if (v === 0) continue;
-      let y;
+      let y, level = li;
       if (v === 1) {
         y = LEVELS[li].y;
       } else {
         y = stairYCache[v - 2](x, z);
         if (y == null) continue; // railing gap between lanes
+        // Stair cells are rasterized on the LOWER level's grid, but a point
+        // high on the ramp (or on the top landing) is physically at the upper
+        // storey — attribute it to whichever level's floor height is nearer,
+        // so spawn/occlusion logic keyed on `level` doesn't think a player
+        // standing at the top of a stair is a storey below.
+        const st = STAIRS[v - 2];
+        level = y >= (LEVELS[st.lo].y + LEVELS[st.hi].y) / 2 ? st.hi : st.lo;
       }
       if (y <= currentY + STEP_UP && y >= currentY - STEP_DOWN && y > bestY) {
-        bestY = y; bestLevel = li;
+        bestY = y; bestLevel = level;
       }
     }
     return bestLevel >= 0 ? { y: bestY, level: bestLevel } : null;
