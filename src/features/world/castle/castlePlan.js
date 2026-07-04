@@ -317,120 +317,114 @@ export function doorLevel(door) {
 }
 
 // ── Light anchors (derived, deterministic) ───────────────────────────────────
-// ~120 warm glow points. ONLY CastleLightPool ever turns the nearest few
-// into real PointLights; every anchor also gets an emissive flame/glow mesh
-// from the builders. kind: torch | chandelier | fireplace | candle | brazier.
+// Dense warm glow points — a genuinely torch-lit castle. Every room is ringed
+// with wall torches and the grander rooms hang a chandelier; the dungeon is
+// fully lined with torches + braziers. CastleLightPool turns the nearest few
+// into real PointLights each frame; every anchor also gets an emissive
+// flame/glow mesh from the builders (cheap, all merged). The themed ambient is
+// the always-on base — this is the fire that layers warm, flickering light on
+// top of it. kind: torch | chandelier | fireplace | candle | brazier.
 // priority: higher wins when ranking pool assignment at equal distance.
 export function buildLightAnchors() {
   const anchors = [];
   const add = (kind, level, x, z, y, priority = 1) =>
     anchors.push({ kind, level, x, z, y, priority });
 
+  // Evenly spaced wall torches around a room's perimeter, inset off each wall.
+  const wallTorches = (level, x0, z0, x1, z1, y, spacing = 6, pr = 1) => {
+    const w = x1 - x0, d = z1 - z0;
+    const nx = Math.max(1, Math.round(w / spacing));
+    const nz = Math.max(1, Math.round(d / spacing));
+    for (let i = 0; i < nx; i++) {
+      const x = x0 + ((i + 0.5) / nx) * w;
+      add('torch', level, x, z0 + 0.4, y, pr);
+      add('torch', level, x, z1 - 0.4, y, pr);
+    }
+    for (let j = 0; j < nz; j++) {
+      const z = z0 + ((j + 0.5) / nz) * d;
+      add('torch', level, x0 + 0.4, z, y, pr);
+      add('torch', level, x1 - 0.4, z, y, pr);
+    }
+  };
+
   for (const room of ROOMS) {
     const L = LEVELS[room.level];
     const { x0, z0, x1, z1 } = room.rect;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    const w = x1 - x0, d = z1 - z0;
+    const w = x1 - x0; // used by the ballroom's long-axis chandelier spacing
     const torchY = L.y + 2.5;
+    const ceilY = L.y + L.clear - 1.5; // chandelier hang height
 
     switch (room.kind) {
-      case 'corridor': case 'gallery': {
-        // paired wall torches marching down the long axis
-        const along = w >= d ? 'x' : 'z';
-        const len = along === 'x' ? w : d;
-        const n = Math.max(2, Math.floor(len / 7));
-        for (let i = 0; i < n; i++) {
-          const t = (i + 0.5) / n;
-          if (along === 'x') {
-            add('torch', room.level, x0 + t * w, z0 + 0.4, torchY);
-            add('torch', room.level, x0 + t * w, z1 - 0.4, torchY);
-          } else {
-            add('torch', room.level, x0 + 0.4, z0 + t * d, torchY);
-            add('torch', room.level, x1 - 0.4, z0 + t * d, torchY);
-          }
-        }
+      case 'corridor': case 'gallery':
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
-      }
       case 'entrance':
         add('chandelier', room.level, cx, cz, L.y + L.clear - 1.6, 3);
-        add('torch', room.level, x0 + 0.4, cz - 6, torchY);
-        add('torch', room.level, x0 + 0.4, cz + 6, torchY);
-        add('torch', room.level, cx, z0 + 0.4, torchY);
-        add('torch', room.level, cx, z1 - 0.4, torchY);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5);
         break;
       case 'ballroom': {
-        // three great chandeliers down the long axis + wall sconces
-        for (const t of [0.22, 0.5, 0.78]) {
+        // three great chandeliers down the long axis + a full ring of sconces
+        for (const t of [0.18, 0.5, 0.82]) {
           add('chandelier', room.level, x0 + t * w, cz, L.y + 13.5, 4);
         }
-        for (const t of [0.2, 0.5, 0.8]) {
-          add('torch', room.level, x0 + t * w, z0 + 0.4, torchY);
-          add('torch', room.level, x0 + 0.4, z0 + t * d, torchY);
-        }
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5);
         break;
       }
       case 'dining':
-        add('chandelier', room.level, cx - 4, cz, L.y + L.clear - 1.5, 3);
-        add('chandelier', room.level, cx + 4, cz, L.y + L.clear - 1.5, 3);
+        add('chandelier', room.level, cx - 4, cz, ceilY, 3);
+        add('chandelier', room.level, cx + 4, cz, ceilY, 3);
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
       case 'kitchen':
         add('fireplace', room.level, cx, z1 - 0.7, L.y + 1.0, 3); // great hearth
-        add('torch', room.level, x0 + 0.4, cz, torchY);
-        add('torch', room.level, x1 - 0.4, cz - 4, torchY);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
       case 'stairHall':
         add('chandelier', room.level, cx, cz, L.y + L.clear - 1.4, 2);
-        add('torch', room.level, x0 + 0.4, z0 + 2, torchY);
-        add('torch', room.level, x1 - 0.4, z1 - 2, torchY);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
       case 'master': case 'royal':
+        add('chandelier', room.level, cx, cz, ceilY, 2);
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
-        add('candle', room.level, cx + 3, cz + 3, L.y + 1.1);
-        add('candle', room.level, cx - 3, cz - 3, L.y + 1.1);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
       case 'bedroom': case 'sitting':
-        add('candle', room.level, cx, cz - 2, L.y + 1.1);
-        add('torch', room.level, x0 + 0.4, cz, torchY);
+        add('chandelier', room.level, cx, cz, ceilY, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
       case 'library':
-        add('chandelier', room.level, cx, cz, L.y + L.clear - 1.5, 2);
-        add('candle', room.level, cx - 4, cz, L.y + 1.1);
-        add('candle', room.level, cx + 4, cz, L.y + 1.1);
+        add('chandelier', room.level, cx, cz, ceilY, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5);
         break;
       case 'bathroom':
         add('candle', room.level, cx, cz, L.y + 1.1);
-        add('torch', room.level, x0 + 0.4, cz, torchY);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
       case 'treasury':
-        add('candle', room.level, cx - 3, cz, L.y + 1.3, 2);
-        add('candle', room.level, cx + 3, cz, L.y + 1.3, 2);
-        add('torch', room.level, cx, z0 + 0.4, torchY);
+        add('chandelier', room.level, cx, cz, ceilY, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 5.5, 2);
         break;
       case 'observatory':
-        add('candle', room.level, cx, cz, L.y + 1.1);
+        add('chandelier', room.level, cx, cz, ceilY, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
-      case 'dungeonHall': case 'cells': {
-        // sparse — the dungeon stays dark between pools of torchlight
-        const along = w >= d ? 'x' : 'z';
-        const len = along === 'x' ? w : d;
-        const n = Math.max(1, Math.floor(len / 12));
-        for (let i = 0; i < n; i++) {
-          const t = (i + 0.5) / n;
-          if (along === 'x') add('torch', room.level, x0 + t * w, z0 + 0.4, torchY, 2);
-          else               add('torch', room.level, x0 + 0.4, z0 + t * d, torchY, 2);
-        }
+      case 'dungeonHall': case 'cells':
+        // the dungeon is now fully torch-lined (still cold-blue from the
+        // ambient — the fire adds warm pools, no longer a dark pit)
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6, 2);
         break;
-      }
       case 'guard':
         add('brazier', room.level, cx, cz, L.y + 0.9, 3);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6, 2);
         break;
       case 'vault':
-        add('torch', room.level, cx, z1 - 0.4, torchY, 2);
-        add('candle', room.level, cx, cz, L.y + 1.0);
+        add('brazier', room.level, cx, cz, L.y + 0.9, 2);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6, 2);
         break;
       case 'storage': case 'servant':
-        add('torch', room.level, cx, z1 - 0.4, torchY);
+        wallTorches(room.level, x0, z0, x1, z1, torchY, 6);
         break;
     }
   }

@@ -16,12 +16,14 @@
 import { hash2 } from '../../worldgen/rng.js';
 
 // The castle's always-on themed ambient (a scoped hemispheric) must ALWAYS be
-// in each material's active light set — otherwise the 6 pool torches (kept
-// enabled at intensity 0) plus the scene fill/bounce fill all 8 default slots
-// and the ambient base silently drops out, leaving rooms lit only where a
-// torch pool happens to reach. 10 slots fit fill + bounce + ambient + 6 pool
-// with headroom; the ambient also gets a high renderPriority so it's never the
-// one evicted.
+// in each material's active light set — otherwise the pool torches (kept
+// enabled at intensity 0) plus the scene fill/bounce fill every slot and the
+// ambient base silently drops out, leaving rooms lit only where a torch pool
+// happens to reach. 10 slots fit fill + bounce + ambient + the 7-light pool
+// exactly; the ambient also gets a high renderPriority so it's never the one
+// evicted. (Pushing this higher risks StandardMaterial exceeding the shader's
+// light budget and failing to compile on weaker GLSL backends — lit meshes
+// then vanish while the unlit emissive flames still draw.)
 const MAX_LIGHTS = 10;
 
 /**

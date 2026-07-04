@@ -268,7 +268,7 @@ export class CastleSystem {
       }
       ctx.colliders.length = 0;
       this._intMeshes = mergeCollector(ctx, this._intRoot);
-      this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 3 : 6);
+      this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 4 : 7);
       this._pool.setIncludedMeshes(this._intMeshes);
       this._spawnInteriorLights();
     }
