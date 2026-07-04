@@ -169,6 +169,15 @@ export function buildPropTemplates(scene, opts = {}) {
     applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
     applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
 
+    // Bush blobs + pine cones: flat untextured olive/sage blows out to
+    // chartreuse under full sun + tone mapping — the "neon" outliers once
+    // the grass went photographic. Drape the Meshy clump albedo over them
+    // and pull the base color down so they sit inside the field's palette.
+    applyOptionalTexture(bushM, 'diffuseTexture', `${TEX_BASE}/grass-clump-albedo.jpg`, scene, { uScale: 2, vScale: 1 });
+    bushM.diffuseColor = BABYLON.Color3.FromHexString('#77806a');
+    applyOptionalTexture(pine, 'diffuseTexture', `${TEX_BASE}/grass-clump-albedo.jpg`, scene, { uScale: 3, vScale: 2 });
+    pine.diffuseColor = BABYLON.Color3.FromHexString('#8a967c');
+
     // Broadleaf canopy material: an alpha-cutout leaf card. The source JPG has
     // no alpha channel, so it is preprocessed once into a proper RGBA texture:
     //  - alpha is a HARD key on "not black" (max channel), so dark/shadowed
@@ -293,13 +302,55 @@ export function buildPropTemplates(scene, opts = {}) {
   T.bush.bakeTransformIntoVertices(BABYLON.Matrix.Scaling(1, 0.7, 1).multiply(BABYLON.Matrix.Translation(0, 0.55, 0)));
   T.bush.material = bushM;
 
-  // ground details / understory
-  T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
-  T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
-  T.tuft.material = green;
-  T.fern = BABYLON.MeshBuilder.CreateCylinder('tpl_fern', { diameterTop: 0, diameterBottom: 1.48, height: 0.5, tessellation: 6 }, scene);
-  T.fern.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.25, 0));
-  T.fern.material = green;
+  // ground details / understory. At runtime these are alpha-cutout crossed
+  // cards sampling the same Meshy-derived clump atlas as AshwoodGrass — the
+  // old solid cones read as flat neon shapes against the textured field.
+  // Bake keeps the cones (GLB contract: plain geometry + vertex colors).
+  if (!opts.bake) {
+    const grassCardMat = new BABYLON.StandardMaterial('ash_grasscard', scene);
+    grassCardMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    grassCardMat.backFaceCulling = false;
+    grassCardMat.twoSidedLighting = true;
+    // Explicit alpha-test mode like leafCardMat — hasAlpha alone leaves the
+    // material opaque and the atlas's dilated backdrop renders as solid
+    // chartreuse ribbons.
+    grassCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTMODE;
+    grassCardMat.alphaCutOff = 0.35;
+    const gtex = new BABYLON.Texture(`${TEX_BASE}/grass-cards.png`, scene);
+    gtex.hasAlpha = true; // alpha-test cutout, no blending/sorting
+    grassCardMat.diffuseTexture = gtex;
+    new LeafSwayPlugin(grassCardMat);
+
+    // Crossed pair of quads rooted at y=0, sampling one atlas half
+    // (v=0 = image bottom = opaque roots, per default invertY). v starts at
+    // 0.12 to skip the dark dirt rows at the atlas base — standalone prop
+    // cards show their roots, unlike the dense field cards.
+    const card = (name, w, h, u0, u1) => {
+      const hw = w / 2;
+      const v0 = 0.12;
+      const vd = new BABYLON.VertexData();
+      vd.positions = [-hw, 0, 0, hw, 0, 0, hw, h, 0, -hw, h, 0,
+                      0, 0, -hw, 0, 0, hw, 0, h, hw, 0, h, -hw];
+      vd.uvs = [u0, v0, u1, v0, u1, 1, u0, 1, u0, v0, u1, v0, u1, 1, u0, 1];
+      vd.normals = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+                    1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0];
+      vd.indices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7];
+      const mesh = new BABYLON.Mesh(name, scene);
+      vd.applyToMesh(mesh);
+      mesh.material = grassCardMat;
+      mesh.metadata = { texturedCard: true };
+      return mesh;
+    };
+    T.tuft = card('tpl_tuft', 0.8, 1.05, 0.5, 1.0);   // dense variant half
+    T.fern = card('tpl_fern', 1.48, 0.62, 0.0, 0.5);  // wide low, lush half
+  } else {
+    T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
+    T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
+    T.tuft.material = green;
+    T.fern = BABYLON.MeshBuilder.CreateCylinder('tpl_fern', { diameterTop: 0, diameterBottom: 1.48, height: 0.5, tessellation: 6 }, scene);
+    T.fern.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.25, 0));
+    T.fern.material = green;
+  }
   T.flower = BABYLON.MeshBuilder.CreateIcoSphere('tpl_flower', { radius: 0.3, subdivisions: 1 }, scene);
   T.flower.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.3, 0));
   T.flower.convertToFlatShadedMesh();
@@ -429,7 +480,16 @@ class Acc {
     mesh.setEnabled(true);
     mesh.isPickable = false;
     mesh.thinInstanceSetBuffer('matrix', new Float32Array(this.mats), 16, true);
-    if (this.cols.length) mesh.thinInstanceSetBuffer('color', new Float32Array(this.cols), 4, true);
+    let cols = this.cols;
+    if (cols.length && template.metadata?.texturedCard) {
+      // Textured-card templates carry their color in the texture; the pushed
+      // biome tints (grassCol-scale, some ×1.3 — the old "neon" understory)
+      // would darken/oversaturate it. Soften to 35% strength around neutral,
+      // mirroring the AshwoodGrass shader's tint formula.
+      cols = cols.map((v, i) =>
+        i % 4 === 3 ? 1 : 0.65 + 0.35 * Math.min(v * 2.2, 1.6));
+    }
+    if (cols.length) mesh.thinInstanceSetBuffer('color', new Float32Array(cols), 4, true);
     mesh.thinInstanceRefreshBoundingInfo();
     container.meshes.push(mesh);
     if (castShadow) castShadow(mesh);

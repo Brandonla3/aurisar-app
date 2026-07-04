@@ -252,7 +252,7 @@ export class AshwoodGrass {
       m.setVector3('uSunDir', this._sunDir);
       // High tier only — cheap to always set, the shader multiplies by 0 on
       // low/mobile so the term is a free no-op there.
-      m.setFloat('uBackStrength', tier === 'high' ? 0.5 : 0.0);
+      m.setFloat('uBackStrength', tier === 'high' ? 0.25 : 0.0);
     }
     // Hero clumps render on every tier (~1.3k tris each, a few dozen
     // instances) — phones just get a tighter ring around the player.
