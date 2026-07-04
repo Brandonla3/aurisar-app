@@ -21,16 +21,16 @@
 
 import {
   CASTLE_PLAN, LEVELS, INTERIOR_ANCHOR, ENTRY, EXTERIOR, LOCAL_BOUNDS,
-  buildLightAnchors,
+  SHELL_COLLISION, buildLightAnchors,
 } from './castlePlan.js';
-import { buildNav } from './castleNav.js';
-import { createCastleMaterials } from './builders/materials.js';
+import { buildNav, buildNavDebugOverlay } from './castleNav.js';
+import { createCastleMaterials, applyWindowWarmth } from './builders/materials.js';
 import { createCollector, mergeCollector } from './builders/mergeUtil.js';
 import { createFloorSlabs, createRoom, createWallsForLevel, dressStructuralRooms } from './builders/rooms.js';
 import { createAllStaircases } from './builders/staircase.js';
 import { createAllFurniture } from './builders/furniture.js';
 import { createFixturesFromAnchors } from './builders/fixtures.js';
-import { createCastleExterior } from './builders/exterior.js';
+import { createCastleExterior, EXTERIOR_LOD0_MAX_M } from './builders/exterior.js';
 import { CastleLightPool } from './CastleLightPool.js';
 import { hash2 } from '../worldgen/rng.js';
 
@@ -39,6 +39,13 @@ const EXIT_PROMPT_DIST_SQ = 3.4 * 3.4;
 const LEAVE_DIST_SQ = 7.0 * 7.0;   // hysteresis
 const PROX_MS = 200;
 const MOOD_MS = 300;
+const LOD_MS = 500;
+
+/** 0..1 warmth bias from time-of-day hours (peaks near sunset). */
+function eveningBiasFromTod(hours) {
+  const phase = ((hours % 24) + 24) % 24 / 24;
+  return 0.5 + 0.5 * Math.cos((phase - 0.72) * Math.PI * 2);
+}
 
 // Warm interior mood vs the darker, rougher dungeon level. Applied through
 // LightingManager.setDungeonMood so the LM stays the only writer of
@@ -73,6 +80,7 @@ const DUNGEON_MOOD = {
 // at call time.
 const AMBIENT_ROYAL = { diffuse: [0.66, 0.63, 0.62], ground: [0.38, 0.34, 0.30], intensity: 0.80 };
 const AMBIENT_WARM = { diffuse: [0.68, 0.60, 0.46], ground: [0.36, 0.30, 0.22], intensity: 0.72 };
+const NO_INTERIOR_SHADOW = new Set(['windowGlow', 'windowCool', 'flame', 'ember', 'candleGlow']);
 // dungeon: distinctly blue but bright — close to the rest of the castle so it
 // reads as a cold hall, not a black pit.
 const AMBIENT_DUNGEON = { diffuse: [0.48, 0.56, 0.74], ground: [0.28, 0.33, 0.44], intensity: 0.98 };
@@ -113,9 +121,25 @@ export class CastleSystem {
     this._lastMoodAt = 0;
     this._moodLevel = -1;
     this._gateObs = null;
+    this._navDebugRoot = null;
+    this._colliders = [];
+    this._extLodMeshes = [];
+    this._lastLodAt = 0;
+    this._lastWarmAt = 0;
   }
 
   isInside() { return this._inside; }
+
+  /** Dev-only: subsampled nav grid overlay for one level. */
+  showNavDebug(show, level = 1) {
+    this._navDebugRoot?.dispose(false, true);
+    this._navDebugRoot = null;
+    if (!show || !this._built) return;
+    this._navDebugRoot = buildNavDebugOverlay(
+      this.scene, this.nav, level, INTERIOR_ANCHOR.x, INTERIOR_ANCHOR.z,
+    );
+    this._navDebugRoot.parent = this._intRoot;
+  }
 
   /**
    * Overworld collision against the exterior shell: the walls are real.
@@ -125,11 +149,11 @@ export class CastleSystem {
    */
   resolveShellCollision(prevX, prevZ, pos) {
     const E = EXTERIOR;
-    const m = 0.7; // player radius + skin
+    const m = SHELL_COLLISION.marginM;
     const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
     const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
     const tr = E.towerR + m;
-    const gr = 2.6 + m; // gatehouse turret body (protrudes past the wall line)
+    const gr = E.gateTurretR + m;
     const blocked = (x, z) => {
       if (x > x0 && x < x1 && z > z0 && z < z1) return true;
       for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -137,7 +161,8 @@ export class CastleSystem {
         if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < tr * tr) return true;
       }
       for (const s of [-1, 1]) {
-        const tx = E.site.x - E.halfW, tz = E.gate.z + s * (E.gate.width / 2 + 1.6);
+        const tx = E.site.x - E.halfW;
+        const tz = E.gate.z + s * (E.gate.width / 2 + E.gateTurretProtrude);
         if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < gr * gr) return true;
       }
       return false;
@@ -192,7 +217,7 @@ export class CastleSystem {
     if (this._siteBaseY == null) {
       this._siteBaseY = this._worldgen.surfaceY(E.site.x, E.site.z);
     }
-    const m = 0.5; // camera skin
+    const m = SHELL_COLLISION.cameraSkinM;
     const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
     const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
     const wallTop = this._siteBaseY + E.wallH + 2.2; // + battlements
@@ -202,8 +227,8 @@ export class CastleSystem {
         (E.towerR + m) ** 2, this._siteBaseY + E.towerH + 1]);
     }
     for (const s of [-1, 1]) {
-      cyls.push([E.site.x - E.halfW, E.gate.z + s * (E.gate.width / 2 + 1.6),
-        (3.2 + m) ** 2, wallTop + 6]);
+      cyls.push([E.site.x - E.halfW, E.gate.z + s * (E.gate.width / 2 + E.gateTurretProtrude),
+        (E.gateTurretR + m) ** 2, wallTop + 6]);
     }
     const blocked = (x, y, z) => {
       for (const [cx, cz, r2, top] of cyls) {
@@ -229,7 +254,7 @@ export class CastleSystem {
 
   async init() {
     if (this._disposed) return;
-    this._mats = createCastleMaterials(this.scene);
+    this._mats = createCastleMaterials(this.scene, { isMobile: this._host.isMobile });
     // yield between build chunks via the render loop, NOT setTimeout —
     // browsers throttle timers under heavy rAF load (a 1.6 s build was
     // stretching to ~28 s of throttled waits in headless profiling)
@@ -240,11 +265,13 @@ export class CastleSystem {
     this._extRoot = new BABYLON.TransformNode('castle_exterior', this.scene);
     {
       const ctx = createCollector(this.scene, this._mats);
-      const { gateTorchPositions } = createCastleExterior(ctx, this._worldgen);
+      const warmBias = eveningBiasFromTod(this._host.getTimeOfDay?.() ?? 18);
+      const { gateTorchPositions } = createCastleExterior(ctx, this._worldgen, { warmBias });
       const extMeshes = mergeCollector(ctx, this._extRoot, (mesh, group, matKey) => {
-        // shadow casters: stone masses only (windows/flames don't cast)
         if (matKey.includes('Stone') || matKey === 'stone') this._host.castShadow?.(mesh);
       });
+      this._extLodMeshes = extMeshes.filter((m) => m.name.includes('_EXT_LOD0_'));
+      applyWindowWarmth(this._mats, warmBias);
       this._spawnGateTorchLights(gateTorchPositions, extMeshes);
     }
     if (this._disposed) return;
@@ -278,23 +305,13 @@ export class CastleSystem {
         ...a, x: a.x + ax, z: a.z + az,
       }));
       createFixturesFromAnchors(ctx, anchors, 0, 0); // anchors already world-space
-      // invisible camera-collision proxies (walls/slabs recorded during the
-      // build). The camera collides against ~250 simple boxes instead of the
-      // merged render meshes — cheap, and Babylon's collision response never
-      // touches the player's zoom, so the camera can't get "stuck".
-      for (const c of ctx.colliders) {
-        const b = BABYLON.MeshBuilder.CreateBox('castleCamCol', {
-          width: c.w, height: c.h, depth: c.d,
-        }, this.scene);
-        b.position.set(c.cx, c.cy, c.cz);
-        b.isVisible = false;
-        b.isPickable = false;
-        b.checkCollisions = true;
-        b.parent = this._intRoot;
-        b.freezeWorldMatrix();
-      }
+      // Record wall/floor/ceiling AABBs for future mob/projectile queries —
+      // no Babylon proxy meshes (camera uses nav LOS, not checkCollisions).
+      this._colliders = ctx.colliders.slice();
       ctx.colliders.length = 0;
-      this._intMeshes = mergeCollector(ctx, this._intRoot);
+      this._intMeshes = mergeCollector(ctx, this._intRoot, null, {
+        receiveShadowsFor: (matKey) => !NO_INTERIOR_SHADOW.has(matKey),
+      });
       this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 4 : 7);
       this._pool.setIncludedMeshes(this._intMeshes);
       this._spawnInteriorLights();
@@ -371,6 +388,8 @@ export class CastleSystem {
     this._lastProxAt = now;
     const p = this._host.getPlayerPos();
     if (!p) return;
+    this._updateExteriorLod(p, now);
+    this._updateWindowWarmth(now);
 
     let id = this._nearbyDoorId;
     if (!this._inside) {
@@ -393,6 +412,20 @@ export class CastleSystem {
         label: id === 'castle_gate' ? 'Enter Castle Ashwood' : 'Leave the castle',
       } : null);
     }
+  }
+
+  _updateExteriorLod(p, now) {
+    if (now - this._lastLodAt < LOD_MS || !this._extLodMeshes?.length) return;
+    this._lastLodAt = now;
+    const dist = Math.hypot(p.x - EXTERIOR.site.x, p.z - EXTERIOR.site.z);
+    const show = dist < EXTERIOR_LOD0_MAX_M;
+    for (const m of this._extLodMeshes) m.setEnabled(show);
+  }
+
+  _updateWindowWarmth(now) {
+    if (now - this._lastWarmAt < 2000 || !this._mats) return;
+    this._lastWarmAt = now;
+    applyWindowWarmth(this._mats, eveningBiasFromTod(this._host.getTimeOfDay?.() ?? 18));
   }
 
   _updateMood(p, now) {
@@ -534,7 +567,8 @@ export class CastleSystem {
     this._gateLights.length = 0;
     this._extRoot?.dispose(false, true);
     this._intRoot?.dispose(false, true);
-    this._extRoot = this._intRoot = null;
+    this._navDebugRoot?.dispose(false, true);
+    this._extRoot = this._intRoot = this._navDebugRoot = null;
     this._lm?.setDungeonMood?.(null);
     this._mats?.disposeAll();
     this._mats = null;

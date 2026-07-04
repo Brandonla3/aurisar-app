@@ -1035,6 +1035,7 @@ export class BabylonWorldScene {
       isMobile: this._isMobile,
       castShadow: (m) => this._castShadow(m),
       getPlayerPos: () => this._local?.root?.position ?? null,
+      getTimeOfDay: () => this.timeOfDay,
       getAvatarMeshes: () => this._local?.root?.getChildMeshes?.() ?? [],
       teleportPlayer: (x, y, z, yaw) => this._teleportLocal(x, y, z, yaw),
       cameraEnter: (t, yaw) => this._castleCameraSet(t, yaw, true),

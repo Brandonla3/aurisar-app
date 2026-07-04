@@ -20,9 +20,31 @@
 // ── Navigation / construction constants ─────────────────────────────────────
 export const WALL_T     = 0.5;   // wall thickness (walls sit centered on room edges)
 export const PLAYER_R   = 0.35;  // player capsule radius baked into the nav grid inset
+export const PLAYER_SKIN = 0.35; // extra analytic margin (exterior shell + camera probes)
 export const STEP_UP    = 0.55;  // max step-up per move (stair seams, thresholds)
 export const NAV_CELL   = 0.25;  // nav grid cell size in meters
 export const SLAB_T     = 0.6;   // floor slab thickness (slab top = level y)
+
+/** Room-kind → material keys consumed by builders/materials.js. Spec-driven palette. */
+export const MATERIAL_SPEC = Object.freeze({
+  floorByKind: Object.freeze({
+    entrance: 'marble', corridor: 'marble', gallery: 'marble', stairHall: 'marble',
+    ballroom: 'marble', treasury: 'marble', bathroom: 'marble',
+    dining: 'woodFloor', bedroom: 'woodFloor', master: 'woodFloor', royal: 'woodFloor',
+    sitting: 'woodFloor', library: 'woodFloor', observatory: 'woodFloor',
+    kitchen: 'darkStone', servant: 'woodFloor', storage: 'darkStone',
+    dungeonHall: 'darkStone', cells: 'darkStone', guard: 'darkStone', vault: 'darkStone',
+  }),
+  wallByLevel: Object.freeze(['darkStone', 'stone', 'plaster', 'plaster', 'plaster']),
+  windowedKinds: Object.freeze([
+    'entrance', 'ballroom', 'bedroom', 'master', 'royal', 'sitting', 'library',
+    'bathroom', 'observatory', 'dining', 'kitchen', 'gallery', 'corridor', 'stairHall',
+  ]),
+  fancyKinds: Object.freeze([
+    'entrance', 'ballroom', 'gallery', 'royal', 'master', 'library', 'sitting',
+    'dining', 'stairHall', 'treasury',
+  ]),
+});
 
 // Interior-local bounds (nav grid + slab extents). Interior anchor keeps the
 // far edge at x = 840 + 33 = 873 m — inside the server clamp (x <= 999 m,
@@ -209,6 +231,18 @@ export const EXTERIOR = Object.freeze({
   towerR: 6.5, towerH: 39,     // corner towers
   keep: { halfW: 16, halfD: 12, h: 36 },  // raised central keep block
   gate: { z: 20, width: 6.4, height: 9 }, // gate centered on west wall at site.z
+  gateTurretR: 2.6,           // gatehouse turret body radius (analytic collision)
+  gateTurretProtrude: 1.6,    // turret center offset past the west wall line
+});
+
+/** Analytic exterior collision + camera probe constants (derived from EXTERIOR). */
+export const SHELL_COLLISION = Object.freeze({
+  playerRadiusM: PLAYER_R,
+  skinM: PLAYER_SKIN,
+  marginM: PLAYER_R + PLAYER_SKIN,
+  cameraSkinM: 0.5,
+  gateTurretR: EXTERIOR.gateTurretR,
+  gateTurretProtrude: EXTERIOR.gateTurretProtrude,
 });
 
 export const INTERIOR_ANCHOR = Object.freeze({ x: 840, z: 0 });
@@ -224,6 +258,28 @@ export const ENTRY = Object.freeze({
   gateWorld: { x: EXTERIOR.site.x - EXTERIOR.halfW - 3.5, z: EXTERIOR.gate.z },
 });
 
+// ── Dungeon spawn markers (interior-local, PLAN_SCALE coords) ────────────────
+const RAW_SPAWN_MARKERS = [
+  { netId: 'ca_cells',    roomId: 'cellBlockN', mobType: 'restless_bones', count: 4, radiusM: 8 },
+  { netId: 'ca_vault',    roomId: 'dVault',     mobType: 'vale_bandit',    count: 3, radiusM: 6 },
+  { netId: 'ca_ballroom', roomId: 'ballroom',   mobType: 'restless_bones', count: 5, radiusM: 10 },
+  { netId: 'ca_boss',     roomId: 'treasury',   mobType: 'gorrak',         count: 1, radiusM: 2 },
+];
+
+/** Interior-local center of a room rect (post-PLAN_SCALE). */
+export function roomCenterLocal(roomId) {
+  const r = ROOMS.find((rm) => rm.id === roomId);
+  if (!r) throw new Error(`castlePlan: unknown room "${roomId}"`);
+  return {
+    x: (r.rect.x0 + r.rect.x1) / 2,
+    z: (r.rect.z0 + r.rect.z1) / 2,
+  };
+}
+
+export const SPAWN_MARKERS = Object.freeze(
+  RAW_SPAWN_MARKERS.map((s) => ({ ...s, pos: roomCenterLocal(s.roomId) })),
+);
+
 // ── Aggregate plan object (SEAM:layout-manifest — JSON-serializable) ─────────
 export const CASTLE_PLAN = Object.freeze({
   name: 'Castle Ashwood',
@@ -236,10 +292,12 @@ export const CASTLE_PLAN = Object.freeze({
   stairs: STAIRS,
   voids: VOIDS,
   entry: ENTRY,
+  materialSpec: MATERIAL_SPEC,
+  collision: SHELL_COLLISION,
   // SEAM:dungeon-def — v2 mob spawns, DungeonSpawnDef-shaped, seeded by the
   // server when the castle becomes a real instance. Positions are
   // interior-local; contentPos = local + interiorAnchor.
-  spawnMarkers: [],
+  spawnMarkers: SPAWN_MARKERS,
 });
 
 // ── Stair math (shared by geometry AND nav — the anti-drift seam) ────────────
