@@ -108,10 +108,13 @@ void main() {
   float wrap = clamp((ndl + 0.5) / 1.5, 0.0, 1.0);
   float lambert = mix(0.55, 1.0, wrap);
 
-  // The texture carries the blade detail; the instance rgb (biome grassCol,
-  // ~0.15-0.5) hue-shifts it per biome. 1.7 renormalizes the tint so a
-  // mid-green biome keeps the texture a touch deeper than neutral.
-  vec3 base = tex.rgb * clamp(vCol.rgb * 1.7, 0.0, 1.5);
+  // The texture carries both the blade detail AND the color (the Meshy
+  // renders' native moody green). The biome tint (instance rgb, ~0.15-0.5,
+  // renormalized by 2.2) only nudges the hue at 35% strength — full-strength
+  // tinting is what made the first pass read neon-lime instead of the
+  // source renders.
+  vec3 tint = mix(vec3(1.0), clamp(vCol.rgb * 2.2, 0.0, 1.6), 0.35);
+  vec3 base = tex.rgb * tint;
 
   vec3 V = normalize(cameraPosition - vWp);
   // Translucency / backlight: blades glow when the sun sits behind them from
