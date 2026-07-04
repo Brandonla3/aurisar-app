@@ -15,7 +15,14 @@
 
 import { hash2 } from '../../worldgen/rng.js';
 
-const MAX_LIGHTS = 8;
+// The castle's always-on themed ambient (a scoped hemispheric) must ALWAYS be
+// in each material's active light set — otherwise the 6 pool torches (kept
+// enabled at intensity 0) plus the scene fill/bounce fill all 8 default slots
+// and the ambient base silently drops out, leaving rooms lit only where a
+// torch pool happens to reach. 10 slots fit fill + bounce + ambient + 6 pool
+// with headroom; the ambient also gets a high renderPriority so it's never the
+// one evicted.
+const MAX_LIGHTS = 10;
 
 /**
  * 128px procedural diffuse texture. mode:
@@ -110,22 +117,25 @@ export function createCastleMaterials(scene) {
       uv: 0.18,
     }),
     stone: mat(scene, 'castle_stone', {
-      // cooled toward blue-grey for the "royal stone" identity (was warm-white);
-      // wood/fabric stay warm so warm rooms keep their character
-      diffuse: [0.90, 0.94, 1.0],
-      texture: T('castle_tex_stone', [0.44, 0.48, 0.55], [0.32, 0.35, 0.42], 'stone', 23),
+      // warm-neutral royal stone (a touch cool, not blue) — grand halls read
+      // vibrant/warm, not steel-blue; wood/fabric stay warm
+      diffuse: [0.97, 0.95, 0.92],
+      texture: T('castle_tex_stone', [0.50, 0.49, 0.46], [0.38, 0.37, 0.35], 'stone', 23),
       uv: 0.3,
     }),
     darkStone: mat(scene, 'castle_darkStone', {
-      diffuse: [0.82, 0.85, 0.92],
-      texture: T('castle_tex_darkStone', [0.30, 0.34, 0.42], [0.18, 0.21, 0.27], 'stone', 37),
+      // dungeon stone: distinctly BLUE but lightened well up so the dungeon
+      // reads as a cold blue hall at a brightness near the rest of the castle,
+      // not a black pit
+      diffuse: [0.86, 0.90, 0.98],
+      texture: T('castle_tex_darkStone', [0.50, 0.56, 0.68], [0.36, 0.41, 0.53], 'stone', 37),
       uv: 0.28,
     }),
     marble: mat(scene, 'castle_marble', {
-      // cool royal marble (was warm ivory)
-      diffuse: [0.90, 0.95, 1.0],
-      texture: T('castle_tex_marble', [0.72, 0.77, 0.85], [0.86, 0.90, 0.98], 'marble', 5),
-      specular: [0.32, 0.32, 0.34], uv: 0.2,
+      // warm ivory royal marble (slightly cool of the original, not blue)
+      diffuse: [0.97, 0.96, 0.93],
+      texture: T('castle_tex_marble', [0.80, 0.78, 0.74], [0.93, 0.92, 0.88], 'marble', 5),
+      specular: [0.32, 0.32, 0.31], uv: 0.2,
     }),
     marbleDark: mat(scene, 'castle_marbleDark', {
       diffuse: [0.95, 0.95, 1.0],
@@ -207,11 +217,10 @@ export function createCastleMaterials(scene) {
       diffuse: [0.25, 0.42, 0.48], specular: [0.5, 0.55, 0.6], alpha: 0.72,
     }),
     plaster: mat(scene, 'castle_plaster', {
-      // neutral-cool plaster: reads cool under the ballroom's ROYAL ambient
-      // yet stays neutral in the warm upper rooms (their wood floors + WARM
-      // ambient + warm torch accents carry the warmth)
-      diffuse: [0.94, 0.96, 0.98],
-      texture: T('castle_tex_plaster', [0.56, 0.57, 0.58], [0.48, 0.50, 0.53], 'plaster', 83),
+      // warm-neutral plaster: vibrant/warm in the upper rooms, still fine under
+      // the ballroom's royal ambient (wood floors + warm accents carry warmth)
+      diffuse: [0.98, 0.96, 0.92],
+      texture: T('castle_tex_plaster', [0.60, 0.58, 0.54], [0.52, 0.50, 0.46], 'plaster', 83),
       uv: 0.25,
     }),
   };
