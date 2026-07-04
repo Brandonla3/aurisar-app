@@ -75,6 +75,15 @@ export const MANIFEST = {
   // has been fit + processed + visually verified.
 };
 
+// Standalone, self-contained character models — a full rigged+animated mesh in
+// a single GLB, NOT part of the modular MPFB system (no shape keys, own
+// skeleton). Used for authored hero/NPC appearances via `avatarConfig.model`.
+// Built by scripts/build_gilded_sentinel.mjs. CharacterAvatar takes a distinct
+// build path for these (no morphs, no modular hair/clothing/gear pieces).
+export const MODEL_MANIFEST = {
+  gilded_sentinel: 'gilded_sentinel.glb',
+};
+
 const _containers = new Map();
 let   _scene      = null;
 let   _ready      = false;
@@ -148,6 +157,11 @@ export const AssetLibrary = {
         .filter(([k]) => k !== 'base_body')
         .map(([k, p]) => _load(k, p, scene))
     );
+    // Standalone full-model characters (Gilded Sentinel etc.). Non-critical —
+    // missing files fall back to the modular body in CharacterAvatar.
+    await Promise.all(
+      Object.entries(MODEL_MANIFEST).map(([k, p]) => _load(`model/${k}`, p, scene))
+    );
     _ready = true;
     console.log('[AssetLibrary] Ready. Loaded:', [..._containers.keys()].join(', ') || '(none)');
   },
@@ -155,6 +169,11 @@ export const AssetLibrary = {
   /** Returns the AssetContainer for a key, or null if not loaded. */
   getContainer(key) {
     return _containers.get(key) ?? null;
+  },
+
+  /** Returns the AssetContainer for a standalone model key, or null. */
+  getModelContainer(key) {
+    return _containers.get(`model/${key}`) ?? null;
   },
 
   isReady() { return _ready; },

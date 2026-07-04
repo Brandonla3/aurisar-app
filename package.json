@@ -12,6 +12,7 @@
     "sync:content": "node scripts/sync_world_content.mjs",
     "sync:content:check": "node scripts/sync_world_content.mjs --check",
     "build:glb": "node scripts/build_glb_assets.mjs",
+    "build:sentinel": "node scripts/build_gilded_sentinel.mjs",
     "build:gameplay": "node scripts/copy_gameplay_to_public.mjs",
     "bake:tiles": "node scripts/bake_ashwood_tiles.mjs",
     "bake:heightmap": "node scripts/bake_ashwood_heightmap.mjs",

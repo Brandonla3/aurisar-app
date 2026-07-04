@@ -32,7 +32,18 @@ function hashId(id) {
   return h;
 }
 
+// Per-NPC standalone-model overrides. When an id maps here, the NPC renders
+// from a self-contained authored GLB (AssetLibrary.MODEL_MANIFEST) instead of
+// the procedurally-varied modular body. Kept out of the shared content package
+// (src/.../content) so it stays a pure rendering concern and doesn't churn the
+// SpacetimeDB content mirror.
+const NPC_MODEL_OVERRIDES = {
+  marshal_halwin: 'gilded_sentinel',
+};
+
 function npcAvatarConfig(npc) {
+  const model = NPC_MODEL_OVERRIDES[npc.id];
+  if (model) return { version: 1, model };
   const h = hashId(npc.id);
   // Unsigned shifts throughout: h is a full uint32, and `h >> n` reads it as
   // SIGNED — ids hashing ≥ 2^31 (trader_pell, foreman_bram) produced negative

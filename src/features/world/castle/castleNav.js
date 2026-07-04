@@ -233,9 +233,22 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
     return null;
   }
 
+  /**
+   * Post-build blocker: mark a LOCAL-coord rect impassable on one level
+   * (furniture bodies, cell bars, columns). Expanded by PLAYER_R like
+   * voids, so the point-test player stops a body-radius short of the
+   * face. Writes 0 into that level's grid only — stacked floors above/
+   * below stay walkable — and every query reads grids live, so blocking
+   * after build needs no rebuild.
+   */
+  function blockRect(level, rect, expandBy = PLAYER_R) {
+    fillRect(grids[level], expand(rect, expandBy), 0);
+  }
+
   return {
     anchor, cols, rows, grids,
     surfaceAt, resolveMove, isOpen, isOpenBelow, levelAtY, nearestWalkable,
+    blockRect,
     // exposed for tests
     _local: { colOf, rowOf, cellX, cellZ },
   };

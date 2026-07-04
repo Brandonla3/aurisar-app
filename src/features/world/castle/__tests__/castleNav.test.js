@@ -161,6 +161,28 @@ describe('castleNav', () => {
     expect(Math.hypot(p.x - (22 * PLAN_SCALE + AX), p.z - (-5 * PLAN_SCALE + AZ))).toBeLessThan(8);
   });
 
+  it('blockRect makes a footprint impassable on its level only, with slide', () => {
+    // fresh nav so the shared instance stays pristine for other tests
+    const nav2 = buildNav();
+    const c = roomCenterWorld('diningHall'); // level 1; library (3) sits in the same column region
+    const lx = c.x - AX, lz = c.z - AZ;
+    nav2.blockRect(1, { x0: lx - 0.6, z0: lz - 0.6, x1: lx + 0.6, z1: lz + 0.6 });
+    // blocked at its own level (PLAYER_R expansion included)
+    expect(nav2.surfaceAt(c.x, c.z, LEVELS[1].y + 0.3)).toBeNull();
+    expect(nav2.surfaceAt(c.x + 0.8, c.z, LEVELS[1].y + 0.3)).toBeNull(); // inside expansion
+    // clear past the expansion
+    expect(nav2.surfaceAt(c.x + 1.3, c.z, LEVELS[1].y + 0.3)).toBeTruthy();
+    // other levels at the same (x,z) column are untouched
+    const above = nav2.surfaceAt(c.x, c.z, LEVELS[3].y + 0.3);
+    if (above) expect(above.level).not.toBe(1);
+    // resolveMove slides around the blocker instead of entering it
+    const pos = { x: c.x - 2.5, y: LEVELS[1].y, z: c.z + 0.2 };
+    const tgt = { x: c.x, y: pos.y, z: c.z + 0.2 };
+    const res = nav2.resolveMove(pos.x, pos.z, tgt);
+    expect(res).toBeTruthy();
+    expect(tgt.x).toBeLessThan(c.x - 0.8); // stopped short of the footprint
+  });
+
   it('grid rasterization keeps door strips passable at walking width', () => {
     // sample straight through each door center at its level height
     for (const door of CASTLE_PLAN.doors) {
