@@ -17,6 +17,19 @@ import { hash2 } from '../../worldgen/rng.js';
 
 const G = (level) => `L${level}`;
 
+// ── nav blockers ─────────────────────────────────────────────────────────────
+// Solid pieces mark their footprints impassable (interior-LOCAL coords);
+// CastleSystem drains ctx.navBlockers into nav.blockRect after the build.
+// Flat decor (rugs, cloths) and wall-hung pieces never block.
+function blockNav(ctx, level, cx, cz, halfW, halfD, expand) {
+  ctx.addNavBlocker?.(level, cx - halfW, cz - halfD, cx + halfW, cz + halfD, expand);
+}
+// rotated footprint → enclosing AABB
+function blockNavRot(ctx, level, cx, cz, halfW, halfD, rot) {
+  const c = Math.abs(Math.cos(rot)), sn = Math.abs(Math.sin(rot));
+  blockNav(ctx, level, cx, cz, halfW * c + halfD * sn, halfW * sn + halfD * c);
+}
+
 // ── Doorway clearance ────────────────────────────────────────────────────────
 // No furniture may sit in front of a doorway: every piece checks its
 // footprint against the door approach zones before building. Pieces that
@@ -55,6 +68,7 @@ export function createBed(ctx, level, x, z, ax, az, royal = false) {
   const w = royal ? 2.6 : 1.7, d = royal ? 3.0 : 2.3;
   if (!doorClear(level, x, z, Math.max(w, d) / 2 + 0.3)) return;
   const wx = x + ax, wz = z + az;
+  blockNav(ctx, level, x, z, w / 2, d / 2);
   // frame + legs
   ctx.add(box(ctx.scene, `bed_${level}`, wx, fy + 0.42, wz, w, 0.28, d), 'woodDark', G(level));
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -90,6 +104,7 @@ export function createChest(ctx, level, x, z, ax, az, rotY = 0, gold = false) {
   if (!doorClear(level, x, z, 0.9)) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
+  blockNavRot(ctx, level, x, z, 0.58, 0.35, rotY);
   const body = box(ctx.scene, `chest_${level}`, wx, fy + 0.34, wz, 1.15, 0.6, 0.7);
   body.rotation.y = rotY;
   ctx.add(body, 'woodDark', G(level));
@@ -110,6 +125,8 @@ export function createDesk(ctx, level, x, z, ax, az, rotY = 0) {
   if (!doorClear(level, x, z, 1.3)) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
+  blockNavRot(ctx, level, x, z, 0.8, 0.43, rotY);
+  blockNavRot(ctx, level, x + Math.sin(rotY) * 0.9, z + Math.cos(rotY) * 0.9, 0.3, 0.3, rotY);
   const top = box(ctx.scene, `desk_${level}`, wx, fy + 0.78, wz, 1.6, 0.08, 0.85);
   top.rotation.y = rotY;
   ctx.add(top, 'woodDark', G(level));
@@ -129,6 +146,7 @@ export function createDesk(ctx, level, x, z, ax, az, rotY = 0) {
 export function createWardrobe(ctx, level, x, z, ax, az) {
   if (!doorClear(level, x, z, 1.1)) return;
   const fy = LEVELS[level].y;
+  blockNav(ctx, level, x, z, 0.75, 0.35);
   ctx.add(box(ctx.scene, `ward_${level}`, x + ax, fy + 1.1, z + az, 1.5, 2.2, 0.7), 'woodDark', G(level));
   ctx.add(box(ctx.scene, `wardTrim_${level}`, x + ax, fy + 2.24, z + az, 1.6, 0.1, 0.8), 'woodDark', G(level));
   ctx.add(box(ctx.scene, `wardSplit_${level}`, x + ax, fy + 1.1, z + az + 0.36, 0.05, 2.0, 0.03), 'iron', G(level));
@@ -148,6 +166,7 @@ export function createBookcase(ctx, level, x, z, ax, az, w = 2.2) {
   if (!doorClear(level, x, z, w / 2 + 0.3)) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
+  blockNav(ctx, level, x, z, w / 2, 0.23);
   ctx.add(box(ctx.scene, `bookc_${level}`, wx, fy + 1.35, wz, w, 2.7, 0.45), 'woodDark', G(level));
   for (let s = 0; s < 4; s++) {
     // book row: an emissive-free multicolor slab (books texture)
@@ -159,6 +178,7 @@ export function createTable(ctx, level, x, z, ax, az, w, d, withBenches = false)
   if (!doorClear(level, x, z, Math.max(w, d) / 2 + (withBenches ? 0.9 : 0.3))) return;
   const fy = LEVELS[level].y;
   const wx = x + ax, wz = z + az;
+  blockNav(ctx, level, x, z, w / 2, d / 2);
   ctx.add(box(ctx.scene, `table_${level}`, wx, fy + 0.82, wz, w, 0.1, d), 'woodDark', G(level));
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     ctx.add(box(ctx.scene, `tableLeg_${level}`, wx + sx * (w / 2 - 0.18), fy + 0.4, wz + sz * (d / 2 - 0.18), 0.14, 0.8, 0.14), 'woodDark', G(level));
@@ -172,6 +192,7 @@ export function createTable(ctx, level, x, z, ax, az, w, d, withBenches = false)
   ctx.add(box(ctx.scene, `tableApronE_${level}`, wx + w / 2 - 0.07, aY, wz, 0.08, aH, d - 0.28), 'woodDark', G(level));
   if (withBenches) {
     for (const s of [-1, 1]) {
+      blockNav(ctx, level, x, z + s * (d / 2 + 0.45), (w - 0.5) / 2, 0.2);
       ctx.add(box(ctx.scene, `bench_${level}`, wx, fy + 0.44, wz + s * (d / 2 + 0.45), w - 0.5, 0.09, 0.4), 'woodDark', G(level));
       for (const bx of [-w / 2 + 0.4, w / 2 - 0.4]) {
         ctx.add(box(ctx.scene, `benchLeg_${level}`, wx + bx, fy + 0.2, wz + s * (d / 2 + 0.45), 0.12, 0.4, 0.34), 'woodDark', G(level));
@@ -183,6 +204,7 @@ export function createTable(ctx, level, x, z, ax, az, w, d, withBenches = false)
 export function createBarrel(ctx, level, x, z, ax, az) {
   if (!doorClear(level, x, z, 0.7)) return;
   const fy = LEVELS[level].y;
+  blockNav(ctx, level, x, z, 0.43, 0.43);
   const b = cyl(ctx.scene, `barrel_${level}`, x + ax, fy + 0.55, z + az, 1.1, 0.85, 12);
   ctx.add(b, 'woodDark', G(level));
   for (const hy of [0.25, 0.85]) {
@@ -195,6 +217,7 @@ export function createBarrel(ctx, level, x, z, ax, az) {
 export function createCrate(ctx, level, x, z, ax, az, s = 0.8, rot = 0) {
   if (!doorClear(level, x, z, s / 2 + 0.3)) return;
   const fy = LEVELS[level].y;
+  blockNavRot(ctx, level, x, z, s / 2, s / 2, rot);
   const c = box(ctx.scene, `crate_${level}`, x + ax, fy + s / 2, z + az, s, s, s);
   c.rotation.y = rot;
   ctx.add(c, 'woodFloor', G(level));
@@ -216,6 +239,11 @@ export function createDungeonCell(ctx, level, x0, z0, x1, z1, openSide, ax, az) 
   const fy = LEVELS[level].y;
   const barH = 2.6;
   const front = openSide === 'north' ? z1 : z0;
+  // solid partitions + the bar line (minus the gate gap) block movement.
+  // Bars use zero expansion: PLAYER_R padding would choke the 0.9 m gate
+  // gap below a nav cell and seal the cell.
+  blockNav(ctx, level, x0, (z0 + z1) / 2, 0.15, (z1 - z0) / 2);
+  blockNav(ctx, level, x1, (z0 + z1) / 2, 0.15, (z1 - z0) / 2);
   // partitions (solid stone) on east/west
   ctx.add(box(ctx.scene, `cellWallW_${level}`, x0 + ax, fy + barH / 2, (z0 + z1) / 2 + az, 0.3, barH, z1 - z0), 'darkStone', G(level));
   ctx.add(box(ctx.scene, `cellWallE_${level}`, x1 + ax, fy + barH / 2, (z0 + z1) / 2 + az, 0.3, barH, z1 - z0), 'darkStone', G(level));
@@ -226,6 +254,8 @@ export function createDungeonCell(ctx, level, x0, z0, x1, z1, openSide, ax, az) 
     if (bx > gate0 && bx < gate1) continue;
     ctx.add(cyl(ctx.scene, `cellBar_${level}`, bx + ax, fy + barH / 2, front + az, barH, 0.07, 6), 'ironRust', G(level));
   }
+  blockNav(ctx, level, (x0 + gate0) / 2, front, (gate0 - x0) / 2, 0.08, 0);
+  blockNav(ctx, level, (gate1 + x1) / 2, front, (x1 - gate1) / 2, 0.08, 0);
   ctx.add(box(ctx.scene, `cellRail_${level}`, (x0 + x1) / 2 + ax, fy + barH, front + az, x1 - x0, 0.12, 0.12), 'ironRust', G(level));
   ctx.add(box(ctx.scene, `cellRailB_${level}`, (x0 + x1) / 2 + ax, fy + 0.08, front + az, x1 - x0, 0.16, 0.12), 'ironRust', G(level));
   // open gate leaf against the partition
@@ -237,6 +267,7 @@ export function createDungeonCell(ctx, level, x0, z0, x1, z1, openSide, ax, az) 
   straw.scaling.y = 0.22;
   straw.position.set(x0 + 1.0 + ax, fy + 0.12, backZ + az);
   ctx.add(straw, 'woodFloor', G(level)); // warm honey-brown ≈ dry straw ('linen' read as white cloth)
+  blockNav(ctx, level, x1 - 0.9, backZ, 0.65, 0.25, 0);
   ctx.add(box(ctx.scene, `cellBench_${level}`, x1 - 0.9 + ax, fy + 0.3, backZ + az, 1.3, 0.14, 0.5), 'woodDark', G(level));
   // sagging wall chains: linked short cylinders, alternating orientation
   for (const cxp of [x0 + (x1 - x0) * 0.35, x0 + (x1 - x0) * 0.65]) {
@@ -284,12 +315,14 @@ function fitKitchen(ctx, room, ax, az) {
   // counters along the west wall (skipping doorway approaches)
   for (let z = z0 + 2; z <= z1 - 3; z += 2.2) {
     if (!doorClear(level, x0 + 1.0, z, 1.3)) continue;
+    blockNav(ctx, level, x0 + 1.0, z, 0.75, 1.0);
     ctx.add(box(ctx.scene, `counter_${level}`, x0 + 1.0 + ax, fy + 0.5, z + az, 1.5, 1.0, 2.0), 'stone', G(level));
     ctx.add(box(ctx.scene, `counterTop_${level}`, x0 + 1.0 + ax, fy + 1.03, z + az, 1.6, 0.07, 2.1), 'woodDark', G(level));
   }
   // bread ovens: two arched mouths beside the hearth (north wall)
   for (const dx of [-3.2, 3.2]) {
     const cxp = (x0 + x1) / 2 + dx;
+    blockNav(ctx, level, cxp, z1 - 1.0, 1.0, 0.8);
     ctx.add(box(ctx.scene, `oven_${level}`, cxp + ax, fy + 0.9, z1 - 1.0 + az, 2.0, 1.8, 1.6), 'darkStone', G(level));
     const mouth = cyl(ctx.scene, `ovenMouth_${level}`, cxp + ax, fy + 0.75, z1 - 1.55 + az, 0.5, 0.9, 12);
     mouth.rotation.x = Math.PI / 2;
@@ -327,9 +360,11 @@ function fitBathroom(ctx, room, ax, az) {
   const fy = LEVELS[level].y;
   const cx = (x0 + x1) / 2;
   // sunken stone tub
+  blockNav(ctx, level, cx, z1 - 2.2, 1.6, 1.1);
   ctx.add(box(ctx.scene, `tub_${level}`, cx + ax, fy + 0.5, z1 - 2.2 + az, 3.2, 1.0, 2.2), 'marble', G(level));
   ctx.add(box(ctx.scene, `tubWater_${level}`, cx + ax, fy + 0.86, z1 - 2.2 + az, 2.7, 0.08, 1.7), 'water', G(level));
   // basin pedestal + bowl
+  blockNav(ctx, level, x0 + 1.4, z0 + 1.6, 0.25, 0.25);
   ctx.add(cyl(ctx.scene, `basinPed_${level}`, x0 + 1.4 + ax, fy + 0.5, z0 + 1.6 + az, 1.0, 0.4, 10), 'marble', G(level));
   const bowl = cyl(ctx.scene, `basin_${level}`, x0 + 1.4 + ax, fy + 1.08, z0 + 1.6 + az, 0.24, 0.85, 14);
   ctx.add(bowl, 'marble', G(level));
@@ -339,6 +374,7 @@ function fitBathroom(ctx, room, ax, az) {
   // privacy screen: three angled panels
   for (let i = 0; i < 3; i++) {
     if (!doorClear(level, x1 - 1.6 + i * 0.55, z0 + 2.2 + i * 0.3, 0.7)) continue;
+    blockNavRot(ctx, level, x1 - 1.6 + i * 0.55, z0 + 2.2 + i * 0.3, 0.05, 0.43, 0.5 - i * 0.45);
     const p = box(ctx.scene, `screen_${level}`, x1 - 1.6 + i * 0.55 + ax, fy + 1.0, z0 + 2.2 + i * 0.3 + az, 0.06, 2.0, 0.85);
     p.rotation.y = 0.5 - i * 0.45;
     ctx.add(p, 'woodDark', G(level));
@@ -365,6 +401,7 @@ function fitDining(ctx, room, ax, az) {
   }
   // sideboard on the east wall
   if (doorClear(level, x1 - 0.9, cz, 3.0)) {
+    blockNav(ctx, level, x1 - 0.9, cz, 0.4, 2.75);
     ctx.add(box(ctx.scene, `sideb_${level}`, x1 - 0.9 + ax, fy + 0.6, cz + az, 0.8, 1.2, 5.5), 'woodDark', G(level));
   }
   // wall tapestries flanking the west entrance
@@ -408,6 +445,7 @@ function fitTreasury(ctx, room, ax, az) {
     ctx.add(pile, 'gold', G(level));
   }
   // strongbox plinth at the center-back
+  blockNav(ctx, level, (x0 + x1) / 2, z1 - 2.6, 0.7, 0.7);
   ctx.add(box(ctx.scene, `plinth_${level}`, (x0 + x1) / 2 + ax, fy + 0.3, z1 - 2.6 + az, 1.4, 0.6, 1.4), 'marbleDark', G(level));
   createChest(ctx, level, (x0 + x1) / 2, z1 - 2.6, ax, az, 0, true);
 }
@@ -422,6 +460,7 @@ function fitSitting(ctx, room, ax, az) {
   // armchairs around the table
   for (const [dx, dz, r] of [[-1.8, 0, Math.PI / 2], [1.8, 0, -Math.PI / 2], [0, 1.8, Math.PI], [0, -1.8, 0]]) {
     if (!doorClear(level, cx + dx, cz + dz, 0.7)) continue;
+    blockNavRot(ctx, level, cx + dx, cz + dz, 0.42, 0.42, r);
     const seat = box(ctx.scene, `arm_${level}`, cx + dx + ax, fy + 0.42, cz + dz + az, 0.8, 0.35, 0.8);
     seat.rotation.y = r;
     ctx.add(seat, 'redFabric', G(level));
@@ -496,8 +535,11 @@ function fitVault(ctx, room, ax, az) {
 function fitCells(ctx, room, ax, az) {
   const { x0, z0, x1, z1 } = room.rect;
   const level = room.level;
-  // cells along the far wall, opening toward the corridor side
-  const openSide = room.rect.z0 === 4 ? 'south' : 'north'; // corridor sits at z ∈ [-4, 4]
+  // cells along the far wall, opening toward the corridor side. The
+  // corridor straddles z = 0, so a block starting above it opens south.
+  // (Was `z0 === 4`, a raw-plan literal that silently broke at the 1.75
+  // scale-up and parked the north block's cells across its own door.)
+  const openSide = room.rect.z0 > 0 ? 'south' : 'north';
   const cellD = 5.2;
   const cz0 = openSide === 'south' ? z1 - cellD : z0;
   const cz1 = openSide === 'south' ? z1 : z0 + cellD;
@@ -542,6 +584,8 @@ function fitBallroom(ctx, room, ax, az) {
   // long banquet sideboards along the north wall under the gallery,
   // dressed with goblets + candles so they read as feast boards
   for (const dx of [8, 16, 24]) {
+    if (!doorClear(level, x0 + dx, z1 - 1.2, 1.8)) continue; // the west door
+    blockNav(ctx, level, x0 + dx, z1 - 1.2, 1.6, 0.45);
     ctx.add(box(ctx.scene, `ballSide_${level}`, x0 + dx + ax, fy + 0.55, z1 - 1.2 + az, 3.2, 1.1, 0.9), 'woodDark', G(level));
     for (const gx of [-1.15, -0.45, 0.45, 1.15]) {
       ctx.add(cyl(ctx.scene, `goblet_${level}`, x0 + dx + gx + ax, fy + 1.25, z1 - 1.2 + az, 0.3, 0.18, 8), 'gold', G(level));
@@ -572,6 +616,7 @@ function fitEntrance(ctx, room, ax, az) {
   }
   for (const dz of [-8.5, 8.5]) {
     const cz = (z0 + z1) / 2 + dz;
+    blockNav(ctx, level, x0 + 2.2, cz, 0.55, 0.55);
     ctx.add(box(ctx.scene, `plinth_${level}`, x0 + 2.2 + ax, fy + 0.55, cz + az, 1.1, 1.1, 1.1), 'marbleDark', G(level));
     // stylized armor stand: torso + helm
     ctx.add(box(ctx.scene, `armor_${level}`, x0 + 2.2 + ax, fy + 1.8, cz + az, 0.62, 1.0, 0.4), 'iron', G(level));

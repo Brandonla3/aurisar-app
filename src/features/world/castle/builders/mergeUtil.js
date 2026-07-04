@@ -18,12 +18,21 @@ export function createCollector(scene, mats) {
   const buckets = new Map(); // `${group}|${matKey}` -> mesh[]
   const dynamic = [];        // meshes excluded from merging (animated later)
   const colliders = [];      // {cx,cy,cz,w,h,d} — invisible camera-collision boxes
+  const navBlockers = [];    // {level,x0,z0,x1,z1} local-coord rects → nav 0
 
   return {
-    scene, mats, colliders,
+    scene, mats, colliders, navBlockers,
     /** Record an invisible collision proxy (camera-vs-wall/floor/ceiling). */
     addCollider(cx, cy, cz, w, h, d) {
       colliders.push({ cx, cy, cz, w, h, d });
+    },
+    /** Mark a footprint rect (interior-LOCAL coords, pre-anchor) as
+     *  impassable on `level`'s nav grid. CastleSystem drains these after
+     *  the build, like colliders — solid furniture must block movement.
+     *  `expand` overrides the default PLAYER_R padding (0 for thin bars
+     *  whose padding would seal narrow gaps). */
+    addNavBlocker(level, x0, z0, x1, z1, expand) {
+      navBlockers.push({ level, x0, z0, x1, z1, expand });
     },
     /** Register a primitive for merging under (group, matKey). Primitives
      *  are disabled immediately — thousands of unmerged draw calls must

@@ -2223,10 +2223,23 @@ export class BabylonWorldScene {
   }
 
   _lerpRemote(rp, dt) {
-    const f = 1 - Math.pow(0.04, dt / 100);
-    rp.root.position.x = BABYLON.Scalar.Lerp(rp.root.position.x, rp._targetX, f);
-    rp.root.position.z = BABYLON.Scalar.Lerp(rp.root.position.z, rp._targetZ, f);
-    rp.root.position.y = this._worldgen.surfaceY(rp.root.position.x, rp.root.position.z);
+    const p = rp.root.position;
+    const jx = rp._targetX - p.x, jz = rp._targetZ - p.z;
+    if (jx * jx + jz * jz > 2500) {
+      // >50 m jump = castle enter/exit teleport — snap, never sweep the
+      // avatar across the world (also keeps the Y hysteresis meaningful)
+      p.x = rp._targetX;
+      p.z = rp._targetZ;
+    } else {
+      const f = 1 - Math.pow(0.04, dt / 100);
+      p.x = BABYLON.Scalar.Lerp(p.x, rp._targetX, f);
+      p.z = BABYLON.Scalar.Lerp(p.z, rp._targetZ, f);
+    }
+    // SEAM:remote-y — inside the castle region remotes ride the interior
+    // floors (p.y carries the frame-to-frame floor hysteresis); elsewhere
+    // they pin to terrain as before.
+    const cy = this._castle?.remoteSurfaceY(p.x, p.z, p.y);
+    p.y = cy ?? this._worldgen.surfaceY(p.x, p.z);
   }
 
   // ── Name label ─────────────────────────────────────────────────────────────

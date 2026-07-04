@@ -20,7 +20,8 @@
 /* global BABYLON */
 
 import {
-  CASTLE_PLAN, LEVELS, INTERIOR_ANCHOR, ENTRY, EXTERIOR, buildLightAnchors,
+  CASTLE_PLAN, LEVELS, INTERIOR_ANCHOR, ENTRY, EXTERIOR, LOCAL_BOUNDS,
+  buildLightAnchors,
 } from './castlePlan.js';
 import { buildNav } from './castleNav.js';
 import { createCastleMaterials } from './builders/materials.js';
@@ -124,6 +125,21 @@ export class CastleSystem {
     pos.x = prevX; pos.z = prevZ;                                 // fully blocked
   }
 
+  /** SEAM:remote-y — floor height for a REMOTE avatar at (x, z), or null
+   *  when outside the interior region (caller falls back to terrain).
+   *  prevY disambiguates stacked floors frame-to-frame; the ground-floor
+   *  retry seeds a remote that just teleported in through the gate; and on
+   *  a wall-clip frame (network lerp cutting a corner) the last height is
+   *  held so the avatar never pops to terrain and back. */
+  remoteSurfaceY(x, z, prevY) {
+    const lx = x - INTERIOR_ANCHOR.x, lz = z - INTERIOR_ANCHOR.z;
+    if (lx < LOCAL_BOUNDS.x0 || lx >= LOCAL_BOUNDS.x1 ||
+        lz < LOCAL_BOUNDS.z0 || lz >= LOCAL_BOUNDS.z1) return null;
+    const s = this.nav.surfaceAt(x, z, prevY + 0.5)
+      ?? this.nav.surfaceAt(x, z, LEVELS[1].y + 1);
+    return s ? s.y : prevY;
+  }
+
   /** Ceiling height over (x, z) for the camera clamp while inside. */
   ceilingYAt(x, z, refY) {
     const s = this.nav.surfaceAt(x, z, refY + 0.5);
@@ -224,6 +240,11 @@ export class CastleSystem {
       await yieldFrame();
       if (this._disposed) return;
       createAllFurniture(ctx, ax, az);
+      // solid furniture / columns / cell bars block movement: stamp their
+      // footprints into the nav grids (post-build mutation — every nav
+      // query reads the grids live)
+      for (const b of ctx.navBlockers) this.nav.blockRect(b.level, b, b.expand);
+      ctx.navBlockers.length = 0;
       const anchors = buildLightAnchors().map((a) => ({
         ...a, x: a.x + ax, z: a.z + az,
       }));
