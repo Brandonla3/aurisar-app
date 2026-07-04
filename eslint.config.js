@@ -64,4 +64,26 @@ export default defineConfig([
       'jsx-a11y/no-noninteractive-element-interactions': 'warn',
     },
   },
+  // ── Node.js environments ──────────────────────────────────────────────────
+  // Netlify serverless functions and local scripts run in Node, not a browser.
+  // They use `process.env`, `require`-style patterns (even as ESM), and other
+  // Node globals. Override `globals` here so ESLint does not flag `process` as
+  // undefined. Only `no-unused-vars` is tightened further; all other rules
+  // (security, a11y) are irrelevant to these files and stay at default/off.
+  {
+    files: ['netlify/functions/**/*.js', 'scripts/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.node,
+      },
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
+    },
+  },
 ])
