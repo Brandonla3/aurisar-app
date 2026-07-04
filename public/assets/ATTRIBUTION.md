@@ -27,6 +27,12 @@ seamlessly tileable, with the normal map generated from luminance gradients.
 is extracted from the same Meshy AI renders by keying out the studio
 backdrop, with edge-color dilation so mipmaps stay grass-colored.
 
+`textures/grass-clump-albedo.jpg` and the hero clump geometry
+(`src/features/world/game/grassClump.json`) are extracted from a Meshy
+AI-generated textured grass GLB supplied by the project owner (baked base
+color downscaled 4096→1024 and brightness-matched to the game palette; a
+66-blade / 1.3k-tri sub-clump lifted from the 22k-tri source mesh).
+
 Replacing any of these files in place (same filename, passing the GLB
 validator) swaps the art with zero code changes — the intended path for
 the custom Blender/Unreal art pass.

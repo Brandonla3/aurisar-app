@@ -10,11 +10,10 @@
  * instance color's alpha channel selects the variant, its rgb carries the
  * biome tint that hue-shifts the texture per biome.
  *
- * A second, sparser layer of "hero" clumps (real 3D blade geometry lifted
- * from the Meshy GLB, grassClump.json, ~1.3k tris) surrounds the player on
- * the high quality tier — same shader with uTextured=0, so the blades take
- * the biome tint + AO gradient instead of the card texture. Two draw calls
- * total, second one gated to tier 'high'.
+ * A second, sparser layer of "hero" clumps (real 3D blade geometry + UVs
+ * lifted from the textured Meshy GLB, grassClump.json, ~1.3k tris, sampling
+ * the GLB's own baked albedo grass-clump-albedo.jpg) surrounds the player.
+ * Two draw calls total, second one skipped on low/mobile tiers.
  *
  * Placement is pure hash2 math — identical on every client, no manifest.
  */
@@ -44,6 +43,7 @@ attribute vec4 instanceColor;
 uniform mat4 viewProjection;
 uniform float uTime;
 uniform float uWind;
+uniform float uAtlasHalf;
 varying vec4 vCol;
 varying vec2 vUV;
 varying vec3 vWp;
@@ -59,9 +59,11 @@ void main() {
   vec4 wp = finalWorld * vec4(p, 1.0);
   vWp = wp.xyz;
 
-  // Atlas holds two clump variants side by side; the instance color's alpha
-  // channel (0 or 1) picks which half this card samples.
-  vUV = vec2(uv.x * 0.5 + instanceColor.a * 0.5, uv.y);
+  // Card atlas holds two clump variants side by side (uAtlasHalf 0.5): the
+  // instance color's alpha channel (0 or 1) picks the half. The hero clump
+  // texture is a plain UV map (uAtlasHalf 1.0) — there the alpha shift is a
+  // whole UV period, a no-op under REPEAT wrapping.
+  vUV = vec2(uv.x * uAtlasHalf + instanceColor.a * uAtlasHalf, uv.y);
 
   // Vertical AO: darken the base (ground contact), brighten the tip — reads
   // as ambient occlusion for one extra multiply, no extra draw/pass.
@@ -86,7 +88,6 @@ varying vec2 vUV;
 varying vec3 vWp;
 varying vec3 vN;
 uniform sampler2D uCardTex;
-uniform float uTextured;     // 1 = card atlas cutout, 0 = untextured geometry
 uniform float uLight;
 uniform vec3 cameraPosition;
 uniform vec3 vFogColor;
@@ -94,14 +95,10 @@ uniform float fogDensity;
 uniform vec3 uSunDir;        // world-space direction toward the sun
 uniform float uBackStrength; // 0 on low/mobile tier, >0 on high tier
 void main() {
-  // Untextured (hero clump) fragments use a flat 0.55 in place of the card
-  // texture so both layers land at the same average brightness.
-  vec4 tex = vec4(0.55);
-  if (uTextured > 0.5) {
-    tex = texture2D(uCardTex, vUV);
-    // Alpha cutout — no sorting/blending needed, cards stay one draw call.
-    if (tex.a < 0.35) discard;
-  }
+  vec4 tex = texture2D(uCardTex, vUV);
+  // Alpha cutout — no sorting/blending needed, each layer stays one draw
+  // call. The hero clump albedo is opaque (a=1), so it never discards.
+  if (tex.a < 0.35) discard;
 
   vec3 N = normalize(vN);
   vec3 L = normalize(uSunDir);
@@ -155,16 +152,15 @@ function cardGeometry() {
   return { positions, indices, normals, uvs };
 }
 
-// Real blade geometry extracted from the Meshy AI grass GLB (13 blades,
-// ~1.3k tris), normalized to a 0.75 m clump rooted at the origin. Smooth
-// normals are computed here; UVs are dummy zeros (uTextured=0 path).
+// Real blade geometry + UVs extracted from the textured Meshy AI grass GLB
+// (66 blades, ~1.3k tris), normalized to a ground-rooted clump. Smooth
+// normals are recomputed here; the UVs sample the GLB's baked albedo.
 function clumpGeometry() {
   const positions = clumpData.positions;
   const indices = clumpData.indices;
   const normals = new Array(positions.length).fill(0);
   BABYLON.VertexData.ComputeNormals(positions, indices, normals);
-  const uvs = new Array((positions.length / 3) * 2).fill(0);
-  return { positions, indices, normals, uvs };
+  return { positions, indices, normals, uvs: clumpData.uvs };
 }
 
 export class AshwoodGrass {
@@ -182,25 +178,27 @@ export class AshwoodGrass {
 
     this._cardTex = new BABYLON.Texture('/assets/textures/grass-cards.png', scene);
     this._cardTex.anisotropicFilteringLevel = 4;
+    this._clumpTex = new BABYLON.Texture('/assets/textures/grass-clump-albedo.jpg', scene);
+    this._clumpTex.anisotropicFilteringLevel = 4;
 
-    const makeMaterial = (name, textured) => {
+    const makeMaterial = (name, texture, atlasHalf) => {
       const mat = new BABYLON.ShaderMaterial(name, scene, 'ashwoodGrass', {
         // world0-3 MUST be declared for (thin) instancing — without them the
         // instancesVertex include reads unbound attributes and instance
         // matrices come out as garbage (blades stretched across the sky).
         attributes: ['position', 'normal', 'uv', 'instanceColor', 'world0', 'world1', 'world2', 'world3'],
         uniforms: ['viewProjection', 'world', 'cameraPosition',
-                   'uTime', 'uWind', 'uTextured', 'uLight', 'vFogColor', 'fogDensity',
+                   'uTime', 'uWind', 'uAtlasHalf', 'uLight', 'vFogColor', 'fogDensity',
                    'uSunDir', 'uBackStrength'],
         samplers: ['uCardTex'],
       });
       mat.backFaceCulling = false;
-      mat.setTexture('uCardTex', this._cardTex);
-      mat.setFloat('uTextured', textured ? 1 : 0);
+      mat.setTexture('uCardTex', texture);
+      mat.setFloat('uAtlasHalf', atlasHalf);
       return mat;
     };
-    this.material = makeMaterial('ashwoodGrassMat', true);
-    this.heroMaterial = makeMaterial('ashwoodGrassHeroMat', false);
+    this.material = makeMaterial('ashwoodGrassMat', this._cardTex, 0.5);
+    this.heroMaterial = makeMaterial('ashwoodGrassHeroMat', this._clumpTex, 1.0);
 
     const makeMesh = (name, geo, mat) => {
       const mesh = new BABYLON.Mesh(name, scene);
@@ -329,5 +327,6 @@ export class AshwoodGrass {
     this.material?.dispose();
     this.heroMaterial?.dispose();
     this._cardTex?.dispose();
+    this._clumpTex?.dispose();
   }
 }
