@@ -100,6 +100,22 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch { /* not connected yet */ }
   }, []);
 
+  const enterDungeon = useCallback((dungeonId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.enterDungeon(dungeonId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const leaveDungeon = useCallback(() => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.leaveDungeon();
+    } catch { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -142,6 +158,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
               'SELECT * FROM player',
               'SELECT * FROM chat_message',
               'SELECT * FROM mob',
+              'SELECT * FROM dungeon_instance',
             ]);
 
           // Campfires ride a separate subscription: if the deployed module
@@ -260,6 +277,8 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     abandonQuest,
     turnInQuest,
     reachWaypoint,
+    enterDungeon,
+    leaveDungeon,
     identity: connRef.current?.identity ?? null,
   };
 }

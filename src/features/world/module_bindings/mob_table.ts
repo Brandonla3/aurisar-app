@@ -25,4 +25,5 @@ export default __t.row({
   leashRadiusPx: __t.f32().name("leash_radius_px"),
   respawnSec: __t.u32().name("respawn_sec"),
   lastAttackAt: __t.u64().name("last_attack_at"),
+  dungeonInstanceId: __t.u64().name("dungeon_instance_id"),
 });

@@ -38,6 +38,8 @@ import AbandonQuestReducer from "./abandon_quest_reducer";
 import AcceptQuestReducer from "./accept_quest_reducer";
 import BuildCampfireReducer from "./build_campfire_reducer";
 import CastAbilityReducer from "./cast_ability_reducer";
+import EnterDungeonReducer from "./enter_dungeon_reducer";
+import LeaveDungeonReducer from "./leave_dungeon_reducer";
 import MovePlayerReducer from "./move_player_reducer";
 import ReachWaypointReducer from "./reach_waypoint_reducer";
 import SeedWorldReducer from "./seed_world_reducer";
@@ -51,6 +53,7 @@ import TurnInQuestReducer from "./turn_in_quest_reducer";
 // Import all table schema definitions
 import CampfireRow from "./campfire_table";
 import ChatMessageRow from "./chat_message_table";
+import DungeonInstanceRow from "./dungeon_instance_table";
 import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
 import PlayerQuestRow from "./player_quest_table";
@@ -110,6 +113,17 @@ const tablesSchema = __schema({
       { name: 'player_quest_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerQuestRow),
+  dungeonInstance: __table({
+    name: 'dungeon_instance',
+    indexes: [
+      { accessor: 'instanceId', name: 'dungeon_instance_instance_id_idx_btree', algorithm: 'btree', columns: [
+        'instanceId',
+      ] },
+    ],
+    constraints: [
+      { name: 'dungeon_instance_instance_id_key', constraint: 'unique', columns: ['instanceId'] },
+    ],
+  }, DungeonInstanceRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
@@ -118,6 +132,8 @@ const reducersSchema = __reducers(
   __reducerSchema("accept_quest", AcceptQuestReducer),
   __reducerSchema("build_campfire", BuildCampfireReducer),
   __reducerSchema("cast_ability", CastAbilityReducer),
+  __reducerSchema("enter_dungeon", EnterDungeonReducer),
+  __reducerSchema("leave_dungeon", LeaveDungeonReducer),
   __reducerSchema("move_player", MovePlayerReducer),
   __reducerSchema("reach_waypoint", ReachWaypointReducer),
   __reducerSchema("seed_world", SeedWorldReducer),

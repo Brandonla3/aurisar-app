@@ -7,10 +7,9 @@
  *  - the INTERIOR instance built in the flat far-east interiors region
  *    (enabled only while the local player is inside).
  *
- * The two are linked only by the press-E door teleport. enterInterior()/
- * exitInterior() are the ONLY teleport paths — SEAM:enter-reducer — v2
- * replaces their bodies with a server-authoritative enterDungeon(instanceId)
- * reducer call and group gating.
+ * The two are linked by press-E at the gate, which calls server reducers
+ * (enterDungeon / leaveDungeon). applyServerInteriorState /
+ * applyServerExteriorState sync the client once the player row updates.
  *
  * Lifecycle follows the PropsSystem convention: constructed next to the
  * other systems, init() builds asynchronously (chunked per level so first
@@ -446,21 +445,20 @@ export class CastleSystem {
     }
   }
 
-  /** Press-E handler — the single enter/exit choke point. */
+  /** Press-E handler — server-authoritative enter/exit. */
   useDoor(id) {
-    if (id === 'castle_gate' && !this._inside) this.enterInterior();
-    else if (id === 'castle_exit' && this._inside) this.exitInterior();
+    if (id === 'castle_gate' && !this._inside) {
+      this._host.requestEnterDungeon?.('castle_ashwood');
+    } else if (id === 'castle_exit' && this._inside) {
+      this._host.requestLeaveDungeon?.();
+    }
   }
 
-  // ── enter / exit (SEAM:enter-reducer) ─────────────────────────────────────
+  // ── enter / exit (server row drives presentation) ─────────────────────────
 
+  /** @deprecated dev-only fallback; production path is applyServerInteriorState */
   enterInterior({ snapToNearestWalkable = false } = {}) {
     if (!this._built || this._inside) return;
-    this._inside = true;
-    this._intRoot.setEnabled(true);
-
-    // destination: entrance-hall spawn, or (reconnect) nearest walkable to
-    // wherever the server row put us
     const ax = INTERIOR_ANCHOR.x, az = INTERIOR_ANCHOR.z;
     let dest = {
       x: ENTRY.spawnLocal.x + ax,
@@ -480,18 +478,43 @@ export class CastleSystem {
       const s = this.nav.surfaceAt(dest.x, dest.z, dest.y + 1);
       if (s) dest.y = s.y;
     }
+    this.applyServerInteriorState(dest.x, dest.y, dest.z, dest.yaw);
+  }
 
-    this._host.teleportPlayer(dest.x, dest.y, dest.z, dest.yaw);
-    this._host.cameraEnter({ x: dest.x, y: dest.y + 1.2, z: dest.z }, dest.yaw);
+  /** Enable interior mode after enterDungeon confirms on the server row. */
+  applyServerInteriorState(wx, wy, wz, yaw = ENTRY.spawnFacing) {
+    if (!this._built) return;
+    const firstEnter = !this._inside;
+    if (firstEnter) {
+      this._inside = true;
+      this._intRoot.setEnabled(true);
+    }
+    this._host.teleportPlayer(wx, wy, wz, yaw);
+    if (firstEnter) this._applyInteriorPresentation(wx, wy, wz, yaw);
+    this._clearPrompt();
+  }
+
+  /** Disable interior mode after leaveDungeon clears dungeonInstanceId. */
+  applyServerExteriorState(wx, wy, wz, yaw = -Math.PI / 2) {
+    if (this._inside) {
+      this._inside = false;
+      this._host.cameraExit({ x: wx, y: wy + 1.2, z: wz }, yaw);
+      this._settleOutside();
+      this._host.onZoneChange?.('overworld');
+    }
+    this._host.teleportPlayer(wx, wy, wz, yaw);
+    this._clearPrompt();
+  }
+
+  _applyInteriorPresentation(wx, wy, wz, yaw) {
+    this._host.cameraEnter({ x: wx, y: wy + 1.2, z: wz }, yaw);
     this._lm.setZone('dungeon', 0.6);
-    this._moodLevel = -1; // force a mood refresh on the next tick
+    this._moodLevel = -1;
     this._lm.setDungeonMood?.(WARM_MOOD);
     this._pool?.setActive(true, () => {
       const pos = this._host.getPlayerPos();
       return pos ? { pos, level: this._moodLevel >= 0 ? this._moodLevel : null } : null;
     });
-    // light the character: refresh the avatar mesh list (it can change on
-    // equip) into the dedicated PBR-strength character light and the ambient
     const avatarMeshes = this._host.getAvatarMeshes?.() ?? [];
     if (this._charLight) {
       this._charLight.includedOnlyMeshes = avatarMeshes;
@@ -500,7 +523,6 @@ export class CastleSystem {
     if (avatarMeshes.length && this._ambLight && this._intMeshes) {
       this._ambLight.includedOnlyMeshes = [...this._intMeshes, ...avatarMeshes];
     }
-    this._clearPrompt();
     this._host.onZoneChange?.('castle');
   }
 

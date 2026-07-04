@@ -11,14 +11,23 @@ Regenerate with `npm run emit:castle`.
 
 ## Server validation
 
-SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` (checked in; regenerate with `npm run emit:castle`) and validated in `spacetimedb/src/castle/validate.ts` (mirrors `castleNavServer.js`).
+SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` (includes furniture blockers via `castleNavBlockers.js`; regenerate with `npm run emit:castle`) and validated in `spacetimedb/src/castle/validate.ts`.
+
+## Dungeon instances (v2)
+
+- **`enterDungeon` / `leaveDungeon`** — server-authoritative gate entry and interior exit
+- **`dungeonInstance`** table + `player.dungeonInstanceId` / `mob.dungeonInstanceId`
+- Instance mobs seed from `castleAshwood.generated.ts` on first member entry
+- Client syncs interior presentation from the player row
+
+**Planned in the same epic:** level-aware server nav, interior mob AI, minLevel gating, Gorrak quest wiring.
 
 ## Coordinate scheme
 
 - All layout rects are in **interior-local meters** (post-`PLAN_SCALE = 1.75`).
 - World position = local + `interiorAnchor` (`{ x: 840, z: 0 }`).
 - The **exterior shell** is separate at `exterior.site` (`{ x: 150, z: 20 }`) on overworld terrain.
-- Entry/exit is a press-E teleport at the west gate — not a walk-through door.
+- Entry/exit is press-E at the gate — server reducers authorize the teleport.
 
 ## Levels
 

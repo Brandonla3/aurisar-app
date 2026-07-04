@@ -299,7 +299,8 @@ export default function WorldGame({ playerInfo, onExit }) {
 
   const {
     connected, onlineCount, movePlayer, sendChat, castAbility, buildCampfire,
-    acceptQuest, abandonQuest, turnInQuest, reachWaypoint, identity,
+    acceptQuest, abandonQuest, turnInQuest, reachWaypoint, enterDungeon, leaveDungeon,
+    identity,
   } = useSpacetimeWorld(playerInfo, {
     onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
     onCampfireUpsert, onCampfireDelete, onQuestUpsert, onQuestDelete,
@@ -363,7 +364,8 @@ export default function WorldGame({ playerInfo, onExit }) {
       canvasRef.current,
       playerInfo,
       { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
-        onLocalPlayerUpdate, onChestOpen, onNearbyNpc, onNearbyDoor }
+        onLocalPlayerUpdate, onChestOpen, onNearbyNpc, onNearbyDoor,
+        onEnterDungeon: enterDungeon, onLeaveDungeon: leaveDungeon }
     );
     sceneRef.current = scene;
     setMapData(scene.getMapData());
@@ -387,6 +389,12 @@ export default function WorldGame({ playerInfo, onExit }) {
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onBuildCampfire = buildCampfire;
   }, [buildCampfire]);
+  useEffect(() => {
+    if (sceneRef.current) sceneRef.current.callbacks.onEnterDungeon = enterDungeon;
+  }, [enterDungeon]);
+  useEffect(() => {
+    if (sceneRef.current) sceneRef.current.callbacks.onLeaveDungeon = leaveDungeon;
+  }, [leaveDungeon]);
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onChestOpen = onChestOpen;
   }, [onChestOpen]);

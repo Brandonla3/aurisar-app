@@ -32,6 +32,19 @@ import {
   ZONES_BY_ID,
 } from './content/index.js';
 import type { MobDef, QuestDef, SpawnDef } from './content/types.js';
+import {
+  DUNGEONS_BY_ID,
+  DUNGEON_EXIT_RANGE_PX,
+  DUNGEON_GATE_RANGE_PX,
+  DUNGEON_MAX_PLAYERS,
+  castleExitHotspotPx,
+  castleSpawnPx,
+  distSqPx,
+  dungeonSpawnByNetId,
+  interiorLocalToPx,
+  zoneEntranceToPx,
+  type DungeonSpawnEntry,
+} from './dungeon/helpers.js';
 import { castleInteriorWalkable, pxToWorldM } from './castle/validate.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
@@ -146,7 +159,8 @@ const mobAiTickScheduleRow = t.row('MobAiTickScheduleRow', {
 const mobRespawnQueueRow = t.row('MobRespawnQueueRow', {
   id:          t.u64().primaryKey().autoInc(),
   scheduledAt: t.scheduleAt(),
-  spawnNetId:  t.string(),     // payload — which spawn point net_id (suffixed: e.g. SPAWN_..._NW_0)
+  spawnNetId:  t.string(),
+  dungeonInstanceId: t.u64().default(0n),
 });
 
 const playerRespawnQueueRow = t.row('PlayerRespawnQueueRow', {
@@ -197,6 +211,7 @@ const spacetimedb = schema({
       hp:           t.i32().default(PLAYER_MAX_HP),   // current HP; 0 = dead
       maxHp:        t.i32().default(PLAYER_MAX_HP),   // max HP for HP-bar normalization
       deadUntil:    t.u64().default(0n),              // 0 = alive; otherwise micros-since-epoch when respawn fires
+      dungeonInstanceId: t.u64().default(0n),        // 0 = overworld; else active dungeon instance
     }
   ),
 
@@ -247,6 +262,7 @@ const spacetimedb = schema({
       leashRadiusPx: t.f32().default(SEED_WOLF_LEASH_M * PX_PER_M),     // 1120 default (35 m × 32)
       respawnSec:    t.u32().default(SEED_WOLF_RESPAWN_SEC),            // delay between death and respawn insert
       lastAttackAt:  t.u64().default(0n),                               // micros since epoch of last bite (cooldown enforcement)
+      dungeonInstanceId: t.u64().default(0n),                            // 0 = overworld mob; else instance-scoped
     }
   ),
 
@@ -330,6 +346,19 @@ const spacetimedb = schema({
     }
   ),
 
+  /**
+   * Active dungeon instances (Castle Ashwood v2). Mobs and players reference
+   * instanceId; rows are deleted when the last member leaves.
+   */
+  dungeonInstance: table(
+    { public: true },
+    {
+      instanceId: t.u64().primaryKey().autoInc(),
+      dungeonId:  t.string(),
+      createdAt:  t.u64(),
+    }
+  ),
+
 });
 
 export default spacetimedb;
@@ -392,6 +421,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
         deadUntil: 0n,
+        dungeonInstanceId: 0n,
       });
     }
   }
@@ -459,6 +489,94 @@ export const movePlayer = spacetimedb.reducer(
       isMoving,
       zoneId,
     });
+  }
+);
+
+/**
+ * Server-authoritative castle / dungeon entry. Validates gate proximity,
+ * assigns or creates a ≤5-player instance, teleports to the interior spawn,
+ * and seeds instance mobs on first creation.
+ *
+ * minLevel gating arrives with playerProgress (P2).
+ */
+export const enterDungeon = spacetimedb.reducer(
+  { dungeonId: t.string() },
+  (ctx, { dungeonId }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return;
+    const now = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > now) return;
+    if (player.dungeonInstanceId > 0n) return;
+
+    const dungeon = DUNGEONS_BY_ID[dungeonId];
+    if (!dungeon) return;
+
+    const gatePx = zoneEntranceToPx(dungeon);
+    if (distSqPx(player.x, player.y, gatePx.x, gatePx.y) > DUNGEON_GATE_RANGE_PX * DUNGEON_GATE_RANGE_PX) {
+      return;
+    }
+
+    let instanceId = findOpenDungeonInstance(ctx, dungeonId);
+    let created = false;
+    if (!instanceId) {
+      const row = ctx.db.dungeonInstance.insert({
+        instanceId: 0n,
+        dungeonId,
+        createdAt: now,
+      });
+      instanceId = row.instanceId;
+      created = true;
+    }
+
+    const spawnPx = dungeonId === 'castle_ashwood' ? castleSpawnPx() : gatePx;
+    ctx.db.player.identity.update({
+      ...player,
+      x: spawnPx.x,
+      y: spawnPx.y,
+      isMoving: false,
+      zoneId: detectZone(spawnPx.x, spawnPx.y),
+      dungeonInstanceId: instanceId,
+    });
+
+    if (created) seedDungeonInstanceMobs(ctx, instanceId, dungeonId);
+  }
+);
+
+/**
+ * Leave the active dungeon instance. Requires proximity to the interior
+ * exit hotspot; teleports to the overworld gate and cleans up empty instances.
+ */
+export const leaveDungeon = spacetimedb.reducer(
+  {},
+  (ctx) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player || player.dungeonInstanceId === 0n) return;
+
+    const instance = ctx.db.dungeonInstance.instanceId.find(player.dungeonInstanceId);
+    if (!instance) {
+      ctx.db.player.identity.update({ ...player, dungeonInstanceId: 0n });
+      return;
+    }
+
+    const exitPx = castleExitHotspotPx();
+    if (distSqPx(player.x, player.y, exitPx.x, exitPx.y) > DUNGEON_EXIT_RANGE_PX * DUNGEON_EXIT_RANGE_PX) {
+      return;
+    }
+
+    const dungeon = DUNGEONS_BY_ID[instance.dungeonId];
+    const gatePx = dungeon ? zoneEntranceToPx(dungeon) : { x: WORLD_CENTER_PX, y: WORLD_CENTER_PX };
+    const leavingInstance = player.dungeonInstanceId;
+
+    ctx.db.player.identity.update({
+      ...player,
+      x: gatePx.x,
+      y: gatePx.y,
+      isMoving: false,
+      zoneId: detectZone(gatePx.x, gatePx.y),
+      dungeonInstanceId: 0n,
+    });
+
+    cleanupDungeonInstanceIfEmpty(ctx, leavingInstance);
   }
 );
 
@@ -651,6 +769,7 @@ export const seedWorld = spacetimedb.reducer({}, (ctx) => {
   const seeded = new Set<string>();
   const toDelete: bigint[] = [];
   for (const m of ctx.db.mob.iter()) {
+    if (m.dungeonInstanceId > 0n) continue;
     const entry = spawnByNetId.get(m.spawnNetId);
     if (!entry) {
       toDelete.push(m.mobId);
@@ -726,6 +845,7 @@ export const castAbility = spacetimedb.reducer(
         id: 0n,    // auto-inc replaces this
         scheduledAt: ScheduleAt.time(respawnAt),
         spawnNetId: mob.spawnNetId,
+        dungeonInstanceId: mob.dungeonInstanceId,
       });
       ctx.db.mob.mobId.delete(mobId);
       // P1 quest hook: kill credit goes to whoever lands the killing blow
@@ -883,6 +1003,19 @@ export const respawnMob = spacetimedb.reducer(
   },
   (ctx, { schedule }) => {
     const spawnNetId = schedule.spawnNetId;
+    const dungeonInst = schedule.dungeonInstanceId;
+
+    if (dungeonInst > 0n) {
+      if (!ctx.db.dungeonInstance.instanceId.find(dungeonInst)) return;
+      const entry = dungeonSpawnByNetId.get(spawnNetId);
+      if (!entry) return;
+      for (const m of ctx.db.mob.iter()) {
+        if (m.spawnNetId === spawnNetId && m.dungeonInstanceId === dungeonInst) return;
+      }
+      insertMobFromDungeonSpawn(ctx, entry, spawnNetId, dungeonInst, 0);
+      return;
+    }
+
     const entry = spawnByNetId.get(spawnNetId);
     if (!entry) return; // spawn point removed from manifest; drop respawn
 
@@ -921,6 +1054,7 @@ export const respawnPlayer = spacetimedb.reducer(
       zoneId: detectZone(WORLD_CENTER_PX, WORLD_CENTER_PX),
       hp: p.maxHp > 0 ? p.maxHp : PLAYER_MAX_HP,
       deadUntil: 0n,
+      dungeonInstanceId: 0n,
     });
   }
 );
@@ -1251,5 +1385,79 @@ function insertMobFromSpawn(
     leashRadiusPx: mobDef.leashRadiusM * PX_PER_M,
     respawnSec:    mobDef.respawnSec,
     lastAttackAt:  0n,
+    dungeonInstanceId: 0n,
   });
+}
+
+function insertMobFromDungeonSpawn(
+  ctx: any,
+  entry: DungeonSpawnEntry,
+  netId: string,
+  instanceId: bigint,
+  instanceCounter: number,
+): void {
+  const { spawn, mobDef, instanceIndex } = entry;
+  const offset = spawnInstanceOffsetM(instanceIndex, spawn.radiusM);
+  const px = interiorLocalToPx({
+    x: spawn.pos.x + offset.dx,
+    z: spawn.pos.z + offset.dz,
+  });
+
+  ctx.db.mob.insert({
+    mobId:         ctx.timestamp.microsSinceUnixEpoch + BigInt(instanceCounter),
+    mobType:       spawn.mobType,
+    x:             px.x,
+    y:             px.y,
+    hp:            mobDef.maxHp,
+    maxHp:         mobDef.maxHp,
+    state:         'alive',
+    spawnNetId:    netId,
+    spawnX:        px.x,
+    spawnY:        px.y,
+    aggroRadiusPx: mobDef.aggroRadiusM * PX_PER_M,
+    leashRadiusPx: mobDef.leashRadiusM * PX_PER_M,
+    respawnSec:    mobDef.respawnSec,
+    lastAttackAt:  0n,
+    dungeonInstanceId: instanceId,
+  });
+}
+
+function countInstanceMembers(ctx: any, instanceId: bigint): number {
+  let n = 0;
+  for (const p of ctx.db.player.iter()) {
+    if (p.dungeonInstanceId === instanceId) n++;
+  }
+  return n;
+}
+
+function findOpenDungeonInstance(ctx: any, dungeonId: string): bigint | null {
+  for (const inst of ctx.db.dungeonInstance.iter()) {
+    if (inst.dungeonId !== dungeonId) continue;
+    if (countInstanceMembers(ctx, inst.instanceId) < DUNGEON_MAX_PLAYERS) {
+      return inst.instanceId;
+    }
+  }
+  return null;
+}
+
+function seedDungeonInstanceMobs(ctx: any, instanceId: bigint, dungeonId: string): void {
+  const dungeon = DUNGEONS_BY_ID[dungeonId];
+  if (!dungeon) return;
+  let counter = 0;
+  for (const spawn of dungeon.spawns) {
+    for (let i = 0; i < spawn.count; i++) {
+      const netId = `${spawn.netId}_${i}`;
+      const entry = dungeonSpawnByNetId.get(netId);
+      if (!entry) continue;
+      insertMobFromDungeonSpawn(ctx, entry, netId, instanceId, counter++);
+    }
+  }
+}
+
+function cleanupDungeonInstanceIfEmpty(ctx: any, instanceId: bigint): void {
+  if (countInstanceMembers(ctx, instanceId) > 0) return;
+  for (const m of ctx.db.mob.iter()) {
+    if (m.dungeonInstanceId === instanceId) ctx.db.mob.mobId.delete(m.mobId);
+  }
+  ctx.db.dungeonInstance.instanceId.delete(instanceId);
 }
