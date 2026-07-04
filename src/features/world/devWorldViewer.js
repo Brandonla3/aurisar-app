@@ -64,7 +64,12 @@ setInterval(() => {
     `biome ${inside ? 'Castle Ashwood' : wg.biomeAt(p.x, p.z).name}\n` +
     `fps   ${fps}\n` +
     `mesh  ${scene.scene.getActiveMeshes().length} active / ${scene.scene.meshes.length}\n` +
-    `light ${scene.scene.lights.length}`;
+    `light ${scene.scene.lights.length}\n` +
+    `cam   r=${scene._camera.radius.toFixed(2)} ` +
+    `user=${scene._camUserRadius?.toFixed(2) ?? '-'} ` +
+    `wrote=${scene._lastCamWritten?.toFixed(2) ?? '-'}\n` +
+    `      a=${scene._camera.alpha.toFixed(2)} b=${scene._camera.beta.toFixed(2)} ` +
+    `bLim=${scene._camera.lowerBetaLimit?.toFixed(2)}..${scene._camera.upperBetaLimit?.toFixed(2)}`;
 }, 250);
 
 window.__worldScene = scene; // console access for debugging

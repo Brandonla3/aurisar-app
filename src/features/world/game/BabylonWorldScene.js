@@ -1881,11 +1881,14 @@ export class BabylonWorldScene {
   }
 
   /** Snap the camera across a castle enter/exit (never lerp 700 m) and
-   *  switch wall handling. Indoors the ENGINE's camera collision takes
-   *  over (against the castle's invisible proxy boxes): it slides the view
-   *  along walls and recovers by itself, and it never mutates radius/beta
-   *  state — so zoom and orbit cannot get stuck. No per-frame camera math.
-   */
+   *  switch zoom limits. Wall handling in BOTH modes is _camLosClamp in
+   *  _trackCamera (memoryless LOS radius clamp) — NOT Babylon's
+   *  cam.checkCollisions. Engine camera collision was tried and removed:
+   *  its response GLIDES the camera positionally without updating radius
+   *  state (teleports swept the whole map, and it stranded the camera
+   *  inside merged wall mass with no way to recover). The invisible
+   *  castleCamCol proxy boxes it used are kept for future mob collision,
+   *  not for the camera. */
   _castleCameraSet(target, yaw, interior) {
     const cam = this._camera;
     if (interior) {
