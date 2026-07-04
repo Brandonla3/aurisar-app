@@ -9,8 +9,11 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import BABYLON from 'babylonjs';
-import 'babylonjs-loaders';
+// babylonGlobal must come before BabylonWorldScene: it publishes
+// window.BABYLON (bundled UMD — avoids a CSP script-src violation from a
+// CDN load) before scene modules that read the global at module scope
+// (e.g. CharacterAvatar's default-color tables) evaluate.
+import './game/babylonGlobal.js';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 import TestingHud             from './TestingHud.jsx';
@@ -29,12 +32,6 @@ import {
   QUEST_STATE, useQuestRows, myQuestsFrom, buildNpcMarkers, parseCounts,
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
-
-// Bundled UMD package — avoids the CSP script-src violation from loading
-// jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
-if (typeof window !== 'undefined' && !window.BABYLON) {
-  window.BABYLON = BABYLON;
-}
 
 const IS_TOUCH = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;

@@ -12,13 +12,10 @@
  * dev (it is not a build input).
  */
 
-import BABYLON from 'babylonjs';
-import 'babylonjs-loaders';
+// babylonGlobal must come first: it publishes window.BABYLON before the
+// scene modules (which reference the global at module scope) evaluate.
+import './game/babylonGlobal.js';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
-
-if (typeof window !== 'undefined' && !window.BABYLON) {
-  window.BABYLON = BABYLON;
-}
 
 const canvas = document.getElementById('world-canvas');
 const hud = document.getElementById('hud');

@@ -40,7 +40,15 @@
     # DbConnection.builder().build() and every subscription silently fails.
     # wss://maincloud.spacetimedb.com is the live STDB endpoint (set via
     # VITE_SPACETIMEDB_URI; defaulted in src/features/world/useSpacetimeWorld.js).
-    Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
+    #
+    # worker-src 'self' blob: (+ child-src, the pre-worker-src fallback older
+    # Safari uses) is required by Babylon's EXT_meshopt_compression support —
+    # it runs the meshopt decoder in a Worker created from a blob: URL. Without
+    # it every meshopt-compressed GLB (all of assets/props/, most of
+    # assets/mobs/) fails to load. blob: in img-src is required for
+    # GLB-embedded textures (EXT_texture_webp), which Babylon hands to <img>
+    # via createObjectURL.
+    Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob: https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
 
 # Cache the immutable Vite-hashed bundle aggressively.
 [[headers]]

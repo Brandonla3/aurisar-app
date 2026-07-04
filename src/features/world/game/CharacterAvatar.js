@@ -38,16 +38,27 @@ function hexToColor3(hex) {
 // with no baseColorFactor (per scripts/blender/README.md: "runtime-tinted via
 // albedoColor"), which makes them render pure white otherwise — appearing as
 // bright humanoid-shaped meshes overlaid on the character.
-const CLOTHING_DEFAULTS = {
-  top:    new BABYLON.Color3(0.55, 0.42, 0.31), // leather tan
-  bottom: new BABYLON.Color3(0.31, 0.23, 0.15), // dark trousers
-  shoes:  new BABYLON.Color3(0.18, 0.13, 0.09), // dark boot leather
-};
+//
+// Built lazily at first call: BABYLON is a window global set by the chunk
+// that bundles the UMD, and this module can evaluate before that assignment
+// runs (chunk-internal module order), so `new BABYLON.*` at module scope is
+// a ReferenceError landmine — same rule as classColor() in BabylonWorldScene.
+let _clothingDefaults = null;
+function clothingDefaults() {
+  return (_clothingDefaults ??= {
+    top:    new BABYLON.Color3(0.55, 0.42, 0.31), // leather tan
+    bottom: new BABYLON.Color3(0.31, 0.23, 0.15), // dark trousers
+    shoes:  new BABYLON.Color3(0.18, 0.13, 0.09), // dark boot leather
+  });
+}
 
-const SPECIES_DEFAULTS = {
-  horns: new BABYLON.Color3(0.75, 0.65, 0.50),  // bone / ivory
-  tail:  new BABYLON.Color3(0.40, 0.30, 0.18),  // warm brown fur
-};
+let _speciesDefaults = null;
+function speciesDefaults() {
+  return (_speciesDefaults ??= {
+    horns: new BABYLON.Color3(0.75, 0.65, 0.50), // bone / ivory
+    tail:  new BABYLON.Color3(0.40, 0.30, 0.18), // warm brown fur
+  });
+}
 
 function tintInstance(inst, color) {
   inst.rootNodes
@@ -515,7 +526,7 @@ export class CharacterAvatar {
         n.parent = this.root;
       }
     });
-    tintInstance(inst, SPECIES_DEFAULTS.horns);
+    tintInstance(inst, speciesDefaults().horns);
     this._slots['horns'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
@@ -551,7 +562,7 @@ export class CharacterAvatar {
         else                      n.parent = this.root;
       });
     }
-    tintInstance(inst, SPECIES_DEFAULTS.tail);
+    tintInstance(inst, speciesDefaults().tail);
     this._slots['tail'] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
@@ -576,7 +587,7 @@ export class CharacterAvatar {
     // Relink the clothing's bones onto the body rig (order-independent).
     this._bindInstanceToRig(inst);
     // Tint the GLB's blank material so the piece doesn't render pure white.
-    tintInstance(inst, CLOTHING_DEFAULTS[slot] ?? CLOTHING_DEFAULTS.top);
+    tintInstance(inst, clothingDefaults()[slot] ?? clothingDefaults().top);
     this._slots[`clothing_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
