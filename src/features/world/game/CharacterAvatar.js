@@ -653,10 +653,17 @@ export class CharacterAvatar {
       lm.useAlphaFromDiffuseTexture = true;
       lm.backFaceCulling = false;
       lm.disableLighting = true;
-      plane.material      = lm;
+      // Draw the nameplate in an overlay rendering group so world geometry —
+      // the sky dome and the terrain/hill silhouette at the horizon — can never
+      // occlude it. Babylon clears the depth buffer between rendering groups by
+      // default, so group 1 renders on top of group 0; disabling depth writes
+      // keeps the label from polluting depth for anything drawn after it.
+      lm.disableDepthWrite = true;
+      plane.material        = lm;
       plane.position.set(0, labelY, 0);
-      plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-      plane.parent        = this.root;
+      plane.billboardMode   = BABYLON.Mesh.BILLBOARDMODE_ALL;
+      plane.renderingGroupId = 1;
+      plane.parent          = this.root;
     } catch (_) { /* non-critical */ }
   }
 
