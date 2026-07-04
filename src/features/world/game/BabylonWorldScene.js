@@ -2275,9 +2275,13 @@ export class BabylonWorldScene {
       lm.useAlphaFromDiffuseTexture = true;
       lm.backFaceCulling = false;
       lm.disableLighting = true;
+      // Overlay rendering group so the sky dome / horizon terrain can never
+      // clip the label (Babylon clears depth between groups by default).
+      lm.disableDepthWrite = true;
       plane.material      = lm;
       plane.position.set(0, 2.15, 0);
       plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+      plane.renderingGroupId = 1;
       plane.parent        = parent;
     } catch (_) { /* non-critical */ }
   }
