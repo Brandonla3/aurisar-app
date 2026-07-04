@@ -44,6 +44,7 @@ import { PropsSystem } from '../systems/PropsSystem.js';
 import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
+import { sameInteriorFloor } from '../castle/castleNavSurface.js';
 import { MOBS as MOB_DEFS } from '../content/index';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -1814,6 +1815,7 @@ export class BabylonWorldScene {
   _findNearestAliveMobInRange(maxRange) {
     const p = this._local?.root?.position;
     if (!p) return null;
+    const inInterior = this._castle?.isInside() || this._localDungeonInstanceId > 0n;
     let bestId = null;
     let bestSq = maxRange * maxRange;
     this._mobs.forEach((m, mobId) => {
@@ -1821,7 +1823,10 @@ export class BabylonWorldScene {
       const dx = m.root.position.x - p.x;
       const dz = m.root.position.z - p.z;
       const dsq = dx * dx + dz * dz;
-      if (dsq < bestSq) { bestSq = dsq; bestId = mobId; }
+      if (dsq >= bestSq) return;
+      if (inInterior && !sameInteriorFloor(m.root.position.y, p.y)) return;
+      bestSq = dsq;
+      bestId = mobId;
     });
     return bestId ? { mobId: bestId } : null;
   }

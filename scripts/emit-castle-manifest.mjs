@@ -16,7 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  CASTLE_PLAN, LOCAL_BOUNDS, LEVELS, NAV_CELL, PLAYER_R, PLAYER_SKIN,
+  CASTLE_PLAN, LOCAL_BOUNDS, LEVELS, ROOMS, NAV_CELL, PLAYER_R, PLAYER_SKIN,
   WALL_T, STEP_UP, PLAN_SCALE, EXTERIOR, SHELL_COLLISION, INTERIOR_ANCHOR, STAIRS,
 } from '../src/features/world/castle/castlePlan.js';
 import { STEP_DOWN, buildNav } from '../src/features/world/castle/castleNav.js';
@@ -115,6 +115,13 @@ export const CASTLE_STAIRS = ${JSON.stringify(STAIRS, null, 2)} as const;
 
 export const CASTLE_STEP_UP = ${STEP_UP};
 export const CASTLE_STEP_DOWN = ${STEP_DOWN};
+
+/** roomId → walkable floor Y (world meters) for dungeon mob spawn height. */
+export const CASTLE_ROOM_FLOOR_Y = ${JSON.stringify(
+  Object.fromEntries(ROOMS.map((r) => [r.id, LEVELS[r.level].y])),
+  null,
+  2,
+)} as const;
 `;
 
 const dungeonSpawnsTs = `// GENERATED FILE — DO NOT EDIT.

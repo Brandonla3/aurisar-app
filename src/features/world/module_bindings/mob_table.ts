@@ -26,4 +26,5 @@ export default __t.row({
   respawnSec: __t.u32().name("respawn_sec"),
   lastAttackAt: __t.u64().name("last_attack_at"),
   dungeonInstanceId: __t.u64().name("dungeon_instance_id"),
+  floorYM: __t.f32().name("floor_ym"),
 });

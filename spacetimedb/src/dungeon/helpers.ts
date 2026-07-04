@@ -5,7 +5,8 @@
 
 import { MOBS } from '../content/index.js';
 import { DUNGEONS } from '../content/dungeons/index.js';
-import { CASTLE_ASHWOOD_ENTRY } from '../content/dungeons/castleAshwood.generated.js';
+import { CASTLE_ASHWOOD_ENTRY, CASTLE_ASHWOOD_SPAWNS } from '../content/dungeons/castleAshwood.generated.js';
+import { CASTLE_LEVELS, CASTLE_ROOM_FLOOR_Y } from '../castle/navGrids.js';
 import type { DungeonDef, DungeonSpawnDef, MobDef } from '../content/types.js';
 
 export const WORLD_CENTER_PX = 1600;
@@ -71,4 +72,16 @@ export function distSqPx(ax: number, ay: number, bx: number, by: number): number
   const dx = ax - bx;
   const dy = ay - by;
   return dx * dx + dy * dy;
+}
+
+const dungeonSpawnFloorByNetId = new Map<string, number>(
+  CASTLE_ASHWOOD_SPAWNS.map((s) => [
+    s.netId,
+    CASTLE_ROOM_FLOOR_Y[s.roomId as keyof typeof CASTLE_ROOM_FLOOR_Y] ?? CASTLE_LEVELS[1].y,
+  ]),
+);
+
+/** Walkable floor Y (world meters) for a castle dungeon spawn netId. */
+export function dungeonSpawnFloorYM(netId: string): number {
+  return dungeonSpawnFloorByNetId.get(netId) ?? CASTLE_LEVELS[1].y;
 }

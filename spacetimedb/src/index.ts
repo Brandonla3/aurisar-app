@@ -43,9 +43,17 @@ import {
   dungeonSpawnByNetId,
   interiorLocalToPx,
   zoneEntranceToPx,
+  dungeonSpawnFloorYM,
   type DungeonSpawnEntry,
 } from './dungeon/helpers.js';
-import { castleInteriorSurfaceAt, isInCastleInterior, pxToWorldM } from './castle/validate.js';
+import {
+  castleInteriorResolveMove,
+  castleInteriorSurfaceAt,
+  isInCastleInterior,
+  pxToWorldM,
+  sameInteriorFloor,
+  worldMToPx,
+} from './castle/validate.js';
 import { CASTLE_LEVELS } from './castle/navGrids.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
@@ -265,6 +273,7 @@ const spacetimedb = schema({
       respawnSec:    t.u32().default(SEED_WOLF_RESPAWN_SEC),            // delay between death and respawn insert
       lastAttackAt:  t.u64().default(0n),                               // micros since epoch of last bite (cooldown enforcement)
       dungeonInstanceId: t.u64().default(0n),                            // 0 = overworld mob; else instance-scoped
+      floorYM:       t.f32().default(0),                                 // interior world Y (m); 0 = overworld
     }
   ),
 
@@ -851,6 +860,10 @@ export const castAbility = spacetimedb.reducer(
     const dy = player.y - mob.y;
     if (dx * dx + dy * dy > MELEE_RANGE_PX * MELEE_RANGE_PX) return;
 
+    // Instance + floor gating for dungeon mobs.
+    if (mob.dungeonInstanceId !== player.dungeonInstanceId) return;
+    if (mob.dungeonInstanceId > 0n && !sameInteriorFloor(mob.floorYM, player.floorYM)) return;
+
     const newHp = mob.hp - MELEE_DAMAGE;
     if (newHp <= 0) {
       // Kill: delete the row (client sees onDelete → mob disappears) and
@@ -909,12 +922,21 @@ export const tickMobAI = spacetimedb.reducer(
 
     // Snapshot online alive players. We do this once per tick rather than
     // per-mob to avoid re-iterating the player table for each wolf.
-    const livePlayers: Array<{ identity: any; x: number; y: number }> = [];
+    const livePlayers: Array<{
+      identity: any; x: number; y: number;
+      dungeonInstanceId: bigint; floorYM: number;
+    }> = [];
     for (const p of ctx.db.player.iter()) {
       if (!p.online) continue;
       if (p.hp <= 0) continue;
       if (p.deadUntil > now) continue;
-      livePlayers.push({ identity: p.identity, x: p.x, y: p.y });
+      livePlayers.push({
+        identity: p.identity,
+        x: p.x,
+        y: p.y,
+        dungeonInstanceId: p.dungeonInstanceId,
+        floorYM: p.floorYM,
+      });
     }
 
     for (const mob of ctx.db.mob.iter()) {
@@ -937,25 +959,38 @@ export const tickMobAI = spacetimedb.reducer(
       let newState = mob.state;
       let nextX = mob.x;
       let nextY = mob.y;
+      let nextFloorYM = mob.floorYM;
       let nextLastAttackAt = mob.lastAttackAt;
 
+      const inDungeon = mob.dungeonInstanceId > 0n;
+      if (inDungeon && nextFloorYM === 0) {
+        nextFloorYM = resolveMobFloorYM(mob.x, mob.y, 0);
+      }
+
+      const stepMob = (fromX: number, fromY: number, toX: number, toY: number) => {
+        if (inDungeon) {
+          return mobInteriorStepPx(fromX, fromY, toX, toY, moveStepPx, nextFloorYM);
+        }
+        const step = stepToward(fromX, fromY, toX, toY, moveStepPx);
+        return { x: step.x, y: step.y, floorYM: nextFloorYM, arrived: step.arrived };
+      };
+
       if (mob.state === 'returning' || homeDistSq > leashSq) {
-        // Walk straight back to spawn point. Continue in 'returning' until
-        // we're close enough to snap home.
-        const stepArrived = stepToward(mob.x, mob.y, mob.spawnX, mob.spawnY, moveStepPx);
+        const stepArrived = stepMob(mob.x, mob.y, mob.spawnX, mob.spawnY);
         nextX = stepArrived.x;
         nextY = stepArrived.y;
+        nextFloorYM = stepArrived.floorYM;
         if (stepArrived.arrived) {
           newState = 'alive';
         } else {
           newState = 'returning';
         }
       } else {
-        // 2. Find nearest live player within aggro.
         const aggroSq = mob.aggroRadiusPx * mob.aggroRadiusPx;
-        let nearest: { x: number; y: number; identity: any } | null = null;
+        let nearest: typeof livePlayers[number] | null = null;
         let nearestDistSq = aggroSq;
         for (const p of livePlayers) {
+          if (!isValidMobTarget(mob, p, nextFloorYM)) continue;
           const dx = p.x - mob.x;
           const dy = p.y - mob.y;
           const dsq = dx * dx + dy * dy;
@@ -966,35 +1001,32 @@ export const tickMobAI = spacetimedb.reducer(
         }
 
         if (nearest) {
-          // Chase. Step toward the target.
           const meleeSq = WOLF_MELEE_RANGE_PX * WOLF_MELEE_RANGE_PX;
-          if (nearestDistSq <= meleeSq) {
-            // In melee range — try to land a hit instead of moving.
+          const sameFloor = sameInteriorFloor(nextFloorYM, nearest.floorYM);
+          if (nearestDistSq <= meleeSq && sameFloor) {
             if (now - mob.lastAttackAt >= attackCdMicros) {
               applyMobHit(ctx, nearest.identity, now, attackDamage);
               nextLastAttackAt = now;
             }
-            // Don't step — we're already in melee.
           } else {
-            const step = stepToward(mob.x, mob.y, nearest.x, nearest.y, moveStepPx);
+            const step = stepMob(mob.x, mob.y, nearest.x, nearest.y);
             nextX = step.x;
             nextY = step.y;
+            nextFloorYM = step.floorYM;
           }
           newState = 'alive';
         } else {
-          // No one in aggro — hold position.
           newState = 'alive';
         }
       }
 
-      // Only emit an update if something actually changed. Skipping no-ops
-      // avoids needless WebSocket churn for idle mobs.
       if (nextX !== mob.x || nextY !== mob.y || newState !== mob.state ||
-          nextLastAttackAt !== mob.lastAttackAt) {
+          nextLastAttackAt !== mob.lastAttackAt || nextFloorYM !== mob.floorYM) {
         ctx.db.mob.mobId.update({
           ...mob,
           x: nextX,
           y: nextY,
+          floorYM: nextFloorYM,
           state: newState,
           lastAttackAt: nextLastAttackAt,
         });
@@ -1144,6 +1176,45 @@ function stepToward(x: number, y: number, tx: number, ty: number, maxStep: numbe
   }
   const k = maxStep / dist;
   return { x: x + dx * k, y: y + dy * k, arrived: false };
+}
+
+function isValidMobTarget(
+  mob: { dungeonInstanceId: bigint; floorYM: number },
+  player: { dungeonInstanceId: bigint; floorYM: number },
+  mobFloorYM: number,
+): boolean {
+  if (player.dungeonInstanceId !== mob.dungeonInstanceId) return false;
+  if (mob.dungeonInstanceId > 0n && !sameInteriorFloor(mobFloorYM, player.floorYM)) return false;
+  return true;
+}
+
+/** Resolve mob floor Y from px position when floorYM was unset (migration backfill). */
+function resolveMobFloorYM(pxX: number, pxY: number, fallback: number): number {
+  const wx = pxToWorldM(pxX);
+  const wz = pxToWorldM(pxY);
+  for (const lv of CASTLE_LEVELS) {
+    const s = castleInteriorSurfaceAt(wx, wz, lv.y);
+    if (s) return s.y;
+  }
+  return fallback;
+}
+
+function mobInteriorStepPx(
+  fromX: number, fromY: number, toX: number, toY: number,
+  maxStepPx: number, floorYM: number,
+): { x: number; y: number; floorYM: number; arrived: boolean } {
+  const step = stepToward(fromX, fromY, toX, toY, maxStepPx);
+  const prevWX = pxToWorldM(fromX);
+  const prevWZ = pxToWorldM(fromY);
+  const nextWX = pxToWorldM(step.x);
+  const nextWZ = pxToWorldM(step.y);
+  const resolved = castleInteriorResolveMove(prevWX, prevWZ, nextWX, nextWZ, floorYM);
+  return {
+    x: worldMToPx(resolved.x),
+    y: worldMToPx(resolved.z),
+    floorYM: resolved.floorYM,
+    arrived: step.arrived && resolved.surface != null,
+  };
 }
 
 /**
@@ -1435,6 +1506,7 @@ function insertMobFromDungeonSpawn(
     respawnSec:    mobDef.respawnSec,
     lastAttackAt:  0n,
     dungeonInstanceId: instanceId,
+    floorYM:       dungeonSpawnFloorYM(spawn.netId),
   });
 }
 

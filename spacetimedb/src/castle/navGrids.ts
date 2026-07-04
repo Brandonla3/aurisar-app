@@ -100,3 +100,44 @@ export const CASTLE_STAIRS = [
 
 export const CASTLE_STEP_UP = 0.55;
 export const CASTLE_STEP_DOWN = 1.4;
+
+/** roomId → walkable floor Y (world meters) for dungeon mob spawn height. */
+export const CASTLE_ROOM_FLOOR_Y = {
+  "dCorridor": 0.6,
+  "cellBlockN": 0.6,
+  "cellBlockS": 0.6,
+  "guardPost": 0.6,
+  "dVault": 0.6,
+  "dVestibule": 0.6,
+  "entranceHall": 11,
+  "corridor1": 11,
+  "kitchen": 11,
+  "stairHall1": 11,
+  "diningHall": 11,
+  "servantHall": 11,
+  "storeRoom": 11,
+  "gVestibule": 11,
+  "ballroom": 22,
+  "corridor2": 22,
+  "guestWest": 22,
+  "guestEast": 22,
+  "bathroom2": 22,
+  "stairHall2": 22,
+  "sittingRoom": 22,
+  "guestSouth": 22,
+  "linenRoom": 22,
+  "gallery3": 31.6,
+  "masterWest": 31.6,
+  "library": 31.6,
+  "stairHall3": 31.6,
+  "masterEast": 31.6,
+  "bathroom3": 31.6,
+  "corridor4": 41.2,
+  "royalSuite": 41.2,
+  "treasury": 41.2,
+  "stairHall4": 41.2,
+  "royalStudy": 41.2,
+  "guardChamber": 41.2,
+  "towerRoom": 41.2,
+  "towerTop": 41.2
+} as const;

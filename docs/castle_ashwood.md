@@ -20,8 +20,9 @@ SpacetimeDB `movePlayer` validates interior moves with level-aware `surfaceAt` (
 - Instance mobs seed from `castleAshwood.generated.ts` on first member entry
 - Client syncs interior presentation from the player row
 - **`player.floorYM`** persisted for reconnect + server surfaceAt reference
+- **Interior mob AI (phase 3)** — dungeon mobs use nav wall-slide; aggro/melee require same instance + floor
 
-**Planned in the same epic:** interior mob AI, minLevel gating, Gorrak quest wiring, boss mechanics.
+**Planned in the same epic:** minLevel gating, Gorrak quest wiring, boss mechanics.
 
 ## Coordinate scheme
 

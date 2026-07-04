@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { buildNav } from '../castleNav.js';
 import { stampNavBlockers } from '../castleNavBlockers.js';
-import { createSurfaceQuery } from '../castleNavSurface.js';
+import { createSurfaceQuery, interiorResolveMove, sameInteriorFloor } from '../castleNavSurface.js';
 import { INTERIOR_ANCHOR, LEVELS, ROOMS, PLAN_SCALE } from '../castlePlan.js';
 import { roomCenterWorld } from '../castleNav.js';
 
@@ -40,5 +40,25 @@ describe('castleNavSurface parity', () => {
 
   it('dungeon void blocks ground floor at ballroom center column', () => {
     expect(surface.surfaceAt(22 * PLAN_SCALE + AX, -5 * PLAN_SCALE + AZ, LEVELS[1].y)).toBeNull();
+  });
+
+  it('interiorResolveMove matches buildNav().resolveMove', () => {
+    const dining = ROOMS.find((r) => r.id === 'diningHall').rect;
+    const cx = (dining.x0 + dining.x1) / 2 + AX;
+    const cz = (dining.z0 + dining.z1) / 2 + AZ;
+    const y = LEVELS[1].y;
+    const prevX = cx - 1.5;
+    const prevZ = cz;
+    const pos = { x: cx, y, z: cz + 3.4 };
+    nav.resolveMove(prevX, prevZ, pos);
+    const moved = interiorResolveMove(surface.surfaceAt, prevX, prevZ, pos.x, pos.z, y);
+    expect(moved.x).toBeCloseTo(pos.x, 5);
+    expect(moved.z).toBeCloseTo(pos.z, 5);
+    expect(moved.floorYM).toBeCloseTo(pos.y, 5);
+  });
+
+  it('sameInteriorFloor matches level hysteresis band', () => {
+    expect(sameInteriorFloor(LEVELS[1].y, LEVELS[1].y + 0.4)).toBe(true);
+    expect(sameInteriorFloor(LEVELS[1].y, LEVELS[2].y)).toBe(false);
   });
 });

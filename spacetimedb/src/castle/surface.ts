@@ -130,6 +130,40 @@ export function castleInteriorSurfaceAt(
   return surfaceAt(worldXM, worldZM, currentY);
 }
 
+export function worldMToPx(m: number): number {
+  return m * 32 + 1600;
+}
+
+/** Wall-slide one interior step — mirrors castleNav.resolveMove / castleNavSurface.js. */
+export function castleInteriorResolveMove(
+  prevXM: number,
+  prevZM: number,
+  nextXM: number,
+  nextZM: number,
+  currentY: number,
+): { x: number; z: number; floorYM: number; surface: Surface | null } {
+  let x = nextXM;
+  let z = nextZM;
+  let s = castleInteriorSurfaceAt(x, z, currentY);
+  if (!s) {
+    s = castleInteriorSurfaceAt(x, prevZM, currentY);
+    if (s) { z = prevZM; }
+    else {
+      s = castleInteriorSurfaceAt(prevXM, z, currentY);
+      if (s) { x = prevXM; }
+      else {
+        x = prevXM; z = prevZM;
+        s = castleInteriorSurfaceAt(prevXM, prevZM, currentY);
+      }
+    }
+  }
+  return { x, z, floorYM: s ? s.y : currentY, surface: s };
+}
+
+export function sameInteriorFloor(a: number, b: number): boolean {
+  return Math.abs(a - b) <= CASTLE_STEP_UP;
+}
+
 /** null = skip validation; false = blocked; true = allowed. */
 export function castleInteriorMoveAllowed(
   worldXM: number,

@@ -59,3 +59,33 @@ export function createSurfaceQuery(nav) {
 export function navSurfaceAt(nav, wx, wz, currentY) {
   return createSurfaceQuery(nav).surfaceAt(wx, wz, currentY);
 }
+
+/**
+ * Wall-slide one interior step — mirrors castleNav.resolveMove.
+ * Keep spacetimedb/src/castle/surface.ts castleInteriorResolveMove in sync.
+ *
+ * @param {(wx: number, wz: number, refY: number) => { y: number, level: number } | null} surfaceAt
+ */
+export function interiorResolveMove(surfaceAt, prevX, prevZ, nextX, nextZ, currentY) {
+  let x = nextX;
+  let z = nextZ;
+  let s = surfaceAt(x, z, currentY);
+  if (!s) {
+    s = surfaceAt(x, prevZ, currentY);
+    if (s) { z = prevZ; }
+    else {
+      s = surfaceAt(prevX, z, currentY);
+      if (s) { x = prevX; }
+      else {
+        x = prevX; z = prevZ;
+        s = surfaceAt(prevX, prevZ, currentY);
+      }
+    }
+  }
+  return { x, z, floorYM: s ? s.y : currentY, surface: s };
+}
+
+/** True when two interior floor Y values are the same walkable level. */
+export function sameInteriorFloor(a, b) {
+  return Math.abs(a - b) <= STEP_UP;
+}

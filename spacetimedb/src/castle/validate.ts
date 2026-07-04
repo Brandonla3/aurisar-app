@@ -5,7 +5,10 @@
 
 export {
   pxToWorldM,
+  worldMToPx,
   isInCastleInterior,
   castleInteriorSurfaceAt,
   castleInteriorMoveAllowed,
+  castleInteriorResolveMove,
+  sameInteriorFloor,
 } from './surface.js';
