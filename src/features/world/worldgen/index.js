@@ -40,6 +40,12 @@ export function createWorldgen(config) {
     ...biomes,
   };
 
+  // True inside the settlement pad footprint (the starter village plate) —
+  // vegetation systems use it to keep grass/brush off the village grounds.
+  const pad = config.settlementPad ?? null;
+  wg.inSettlement = (x, z) =>
+    !!pad && (x - pad.x) * (x - pad.x) + (z - pad.z) * (z - pad.z) < pad.r * pad.r;
+
   wg.forest = buildForestLayout(config);
   wg.sites = generateSites(config, rng, wg);
   Object.assign(wg.sites, generateForestSites(config, rng, wg, wg.forest));

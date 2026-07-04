@@ -6,6 +6,7 @@ creators are credited below as a courtesy.
 
 | Directory | Assets | Author | Source | License |
 |---|---|---|---|---|
+| `props/village_center.glb` | Starter village (generated for this project via Meshy AI; processed by `scripts/build_village_glb.mjs` from `assets_src/village/`) | Project asset | https://www.meshy.ai | Project-owned |
 | `props/` (houses, inn, bell tower, blacksmith, well, market stands, cart) | Medieval Village Pack | Quaternius | https://quaternius.com/packs/medievalvillage.html | CC0 1.0 |
 | `props/` (barrels, crates, lanterns, anvil, weapon stand, farm crate) | Fantasy Props MegaKit | Quaternius | https://quaternius.itch.io/fantasy-props-megakit | CC0 1.0 |
 | `props/` (rocks, mushrooms, columns, statues) | Stylized Nature MegaKit / Nature Kit | Quaternius / Kenney | https://quaternius.itch.io/stylized-nature-megakit · https://kenney.nl | CC0 1.0 |

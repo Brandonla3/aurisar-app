@@ -12,7 +12,7 @@
 import type { WaypointDef } from '../../types';
 
 export const WAYPOINTS: WaypointDef[] = [
-  { id: 'poi_oakrest',      zoneId: 1, pos: { x: 0, z: -3 },    radiusM: 26, label: 'Oakrest' },
+  { id: 'poi_oakrest',      zoneId: 1, pos: { x: -10, z: -100 }, radiusM: 40, label: 'Oakrest' },
   { id: 'poi_greywood_run', zoneId: 1, pos: { x: -2, z: 70 },   radiusM: 20, label: 'Greywood Run' },
   { id: 'poi_tuskfield',    zoneId: 1, pos: { x: 65, z: 0 },    radiusM: 20, label: 'Tuskfield' },
   { id: 'poi_stillmere',    zoneId: 1, pos: { x: -88, z: 82 },  radiusM: 24, label: 'Stillmere' },

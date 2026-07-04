@@ -17,6 +17,7 @@ import { ZONE1_PROPS } from '../content/zones/zone1/props';
 const BASE = '/assets/props/';
 
 const MANIFEST = {
+  village_center: 'village_center.glb',
   house_1: 'house_1.glb',
   house_2: 'house_2.glb',
   house_3: 'house_3.glb',
@@ -77,8 +78,10 @@ export class PropsSystem {
         try {
           const c = await BABYLON.SceneLoader.LoadAssetContainerAsync(BASE, file, this.scene);
           this._containers.set(key, c);
-        } catch {
-          // Missing file — that placement is skipped silently.
+        } catch (err) {
+          // Missing/broken file — that placement is skipped, but say so:
+          // a silent catch here hid the CSP-blocked meshopt decoder for weeks.
+          console.warn(`[PropsSystem] failed to load ${file}:`, err?.message ?? err);
         }
       })
     );
@@ -136,6 +139,15 @@ export class PropsSystem {
 
   _placeAll() {
     const P = ZONE1_PROPS;
+
+    // ── Starter village (composed model, geometry already in meters) ──
+    // No fit/uniform: scale baked by scripts/build_village_glb.mjs. The
+    // small sink hides the plate rim; the walking paths on the plate top
+    // sit within ~0.1m of the (flattened) analytic terrain the player
+    // actually walks on.
+    for (const v of P.villages ?? []) {
+      this._place('village_center', v.x, v.z, { rotY: v.rot, yOffset: -0.25 });
+    }
 
     // ── Buildings ──────────────────────────────────────────────────
     for (const b of P.buildings) {

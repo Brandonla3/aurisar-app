@@ -96,6 +96,24 @@
     [
       [
         0,
+        -4
+      ],
+      [
+        -2,
+        -25
+      ],
+      [
+        -5,
+        -45
+      ],
+      [
+        -7,
+        -62
+      ]
+    ],
+    [
+      [
+        0,
         8
       ],
       [
@@ -358,12 +376,25 @@
     "trailDirt": "#6e5638",
     "beachSand": "#d8bf8c"
   },
+  "settlementPad": {
+    "x": -10,
+    "z": -100,
+    "r": 52,
+    "blendR": 68,
+    "note": "Radial terrain flatten under the starter village (village_center.glb, ~75m footprint) — worldgen/heightfield.js groundHeight"
+  },
   "exclusions": [
     {
       "x": 150,
       "z": 20,
       "r": 42,
       "note": "Castle Ashwood exterior shell footprint + approach (castle/castlePlan.js EXTERIOR)"
+    },
+    {
+      "x": -10,
+      "z": -100,
+      "r": 52,
+      "note": "Starter village footprint (village_center.glb) — keeps scattered trees/rocks/ponds/chests off the settlement pad"
     }
   ]
 }

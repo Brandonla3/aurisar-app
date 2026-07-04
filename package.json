@@ -12,6 +12,7 @@
     "sync:content": "node scripts/sync_world_content.mjs",
     "sync:content:check": "node scripts/sync_world_content.mjs --check",
     "build:glb": "node scripts/build_glb_assets.mjs",
+    "build:village": "node scripts/build_village_glb.mjs",
     "build:gameplay": "node scripts/copy_gameplay_to_public.mjs",
     "bake:tiles": "node scripts/bake_ashwood_tiles.mjs",
     "bake:heightmap": "node scripts/bake_ashwood_heightmap.mjs",
@@ -35,6 +36,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@gltf-transform/core": "^4.4.0",
+    "@gltf-transform/extensions": "^4.4.1",
+    "@gltf-transform/functions": "^4.4.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
@@ -43,6 +46,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "meshoptimizer": "^1.2.0",
     "sharp": "^0.35.2",
     "vite": "^8.1.0",
     "vitest": "^4.1.9"

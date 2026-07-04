@@ -20,6 +20,14 @@ export function createHeightfield(config, zones) {
   const FLTS = config.plateaus;
   const { mtnPathInfo } = zones;
 
+  // Optional settlement pad: a radial flatten so a large rigid structure
+  // (the starter village GLB) sits on level ground. Flat inside `r`,
+  // smoother-blended back into the rolling terrain by `blendR`. The pad
+  // height is the rolling terrain sampled at the pad center, so the flatten
+  // is exactly "freeze the terrain at this spot".
+  const PAD = config.settlementPad ?? null;
+  const padH = PAD ? rollingH(PAD.x, PAD.z) : 0;
+
   /** Carve the Mirrormere bowl into a base height h. */
   function lakeShape(x, z, h) {
     const d = Math.hypot(x - L.x, z - L.z);
@@ -52,13 +60,24 @@ export function createHeightfield(config, zones) {
          * (1 - sstep(L.bowlR + 4, L.bowlR + 10, d));
   }
 
-  /** Rolling base terrain (lake carved in). Flat east of x=500 (interiors). */
+  /** Rolling base terrain formula (no lake, no pad). */
+  function rollingH(x, z) {
+    return Math.sin(x * 0.05) * Math.cos(z * 0.04) * 1.6 + Math.sin(x * 0.13 + z * 0.07) * 0.6 - 0.2;
+  }
+
+  /** Rolling base terrain (settlement pad + lake carved in). Flat east of
+   *  x=500 (interiors). */
   function groundHeight(x, z) {
     if (x > 500) return 0;
-    return lakeShape(
-      x, z,
-      Math.sin(x * 0.05) * Math.cos(z * 0.04) * 1.6 + Math.sin(x * 0.13 + z * 0.07) * 0.6 - 0.2
-    );
+    let h = rollingH(x, z);
+    if (PAD) {
+      const d = Math.hypot(x - PAD.x, z - PAD.z);
+      if (d < PAD.blendR) {
+        const t = d <= PAD.r ? 1 : 1 - smoother((d - PAD.r) / (PAD.blendR - PAD.r));
+        h = h * (1 - t) + padH * t;
+      }
+    }
+    return lakeShape(x, z, h);
   }
 
   /** Mountain massif height: broad smootherstep dome + ridges, with flat

@@ -10,6 +10,7 @@
  */
 
 export interface BuildingProp { kind: 'house' | 'inn' | 'chapel'; x: number; z: number; w: number; d: number; rot: number }
+export interface VillageProp { x: number; z: number; rot: number }
 export interface StallProp { x: number; z: number; rot: number; smithy?: boolean }
 export interface FenceLine { x1: number; z1: number; x2: number; z2: number }
 export interface TentProp { x: number; z: number; rot: number; scale: number }
@@ -18,18 +19,21 @@ export interface SimplePos { x: number; z: number }
 export interface RotPos extends SimplePos { rot: number }
 
 export const ZONE1_PROPS = {
-  buildings: [
-    { kind: 'house',  x: 10,  z: 12, w: 7, d: 6, rot: -0.4 },
-    { kind: 'house',  x: -10, z: 10, w: 6, d: 5, rot: 0.5 },
-    { kind: 'inn',    x: 12,  z: -6, w: 6, d: 7, rot: 2.4 },
-    { kind: 'chapel', x: -16, z: -8, w: 5, d: 7, rot: 0.9 },
-  ] as BuildingProp[],
+  // The starter town: one composed Meshy-AI village model (~75m footprint,
+  // geometry pre-scaled to meters — see scripts/build_village_glb.mjs).
+  // Sits on the terrain settlement pad + scatter exclusion declared in
+  // zone1_world.json. With rot 0 the main path gates face the spawn meadow.
+  villages: [{ x: -10, z: -100, rot: 0 }] as VillageProp[],
 
-  wells: [{ x: 0, z: 2 }] as SimplePos[],
+  // The generic starter buildings were replaced by the village model above.
+  buildings: [] as BuildingProp[],
+
+  // Well + market stalls live on the village plaza (world = village + local).
+  wells: [{ x: -11, z: -97 }] as SimplePos[],
 
   stalls: [
-    { x: -8.5, z: 3,    rot: Math.PI / 2 },
-    { x: 9.5,  z: 17.5, rot: -2.7, smithy: true }, // the smith's smithy
+    { x: -16, z: -91, rot: Math.PI / 2 },
+    { x: 1,   z: -88, rot: -1.9, smithy: true }, // the smith's smithy
   ] as StallProp[],
 
   campfires: [
@@ -37,10 +41,7 @@ export const ZONE1_PROPS = {
     { x: -80, z: -60 }, { x: -61, z: 56 },
   ] as SimplePos[],
 
-  fences: [
-    { x1: 16,  z1: 16, x2: 22,  z2: 4 },
-    { x1: -16, z1: 14, x2: -20, z2: 2 },
-  ] as FenceLine[],
+  fences: [] as FenceLine[],
 
   tents: [
     { x: 62, z: -61, rot: 0.4,  scale: 1 },

@@ -15,6 +15,7 @@
 /* global BABYLON */
 
 import { AssetLibrary }    from './AssetLibrary.js';
+import { configureMeshoptDecoder } from './meshoptConfig.js';
 import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
 import { AshwoodSky }        from './AshwoodSky.js';
@@ -884,6 +885,10 @@ export class BabylonWorldScene {
   // ── Sync bootstrap (terrain, engine — no characters yet) ──────────────────
 
   _initSync() {
+    // Before any SceneLoader call: self-hosted meshopt decoder (the CDN
+    // default is CSP-blocked in production — see meshoptConfig.js).
+    configureMeshoptDecoder();
+
     this.engine = new BABYLON.Engine(this.canvas, true, {
       stencil: true,
       adaptToDeviceRatio: true,
