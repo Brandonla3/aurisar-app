@@ -160,6 +160,8 @@
             "placement": { "type": "string", "enum": ["background", "midground", "foreground"] },
             "scale": { "type": "string", "enum": ["small", "medium", "large", "massive"] },
             "interior_required": { "type": "boolean" },
+            "interior_mode": { "type": "string", "enum": ["instanced_teleport", "walkthrough", "none"] },
+            "runtime_source": { "type": "string", "enum": ["procedural", "glb"] },
             "visual_role": { "type": "string", "enum": ["objective_anchor", "set_dressing", "skyline"] }
           }
         }

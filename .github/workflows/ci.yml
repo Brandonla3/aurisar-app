@@ -28,6 +28,9 @@ jobs:
       - name: World content mirror up to date
         run: npm run sync:content:check
 
+      - name: Castle manifest up to date
+        run: npm run emit:castle:check
+
       - name: Tests
         run: npm test
 

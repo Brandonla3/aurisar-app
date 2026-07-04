@@ -1,0 +1,1037 @@
+{
+  "meta": {
+    "id": "castle_ashwood",
+    "version": "1.0.0",
+    "source": "src/features/world/castle/castlePlan.js",
+    "runtime": "procedural"
+  },
+  "layout": {
+    "name": "Castle Ashwood",
+    "planScale": 1.75,
+    "interiorAnchor": {
+      "x": 840,
+      "z": 0
+    },
+    "bounds": {
+      "x0": -57.75,
+      "z0": -43.75,
+      "x1": 57.75,
+      "z1": 43.75
+    },
+    "levels": [
+      {
+        "id": "dungeon",
+        "y": 0.6,
+        "clear": 9.8
+      },
+      {
+        "id": "ground",
+        "y": 11,
+        "clear": 10.4
+      },
+      {
+        "id": "f2",
+        "y": 22,
+        "clear": 9
+      },
+      {
+        "id": "f3",
+        "y": 31.6,
+        "clear": 9
+      },
+      {
+        "id": "f4",
+        "y": 41.2,
+        "clear": 9
+      }
+    ],
+    "rooms": [
+      {
+        "id": "dCorridor",
+        "level": 0,
+        "rect": {
+          "x0": -42,
+          "z0": -7,
+          "x1": 42,
+          "z1": 7
+        },
+        "kind": "dungeonHall"
+      },
+      {
+        "id": "cellBlockN",
+        "level": 0,
+        "rect": {
+          "x0": -42,
+          "z0": 7,
+          "x1": 3.5,
+          "z1": 28
+        },
+        "kind": "cells"
+      },
+      {
+        "id": "cellBlockS",
+        "level": 0,
+        "rect": {
+          "x0": -42,
+          "z0": -28,
+          "x1": 3.5,
+          "z1": -7
+        },
+        "kind": "cells"
+      },
+      {
+        "id": "guardPost",
+        "level": 0,
+        "rect": {
+          "x0": 3.5,
+          "z0": 7,
+          "x1": 42,
+          "z1": 28
+        },
+        "kind": "guard"
+      },
+      {
+        "id": "dVault",
+        "level": 0,
+        "rect": {
+          "x0": 3.5,
+          "z0": -28,
+          "x1": 42,
+          "z1": -7
+        },
+        "kind": "vault"
+      },
+      {
+        "id": "dVestibule",
+        "level": 0,
+        "rect": {
+          "x0": 42,
+          "z0": -10.5,
+          "x1": 57.39999999999999,
+          "z1": 10.5
+        },
+        "kind": "dungeonHall"
+      },
+      {
+        "id": "entranceHall",
+        "level": 1,
+        "rect": {
+          "x0": -56,
+          "z0": -21,
+          "x1": -21,
+          "z1": 21
+        },
+        "kind": "entrance"
+      },
+      {
+        "id": "corridor1",
+        "level": 1,
+        "rect": {
+          "x0": -21,
+          "z0": -7,
+          "x1": 42,
+          "z1": 7
+        },
+        "kind": "corridor"
+      },
+      {
+        "id": "kitchen",
+        "level": 1,
+        "rect": {
+          "x0": -21,
+          "z0": 7,
+          "x1": 14,
+          "z1": 38.5
+        },
+        "kind": "kitchen"
+      },
+      {
+        "id": "stairHall1",
+        "level": 1,
+        "rect": {
+          "x0": 14,
+          "z0": 7,
+          "x1": 42,
+          "z1": 38.5
+        },
+        "kind": "stairHall"
+      },
+      {
+        "id": "diningHall",
+        "level": 1,
+        "rect": {
+          "x0": -21,
+          "z0": -38.5,
+          "x1": 14,
+          "z1": -7
+        },
+        "kind": "dining"
+      },
+      {
+        "id": "servantHall",
+        "level": 1,
+        "rect": {
+          "x0": 14,
+          "z0": -38.5,
+          "x1": 35,
+          "z1": -7
+        },
+        "kind": "servant"
+      },
+      {
+        "id": "storeRoom",
+        "level": 1,
+        "rect": {
+          "x0": 35,
+          "z0": -38.5,
+          "x1": 56,
+          "z1": -10.5
+        },
+        "kind": "storage"
+      },
+      {
+        "id": "gVestibule",
+        "level": 1,
+        "rect": {
+          "x0": 42,
+          "z0": -10.5,
+          "x1": 57.39999999999999,
+          "z1": 10.5
+        },
+        "kind": "stairHall"
+      },
+      {
+        "id": "ballroom",
+        "level": 2,
+        "rect": {
+          "x0": -56,
+          "z0": -38.5,
+          "x1": 7,
+          "z1": 7
+        },
+        "kind": "ballroom"
+      },
+      {
+        "id": "corridor2",
+        "level": 2,
+        "rect": {
+          "x0": -56,
+          "z0": 7,
+          "x1": 14,
+          "z1": 21
+        },
+        "kind": "corridor"
+      },
+      {
+        "id": "guestWest",
+        "level": 2,
+        "rect": {
+          "x0": -56,
+          "z0": 21,
+          "x1": -31.5,
+          "z1": 38.5
+        },
+        "kind": "bedroom"
+      },
+      {
+        "id": "guestEast",
+        "level": 2,
+        "rect": {
+          "x0": -31.5,
+          "z0": 21,
+          "x1": -10.5,
+          "z1": 38.5
+        },
+        "kind": "bedroom"
+      },
+      {
+        "id": "bathroom2",
+        "level": 2,
+        "rect": {
+          "x0": -10.5,
+          "z0": 21,
+          "x1": 14,
+          "z1": 38.5
+        },
+        "kind": "bathroom"
+      },
+      {
+        "id": "stairHall2",
+        "level": 2,
+        "rect": {
+          "x0": 14,
+          "z0": 7,
+          "x1": 42,
+          "z1": 38.5
+        },
+        "kind": "stairHall"
+      },
+      {
+        "id": "sittingRoom",
+        "level": 2,
+        "rect": {
+          "x0": 7,
+          "z0": -17.5,
+          "x1": 42,
+          "z1": 7
+        },
+        "kind": "sitting"
+      },
+      {
+        "id": "guestSouth",
+        "level": 2,
+        "rect": {
+          "x0": 7,
+          "z0": -38.5,
+          "x1": 42,
+          "z1": -17.5
+        },
+        "kind": "bedroom"
+      },
+      {
+        "id": "linenRoom",
+        "level": 2,
+        "rect": {
+          "x0": 42,
+          "z0": -10.5,
+          "x1": 56,
+          "z1": 10.5
+        },
+        "kind": "storage"
+      },
+      {
+        "id": "gallery3",
+        "level": 3,
+        "rect": {
+          "x0": -56,
+          "z0": 0,
+          "x1": 42,
+          "z1": 7
+        },
+        "kind": "gallery"
+      },
+      {
+        "id": "masterWest",
+        "level": 3,
+        "rect": {
+          "x0": -56,
+          "z0": 7,
+          "x1": -17.5,
+          "z1": 38.5
+        },
+        "kind": "master"
+      },
+      {
+        "id": "library",
+        "level": 3,
+        "rect": {
+          "x0": -17.5,
+          "z0": 7,
+          "x1": 14,
+          "z1": 38.5
+        },
+        "kind": "library"
+      },
+      {
+        "id": "stairHall3",
+        "level": 3,
+        "rect": {
+          "x0": 14,
+          "z0": 7,
+          "x1": 42,
+          "z1": 38.5
+        },
+        "kind": "stairHall"
+      },
+      {
+        "id": "masterEast",
+        "level": 3,
+        "rect": {
+          "x0": 7,
+          "z0": -38.5,
+          "x1": 42,
+          "z1": 0
+        },
+        "kind": "master"
+      },
+      {
+        "id": "bathroom3",
+        "level": 3,
+        "rect": {
+          "x0": 42,
+          "z0": -10.5,
+          "x1": 56,
+          "z1": 10.5
+        },
+        "kind": "bathroom"
+      },
+      {
+        "id": "corridor4",
+        "level": 4,
+        "rect": {
+          "x0": -56,
+          "z0": -3.5,
+          "x1": 42,
+          "z1": 7
+        },
+        "kind": "corridor"
+      },
+      {
+        "id": "royalSuite",
+        "level": 4,
+        "rect": {
+          "x0": -56,
+          "z0": 7,
+          "x1": -10.5,
+          "z1": 38.5
+        },
+        "kind": "royal"
+      },
+      {
+        "id": "treasury",
+        "level": 4,
+        "rect": {
+          "x0": -10.5,
+          "z0": 7,
+          "x1": 14,
+          "z1": 38.5
+        },
+        "kind": "treasury"
+      },
+      {
+        "id": "stairHall4",
+        "level": 4,
+        "rect": {
+          "x0": 14,
+          "z0": 7,
+          "x1": 42,
+          "z1": 38.5
+        },
+        "kind": "stairHall"
+      },
+      {
+        "id": "royalStudy",
+        "level": 4,
+        "rect": {
+          "x0": -56,
+          "z0": -38.5,
+          "x1": -21,
+          "z1": -3.5
+        },
+        "kind": "master"
+      },
+      {
+        "id": "guardChamber",
+        "level": 4,
+        "rect": {
+          "x0": -21,
+          "z0": -38.5,
+          "x1": 14,
+          "z1": -3.5
+        },
+        "kind": "sitting"
+      },
+      {
+        "id": "towerRoom",
+        "level": 4,
+        "rect": {
+          "x0": 14,
+          "z0": -38.5,
+          "x1": 42,
+          "z1": -3.5
+        },
+        "kind": "sitting"
+      },
+      {
+        "id": "towerTop",
+        "level": 4,
+        "rect": {
+          "x0": 42,
+          "z0": -10.5,
+          "x1": 56,
+          "z1": 10.5
+        },
+        "kind": "observatory"
+      }
+    ],
+    "doors": [
+      {
+        "id": "d_cellsN",
+        "a": "dCorridor",
+        "b": "cellBlockN",
+        "edge": "z",
+        "at": 7,
+        "lo": -24.5,
+        "hi": -19.25
+      },
+      {
+        "id": "d_cellsS",
+        "a": "dCorridor",
+        "b": "cellBlockS",
+        "edge": "z",
+        "at": -7,
+        "lo": -24.5,
+        "hi": -19.25
+      },
+      {
+        "id": "d_guard",
+        "a": "dCorridor",
+        "b": "guardPost",
+        "edge": "z",
+        "at": 7,
+        "lo": 17.5,
+        "hi": 22.75
+      },
+      {
+        "id": "d_vault",
+        "a": "dCorridor",
+        "b": "dVault",
+        "edge": "z",
+        "at": -7,
+        "lo": 17.5,
+        "hi": 22.75,
+        "iron": true
+      },
+      {
+        "id": "d_vest",
+        "a": "dCorridor",
+        "b": "dVestibule",
+        "edge": "x",
+        "at": 42,
+        "lo": -5.7749999999999995,
+        "hi": 5.7749999999999995,
+        "arch": true
+      },
+      {
+        "id": "g_gate",
+        "a": "entranceHall",
+        "b": "EXTERIOR",
+        "edge": "x",
+        "at": -56,
+        "lo": -3.8500000000000005,
+        "hi": 3.8500000000000005,
+        "double": true,
+        "sealed": true
+      },
+      {
+        "id": "g_entr",
+        "a": "entranceHall",
+        "b": "corridor1",
+        "edge": "x",
+        "at": -21,
+        "lo": -3.8500000000000005,
+        "hi": 3.8500000000000005,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "g_kitch",
+        "a": "corridor1",
+        "b": "kitchen",
+        "edge": "z",
+        "at": 7,
+        "lo": -10.5,
+        "hi": -5.25
+      },
+      {
+        "id": "g_stair",
+        "a": "corridor1",
+        "b": "stairHall1",
+        "edge": "z",
+        "at": 7,
+        "lo": 24.5,
+        "hi": 31.5,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "g_dining",
+        "a": "corridor1",
+        "b": "diningHall",
+        "edge": "z",
+        "at": -7,
+        "lo": -10.5,
+        "hi": -3.5,
+        "double": true
+      },
+      {
+        "id": "g_serv",
+        "a": "corridor1",
+        "b": "servantHall",
+        "edge": "z",
+        "at": -7,
+        "lo": 21,
+        "hi": 26.25
+      },
+      {
+        "id": "g_vest",
+        "a": "corridor1",
+        "b": "gVestibule",
+        "edge": "x",
+        "at": 42,
+        "lo": -5.7749999999999995,
+        "hi": 5.7749999999999995,
+        "arch": true
+      },
+      {
+        "id": "g_store",
+        "a": "gVestibule",
+        "b": "storeRoom",
+        "edge": "z",
+        "at": -10.5,
+        "lo": 45.5,
+        "hi": 50.75
+      },
+      {
+        "id": "g_kstair",
+        "a": "kitchen",
+        "b": "stairHall1",
+        "edge": "x",
+        "at": 14,
+        "lo": 8.049999999999999,
+        "hi": 12.950000000000001
+      },
+      {
+        "id": "g_dserv",
+        "a": "diningHall",
+        "b": "servantHall",
+        "edge": "x",
+        "at": 14,
+        "lo": -24.5,
+        "hi": -19.25
+      },
+      {
+        "id": "f2_ballW",
+        "a": "ballroom",
+        "b": "corridor2",
+        "edge": "z",
+        "at": 7,
+        "lo": -35,
+        "hi": -28,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "f2_ballE",
+        "a": "ballroom",
+        "b": "corridor2",
+        "edge": "z",
+        "at": 7,
+        "lo": -10.5,
+        "hi": -3.5,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "f2_ballS",
+        "a": "ballroom",
+        "b": "sittingRoom",
+        "edge": "x",
+        "at": 7,
+        "lo": -10.5,
+        "hi": -3.5,
+        "double": true
+      },
+      {
+        "id": "f2_guestW",
+        "a": "corridor2",
+        "b": "guestWest",
+        "edge": "z",
+        "at": 21,
+        "lo": -47.25,
+        "hi": -42
+      },
+      {
+        "id": "f2_guestE",
+        "a": "corridor2",
+        "b": "guestEast",
+        "edge": "z",
+        "at": 21,
+        "lo": -24.5,
+        "hi": -19.25
+      },
+      {
+        "id": "f2_bath",
+        "a": "corridor2",
+        "b": "bathroom2",
+        "edge": "z",
+        "at": 21,
+        "lo": -1.75,
+        "hi": 3.5
+      },
+      {
+        "id": "f2_stair",
+        "a": "corridor2",
+        "b": "stairHall2",
+        "edge": "x",
+        "at": 14,
+        "lo": 8.049999999999999,
+        "hi": 12.950000000000001,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "f2_sit",
+        "a": "stairHall2",
+        "b": "sittingRoom",
+        "edge": "z",
+        "at": 7,
+        "lo": 21,
+        "hi": 26.25
+      },
+      {
+        "id": "f2_guestS",
+        "a": "sittingRoom",
+        "b": "guestSouth",
+        "edge": "z",
+        "at": -17.5,
+        "lo": 21,
+        "hi": 26.25
+      },
+      {
+        "id": "f2_linen",
+        "a": "sittingRoom",
+        "b": "linenRoom",
+        "edge": "x",
+        "at": 42,
+        "lo": -3.5,
+        "hi": 3.5
+      },
+      {
+        "id": "f3_masterW",
+        "a": "gallery3",
+        "b": "masterWest",
+        "edge": "z",
+        "at": 7,
+        "lo": -42,
+        "hi": -36.75,
+        "double": true
+      },
+      {
+        "id": "f3_lib",
+        "a": "gallery3",
+        "b": "library",
+        "edge": "z",
+        "at": 7,
+        "lo": -7,
+        "hi": -1.75,
+        "double": true
+      },
+      {
+        "id": "f3_stair",
+        "a": "gallery3",
+        "b": "stairHall3",
+        "edge": "z",
+        "at": 7,
+        "lo": 24.5,
+        "hi": 31.5,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "f3_masterE",
+        "a": "gallery3",
+        "b": "masterEast",
+        "edge": "z",
+        "at": 0,
+        "lo": 21,
+        "hi": 28,
+        "double": true
+      },
+      {
+        "id": "f3_bath",
+        "a": "masterEast",
+        "b": "bathroom3",
+        "edge": "x",
+        "at": 42,
+        "lo": -7,
+        "hi": -1.75
+      },
+      {
+        "id": "f4_royal",
+        "a": "corridor4",
+        "b": "royalSuite",
+        "edge": "z",
+        "at": 7,
+        "lo": -38.5,
+        "hi": -31.5,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "f4_treas",
+        "a": "corridor4",
+        "b": "treasury",
+        "edge": "z",
+        "at": 7,
+        "lo": -3.5,
+        "hi": 3.5,
+        "iron": true
+      },
+      {
+        "id": "f4_stair",
+        "a": "corridor4",
+        "b": "stairHall4",
+        "edge": "z",
+        "at": 7,
+        "lo": 24.5,
+        "hi": 31.5,
+        "double": true,
+        "arch": true
+      },
+      {
+        "id": "f4_study",
+        "a": "corridor4",
+        "b": "royalStudy",
+        "edge": "z",
+        "at": -3.5,
+        "lo": -43.75,
+        "hi": -38.5
+      },
+      {
+        "id": "f4_guard",
+        "a": "corridor4",
+        "b": "guardChamber",
+        "edge": "z",
+        "at": -3.5,
+        "lo": -8.75,
+        "hi": -1.75
+      },
+      {
+        "id": "f4_tower",
+        "a": "corridor4",
+        "b": "towerRoom",
+        "edge": "z",
+        "at": -3.5,
+        "lo": 24.5,
+        "hi": 29.75
+      },
+      {
+        "id": "f4_ttop",
+        "a": "towerRoom",
+        "b": "towerTop",
+        "edge": "x",
+        "at": 42,
+        "lo": -8.75,
+        "hi": -3.5
+      }
+    ],
+    "stairs": [
+      {
+        "id": "dstair",
+        "lo": 0,
+        "hi": 1,
+        "axis": "x",
+        "u0": 44.449999999999996,
+        "runLen": 8.75,
+        "landingD": 4.2,
+        "laneW": 4.55,
+        "gap": 0.875,
+        "v0": -4.9875
+      },
+      {
+        "id": "grand1",
+        "lo": 1,
+        "hi": 2,
+        "axis": "z",
+        "u0": 14,
+        "runLen": 15.75,
+        "landingD": 7.3500000000000005,
+        "laneW": 5.95,
+        "gap": 1.4000000000000001,
+        "v0": 14.525000000000002
+      },
+      {
+        "id": "grand2",
+        "lo": 2,
+        "hi": 3,
+        "axis": "z",
+        "u0": 14,
+        "runLen": 15.75,
+        "landingD": 7.3500000000000005,
+        "laneW": 5.95,
+        "gap": 1.4000000000000001,
+        "v0": 28.175000000000004
+      },
+      {
+        "id": "grand3",
+        "lo": 3,
+        "hi": 4,
+        "axis": "z",
+        "u0": 14,
+        "runLen": 15.75,
+        "landingD": 7.3500000000000005,
+        "laneW": 5.95,
+        "gap": 1.4000000000000001,
+        "v0": 14.525000000000002
+      }
+    ],
+    "voids": [
+      {
+        "level": 3,
+        "rect": {
+          "x0": -56,
+          "z0": -38.5,
+          "x1": 7,
+          "z1": 0
+        },
+        "over": "ballroom"
+      }
+    ],
+    "entry": {
+      "spawnLocal": {
+        "x": -46.375,
+        "z": 0
+      },
+      "spawnFacing": 1.5707963267948966,
+      "exitHotspotLocal": {
+        "x": -53.375,
+        "z": 0
+      },
+      "gateWorld": {
+        "x": 112.5,
+        "z": 20
+      }
+    },
+    "materialSpec": {
+      "floorByKind": {
+        "entrance": "marble",
+        "corridor": "marble",
+        "gallery": "marble",
+        "stairHall": "marble",
+        "ballroom": "marble",
+        "treasury": "marble",
+        "bathroom": "marble",
+        "dining": "woodFloor",
+        "bedroom": "woodFloor",
+        "master": "woodFloor",
+        "royal": "woodFloor",
+        "sitting": "woodFloor",
+        "library": "woodFloor",
+        "observatory": "woodFloor",
+        "kitchen": "darkStone",
+        "servant": "woodFloor",
+        "storage": "darkStone",
+        "dungeonHall": "darkStone",
+        "cells": "darkStone",
+        "guard": "darkStone",
+        "vault": "darkStone"
+      },
+      "wallByLevel": [
+        "darkStone",
+        "stone",
+        "plaster",
+        "plaster",
+        "plaster"
+      ],
+      "windowedKinds": [
+        "entrance",
+        "ballroom",
+        "bedroom",
+        "master",
+        "royal",
+        "sitting",
+        "library",
+        "bathroom",
+        "observatory",
+        "dining",
+        "kitchen",
+        "gallery",
+        "corridor",
+        "stairHall"
+      ],
+      "fancyKinds": [
+        "entrance",
+        "ballroom",
+        "gallery",
+        "royal",
+        "master",
+        "library",
+        "sitting",
+        "dining",
+        "stairHall",
+        "treasury"
+      ]
+    },
+    "spawnMarkers": [
+      {
+        "netId": "ca_cells",
+        "roomId": "cellBlockN",
+        "mobType": "restless_bones",
+        "count": 4,
+        "radiusM": 8,
+        "pos": {
+          "x": -19.25,
+          "z": 17.5
+        }
+      },
+      {
+        "netId": "ca_vault",
+        "roomId": "dVault",
+        "mobType": "vale_bandit",
+        "count": 3,
+        "radiusM": 6,
+        "pos": {
+          "x": 22.75,
+          "z": -17.5
+        }
+      },
+      {
+        "netId": "ca_ballroom",
+        "roomId": "ballroom",
+        "mobType": "restless_bones",
+        "count": 5,
+        "radiusM": 10,
+        "pos": {
+          "x": -24.5,
+          "z": -15.75
+        }
+      },
+      {
+        "netId": "ca_boss",
+        "roomId": "treasury",
+        "mobType": "gorrak",
+        "count": 1,
+        "radiusM": 2,
+        "pos": {
+          "x": 1.75,
+          "z": 22.75
+        }
+      }
+    ]
+  },
+  "collision": {
+    "navCellM": 0.25,
+    "playerRadiusM": 0.35,
+    "playerSkinM": 0.35,
+    "wallThicknessM": 0.5,
+    "stepUpM": 0.55,
+    "stepDownM": 1.4,
+    "interiorBounds": {
+      "x0": -57.75,
+      "z0": -43.75,
+      "x1": 57.75,
+      "z1": 43.75
+    },
+    "shell": {
+      "site": {
+        "x": 150,
+        "z": 20
+      },
+      "halfW": 34,
+      "halfD": 30,
+      "towerR": 6.5,
+      "gateTurretR": 2.6,
+      "gateTurretProtrude": 1.6,
+      "marginM": 0.7,
+      "cameraSkinM": 0.5
+    },
+    "navGrid": {
+      "cols": 462,
+      "rows": 350,
+      "levels": 5,
+      "encoding": "uint16-le-base64",
+      "bitmapSource": "spacetimedb/src/castle/navGrids.ts"
+    }
+  }
+}

@@ -117,6 +117,10 @@ export class CharacterAvatar {
     // NPCs, the avatar creator) — an unconfigured player must render as the
     // plain test GLB, not in starter clothes.
     this._bareBody = config == null;
+    // Standalone full-model appearance (e.g. the Gilded Sentinel): a single
+    // rigged+animated GLB outside the modular MPFB system. When set, the
+    // build takes _buildModelGLB and skips morphs / hair / clothing / gear.
+    this._model    = config?.model ?? null;
     this._config   = mergeConfig(config);
     this._scene    = scene;
 
@@ -143,7 +147,12 @@ export class CharacterAvatar {
 
   static async create(id, username, config, scene, assetLibrary) {
     const av = new CharacterAvatar(id, username, config, scene);
-    if (assetLibrary.hasBaseBody()) {
+    const modelContainer = av._model
+      ? assetLibrary.getModelContainer?.(av._model)
+      : null;
+    if (modelContainer) {
+      av._buildModelGLB(modelContainer);
+    } else if (assetLibrary.hasBaseBody()) {
       await av._buildGLB(assetLibrary);
     } else {
       av._buildBox();
@@ -246,6 +255,61 @@ export class CharacterAvatar {
       const meshName = this._config.gear[slot];
       if (meshName) await this.setGear(slot, meshName, assetLibrary);
     }
+  }
+
+  // ── Standalone full-model build ──────────────────────────────────────────────
+
+  /**
+   * Build from a self-contained character GLB (own rig + baked-in animation
+   * clips), bypassing the modular MPFB pipeline. Used for authored NPC/hero
+   * appearances like the Gilded Sentinel. No morph targets, no modular hair/
+   * clothing/gear — just the mesh, its skeleton, and its animations, with a
+   * material applied (these Meshy exports ship materialless).
+   */
+  _buildModelGLB(container) {
+    const inst = container.instantiateModelsToScene(
+      name => `${this._id}_model_${name}`,
+      false // share materials (there are none to clone anyway)
+    );
+
+    this.root = new BABYLON.TransformNode(`${this._id}_root`, this._scene);
+    inst.rootNodes.forEach(n => { n.parent = this.root; });
+
+    this._nodes      = inst.rootNodes;
+    this._skeleton   = inst.skeletons[0] ?? null;
+    this._bodyMeshes = inst.rootNodes.flatMap(n =>
+      n.getChildMeshes ? n.getChildMeshes(false) : []
+    );
+
+    // Animations — reuse the same idle/walk resolver + cross-fade as the
+    // modular path. build_gilded_sentinel.mjs names the clips Idle/Walk/...
+    this._animGroups = inst.animationGroups;
+    this._idleAnim   = this._animGroups.find(ag => /idle/i.test(ag.name)) ?? null;
+    this._walkAnim   = this._animGroups.find(ag => /walk/i.test(ag.name)) ?? null;
+    this._animGroups.forEach(ag => ag.stop());
+    if (this._idleAnim) {
+      this._idleAnim.loopAnimation = true;
+      this._idleAnim.weight = 1;
+      this._idleAnim.play(true);
+    }
+    if (this._walkAnim) { this._walkAnim.weight = 0; }
+
+    this._applyModelMaterial();
+  }
+
+  /**
+   * Gilded gold PBR. The Meshy character mesh exports with no material at all,
+   * so meshes instantiate with Babylon's default white — assign a shared
+   * metallic-gold PBRMaterial across the model so it reads as "gilded".
+   */
+  _applyModelMaterial() {
+    const gold = new BABYLON.PBRMaterial(`${this._id}_gold`, this._scene);
+    gold.albedoColor = new BABYLON.Color3(1.0, 0.78, 0.34);
+    gold.metallic  = 1.0;
+    gold.roughness = 0.34;
+    gold.enableSpecularAntiAliasing = true;
+    for (const mesh of this._bodyMeshes) mesh.material = gold;
+    this._modelMaterial = gold;
   }
 
   /**
@@ -664,10 +728,17 @@ export class CharacterAvatar {
       lm.useAlphaFromDiffuseTexture = true;
       lm.backFaceCulling = false;
       lm.disableLighting = true;
-      plane.material      = lm;
+      // Draw the nameplate in an overlay rendering group so world geometry —
+      // the sky dome and the terrain/hill silhouette at the horizon — can never
+      // occlude it. Babylon clears the depth buffer between rendering groups by
+      // default, so group 1 renders on top of group 0; disabling depth writes
+      // keeps the label from polluting depth for anything drawn after it.
+      lm.disableDepthWrite = true;
+      plane.material        = lm;
       plane.position.set(0, labelY, 0);
-      plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-      plane.parent        = this.root;
+      plane.billboardMode   = BABYLON.Mesh.BILLBOARDMODE_ALL;
+      plane.renderingGroupId = 1;
+      plane.parent          = this.root;
     } catch (_) { /* non-critical */ }
   }
 
@@ -682,6 +753,7 @@ export class CharacterAvatar {
   dispose() {
     Object.keys(this._slots).forEach(k => this._disposeSlot(k));
     this._animGroups?.forEach(ag => { ag.stop(); ag.dispose(); });
+    this._modelMaterial?.dispose();
     this._nodes.forEach(n => n.dispose(false, false));
     this.root?.getChildMeshes?.()?.forEach(m => m.dispose());
     this.root?.dispose?.();

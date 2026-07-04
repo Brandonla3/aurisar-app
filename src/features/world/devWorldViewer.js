@@ -70,3 +70,13 @@ setInterval(() => {
 }, 250);
 
 window.__worldScene = scene; // console access for debugging
+
+// ?nav=1 — subsampled walkability overlay once the castle is built (dev only).
+if (params.has('nav')) {
+  const navLevel = parseInt(params.get('navLevel') ?? '1', 10);
+  const poll = setInterval(() => {
+    if (!scene._castle?._built) return;
+    clearInterval(poll);
+    scene._castle.showNavDebug(true, Number.isFinite(navLevel) ? navLevel : 1);
+  }, 400);
+}

@@ -20,9 +20,31 @@
 // ── Navigation / construction constants ─────────────────────────────────────
 export const WALL_T     = 0.5;   // wall thickness (walls sit centered on room edges)
 export const PLAYER_R   = 0.35;  // player capsule radius baked into the nav grid inset
+export const PLAYER_SKIN = 0.35; // extra analytic margin (exterior shell + camera probes)
 export const STEP_UP    = 0.55;  // max step-up per move (stair seams, thresholds)
 export const NAV_CELL   = 0.25;  // nav grid cell size in meters
 export const SLAB_T     = 0.6;   // floor slab thickness (slab top = level y)
+
+/** Room-kind → material keys consumed by builders/materials.js. Spec-driven palette. */
+export const MATERIAL_SPEC = Object.freeze({
+  floorByKind: Object.freeze({
+    entrance: 'marble', corridor: 'marble', gallery: 'marble', stairHall: 'marble',
+    ballroom: 'marble', treasury: 'marble', bathroom: 'marble',
+    dining: 'woodFloor', bedroom: 'woodFloor', master: 'woodFloor', royal: 'woodFloor',
+    sitting: 'woodFloor', library: 'woodFloor', observatory: 'woodFloor',
+    kitchen: 'darkStone', servant: 'woodFloor', storage: 'darkStone',
+    dungeonHall: 'darkStone', cells: 'darkStone', guard: 'darkStone', vault: 'darkStone',
+  }),
+  wallByLevel: Object.freeze(['darkStone', 'stone', 'plaster', 'plaster', 'plaster']),
+  windowedKinds: Object.freeze([
+    'entrance', 'ballroom', 'bedroom', 'master', 'royal', 'sitting', 'library',
+    'bathroom', 'observatory', 'dining', 'kitchen', 'gallery', 'corridor', 'stairHall',
+  ]),
+  fancyKinds: Object.freeze([
+    'entrance', 'ballroom', 'gallery', 'royal', 'master', 'library', 'sitting',
+    'dining', 'stairHall', 'treasury',
+  ]),
+});
 
 // Interior-local bounds (nav grid + slab extents). Interior anchor keeps the
 // far edge at x = 840 + 33 = 873 m — inside the server clamp (x <= 999 m,
@@ -56,22 +78,22 @@ export const LEVELS = Object.freeze([
 // builders. Rooms on a level tile edge-to-edge; walls sit on shared edges.
 const RAW_ROOMS = [
   // ═══ DUNGEON (level 0) ═════════════════════════════════════════════════════
-  { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24, z1: 4  }, kind: 'dungeonHall' },
-  { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,  z1: 16 }, kind: 'cells' },
-  { id: 'cellBlockS',  level: 0, rect: { x0: -24, z0: -16, x1: 2,  z1: -4 }, kind: 'cells' },
-  { id: 'guardPost',   level: 0, rect: { x0: 2,   z0: 4,   x1: 24, z1: 16 }, kind: 'guard' },
-  { id: 'dVault',      level: 0, rect: { x0: 2,   z0: -16, x1: 24, z1: -4 }, kind: 'vault' },
-  { id: 'dVestibule',  level: 0, rect: { x0: 24,  z0: -6,  x1: 32, z1: 6  }, kind: 'dungeonHall' },
+  { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24,   z1: 4  }, kind: 'dungeonHall' },
+  { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,    z1: 16 }, kind: 'cells' },
+  { id: 'cellBlockS',  level: 0, rect: { x0: -24, z0: -16, x1: 2,    z1: -4 }, kind: 'cells' },
+  { id: 'guardPost',   level: 0, rect: { x0: 2,   z0: 4,   x1: 24,   z1: 16 }, kind: 'guard' },
+  { id: 'dVault',      level: 0, rect: { x0: 2,   z0: -16, x1: 24,   z1: -4 }, kind: 'vault' },
+  { id: 'dVestibule',  level: 0, rect: { x0: 24,  z0: -6,  x1: 32.8, z1: 6  }, kind: 'dungeonHall' },
 
   // ═══ GROUND / FLOOR 1 (level 1) — entrance, kitchens, dining, servants ═════
-  { id: 'entranceHall', level: 1, rect: { x0: -32, z0: -12, x1: -12, z1: 12 }, kind: 'entrance' },
-  { id: 'corridor1',    level: 1, rect: { x0: -12, z0: -4,  x1: 24,  z1: 4  }, kind: 'corridor' },
-  { id: 'kitchen',      level: 1, rect: { x0: -12, z0: 4,   x1: 8,   z1: 22 }, kind: 'kitchen' },
-  { id: 'stairHall1',   level: 1, rect: { x0: 8,   z0: 4,   x1: 24,  z1: 22 }, kind: 'stairHall' },
-  { id: 'diningHall',   level: 1, rect: { x0: -12, z0: -22, x1: 8,   z1: -4 }, kind: 'dining' },
-  { id: 'servantHall',  level: 1, rect: { x0: 8,   z0: -22, x1: 20,  z1: -4 }, kind: 'servant' },
-  { id: 'storeRoom',    level: 1, rect: { x0: 20,  z0: -22, x1: 32,  z1: -6 }, kind: 'storage' },
-  { id: 'gVestibule',   level: 1, rect: { x0: 24,  z0: -6,  x1: 32,  z1: 6  }, kind: 'stairHall' },
+  { id: 'entranceHall', level: 1, rect: { x0: -32, z0: -12, x1: -12,  z1: 12 }, kind: 'entrance' },
+  { id: 'corridor1',    level: 1, rect: { x0: -12, z0: -4,  x1: 24,   z1: 4  }, kind: 'corridor' },
+  { id: 'kitchen',      level: 1, rect: { x0: -12, z0: 4,   x1: 8,    z1: 22 }, kind: 'kitchen' },
+  { id: 'stairHall1',   level: 1, rect: { x0: 8,   z0: 4,   x1: 24,   z1: 22 }, kind: 'stairHall' },
+  { id: 'diningHall',   level: 1, rect: { x0: -12, z0: -22, x1: 8,    z1: -4 }, kind: 'dining' },
+  { id: 'servantHall',  level: 1, rect: { x0: 8,   z0: -22, x1: 20,   z1: -4 }, kind: 'servant' },
+  { id: 'storeRoom',    level: 1, rect: { x0: 20,  z0: -22, x1: 32,   z1: -6 }, kind: 'storage' },
+  { id: 'gVestibule',   level: 1, rect: { x0: 24,  z0: -6,  x1: 32.8, z1: 6  }, kind: 'stairHall' },
 
   // ═══ FLOOR 2 (level 2) — ballroom, guest rooms, sitting room, bath ═════════
   { id: 'ballroom',    level: 2, rect: { x0: -32, z0: -22, x1: 4,  z1: 4  }, kind: 'ballroom' },
@@ -120,15 +142,15 @@ const RAW_DOORS = [
   { id: 'd_cellsS',  a: 'dCorridor', b: 'cellBlockS', edge: 'z', at: -4, lo: -14, hi: -11 },
   { id: 'd_guard',   a: 'dCorridor', b: 'guardPost',  edge: 'z', at: 4,  lo: 10,  hi: 13 },
   { id: 'd_vault',   a: 'dCorridor', b: 'dVault',     edge: 'z', at: -4, lo: 10,  hi: 13, iron: true },
-  { id: 'd_vest',    a: 'dCorridor', b: 'dVestibule', edge: 'x', at: 24, lo: -2,  hi: 2, arch: true },
+  { id: 'd_vest',    a: 'dCorridor', b: 'dVestibule', edge: 'x', at: 24, lo: -3.3, hi: 3.3, arch: true },
   // ground
-  { id: 'g_gate',    a: 'entranceHall', b: 'EXTERIOR',   edge: 'x', at: -32, lo: -2.2, hi: 2.2, double: true },
+  { id: 'g_gate',    a: 'entranceHall', b: 'EXTERIOR',   edge: 'x', at: -32, lo: -2.2, hi: 2.2, double: true, sealed: true },
   { id: 'g_entr',    a: 'entranceHall', b: 'corridor1',  edge: 'x', at: -12, lo: -2.2, hi: 2.2, double: true, arch: true },
   { id: 'g_kitch',   a: 'corridor1',   b: 'kitchen',     edge: 'z', at: 4,   lo: -6,  hi: -3 },
   { id: 'g_stair',   a: 'corridor1',   b: 'stairHall1',  edge: 'z', at: 4,   lo: 14,  hi: 18, double: true, arch: true },
   { id: 'g_dining',  a: 'corridor1',   b: 'diningHall',  edge: 'z', at: -4,  lo: -6,  hi: -2, double: true },
   { id: 'g_serv',    a: 'corridor1',   b: 'servantHall', edge: 'z', at: -4,  lo: 12,  hi: 15 },
-  { id: 'g_vest',    a: 'corridor1',   b: 'gVestibule',  edge: 'x', at: 24,  lo: -2,  hi: 2, arch: true },
+  { id: 'g_vest',    a: 'corridor1',   b: 'gVestibule',  edge: 'x', at: 24,  lo: -3.3, hi: 3.3, arch: true },
   { id: 'g_store',   a: 'gVestibule',  b: 'storeRoom',   edge: 'z', at: -6,  lo: 26,  hi: 29 },
   { id: 'g_kstair',  a: 'kitchen',     b: 'stairHall1',  edge: 'x', at: 8,   lo: 4.6, hi: 7.4 }, // opens onto the south walkway
   { id: 'g_dserv',   a: 'diningHall',  b: 'servantHall', edge: 'x', at: 8,   lo: -14, hi: -11 },
@@ -172,9 +194,9 @@ export const DOORS = Object.freeze(RAW_DOORS.map((d) => ({
 // Successive grand stairs alternate v0 so their plan-view footprints never
 // overlap — each nav cell holds at most one ramp per level grid.
 const RAW_STAIRS = [
-  // dungeon <-> ground, in d/gVestibule; runs along x, arrival faces the door
-  { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.6, runLen: 4.2, landingD: 2.2,
-    laneW: 2.6, gap: 0.5, v0: -4.0 },
+  // dungeon <-> ground, in d/gVestibule; both lanes sit inside the widened doorway
+  { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.4, runLen: 5.0, landingD: 2.4,
+    laneW: 2.6, gap: 0.5, v0: -2.85 },
   // the monumental grand stairwell (reference: cathedral-wide marble flights).
   // Consecutive stairs alternate v0 so footprints stay disjoint per grid.
   // u0 8 leaves a wide south walkway (z 4..8) inside every stair hall —
@@ -209,6 +231,18 @@ export const EXTERIOR = Object.freeze({
   towerR: 6.5, towerH: 39,     // corner towers
   keep: { halfW: 16, halfD: 12, h: 36 },  // raised central keep block
   gate: { z: 20, width: 6.4, height: 9 }, // gate centered on west wall at site.z
+  gateTurretR: 2.6,           // gatehouse turret body radius (analytic collision)
+  gateTurretProtrude: 1.6,    // turret center offset past the west wall line
+});
+
+/** Analytic exterior collision + camera probe constants (derived from EXTERIOR). */
+export const SHELL_COLLISION = Object.freeze({
+  playerRadiusM: PLAYER_R,
+  skinM: PLAYER_SKIN,
+  marginM: PLAYER_R + PLAYER_SKIN,
+  cameraSkinM: 0.5,
+  gateTurretR: EXTERIOR.gateTurretR,
+  gateTurretProtrude: EXTERIOR.gateTurretProtrude,
 });
 
 export const INTERIOR_ANCHOR = Object.freeze({ x: 840, z: 0 });
@@ -224,6 +258,28 @@ export const ENTRY = Object.freeze({
   gateWorld: { x: EXTERIOR.site.x - EXTERIOR.halfW - 3.5, z: EXTERIOR.gate.z },
 });
 
+// ── Dungeon spawn markers (interior-local, PLAN_SCALE coords) ────────────────
+const RAW_SPAWN_MARKERS = [
+  { netId: 'ca_cells',    roomId: 'cellBlockN', mobType: 'restless_bones', count: 4, radiusM: 8 },
+  { netId: 'ca_vault',    roomId: 'dVault',     mobType: 'vale_bandit',    count: 3, radiusM: 6 },
+  { netId: 'ca_ballroom', roomId: 'ballroom',   mobType: 'restless_bones', count: 5, radiusM: 10 },
+  { netId: 'ca_boss',     roomId: 'treasury',   mobType: 'gorrak',         count: 1, radiusM: 2 },
+];
+
+/** Interior-local center of a room rect (post-PLAN_SCALE). */
+export function roomCenterLocal(roomId) {
+  const r = ROOMS.find((rm) => rm.id === roomId);
+  if (!r) throw new Error(`castlePlan: unknown room "${roomId}"`);
+  return {
+    x: (r.rect.x0 + r.rect.x1) / 2,
+    z: (r.rect.z0 + r.rect.z1) / 2,
+  };
+}
+
+export const SPAWN_MARKERS = Object.freeze(
+  RAW_SPAWN_MARKERS.map((s) => ({ ...s, pos: roomCenterLocal(s.roomId) })),
+);
+
 // ── Aggregate plan object (SEAM:layout-manifest — JSON-serializable) ─────────
 export const CASTLE_PLAN = Object.freeze({
   name: 'Castle Ashwood',
@@ -236,10 +292,12 @@ export const CASTLE_PLAN = Object.freeze({
   stairs: STAIRS,
   voids: VOIDS,
   entry: ENTRY,
+  materialSpec: MATERIAL_SPEC,
+  collision: SHELL_COLLISION,
   // SEAM:dungeon-def — v2 mob spawns, DungeonSpawnDef-shaped, seeded by the
   // server when the castle becomes a real instance. Positions are
   // interior-local; contentPos = local + interiorAnchor.
-  spawnMarkers: [],
+  spawnMarkers: SPAWN_MARKERS,
 });
 
 // ── Stair math (shared by geometry AND nav — the anti-drift seam) ────────────
@@ -316,6 +374,20 @@ export function doorLevel(door) {
   return ROOMS_BY_ID[door.a].level;
 }
 
+const STAIR_HOST_ROOM_IDS = (() => {
+  const ids = new Set();
+  const rectInside = (inner, outer, eps = 0.01) =>
+    inner.x0 >= outer.x0 - eps && inner.x1 <= outer.x1 + eps &&
+    inner.z0 >= outer.z0 - eps && inner.z1 <= outer.z1 + eps;
+  for (const st of STAIRS) {
+    const fp = stairRects(st).footprint;
+    for (const room of ROOMS) {
+      if ((room.level === st.lo || room.level === st.hi) && rectInside(fp, room.rect)) ids.add(room.id);
+    }
+  }
+  return ids;
+})();
+
 // ── Light anchors (derived, deterministic) ───────────────────────────────────
 // ~120 warm glow points. ONLY CastleLightPool ever turns the nearest few
 // into real PointLights; every anchor also gets an emissive flame/glow mesh
@@ -327,6 +399,10 @@ export function buildLightAnchors() {
     anchors.push({ kind, level, x, z, y, priority });
 
   for (const room of ROOMS) {
+    // Stair shafts stay prop-free: no torches/chandeliers floating through
+    // stair exits or blocking the camera at the mouth of the staircase.
+    if (STAIR_HOST_ROOM_IDS.has(room.id)) continue;
+
     const L = LEVELS[room.level];
     const { x0, z0, x1, z1 } = room.rect;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -380,9 +456,6 @@ export function buildLightAnchors() {
         add('torch', room.level, x1 - 0.4, cz - 4, torchY);
         break;
       case 'stairHall':
-        add('chandelier', room.level, cx, cz, L.y + L.clear - 1.4, 2);
-        add('torch', room.level, x0 + 0.4, z0 + 2, torchY);
-        add('torch', room.level, x1 - 0.4, z1 - 2, torchY);
         break;
       case 'master': case 'royal':
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);

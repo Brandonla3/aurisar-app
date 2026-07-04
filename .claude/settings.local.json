@@ -3,7 +3,11 @@
     "allow": [
       "Bash(python3 -c:*)",
       "Bash(node -e \":*)",
-      "PowerShell(npm install -D vitest)"
+      "PowerShell(npm install -D vitest)",
+      "Bash(cp \"/root/.claude/uploads/7ea900ab-4a0b-5243-a6d6-9bc09516d388/37be902b-Meshy_AI_Gilded_Sentinel_biped_Animation_Idle_11_withSkin.glb\" scripts/assets/gilded_sentinel/idle.glb)",
+      "Bash(cat)",
+      "Bash(node /home/user/aurisar-app/_idlecheck.mjs)",
+      "Bash(rm -f /home/user/aurisar-app/_idlecheck.mjs)"
     ]
   }
 }

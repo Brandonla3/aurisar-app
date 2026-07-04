@@ -1,7 +1,7 @@
 /**
- * Grand staircases — step meshes, railings, newel posts and the shaft-edge
- * balustrades on the upper floor. Step heights sample stairSurfaceY — the
- * SAME function the nav grid uses — so what you see is what you walk.
+ * Grand staircases — step meshes, railings and shaft-edge balustrades on the
+ * upper floor. Step heights sample stairSurfaceY — the SAME function the nav
+ * grid uses — so what you see is what you walk.
  */
 
 /* global BABYLON */
@@ -147,44 +147,6 @@ export function createGrandStaircase(ctx, st, ax, az) {
       const p = e.axis === 'x' ? { x: e.at, z: v } : { x: v, z: e.at };
       ctx.add(cyl(ctx.scene, `shaftPost_${st.id}`, p.x + ax, yU + 0.5, p.z + az, 1.0, 0.09, 8),
         railMat, upper);
-    }
-  }
-
-  // reference look: monumental flanking columns with gold capitals at the
-  // stair mouth and at the landing corners (grand stairs only)
-  if (grand) {
-    const colH = Math.min(LEVELS[st.hi].y - LEVELS[st.lo].y + 2.5, 12);
-    const mouths = [];
-    if (st.axis === 'z') {
-      mouths.push([laneA.x0 - 0.7, st.u0 - 0.7], [laneB.x1 + 0.7, st.u0 - 0.7]);
-      mouths.push([laneA.x0 - 0.7, st.u0 + st.runLen + st.landingD + 0.7],
-        [laneB.x1 + 0.7, st.u0 + st.runLen + st.landingD + 0.7]);
-    } else {
-      mouths.push([st.u0 - 0.7, laneA.z0 - 0.7], [st.u0 - 0.7, laneB.z1 + 0.7]);
-    }
-    for (const [mx, mz] of mouths) {
-      const yB = LEVELS[st.lo].y;
-      // zero expansion: the plinth flanks the lane edge — PLAYER_R padding
-      // would eat into the stair lane itself
-      ctx.addNavBlocker?.(st.lo, mx - 0.75, mz - 0.75, mx + 0.75, mz + 0.75, 0);
-      ctx.add(box(ctx.scene, `stCol_${st.id}`, mx + ax, yB + 0.4, mz + az, 1.5, 0.8, 1.5), 'marbleDark', group);
-      ctx.add(cyl(ctx.scene, `stCol_${st.id}`, mx + ax, yB + colH / 2, mz + az, colH, 1.1, 14), 'marble', group);
-      ctx.add(box(ctx.scene, `stColCap_${st.id}`, mx + ax, yB + colH - 0.35, mz + az, 1.7, 0.7, 1.7), 'gold', group);
-    }
-  }
-
-  // newel posts with gold orbs at the stair mouth (grand stairs only)
-  if (grand) {
-    for (const rect of [laneA, laneB]) {
-      const vMid = st.axis === 'z' ? (rect.x0 + rect.x1) / 2 : (rect.z0 + rect.z1) / 2;
-      const p = st.axis === 'z' ? { x: vMid, z: st.u0 - 0.35 } : { x: st.u0 - 0.35, z: vMid };
-      const laneIsA = rect === laneA;
-      const yBase = laneIsA ? yLo : yHi;
-      ctx.add(box(ctx.scene, `newel_${st.id}`, p.x + ax, yBase + 0.65, p.z + az, 0.34, 1.3, 0.34),
-        'marbleDark', laneIsA ? group : upper);
-      const orb = BABYLON.MeshBuilder.CreateSphere(`newelOrb_${st.id}`, { diameter: 0.3, segments: 10 }, ctx.scene);
-      orb.position.set(p.x + ax, yBase + 1.45, p.z + az);
-      ctx.add(orb, 'gold', laneIsA ? group : upper);
     }
   }
 }

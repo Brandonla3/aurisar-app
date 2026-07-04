@@ -141,15 +141,22 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
     for (let li = 0; li < grids.length; li++) {
       const v = grids[li][idx];
       if (v === 0) continue;
-      let y;
+      let y, level = li;
       if (v === 1) {
         y = LEVELS[li].y;
       } else {
         y = stairYCache[v - 2](x, z);
         if (y == null) continue; // railing gap between lanes
+        // Stair cells are rasterized on the LOWER level's grid, but a point
+        // high on the ramp (or on the top landing) is physically at the upper
+        // storey — attribute it to whichever level's floor height is nearer,
+        // so spawn/occlusion logic keyed on `level` doesn't think a player
+        // standing at the top of a stair is a storey below.
+        const st = STAIRS[v - 2];
+        level = y >= (LEVELS[st.lo].y + LEVELS[st.hi].y) / 2 ? st.hi : st.lo;
       }
       if (y <= currentY + STEP_UP && y >= currentY - STEP_DOWN && y > bestY) {
-        bestY = y; bestLevel = li;
+        bestY = y; bestLevel = level;
       }
     }
     return bestLevel >= 0 ? { y: bestY, level: bestLevel } : null;
@@ -249,9 +256,46 @@ export function buildNav(anchor = CASTLE_PLAN.interiorAnchor) {
     anchor, cols, rows, grids,
     surfaceAt, resolveMove, isOpen, isOpenBelow, levelAtY, nearestWalkable,
     blockRect,
-    // exposed for tests
+    // exposed for tests + dev nav overlay
     _local: { colOf, rowOf, cellX, cellZ },
   };
+}
+
+const NAV_DEBUG_STRIDE = 3;
+
+/**
+ * Dev-only subsampled nav grid overlay (walkable = green, blocked = red).
+ * Returns a TransformNode parent; call dispose() on it to remove.
+ */
+export function buildNavDebugOverlay(scene, nav, level, ax, az) {
+  const grid = nav.grids[level];
+  const { cols, rows, _local: { cellX, cellZ } } = nav;
+  const L = LEVELS[level];
+  const root = new BABYLON.TransformNode(`navDebug_L${level}`, scene);
+  for (let r = 0; r < rows; r += NAV_DEBUG_STRIDE) {
+    for (let c = 0; c < cols; c += NAV_DEBUG_STRIDE) {
+      const v = grid[r * cols + c];
+      const x = cellX(c) + ax;
+      const z = cellZ(r) + az;
+      const size = NAV_CELL * NAV_DEBUG_STRIDE * 0.9;
+      const h = v === 0 ? 0.08 : 0.04;
+      const y = L.y + h / 2 + 0.02;
+      const box = BABYLON.MeshBuilder.CreateBox(`navDbg_${r}_${c}`, {
+        width: size, height: h, depth: size,
+      }, scene);
+      box.position.set(x, y, z);
+      const mat = new BABYLON.StandardMaterial(`navDbgMat_${r}_${c}`, scene);
+      mat.diffuseColor = v === 0
+        ? new BABYLON.Color3(0.85, 0.15, 0.12)
+        : new BABYLON.Color3(0.12, 0.72, 0.22);
+      mat.alpha = 0.55;
+      mat.disableLighting = true;
+      box.material = mat;
+      box.parent = root;
+      box.isPickable = false;
+    }
+  }
+  return root;
 }
 
 /** Convenience: room center in world coords (for tests + spawn points). */

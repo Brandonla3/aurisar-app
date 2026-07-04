@@ -63,7 +63,8 @@ export function createCollector(scene, mats) {
  * meshes. `onMerged(mesh, group, matKey)` lets the caller add shadow
  * casters (exterior) or per-level bookkeeping.
  */
-export function mergeCollector(collector, root, onMerged = null) {
+export function mergeCollector(collector, root, onMerged = null, opts = {}) {
+  const receiveShadowsFor = opts.receiveShadowsFor ?? null;
   const out = [];
   for (const [key, meshes] of collector.buckets) {
     if (!meshes.length) continue;
@@ -80,7 +81,7 @@ export function mergeCollector(collector, root, onMerged = null) {
     merged.name = `castle_${group}_${matKey}`;
     merged.material = material;
     merged.isPickable = false;
-    merged.receiveShadows = false;
+    merged.receiveShadows = receiveShadowsFor ? receiveShadowsFor(matKey) : false;
     merged.cullingStrategy = BABYLON.AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
     merged.parent = root;
     merged.freezeWorldMatrix();
