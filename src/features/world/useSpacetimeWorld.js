@@ -26,11 +26,11 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
 
   // ── Reducer wrappers ───────────────────────────────────────────────────────
 
-  const movePlayer = useCallback((x, y, direction, isMoving) => {
+  const movePlayer = useCallback((x, y, direction, isMoving, floorYM = 0) => {
     const conn = connRef.current;
     if (!conn) return;
     try {
-      conn.reducers.movePlayer(x, y, direction, isMoving);
+      conn.reducers.movePlayer(x, y, direction, isMoving, floorYM);
     } catch (_) { /* not connected yet */ }
   }, []);
 

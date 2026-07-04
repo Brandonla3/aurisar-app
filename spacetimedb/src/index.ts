@@ -45,7 +45,8 @@ import {
   zoneEntranceToPx,
   type DungeonSpawnEntry,
 } from './dungeon/helpers.js';
-import { castleInteriorWalkable, pxToWorldM } from './castle/validate.js';
+import { castleInteriorSurfaceAt, isInCastleInterior, pxToWorldM } from './castle/validate.js';
+import { CASTLE_LEVELS } from './castle/navGrids.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -212,6 +213,7 @@ const spacetimedb = schema({
       maxHp:        t.i32().default(PLAYER_MAX_HP),   // max HP for HP-bar normalization
       deadUntil:    t.u64().default(0n),              // 0 = alive; otherwise micros-since-epoch when respawn fires
       dungeonInstanceId: t.u64().default(0n),        // 0 = overworld; else active dungeon instance
+      floorYM:      t.f32().default(0),              // castle interior vertical meters (world Y)
     }
   ),
 
@@ -422,6 +424,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         maxHp: PLAYER_MAX_HP,
         deadUntil: 0n,
         dungeonInstanceId: 0n,
+        floorYM: 0,
       });
     }
   }
@@ -454,8 +457,9 @@ export const movePlayer = spacetimedb.reducer(
     y:         t.f32(),
     direction: t.u8(),
     isMoving:  t.bool(),
+    floorYM:   t.f32(),
   },
-  (ctx, { x, y, direction, isMoving }) => {
+  (ctx, { x, y, direction, isMoving, floorYM }) => {
     const identity = ctx.sender;
     const existing = ctx.db.player.identity.find(identity);
     if (!existing) return; // player hasn't called setPlayerInfo yet
@@ -475,8 +479,16 @@ export const movePlayer = spacetimedb.reducer(
     // interior footprint this returns null and we fall through to normal px clamp.
     const worldXM = pxToWorldM(clampedX);
     const worldZM = pxToWorldM(clampedY);
-    const castleOk = castleInteriorWalkable(worldXM, worldZM);
-    if (castleOk === false) return;
+    let nextFloorYM = existing.floorYM;
+
+    if (isInCastleInterior(worldXM, worldZM) || existing.dungeonInstanceId > 0n) {
+      const refY = floorYM > 0 ? floorYM : (existing.floorYM > 0 ? existing.floorYM : CASTLE_LEVELS[1].y);
+      const surface = castleInteriorSurfaceAt(worldXM, worldZM, refY);
+      if (!surface) return;
+      nextFloorYM = surface.y;
+    } else if (existing.floorYM !== 0) {
+      nextFloorYM = 0;
+    }
 
     // Zone detection based on position
     const zoneId = detectZone(clampedX, clampedY);
@@ -488,6 +500,7 @@ export const movePlayer = spacetimedb.reducer(
       direction: direction % 4, // only 0-3 valid
       isMoving,
       zoneId,
+      floorYM: nextFloorYM,
     });
   }
 );
@@ -536,6 +549,7 @@ export const enterDungeon = spacetimedb.reducer(
       isMoving: false,
       zoneId: detectZone(spawnPx.x, spawnPx.y),
       dungeonInstanceId: instanceId,
+      floorYM: CASTLE_LEVELS[1].y,
     });
 
     if (created) seedDungeonInstanceMobs(ctx, instanceId, dungeonId);
@@ -574,6 +588,7 @@ export const leaveDungeon = spacetimedb.reducer(
       isMoving: false,
       zoneId: detectZone(gatePx.x, gatePx.y),
       dungeonInstanceId: 0n,
+      floorYM: 0,
     });
 
     cleanupDungeonInstanceIfEmpty(ctx, leavingInstance);
@@ -1055,6 +1070,7 @@ export const respawnPlayer = spacetimedb.reducer(
       hp: p.maxHp > 0 ? p.maxHp : PLAYER_MAX_HP,
       deadUntil: 0n,
       dungeonInstanceId: 0n,
+      floorYM: 0,
     });
   }
 );

@@ -2086,7 +2086,10 @@ export class BabylonWorldScene {
     const dz = z - this._lastPos.z;
 
     if (Math.sqrt(dx * dx + dz * dz) > 0.04 || this._local.isMoving !== this._lastMoving) {
-      this.callbacks.onMove?.(toStdb(x), toStdb(z), this._dir(), this._local.isMoving);
+      const floorYM = (this._castle?.isInside() || this._localDungeonInstanceId > 0n)
+        ? this._local.root.position.y
+        : 0;
+      this.callbacks.onMove?.(toStdb(x), toStdb(z), this._dir(), this._local.isMoving, floorYM);
       this._lastPos    = { x, z };
       this._lastMoving = this._local.isMoving;
       this._lastSentAt = now;

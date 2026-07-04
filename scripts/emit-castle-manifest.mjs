@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   CASTLE_PLAN, LOCAL_BOUNDS, LEVELS, NAV_CELL, PLAYER_R, PLAYER_SKIN,
-  WALL_T, STEP_UP, PLAN_SCALE, EXTERIOR, SHELL_COLLISION, INTERIOR_ANCHOR,
+  WALL_T, STEP_UP, PLAN_SCALE, EXTERIOR, SHELL_COLLISION, INTERIOR_ANCHOR, STAIRS,
 } from '../src/features/world/castle/castlePlan.js';
 import { STEP_DOWN, buildNav } from '../src/features/world/castle/castleNav.js';
 import { stampNavBlockers } from '../src/features/world/castle/castleNavBlockers.js';
@@ -108,6 +108,13 @@ export const CASTLE_NAV_META = {
 export const CASTLE_NAV_BITMAPS_B64: readonly string[] = [
 ${navLevels.map((l) => `  '${l.data}', // level ${l.level}`).join('\n')}
 ];
+
+export const CASTLE_LEVELS = ${JSON.stringify(LEVELS, null, 2)} as const;
+
+export const CASTLE_STAIRS = ${JSON.stringify(STAIRS, null, 2)} as const;
+
+export const CASTLE_STEP_UP = ${STEP_UP};
+export const CASTLE_STEP_DOWN = ${STEP_DOWN};
 `;
 
 const dungeonSpawnsTs = `// GENERATED FILE — DO NOT EDIT.

@@ -11,7 +11,7 @@ Regenerate with `npm run emit:castle`.
 
 ## Server validation
 
-SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` (includes furniture blockers via `castleNavBlockers.js`; regenerate with `npm run emit:castle`) and validated in `spacetimedb/src/castle/validate.ts`.
+SpacetimeDB `movePlayer` validates interior moves with level-aware `surfaceAt` (not column-OR): the client sends `floorYM` (avatar world Y), and the server resolves the reachable floor via `spacetimedb/src/castle/surface.ts` (mirrors `castleNavSurface.js`). Nav bitmaps plus `CASTLE_LEVELS` / `CASTLE_STAIRS` are emitted to `navGrids.ts`.
 
 ## Dungeon instances (v2)
 
@@ -19,8 +19,9 @@ SpacetimeDB `movePlayer` rejects positions inside the interior footprint that ma
 - **`dungeonInstance`** table + `player.dungeonInstanceId` / `mob.dungeonInstanceId`
 - Instance mobs seed from `castleAshwood.generated.ts` on first member entry
 - Client syncs interior presentation from the player row
+- **`player.floorYM`** persisted for reconnect + server surfaceAt reference
 
-**Planned in the same epic:** level-aware server nav, interior mob AI, minLevel gating, Gorrak quest wiring.
+**Planned in the same epic:** interior mob AI, minLevel gating, Gorrak quest wiring, boss mechanics.
 
 ## Coordinate scheme
 

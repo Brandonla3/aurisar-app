@@ -47,4 +47,10 @@ describe('castleNavServer', () => {
     expect(nav.grids[1][idx]).toBe(0);
     expect(nav.surfaceAt(cx + INTERIOR_ANCHOR.x, cz + INTERIOR_ANCHOR.z, LEVELS[1].y + 0.3)).toBeNull();
   });
+
+  it('level-aware castleMoveAllowed rejects wrong floor at stacked column', () => {
+    expect(castleMoveAllowed(nav, 6.5 + INTERIOR_ANCHOR.x, -38 + INTERIOR_ANCHOR.z, LEVELS[2].y)).toBe(false);
+    expect(castleMoveAllowed(nav, ENTRY.spawnLocal.x + INTERIOR_ANCHOR.x,
+      ENTRY.spawnLocal.z + INTERIOR_ANCHOR.z, LEVELS[1].y)).toBe(true);
+  });
 });
