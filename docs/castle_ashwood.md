@@ -11,14 +11,26 @@ Regenerate with `npm run emit:castle`.
 
 ## Server validation
 
-SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` (checked in; regenerate with `npm run emit:castle`) and validated in `spacetimedb/src/castle/validate.ts` (mirrors `castleNavServer.js`).
+SpacetimeDB `movePlayer` validates interior moves with level-aware `surfaceAt` (not column-OR): the client sends `floorYM` (avatar world Y), and the server resolves the reachable floor via `spacetimedb/src/castle/surface.ts` (mirrors `castleNavSurface.js`). Nav bitmaps plus `CASTLE_LEVELS` / `CASTLE_STAIRS` are emitted to `navGrids.ts`.
+
+## Dungeon instances (v2)
+
+- **`enterDungeon` / `leaveDungeon`** — server-authoritative gate entry and interior exit
+- **`dungeonInstance`** table + `player.dungeonInstanceId` / `mob.dungeonInstanceId`
+- Instance mobs seed from `castleAshwood.generated.ts` on first member entry
+- Client syncs interior presentation from the player row
+- **`player.floorYM`** persisted for reconnect + server surfaceAt reference
+- **Interior mob AI (phase 3)** — dungeon mobs use nav wall-slide; aggro/melee require same instance + floor
+- **minLevel gating (phase 4)** — private `playerProgress` + `syncProgress`; dungeon entry and quests enforce level
+- **Gorrak treasury quest** — `q_ringleader` kill scoped to `ca_boss` spawn in Castle Ashwood instance
+- **Boss mechanics (phase 5)** — instance Gorrak `aoePulse` + `enrage` from `DungeonDef.bossMechanics`
 
 ## Coordinate scheme
 
 - All layout rects are in **interior-local meters** (post-`PLAN_SCALE = 1.75`).
 - World position = local + `interiorAnchor` (`{ x: 840, z: 0 }`).
 - The **exterior shell** is separate at `exterior.site` (`{ x: 150, z: 20 }`) on overworld terrain.
-- Entry/exit is a press-E teleport at the west gate — not a walk-through door.
+- Entry/exit is press-E at the gate — server reducers authorize the teleport.
 
 ## Levels
 

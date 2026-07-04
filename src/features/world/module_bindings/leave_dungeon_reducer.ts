@@ -10,10 +10,4 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  x: __t.f32(),
-  y: __t.f32(),
-  direction: __t.u8(),
-  isMoving: __t.bool(),
-  floorYM: __t.f32(),
-};
+export default {};

@@ -10,10 +10,8 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  x: __t.f32(),
-  y: __t.f32(),
-  direction: __t.u8(),
-  isMoving: __t.bool(),
-  floorYM: __t.f32(),
-};
+export default __t.row({
+  instanceId: __t.u64().primaryKey().autoInc().name("instance_id"),
+  dungeonId: __t.string().name("dungeon_id"),
+  createdAt: __t.u64().name("created_at"),
+});

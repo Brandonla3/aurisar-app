@@ -71,10 +71,11 @@ export function parseCounts(row, quest) {
 }
 
 /** Quests this NPC offers that the player can accept right now. */
-export function availableQuestsAt(npcId, myQuests) {
+export function availableQuestsAt(npcId, myQuests, playerLevel = 999) {
   return Object.values(QUESTS).filter((q) => {
     if (q.giverNpcId !== npcId) return false;
     if (myQuests.has(q.id)) return false; // active, ready, or done
+    if (q.minLevel && playerLevel < q.minLevel) return false;
     if (q.requiresQuestId) {
       const prereq = myQuests.get(q.requiresQuestId);
       if (!prereq || prereq.state !== QUEST_STATE.DONE) return false;
@@ -102,16 +103,16 @@ export function inProgressQuestsAt(npcId, myQuests) {
 }
 
 /** '?' (turn-in ready) wins over '!' (quest available); null = no marker. */
-export function npcMarker(npcId, myQuests) {
+export function npcMarker(npcId, myQuests, playerLevel = 999) {
   if (readyQuestsAt(npcId, myQuests).length > 0) return '?';
-  if (availableQuestsAt(npcId, myQuests).length > 0) return '!';
+  if (availableQuestsAt(npcId, myQuests, playerLevel).length > 0) return '!';
   return null;
 }
 
 /** { npcId: '!' | '?' } map for NpcSystem.setMarkers. */
-export function buildNpcMarkers(npcIds, myQuests) {
+export function buildNpcMarkers(npcIds, myQuests, playerLevel = 999) {
   const out = {};
-  for (const id of npcIds) out[id] = npcMarker(id, myQuests);
+  for (const id of npcIds) out[id] = npcMarker(id, myQuests, playerLevel);
   return out;
 }
 

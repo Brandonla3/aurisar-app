@@ -16,10 +16,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  CASTLE_PLAN, LOCAL_BOUNDS, LEVELS, NAV_CELL, PLAYER_R, PLAYER_SKIN,
-  WALL_T, STEP_UP, PLAN_SCALE, EXTERIOR, SHELL_COLLISION, INTERIOR_ANCHOR,
+  CASTLE_PLAN, LOCAL_BOUNDS, LEVELS, ROOMS, NAV_CELL, PLAYER_R, PLAYER_SKIN,
+  WALL_T, STEP_UP, PLAN_SCALE, EXTERIOR, SHELL_COLLISION, INTERIOR_ANCHOR, STAIRS,
 } from '../src/features/world/castle/castlePlan.js';
 import { STEP_DOWN, buildNav } from '../src/features/world/castle/castleNav.js';
+import { stampNavBlockers } from '../src/features/world/castle/castleNavBlockers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
@@ -33,6 +34,7 @@ const NAV_GRIDS_TS = join(repoRoot, 'spacetimedb', 'src', 'castle', 'navGrids.ts
 const DUNGEON_SPAWNS_TS = join(repoRoot, 'src', 'features', 'world', 'content', 'dungeons', 'castleAshwood.generated.ts');
 
 const nav = buildNav(INTERIOR_ANCHOR);
+stampNavBlockers(nav);
 const navLevels = nav.grids.map((grid, level) => ({
   level,
   encoding: 'uint16-le-base64',
@@ -91,7 +93,7 @@ const manifest = {
 const payload = `${JSON.stringify(manifest, null, 2)}\n`;
 
 const navGridsTs = `// GENERATED FILE — DO NOT EDIT.
-// Source: src/features/world/castle/castlePlan.js + castleNav.js
+// Source: src/features/world/castle/castlePlan.js + castleNav.js + nav blockers
 // Regenerate with: npm run emit:castle
 
 export const CASTLE_NAV_META = {
@@ -106,6 +108,20 @@ export const CASTLE_NAV_META = {
 export const CASTLE_NAV_BITMAPS_B64: readonly string[] = [
 ${navLevels.map((l) => `  '${l.data}', // level ${l.level}`).join('\n')}
 ];
+
+export const CASTLE_LEVELS = ${JSON.stringify(LEVELS, null, 2)} as const;
+
+export const CASTLE_STAIRS = ${JSON.stringify(STAIRS, null, 2)} as const;
+
+export const CASTLE_STEP_UP = ${STEP_UP};
+export const CASTLE_STEP_DOWN = ${STEP_DOWN};
+
+/** roomId → walkable floor Y (world meters) for dungeon mob spawn height. */
+export const CASTLE_ROOM_FLOOR_Y = ${JSON.stringify(
+  Object.fromEntries(ROOMS.map((r) => [r.id, LEVELS[r.level].y])),
+  null,
+  2,
+)} as const;
 `;
 
 const dungeonSpawnsTs = `// GENERATED FILE — DO NOT EDIT.

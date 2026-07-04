@@ -42,7 +42,9 @@ import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
 import { PropsSystem } from '../systems/PropsSystem.js';
 import { CastleSystem } from '../castle/CastleSystem.js';
-import { ENTRY as CASTLE_ENTRY } from '../castle/castlePlan.js';
+import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
+import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
+import { sameInteriorFloor } from '../castle/castleNavSurface.js';
 import { MOBS as MOB_DEFS } from '../content/index';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -836,6 +838,8 @@ export class BabylonWorldScene {
     this._campfires     = new Map(); // campfireId(BigInt) -> { root, light, ps, ph }
     this._lastCampfireBuildAt = 0;
     this._lastAttackAt  = 0;          // ms timestamp; throttles spacebar
+    this._localDungeonInstanceId = 0n;
+    this._pendingCastleSyncRow = null;
     this._myIdentity    = null;
     this._keys          = {};
     this._lastPos       = { x: 0, z: 0 };
@@ -1042,8 +1046,15 @@ export class BabylonWorldScene {
       cameraExit: (t = null, yaw = 0) => this._castleCameraSet(t, yaw, false),
       onZoneChange: (zone) => this.callbacks.onZoneChange?.(zone),
       onNearbyDoor: (info) => this.callbacks.onNearbyDoor?.(info),
+      requestEnterDungeon: (id) => this.callbacks.onEnterDungeon?.(id),
+      requestLeaveDungeon: () => this.callbacks.onLeaveDungeon?.(),
     });
-    this._castle.init().catch((err) => console.warn('[CastleSystem] init failed:', err));
+    this._castle.init().then(() => {
+      if (this._pendingCastleSyncRow) {
+        this._syncCastleFromServer(this._pendingCastleSyncRow);
+        this._pendingCastleSyncRow = null;
+      }
+    }).catch((err) => console.warn('[CastleSystem] init failed:', err));
   }
 
   /** React → scene: per-NPC quest markers ('!' / '?' / null). */
@@ -1507,21 +1518,22 @@ export class BabylonWorldScene {
   // Position is server-side in STDB px; we toWorld() it for Babylon coords.
 
   applyMobUpdate(row) {
-    if (!this.scene) return; // pre-init race; server will resend on resubscribe
-    // Queue until MobAssetLibrary finishes loading. _spawnMob's GLB-vs-primitive
-    // decision is made once at first sight, so rows that arrive before assets
-    // are ready would otherwise be baked as primitives and never upgrade —
-    // subsequent updates find the mob already in `_mobs` and skip `_spawnMob`
-    // entirely. Flush happens in `_initCharactersAsync` after both libraries
-    // resolve. (Codex P1 on #191.)
+    if (!this.scene) return;
     if (!MobAssetLibrary.isReady()) { this._pendingMobUpdates.push(row); return; }
+
+    const mobInst = typeof row.dungeonInstanceId === 'bigint' ? row.dungeonInstanceId : 0n;
+    if (mobInst !== this._localDungeonInstanceId) {
+      this._removeMob(row.mobId);
+      return;
+    }
+
     let m = this._mobs.get(row.mobId);
     if (!m) m = this._spawnMob(row);
     if (!m) return;
 
     m.root.position.x = toWorld(row.x);
     m.root.position.z = toWorld(row.y);
-    m.root.position.y = this._worldgen.surfaceY(m.root.position.x, m.root.position.z);
+    m.root.position.y = this._groundYFor(m.root.position.x, m.root.position.z, m.root.position.y);
 
     // HP bar — scale fill to current/max ratio. Hide entire bar on death.
     m.maxHp = row.maxHp;
@@ -1803,6 +1815,7 @@ export class BabylonWorldScene {
   _findNearestAliveMobInRange(maxRange) {
     const p = this._local?.root?.position;
     if (!p) return null;
+    const inInterior = this._castle?.isInside() || this._localDungeonInstanceId > 0n;
     let bestId = null;
     let bestSq = maxRange * maxRange;
     this._mobs.forEach((m, mobId) => {
@@ -1810,7 +1823,10 @@ export class BabylonWorldScene {
       const dx = m.root.position.x - p.x;
       const dz = m.root.position.z - p.z;
       const dsq = dx * dx + dz * dz;
-      if (dsq < bestSq) { bestSq = dsq; bestId = mobId; }
+      if (dsq >= bestSq) return;
+      if (inInterior && !sameInteriorFloor(m.root.position.y, p.y)) return;
+      bestSq = dsq;
+      bestId = mobId;
     });
     return bestId ? { mobId: bestId } : null;
   }
@@ -1887,12 +1903,10 @@ export class BabylonWorldScene {
 
   // ── Castle bridge ───────────────────────────────────────────────────────────
 
-  /** Ground height for entity pinning: castle nav while inside, else terrain. */
+  /** Ground height for entity pinning: castle nav in interior footprint, else terrain. */
   _groundYFor(x, z, currentY) {
-    if (this._castle?.isInside()) {
-      const s = this._castle.nav.surfaceAt(x, z, currentY + 0.5);
-      if (s) return s.y;
-    }
+    const cy = this._castle?.remoteSurfaceY(x, z, currentY);
+    if (cy !== null) return cy;
     return this._worldgen.surfaceY(x, z);
   }
 
@@ -2077,7 +2091,10 @@ export class BabylonWorldScene {
     const dz = z - this._lastPos.z;
 
     if (Math.sqrt(dx * dx + dz * dz) > 0.04 || this._local.isMoving !== this._lastMoving) {
-      this.callbacks.onMove?.(toStdb(x), toStdb(z), this._dir(), this._local.isMoving);
+      const floorYM = (this._castle?.isInside() || this._localDungeonInstanceId > 0n)
+        ? this._local.root.position.y
+        : 0;
+      this.callbacks.onMove?.(toStdb(x), toStdb(z), this._dir(), this._local.isMoving, floorYM);
       this._lastPos    = { x, z };
       this._lastMoving = this._local.isMoving;
       this._lastSentAt = now;
@@ -2105,6 +2122,13 @@ export class BabylonWorldScene {
       return;
     }
     if (!row.online) { this._removeRemote(row.identity); return; }
+
+    const remoteInst = typeof row.dungeonInstanceId === 'bigint' ? row.dungeonInstanceId : 0n;
+    if (remoteInst !== this._localDungeonInstanceId) {
+      this._removeRemote(row.identity);
+      return;
+    }
+
     if (!this._local) { this._pendingUpdates.push(row); return; }
 
     if (this._remotePlayers.has(key)) {
@@ -2179,6 +2203,40 @@ export class BabylonWorldScene {
       dead:      this._localDead,
       deadUntil: row.deadUntil ?? 0n,
     });
+
+    this._syncCastleFromServer(row);
+  }
+
+  /** Reconcile interior presentation + mob scope from the authoritative row. */
+  _syncCastleFromServer(row) {
+    if (!this._castle?._built) {
+      this._pendingCastleSyncRow = row;
+      return;
+    }
+
+    const instId = typeof row.dungeonInstanceId === 'bigint' ? row.dungeonInstanceId : 0n;
+    const instChanged = instId !== this._localDungeonInstanceId;
+    this._localDungeonInstanceId = instId;
+
+    const wx = toWorld(row.x);
+    const wz = toWorld(row.y);
+    const inFootprint = isInCastleInteriorFootprint(wx, wz);
+    const shouldBeInside = instId > 0n || inFootprint;
+
+    if (shouldBeInside && !this._castle.isInside()) {
+      const s = this._castle.nav.surfaceAt(wx, wz, CASTLE_LEVELS[1].y + 1);
+      const wy = s?.y ?? CASTLE_LEVELS[1].y;
+      this._castle.applyServerInteriorState(wx, wy, wz, CASTLE_ENTRY.spawnFacing);
+      this._lastPos = { x: wx, z: wz };
+    } else if (!shouldBeInside && this._castle.isInside()) {
+      const gy = this._worldgen.surfaceY(wx, wz);
+      this._castle.applyServerExteriorState(wx, gy, wz, -Math.PI / 2);
+      this._lastPos = { x: wx, z: wz };
+    } else if (instChanged) {
+      // Instance scope changed — drop mobs and remotes from other instances.
+      for (const [mobId] of this._mobs) this._removeMob(mobId);
+      for (const [remoteKey] of this._remotePlayers) this._removeRemote(remoteKey);
+    }
   }
 
   async _spawnRemote(row) {

@@ -27,4 +27,6 @@ export default __t.row({
   hp: __t.i32(),
   maxHp: __t.i32().name("max_hp"),
   deadUntil: __t.u64().name("dead_until"),
+  dungeonInstanceId: __t.u64().name("dungeon_instance_id"),
+  floorYM: __t.f32().name("floor_y_m"),
 });

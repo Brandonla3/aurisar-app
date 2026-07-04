@@ -31,8 +31,38 @@ import {
   WAYPOINTS,
   ZONES_BY_ID,
 } from './content/index.js';
-import type { MobDef, QuestDef, SpawnDef } from './content/types.js';
-import { castleInteriorWalkable, pxToWorldM } from './castle/validate.js';
+import type { MobDef, QuestDef, QuestObjective, SpawnDef } from './content/types.js';
+import { worldLevelFromFitnessXp } from './content/formulas/xp.js';
+import {
+  DUNGEONS_BY_ID,
+  DUNGEON_EXIT_RANGE_PX,
+  DUNGEON_GATE_RANGE_PX,
+  DUNGEON_MAX_PLAYERS,
+  castleExitHotspotPx,
+  castleSpawnPx,
+  distSqPx,
+  dungeonSpawnByNetId,
+  interiorLocalToPx,
+  zoneEntranceToPx,
+  dungeonSpawnFloorYM,
+  type DungeonSpawnEntry,
+} from './dungeon/helpers.js';
+import {
+  bossAoeRadiusPx,
+  bossDamageMult,
+  bossEnraged,
+  getBossMechanicsForMob,
+  shouldBossAoePulse,
+} from './dungeon/bossMechanics.js';
+import {
+  castleInteriorResolveMove,
+  castleInteriorSurfaceAt,
+  isInCastleInterior,
+  pxToWorldM,
+  sameInteriorFloor,
+  worldMToPx,
+} from './castle/validate.js';
+import { CASTLE_LEVELS, CASTLE_STEP_UP } from './castle/navGrids.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -146,7 +176,8 @@ const mobAiTickScheduleRow = t.row('MobAiTickScheduleRow', {
 const mobRespawnQueueRow = t.row('MobRespawnQueueRow', {
   id:          t.u64().primaryKey().autoInc(),
   scheduledAt: t.scheduleAt(),
-  spawnNetId:  t.string(),     // payload — which spawn point net_id (suffixed: e.g. SPAWN_..._NW_0)
+  spawnNetId:  t.string(),
+  dungeonInstanceId: t.u64().default(0n),
 });
 
 const playerRespawnQueueRow = t.row('PlayerRespawnQueueRow', {
@@ -197,6 +228,8 @@ const spacetimedb = schema({
       hp:           t.i32().default(PLAYER_MAX_HP),   // current HP; 0 = dead
       maxHp:        t.i32().default(PLAYER_MAX_HP),   // max HP for HP-bar normalization
       deadUntil:    t.u64().default(0n),              // 0 = alive; otherwise micros-since-epoch when respawn fires
+      dungeonInstanceId: t.u64().default(0n),        // 0 = overworld; else active dungeon instance
+      floorYM:      t.f32().default(0),              // castle interior vertical meters (world Y)
     }
   ),
 
@@ -247,6 +280,11 @@ const spacetimedb = schema({
       leashRadiusPx: t.f32().default(SEED_WOLF_LEASH_M * PX_PER_M),     // 1120 default (35 m × 32)
       respawnSec:    t.u32().default(SEED_WOLF_RESPAWN_SEC),            // delay between death and respawn insert
       lastAttackAt:  t.u64().default(0n),                               // micros since epoch of last bite (cooldown enforcement)
+      dungeonInstanceId: t.u64().default(0n),                            // 0 = overworld mob; else instance-scoped
+      floorYM:       t.f32().default(0),                                 // interior world Y (m); 0 = overworld
+      spawnedAt:     t.u64().default(0n),                                // boss spawn micros (instance bosses)
+      lastAoeAt:     t.u64().default(0n),                                // last aoePulse micros
+      enraged:       t.bool().default(false),                            // enrage multiplier active
     }
   ),
 
@@ -330,6 +368,33 @@ const spacetimedb = schema({
     }
   ),
 
+  /**
+   * Active dungeon instances (Castle Ashwood v2). Mobs and players reference
+   * instanceId; rows are deleted when the last member leaves.
+   */
+  dungeonInstance: table(
+    { public: true },
+    {
+      instanceId: t.u64().primaryKey().autoInc(),
+      dungeonId:  t.string(),
+      createdAt:  t.u64(),
+    }
+  ),
+
+  /**
+   * P2 — fitness XP mirror for world level gating. Private: raw XP stays
+   * server-side; clients derive level locally from profile XP on connect.
+   */
+  playerProgress: table(
+    {},
+    {
+      identity:            t.identity().primaryKey(),
+      fitnessXp:           t.u64().default(0n),
+      fitnessXpBaseline:   t.u64().default(0n),
+      worldLevel:          t.u32().default(1),
+    }
+  ),
+
 });
 
 export default spacetimedb;
@@ -392,6 +457,44 @@ export const setPlayerInfo = spacetimedb.reducer(
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
         deadUntil: 0n,
+        dungeonInstanceId: 0n,
+        floorYM: 0,
+      });
+    }
+  }
+);
+
+/**
+ * Sync fitness XP from the Aurisar profile into world level (P2).
+ * fitnessXp must be monotonic; worldLevel is derived server-side.
+ */
+export const syncProgress = spacetimedb.reducer(
+  {
+    fitnessXp:         t.u64(),
+    fitnessXpBaseline: t.u64(),
+  },
+  (ctx, { fitnessXp, fitnessXpBaseline }) => {
+    const xp = Number(fitnessXp);
+    const baseline = Number(fitnessXpBaseline);
+    if (!Number.isFinite(xp) || xp < 0) return;
+    if (!Number.isFinite(baseline) || baseline < 0) return;
+
+    const level = worldLevelFromFitnessXp(xp, baseline);
+    const existing = ctx.db.playerProgress.identity.find(ctx.sender);
+    if (existing) {
+      if (fitnessXp < existing.fitnessXp) return;
+      ctx.db.playerProgress.identity.update({
+        ...existing,
+        fitnessXp,
+        fitnessXpBaseline,
+        worldLevel: level,
+      });
+    } else {
+      ctx.db.playerProgress.insert({
+        identity: ctx.sender,
+        fitnessXp,
+        fitnessXpBaseline,
+        worldLevel: level,
       });
     }
   }
@@ -424,8 +527,9 @@ export const movePlayer = spacetimedb.reducer(
     y:         t.f32(),
     direction: t.u8(),
     isMoving:  t.bool(),
+    floorYM:   t.f32(),
   },
-  (ctx, { x, y, direction, isMoving }) => {
+  (ctx, { x, y, direction, isMoving, floorYM }) => {
     const identity = ctx.sender;
     const existing = ctx.db.player.identity.find(identity);
     if (!existing) return; // player hasn't called setPlayerInfo yet
@@ -445,8 +549,20 @@ export const movePlayer = spacetimedb.reducer(
     // interior footprint this returns null and we fall through to normal px clamp.
     const worldXM = pxToWorldM(clampedX);
     const worldZM = pxToWorldM(clampedY);
-    const castleOk = castleInteriorWalkable(worldXM, worldZM);
-    if (castleOk === false) return;
+    let nextFloorYM = existing.floorYM;
+
+    if (isInCastleInterior(worldXM, worldZM) || existing.dungeonInstanceId > 0n) {
+      // Server-stored floor is authoritative — never use client floorYM as
+      // surfaceAt refY (prevents spoofed jumps to upper floors / boss rooms).
+      const refY = existing.floorYM > 0 ? existing.floorYM : CASTLE_LEVELS[1].y;
+      const surface = castleInteriorSurfaceAt(worldXM, worldZM, refY);
+      if (!surface) return;
+      // Reject moves whose client-claimed floor is far from the resolved surface.
+      if (floorYM > 0 && Math.abs(floorYM - surface.y) > CASTLE_STEP_UP) return;
+      nextFloorYM = surface.y;
+    } else if (existing.floorYM !== 0) {
+      nextFloorYM = 0;
+    }
 
     // Zone detection based on position
     const zoneId = detectZone(clampedX, clampedY);
@@ -458,7 +574,100 @@ export const movePlayer = spacetimedb.reducer(
       direction: direction % 4, // only 0-3 valid
       isMoving,
       zoneId,
+      floorYM: nextFloorYM,
     });
+  }
+);
+
+/**
+ * Server-authoritative castle / dungeon entry. Validates gate proximity,
+ * assigns or creates a ≤5-player instance, teleports to the interior spawn,
+ * and seeds instance mobs on first creation.
+ *
+ * minLevel gating via playerProgress (syncProgress on connect).
+ */
+export const enterDungeon = spacetimedb.reducer(
+  { dungeonId: t.string() },
+  (ctx, { dungeonId }) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player) return;
+    const now = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > now) return;
+    if (player.dungeonInstanceId > 0n) return;
+
+    const dungeon = DUNGEONS_BY_ID[dungeonId];
+    if (!dungeon) return;
+
+    if (getPlayerLevel(ctx, ctx.sender) < dungeon.minLevel) return;
+
+    const gatePx = zoneEntranceToPx(dungeon);
+    if (distSqPx(player.x, player.y, gatePx.x, gatePx.y) > DUNGEON_GATE_RANGE_PX * DUNGEON_GATE_RANGE_PX) {
+      return;
+    }
+
+    let instanceId = findOpenDungeonInstance(ctx, dungeonId);
+    let created = false;
+    if (!instanceId) {
+      const row = ctx.db.dungeonInstance.insert({
+        instanceId: 0n,
+        dungeonId,
+        createdAt: now,
+      });
+      instanceId = row.instanceId;
+      created = true;
+    }
+
+    const spawnPx = dungeonId === 'castle_ashwood' ? castleSpawnPx() : gatePx;
+    ctx.db.player.identity.update({
+      ...player,
+      x: spawnPx.x,
+      y: spawnPx.y,
+      isMoving: false,
+      zoneId: detectZone(spawnPx.x, spawnPx.y),
+      dungeonInstanceId: instanceId,
+      floorYM: CASTLE_LEVELS[1].y,
+    });
+
+    if (created) seedDungeonInstanceMobs(ctx, instanceId, dungeonId);
+  }
+);
+
+/**
+ * Leave the active dungeon instance. Requires proximity to the interior
+ * exit hotspot; teleports to the overworld gate and cleans up empty instances.
+ */
+export const leaveDungeon = spacetimedb.reducer(
+  {},
+  (ctx) => {
+    const player = ctx.db.player.identity.find(ctx.sender);
+    if (!player || player.dungeonInstanceId === 0n) return;
+
+    const instance = ctx.db.dungeonInstance.instanceId.find(player.dungeonInstanceId);
+    if (!instance) {
+      ctx.db.player.identity.update({ ...player, dungeonInstanceId: 0n });
+      return;
+    }
+
+    const exitPx = castleExitHotspotPx();
+    if (distSqPx(player.x, player.y, exitPx.x, exitPx.y) > DUNGEON_EXIT_RANGE_PX * DUNGEON_EXIT_RANGE_PX) {
+      return;
+    }
+
+    const dungeon = DUNGEONS_BY_ID[instance.dungeonId];
+    const gatePx = dungeon ? zoneEntranceToPx(dungeon) : { x: WORLD_CENTER_PX, y: WORLD_CENTER_PX };
+    const leavingInstance = player.dungeonInstanceId;
+
+    ctx.db.player.identity.update({
+      ...player,
+      x: gatePx.x,
+      y: gatePx.y,
+      isMoving: false,
+      zoneId: detectZone(gatePx.x, gatePx.y),
+      dungeonInstanceId: 0n,
+      floorYM: 0,
+    });
+
+    cleanupDungeonInstanceIfEmpty(ctx, leavingInstance);
   }
 );
 
@@ -651,6 +860,7 @@ export const seedWorld = spacetimedb.reducer({}, (ctx) => {
   const seeded = new Set<string>();
   const toDelete: bigint[] = [];
   for (const m of ctx.db.mob.iter()) {
+    if (m.dungeonInstanceId > 0n) continue;
     const entry = spawnByNetId.get(m.spawnNetId);
     if (!entry) {
       toDelete.push(m.mobId);
@@ -717,6 +927,10 @@ export const castAbility = spacetimedb.reducer(
     const dy = player.y - mob.y;
     if (dx * dx + dy * dy > MELEE_RANGE_PX * MELEE_RANGE_PX) return;
 
+    // Instance + floor gating for dungeon mobs.
+    if (mob.dungeonInstanceId !== player.dungeonInstanceId) return;
+    if (mob.dungeonInstanceId > 0n && !sameInteriorFloor(mob.floorYM, player.floorYM)) return;
+
     const newHp = mob.hp - MELEE_DAMAGE;
     if (newHp <= 0) {
       // Kill: delete the row (client sees onDelete → mob disappears) and
@@ -726,11 +940,12 @@ export const castAbility = spacetimedb.reducer(
         id: 0n,    // auto-inc replaces this
         scheduledAt: ScheduleAt.time(respawnAt),
         spawnNetId: mob.spawnNetId,
+        dungeonInstanceId: mob.dungeonInstanceId,
       });
       ctx.db.mob.mobId.delete(mobId);
       // P1 quest hook: kill credit goes to whoever lands the killing blow
       // (tap rights / party sharing arrive with P3/P6).
-      creditKillToQuests(ctx, player.identity, mob.mobType);
+      creditKillToQuests(ctx, player.identity, mob);
     } else {
       ctx.db.mob.mobId.update({ ...mob, hp: newHp });
     }
@@ -774,12 +989,21 @@ export const tickMobAI = spacetimedb.reducer(
 
     // Snapshot online alive players. We do this once per tick rather than
     // per-mob to avoid re-iterating the player table for each wolf.
-    const livePlayers: Array<{ identity: any; x: number; y: number }> = [];
+    const livePlayers: Array<{
+      identity: any; x: number; y: number;
+      dungeonInstanceId: bigint; floorYM: number;
+    }> = [];
     for (const p of ctx.db.player.iter()) {
       if (!p.online) continue;
       if (p.hp <= 0) continue;
       if (p.deadUntil > now) continue;
-      livePlayers.push({ identity: p.identity, x: p.x, y: p.y });
+      livePlayers.push({
+        identity: p.identity,
+        x: p.x,
+        y: p.y,
+        dungeonInstanceId: p.dungeonInstanceId,
+        floorYM: p.floorYM,
+      });
     }
 
     for (const mob of ctx.db.mob.iter()) {
@@ -802,25 +1026,62 @@ export const tickMobAI = spacetimedb.reducer(
       let newState = mob.state;
       let nextX = mob.x;
       let nextY = mob.y;
+      let nextFloorYM = mob.floorYM;
       let nextLastAttackAt = mob.lastAttackAt;
+      let nextSpawnedAt = mob.spawnedAt;
+      let nextLastAoeAt = mob.lastAoeAt;
+      let nextEnraged = mob.enraged;
+
+      const bossMech = getBossMechanicsForMob(ctx, mob);
+      if (bossMech && nextSpawnedAt === 0n) nextSpawnedAt = now;
+      if (bossMech) {
+        nextEnraged = bossEnraged(bossMech, nextSpawnedAt, now, nextEnraged);
+        if (shouldBossAoePulse(bossMech, nextLastAoeAt, now)) {
+          const aoeSq = bossAoeRadiusPx(bossMech) ** 2;
+          const aoeDmg = bossMech.aoePulse?.damage ?? 0;
+          for (const p of livePlayers) {
+            if (!isValidMobTarget(mob, p, nextFloorYM)) continue;
+            const dx = p.x - mob.x;
+            const dy = p.y - mob.y;
+            if (dx * dx + dy * dy <= aoeSq) {
+              applyMobHit(ctx, p.identity, now, aoeDmg);
+            }
+          }
+          nextLastAoeAt = now;
+        }
+      }
+      const dmgMult = bossMech ? bossDamageMult(bossMech, nextEnraged) : 1;
+      const effectiveDamage = Math.round(attackDamage * dmgMult);
+
+      const inDungeon = mob.dungeonInstanceId > 0n;
+      if (inDungeon && nextFloorYM === 0) {
+        nextFloorYM = resolveMobFloorYM(mob.x, mob.y, 0);
+      }
+
+      const stepMob = (fromX: number, fromY: number, toX: number, toY: number) => {
+        if (inDungeon) {
+          return mobInteriorStepPx(fromX, fromY, toX, toY, moveStepPx, nextFloorYM);
+        }
+        const step = stepToward(fromX, fromY, toX, toY, moveStepPx);
+        return { x: step.x, y: step.y, floorYM: nextFloorYM, arrived: step.arrived };
+      };
 
       if (mob.state === 'returning' || homeDistSq > leashSq) {
-        // Walk straight back to spawn point. Continue in 'returning' until
-        // we're close enough to snap home.
-        const stepArrived = stepToward(mob.x, mob.y, mob.spawnX, mob.spawnY, moveStepPx);
+        const stepArrived = stepMob(mob.x, mob.y, mob.spawnX, mob.spawnY);
         nextX = stepArrived.x;
         nextY = stepArrived.y;
+        nextFloorYM = stepArrived.floorYM;
         if (stepArrived.arrived) {
           newState = 'alive';
         } else {
           newState = 'returning';
         }
       } else {
-        // 2. Find nearest live player within aggro.
         const aggroSq = mob.aggroRadiusPx * mob.aggroRadiusPx;
-        let nearest: { x: number; y: number; identity: any } | null = null;
+        let nearest: typeof livePlayers[number] | null = null;
         let nearestDistSq = aggroSq;
         for (const p of livePlayers) {
+          if (!isValidMobTarget(mob, p, nextFloorYM)) continue;
           const dx = p.x - mob.x;
           const dy = p.y - mob.y;
           const dsq = dx * dx + dy * dy;
@@ -831,37 +1092,39 @@ export const tickMobAI = spacetimedb.reducer(
         }
 
         if (nearest) {
-          // Chase. Step toward the target.
           const meleeSq = WOLF_MELEE_RANGE_PX * WOLF_MELEE_RANGE_PX;
-          if (nearestDistSq <= meleeSq) {
-            // In melee range — try to land a hit instead of moving.
+          const sameFloor = sameInteriorFloor(nextFloorYM, nearest.floorYM);
+          if (nearestDistSq <= meleeSq && sameFloor) {
             if (now - mob.lastAttackAt >= attackCdMicros) {
-              applyMobHit(ctx, nearest.identity, now, attackDamage);
+              applyMobHit(ctx, nearest.identity, now, effectiveDamage);
               nextLastAttackAt = now;
             }
-            // Don't step — we're already in melee.
           } else {
-            const step = stepToward(mob.x, mob.y, nearest.x, nearest.y, moveStepPx);
+            const step = stepMob(mob.x, mob.y, nearest.x, nearest.y);
             nextX = step.x;
             nextY = step.y;
+            nextFloorYM = step.floorYM;
           }
           newState = 'alive';
         } else {
-          // No one in aggro — hold position.
           newState = 'alive';
         }
       }
 
-      // Only emit an update if something actually changed. Skipping no-ops
-      // avoids needless WebSocket churn for idle mobs.
       if (nextX !== mob.x || nextY !== mob.y || newState !== mob.state ||
-          nextLastAttackAt !== mob.lastAttackAt) {
+          nextLastAttackAt !== mob.lastAttackAt || nextFloorYM !== mob.floorYM ||
+          nextSpawnedAt !== mob.spawnedAt || nextLastAoeAt !== mob.lastAoeAt ||
+          nextEnraged !== mob.enraged) {
         ctx.db.mob.mobId.update({
           ...mob,
           x: nextX,
           y: nextY,
+          floorYM: nextFloorYM,
           state: newState,
           lastAttackAt: nextLastAttackAt,
+          spawnedAt: nextSpawnedAt,
+          lastAoeAt: nextLastAoeAt,
+          enraged: nextEnraged,
         });
       }
     }
@@ -883,6 +1146,19 @@ export const respawnMob = spacetimedb.reducer(
   },
   (ctx, { schedule }) => {
     const spawnNetId = schedule.spawnNetId;
+    const dungeonInst = schedule.dungeonInstanceId;
+
+    if (dungeonInst > 0n) {
+      if (!ctx.db.dungeonInstance.instanceId.find(dungeonInst)) return;
+      const entry = dungeonSpawnByNetId.get(spawnNetId);
+      if (!entry) return;
+      for (const m of ctx.db.mob.iter()) {
+        if (m.spawnNetId === spawnNetId && m.dungeonInstanceId === dungeonInst) return;
+      }
+      insertMobFromDungeonSpawn(ctx, entry, spawnNetId, dungeonInst, 0);
+      return;
+    }
+
     const entry = spawnByNetId.get(spawnNetId);
     if (!entry) return; // spawn point removed from manifest; drop respawn
 
@@ -912,6 +1188,8 @@ export const respawnPlayer = spacetimedb.reducer(
     const p = ctx.db.player.identity.find(schedule.identity);
     if (!p) return;
 
+    const prevInstanceId = p.dungeonInstanceId;
+
     ctx.db.player.identity.update({
       ...p,
       x: WORLD_CENTER_PX,
@@ -921,7 +1199,13 @@ export const respawnPlayer = spacetimedb.reducer(
       zoneId: detectZone(WORLD_CENTER_PX, WORLD_CENTER_PX),
       hp: p.maxHp > 0 ? p.maxHp : PLAYER_MAX_HP,
       deadUntil: 0n,
+      dungeonInstanceId: 0n,
+      floorYM: 0,
     });
+
+    if (prevInstanceId > 0n) {
+      cleanupDungeonInstanceIfEmpty(ctx, prevInstanceId);
+    }
   }
 );
 
@@ -980,6 +1264,26 @@ function detectZone(x: number, y: number): number {
   return 3; // Wilderness
 }
 
+function getPlayerLevel(ctx: any, identity: any): number {
+  const row = ctx.db.playerProgress.identity.find(identity);
+  return row?.worldLevel ?? 1;
+}
+
+function killObjectiveMatches(
+  ctx: any,
+  obj: QuestObjective,
+  mob: { mobType: string; spawnNetId: string; dungeonInstanceId: bigint },
+): boolean {
+  if (obj.type !== 'kill' || obj.mobType !== mob.mobType) return false;
+  if (obj.spawnNetIdPrefix && !mob.spawnNetId.startsWith(obj.spawnNetIdPrefix)) return false;
+  if (obj.dungeonId) {
+    if (mob.dungeonInstanceId === 0n) return false;
+    const inst = ctx.db.dungeonInstance.instanceId.find(mob.dungeonInstanceId);
+    if (!inst || inst.dungeonId !== obj.dungeonId) return false;
+  }
+  return true;
+}
+
 /**
  * Move from `(x, y)` toward `(tx, ty)` by at most `maxStep` px.
  * Returns the new position and whether we landed on the target.
@@ -994,6 +1298,45 @@ function stepToward(x: number, y: number, tx: number, ty: number, maxStep: numbe
   }
   const k = maxStep / dist;
   return { x: x + dx * k, y: y + dy * k, arrived: false };
+}
+
+function isValidMobTarget(
+  mob: { dungeonInstanceId: bigint; floorYM: number },
+  player: { dungeonInstanceId: bigint; floorYM: number },
+  mobFloorYM: number,
+): boolean {
+  if (player.dungeonInstanceId !== mob.dungeonInstanceId) return false;
+  if (mob.dungeonInstanceId > 0n && !sameInteriorFloor(mobFloorYM, player.floorYM)) return false;
+  return true;
+}
+
+/** Resolve mob floor Y from px position when floorYM was unset (migration backfill). */
+function resolveMobFloorYM(pxX: number, pxY: number, fallback: number): number {
+  const wx = pxToWorldM(pxX);
+  const wz = pxToWorldM(pxY);
+  for (const lv of CASTLE_LEVELS) {
+    const s = castleInteriorSurfaceAt(wx, wz, lv.y);
+    if (s) return s.y;
+  }
+  return fallback;
+}
+
+function mobInteriorStepPx(
+  fromX: number, fromY: number, toX: number, toY: number,
+  maxStepPx: number, floorYM: number,
+): { x: number; y: number; floorYM: number; arrived: boolean } {
+  const step = stepToward(fromX, fromY, toX, toY, maxStepPx);
+  const prevWX = pxToWorldM(fromX);
+  const prevWZ = pxToWorldM(fromY);
+  const nextWX = pxToWorldM(step.x);
+  const nextWZ = pxToWorldM(step.y);
+  const resolved = castleInteriorResolveMove(prevWX, prevWZ, nextWX, nextWZ, floorYM);
+  return {
+    x: worldMToPx(resolved.x),
+    y: worldMToPx(resolved.z),
+    floorYM: resolved.floorYM,
+    arrived: step.arrived && resolved.surface != null,
+  };
 }
 
 /**
@@ -1075,8 +1418,8 @@ function playerInRangeOfNpc(player: { x: number; y: number }, npcId: string): bo
 
 /**
  * Accept a quest from its giver NPC. Quests are once-only: any existing
- * row (active, ready, or done) blocks re-acceptance. minLevel enforcement
- * arrives with playerProgress in P2.
+ * row (active, ready, or done) blocks re-acceptance. minLevel enforced
+ * via playerProgress.worldLevel.
  */
 export const acceptQuest = spacetimedb.reducer(
   { questId: t.string() },
@@ -1094,6 +1437,7 @@ export const acceptQuest = spacetimedb.reducer(
       const prereq = findQuestRow(ctx, ctx.sender, quest.requiresQuestId);
       if (!prereq || prereq.state !== QUEST_STATE_DONE) return;
     }
+    if (quest.minLevel && getPlayerLevel(ctx, ctx.sender) < quest.minLevel) return;
     if (!playerInRangeOfNpc(player, quest.giverNpcId)) return;
 
     ctx.db.playerQuest.insert({
@@ -1190,7 +1534,11 @@ export const reachWaypoint = spacetimedb.reducer(
  * matching kill objective on the killer's active quests and promotes rows
  * to 'ready' when all objectives are met.
  */
-function creditKillToQuests(ctx: any, identity: any, mobType: string): void {
+function creditKillToQuests(
+  ctx: any,
+  identity: any,
+  mob: { mobType: string; spawnNetId: string; dungeonInstanceId: bigint },
+): void {
   for (const row of ctx.db.playerQuest.iter()) {
     if (row.state !== QUEST_STATE_ACTIVE) continue;
     if (!row.owner.isEqual(identity)) continue;
@@ -1200,7 +1548,7 @@ function creditKillToQuests(ctx: any, identity: any, mobType: string): void {
     const counts = parseCounts(row.countsJson, quest.objectives.length);
     let changed = false;
     quest.objectives.forEach((obj, i) => {
-      if (obj.type === 'kill' && obj.mobType === mobType && counts[i] < obj.count) {
+      if (killObjectiveMatches(ctx, obj, mob) && counts[i] < objectiveTarget(obj)) {
         counts[i]++;
         changed = true;
       }
@@ -1251,5 +1599,88 @@ function insertMobFromSpawn(
     leashRadiusPx: mobDef.leashRadiusM * PX_PER_M,
     respawnSec:    mobDef.respawnSec,
     lastAttackAt:  0n,
+    dungeonInstanceId: 0n,
   });
+}
+
+function insertMobFromDungeonSpawn(
+  ctx: any,
+  entry: DungeonSpawnEntry,
+  netId: string,
+  instanceId: bigint,
+  instanceCounter: number,
+): void {
+  const { spawn, mobDef, instanceIndex } = entry;
+  const offset = spawnInstanceOffsetM(instanceIndex, spawn.radiusM);
+  const px = interiorLocalToPx({
+    x: spawn.pos.x + offset.dx,
+    z: spawn.pos.z + offset.dz,
+  });
+
+  const inst = ctx.db.dungeonInstance.instanceId.find(instanceId);
+  const dungeon = inst ? DUNGEONS_BY_ID[inst.dungeonId] : undefined;
+  const isBoss = dungeon && spawn.mobType === dungeon.bossMobType;
+  const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+
+  ctx.db.mob.insert({
+    mobId:         nowMicros + BigInt(instanceCounter),
+    mobType:       spawn.mobType,
+    x:             px.x,
+    y:             px.y,
+    hp:            mobDef.maxHp,
+    maxHp:         mobDef.maxHp,
+    state:         'alive',
+    spawnNetId:    netId,
+    spawnX:        px.x,
+    spawnY:        px.y,
+    aggroRadiusPx: mobDef.aggroRadiusM * PX_PER_M,
+    leashRadiusPx: mobDef.leashRadiusM * PX_PER_M,
+    respawnSec:    mobDef.respawnSec,
+    lastAttackAt:  0n,
+    dungeonInstanceId: instanceId,
+    floorYM:       dungeonSpawnFloorYM(spawn.netId),
+    spawnedAt:     isBoss ? nowMicros : 0n,
+    lastAoeAt:     0n,
+    enraged:       false,
+  });
+}
+
+function countInstanceMembers(ctx: any, instanceId: bigint): number {
+  let n = 0;
+  for (const p of ctx.db.player.iter()) {
+    if (p.dungeonInstanceId === instanceId) n++;
+  }
+  return n;
+}
+
+function findOpenDungeonInstance(ctx: any, dungeonId: string): bigint | null {
+  for (const inst of ctx.db.dungeonInstance.iter()) {
+    if (inst.dungeonId !== dungeonId) continue;
+    if (countInstanceMembers(ctx, inst.instanceId) < DUNGEON_MAX_PLAYERS) {
+      return inst.instanceId;
+    }
+  }
+  return null;
+}
+
+function seedDungeonInstanceMobs(ctx: any, instanceId: bigint, dungeonId: string): void {
+  const dungeon = DUNGEONS_BY_ID[dungeonId];
+  if (!dungeon) return;
+  let counter = 0;
+  for (const spawn of dungeon.spawns) {
+    for (let i = 0; i < spawn.count; i++) {
+      const netId = `${spawn.netId}_${i}`;
+      const entry = dungeonSpawnByNetId.get(netId);
+      if (!entry) continue;
+      insertMobFromDungeonSpawn(ctx, entry, netId, instanceId, counter++);
+    }
+  }
+}
+
+function cleanupDungeonInstanceIfEmpty(ctx: any, instanceId: bigint): void {
+  if (countInstanceMembers(ctx, instanceId) > 0) return;
+  for (const m of ctx.db.mob.iter()) {
+    if (m.dungeonInstanceId === instanceId) ctx.db.mob.mobId.delete(m.mobId);
+  }
+  ctx.db.dungeonInstance.instanceId.delete(instanceId);
 }

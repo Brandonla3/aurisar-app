@@ -8,48 +8,42 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { buildNav } from '../castleNav.js';
+import { collectNavBlockers, stampNavBlockers } from '../castleNavBlockers.js';
 import {
   CASTLE_PLAN, LEVELS, ROOMS, ENTRY, INTERIOR_ANCHOR,
 } from '../castlePlan.js';
 
 const AX = INTERIOR_ANCHOR.x, AZ = INTERIOR_ANCHOR.z;
 
-// Minimal BABYLON: every MeshBuilder.Create* returns an inert mesh record.
-const fakeMesh = () => ({
-  position: { set() {} },
-  rotation: {},
-  scaling: {},
-  setEnabled() {},
-  computeWorldMatrix() {},
-  freezeWorldMatrix() {},
-  isPickable: true,
-  material: null,
-});
 beforeAll(() => {
-  globalThis.BABYLON = {
-    MeshBuilder: new Proxy({}, { get: () => () => fakeMesh() }),
-    Mesh: { CAP_ALL: 0 },
-    Vector3: class Vector3 {
-      constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
-      static Zero() { return new Vector3(); }
-    },
-  };
+  if (!globalThis.BABYLON) {
+    const fakeMesh = () => ({
+      position: { set() {} },
+      rotation: {},
+      scaling: {},
+      setEnabled() {},
+      computeWorldMatrix() {},
+      freezeWorldMatrix() {},
+      isPickable: true,
+      material: null,
+    });
+    globalThis.BABYLON = {
+      MeshBuilder: new Proxy({}, { get: () => () => fakeMesh() }),
+      Mesh: { CAP_ALL: 0 },
+      Vector3: class Vector3 {
+        constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+        static Zero() { return new Vector3(); }
+      },
+    };
+  }
 });
 
 let nav;
 let blockers;
-beforeAll(async () => {
-  const { createCollector } = await import('../builders/mergeUtil.js');
-  const { createAllFurniture } = await import('../builders/furniture.js');
-  const { dressStructuralRooms } = await import('../builders/rooms.js');
-  const { createAllStaircases } = await import('../builders/staircase.js');
-  const ctx = createCollector(null, {});
-  dressStructuralRooms(ctx, AX, AZ);
-  createAllStaircases(ctx, AX, AZ);
-  createAllFurniture(ctx, AX, AZ);
-  blockers = ctx.navBlockers;
+beforeAll(() => {
+  blockers = collectNavBlockers();
   nav = buildNav();
-  for (const b of blockers) nav.blockRect(b.level, b, b.expand);
+  stampNavBlockers(nav, blockers);
 });
 
 describe('castle furniture nav blockers', () => {

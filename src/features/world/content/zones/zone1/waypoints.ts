@@ -15,5 +15,6 @@ export const WAYPOINTS: WaypointDef[] = [
   { id: 'poi_gloomweb',     zoneId: 1, pos: { x: -60, z: 4 },   radiusM: 20, label: 'Gloomweb' },
   { id: 'poi_rustvein_dig', zoneId: 1, pos: { x: -84, z: -64 }, radiusM: 18, label: 'Rustvein Dig' },
   { id: 'poi_gallows_rise', zoneId: 1, pos: { x: 76, z: -76 },  radiusM: 22, label: 'Gallows Rise' },
+  { id: 'poi_castle_ashwood', zoneId: 1, pos: { x: 112.5, z: 20 }, radiusM: 12, label: 'Castle Ashwood' },
   { id: 'poi_mourners_rest',zoneId: 1, pos: { x: 80, z: 80 },   radiusM: 16, label: "Mourner's Rest" },
 ];

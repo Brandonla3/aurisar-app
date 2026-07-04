@@ -11,9 +11,6 @@ import {
 } from "spacetimedb";
 
 export default {
-  x: __t.f32(),
-  y: __t.f32(),
-  direction: __t.u8(),
-  isMoving: __t.bool(),
-  floorYM: __t.f32(),
+  fitnessXp: __t.u64(),
+  fitnessXpBaseline: __t.u64(),
 };
