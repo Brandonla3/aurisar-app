@@ -238,6 +238,16 @@ export function createWallsForLevel(ctx, level, ax, az) {
         createDoor(ctx, level, line, door, ax, az);
       } else {
         createWall(ctx, level, line, lo, hi, L.y, hUp, wallMat, ax, az);
+        // dado rail on plaster walls: a stone band proud of both faces
+        // breaks up the uniform full-height plaster panels. Full segments
+        // only — never emitted across door openings.
+        if (wallMat === 'plaster') {
+          const len = hi - lo + WALL_T;
+          const dado = line.axis === 'x'
+            ? box(ctx.scene, `dado_${level}`, line.at + ax, L.y + 0.9, (lo + hi) / 2 + az, WALL_T + 0.12, 0.18, len)
+            : box(ctx.scene, `dado_${level}`, (lo + hi) / 2 + ax, L.y + 0.9, line.at + az, len, 0.18, WALL_T + 0.12);
+          ctx.add(dado, 'stone', G(level));
+        }
         // windows on exterior-facing pieces (exactly one side is a room)
         const roomSide = negRoom ?? posRoom;
         const isPerimeter = !negRoom !== !posRoom;

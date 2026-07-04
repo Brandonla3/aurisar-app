@@ -69,11 +69,20 @@ export function createBed(ctx, level, x, z, ax, az, royal = false) {
     ctx.add(box(ctx.scene, `bedPil_${level}`, wx + off, fy + 0.8, wz - d / 2 + 0.45, 0.7, 0.14, 0.45), 'linen', G(level));
   }
   if (royal) {
-    // four-poster canopy
+    // four-poster canopy: perimeter frame beams + inset fabric panel (a
+    // solid slab top read as a crate lid, not a canopy)
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
       ctx.add(cyl(ctx.scene, `bedPost_${level}`, wx + sx * (w / 2 - 0.06), fy + 1.3, wz + sz * (d / 2 - 0.06), 2.6, 0.1, 8), 'woodDark', G(level));
     }
-    ctx.add(box(ctx.scene, `bedCanopy_${level}`, wx, fy + 2.62, wz, w + 0.2, 0.08, d + 0.2), 'redFabric', G(level));
+    for (const [px, pz, bw, bd] of [
+      [wx, wz - d / 2 + 0.06, w + 0.2, 0.1],
+      [wx, wz + d / 2 - 0.06, w + 0.2, 0.1],
+      [wx - w / 2 + 0.06, wz, 0.1, d + 0.1],
+      [wx + w / 2 - 0.06, wz, 0.1, d + 0.1],
+    ]) {
+      ctx.add(box(ctx.scene, `bedCanopyBeam_${level}`, px, fy + 2.62, pz, bw, 0.08, bd), 'woodDark', G(level));
+    }
+    ctx.add(box(ctx.scene, `bedCanopy_${level}`, wx, fy + 2.56, wz, w - 0.22, 0.04, d - 0.22), 'redFabric', G(level));
   }
 }
 
@@ -111,6 +120,10 @@ export function createDesk(ctx, level, x, z, ax, az, rotY = 0) {
   const cxp = wx + Math.sin(rotY) * 0.9, czp = wz + Math.cos(rotY) * 0.9;
   ctx.add(box(ctx.scene, `chairSeat_${level}`, cxp, fy + 0.45, czp, 0.5, 0.07, 0.5), 'woodDark', G(level));
   ctx.add(box(ctx.scene, `chairBack_${level}`, cxp, fy + 0.85, czp + 0.22, 0.5, 0.75, 0.07), 'woodDark', G(level));
+  for (const sx of [-1, 1]) {
+    ctx.add(box(ctx.scene, `chairArm_${level}`, cxp + sx * 0.26, fy + 0.60, czp, 0.07, 0.06, 0.46), 'woodDark', G(level));
+    ctx.add(box(ctx.scene, `chairArmPost_${level}`, cxp + sx * 0.26, fy + 0.52, czp + 0.12, 0.07, 0.18, 0.07), 'woodDark', G(level));
+  }
 }
 
 export function createWardrobe(ctx, level, x, z, ax, az) {
@@ -119,6 +132,16 @@ export function createWardrobe(ctx, level, x, z, ax, az) {
   ctx.add(box(ctx.scene, `ward_${level}`, x + ax, fy + 1.1, z + az, 1.5, 2.2, 0.7), 'woodDark', G(level));
   ctx.add(box(ctx.scene, `wardTrim_${level}`, x + ax, fy + 2.24, z + az, 1.6, 0.1, 0.8), 'woodDark', G(level));
   ctx.add(box(ctx.scene, `wardSplit_${level}`, x + ax, fy + 1.1, z + az + 0.36, 0.05, 2.0, 0.03), 'iron', G(level));
+  // door hardware + raised panels (proud of the 0.35 front face)
+  for (const sx of [-1, 1]) {
+    ctx.add(cyl(ctx.scene, `wardKnob_${level}`, x + ax + sx * 0.12, fy + 1.1, z + az + 0.38, 0.08, 0.06, 8), 'gold', G(level));
+  }
+  for (const [px, py] of [
+    [x + ax - 0.36, fy + 1.7], [x + ax - 0.36, fy + 0.7],
+    [x + ax + 0.36, fy + 1.7], [x + ax + 0.36, fy + 0.7],
+  ]) {
+    ctx.add(box(ctx.scene, `wardPanel_${level}`, px, py, z + az + 0.36, 0.5, 0.58, 0.04), 'woodFloor', G(level));
+  }
 }
 
 export function createBookcase(ctx, level, x, z, ax, az, w = 2.2) {
@@ -140,6 +163,13 @@ export function createTable(ctx, level, x, z, ax, az, w, d, withBenches = false)
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     ctx.add(box(ctx.scene, `tableLeg_${level}`, wx + sx * (w / 2 - 0.18), fy + 0.4, wz + sz * (d / 2 - 0.18), 0.14, 0.8, 0.14), 'woodDark', G(level));
   }
+  // apron under the top on all four sides — a bare top-on-legs reads as a
+  // thin board, not a built table
+  const aH = 0.26, aY = fy + 0.68;
+  ctx.add(box(ctx.scene, `tableApronN_${level}`, wx, aY, wz - d / 2 + 0.07, w - 0.28, aH, 0.08), 'woodDark', G(level));
+  ctx.add(box(ctx.scene, `tableApronS_${level}`, wx, aY, wz + d / 2 - 0.07, w - 0.28, aH, 0.08), 'woodDark', G(level));
+  ctx.add(box(ctx.scene, `tableApronW_${level}`, wx - w / 2 + 0.07, aY, wz, 0.08, aH, d - 0.28), 'woodDark', G(level));
+  ctx.add(box(ctx.scene, `tableApronE_${level}`, wx + w / 2 - 0.07, aY, wz, 0.08, aH, d - 0.28), 'woodDark', G(level));
   if (withBenches) {
     for (const s of [-1, 1]) {
       ctx.add(box(ctx.scene, `bench_${level}`, wx, fy + 0.44, wz + s * (d / 2 + 0.45), w - 0.5, 0.09, 0.4), 'woodDark', G(level));
@@ -172,6 +202,11 @@ export function createCrate(ctx, level, x, z, ax, az, s = 0.8, rot = 0) {
 
 export function createRug(ctx, level, x, z, ax, az, w, d, matKey = 'carpet') {
   const fy = LEVELS[level].y;
+  // gilded border under the woven mats (12mm y-gap — no z-fighting);
+  // utility mats (kitchen stone etc.) stay borderless
+  if (matKey === 'carpet' || matKey === 'carpetBlue') {
+    ctx.add(box(ctx.scene, `rugBorder_${level}`, x + ax, fy + 0.038, z + az, w + 0.3, 0.02, d + 0.3), 'gold', G(level));
+  }
   ctx.add(box(ctx.scene, `rug_${level}`, x + ax, fy + 0.05, z + az, w, 0.024, d), matKey, G(level));
 }
 
@@ -185,27 +220,31 @@ export function createDungeonCell(ctx, level, x0, z0, x1, z1, openSide, ax, az) 
   ctx.add(box(ctx.scene, `cellWallW_${level}`, x0 + ax, fy + barH / 2, (z0 + z1) / 2 + az, 0.3, barH, z1 - z0), 'darkStone', G(level));
   ctx.add(box(ctx.scene, `cellWallE_${level}`, x1 + ax, fy + barH / 2, (z0 + z1) / 2 + az, 0.3, barH, z1 - z0), 'darkStone', G(level));
   // iron bars across the front, leaving a 0.9m gate gap at the west end
+  // (all cell ironwork is ironRust — polished specular reads wrong here)
   const gate0 = x0 + 0.5, gate1 = x0 + 1.4;
   for (let bx = x0 + 0.15; bx <= x1 - 0.15; bx += 0.3) {
     if (bx > gate0 && bx < gate1) continue;
-    ctx.add(cyl(ctx.scene, `cellBar_${level}`, bx + ax, fy + barH / 2, front + az, barH, 0.07, 6), 'iron', G(level));
+    ctx.add(cyl(ctx.scene, `cellBar_${level}`, bx + ax, fy + barH / 2, front + az, barH, 0.07, 6), 'ironRust', G(level));
   }
-  ctx.add(box(ctx.scene, `cellRail_${level}`, (x0 + x1) / 2 + ax, fy + barH, front + az, x1 - x0, 0.12, 0.12), 'iron', G(level));
-  ctx.add(box(ctx.scene, `cellRailB_${level}`, (x0 + x1) / 2 + ax, fy + 0.08, front + az, x1 - x0, 0.16, 0.12), 'iron', G(level));
+  ctx.add(box(ctx.scene, `cellRail_${level}`, (x0 + x1) / 2 + ax, fy + barH, front + az, x1 - x0, 0.12, 0.12), 'ironRust', G(level));
+  ctx.add(box(ctx.scene, `cellRailB_${level}`, (x0 + x1) / 2 + ax, fy + 0.08, front + az, x1 - x0, 0.16, 0.12), 'ironRust', G(level));
   // open gate leaf against the partition
   const leaf = box(ctx.scene, `cellGate_${level}`, gate0 + ax - 0.05, fy + barH / 2 - 0.15, front + az + (openSide === 'north' ? 0.45 : -0.45), 0.06, barH - 0.3, 0.9);
-  ctx.add(leaf, 'iron', G(level));
+  ctx.add(leaf, 'ironRust', G(level));
   // straw pile + bench + wall chains
   const backZ = openSide === 'north' ? z0 + 0.7 : z1 - 0.7;
   const straw = BABYLON.MeshBuilder.CreateSphere(`straw_${level}`, { diameter: 1.2, segments: 5 }, ctx.scene);
   straw.scaling.y = 0.22;
   straw.position.set(x0 + 1.0 + ax, fy + 0.12, backZ + az);
-  ctx.add(straw, 'linen', G(level));
+  ctx.add(straw, 'woodFloor', G(level)); // warm honey-brown ≈ dry straw ('linen' read as white cloth)
   ctx.add(box(ctx.scene, `cellBench_${level}`, x1 - 0.9 + ax, fy + 0.3, backZ + az, 1.3, 0.14, 0.5), 'woodDark', G(level));
+  // sagging wall chains: linked short cylinders, alternating orientation
   for (const cxp of [x0 + (x1 - x0) * 0.35, x0 + (x1 - x0) * 0.65]) {
-    const ch = cyl(ctx.scene, `chain_${level}`, cxp + ax, fy + 1.7, backZ + az - (openSide === 'north' ? -0.6 : 0.6) * 0 + 0.0, 1.1, 0.045, 5);
-    ch.rotation.x = 0.35;
-    ctx.add(ch, 'iron', G(level));
+    for (let link = 0; link < 4; link++) {
+      const lk = cyl(ctx.scene, `chainLink_${level}`, cxp + ax, fy + 2.1 - link * 0.28, backZ + az, 0.28, 0.08, 5);
+      lk.rotation.x = link % 2 === 0 ? 0 : Math.PI / 2;
+      ctx.add(lk, 'ironRust', G(level));
+    }
   }
 }
 
@@ -219,7 +258,7 @@ function fitBedroom(ctx, room, ax, az, tier /* 'bedroom'|'master'|'royal' */) {
   const r = hash2(x0 * 1.3, z0 * 2.7);
   // bed against the north wall
   createBed(ctx, level, cx + (r - 0.5) * 3, z1 - 2.2, ax, az, royal);
-  createRug(ctx, level, cx, cz, ax, az, Math.min(5, x1 - x0 - 4), Math.min(3.6, z1 - z0 - 5), royal ? 'carpet' : 'blueFabric');
+  createRug(ctx, level, cx, cz, ax, az, Math.min(5, x1 - x0 - 4), Math.min(3.6, z1 - z0 - 5), royal ? 'carpet' : 'carpetBlue');
   createChest(ctx, level, x0 + 1.4, z1 - 1.2, ax, az, 0, tier === 'royal');
   if (royal) {
     createDesk(ctx, level, x1 - 2.2, z0 + 2.0, ax, az, Math.PI);
@@ -230,9 +269,11 @@ function fitBedroom(ctx, room, ax, az, tier /* 'bedroom'|'master'|'royal' */) {
     createTable(ctx, level, cx + 2.2, z1 - 1.4, ax, az, 0.7, 0.7);
   }
   if (tier === 'royal') {
-    // second seating rug + chests of the royal apartment
+    // second seating rug + chests of the royal apartment (rug placed
+    // relative to room size — a fixed corner offset overlapped walls in
+    // narrow rooms)
     createChest(ctx, level, x0 + 2.6, z1 - 1.2, ax, az, 0.3, true);
-    createRug(ctx, level, x0 + 4, z0 + 4, ax, az, 3.4, 2.6);
+    createRug(ctx, level, cx - (x1 - x0) * 0.18, z0 + (z1 - z0) * 0.22, ax, az, 3.4, 2.6);
   }
 }
 
@@ -254,16 +295,21 @@ function fitKitchen(ctx, room, ax, az) {
     mouth.rotation.x = Math.PI / 2;
     ctx.add(mouth, 'ember', G(level));
   }
-  // long prep table down the middle
+  // long prep table down the middle + a worn stone floor mat beside it
   createTable(ctx, level, (x0 + x1) / 2, (z0 + z1) / 2, ax, az, 6.5, 1.6);
-  // hanging pot rack over it
+  createRug(ctx, level, (x0 + x1) / 2, (z0 + z1) / 2 + 1.6, ax, az, 3, 2, 'darkStone');
+  // pot rack over it — freestanding on end posts (the bare bar floated;
+  // rods up to the 10m kitchen ceiling would read even worse). Aged iron.
   const rackY = fy + 2.3;
-  ctx.add(box(ctx.scene, `rack_${level}`, (x0 + x1) / 2 + ax, rackY, (z0 + z1) / 2 + az, 4.5, 0.08, 0.08), 'iron', G(level));
+  ctx.add(box(ctx.scene, `rack_${level}`, (x0 + x1) / 2 + ax, rackY, (z0 + z1) / 2 + az, 4.5, 0.08, 0.08), 'ironRust', G(level));
+  for (const sx of [-2.1, 2.1]) {
+    ctx.add(box(ctx.scene, `rackPost_${level}`, (x0 + x1) / 2 + sx + ax, (fy + rackY) / 2, (z0 + z1) / 2 + az, 0.08, rackY - fy, 0.08), 'woodDark', G(level));
+  }
   for (let i = 0; i < 5; i++) {
     const px = (x0 + x1) / 2 - 2 + i * 1.0;
-    ctx.add(cyl(ctx.scene, `potHang_${level}`, px + ax, rackY - 0.25, (z0 + z1) / 2 + az, 0.4, 0.04, 5), 'iron', G(level));
+    ctx.add(cyl(ctx.scene, `potHang_${level}`, px + ax, rackY - 0.25, (z0 + z1) / 2 + az, 0.4, 0.04, 5), 'ironRust', G(level));
     const pot = cyl(ctx.scene, `pot_${level}`, px + ax, rackY - 0.55, (z0 + z1) / 2 + az, 0.32, 0.4, 10);
-    ctx.add(pot, 'iron', G(level));
+    ctx.add(pot, 'ironRust', G(level));
   }
   // barrels + crates in the SE corner
   for (let i = 0; i < 5; i++) {
@@ -304,15 +350,29 @@ function fitDining(ctx, room, ax, az) {
   const { x0, z0, x1, z1 } = room.rect;
   const level = room.level;
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  // two long feast tables with benches
-  createTable(ctx, level, cx, cz + 3.4, ax, az, 11, 1.8, true);
-  createTable(ctx, level, cx, cz - 3.4, ax, az, 11, 1.8, true);
-  // sideboard on the east wall
   const fy = LEVELS[level].y;
+  // hall rug under both feast tables — bare stone read as unfinished
+  createRug(ctx, level, cx, cz, ax, az, Math.min(12, x1 - x0 - 4), Math.min(10, z1 - z0 - 3));
+  // two long feast tables with benches, dressed: tablecloth + candelabras
+  for (const dz of [3.4, -3.4]) {
+    createTable(ctx, level, cx, cz + dz, ax, az, 11, 1.8, true);
+    ctx.add(box(ctx.scene, `tablecloth_${level}`, cx + ax, fy + 0.885, cz + dz + az, 10.4, 0.025, 2.05), 'linen', G(level));
+    for (const dx of [-2.2, 0, 2.2]) {
+      ctx.add(cyl(ctx.scene, `candelBase_${level}`, cx + dx + ax, fy + 1.0, cz + dz + az, 0.3, 0.22, 8), 'gold', G(level));
+      ctx.add(cyl(ctx.scene, `candelStem_${level}`, cx + dx + ax, fy + 1.18, cz + dz + az, 0.16, 0.06, 6), 'gold', G(level));
+      ctx.add(cyl(ctx.scene, `candelFlame_${level}`, cx + dx + ax, fy + 1.3, cz + dz + az, 0.1, 0.05, 5), 'candleGlow', G(level));
+    }
+  }
+  // sideboard on the east wall
   if (doorClear(level, x1 - 0.9, cz, 3.0)) {
     ctx.add(box(ctx.scene, `sideb_${level}`, x1 - 0.9 + ax, fy + 0.6, cz + az, 0.8, 1.2, 5.5), 'woodDark', G(level));
   }
-  void z0; void z1;
+  // wall tapestries flanking the west entrance
+  for (const dz of [-4.5, 4.5]) {
+    if (!doorClear(level, x0 + 0.6, cz + dz, 1.0)) continue;
+    ctx.add(box(ctx.scene, `tapestry_${level}`, x0 + 0.35 + ax, fy + 2.8, cz + dz + az, 0.06, 3.5, 1.4), 'redFabric', G(level));
+    ctx.add(box(ctx.scene, `tapestryRod_${level}`, x0 + 0.35 + ax, fy + 4.62, cz + dz + az, 0.1, 0.08, 1.7), 'gold', G(level));
+  }
 }
 
 function fitLibrary(ctx, room, ax, az) {
@@ -472,12 +532,23 @@ function fitObservatory(ctx, room, ax, az) {
 }
 
 function fitBallroom(ctx, room, ax, az) {
-  const { x0, z1 } = room.rect;
+  const { x0, z0, x1, z1 } = room.rect;
   const level = room.level;
   const fy = LEVELS[level].y;
-  // long banquet sideboards along the north wall under the gallery
+  // grand central carpet anchoring the dance floor
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  createRug(ctx, level, cx, cz + 5, ax, az,
+    Math.min(18, x1 - x0 - 6), Math.min(14, z1 - z0 - 10));
+  // long banquet sideboards along the north wall under the gallery,
+  // dressed with goblets + candles so they read as feast boards
   for (const dx of [8, 16, 24]) {
     ctx.add(box(ctx.scene, `ballSide_${level}`, x0 + dx + ax, fy + 0.55, z1 - 1.2 + az, 3.2, 1.1, 0.9), 'woodDark', G(level));
+    for (const gx of [-1.15, -0.45, 0.45, 1.15]) {
+      ctx.add(cyl(ctx.scene, `goblet_${level}`, x0 + dx + gx + ax, fy + 1.25, z1 - 1.2 + az, 0.3, 0.18, 8), 'gold', G(level));
+    }
+    for (const gx of [-0.8, 0.8]) {
+      ctx.add(cyl(ctx.scene, `sideCandle_${level}`, x0 + dx + gx + ax, fy + 1.22, z1 - 1.35 + az, 0.24, 0.06, 5), 'candleGlow', G(level));
+    }
   }
   // hanging banners between the tall windows (west + south walls)
   for (let i = 0; i < 6; i++) {

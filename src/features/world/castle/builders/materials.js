@@ -19,9 +19,11 @@ const MAX_LIGHTS = 8;
 
 /**
  * 128px procedural diffuse texture. mode:
- *  'stone'  — block speckle + mortar-ish darker joints
- *  'wood'   — lengthwise plank streaks
- *  'marble' — soft light field with faint veins
+ *  'stone'   — block speckle + mortar-ish darker joints
+ *  'wood'    — lengthwise plank streaks
+ *  'marble'  — soft light field with faint veins
+ *  'fabric'  — fine crosshatch weave (warp/weft lines)
+ *  'plaster' — soft irregular surface noise, no pattern
  */
 function noiseTexture(scene, name, base, accent, mode, seed = 1) {
   const SIZE = 128;
@@ -40,6 +42,16 @@ function noiseTexture(scene, name, base, accent, mode, seed = 1) {
       } else if (mode === 'marble') {
         const vein = Math.abs(Math.sin(x * 0.11 + hash2(seed, Math.floor(y / 7)) * 6.28 + y * 0.03));
         t = (vein > 0.94 ? 0.85 : 0) + hash2(seed + x * 0.51, y * 0.47) * 0.16;
+      } else if (mode === 'fabric') {
+        // crosshatch weave: thin warp/weft lines at alternating density
+        const warp = (Math.sin(x * 2.5 + hash2(seed, y) * 0.8) + 1) * 0.5;
+        const weft = (Math.sin(y * 2.5 + hash2(seed * 3, x) * 0.8) + 1) * 0.5;
+        t = warp * 0.45 + weft * 0.45 + hash2(seed * 1.9 + x * 0.4, y * 0.4) * 0.14;
+      } else if (mode === 'plaster') {
+        // soft irregular trowel noise — no veins, no cells
+        t = hash2(seed + Math.floor(x / 22), Math.floor(y / 18)) * 0.18 +
+            hash2(seed * 2.1 + x * 0.7, y * 0.6) * 0.14 +
+            hash2(seed * 5.3 + x * 0.22, y * 0.18) * 0.08;
       } else {
         // stone: coarse cells + fine speckle
         const cell = hash2(seed + Math.floor(x / 16), Math.floor(y / 12)) * 0.4;
@@ -132,20 +144,36 @@ export function createCastleMaterials(scene) {
     iron: mat(scene, 'castle_iron', {
       diffuse: [0.10, 0.10, 0.115], specular: [0.30, 0.30, 0.34],
     }),
-    // ── fabric ──
+    // dull aged iron: dungeon cells/chains + kitchen pot rack — the
+    // polished specular above reads wrong on props meant to look rusted
+    ironRust: mat(scene, 'castle_ironRust', {
+      diffuse: [0.14, 0.10, 0.08], specular: [0.10, 0.09, 0.08],
+    }),
+    // ── fabric (all woven — flat diffuse read as plastic) ──
     redFabric: mat(scene, 'castle_redFabric', {
-      diffuse: [0.44, 0.05, 0.07], specular: [0.02, 0.01, 0.01],
+      diffuse: [1.0, 0.94, 0.92],
+      texture: T('castle_tex_redFabric', [0.38, 0.04, 0.06], [0.30, 0.03, 0.05], 'fabric', 67),
+      specular: [0.02, 0.01, 0.01], uv: 0.45,
     }),
     blueFabric: mat(scene, 'castle_blueFabric', {
-      diffuse: [0.10, 0.16, 0.38], specular: [0.02, 0.02, 0.03],
+      diffuse: [0.94, 0.96, 1.0],
+      texture: T('castle_tex_blueFabric', [0.09, 0.14, 0.34], [0.07, 0.10, 0.28], 'fabric', 73),
+      specular: [0.02, 0.02, 0.03], uv: 0.45,
     }),
     linen: mat(scene, 'castle_linen', {
-      diffuse: [0.82, 0.78, 0.68], specular: [0.02, 0.02, 0.02],
+      diffuse: [1.0, 0.98, 0.94],
+      texture: T('castle_tex_linen', [0.76, 0.72, 0.62], [0.68, 0.64, 0.54], 'fabric', 79),
+      specular: [0.02, 0.02, 0.02], uv: 0.55,
     }),
     carpet: mat(scene, 'castle_carpet', {
-      diffuse: [0.38, 0.07, 0.09],
-      texture: T('castle_tex_carpet', [0.40, 0.08, 0.10], [0.28, 0.05, 0.07], 'stone', 61),
-      specular: [0, 0, 0], uv: 0.6,
+      diffuse: [0.98, 0.92, 0.92],
+      texture: T('castle_tex_carpet', [0.40, 0.08, 0.10], [0.28, 0.05, 0.07], 'fabric', 61),
+      specular: [0, 0, 0], uv: 0.45,
+    }),
+    carpetBlue: mat(scene, 'castle_carpetBlue', {
+      diffuse: [0.92, 0.94, 1.0],
+      texture: T('castle_tex_carpetBlue', [0.09, 0.14, 0.34], [0.07, 0.10, 0.28], 'fabric', 89),
+      specular: [0, 0, 0], uv: 0.45,
     }),
     // ── glow (unlit — pure emissive, cheap) ──
     windowGlow: mat(scene, 'castle_windowGlow', {
@@ -174,7 +202,7 @@ export function createCastleMaterials(scene) {
     }),
     plaster: mat(scene, 'castle_plaster', {
       diffuse: [1.0, 0.97, 0.9],
-      texture: T('castle_tex_plaster', [0.62, 0.58, 0.50], [0.54, 0.50, 0.44], 'marble', 83),
+      texture: T('castle_tex_plaster', [0.62, 0.58, 0.50], [0.54, 0.50, 0.44], 'plaster', 83),
       uv: 0.25,
     }),
   };
