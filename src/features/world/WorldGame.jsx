@@ -448,24 +448,47 @@ export default function WorldGame({ playerInfo, onExit }) {
       sceneRef.current?.setJoystick(nx * (capped / JOY_MAX_PX), ny * (capped / JOY_MAX_PX));
     };
 
-    const onUp = (e) => {
-      if (!joyTouchRef.current || e.pointerId !== joyTouchRef.current.id) return;
-      e.preventDefault();
+    const clearJoy = () => {
       joyTouchRef.current = null;
       setJoyVis(null);
       sceneRef.current?.setJoystick(0, 0);
     };
 
-    zone.addEventListener('pointerdown',   onDown, { passive: false });
-    zone.addEventListener('pointermove',   onMove, { passive: false });
-    zone.addEventListener('pointerup',     onUp,   { passive: false });
-    zone.addEventListener('pointercancel', onUp,   { passive: false });
+    const onUp = (e) => {
+      if (!joyTouchRef.current || e.pointerId !== joyTouchRef.current.id) return;
+      e.preventDefault();
+      clearJoy();
+    };
+
+    // Pointer loss that never delivers a zone pointerup (iOS gestures,
+    // overlays stealing capture, app switches) would leave the stick
+    // "held": the avatar keeps walking and no new joystick touch is
+    // accepted. Catch pointer loss globally.
+    const onWinUp = (e) => {
+      if (joyTouchRef.current && e.pointerId === joyTouchRef.current.id) clearJoy();
+    };
+    const onVis = () => { if (document.hidden) clearJoy(); };
+
+    zone.addEventListener('pointerdown',        onDown, { passive: false });
+    zone.addEventListener('pointermove',        onMove, { passive: false });
+    zone.addEventListener('pointerup',          onUp,   { passive: false });
+    zone.addEventListener('pointercancel',      onUp,   { passive: false });
+    zone.addEventListener('lostpointercapture', onUp,   { passive: false });
+    window.addEventListener('pointerup',     onWinUp);
+    window.addEventListener('pointercancel', onWinUp);
+    window.addEventListener('blur', clearJoy);
+    document.addEventListener('visibilitychange', onVis);
 
     return () => {
-      zone.removeEventListener('pointerdown',   onDown, { passive: false });
-      zone.removeEventListener('pointermove',   onMove, { passive: false });
-      zone.removeEventListener('pointerup',     onUp,   { passive: false });
-      zone.removeEventListener('pointercancel', onUp,   { passive: false });
+      zone.removeEventListener('pointerdown',        onDown, { passive: false });
+      zone.removeEventListener('pointermove',        onMove, { passive: false });
+      zone.removeEventListener('pointerup',          onUp,   { passive: false });
+      zone.removeEventListener('pointercancel',      onUp,   { passive: false });
+      zone.removeEventListener('lostpointercapture', onUp,   { passive: false });
+      window.removeEventListener('pointerup',     onWinUp);
+      window.removeEventListener('pointercancel', onWinUp);
+      window.removeEventListener('blur', clearJoy);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
 

@@ -1102,10 +1102,12 @@ export class BabylonWorldScene {
     cam.lowerRadiusLimit     = 2.5;
     cam.upperRadiusLimit     = 34;
     cam.lowerBetaLimit       = 0.25;
-    // Initial cap only — _trackCamera raises it dynamically (terrain-aware)
-    // every frame so the player can tilt up past the horizon to see the sky
-    // without the camera dipping under the ground.
-    cam.upperBetaLimit       = Math.PI / 2.1;
+    // STATIC tilt range. Beta limits are never rewritten per frame: a
+    // moving limit can clamp mid-drag (feels like the camera dies) and a
+    // terrain-tightened cap once locked rotation outright. Keeping the
+    // camera above the ground is _camLosClamp's job (radius obstruction),
+    // not a rotation limit's.
+    cam.upperBetaLimit       = 2.0;
     cam.wheelPrecision       = 60;
     // 0.01 (1%/notch) needed ~120 wheel notches for a full zoom-out — read
     // as "zoom doesn't work". 5%/notch covers the range in ~2 flicks.
@@ -1182,19 +1184,43 @@ export class BabylonWorldScene {
     };
 
     const onUp = (e) => {
-      if (touches.delete(e.pointerId)) e.preventDefault();
+      if (touches.delete(e.pointerId)) {
+        if (touches.size < 2) pinchDist = 0;
+        e.preventDefault();
+      }
     };
 
-    canvas.addEventListener('pointerdown',   onDown, { passive: false });
-    canvas.addEventListener('pointermove',   onMove, { passive: false });
-    canvas.addEventListener('pointerup',     onUp,   { passive: false });
-    canvas.addEventListener('pointercancel', onUp,   { passive: false });
+    // Pointer loss that never delivers a canvas pointerup (iOS gestures,
+    // overlays stealing capture, app switches) leaves a PHANTOM entry in
+    // the touch map: every later one-finger drag is then misread as a
+    // pinch ("the camera zooms instead of rotating") or ignored as a 3rd
+    // finger ("the camera is stuck"). Catch pointer loss globally.
+    const onWinUp = (e) => {
+      if (touches.delete(e.pointerId) && touches.size < 2) pinchDist = 0;
+    };
+    const clearTouches = () => { touches.clear(); pinchDist = 0; };
+    const onVis = () => { if (document.hidden) clearTouches(); };
+
+    canvas.addEventListener('pointerdown',       onDown, { passive: false });
+    canvas.addEventListener('pointermove',       onMove, { passive: false });
+    canvas.addEventListener('pointerup',         onUp,   { passive: false });
+    canvas.addEventListener('pointercancel',     onUp,   { passive: false });
+    canvas.addEventListener('lostpointercapture', onUp,  { passive: false });
+    window.addEventListener('pointerup',     onWinUp);
+    window.addEventListener('pointercancel', onWinUp);
+    window.addEventListener('blur', clearTouches);
+    document.addEventListener('visibilitychange', onVis);
 
     this._touchCleanup = () => {
-      canvas.removeEventListener('pointerdown',   onDown, { passive: false });
-      canvas.removeEventListener('pointermove',   onMove, { passive: false });
-      canvas.removeEventListener('pointerup',     onUp,   { passive: false });
-      canvas.removeEventListener('pointercancel', onUp,   { passive: false });
+      canvas.removeEventListener('pointerdown',       onDown, { passive: false });
+      canvas.removeEventListener('pointermove',       onMove, { passive: false });
+      canvas.removeEventListener('pointerup',         onUp,   { passive: false });
+      canvas.removeEventListener('pointercancel',     onUp,   { passive: false });
+      canvas.removeEventListener('lostpointercapture', onUp,  { passive: false });
+      window.removeEventListener('pointerup',     onWinUp);
+      window.removeEventListener('pointercancel', onWinUp);
+      window.removeEventListener('blur', clearTouches);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }
 
@@ -1909,6 +1935,7 @@ export class BabylonWorldScene {
       cam.upperRadiusLimit = this._savedUpperRadius;
       cam.lowerRadiusLimit = this._savedLowerRadius ?? 2.5;
       cam.lowerBetaLimit = 0.25;
+      cam.upperBetaLimit = 2.0;
       this._savedUpperRadius = null;
       this._savedLowerRadius = null;
       this._camUserRadius = null;
@@ -1944,16 +1971,10 @@ export class BabylonWorldScene {
     this._camTarget.set(p.x, p.y + 1.2, p.z);
     BABYLON.Vector3.LerpToRef(this._camera.target, this._camTarget, 0.12, this._camera.target);
 
-    // Terrain-aware look-up limit. beta = PI/2 is horizontal; the old fixed
-    // cap of PI/2.1 meant the camera could never tilt above the horizon, so
-    // the upper sky was unviewable and an upward drag hit a dead stop. The
-    // cap is now the beta at which the camera would sink to ~0.4 m above the
-    // terrain under it (cos(beta) = camY-targetY over radius, solved for the
-    // ground height) — zoomed in this allows ~110 deg+ of upward tilt for sky
-    // gazing, and it tightens automatically as the radius grows so the camera
-    // never clips under the ground. One surfaceY sample + acos per frame.
-    const cam = this._camera;
-    const camPos = cam.globalPosition;
+    // Camera-vs-world is handled ONLY by the radius clamp below. Beta limits
+    // are static (see _setupCamera): the per-frame terrain-aware
+    // upperBetaLimit rewrite this replaces could clamp mid-drag on rising
+    // ground — the drag dead-stopped, which read as "the camera is stuck".
     if (this._castle?.isInside()) {
       // interior: LOS against the nav grids (walls, floors, ceilings)
       const nav = this._castle.nav;
@@ -1971,18 +1992,25 @@ export class BabylonWorldScene {
         return maxD;
       });
     } else {
-      // outdoors: terrain-aware upward tilt cap (pre-castle behavior)
-      const groundY = this._worldgen.surfaceY(camPos.x, camPos.z) + 0.4;
-      const cosCap = Math.max(-1, Math.min(1, (groundY - cam.target.y) / cam.radius));
-      cam.upperBetaLimit = Math.max(Math.PI / 2.1, Math.min(2.0, Math.acos(cosCap)));
-      // castle shell LOS — near the walls (the fast-travel gate spot is
-      // metres from the gatehouse) half the orbit sphere sits inside the
-      // masonry; without this the view fills with wall and dragging
-      // appears dead while only zoom visibly changes anything
-      if (this._castle) {
-        this._camLosClamp((tx, ty, tz, dirX, dirY, dirZ, maxD) =>
-          this._castle.shellCameraOpenDist(tx, ty, tz, dirX, dirY, dirZ, maxD));
-      }
+      // Outdoors: castle exterior shell (orbiting at the gate otherwise
+      // buries the camera inside the gatehouse) + the terrain heightfield
+      // (keeps the camera above the ground now that the tilt range is
+      // static — a low drag eases the view in toward the avatar instead
+      // of hitting a rotation wall).
+      this._camLosClamp((tx, ty, tz, dirX, dirY, dirZ, maxD) => {
+        let open = this._castle
+          ? this._castle.shellCameraOpenDist(tx, ty, tz, dirX, dirY, dirZ, maxD)
+          : maxD;
+        for (let d = 1.2; d < open; d += 1.2) {
+          const sy = ty + dirY * d;
+          if (sy - ty > 22) break; // climbing well above any nearby hill
+          if (sy < this._worldgen.surfaceY(tx + dirX * d, tz + dirZ * d) + 0.35) {
+            open = Math.max(0, d - 1.2);
+            break;
+          }
+        }
+        return open;
+      });
     }
   }
 
