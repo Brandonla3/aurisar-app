@@ -2122,6 +2122,13 @@ export class BabylonWorldScene {
       return;
     }
     if (!row.online) { this._removeRemote(row.identity); return; }
+
+    const remoteInst = typeof row.dungeonInstanceId === 'bigint' ? row.dungeonInstanceId : 0n;
+    if (remoteInst !== this._localDungeonInstanceId) {
+      this._removeRemote(row.identity);
+      return;
+    }
+
     if (!this._local) { this._pendingUpdates.push(row); return; }
 
     if (this._remotePlayers.has(key)) {
@@ -2226,8 +2233,9 @@ export class BabylonWorldScene {
       this._castle.applyServerExteriorState(wx, gy, wz, -Math.PI / 2);
       this._lastPos = { x: wx, z: wz };
     } else if (instChanged) {
-      // Instance scope changed — drop mobs from the previous instance filter.
+      // Instance scope changed — drop mobs and remotes from other instances.
       for (const [mobId] of this._mobs) this._removeMob(mobId);
+      for (const [remoteKey] of this._remotePlayers) this._removeRemote(remoteKey);
     }
   }
 

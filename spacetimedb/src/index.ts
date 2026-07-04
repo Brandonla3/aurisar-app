@@ -62,7 +62,7 @@ import {
   sameInteriorFloor,
   worldMToPx,
 } from './castle/validate.js';
-import { CASTLE_LEVELS } from './castle/navGrids.js';
+import { CASTLE_LEVELS, CASTLE_STEP_UP } from './castle/navGrids.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -382,11 +382,11 @@ const spacetimedb = schema({
   ),
 
   /**
-   * P2 — fitness XP mirror for world level gating. The client calls
-   * syncProgress on connect; levels derive from the shared xp curve.
+   * P2 — fitness XP mirror for world level gating. Private: raw XP stays
+   * server-side; clients derive level locally from profile XP on connect.
    */
   playerProgress: table(
-    { public: true },
+    {},
     {
       identity:            t.identity().primaryKey(),
       fitnessXp:           t.u64().default(0n),
@@ -552,9 +552,13 @@ export const movePlayer = spacetimedb.reducer(
     let nextFloorYM = existing.floorYM;
 
     if (isInCastleInterior(worldXM, worldZM) || existing.dungeonInstanceId > 0n) {
-      const refY = floorYM > 0 ? floorYM : (existing.floorYM > 0 ? existing.floorYM : CASTLE_LEVELS[1].y);
+      // Server-stored floor is authoritative — never use client floorYM as
+      // surfaceAt refY (prevents spoofed jumps to upper floors / boss rooms).
+      const refY = existing.floorYM > 0 ? existing.floorYM : CASTLE_LEVELS[1].y;
       const surface = castleInteriorSurfaceAt(worldXM, worldZM, refY);
       if (!surface) return;
+      // Reject moves whose client-claimed floor is far from the resolved surface.
+      if (floorYM > 0 && Math.abs(floorYM - surface.y) > CASTLE_STEP_UP) return;
       nextFloorYM = surface.y;
     } else if (existing.floorYM !== 0) {
       nextFloorYM = 0;
@@ -1184,6 +1188,8 @@ export const respawnPlayer = spacetimedb.reducer(
     const p = ctx.db.player.identity.find(schedule.identity);
     if (!p) return;
 
+    const prevInstanceId = p.dungeonInstanceId;
+
     ctx.db.player.identity.update({
       ...p,
       x: WORLD_CENTER_PX,
@@ -1196,6 +1202,10 @@ export const respawnPlayer = spacetimedb.reducer(
       dungeonInstanceId: 0n,
       floorYM: 0,
     });
+
+    if (prevInstanceId > 0n) {
+      cleanupDungeonInstanceIfEmpty(ctx, prevInstanceId);
+    }
   }
 );
 

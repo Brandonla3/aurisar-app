@@ -194,13 +194,6 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             })
             .subscribe(['SELECT * FROM player_quest']);
 
-          connection
-            .subscriptionBuilder()
-            .onError((ctx) => {
-              console.warn('[useSpacetimeWorld] player_progress subscription failed (module not republished yet?):', ctx?.event);
-            })
-            .subscribe(['SELECT * FROM player_progress']);
-
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {
             callbacksRef.current?.onPlayerUpdate?.(row);
@@ -250,14 +243,6 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           connection.db.playerQuest?.onDelete((_ctx, row) => {
             callbacksRef.current?.onQuestDelete?.(row);
           });
-
-          const applyProgressLevel = (row) => {
-            if (connection.identity?.isEqual?.(row.identity)) {
-              setWorldLevel(row.worldLevel ?? 1);
-            }
-          };
-          connection.db.playerProgress?.onInsert((_ctx, row) => applyProgressLevel(row));
-          connection.db.playerProgress?.onUpdate((_ctx, _old, row) => applyProgressLevel(row));
         })
         .onDisconnect((_ctx, err) => {
           setConnected(false);

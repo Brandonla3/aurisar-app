@@ -58,7 +58,6 @@ import DungeonInstanceRow from "./dungeon_instance_table";
 import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
 import PlayerQuestRow from "./player_quest_table";
-import PlayerProgressRow from "./player_progress_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -115,17 +114,6 @@ const tablesSchema = __schema({
       { name: 'player_quest_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerQuestRow),
-  playerProgress: __table({
-    name: 'player_progress',
-    indexes: [
-      { accessor: 'identity', name: 'player_progress_identity_idx_btree', algorithm: 'btree', columns: [
-        'identity',
-      ] },
-    ],
-    constraints: [
-      { name: 'player_progress_identity_key', constraint: 'unique', columns: ['identity'] },
-    ],
-  }, PlayerProgressRow),
   dungeonInstance: __table({
     name: 'dungeon_instance',
     indexes: [

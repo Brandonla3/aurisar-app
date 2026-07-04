@@ -61,4 +61,16 @@ describe('castleNavSurface parity', () => {
     expect(sameInteriorFloor(LEVELS[1].y, LEVELS[1].y + 0.4)).toBe(true);
     expect(sameInteriorFloor(LEVELS[1].y, LEVELS[2].y)).toBe(false);
   });
+
+  it('ground refY resolves ground floor at stacked columns, not treasury height', () => {
+    const treasury = ROOMS.find((r) => r.id === 'treasury').rect;
+    const cx = (treasury.x0 + treasury.x1) / 2 + AX;
+    const cz = (treasury.z0 + treasury.z1) / 2 + AZ;
+    const groundRefY = LEVELS[1].y;
+    const atGround = surface.surfaceAt(cx, cz, groundRefY);
+    const atTreasury = surface.surfaceAt(cx, cz, LEVELS[4].y);
+    expect(atGround?.level).toBeLessThan(4);
+    expect(atTreasury?.level).toBe(4);
+    expect(atGround?.y).not.toBeCloseTo(LEVELS[4].y, 0);
+  });
 });
