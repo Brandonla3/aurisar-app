@@ -1,6 +1,6 @@
 import React from 'react';
-export { getExIconName, getExIconColor } from './ExIconUtils';
 import { getExIconName, getExIconColor } from './ExIconUtils';
+export { getExIconName, getExIconColor } from './ExIconUtils';
 
 export function ExIcon({ ex, size = "1.15rem", color, style = {} }) {
   if (ex && ex.custom) {

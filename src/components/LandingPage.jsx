@@ -32,6 +32,16 @@ const FEATURES = [
   },
 ];
 
+// Generated once at module load — stable across re-renders (satisfies react-hooks/purity).
+const GLOBAL_DUST = Array.from({ length: 18 }, () => ({
+  left: Math.random() * 100 + '%',
+  size: 1 + Math.random() * 2 + 'px',
+  dur: 10 + Math.random() * 14 + 's',
+  delay: Math.random() * 18 + 's',
+  drift: (Math.random() - 0.5) * 60 + 'px',
+  o: 0.25 + Math.random() * 0.5,
+}));
+
 function HeroMonolith({ onLogin, onSignUp }) {
   const [now, setNow] = useState(() => new Date());
 
@@ -117,18 +127,8 @@ export function LandingPage({ onLogin, onSignUp }) {
   const lbRef = useRef(null);
   const revealRefs = useRef([]);
 
-  const globalDust = useMemo(
-    () =>
-      Array.from({ length: 18 }, () => ({
-        left: Math.random() * 100 + '%',
-        size: 1 + Math.random() * 2 + 'px',
-        dur: 10 + Math.random() * 14 + 's',
-        delay: Math.random() * 18 + 's',
-        drift: (Math.random() - 0.5) * 60 + 'px',
-        o: 0.25 + Math.random() * 0.5,
-      })),
-    [],
-  );
+  // Use stable module-level constant — no useMemo needed.
+  const globalDust = GLOBAL_DUST;
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -189,11 +189,11 @@ export function LandingPage({ onLogin, onSignUp }) {
           </h2>
           <p className="landing-primer-body">
             Aurisar is a workout logger — reps, sets, weight, cardio, rest. What makes it different is how it gives that
-            data back to you: as a character you level up, a class you evolve into, and a log of chapters you’ll
+            data back to you: as a character you level up, a class you evolve into, and a log of chapters you'll
             actually remember finishing.
           </p>
           <p className="landing-primer-body">
-            Every rep is XP. Every session is a quest. Every week is a chapter. You don’t lose the numbers — you just
+            Every rep is XP. Every session is a quest. Every week is a chapter. You don't lose the numbers — you just
             stop needing to white-knuckle them.
           </p>
           <div className="landing-primer-stats">
