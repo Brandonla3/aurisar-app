@@ -10,15 +10,24 @@
  * instance color's alpha channel selects the variant, its rgb carries the
  * biome tint that hue-shifts the texture per biome.
  *
+ * A second, sparser layer of "hero" clumps (real 3D blade geometry lifted
+ * from the Meshy GLB, grassClump.json, ~1.3k tris) surrounds the player on
+ * the high quality tier — same shader with uTextured=0, so the blades take
+ * the biome tint + AO gradient instead of the card texture. Two draw calls
+ * total, second one gated to tier 'high'.
+ *
  * Placement is pure hash2 math — identical on every client, no manifest.
  */
 
 /* global BABYLON */
 
 import { hash2 } from '../worldgen/index.js';
+import clumpData from './grassClump.json' with { type: 'json' };
 
 const CELL = 0.6;
 const RADIUS = 30;
+const HERO_CELL = 2.2;
+const HERO_RADIUS = 12;
 
 const VERT = `
 precision highp float;
@@ -77,6 +86,7 @@ varying vec2 vUV;
 varying vec3 vWp;
 varying vec3 vN;
 uniform sampler2D uCardTex;
+uniform float uTextured;     // 1 = card atlas cutout, 0 = untextured geometry
 uniform float uLight;
 uniform vec3 cameraPosition;
 uniform vec3 vFogColor;
@@ -84,9 +94,14 @@ uniform float fogDensity;
 uniform vec3 uSunDir;        // world-space direction toward the sun
 uniform float uBackStrength; // 0 on low/mobile tier, >0 on high tier
 void main() {
-  vec4 tex = texture2D(uCardTex, vUV);
-  // Alpha cutout — no sorting/blending needed, cards stay one draw call.
-  if (tex.a < 0.35) discard;
+  // Untextured (hero clump) fragments use a flat 0.55 in place of the card
+  // texture so both layers land at the same average brightness.
+  vec4 tex = vec4(0.55);
+  if (uTextured > 0.5) {
+    tex = texture2D(uCardTex, vUV);
+    // Alpha cutout — no sorting/blending needed, cards stay one draw call.
+    if (tex.a < 0.35) discard;
+  }
 
   vec3 N = normalize(vN);
   vec3 L = normalize(uSunDir);
@@ -140,6 +155,18 @@ function cardGeometry() {
   return { positions, indices, normals, uvs };
 }
 
+// Real blade geometry extracted from the Meshy AI grass GLB (13 blades,
+// ~1.3k tris), normalized to a 0.75 m clump rooted at the origin. Smooth
+// normals are computed here; UVs are dummy zeros (uTextured=0 path).
+function clumpGeometry() {
+  const positions = clumpData.positions;
+  const indices = clumpData.indices;
+  const normals = new Array(positions.length).fill(0);
+  BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+  const uvs = new Array((positions.length / 3) * 2).fill(0);
+  return { positions, indices, normals, uvs };
+}
+
 export class AshwoodGrass {
   constructor(scene, worldgen, getPlayerPos) {
     this.scene = scene;
@@ -153,37 +180,52 @@ export class AshwoodGrass {
     BABYLON.Effect.ShadersStore['ashwoodGrassVertexShader'] = VERT;
     BABYLON.Effect.ShadersStore['ashwoodGrassFragmentShader'] = FRAG;
 
-    this.material = new BABYLON.ShaderMaterial('ashwoodGrassMat', scene, 'ashwoodGrass', {
-      // world0-3 MUST be declared for (thin) instancing — without them the
-      // instancesVertex include reads unbound attributes and instance
-      // matrices come out as garbage (blades stretched across the sky).
-      attributes: ['position', 'normal', 'uv', 'instanceColor', 'world0', 'world1', 'world2', 'world3'],
-      uniforms: ['viewProjection', 'world', 'cameraPosition',
-                 'uTime', 'uWind', 'uLight', 'vFogColor', 'fogDensity',
-                 'uSunDir', 'uBackStrength'],
-      samplers: ['uCardTex'],
-    });
-    this.material.backFaceCulling = false;
     this._cardTex = new BABYLON.Texture('/assets/textures/grass-cards.png', scene);
     this._cardTex.anisotropicFilteringLevel = 4;
-    this.material.setTexture('uCardTex', this._cardTex);
 
-    const { positions, indices, normals, uvs } = cardGeometry();
-    this.mesh = new BABYLON.Mesh('ashwoodGrass', scene);
-    const vd = new BABYLON.VertexData();
-    vd.positions = positions;
-    vd.indices = indices;
-    vd.normals = normals;
-    vd.uvs = uvs;
-    vd.applyToMesh(this.mesh);
-    this.mesh.material = this.material;
-    this.mesh.isPickable = false;
-    this.mesh.alwaysSelectAsActiveMesh = true; // skip culling: it surrounds the camera
+    const makeMaterial = (name, textured) => {
+      const mat = new BABYLON.ShaderMaterial(name, scene, 'ashwoodGrass', {
+        // world0-3 MUST be declared for (thin) instancing — without them the
+        // instancesVertex include reads unbound attributes and instance
+        // matrices come out as garbage (blades stretched across the sky).
+        attributes: ['position', 'normal', 'uv', 'instanceColor', 'world0', 'world1', 'world2', 'world3'],
+        uniforms: ['viewProjection', 'world', 'cameraPosition',
+                   'uTime', 'uWind', 'uTextured', 'uLight', 'vFogColor', 'fogDensity',
+                   'uSunDir', 'uBackStrength'],
+        samplers: ['uCardTex'],
+      });
+      mat.backFaceCulling = false;
+      mat.setTexture('uCardTex', this._cardTex);
+      mat.setFloat('uTextured', textured ? 1 : 0);
+      return mat;
+    };
+    this.material = makeMaterial('ashwoodGrassMat', true);
+    this.heroMaterial = makeMaterial('ashwoodGrassHeroMat', false);
+
+    const makeMesh = (name, geo, mat) => {
+      const mesh = new BABYLON.Mesh(name, scene);
+      const vd = new BABYLON.VertexData();
+      vd.positions = geo.positions;
+      vd.indices = geo.indices;
+      vd.normals = geo.normals;
+      vd.uvs = geo.uvs;
+      vd.applyToMesh(mesh);
+      mesh.material = mat;
+      mesh.isPickable = false;
+      mesh.alwaysSelectAsActiveMesh = true; // skip culling: it surrounds the camera
+      return mesh;
+    };
+    this.mesh = makeMesh('ashwoodGrass', cardGeometry(), this.material);
+    this.heroMesh = makeMesh('ashwoodGrassHero', clumpGeometry(), this.heroMaterial);
 
     const n = Math.ceil(RADIUS / CELL);
     this.cap = (2 * n + 1) * (2 * n + 1);
     this._mats = new Float32Array(this.cap * 16);
     this._cols = new Float32Array(this.cap * 4);
+    const hn = Math.ceil(HERO_RADIUS / HERO_CELL);
+    this.heroCap = (2 * hn + 1) * (2 * hn + 1);
+    this._heroMats = new Float32Array(this.heroCap * 16);
+    this._heroCols = new Float32Array(this.heroCap * 4);
 
     this._observer = scene.onBeforeRenderObservable.add(() => this._update());
   }
@@ -192,45 +234,49 @@ export class AshwoodGrass {
     const p = this.getPlayerPos?.();
     if (!p) return;
     this.time += this.scene.getEngine().getDeltaTime() / 1000;
-    const m = this.material;
-    m.setFloat('uTime', this.time);
     // storm-swept blades: the weather system publishes wind strength
     const wind = this.scene.metadata?.ashwood?.weather?.windStrength ?? 1;
-    m.setFloat('uWind', Math.max(0.2, Math.min(3, wind)));
     const lm = this.scene.metadata?.ashwood?.lm;
-    m.setFloat('uLight', 0.35 + 0.65 * (lm?.dayFactor ?? 1));
-    m.setColor3('vFogColor', this.scene.fogColor);
-    m.setFloat('fogDensity', this.scene.fogDensity);
-
+    const tier = this.scene.metadata?.ashwood?.qualityTier;
     if (lm?.key) {
       this._sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
       this._sunDir.normalize();
     }
-    m.setVector3('uSunDir', this._sunDir);
-    // High tier only — cheap to always set, the shader multiplies by 0 on
-    // low/mobile so the term is a free no-op there.
-    const tier = this.scene.metadata?.ashwood?.qualityTier;
-    m.setFloat('uBackStrength', tier === 'high' ? 0.5 : 0.0);
+    for (const m of [this.material, this.heroMaterial]) {
+      m.setFloat('uTime', this.time);
+      m.setFloat('uWind', Math.max(0.2, Math.min(3, wind)));
+      m.setFloat('uLight', 0.35 + 0.65 * (lm?.dayFactor ?? 1));
+      m.setColor3('vFogColor', this.scene.fogColor);
+      m.setFloat('fogDensity', this.scene.fogDensity);
+      m.setVector3('uSunDir', this._sunDir);
+      // High tier only — cheap to always set, the shader multiplies by 0 on
+      // low/mobile so the term is a free no-op there.
+      m.setFloat('uBackStrength', tier === 'high' ? 0.5 : 0.0);
+    }
+    // The 3D hero clumps are ~1.3k tris each — high tier only.
+    this.heroMesh.setEnabled(tier !== 'low' && tier !== 'mobile');
     if (Math.abs(p.x - this.lastX) + Math.abs(p.z - this.lastZ) > CELL) this._rebuild(p.x, p.z);
   }
 
-  _rebuild(px, pz) {
+  // Scatter one layer onto the hash grid. Both layers share the same biome /
+  // trail / lake / forest filters so hero clumps only appear where cards do.
+  _scatter(px, pz, cell, radius, keep, mats, cols, cap) {
     const wg = this.wg;
-    const n = Math.ceil(RADIUS / CELL);
-    const R2 = RADIUS * RADIUS;
+    const n = Math.ceil(radius / cell);
+    const R2 = radius * radius;
     const worldR2 = wg.config.radius * wg.config.radius;
-    const cx = Math.round(px / CELL), cz = Math.round(pz / CELL);
+    const cx = Math.round(px / cell), cz = Math.round(pz / cell);
     const mat = BABYLON.Matrix.Identity();
     const q = new BABYLON.Quaternion();
     const sVec = new BABYLON.Vector3();
     const pVec = new BABYLON.Vector3();
     let i = 0;
-    for (let gz = cz - n; gz <= cz + n && i < this.cap; gz++) {
-      for (let gx = cx - n; gx <= cx + n && i < this.cap; gx++) {
+    for (let gz = cz - n; gz <= cz + n && i < cap; gz++) {
+      for (let gx = cx - n; gx <= cx + n && i < cap; gx++) {
         const h1 = hash2(gx, gz);
-        if (h1 < 0.16) continue;
-        const wx = gx * CELL + (hash2(gx * 1.3, gz * 0.7) - 0.5) * CELL * 0.95;
-        const wz = gz * CELL + (hash2(gx * 0.7, gz * 1.3) - 0.5) * CELL * 0.95;
+        if (h1 < keep) continue;
+        const wx = gx * cell + (hash2(gx * 1.3, gz * 0.7) - 0.5) * cell * 0.95;
+        const wz = gz * cell + (hash2(gx * 0.7, gz * 1.3) - 0.5) * cell * 0.95;
         const dx = wx - px, dz = wz - pz;
         if (dx * dx + dz * dz > R2) continue;
         if (wx * wx + wz * wz > worldR2) continue;
@@ -245,20 +291,33 @@ export class AshwoodGrass {
         sVec.set(sc, sc * (0.8 + hash2(gx, gz + 2) * 0.7), sc);
         pVec.set(wx, wg.surfaceY(wx, wz), wz);
         BABYLON.Matrix.ComposeToRef(sVec, q, pVec, mat);
-        this._mats.set(mat.m, i * 16);
+        mats.set(mat.m, i * 16);
         const tnt = hash2(gx + 7, gz + 11);
         const gc = bi.grassCol;
-        this._cols[i * 4]     = gc[0] + 0.10 * tnt;
-        this._cols[i * 4 + 1] = gc[1] + 0.14 * tnt;
-        this._cols[i * 4 + 2] = gc[2] + 0.05 * tnt;
+        cols[i * 4]     = gc[0] + 0.10 * tnt;
+        cols[i * 4 + 1] = gc[1] + 0.14 * tnt;
+        cols[i * 4 + 2] = gc[2] + 0.05 * tnt;
         // alpha = clump-texture variant (left/right atlas half), not opacity
-        this._cols[i * 4 + 3] = hash2(gx + 13, gz + 17) > 0.5 ? 1 : 0;
+        cols[i * 4 + 3] = hash2(gx + 13, gz + 17) > 0.5 ? 1 : 0;
         i++;
       }
     }
+    return i;
+  }
+
+  _rebuild(px, pz) {
+    const i = this._scatter(px, pz, CELL, RADIUS, 0.16, this._mats, this._cols, this.cap);
     this.mesh.thinInstanceSetBuffer('matrix', this._mats.subarray(0, Math.max(1, i) * 16), 16, false);
     this.mesh.thinInstanceSetBuffer('color', this._cols.subarray(0, Math.max(1, i) * 4), 4, false);
     this.mesh.thinInstanceCount = i;
+
+    // Hero clumps: sparser grid, tighter ring, higher keep threshold.
+    const h = this._scatter(px, pz, HERO_CELL, HERO_RADIUS, 0.35,
+                            this._heroMats, this._heroCols, this.heroCap);
+    this.heroMesh.thinInstanceSetBuffer('matrix', this._heroMats.subarray(0, Math.max(1, h) * 16), 16, false);
+    this.heroMesh.thinInstanceSetBuffer('color', this._heroCols.subarray(0, Math.max(1, h) * 4), 4, false);
+    this.heroMesh.thinInstanceCount = h;
+
     this.lastX = px;
     this.lastZ = pz;
   }
@@ -266,7 +325,9 @@ export class AshwoodGrass {
   dispose() {
     if (this._observer) this.scene.onBeforeRenderObservable.remove(this._observer);
     this.mesh?.dispose();
+    this.heroMesh?.dispose();
     this.material?.dispose();
+    this.heroMaterial?.dispose();
     this._cardTex?.dispose();
   }
 }
