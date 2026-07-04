@@ -7,6 +7,9 @@ This PR starts the Castle Ashwood polish pass as an isolated branch off `main`.
 - `src/features/world/castle/builders/aestheticPolish.js`
   - Exterior polish helpers for buttresses, corbel/machicolation rhythm, heavier base courses, chimneys, gate braziers, courtyard crates, and training dummies.
   - Interior hero-prop helpers for the entrance crest medallion, ballroom throne, library globe, treasury vault door, dungeon drain grates, and observatory star chart.
+- `src/features/world/castle/CastleSystem.js`
+  - Wires the exterior polish pass into the existing exterior build before merge.
+  - Wires the interior hero-prop pass after the furniture pass and before nav blockers are committed.
 
 The helper file follows the existing castle style:
 
@@ -16,9 +19,9 @@ The helper file follows the existing castle style:
 - Collector-based static geometry for merge-friendly rendering.
 - No extra real point lights.
 
-## Intended wiring
+## Implementation wiring
 
-The intended follow-up wiring is deliberately small and localized to `CastleSystem.js`:
+`CastleSystem.js` now imports:
 
 ```js
 import {
@@ -27,24 +30,23 @@ import {
 } from './builders/aestheticPolish.js';
 ```
 
-Then inside the exterior build block:
+The exterior build now captures `baseY` from `createCastleExterior(...)` and applies the polish before the exterior merge:
 
 ```js
 const { gateTorchPositions, baseY } = createCastleExterior(ctx, this._worldgen);
 createCastleExteriorPolish(ctx, this._worldgen, baseY);
 ```
 
-And inside the interior build block after `createAllFurniture(ctx, ax, az);`:
+The interior build now applies hero props after furniture is placed:
 
 ```js
+createAllFurniture(ctx, ax, az);
 createCastleInteriorHeroProps(ctx, ax, az);
 ```
 
 ## Suggested review path
 
-1. Review the new builder module as a safe, isolated first commit.
-2. Wire it into `CastleSystem.js` in a second commit.
-3. Run:
+Run:
 
 ```bash
 npm run lint
@@ -52,7 +54,7 @@ npm run build
 npm run test
 ```
 
-4. Visually inspect:
+Then visually inspect:
 
 - overworld castle approach/gate silhouette,
 - courtyard detail density,
