@@ -45,19 +45,42 @@ const MOOD_MS = 300;
 // scene-global fog/exposure.
 // Colors as plain arrays — BABYLON isn't on window at module-eval time
 // (same call-time-only rule as the rest of the world code).
+//
+// The castle interior has NO fog — it owns its own always-on themed ambient
+// (AMBIENT_PALETTES below), and any haze just dims the far end of the big
+// halls. fogDensity 0 (EXP2 factor → 1) disables it on both moods; the
+// fogColor is retained only as an inert value.
 const WARM_MOOD = {
-  fogColor: [0.095, 0.062, 0.038],
-  fogDensity: 0.008,
-  exposure: 1.08,
-  fill: 0.45, // neutral hemispheric lift so warm pools don't monochrome the room
+  fogColor: [0.11, 0.13, 0.17],
+  fogDensity: 0.0,
+  exposure: 1.04,
+  fill: 0.42, // scene hemispheric lift on top of the themed castle ambient
   noGrading: true, // the cold dungeon LUT mutes the royal reds/golds
 };
 const DUNGEON_MOOD = {
   fogColor: [0.045, 0.05, 0.062],
-  fogDensity: 0.018,
-  exposure: 1.0,
-  fill: 0.25,
+  fogDensity: 0.0,
+  exposure: 1.05,
+  fill: 0.50,
 };
+
+// The castle's OWN themed always-on ambient. A single scoped HemisphericLight
+// (castleAmbient) can only theme per LEVEL — floors are mixed-use — so the
+// scheme progresses as you climb: a warm, vibrant "royal stone" on the grand
+// public floors, warmer still on the private upper floors, and a bright BLUE
+// dungeon. Warm rooms sitting on a warm floor keep their character via wood
+// floors + dense warm torch/candle/fireplace accents. Plain arrays: applied
+// at call time.
+const AMBIENT_ROYAL = { diffuse: [0.66, 0.63, 0.62], ground: [0.38, 0.34, 0.30], intensity: 0.80 };
+const AMBIENT_WARM = { diffuse: [0.68, 0.60, 0.46], ground: [0.36, 0.30, 0.22], intensity: 0.72 };
+// dungeon: distinctly blue but bright — close to the rest of the castle so it
+// reads as a cold hall, not a black pit.
+const AMBIENT_DUNGEON = { diffuse: [0.48, 0.56, 0.74], ground: [0.28, 0.33, 0.44], intensity: 0.98 };
+// level → palette. L0 dungeon; L1 entrance/L2 ballroom = grand cool royal;
+// L3 masters+library / L4 royal suite+treasury = warm private quarters.
+const AMBIENT_BY_LEVEL = [
+  AMBIENT_DUNGEON, AMBIENT_ROYAL, AMBIENT_ROYAL, AMBIENT_WARM, AMBIENT_WARM,
+];
 
 export class CastleSystem {
   /**
@@ -272,7 +295,7 @@ export class CastleSystem {
       }
       ctx.colliders.length = 0;
       this._intMeshes = mergeCollector(ctx, this._intRoot);
-      this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 3 : 6);
+      this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 4 : 7);
       this._pool.setIncludedMeshes(this._intMeshes);
       this._spawnInteriorLights();
     }
@@ -280,16 +303,31 @@ export class CastleSystem {
     this._built = true;
   }
 
+  /** Mutate an enabled hemispheric's colors/intensity to a palette entry.
+   *  Recompile-free (only touches Color3/scalar state, never setEnabled). */
+  _applyAmbientPalette(amb, pal) {
+    amb.diffuse = new BABYLON.Color3(...pal.diffuse);
+    amb.groundColor = new BABYLON.Color3(...pal.ground);
+    amb.intensity = pal.intensity;
+  }
+
   _spawnInteriorLights() {
-    // Scoped warm ambient: hemispheric light that ONLY castle meshes see.
-    // This is what keeps room corners readable between torch pools without
-    // touching the overworld look (and without more point lights).
+    // The castle's OWN bright, themed ambient: a scoped hemispheric that only
+    // castle meshes see. This is the always-on base — rooms stay bright
+    // corner-to-corner regardless of torch proximity; the pooled torches
+    // merely accent it. The axis is tilted off vertical so surfaces facing it
+    // catch the sky `diffuse` and opposing faces catch `groundColor`, giving
+    // columns/walls real dimensional shading without spending a light on the
+    // castle's already-saturated (>8) budget. Palette is swapped per level in
+    // _updateMood; ROYAL is the initial (ground-floor) look.
     const amb = new BABYLON.HemisphericLight('castleAmbient',
-      new BABYLON.Vector3(0, 1, 0), this.scene);
-    amb.diffuse = new BABYLON.Color3(0.52, 0.47, 0.40);
-    amb.groundColor = new BABYLON.Color3(0.30, 0.25, 0.20);
-    amb.intensity = 0.55;
+      new BABYLON.Vector3(0.35, 1.0, 0.15).normalize(), this.scene);
+    this._applyAmbientPalette(amb, AMBIENT_ROYAL);
     amb.includedOnlyMeshes = [...this._intMeshes];
+    // the always-enabled pool torches + scene fill/bounce would otherwise fill
+    // the material light budget and evict this base; a high renderPriority
+    // guarantees the themed ambient is always applied.
+    amb.renderPriority = 100;
     this._ambLight = amb;
 
     // Dedicated character light: the avatar is a PBR-material GLB, which
@@ -365,6 +403,13 @@ export class CastleSystem {
     if (level !== this._moodLevel) {
       this._moodLevel = level;
       this._lm.setDungeonMood?.(level === 0 ? DUNGEON_MOOD : WARM_MOOD);
+      // swap the castle's own themed ambient to this level's palette (cool
+      // royal on the grand floors, warm on the private upper floors, dim in
+      // the dungeon) — recompile-free colour/intensity mutation.
+      if (this._ambLight) {
+        this._applyAmbientPalette(
+          this._ambLight, AMBIENT_BY_LEVEL[level] ?? AMBIENT_ROYAL);
+      }
     }
   }
 

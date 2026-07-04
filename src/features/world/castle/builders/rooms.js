@@ -232,9 +232,15 @@ export function createWallsForLevel(ctx, level, ax, az) {
         : L.clear;
 
       if (door) {
-        // jamb-to-jamb opening: wall exists only above the door
         const dh = doorHeight(door);
-        createWall(ctx, level, line, lo, hi, L.y + dh, hUp - dh, wallMat, ax, az);
+        if (door.sealed) {
+          // Decorative-only gates keep the wall/collision solid; the press-E
+          // teleport remains a proximity hotspot rather than a walk-through.
+          createWall(ctx, level, line, lo, hi, L.y, hUp, wallMat, ax, az);
+        } else {
+          // jamb-to-jamb opening: wall exists only above the door
+          createWall(ctx, level, line, lo, hi, L.y + dh, hUp - dh, wallMat, ax, az);
+        }
         createDoor(ctx, level, line, door, ax, az);
       } else {
         createWall(ctx, level, line, lo, hi, L.y, hUp, wallMat, ax, az);
@@ -304,9 +310,21 @@ export function createDoor(ctx, level, line, door, ax, az) {
       : new BABYLON.Vector3(mid + ax, L.y + dh + 0.3, at + az);
     ctx.add(arch, frameMat, G(level));
   }
-  // swung-open panels (flat against the wall face beside the opening)
   const panelMat = door.iron ? 'iron' : 'woodDark';
   const ph = dh - 0.15, pw = door.double ? w / 2 : Math.min(w, 1.6);
+  if (door.sealed) {
+    // One broad closed panel on the room-side wall face: no outside vista.
+    const faceOff = WALL_T / 2 + 0.08;
+    const panelW = Math.max(0.8, w - 0.35);
+    put(at + faceOff, mid, L.y + ph / 2, 0.12, ph, panelW, panelMat);
+    if (!door.iron) {
+      put(at + faceOff + 0.04, mid, L.y + ph * 0.28, 0.035, 0.12, panelW * 0.96, 'iron');
+      put(at + faceOff + 0.04, mid, L.y + ph * 0.75, 0.035, 0.12, panelW * 0.96, 'iron');
+      if (door.double) put(at + faceOff + 0.05, mid, L.y + ph / 2, 0.035, ph * 0.96, 0.10, 'iron');
+    }
+    return;
+  }
+  // swung-open panels (flat against the wall face beside the opening)
   put(at + 0.62, door.lo + 0.08, L.y + ph / 2, 0.09, ph, pw * 0.94, panelMat);
   if (door.double) put(at + 0.62, door.hi - 0.08, L.y + ph / 2, 0.09, ph, pw * 0.94, panelMat);
   // iron banding on wooden panels
