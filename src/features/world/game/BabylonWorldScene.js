@@ -1995,11 +1995,23 @@ export class BabylonWorldScene {
     const cam = this._camera;
     if (this._camUserRadius == null) {
       this._camUserRadius = cam.radius;
+      this._lastCamWritten = cam.radius;
     } else {
       const delta = cam.radius - this._lastCamWritten; // user zoom since last frame
-      if (delta !== 0) {
+      if (delta < -1e-6) {
+        // Zoom IN counts from the VISIBLE radius: when wall-clamped the
+        // user expects to pull in from what they see, not to first wind a
+        // far-away stored zoom down through the whole clamped gap.
+        this._camUserRadius = Math.max(cam.lowerRadiusLimit,
+          Math.min(this._camUserRadius, this._lastCamWritten) + delta);
+      } else if (delta > 1e-6) {
+        // Zoom OUT scales with the stored zoom: wheelDeltaPercentage sizes
+        // the step from the CLAMPED radius, which otherwise makes zoom-out
+        // feel dead against a wall (5% of 2.6 m/notch instead of 5% of 14 m).
+        const scale = this._lastCamWritten > 0.01
+          ? this._camUserRadius / this._lastCamWritten : 1;
         this._camUserRadius = Math.min(cam.upperRadiusLimit,
-          Math.max(cam.lowerRadiusLimit, this._camUserRadius + delta));
+          this._camUserRadius + delta * scale);
       }
     }
     const tx = cam.target.x, ty = cam.target.y, tz = cam.target.z;
@@ -2007,8 +2019,19 @@ export class BabylonWorldScene {
     const dirY = Math.cos(cam.beta);
     const dirZ = Math.sin(cam.alpha) * Math.sin(cam.beta);
     const open = openDistFn(tx, ty, tz, dirX, dirY, dirZ, this._camUserRadius);
-    const write = Math.min(this._camUserRadius,
+    const desired = Math.min(this._camUserRadius,
       Math.max(cam.lowerRadiusLimit, open));
+    // Shrink instantly (the camera must never enter blocking mass) but EASE
+    // the recovery: sweeping the orbit across a turret or door jamb
+    // otherwise pumps the radius full-range within a few degrees of drag,
+    // which reads as "the camera zooms in and out instead of rotating".
+    // In open space desired === current (identity), so user zoom has no lag.
+    const cur = cam.radius;
+    let write = desired;
+    if (desired > cur + 0.02) {
+      const k = 1 - Math.exp(-this.scene.getEngine().getDeltaTime() * 0.007);
+      write = cur + (desired - cur) * k;
+    }
     cam.radius = write;
     this._lastCamWritten = write;
   }
