@@ -48,7 +48,7 @@ async function checkRateLimit(ip) {
 // neutralise the most abusable characters before interpolation.
 function escapeMarkdown(str) {
   return String(str ?? "")
-    .replace(/​|‌|‍|﻿/g, "") // strip zero-width chars
+    .replace(/\u200B|\u200C|\u200D|\uFEFF/g, "") // strip zero-width chars
     .replace(/[`<>]/g, m => ({ "`": "\\`", "<": "&lt;", ">": "&gt;" }[m]));
 }
 

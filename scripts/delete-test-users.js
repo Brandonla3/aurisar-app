@@ -51,7 +51,7 @@ async function deleteRowsForUser(userId) {
 
   for (const { table, columns } of DEPENDENT_TABLES) {
     for (const col of columns) {
-      const { data, error, count } = await supabase
+      const { error, count } = await supabase
         .from(table)
         .delete({ count: "exact" })
         .eq(col, userId);

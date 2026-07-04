@@ -19,7 +19,8 @@ const T = {
   BoxGeometry, CylinderGeometry, SphereGeometry, CircleGeometry, TorusGeometry,
 };
 
-function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePreset, clsColor, clsKey}) {
+// eslint-disable-next-line no-unused-vars
+function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePreset: _facePreset, clsColor, clsKey: _clsKey}) {
   const mountRef = React.useRef(null);
 
   React.useEffect(()=>{
@@ -134,8 +135,11 @@ function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePr
     const eyeWhiteM = new T.MeshPhysicalMaterial({color:0xf0ece8, roughness:0.15, metalness:0});
     const eyeIrisM  = new T.MeshPhysicalMaterial({color:0x2a3848, roughness:0.1,  metalness:0, clearcoat:1, clearcoatRoughness:0.05});
     const eyePupilM = new T.MeshPhysicalMaterial({color:0x060606, roughness:0.05, metalness:0});
-    const teethM    = new T.MeshPhysicalMaterial({color:0xe8e0d0, roughness:0.35, metalness:0, clearcoat:0.4});
-    const nailM     = new T.MeshPhysicalMaterial({color:new T.Color(skinHex).multiplyScalar(1.1), roughness:0.25, metalness:0, clearcoat:0.7});
+    // teethM and nailM are defined for completeness but not yet rendered
+    // eslint-disable-next-line no-unused-vars
+    const _teethM   = new T.MeshPhysicalMaterial({color:0xe8e0d0, roughness:0.35, metalness:0, clearcoat:0.4});
+    // eslint-disable-next-line no-unused-vars
+    const _nailM    = new T.MeshPhysicalMaterial({color:new T.Color(skinHex).multiplyScalar(1.1), roughness:0.25, metalness:0, clearcoat:0.7});
 
     // ── Race & body configs ─────────────────────────────────────
     const BC = {
@@ -173,7 +177,9 @@ function AvatarPreview3D({race, bodyType, skinTone, hairColor, hairStyle, facePr
     // ── Torso system ────────────────────────────────────────────
     const torsoTopY   = (0.72 + bc.sh*0.5) * sy;
     const torsoBotY   = (0.72 - bc.sh*0.5) * sy;
-    const torsoMidY   = (torsoTopY + torsoBotY) * 0.5;
+    // torsoMidY retained for future use (e.g. belt placement)
+    // eslint-disable-next-line no-unused-vars
+    const _torsoMidY  = (torsoTopY + torsoBotY) * 0.5;
 
     // Torso — tapered box (wider shoulders, narrower waist)
     const torsoGeo = new T.CylinderGeometry(bc.sw*sx, bc.sw*sx*0.78, bc.sh*sy, 8);
