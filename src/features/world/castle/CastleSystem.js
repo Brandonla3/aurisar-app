@@ -31,6 +31,10 @@ import { createAllStaircases } from './builders/staircase.js';
 import { createAllFurniture } from './builders/furniture.js';
 import { createFixturesFromAnchors } from './builders/fixtures.js';
 import { createCastleExterior } from './builders/exterior.js';
+import {
+  createCastleExteriorPolish,
+  createCastleInteriorHeroProps,
+} from './builders/aestheticPolish.js';
 import { CastleLightPool } from './CastleLightPool.js';
 import { hash2 } from '../worldgen/rng.js';
 
@@ -240,7 +244,8 @@ export class CastleSystem {
     this._extRoot = new BABYLON.TransformNode('castle_exterior', this.scene);
     {
       const ctx = createCollector(this.scene, this._mats);
-      const { gateTorchPositions } = createCastleExterior(ctx, this._worldgen);
+      const { gateTorchPositions, baseY } = createCastleExterior(ctx, this._worldgen);
+      createCastleExteriorPolish(ctx, this._worldgen, baseY);
       const extMeshes = mergeCollector(ctx, this._extRoot, (mesh, group, matKey) => {
         // shadow casters: stone masses only (windows/flames don't cast)
         if (matKey.includes('Stone') || matKey === 'stone') this._host.castShadow?.(mesh);
@@ -269,6 +274,7 @@ export class CastleSystem {
       await yieldFrame();
       if (this._disposed) return;
       createAllFurniture(ctx, ax, az);
+      createCastleInteriorHeroProps(ctx, ax, az);
       // solid furniture / columns / cell bars block movement: stamp their
       // footprints into the nav grids (post-build mutation — every nav
       // query reads the grids live)
