@@ -1,10 +1,14 @@
 /**
  * AshwoodGrass — wind-animated instanced grass that follows the player.
  *
- * Port of the prototype's buildGrass/rebuildGrass/updateGrass (lines
- * ~747-841): a deterministic hash2 cell grid (cell 0.6 m, radius 30 m)
- * rebuilt whenever the player crosses a cell, rendered as thin instances of
- * a crossed-blade template with a vertex-shader wind sway. One draw call.
+ * A deterministic hash2 cell grid (cell 0.6 m, radius 30 m) rebuilt whenever
+ * the player crosses a cell, rendered as thin instances of a crossed-quad
+ * "card" template with a vertex-shader wind sway. One draw call.
+ *
+ * Each card samples an alpha-cutout clump texture (grass-cards.png, two
+ * 512px variants side by side, extracted from Meshy AI renders) — the
+ * instance color's alpha channel selects the variant, its rgb carries the
+ * biome tint that hue-shifts the texture per biome.
  *
  * Placement is pure hash2 math — identical on every client, no manifest.
  */
@@ -20,12 +24,19 @@ const VERT = `
 precision highp float;
 attribute vec3 position;
 attribute vec3 normal;
-attribute vec4 color;
+attribute vec2 uv;
 #include<instancesDeclaration>
+// Thin-instance color arrives as the auto-declared 'instanceColor' attribute
+// (inside instancesDeclaration when the mesh has a color buffer), NOT as
+// 'color' — binding 'color' silently reads zeros and every card goes black.
+#ifndef INSTANCESCOLOR
+attribute vec4 instanceColor;
+#endif
 uniform mat4 viewProjection;
 uniform float uTime;
 uniform float uWind;
 varying vec4 vCol;
+varying vec2 vUV;
 varying vec3 vWp;
 varying vec3 vN;
 void main() {
@@ -39,10 +50,14 @@ void main() {
   vec4 wp = finalWorld * vec4(p, 1.0);
   vWp = wp.xyz;
 
+  // Atlas holds two clump variants side by side; the instance color's alpha
+  // channel (0 or 1) picks which half this card samples.
+  vUV = vec2(uv.x * 0.5 + instanceColor.a * 0.5, uv.y);
+
   // Vertical AO: darken the base (ground contact), brighten the tip — reads
   // as ambient occlusion for one extra multiply, no extra draw/pass.
-  float ao = mix(0.55, 1.15, clamp(position.y / 0.55, 0.0, 1.0));
-  vCol = vec4(color.rgb * ao, color.a);
+  float ao = mix(0.6, 1.1, clamp(position.y / 0.7, 0.0, 1.0));
+  vCol = vec4(instanceColor.rgb * ao, 1.0);
 
   // Approximate world-space normal: baked per-triangle flat normals (computed
   // once in JS at blade-geometry build time) rotated by the instance's world
@@ -58,8 +73,10 @@ void main() {
 const FRAG = `
 precision highp float;
 varying vec4 vCol;
+varying vec2 vUV;
 varying vec3 vWp;
 varying vec3 vN;
+uniform sampler2D uCardTex;
 uniform float uLight;
 uniform vec3 cameraPosition;
 uniform vec3 vFogColor;
@@ -67,6 +84,10 @@ uniform float fogDensity;
 uniform vec3 uSunDir;        // world-space direction toward the sun
 uniform float uBackStrength; // 0 on low/mobile tier, >0 on high tier
 void main() {
+  vec4 tex = texture2D(uCardTex, vUV);
+  // Alpha cutout — no sorting/blending needed, cards stay one draw call.
+  if (tex.a < 0.35) discard;
+
   vec3 N = normalize(vN);
   vec3 L = normalize(uSunDir);
   float ndl = dot(N, L);
@@ -75,13 +96,18 @@ void main() {
   float wrap = clamp((ndl + 0.5) / 1.5, 0.0, 1.0);
   float lambert = mix(0.55, 1.0, wrap);
 
+  // The texture carries the blade detail; the instance rgb (biome grassCol,
+  // ~0.15-0.5) hue-shifts it per biome. 1.7 renormalizes the tint so a
+  // mid-green biome keeps the texture a touch deeper than neutral.
+  vec3 base = tex.rgb * clamp(vCol.rgb * 1.7, 0.0, 1.5);
+
   vec3 V = normalize(cameraPosition - vWp);
   // Translucency / backlight: blades glow when the sun sits behind them from
   // the camera's viewpoint — the "glowing grass" look at golden hour. Zero
   // on low/mobile tier (uBackStrength), so this is a free no-op there.
   float back = pow(clamp(dot(-V, L), 0.0, 1.0), 2.0) * uBackStrength;
 
-  vec3 c = vCol.rgb * uLight * lambert + vCol.rgb * back;
+  vec3 c = base * uLight * lambert + base * back;
   float dist = length(cameraPosition - vWp);
   float fog = exp(-pow(dist * fogDensity, 2.0));
   c = mix(vFogColor, c, clamp(fog, 0.0, 1.0));
@@ -89,43 +115,29 @@ void main() {
 }
 `;
 
-// Crossed pair of three-triangle blade fans (prototype buildGrass), with the
-// per-vertex shade ramp baked into the instance-color multiplier instead.
-function bladeGeometry() {
-  const w = 0.06, hh = 0.55, d = 0.13;
-  const blade = [
-    -w, 0, 0,  w, 0, 0,  -w * 0.6, hh * 0.5, d,
-    -w * 0.6, hh * 0.5, d,  w, 0, 0,  w * 0.6, hh * 0.5, d,
-    -w * 0.6, hh * 0.5, d,  w * 0.6, hh * 0.5, d,  0, hh, d * 1.5,
+// Crossed pair of textured quads ("grass cards"). Each quad maps the full
+// clump texture (variant half is selected in the vertex shader); the second
+// quad is rotated 90° so the clump reads from every camera angle.
+function cardGeometry() {
+  const w = 0.45, h = 0.7;
+  const positions = [
+    // quad A — faces ±Z
+    -w, 0, 0,   w, 0, 0,   w, h, 0,   -w, h, 0,
+    // quad B — faces ±X
+    0, 0, -w,   0, 0, w,   0, h, w,   0, h, -w,
   ];
-  const positions = [];
-  const ROT = 1.36, ca = Math.cos(ROT), sa = Math.sin(ROT), ys = 0.88;
-  for (let i = 0; i < blade.length; i += 3) positions.push(blade[i], blade[i + 1], blade[i + 2]);
-  for (let i = 0; i < blade.length; i += 3) {
-    const x = blade[i], y = blade[i + 1], z = blade[i + 2];
-    positions.push(x * ca - z * sa + 0.03, y * ys, x * sa + z * ca - 0.02);
-  }
-  const indices = [];
-  for (let i = 0; i < positions.length / 3; i++) indices.push(i);
-
-  // Flat per-triangle normals (cross of two edges). No vertices are shared
-  // between triangles here, so each triangle's 3 unique vertices simply take
-  // that triangle's face normal — real geometric lighting for the blade with
-  // no averaging pass needed.
-  const normals = new Array(positions.length).fill(0);
-  for (let t = 0; t < indices.length; t += 3) {
-    const i0 = indices[t] * 3, i1 = indices[t + 1] * 3, i2 = indices[t + 2] * 3;
-    const ax = positions[i0], ay = positions[i0 + 1], az = positions[i0 + 2];
-    const bx = positions[i1], by = positions[i1 + 1], bz = positions[i1 + 2];
-    const cx = positions[i2], cy = positions[i2 + 1], cz = positions[i2 + 2];
-    const ux = bx - ax, uy = by - ay, uz = bz - az;
-    const vx = cx - ax, vy = cy - ay, vz = cz - az;
-    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-    const len = Math.hypot(nx, ny, nz) || 1;
-    nx /= len; ny /= len; nz /= len;
-    for (const idx of [i0, i1, i2]) { normals[idx] = nx; normals[idx + 1] = ny; normals[idx + 2] = nz; }
-  }
-  return { positions, indices, normals };
+  // v=0 samples the image bottom (opaque grass roots) at ground level, v=1
+  // the transparent sky at the card top (Texture default invertY).
+  const uvs = [
+    0, 0,  1, 0,  1, 1,  0, 1,
+    0, 0,  1, 0,  1, 1,  0, 1,
+  ];
+  const normals = [
+    0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
+    1, 0, 0,  1, 0, 0,  1, 0, 0,  1, 0, 0,
+  ];
+  const indices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7];
+  return { positions, indices, normals, uvs };
 }
 
 export class AshwoodGrass {
@@ -145,19 +157,24 @@ export class AshwoodGrass {
       // world0-3 MUST be declared for (thin) instancing — without them the
       // instancesVertex include reads unbound attributes and instance
       // matrices come out as garbage (blades stretched across the sky).
-      attributes: ['position', 'normal', 'color', 'world0', 'world1', 'world2', 'world3'],
+      attributes: ['position', 'normal', 'uv', 'instanceColor', 'world0', 'world1', 'world2', 'world3'],
       uniforms: ['viewProjection', 'world', 'cameraPosition',
                  'uTime', 'uWind', 'uLight', 'vFogColor', 'fogDensity',
                  'uSunDir', 'uBackStrength'],
+      samplers: ['uCardTex'],
     });
     this.material.backFaceCulling = false;
+    this._cardTex = new BABYLON.Texture('/assets/textures/grass-cards.png', scene);
+    this._cardTex.anisotropicFilteringLevel = 4;
+    this.material.setTexture('uCardTex', this._cardTex);
 
-    const { positions, indices, normals } = bladeGeometry();
+    const { positions, indices, normals, uvs } = cardGeometry();
     this.mesh = new BABYLON.Mesh('ashwoodGrass', scene);
     const vd = new BABYLON.VertexData();
     vd.positions = positions;
     vd.indices = indices;
     vd.normals = normals;
+    vd.uvs = uvs;
     vd.applyToMesh(this.mesh);
     this.mesh.material = this.material;
     this.mesh.isPickable = false;
@@ -234,7 +251,8 @@ export class AshwoodGrass {
         this._cols[i * 4]     = gc[0] + 0.10 * tnt;
         this._cols[i * 4 + 1] = gc[1] + 0.14 * tnt;
         this._cols[i * 4 + 2] = gc[2] + 0.05 * tnt;
-        this._cols[i * 4 + 3] = 1;
+        // alpha = clump-texture variant (left/right atlas half), not opacity
+        this._cols[i * 4 + 3] = hash2(gx + 13, gz + 17) > 0.5 ? 1 : 0;
         i++;
       }
     }
@@ -249,5 +267,6 @@ export class AshwoodGrass {
     if (this._observer) this.scene.onBeforeRenderObservable.remove(this._observer);
     this.mesh?.dispose();
     this.material?.dispose();
+    this._cardTex?.dispose();
   }
 }

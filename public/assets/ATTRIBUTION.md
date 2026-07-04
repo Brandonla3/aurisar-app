@@ -23,6 +23,10 @@ albedo + normal map) are derived from a Meshy AI-generated render supplied by
 the project owner: cropped, color-balanced against the previous palette, made
 seamlessly tileable, with the normal map generated from luminance gradients.
 
+`textures/grass-cards.png` (3D grass clump atlas, two alpha-cutout variants)
+is extracted from the same Meshy AI renders by keying out the studio
+backdrop, with edge-color dilation so mipmaps stay grass-colored.
+
 Replacing any of these files in place (same filename, passing the GLB
 validator) swaps the art with zero code changes — the intended path for
 the custom Blender/Unreal art pass.
