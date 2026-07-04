@@ -496,8 +496,12 @@ function fitVault(ctx, room, ax, az) {
 function fitCells(ctx, room, ax, az) {
   const { x0, z0, x1, z1 } = room.rect;
   const level = room.level;
-  // cells along the far wall, opening toward the corridor side
-  const openSide = room.rect.z0 === 4 ? 'south' : 'north'; // corridor sits at z ∈ [-4, 4]
+  // cells along the far wall, opening toward the corridor side. room.rect is
+  // in SCALED coords (PLAN_SCALE), and the corridor straddles z = 0, so a block
+  // whose near edge sits north of centre opens south toward it. (Was
+  // `z0 === 4`, a raw-plan literal that never matched post-scale-up and parked
+  // the north block's cells across their own entrance door.)
+  const openSide = room.rect.z0 > 0 ? 'south' : 'north';
   const cellD = 5.2;
   const cz0 = openSide === 'south' ? z1 - cellD : z0;
   const cz1 = openSide === 'south' ? z1 : z0 + cellD;
