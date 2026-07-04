@@ -164,6 +164,9 @@ export function createGrandStaircase(ctx, st, ax, az) {
     }
     for (const [mx, mz] of mouths) {
       const yB = LEVELS[st.lo].y;
+      // zero expansion: the plinth flanks the lane edge — PLAYER_R padding
+      // would eat into the stair lane itself
+      ctx.addNavBlocker?.(st.lo, mx - 0.75, mz - 0.75, mx + 0.75, mz + 0.75, 0);
       ctx.add(box(ctx.scene, `stCol_${st.id}`, mx + ax, yB + 0.4, mz + az, 1.5, 0.8, 1.5), 'marbleDark', group);
       ctx.add(cyl(ctx.scene, `stCol_${st.id}`, mx + ax, yB + colH / 2, mz + az, colH, 1.1, 14), 'marble', group);
       ctx.add(box(ctx.scene, `stColCap_${st.id}`, mx + ax, yB + colH - 0.35, mz + az, 1.7, 0.7, 1.7), 'gold', group);

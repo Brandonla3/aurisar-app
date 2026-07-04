@@ -396,6 +396,9 @@ export function createRailing(ctx, level, line, lo, hi, ax, az) {
 /** Fluted column with base + capital. */
 export function createColumn(ctx, level, x, z, h, ax, az, matKey = 'marble', dia = 0.85) {
   const L = LEVELS[level];
+  // solid: the base plinth footprint blocks movement
+  ctx.addNavBlocker?.(level, x - (dia + 0.5) / 2, z - (dia + 0.5) / 2,
+    x + (dia + 0.5) / 2, z + (dia + 0.5) / 2);
   ctx.add(box(ctx.scene, `colBase_${level}`, x + ax, L.y + 0.25, z + az, dia + 0.5, 0.5, dia + 0.5), matKey, G(level));
   ctx.add(cyl(ctx.scene, `col_${level}`, x + ax, L.y + h / 2, z + az, h, dia, 14), matKey, G(level));
   ctx.add(box(ctx.scene, `colCap_${level}`, x + ax, L.y + h - 0.22, z + az, dia + 0.6, 0.44, dia + 0.6), matKey, G(level));
