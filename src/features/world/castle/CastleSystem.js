@@ -105,11 +105,16 @@ export class CastleSystem {
     const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
     const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
     const tr = E.towerR + m;
+    const gr = 2.6 + m; // gatehouse turret body (protrudes past the wall line)
     const blocked = (x, z) => {
       if (x > x0 && x < x1 && z > z0 && z < z1) return true;
       for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
         const tx = E.site.x + dx * E.halfW, tz = E.site.z + dz * E.halfD;
         if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < tr * tr) return true;
+      }
+      for (const s of [-1, 1]) {
+        const tx = E.site.x - E.halfW, tz = E.gate.z + s * (E.gate.width / 2 + 1.6);
+        if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < gr * gr) return true;
       }
       return false;
     };
@@ -417,6 +422,11 @@ export class CastleSystem {
 
   _settleOutside() {
     if (this._charLight) this._charLight.intensity = 0;
+    // drop the avatar from the castle ambient scope — it must not stay
+    // warmed/brightened by the interior hemispheric out in the overworld
+    if (this._ambLight && this._intMeshes) {
+      this._ambLight.includedOnlyMeshes = [...this._intMeshes];
+    }
     this._lm.setDungeonMood?.(null);
     this._lm.setZone('overworld', 0.8);
     this._pool?.setActive(false);
