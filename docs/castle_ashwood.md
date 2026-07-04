@@ -9,6 +9,10 @@ A machine-readable export is generated at build time:
 
 Regenerate with `npm run emit:castle`.
 
+## Server validation
+
+SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` and checked in `spacetimedb/src/castle/validate.ts` (mirrors `castleNavServer.js`).
+
 ## Coordinate scheme
 
 - All layout rects are in **interior-local meters** (post-`PLAN_SCALE = 1.75`).

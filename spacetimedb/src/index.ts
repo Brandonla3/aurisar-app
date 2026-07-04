@@ -32,6 +32,7 @@ import {
   ZONES_BY_ID,
 } from './content/index.js';
 import type { MobDef, QuestDef, SpawnDef } from './content/types.js';
+import { castleInteriorWalkable, pxToWorldM } from './castle/validate.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -438,6 +439,14 @@ export const movePlayer = spacetimedb.reducer(
     // See header for derivation from world_build_config.tiling_streaming.
     const clampedX = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
     const clampedY = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
+
+    // Castle Ashwood interior: reject moves into nav-blocked columns (walls,
+    // furniture footprints baked into emitted nav bitmaps). Outside the
+    // interior footprint this returns null and we fall through to normal px clamp.
+    const worldXM = pxToWorldM(clampedX);
+    const worldZM = pxToWorldM(clampedY);
+    const castleOk = castleInteriorWalkable(worldXM, worldZM);
+    if (castleOk === false) return;
 
     // Zone detection based on position
     const zoneId = detectZone(clampedX, clampedY);

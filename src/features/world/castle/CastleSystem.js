@@ -24,13 +24,13 @@ import {
   SHELL_COLLISION, buildLightAnchors,
 } from './castlePlan.js';
 import { buildNav, buildNavDebugOverlay } from './castleNav.js';
-import { createCastleMaterials } from './builders/materials.js';
+import { createCastleMaterials, applyWindowWarmth } from './builders/materials.js';
 import { createCollector, mergeCollector } from './builders/mergeUtil.js';
 import { createFloorSlabs, createRoom, createWallsForLevel, dressStructuralRooms } from './builders/rooms.js';
 import { createAllStaircases } from './builders/staircase.js';
 import { createAllFurniture } from './builders/furniture.js';
 import { createFixturesFromAnchors } from './builders/fixtures.js';
-import { createCastleExterior } from './builders/exterior.js';
+import { createCastleExterior, EXTERIOR_LOD0_MAX_M } from './builders/exterior.js';
 import { CastleLightPool } from './CastleLightPool.js';
 import { hash2 } from '../worldgen/rng.js';
 
@@ -39,6 +39,13 @@ const EXIT_PROMPT_DIST_SQ = 3.4 * 3.4;
 const LEAVE_DIST_SQ = 7.0 * 7.0;   // hysteresis
 const PROX_MS = 200;
 const MOOD_MS = 300;
+const LOD_MS = 500;
+
+/** 0..1 warmth bias from time-of-day hours (peaks near sunset). */
+function eveningBiasFromTod(hours) {
+  const phase = ((hours % 24) + 24) % 24 / 24;
+  return 0.5 + 0.5 * Math.cos((phase - 0.72) * Math.PI * 2);
+}
 
 // Warm interior mood vs the darker, rougher dungeon level. Applied through
 // LightingManager.setDungeonMood so the LM stays the only writer of
@@ -116,6 +123,9 @@ export class CastleSystem {
     this._gateObs = null;
     this._navDebugRoot = null;
     this._colliders = [];
+    this._extLodMeshes = [];
+    this._lastLodAt = 0;
+    this._lastWarmAt = 0;
   }
 
   isInside() { return this._inside; }
@@ -244,7 +254,7 @@ export class CastleSystem {
 
   async init() {
     if (this._disposed) return;
-    this._mats = createCastleMaterials(this.scene);
+    this._mats = createCastleMaterials(this.scene, { isMobile: this._host.isMobile });
     // yield between build chunks via the render loop, NOT setTimeout —
     // browsers throttle timers under heavy rAF load (a 1.6 s build was
     // stretching to ~28 s of throttled waits in headless profiling)
@@ -255,11 +265,13 @@ export class CastleSystem {
     this._extRoot = new BABYLON.TransformNode('castle_exterior', this.scene);
     {
       const ctx = createCollector(this.scene, this._mats);
-      const { gateTorchPositions } = createCastleExterior(ctx, this._worldgen);
+      const warmBias = eveningBiasFromTod(this._host.getTimeOfDay?.() ?? 18);
+      const { gateTorchPositions } = createCastleExterior(ctx, this._worldgen, { warmBias });
       const extMeshes = mergeCollector(ctx, this._extRoot, (mesh, group, matKey) => {
-        // shadow casters: stone masses only (windows/flames don't cast)
         if (matKey.includes('Stone') || matKey === 'stone') this._host.castShadow?.(mesh);
       });
+      this._extLodMeshes = extMeshes.filter((m) => m.name.includes('_EXT_LOD0_'));
+      applyWindowWarmth(this._mats, warmBias);
       this._spawnGateTorchLights(gateTorchPositions, extMeshes);
     }
     if (this._disposed) return;
@@ -376,6 +388,8 @@ export class CastleSystem {
     this._lastProxAt = now;
     const p = this._host.getPlayerPos();
     if (!p) return;
+    this._updateExteriorLod(p, now);
+    this._updateWindowWarmth(now);
 
     let id = this._nearbyDoorId;
     if (!this._inside) {
@@ -398,6 +412,20 @@ export class CastleSystem {
         label: id === 'castle_gate' ? 'Enter Castle Ashwood' : 'Leave the castle',
       } : null);
     }
+  }
+
+  _updateExteriorLod(p, now) {
+    if (now - this._lastLodAt < LOD_MS || !this._extLodMeshes?.length) return;
+    this._lastLodAt = now;
+    const dist = Math.hypot(p.x - EXTERIOR.site.x, p.z - EXTERIOR.site.z);
+    const show = dist < EXTERIOR_LOD0_MAX_M;
+    for (const m of this._extLodMeshes) m.setEnabled(show);
+  }
+
+  _updateWindowWarmth(now) {
+    if (now - this._lastWarmAt < 2000 || !this._mats) return;
+    this._lastWarmAt = now;
+    applyWindowWarmth(this._mats, eveningBiasFromTod(this._host.getTimeOfDay?.() ?? 18));
   }
 
   _updateMood(p, now) {

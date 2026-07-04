@@ -12,21 +12,21 @@
  * Spawn positions are interior-local meters (castlePlan LOCAL space).
  */
 import type { DungeonDef } from '../types';
-import { SPAWN_MARKERS, ENTRY } from '../../castle/castlePlan.js';
+import { CASTLE_ASHWOOD_ENTRY, CASTLE_ASHWOOD_SPAWNS } from './castleAshwood.generated.js';
 
 export const DUNGEONS: DungeonDef[] = [
   {
     id: 'castle_ashwood',
     name: 'Castle Ashwood',
     minLevel: 5,
-    entrance: { zoneId: 1, pos: { x: ENTRY.gateWorld.x, z: ENTRY.gateWorld.z } },
+    entrance: { zoneId: 1, pos: { x: CASTLE_ASHWOOD_ENTRY.gateWorld.x, z: CASTLE_ASHWOOD_ENTRY.gateWorld.z } },
     layoutManifest: 'castle_ashwood.json',
     bossMobType: 'gorrak',
     bossMechanics: {
       aoePulse: { everySec: 9, damage: 14, radiusM: 6 },
       enrage: { afterSec: 240, mult: 1.5 },
     },
-    spawns: SPAWN_MARKERS.map(({ netId, mobType, pos, count, radiusM }) => ({
+    spawns: CASTLE_ASHWOOD_SPAWNS.map(({ netId, mobType, pos, count, radiusM }) => ({
       netId,
       mobType,
       pos: { x: pos.x, z: pos.z },
