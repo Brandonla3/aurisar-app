@@ -251,14 +251,19 @@ export class AshwoodGrass {
       // low/mobile so the term is a free no-op there.
       m.setFloat('uBackStrength', tier === 'high' ? 0.5 : 0.0);
     }
-    // The 3D hero clumps are ~1.3k tris each — high tier only.
-    this.heroMesh.setEnabled(tier !== 'low' && tier !== 'mobile');
+    // Hero clumps render on every tier (~1.3k tris each, a few dozen
+    // instances) — phones just get a tighter ring around the player.
+    const heroR = tier === 'low' || tier === 'mobile' ? 8 : HERO_RADIUS;
+    if (heroR !== this._heroRadius) {
+      this._heroRadius = heroR;
+      this.lastX = 1e9; // force a rebuild with the new ring
+    }
     if (Math.abs(p.x - this.lastX) + Math.abs(p.z - this.lastZ) > CELL) this._rebuild(p.x, p.z);
   }
 
   // Scatter one layer onto the hash grid. Both layers share the same biome /
   // trail / lake / forest filters so hero clumps only appear where cards do.
-  _scatter(px, pz, cell, radius, keep, mats, cols, cap) {
+  _scatter(px, pz, cell, radius, keep, mats, cols, cap, scaleMul = 1) {
     const wg = this.wg;
     const n = Math.ceil(radius / cell);
     const R2 = radius * radius;
@@ -284,7 +289,7 @@ export class AshwoodGrass {
         if (wg.lakeWaterDepthAt(wx, wz) > 0.02) continue;
         if (wg.lakeShoreAt(wx, wz) > 0.4) continue; // bare beach sand strip
         if (wg.inForest(wx, wz)) continue; // forest floor has its own brush
-        const sc = 0.7 + hash2(gx + 5, gz - 3) * 0.95;
+        const sc = (0.7 + hash2(gx + 5, gz - 3) * 0.95) * scaleMul;
         BABYLON.Quaternion.FromEulerAnglesToRef(0, h1 * 6.28, 0, q);
         sVec.set(sc, sc * (0.8 + hash2(gx, gz + 2) * 0.7), sc);
         pVec.set(wx, wg.surfaceY(wx, wz), wz);
@@ -309,9 +314,10 @@ export class AshwoodGrass {
     this.mesh.thinInstanceSetBuffer('color', this._cols.subarray(0, Math.max(1, i) * 4), 4, false);
     this.mesh.thinInstanceCount = i;
 
-    // Hero clumps: sparser grid, tighter ring, higher keep threshold.
-    const h = this._scatter(px, pz, HERO_CELL, HERO_RADIUS, 0.35,
-                            this._heroMats, this._heroCols, this.heroCap);
+    // Hero clumps: sparser grid, tighter ring (tier-dependent), higher keep
+    // threshold, scaled up so the real 3D blades read above the card field.
+    const h = this._scatter(px, pz, HERO_CELL, this._heroRadius ?? HERO_RADIUS, 0.35,
+                            this._heroMats, this._heroCols, this.heroCap, 1.35);
     this.heroMesh.thinInstanceSetBuffer('matrix', this._heroMats.subarray(0, Math.max(1, h) * 16), 16, false);
     this.heroMesh.thinInstanceSetBuffer('color', this._heroCols.subarray(0, Math.max(1, h) * 4), 4, false);
     this.heroMesh.thinInstanceCount = h;
