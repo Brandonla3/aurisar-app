@@ -118,7 +118,21 @@ export function generateSites(config, rng, wg) {
     ponds.push({ x: p.x, z: p.z, r, seed: siteSeed() });
   }
 
-  return { trees, rocks, bushes, details, ruins, caves, chests, ponds };
+  // ── exclusion zones (post-filter) ──
+  // Structures like Castle Ashwood claim their footprint AFTER all RNG
+  // draws, so the append-only draw-order determinism contract is untouched
+  // and every client filters the identical manifest identically.
+  const sites = { trees, rocks, bushes, details, ruins, caves, chests, ponds };
+  const exclusions = config.exclusions ?? [];
+  if (exclusions.length) {
+    const outside = (s) => exclusions.every(
+      (e) => Math.hypot(s.x - e.x, s.z - e.z) > e.r
+    );
+    for (const key of Object.keys(sites)) {
+      sites[key] = sites[key].filter(outside);
+    }
+  }
+  return sites;
 }
 
 /** Sites whose (x,z) fall inside tile bounds {min:{x,z}, max:{x,z}}. */

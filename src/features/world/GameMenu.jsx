@@ -156,6 +156,18 @@ export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCo
         </button>
       </div>
 
+      <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#94a3b8', fontFamily: FONT, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        Fast travel · testing
+      </h3>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+        <button
+          style={{ ...ghostBtn, padding: '4px 10px', fontSize: 12 }}
+          onClick={() => { sceneRef?.current?.fastTravelToCastle?.(); onClose(); }}
+        >
+          🏰 Castle gates
+        </button>
+      </div>
+
       <TimeOfDayControl sceneRef={sceneRef} />
 
       <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#94a3b8', fontFamily: FONT, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
