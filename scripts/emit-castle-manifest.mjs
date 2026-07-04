@@ -20,6 +20,7 @@ import {
   WALL_T, STEP_UP, PLAN_SCALE, EXTERIOR, SHELL_COLLISION, INTERIOR_ANCHOR,
 } from '../src/features/world/castle/castlePlan.js';
 import { STEP_DOWN, buildNav } from '../src/features/world/castle/castleNav.js';
+import { stampNavBlockers } from '../src/features/world/castle/castleNavBlockers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
@@ -33,6 +34,7 @@ const NAV_GRIDS_TS = join(repoRoot, 'spacetimedb', 'src', 'castle', 'navGrids.ts
 const DUNGEON_SPAWNS_TS = join(repoRoot, 'src', 'features', 'world', 'content', 'dungeons', 'castleAshwood.generated.ts');
 
 const nav = buildNav(INTERIOR_ANCHOR);
+stampNavBlockers(nav);
 const navLevels = nav.grids.map((grid, level) => ({
   level,
   encoding: 'uint16-le-base64',
@@ -91,7 +93,7 @@ const manifest = {
 const payload = `${JSON.stringify(manifest, null, 2)}\n`;
 
 const navGridsTs = `// GENERATED FILE — DO NOT EDIT.
-// Source: src/features/world/castle/castlePlan.js + castleNav.js
+// Source: src/features/world/castle/castlePlan.js + castleNav.js + nav blockers
 // Regenerate with: npm run emit:castle
 
 export const CASTLE_NAV_META = {
