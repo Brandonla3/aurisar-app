@@ -157,4 +157,18 @@ describe('castle furniture nav blockers', () => {
     // the aisle between the two tables stays walkable
     expect(nav.surfaceAt(cx + AX, cz + AZ, LEVELS[1].y + 0.3)).toBeTruthy();
   });
+
+  it('gallery railings record thin nav blockers', async () => {
+    const { createCollector } = await import('../builders/mergeUtil.js');
+    const { createRailing } = await import('../builders/rooms.js');
+    const ctx = createCollector(null, {});
+    createRailing(ctx, 3, { axis: 'z', at: 0 }, -20, 20, AX, AZ);
+    expect(ctx.navBlockers).toHaveLength(1);
+    expect(ctx.navBlockers[0].expand).toBe(0);
+    const nav2 = buildNav();
+    nav2.blockRect(3, ctx.navBlockers[0], 0);
+    const y = LEVELS[3].y + 0.3;
+    expect(nav2.surfaceAt(5 + AX, 0.05 + AZ, y)).toBeNull();
+    expect(nav2.surfaceAt(5 + AX, 3 + AZ, y)).toBeTruthy();
+  });
 });

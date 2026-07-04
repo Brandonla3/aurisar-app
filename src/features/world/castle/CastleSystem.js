@@ -21,9 +21,9 @@
 
 import {
   CASTLE_PLAN, LEVELS, INTERIOR_ANCHOR, ENTRY, EXTERIOR, LOCAL_BOUNDS,
-  buildLightAnchors,
+  SHELL_COLLISION, buildLightAnchors,
 } from './castlePlan.js';
-import { buildNav } from './castleNav.js';
+import { buildNav, buildNavDebugOverlay } from './castleNav.js';
 import { createCastleMaterials } from './builders/materials.js';
 import { createCollector, mergeCollector } from './builders/mergeUtil.js';
 import { createFloorSlabs, createRoom, createWallsForLevel, dressStructuralRooms } from './builders/rooms.js';
@@ -73,6 +73,7 @@ const DUNGEON_MOOD = {
 // at call time.
 const AMBIENT_ROYAL = { diffuse: [0.66, 0.63, 0.62], ground: [0.38, 0.34, 0.30], intensity: 0.80 };
 const AMBIENT_WARM = { diffuse: [0.68, 0.60, 0.46], ground: [0.36, 0.30, 0.22], intensity: 0.72 };
+const NO_INTERIOR_SHADOW = new Set(['windowGlow', 'windowCool', 'flame', 'ember', 'candleGlow']);
 // dungeon: distinctly blue but bright — close to the rest of the castle so it
 // reads as a cold hall, not a black pit.
 const AMBIENT_DUNGEON = { diffuse: [0.48, 0.56, 0.74], ground: [0.28, 0.33, 0.44], intensity: 0.98 };
@@ -113,9 +114,22 @@ export class CastleSystem {
     this._lastMoodAt = 0;
     this._moodLevel = -1;
     this._gateObs = null;
+    this._navDebugRoot = null;
+    this._colliders = [];
   }
 
   isInside() { return this._inside; }
+
+  /** Dev-only: subsampled nav grid overlay for one level. */
+  showNavDebug(show, level = 1) {
+    this._navDebugRoot?.dispose(false, true);
+    this._navDebugRoot = null;
+    if (!show || !this._built) return;
+    this._navDebugRoot = buildNavDebugOverlay(
+      this.scene, this.nav, level, INTERIOR_ANCHOR.x, INTERIOR_ANCHOR.z,
+    );
+    this._navDebugRoot.parent = this._intRoot;
+  }
 
   /**
    * Overworld collision against the exterior shell: the walls are real.
@@ -125,11 +139,11 @@ export class CastleSystem {
    */
   resolveShellCollision(prevX, prevZ, pos) {
     const E = EXTERIOR;
-    const m = 0.7; // player radius + skin
+    const m = SHELL_COLLISION.marginM;
     const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
     const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
     const tr = E.towerR + m;
-    const gr = 2.6 + m; // gatehouse turret body (protrudes past the wall line)
+    const gr = E.gateTurretR + m;
     const blocked = (x, z) => {
       if (x > x0 && x < x1 && z > z0 && z < z1) return true;
       for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -137,7 +151,8 @@ export class CastleSystem {
         if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < tr * tr) return true;
       }
       for (const s of [-1, 1]) {
-        const tx = E.site.x - E.halfW, tz = E.gate.z + s * (E.gate.width / 2 + 1.6);
+        const tx = E.site.x - E.halfW;
+        const tz = E.gate.z + s * (E.gate.width / 2 + E.gateTurretProtrude);
         if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < gr * gr) return true;
       }
       return false;
@@ -192,7 +207,7 @@ export class CastleSystem {
     if (this._siteBaseY == null) {
       this._siteBaseY = this._worldgen.surfaceY(E.site.x, E.site.z);
     }
-    const m = 0.5; // camera skin
+    const m = SHELL_COLLISION.cameraSkinM;
     const x0 = E.site.x - E.halfW - m, x1 = E.site.x + E.halfW + m;
     const z0 = E.site.z - E.halfD - m, z1 = E.site.z + E.halfD + m;
     const wallTop = this._siteBaseY + E.wallH + 2.2; // + battlements
@@ -202,8 +217,8 @@ export class CastleSystem {
         (E.towerR + m) ** 2, this._siteBaseY + E.towerH + 1]);
     }
     for (const s of [-1, 1]) {
-      cyls.push([E.site.x - E.halfW, E.gate.z + s * (E.gate.width / 2 + 1.6),
-        (3.2 + m) ** 2, wallTop + 6]);
+      cyls.push([E.site.x - E.halfW, E.gate.z + s * (E.gate.width / 2 + E.gateTurretProtrude),
+        (E.gateTurretR + m) ** 2, wallTop + 6]);
     }
     const blocked = (x, y, z) => {
       for (const [cx, cz, r2, top] of cyls) {
@@ -278,23 +293,13 @@ export class CastleSystem {
         ...a, x: a.x + ax, z: a.z + az,
       }));
       createFixturesFromAnchors(ctx, anchors, 0, 0); // anchors already world-space
-      // invisible camera-collision proxies (walls/slabs recorded during the
-      // build). The camera collides against ~250 simple boxes instead of the
-      // merged render meshes — cheap, and Babylon's collision response never
-      // touches the player's zoom, so the camera can't get "stuck".
-      for (const c of ctx.colliders) {
-        const b = BABYLON.MeshBuilder.CreateBox('castleCamCol', {
-          width: c.w, height: c.h, depth: c.d,
-        }, this.scene);
-        b.position.set(c.cx, c.cy, c.cz);
-        b.isVisible = false;
-        b.isPickable = false;
-        b.checkCollisions = true;
-        b.parent = this._intRoot;
-        b.freezeWorldMatrix();
-      }
+      // Record wall/floor/ceiling AABBs for future mob/projectile queries —
+      // no Babylon proxy meshes (camera uses nav LOS, not checkCollisions).
+      this._colliders = ctx.colliders.slice();
       ctx.colliders.length = 0;
-      this._intMeshes = mergeCollector(ctx, this._intRoot);
+      this._intMeshes = mergeCollector(ctx, this._intRoot, null, {
+        receiveShadowsFor: (matKey) => !NO_INTERIOR_SHADOW.has(matKey),
+      });
       this._pool = new CastleLightPool(this.scene, anchors, this._host.isMobile ? 4 : 7);
       this._pool.setIncludedMeshes(this._intMeshes);
       this._spawnInteriorLights();
@@ -534,7 +539,8 @@ export class CastleSystem {
     this._gateLights.length = 0;
     this._extRoot?.dispose(false, true);
     this._intRoot?.dispose(false, true);
-    this._extRoot = this._intRoot = null;
+    this._navDebugRoot?.dispose(false, true);
+    this._extRoot = this._intRoot = this._navDebugRoot = null;
     this._lm?.setDungeonMood?.(null);
     this._mats?.disposeAll();
     this._mats = null;
