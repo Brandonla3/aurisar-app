@@ -16,6 +16,13 @@ creators are credited below as a courtesy.
 
 CC0 license: https://creativecommons.org/publicdomain/zero/1.0/
 
+## Textures
+
+`textures/grass-meshy.jpg` and `textures/grass-meshy-nm.jpg` (terrain grass
+albedo + normal map) are derived from a Meshy AI-generated render supplied by
+the project owner: cropped, color-balanced against the previous palette, made
+seamlessly tileable, with the normal map generated from luminance gradients.
+
 Replacing any of these files in place (same filename, passing the GLB
 validator) swaps the art with zero code changes — the intended path for
 the custom Blender/Unreal art pass.

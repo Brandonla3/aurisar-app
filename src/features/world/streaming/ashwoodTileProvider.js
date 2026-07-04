@@ -25,9 +25,11 @@ import { buildPropTemplates, buildTileProps } from './ashwoodPropMeshes.js';
 const DEFAULT_SUBDIVISIONS = 96;
 
 // Grass texture repeats per tile. Integer ⇒ the world-aligned UVs stay
-// continuous across tile borders. 256m / 9 ≈ 28.4m period — matches the
-// prototype's repeat 44 over a 1248m ground plane.
-const GRASS_REPEATS_PER_TILE = 9;
+// continuous across tile borders. 256m / 24 ≈ 10.7m period — the Meshy-derived
+// texture has far fewer, larger blades per repeat than the old grasslight
+// lawn (which used 9 repeats), so it needs a denser tiling to read at a
+// plausible blade scale from player height.
+const GRASS_REPEATS_PER_TILE = 24;
 
 export class AshwoodTileProvider {
   /**
@@ -66,11 +68,11 @@ export class AshwoodTileProvider {
       ground.roughness = 0.95;
       ground.specularIntensity = 0.4;
       ground.enableSpecularAntiAliasing = true;
-      const grassTex = new BABYLON.Texture('/assets/textures/grasslight-big.jpg', scene);
+      const grassTex = new BABYLON.Texture('/assets/textures/grass-meshy.jpg', scene);
       grassTex.uScale = GRASS_REPEATS_PER_TILE;
       grassTex.vScale = GRASS_REPEATS_PER_TILE;
       ground.albedoTexture = grassTex;        // modulated by biome vertex colors
-      const grassNm = new BABYLON.Texture('/assets/textures/grasslight-big-nm.jpg', scene);
+      const grassNm = new BABYLON.Texture('/assets/textures/grass-meshy-nm.jpg', scene);
       grassNm.uScale = GRASS_REPEATS_PER_TILE;
       grassNm.vScale = GRASS_REPEATS_PER_TILE;
       grassNm.level = 0.85;
