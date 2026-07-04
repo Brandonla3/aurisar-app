@@ -11,7 +11,7 @@ Regenerate with `npm run emit:castle`.
 
 ## Server validation
 
-SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` and checked in `spacetimedb/src/castle/validate.ts` (mirrors `castleNavServer.js`).
+SpacetimeDB `movePlayer` rejects positions inside the interior footprint that map to nav-blocked columns. Bitmaps are emitted to `spacetimedb/src/castle/navGrids.ts` (checked in; regenerate with `npm run emit:castle`) and validated in `spacetimedb/src/castle/validate.ts` (mirrors `castleNavServer.js`).
 
 ## Coordinate scheme
 

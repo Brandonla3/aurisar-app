@@ -43,7 +43,6 @@ const manifest = {
   meta: {
     id: 'castle_ashwood',
     version: '1.0.0',
-    generated_utc: new Date().toISOString(),
     source: 'src/features/world/castle/castlePlan.js',
     runtime: 'procedural',
   },

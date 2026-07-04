@@ -7,13 +7,32 @@ import { CASTLE_NAV_META, CASTLE_NAV_BITMAPS_B64 } from './navGrids.js';
 
 let decoded: Uint16Array[] | null = null;
 
+function decodeBase64(b64: string): Uint8Array {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < alphabet.length; i++) lookup[alphabet.charCodeAt(i)] = i;
+
+  const len = b64.length;
+  const outLen = (len * 3) >> 2;
+  const out = new Uint8Array(outLen);
+  let o = 0;
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[b64.charCodeAt(i)];
+    const b = lookup[b64.charCodeAt(i + 1)];
+    const c = lookup[b64.charCodeAt(i + 2)];
+    const d = lookup[b64.charCodeAt(i + 3)];
+    out[o++] = (a << 2) | (b >> 4);
+    if (b64[i + 2] !== '=') out[o++] = ((b & 15) << 4) | (c >> 2);
+    if (b64[i + 3] !== '=') out[o++] = ((c & 3) << 6) | d;
+  }
+  return out;
+}
+
 function decodeGrids(): Uint16Array[] {
   if (decoded) return decoded;
   decoded = CASTLE_NAV_BITMAPS_B64.map((b64) => {
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new Uint16Array(bytes.buffer);
+    const bytes = decodeBase64(b64);
+    return new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1);
   });
   return decoded;
 }

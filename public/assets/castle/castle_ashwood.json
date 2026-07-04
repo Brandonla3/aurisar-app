@@ -2,7 +2,6 @@
   "meta": {
     "id": "castle_ashwood",
     "version": "1.0.0",
-    "generated_utc": "2026-07-04T17:38:54.231Z",
     "source": "src/features/world/castle/castlePlan.js",
     "runtime": "procedural"
   },

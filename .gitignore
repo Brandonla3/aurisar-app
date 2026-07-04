@@ -15,7 +15,6 @@ dist
 coverage/
 .cache/
 .vite/
-spacetimedb/src/castle/navGrids.ts
 __pycache__/
 *.pyc
 export/
