@@ -127,6 +127,28 @@ describe('castle furniture nav blockers', () => {
     expect([...reachedLevels].sort().join(',')).toBe('0,1,2,3,4');
   });
 
+  it('remoteSurfaceY tracks floors, seeds teleport-ins, and never drops a storey', async () => {
+    const { CastleSystem } = await import('../CastleSystem.js');
+    const c = new CastleSystem({}, { surfaceY: () => 0 }, {}, {});
+    const AXc = INTERIOR_ANCHOR.x, AZc = INTERIOR_ANCHOR.z;
+    // ballroom center (level 2) with a tracked level-2 prevY
+    const ball = ROOMS.find((r) => r.id === 'ballroom').rect;
+    const bx = (ball.x0 + ball.x1) / 2 + AXc, bz = (ball.z0 + ball.z1) / 2 + AZc;
+    expect(c.remoteSurfaceY(bx, bz, LEVELS[2].y + 0.5)).toBeCloseTo(LEVELS[2].y, 4);
+    // Codex's wall-clip case: no level-2 surface at (6.5, -38) local but an
+    // open level-1 floor below — a tracked level-2 remote must HOLD height,
+    // not fall a storey to the seed retry
+    expect(c.nav.surfaceAt(6.5 + AXc, -38 + AZc, LEVELS[2].y + 0.5)).toBeNull();
+    expect(c.remoteSurfaceY(6.5 + AXc, -38 + AZc, LEVELS[2].y)).toBe(LEVELS[2].y);
+    // dungeon remote clipping a wall holds its dungeon height too
+    expect(c.remoteSurfaceY(6.5 + AXc, -38 + AZc, LEVELS[0].y)).toBe(LEVELS[0].y);
+    // fresh teleport-in (prevY at terrain height) seeds the ground floor
+    expect(c.remoteSurfaceY(ENTRY.spawnLocal.x + AXc, ENTRY.spawnLocal.z + AZc, -1.0))
+      .toBeCloseTo(LEVELS[1].y, 4);
+    // outside the interior region → null (caller falls back to terrain)
+    expect(c.remoteSurfaceY(150, 20, 5)).toBeNull();
+  });
+
   it('a feast table blocks movement (spot check)', () => {
     // diningHall level 1: tables at (cx, cz ± 3.4), 11 × 1.8
     const dining = ROOMS.find((r) => r.id === 'diningHall').rect;

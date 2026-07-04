@@ -136,7 +136,13 @@ export class CastleSystem {
     if (lx < LOCAL_BOUNDS.x0 || lx >= LOCAL_BOUNDS.x1 ||
         lz < LOCAL_BOUNDS.z0 || lz >= LOCAL_BOUNDS.z1) return null;
     const s = this.nav.surfaceAt(x, z, prevY + 0.5)
-      ?? this.nav.surfaceAt(x, z, LEVELS[1].y + 1);
+      // seed only FRESH teleport-ins (prevY still at terrain height, below
+      // the lowest interior floor). For tracked remotes a wall-clip frame
+      // must hold height — an unconditional retry could return a lower
+      // open storey at the same (x, z) and drop the avatar a floor.
+      ?? (prevY < LEVELS[0].y - 0.4
+        ? this.nav.surfaceAt(x, z, LEVELS[1].y + 1)
+        : null);
     return s ? s.y : prevY;
   }
 
