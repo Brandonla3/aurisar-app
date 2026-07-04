@@ -15,7 +15,16 @@
 
 import { hash2 } from '../../worldgen/rng.js';
 
-const MAX_LIGHTS = 8;
+// The castle's always-on themed ambient (a scoped hemispheric) must ALWAYS be
+// in each material's active light set — otherwise the pool torches (kept
+// enabled at intensity 0) plus the scene fill/bounce fill every slot and the
+// ambient base silently drops out, leaving rooms lit only where a torch pool
+// happens to reach. 10 slots fit fill + bounce + ambient + the 7-light pool
+// exactly; the ambient also gets a high renderPriority so it's never the one
+// evicted. (Pushing this higher risks StandardMaterial exceeding the shader's
+// light budget and failing to compile on weaker GLSL backends — lit meshes
+// then vanish while the unlit emissive flames still draw.)
+const MAX_LIGHTS = 10;
 
 /**
  * 128px procedural diffuse texture. mode:
@@ -84,10 +93,13 @@ function mat(scene, name, { diffuse, texture = null, specular = [0.03, 0.03, 0.0
   m.specularColor = new BABYLON.Color3(...specular);
   if (emissive) m.emissiveColor = new BABYLON.Color3(...emissive);
   else if (lit) {
-    // faint self-glow floor: interiors between torch pools stay readable
-    // (never pitch black) without washing out the lighting mood
+    // faint self-glow floor: a last-resort "never pitch black" guard. The
+    // castle's bright themed ambient (CastleSystem AMBIENT_PALETTES) now owns
+    // room brightness, so this is kept low — a high floor would flatten the
+    // ambient's directional shading — and biased slightly cool to sit under
+    // the royal stone theme rather than fighting it.
     m.emissiveColor = new BABYLON.Color3(
-      diffuse[0] * 0.09, diffuse[1] * 0.09, diffuse[2] * 0.10);
+      diffuse[0] * 0.05, diffuse[1] * 0.055, diffuse[2] * 0.065);
   }
   if (alpha < 1) m.alpha = alpha;
   m.backFaceCulling = backFace;
@@ -107,19 +119,25 @@ export function createCastleMaterials(scene) {
       uv: 0.18,
     }),
     stone: mat(scene, 'castle_stone', {
-      diffuse: [1.0, 0.97, 0.92],
-      texture: T('castle_tex_stone', [0.52, 0.49, 0.45], [0.38, 0.36, 0.34], 'stone', 23),
+      // warm-neutral royal stone (a touch cool, not blue) — grand halls read
+      // vibrant/warm, not steel-blue; wood/fabric stay warm
+      diffuse: [0.97, 0.95, 0.92],
+      texture: T('castle_tex_stone', [0.50, 0.49, 0.46], [0.38, 0.37, 0.35], 'stone', 23),
       uv: 0.3,
     }),
     darkStone: mat(scene, 'castle_darkStone', {
-      diffuse: [0.85, 0.86, 0.90],
-      texture: T('castle_tex_darkStone', [0.26, 0.25, 0.26], [0.15, 0.15, 0.17], 'stone', 37),
+      // dungeon stone: distinctly BLUE but lightened well up so the dungeon
+      // reads as a cold blue hall at a brightness near the rest of the castle,
+      // not a black pit
+      diffuse: [0.86, 0.90, 0.98],
+      texture: T('castle_tex_darkStone', [0.50, 0.56, 0.68], [0.36, 0.41, 0.53], 'stone', 37),
       uv: 0.28,
     }),
     marble: mat(scene, 'castle_marble', {
-      diffuse: [1.0, 0.99, 0.96],
-      texture: T('castle_tex_marble', [0.78, 0.76, 0.71], [0.92, 0.91, 0.88], 'marble', 5),
-      specular: [0.32, 0.32, 0.30], uv: 0.2,
+      // warm ivory royal marble (slightly cool of the original, not blue)
+      diffuse: [0.97, 0.96, 0.93],
+      texture: T('castle_tex_marble', [0.80, 0.78, 0.74], [0.93, 0.92, 0.88], 'marble', 5),
+      specular: [0.32, 0.32, 0.31], uv: 0.2,
     }),
     marbleDark: mat(scene, 'castle_marbleDark', {
       diffuse: [0.95, 0.95, 1.0],
@@ -201,8 +219,10 @@ export function createCastleMaterials(scene) {
       diffuse: [0.25, 0.42, 0.48], specular: [0.5, 0.55, 0.6], alpha: 0.72,
     }),
     plaster: mat(scene, 'castle_plaster', {
-      diffuse: [1.0, 0.97, 0.9],
-      texture: T('castle_tex_plaster', [0.62, 0.58, 0.50], [0.54, 0.50, 0.44], 'plaster', 83),
+      // warm-neutral plaster: vibrant/warm in the upper rooms, still fine under
+      // the ballroom's royal ambient (wood floors + warm accents carry warmth)
+      diffuse: [0.98, 0.96, 0.92],
+      texture: T('castle_tex_plaster', [0.60, 0.58, 0.54], [0.52, 0.50, 0.46], 'plaster', 83),
       uv: 0.25,
     }),
   };

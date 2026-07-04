@@ -56,22 +56,22 @@ export const LEVELS = Object.freeze([
 // builders. Rooms on a level tile edge-to-edge; walls sit on shared edges.
 const RAW_ROOMS = [
   // ═══ DUNGEON (level 0) ═════════════════════════════════════════════════════
-  { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24, z1: 4  }, kind: 'dungeonHall' },
-  { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,  z1: 16 }, kind: 'cells' },
-  { id: 'cellBlockS',  level: 0, rect: { x0: -24, z0: -16, x1: 2,  z1: -4 }, kind: 'cells' },
-  { id: 'guardPost',   level: 0, rect: { x0: 2,   z0: 4,   x1: 24, z1: 16 }, kind: 'guard' },
-  { id: 'dVault',      level: 0, rect: { x0: 2,   z0: -16, x1: 24, z1: -4 }, kind: 'vault' },
-  { id: 'dVestibule',  level: 0, rect: { x0: 24,  z0: -6,  x1: 32, z1: 6  }, kind: 'dungeonHall' },
+  { id: 'dCorridor',   level: 0, rect: { x0: -24, z0: -4,  x1: 24,   z1: 4  }, kind: 'dungeonHall' },
+  { id: 'cellBlockN',  level: 0, rect: { x0: -24, z0: 4,   x1: 2,    z1: 16 }, kind: 'cells' },
+  { id: 'cellBlockS',  level: 0, rect: { x0: -24, z0: -16, x1: 2,    z1: -4 }, kind: 'cells' },
+  { id: 'guardPost',   level: 0, rect: { x0: 2,   z0: 4,   x1: 24,   z1: 16 }, kind: 'guard' },
+  { id: 'dVault',      level: 0, rect: { x0: 2,   z0: -16, x1: 24,   z1: -4 }, kind: 'vault' },
+  { id: 'dVestibule',  level: 0, rect: { x0: 24,  z0: -6,  x1: 32.8, z1: 6  }, kind: 'dungeonHall' },
 
   // ═══ GROUND / FLOOR 1 (level 1) — entrance, kitchens, dining, servants ═════
-  { id: 'entranceHall', level: 1, rect: { x0: -32, z0: -12, x1: -12, z1: 12 }, kind: 'entrance' },
-  { id: 'corridor1',    level: 1, rect: { x0: -12, z0: -4,  x1: 24,  z1: 4  }, kind: 'corridor' },
-  { id: 'kitchen',      level: 1, rect: { x0: -12, z0: 4,   x1: 8,   z1: 22 }, kind: 'kitchen' },
-  { id: 'stairHall1',   level: 1, rect: { x0: 8,   z0: 4,   x1: 24,  z1: 22 }, kind: 'stairHall' },
-  { id: 'diningHall',   level: 1, rect: { x0: -12, z0: -22, x1: 8,   z1: -4 }, kind: 'dining' },
-  { id: 'servantHall',  level: 1, rect: { x0: 8,   z0: -22, x1: 20,  z1: -4 }, kind: 'servant' },
-  { id: 'storeRoom',    level: 1, rect: { x0: 20,  z0: -22, x1: 32,  z1: -6 }, kind: 'storage' },
-  { id: 'gVestibule',   level: 1, rect: { x0: 24,  z0: -6,  x1: 32,  z1: 6  }, kind: 'stairHall' },
+  { id: 'entranceHall', level: 1, rect: { x0: -32, z0: -12, x1: -12,  z1: 12 }, kind: 'entrance' },
+  { id: 'corridor1',    level: 1, rect: { x0: -12, z0: -4,  x1: 24,   z1: 4  }, kind: 'corridor' },
+  { id: 'kitchen',      level: 1, rect: { x0: -12, z0: 4,   x1: 8,    z1: 22 }, kind: 'kitchen' },
+  { id: 'stairHall1',   level: 1, rect: { x0: 8,   z0: 4,   x1: 24,   z1: 22 }, kind: 'stairHall' },
+  { id: 'diningHall',   level: 1, rect: { x0: -12, z0: -22, x1: 8,    z1: -4 }, kind: 'dining' },
+  { id: 'servantHall',  level: 1, rect: { x0: 8,   z0: -22, x1: 20,   z1: -4 }, kind: 'servant' },
+  { id: 'storeRoom',    level: 1, rect: { x0: 20,  z0: -22, x1: 32,   z1: -6 }, kind: 'storage' },
+  { id: 'gVestibule',   level: 1, rect: { x0: 24,  z0: -6,  x1: 32.8, z1: 6  }, kind: 'stairHall' },
 
   // ═══ FLOOR 2 (level 2) — ballroom, guest rooms, sitting room, bath ═════════
   { id: 'ballroom',    level: 2, rect: { x0: -32, z0: -22, x1: 4,  z1: 4  }, kind: 'ballroom' },
@@ -120,15 +120,15 @@ const RAW_DOORS = [
   { id: 'd_cellsS',  a: 'dCorridor', b: 'cellBlockS', edge: 'z', at: -4, lo: -14, hi: -11 },
   { id: 'd_guard',   a: 'dCorridor', b: 'guardPost',  edge: 'z', at: 4,  lo: 10,  hi: 13 },
   { id: 'd_vault',   a: 'dCorridor', b: 'dVault',     edge: 'z', at: -4, lo: 10,  hi: 13, iron: true },
-  { id: 'd_vest',    a: 'dCorridor', b: 'dVestibule', edge: 'x', at: 24, lo: -2,  hi: 2, arch: true },
+  { id: 'd_vest',    a: 'dCorridor', b: 'dVestibule', edge: 'x', at: 24, lo: -3.3, hi: 3.3, arch: true },
   // ground
-  { id: 'g_gate',    a: 'entranceHall', b: 'EXTERIOR',   edge: 'x', at: -32, lo: -2.2, hi: 2.2, double: true },
+  { id: 'g_gate',    a: 'entranceHall', b: 'EXTERIOR',   edge: 'x', at: -32, lo: -2.2, hi: 2.2, double: true, sealed: true },
   { id: 'g_entr',    a: 'entranceHall', b: 'corridor1',  edge: 'x', at: -12, lo: -2.2, hi: 2.2, double: true, arch: true },
   { id: 'g_kitch',   a: 'corridor1',   b: 'kitchen',     edge: 'z', at: 4,   lo: -6,  hi: -3 },
   { id: 'g_stair',   a: 'corridor1',   b: 'stairHall1',  edge: 'z', at: 4,   lo: 14,  hi: 18, double: true, arch: true },
   { id: 'g_dining',  a: 'corridor1',   b: 'diningHall',  edge: 'z', at: -4,  lo: -6,  hi: -2, double: true },
   { id: 'g_serv',    a: 'corridor1',   b: 'servantHall', edge: 'z', at: -4,  lo: 12,  hi: 15 },
-  { id: 'g_vest',    a: 'corridor1',   b: 'gVestibule',  edge: 'x', at: 24,  lo: -2,  hi: 2, arch: true },
+  { id: 'g_vest',    a: 'corridor1',   b: 'gVestibule',  edge: 'x', at: 24,  lo: -3.3, hi: 3.3, arch: true },
   { id: 'g_store',   a: 'gVestibule',  b: 'storeRoom',   edge: 'z', at: -6,  lo: 26,  hi: 29 },
   { id: 'g_kstair',  a: 'kitchen',     b: 'stairHall1',  edge: 'x', at: 8,   lo: 4.6, hi: 7.4 }, // opens onto the south walkway
   { id: 'g_dserv',   a: 'diningHall',  b: 'servantHall', edge: 'x', at: 8,   lo: -14, hi: -11 },
@@ -172,9 +172,9 @@ export const DOORS = Object.freeze(RAW_DOORS.map((d) => ({
 // Successive grand stairs alternate v0 so their plan-view footprints never
 // overlap — each nav cell holds at most one ramp per level grid.
 const RAW_STAIRS = [
-  // dungeon <-> ground, in d/gVestibule; runs along x, arrival faces the door
-  { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.6, runLen: 4.2, landingD: 2.2,
-    laneW: 2.6, gap: 0.5, v0: -4.0 },
+  // dungeon <-> ground, in d/gVestibule; both lanes sit inside the widened doorway
+  { id: 'dstair', lo: 0, hi: 1, axis: 'x', u0: 25.4, runLen: 5.0, landingD: 2.4,
+    laneW: 2.6, gap: 0.5, v0: -2.85 },
   // the monumental grand stairwell (reference: cathedral-wide marble flights).
   // Consecutive stairs alternate v0 so footprints stay disjoint per grid.
   // u0 8 leaves a wide south walkway (z 4..8) inside every stair hall —
@@ -316,6 +316,20 @@ export function doorLevel(door) {
   return ROOMS_BY_ID[door.a].level;
 }
 
+const STAIR_HOST_ROOM_IDS = (() => {
+  const ids = new Set();
+  const rectInside = (inner, outer, eps = 0.01) =>
+    inner.x0 >= outer.x0 - eps && inner.x1 <= outer.x1 + eps &&
+    inner.z0 >= outer.z0 - eps && inner.z1 <= outer.z1 + eps;
+  for (const st of STAIRS) {
+    const fp = stairRects(st).footprint;
+    for (const room of ROOMS) {
+      if ((room.level === st.lo || room.level === st.hi) && rectInside(fp, room.rect)) ids.add(room.id);
+    }
+  }
+  return ids;
+})();
+
 // ── Light anchors (derived, deterministic) ───────────────────────────────────
 // ~120 warm glow points. ONLY CastleLightPool ever turns the nearest few
 // into real PointLights; every anchor also gets an emissive flame/glow mesh
@@ -327,6 +341,10 @@ export function buildLightAnchors() {
     anchors.push({ kind, level, x, z, y, priority });
 
   for (const room of ROOMS) {
+    // Stair shafts stay prop-free: no torches/chandeliers floating through
+    // stair exits or blocking the camera at the mouth of the staircase.
+    if (STAIR_HOST_ROOM_IDS.has(room.id)) continue;
+
     const L = LEVELS[room.level];
     const { x0, z0, x1, z1 } = room.rect;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -380,9 +398,6 @@ export function buildLightAnchors() {
         add('torch', room.level, x1 - 0.4, cz - 4, torchY);
         break;
       case 'stairHall':
-        add('chandelier', room.level, cx, cz, L.y + L.clear - 1.4, 2);
-        add('torch', room.level, x0 + 0.4, z0 + 2, torchY);
-        add('torch', room.level, x1 - 0.4, z1 - 2, torchY);
         break;
       case 'master': case 'royal':
         add('fireplace', room.level, x0 + 0.7, cz, L.y + 1.0, 3);
