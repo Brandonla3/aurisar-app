@@ -50,14 +50,14 @@ function rewardLines(quest) {
 }
 
 export default function DialoguePanel({
-  npcId, myQuests, playerName, className,
+  npcId, myQuests, playerName, className, playerLevel = 999,
   onAcceptQuest, onTurnInQuest, onClose,
 }) {
   const [detailQuest, setDetailQuest] = useState(null); // { quest, mode: 'accept'|'turnIn' }
   const npc = NPCS[npcId];
   if (!npc) return null;
 
-  const available  = availableQuestsAt(npcId, myQuests);
+  const available  = availableQuestsAt(npcId, myQuests, playerLevel);
   const ready      = readyQuestsAt(npcId, myQuests);
   const inProgress = inProgressQuestsAt(npcId, myQuests);
 

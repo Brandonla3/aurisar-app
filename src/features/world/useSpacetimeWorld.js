@@ -6,19 +6,23 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { DbConnection } from './module_bindings';
+import { worldLevelFromFitnessXp } from './content/formulas/xp';
 
 const STDB_URI    = import.meta.env.VITE_SPACETIMEDB_URI    ?? 'wss://maincloud.spacetimedb.com';
 const STDB_MODULE = import.meta.env.VITE_SPACETIMEDB_MODULE ?? 'aurisar-world';
 
 /**
- * @param {object|null} playerInfo  - { username, classType, avatarColor, avatarConfig }
+ * @param {object|null} playerInfo  - { username, classType, avatarColor, avatarConfig, fitnessXp, fitnessXpBaseline }
  * @param {object}      callbacks   - { onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete, onCampfireUpsert, onCampfireDelete }
- * @returns {{ connected, pending, onlineCount, movePlayer, sendChat, setAvatarConfig, castAbility, buildCampfire, identity }}
+ * @returns {{ connected, pending, onlineCount, worldLevel, movePlayer, sendChat, setAvatarConfig, castAbility, buildCampfire, identity }}
  */
 export function useSpacetimeWorld(playerInfo, callbacks) {
   const connRef      = useRef(null);
   const [connected,    setConnected]    = useState(false);
   const [onlineCount,  setOnlineCount]  = useState(0);
+  const [worldLevel,   setWorldLevel]   = useState(() =>
+    worldLevelFromFitnessXp(playerInfo?.fitnessXp ?? 0, playerInfo?.fitnessXpBaseline ?? 0),
+  );
   const callbacksRef = useRef(callbacks);
 
   // Keep callbacks ref fresh without re-running the main effect
@@ -138,6 +142,15 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             playerInfo.avatarConfig ? JSON.stringify(playerInfo.avatarConfig) : ''
           );
 
+          try {
+            connection.reducers.syncProgress(
+              BigInt(Math.max(0, Math.floor(playerInfo.fitnessXp ?? 0))),
+              BigInt(Math.max(0, Math.floor(playerInfo.fitnessXpBaseline ?? 0))),
+            );
+          } catch (err) {
+            console.warn('[useSpacetimeWorld] syncProgress failed (module not republished yet?):', err);
+          }
+
           // Seed the world's mobs on first ever connect. Idempotent server-side,
           // so subsequent connects are no-ops. Errors are logged so they're
           // visible during debugging (previously a swallowed empty catch hid
@@ -180,6 +193,13 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
               console.warn('[useSpacetimeWorld] player_quest subscription failed (module not republished yet?):', ctx?.event);
             })
             .subscribe(['SELECT * FROM player_quest']);
+
+          connection
+            .subscriptionBuilder()
+            .onError((ctx) => {
+              console.warn('[useSpacetimeWorld] player_progress subscription failed (module not republished yet?):', ctx?.event);
+            })
+            .subscribe(['SELECT * FROM player_progress']);
 
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {
@@ -230,6 +250,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           connection.db.playerQuest?.onDelete((_ctx, row) => {
             callbacksRef.current?.onQuestDelete?.(row);
           });
+
+          const applyProgressLevel = (row) => {
+            if (connection.identity?.isEqual?.(row.identity)) {
+              setWorldLevel(row.worldLevel ?? 1);
+            }
+          };
+          connection.db.playerProgress?.onInsert((_ctx, row) => applyProgressLevel(row));
+          connection.db.playerProgress?.onUpdate((_ctx, _old, row) => applyProgressLevel(row));
         })
         .onDisconnect((_ctx, err) => {
           setConnected(false);
@@ -261,13 +289,21 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
       setConnected(false);
       setOnlineCount(0);
     };
-  // Reconnect if the user's identity changes (e.g. switching accounts)
-  }, [playerInfo?.username, playerInfo?.classType]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reconnect if the user's identity or fitness XP changes
+  }, [playerInfo?.username, playerInfo?.classType, playerInfo?.fitnessXp, playerInfo?.fitnessXpBaseline]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setWorldLevel(worldLevelFromFitnessXp(
+      playerInfo?.fitnessXp ?? 0,
+      playerInfo?.fitnessXpBaseline ?? 0,
+    ));
+  }, [playerInfo?.fitnessXp, playerInfo?.fitnessXpBaseline]);
 
   return {
     connected,
     pending: !connected,
     onlineCount,
+    worldLevel,
     movePlayer,
     sendChat,
     setAvatarConfig,

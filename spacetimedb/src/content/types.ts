@@ -224,7 +224,7 @@ export interface NpcDef {
 
 // ── Quests ───────────────────────────────────────────────────────────
 export type QuestObjective =
-  | { type: 'kill'; mobType: string; count: number; label: string }
+  | { type: 'kill'; mobType: string; count: number; label: string; spawnNetIdPrefix?: string; dungeonId?: string }
   /** Requires server inventory — activates in P4. */
   | { type: 'collect'; itemId: string; count: number; label: string }
   /** Resolved against WaypointDef ids; completed via reachWaypoint. */

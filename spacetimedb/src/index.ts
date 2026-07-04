@@ -31,7 +31,8 @@ import {
   WAYPOINTS,
   ZONES_BY_ID,
 } from './content/index.js';
-import type { MobDef, QuestDef, SpawnDef } from './content/types.js';
+import type { MobDef, QuestDef, QuestObjective, SpawnDef } from './content/types.js';
+import { worldLevelFromFitnessXp } from './content/formulas/xp.js';
 import {
   DUNGEONS_BY_ID,
   DUNGEON_EXIT_RANGE_PX,
@@ -46,6 +47,13 @@ import {
   dungeonSpawnFloorYM,
   type DungeonSpawnEntry,
 } from './dungeon/helpers.js';
+import {
+  bossAoeRadiusPx,
+  bossDamageMult,
+  bossEnraged,
+  getBossMechanicsForMob,
+  shouldBossAoePulse,
+} from './dungeon/bossMechanics.js';
 import {
   castleInteriorResolveMove,
   castleInteriorSurfaceAt,
@@ -274,6 +282,9 @@ const spacetimedb = schema({
       lastAttackAt:  t.u64().default(0n),                               // micros since epoch of last bite (cooldown enforcement)
       dungeonInstanceId: t.u64().default(0n),                            // 0 = overworld mob; else instance-scoped
       floorYM:       t.f32().default(0),                                 // interior world Y (m); 0 = overworld
+      spawnedAt:     t.u64().default(0n),                                // boss spawn micros (instance bosses)
+      lastAoeAt:     t.u64().default(0n),                                // last aoePulse micros
+      enraged:       t.bool().default(false),                            // enrage multiplier active
     }
   ),
 
@@ -370,6 +381,20 @@ const spacetimedb = schema({
     }
   ),
 
+  /**
+   * P2 — fitness XP mirror for world level gating. The client calls
+   * syncProgress on connect; levels derive from the shared xp curve.
+   */
+  playerProgress: table(
+    { public: true },
+    {
+      identity:            t.identity().primaryKey(),
+      fitnessXp:           t.u64().default(0n),
+      fitnessXpBaseline:   t.u64().default(0n),
+      worldLevel:          t.u32().default(1),
+    }
+  ),
+
 });
 
 export default spacetimedb;
@@ -434,6 +459,42 @@ export const setPlayerInfo = spacetimedb.reducer(
         deadUntil: 0n,
         dungeonInstanceId: 0n,
         floorYM: 0,
+      });
+    }
+  }
+);
+
+/**
+ * Sync fitness XP from the Aurisar profile into world level (P2).
+ * fitnessXp must be monotonic; worldLevel is derived server-side.
+ */
+export const syncProgress = spacetimedb.reducer(
+  {
+    fitnessXp:         t.u64(),
+    fitnessXpBaseline: t.u64(),
+  },
+  (ctx, { fitnessXp, fitnessXpBaseline }) => {
+    const xp = Number(fitnessXp);
+    const baseline = Number(fitnessXpBaseline);
+    if (!Number.isFinite(xp) || xp < 0) return;
+    if (!Number.isFinite(baseline) || baseline < 0) return;
+
+    const level = worldLevelFromFitnessXp(xp, baseline);
+    const existing = ctx.db.playerProgress.identity.find(ctx.sender);
+    if (existing) {
+      if (fitnessXp < existing.fitnessXp) return;
+      ctx.db.playerProgress.identity.update({
+        ...existing,
+        fitnessXp,
+        fitnessXpBaseline,
+        worldLevel: level,
+      });
+    } else {
+      ctx.db.playerProgress.insert({
+        identity: ctx.sender,
+        fitnessXp,
+        fitnessXpBaseline,
+        worldLevel: level,
       });
     }
   }
@@ -519,7 +580,7 @@ export const movePlayer = spacetimedb.reducer(
  * assigns or creates a ≤5-player instance, teleports to the interior spawn,
  * and seeds instance mobs on first creation.
  *
- * minLevel gating arrives with playerProgress (P2).
+ * minLevel gating via playerProgress (syncProgress on connect).
  */
 export const enterDungeon = spacetimedb.reducer(
   { dungeonId: t.string() },
@@ -532,6 +593,8 @@ export const enterDungeon = spacetimedb.reducer(
 
     const dungeon = DUNGEONS_BY_ID[dungeonId];
     if (!dungeon) return;
+
+    if (getPlayerLevel(ctx, ctx.sender) < dungeon.minLevel) return;
 
     const gatePx = zoneEntranceToPx(dungeon);
     if (distSqPx(player.x, player.y, gatePx.x, gatePx.y) > DUNGEON_GATE_RANGE_PX * DUNGEON_GATE_RANGE_PX) {
@@ -878,7 +941,7 @@ export const castAbility = spacetimedb.reducer(
       ctx.db.mob.mobId.delete(mobId);
       // P1 quest hook: kill credit goes to whoever lands the killing blow
       // (tap rights / party sharing arrive with P3/P6).
-      creditKillToQuests(ctx, player.identity, mob.mobType);
+      creditKillToQuests(ctx, player.identity, mob);
     } else {
       ctx.db.mob.mobId.update({ ...mob, hp: newHp });
     }
@@ -961,6 +1024,30 @@ export const tickMobAI = spacetimedb.reducer(
       let nextY = mob.y;
       let nextFloorYM = mob.floorYM;
       let nextLastAttackAt = mob.lastAttackAt;
+      let nextSpawnedAt = mob.spawnedAt;
+      let nextLastAoeAt = mob.lastAoeAt;
+      let nextEnraged = mob.enraged;
+
+      const bossMech = getBossMechanicsForMob(ctx, mob);
+      if (bossMech && nextSpawnedAt === 0n) nextSpawnedAt = now;
+      if (bossMech) {
+        nextEnraged = bossEnraged(bossMech, nextSpawnedAt, now, nextEnraged);
+        if (shouldBossAoePulse(bossMech, nextLastAoeAt, now)) {
+          const aoeSq = bossAoeRadiusPx(bossMech) ** 2;
+          const aoeDmg = bossMech.aoePulse?.damage ?? 0;
+          for (const p of livePlayers) {
+            if (!isValidMobTarget(mob, p, nextFloorYM)) continue;
+            const dx = p.x - mob.x;
+            const dy = p.y - mob.y;
+            if (dx * dx + dy * dy <= aoeSq) {
+              applyMobHit(ctx, p.identity, now, aoeDmg);
+            }
+          }
+          nextLastAoeAt = now;
+        }
+      }
+      const dmgMult = bossMech ? bossDamageMult(bossMech, nextEnraged) : 1;
+      const effectiveDamage = Math.round(attackDamage * dmgMult);
 
       const inDungeon = mob.dungeonInstanceId > 0n;
       if (inDungeon && nextFloorYM === 0) {
@@ -1005,7 +1092,7 @@ export const tickMobAI = spacetimedb.reducer(
           const sameFloor = sameInteriorFloor(nextFloorYM, nearest.floorYM);
           if (nearestDistSq <= meleeSq && sameFloor) {
             if (now - mob.lastAttackAt >= attackCdMicros) {
-              applyMobHit(ctx, nearest.identity, now, attackDamage);
+              applyMobHit(ctx, nearest.identity, now, effectiveDamage);
               nextLastAttackAt = now;
             }
           } else {
@@ -1021,7 +1108,9 @@ export const tickMobAI = spacetimedb.reducer(
       }
 
       if (nextX !== mob.x || nextY !== mob.y || newState !== mob.state ||
-          nextLastAttackAt !== mob.lastAttackAt || nextFloorYM !== mob.floorYM) {
+          nextLastAttackAt !== mob.lastAttackAt || nextFloorYM !== mob.floorYM ||
+          nextSpawnedAt !== mob.spawnedAt || nextLastAoeAt !== mob.lastAoeAt ||
+          nextEnraged !== mob.enraged) {
         ctx.db.mob.mobId.update({
           ...mob,
           x: nextX,
@@ -1029,6 +1118,9 @@ export const tickMobAI = spacetimedb.reducer(
           floorYM: nextFloorYM,
           state: newState,
           lastAttackAt: nextLastAttackAt,
+          spawnedAt: nextSpawnedAt,
+          lastAoeAt: nextLastAoeAt,
+          enraged: nextEnraged,
         });
       }
     }
@@ -1160,6 +1252,26 @@ function detectZone(x: number, y: number): number {
   if (x >= 0 && x <= 1200 && y >= 0 && y <= 1200) return 1;       // Training
   if (x >= 2000 && x <= 3200 && y >= 2000 && y <= 3200) return 2; // Plaza
   return 3; // Wilderness
+}
+
+function getPlayerLevel(ctx: any, identity: any): number {
+  const row = ctx.db.playerProgress.identity.find(identity);
+  return row?.worldLevel ?? 1;
+}
+
+function killObjectiveMatches(
+  ctx: any,
+  obj: QuestObjective,
+  mob: { mobType: string; spawnNetId: string; dungeonInstanceId: bigint },
+): boolean {
+  if (obj.type !== 'kill' || obj.mobType !== mob.mobType) return false;
+  if (obj.spawnNetIdPrefix && !mob.spawnNetId.startsWith(obj.spawnNetIdPrefix)) return false;
+  if (obj.dungeonId) {
+    if (mob.dungeonInstanceId === 0n) return false;
+    const inst = ctx.db.dungeonInstance.instanceId.find(mob.dungeonInstanceId);
+    if (!inst || inst.dungeonId !== obj.dungeonId) return false;
+  }
+  return true;
 }
 
 /**
@@ -1296,8 +1408,8 @@ function playerInRangeOfNpc(player: { x: number; y: number }, npcId: string): bo
 
 /**
  * Accept a quest from its giver NPC. Quests are once-only: any existing
- * row (active, ready, or done) blocks re-acceptance. minLevel enforcement
- * arrives with playerProgress in P2.
+ * row (active, ready, or done) blocks re-acceptance. minLevel enforced
+ * via playerProgress.worldLevel.
  */
 export const acceptQuest = spacetimedb.reducer(
   { questId: t.string() },
@@ -1315,6 +1427,7 @@ export const acceptQuest = spacetimedb.reducer(
       const prereq = findQuestRow(ctx, ctx.sender, quest.requiresQuestId);
       if (!prereq || prereq.state !== QUEST_STATE_DONE) return;
     }
+    if (quest.minLevel && getPlayerLevel(ctx, ctx.sender) < quest.minLevel) return;
     if (!playerInRangeOfNpc(player, quest.giverNpcId)) return;
 
     ctx.db.playerQuest.insert({
@@ -1411,7 +1524,11 @@ export const reachWaypoint = spacetimedb.reducer(
  * matching kill objective on the killer's active quests and promotes rows
  * to 'ready' when all objectives are met.
  */
-function creditKillToQuests(ctx: any, identity: any, mobType: string): void {
+function creditKillToQuests(
+  ctx: any,
+  identity: any,
+  mob: { mobType: string; spawnNetId: string; dungeonInstanceId: bigint },
+): void {
   for (const row of ctx.db.playerQuest.iter()) {
     if (row.state !== QUEST_STATE_ACTIVE) continue;
     if (!row.owner.isEqual(identity)) continue;
@@ -1421,7 +1538,7 @@ function creditKillToQuests(ctx: any, identity: any, mobType: string): void {
     const counts = parseCounts(row.countsJson, quest.objectives.length);
     let changed = false;
     quest.objectives.forEach((obj, i) => {
-      if (obj.type === 'kill' && obj.mobType === mobType && counts[i] < obj.count) {
+      if (killObjectiveMatches(ctx, obj, mob) && counts[i] < objectiveTarget(obj)) {
         counts[i]++;
         changed = true;
       }
@@ -1490,8 +1607,13 @@ function insertMobFromDungeonSpawn(
     z: spawn.pos.z + offset.dz,
   });
 
+  const inst = ctx.db.dungeonInstance.instanceId.find(instanceId);
+  const dungeon = inst ? DUNGEONS_BY_ID[inst.dungeonId] : undefined;
+  const isBoss = dungeon && spawn.mobType === dungeon.bossMobType;
+  const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+
   ctx.db.mob.insert({
-    mobId:         ctx.timestamp.microsSinceUnixEpoch + BigInt(instanceCounter),
+    mobId:         nowMicros + BigInt(instanceCounter),
     mobType:       spawn.mobType,
     x:             px.x,
     y:             px.y,
@@ -1507,6 +1629,9 @@ function insertMobFromDungeonSpawn(
     lastAttackAt:  0n,
     dungeonInstanceId: instanceId,
     floorYM:       dungeonSpawnFloorYM(spawn.netId),
+    spawnedAt:     isBoss ? nowMicros : 0n,
+    lastAoeAt:     0n,
+    enraged:       false,
   });
 }
 

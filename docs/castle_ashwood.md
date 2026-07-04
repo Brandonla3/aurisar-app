@@ -21,8 +21,9 @@ SpacetimeDB `movePlayer` validates interior moves with level-aware `surfaceAt` (
 - Client syncs interior presentation from the player row
 - **`player.floorYM`** persisted for reconnect + server surfaceAt reference
 - **Interior mob AI (phase 3)** — dungeon mobs use nav wall-slide; aggro/melee require same instance + floor
-
-**Planned in the same epic:** minLevel gating, Gorrak quest wiring, boss mechanics.
+- **minLevel gating (phase 4)** — `playerProgress` + `syncProgress`; dungeon entry and quests enforce level
+- **Gorrak treasury quest** — `q_ringleader` kill scoped to `ca_boss` spawn in Castle Ashwood instance
+- **Boss mechanics (phase 5)** — instance Gorrak `aoePulse` + `enrage` from `DungeonDef.bossMechanics`
 
 ## Coordinate scheme
 

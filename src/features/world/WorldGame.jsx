@@ -25,11 +25,11 @@ import QuestLogPanel          from './hud/QuestLogPanel.jsx';
 import QuestTracker           from './hud/QuestTracker.jsx';
 import { ITEMS }              from './game/items.js';
 import { NPCS, QUESTS, WAYPOINTS } from './content/index';
+import { DUNGEONS } from './content/dungeons/index';
 import {
   QUEST_STATE, useQuestRows, myQuestsFrom, buildNpcMarkers, parseCounts,
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
-
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
 if (typeof window !== 'undefined' && !window.BABYLON) {
@@ -38,6 +38,8 @@ if (typeof window !== 'undefined' && !window.BABYLON) {
 
 const IS_TOUCH = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;
+
+const CASTLE_MIN_LEVEL = DUNGEONS.find((d) => d.id === 'castle_ashwood')?.minLevel ?? 5;
 
 // Persisted UI visibility prefs (minimap + action-button cluster). Default on.
 const UI_PREFS_KEY = 'aurisar.world.ui.v1';
@@ -298,7 +300,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const { onQuestUpsert, onQuestDelete, rows: questRows } = useQuestRows();
 
   const {
-    connected, onlineCount, movePlayer, sendChat, castAbility, buildCampfire,
+    connected, onlineCount, worldLevel, movePlayer, sendChat, castAbility, buildCampfire,
     acceptQuest, abandonQuest, turnInQuest, reachWaypoint, enterDungeon, leaveDungeon,
     identity,
   } = useSpacetimeWorld(playerInfo, {
@@ -315,8 +317,8 @@ export default function WorldGame({ playerInfo, onExit }) {
   // NPC quest markers (! / ?) follow quest state into the 3D scene.
   useEffect(() => {
     if (!sceneReady) return;
-    sceneRef.current?.setNpcMarkers(buildNpcMarkers(Object.keys(NPCS), myQuests));
-  }, [myQuests, sceneReady]);
+    sceneRef.current?.setNpcMarkers(buildNpcMarkers(Object.keys(NPCS), myQuests, worldLevel));
+  }, [myQuests, sceneReady, worldLevel]);
 
   // Auto-report 'find' objectives: when standing inside an unvisited
   // waypoint of an active quest, tell the server (which re-validates the
@@ -592,6 +594,7 @@ export default function WorldGame({ playerInfo, onExit }) {
           myQuests={myQuests}
           playerName={playerInfo?.username}
           className={className}
+          playerLevel={worldLevel}
           onAcceptQuest={(qid) => { acceptQuest(qid); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
           onTurnInQuest={(qid) => { turnInQuest(qid); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
           onClose={() => setDialogueNpcId(null)}
@@ -601,7 +604,11 @@ export default function WorldGame({ playerInfo, onExit }) {
       {/* Castle door prompt (tap-friendly; E on desktop) */}
       {nearbyDoor && !dialogueNpcId && !activePanel && (
         <button
-          onClick={() => sceneRef.current?.useDoor(nearbyDoor.id)}
+          onClick={() => {
+            if (nearbyDoor.id === 'castle_gate' && worldLevel < CASTLE_MIN_LEVEL) return;
+            sceneRef.current?.useDoor(nearbyDoor.id);
+          }}
+          disabled={nearbyDoor.id === 'castle_gate' && worldLevel < CASTLE_MIN_LEVEL}
           aria-label={nearbyDoor.label}
           style={{
             position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
@@ -609,12 +616,18 @@ export default function WorldGame({ playerInfo, onExit }) {
             background: 'rgba(15,23,42,0.88)', border: '1px solid rgba(240,208,96,0.5)',
             borderRadius: 22, padding: '9px 18px', color: '#f0d060',
             fontSize: 13.5, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
-            cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            cursor: (nearbyDoor.id === 'castle_gate' && worldLevel < CASTLE_MIN_LEVEL) ? 'not-allowed' : 'pointer',
+            opacity: (nearbyDoor.id === 'castle_gate' && worldLevel < CASTLE_MIN_LEVEL) ? 0.65 : 1,
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
           <span>🏰</span>
-          <span>{nearbyDoor.label}{!IS_TOUCH && ' (E)'}</span>
+          <span>
+            {nearbyDoor.id === 'castle_gate' && worldLevel < CASTLE_MIN_LEVEL
+              ? `Requires level ${CASTLE_MIN_LEVEL}`
+              : `${nearbyDoor.label}${!IS_TOUCH ? ' (E)' : ''}`}
+          </span>
         </button>
       )}
 
