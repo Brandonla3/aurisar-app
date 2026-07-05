@@ -77,15 +77,17 @@ export class AshwoodTileProvider {
       ground.bumpTexture = grassNm;
     }
 
-    let water, lakeWater;
+    let water, lakeWater, streamWater;
     if (this.bake) {
       water = new BABYLON.StandardMaterial('ashwood_water', scene);
       water.diffuseColor = BABYLON.Color3.FromHexString('#29646a');
       water.alpha = 0.84;
       water.backFaceCulling = false;
       lakeWater = water;
+      streamWater = water;
     } else {
       water = buildWaterMaterial(scene, {});
+      streamWater = buildWaterMaterial(scene, { name: 'ashwood_streamwater', alpha: 0.58 });
       // Lake material adds a planar reflection at its surface level — but the
       // MirrorTexture is a second render of the whole scene, so it's gated to
       // the high tier. Low/mobile lakes keep the waves + fresnel sky blend.
@@ -112,7 +114,7 @@ export class AshwoodTileProvider {
       beach.specularColor = new BABYLON.Color3(0, 0, 0);
     }
 
-    this._shared = { scene, ground, water, lakeWater, bed, beach };
+    this._shared = { scene, ground, water, lakeWater, streamWater, bed, beach };
     return this._shared;
   }
 
@@ -174,6 +176,7 @@ export class AshwoodTileProvider {
     const silt = wgHexToRgb(wg.config.colors.lakebedSilt);
     const dirt = wgHexToRgb(wg.config.colors.trailDirt);
     const sand = wgHexToRgb(wg.config.colors.beachSand ?? '#d8bf8c');
+    const wet = wgHexToRgb(wg.config.colors.streamWet ?? '#263733');
 
     for (let i = 0; i < count; i++) {
       const wx = cx + positions[i * 3];
@@ -191,10 +194,10 @@ export class AshwoodTileProvider {
       normals[i * 3 + 2] = -dhdz * inv;
 
       // Ported ground-color pass: biome IDW blend → beach sand → lakebed
-      // silt → trail dirt. Sand goes on before silt so the beach band rings
-      // the waterline and stays visible through the shallows, while deeper
-      // water still darkens to silt. A touch of hash mottling keeps the
-      // strip from reading as a flat painted ring.
+      // silt → trail dirt → mountain stream wet stone. Sand goes on before
+      // silt so the beach band rings the waterline and stays visible through
+      // the shallows, while deeper water still darkens to silt. A touch of
+      // hash mottling keeps the strip from reading as a flat painted ring.
       wg.biomeColorAt(wx, wz, bc);
       const sh = wg.lakeShoreAt(wx, wz);
       if (sh > 0) {
@@ -207,6 +210,10 @@ export class AshwoodTileProvider {
       }
       const td = wg.trailDirtAt(wx, wz);
       if (td > 0) lerpRgb(bc, dirt, td * 0.85);
+      const sm = wg.mtnStreamMask?.(wx, wz) ?? 0;
+      if (sm > 0) {
+        lerpRgb(bc, wet, sm * (0.38 + 0.18 * hash2(wx * 0.48, wz * 0.48)));
+      }
 
       colors[i * 4]     = bc.r;
       colors[i * 4 + 1] = bc.g;
@@ -229,11 +236,11 @@ export class AshwoodTileProvider {
     container.meshes.push(ground);
   }
 
-  // ── water: Mirrormere + ponds (owned by the tile that contains their center,
-  //    so streaming adds each exactly once). Surfaces are dense radial grids so
-  //    the Gerstner vertex waves move the whole interior (a fan disc only has
-  //    rim + center verts). The lake gets a planar reflection; ponds keep the
-  //    upgraded waves + fresnel sky but no per-pond mirror. ──────────────────
+  // ── water: Mirrormere + ponds + mountain stream ribbons. Water bodies are
+  //    owned by one tile so streaming adds each exactly once. Stream segments
+  //    are owned by the tile containing the segment midpoint; because each
+  //    authored segment is short relative to a tile, that keeps the mesh visible
+  //    in the player's tile ring without duplicate z-fighting.
   _buildWater(meta, bounds, scene, shared, container) {
     const wg = this.wg;
     const L = wg.config.lake;
@@ -285,6 +292,89 @@ export class AshwoodTileProvider {
       }
       container.meshes.push(surf);
     }
+
+    this._buildMountainStreams(meta, bounds, scene, shared, container, owns);
+  }
+
+  _buildMountainStreams(meta, bounds, scene, shared, container, owns) {
+    const streams = this.wg.config.mountainStreams ?? [];
+    if (!streams.length) return;
+    for (let si = 0; si < streams.length; si++) {
+      const stream = streams[si];
+      const pts = stream.pts ?? [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const mx = (a[0] + b[0]) * 0.5;
+        const mz = (a[1] + b[1]) * 0.5;
+        if (!owns(mx, mz)) continue;
+        const ribbon = this._streamRibbon(
+          `tile_${meta.id}_stream${si}_${i}`,
+          stream,
+          i,
+          scene,
+          shared.streamWater ?? shared.water,
+        );
+        if (ribbon) container.meshes.push(ribbon);
+      }
+    }
+  }
+
+  _streamRibbon(name, stream, segIndex, scene, material) {
+    const pts = stream.pts ?? [];
+    const a = pts[segIndex], b = pts[segIndex + 1];
+    if (!a || !b) return null;
+
+    const ax = a[0], az = a[1], bx = b[0], bz = b[1];
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    if (len < 1) return null;
+
+    const tx = dx / len, tz = dz / len;
+    const nx = -tz, nz = tx;
+    const half = (stream.w ?? 6) * 0.42;
+    const steps = Math.max(4, Math.ceil(len / 4.5));
+    const positions = [];
+    const indices = [];
+    const shore = [];
+
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const cx = ax + dx * t;
+      const cz = az + dz * t;
+      const braid = (hash2(cx * 0.19 + 4.7, cz * 0.19 - 1.3) - 0.5) * half * 0.22;
+      const width = half * (0.72 + 0.22 * Math.sin(t * Math.PI) + 0.08 * hash2(cx * 0.31, cz * 0.31));
+      const ox = nx * width + tx * braid;
+      const oz = nz * width + tz * braid;
+      const y = this.wg.surfaceY(cx, cz) + 0.055;
+
+      // Three vertices per cross-section: left edge, center flow, right edge.
+      // The water shader uses shore=1 near contacts and shore≈0 in the middle,
+      // giving narrow edge ripples instead of foaming the whole ribbon.
+      positions.push(cx + ox, y, cz + oz);
+      positions.push(cx, y + 0.018, cz);
+      positions.push(cx - ox, y, cz - oz);
+      shore.push(0.92, 0.18, 0.92);
+    }
+
+    for (let s = 0; s < steps; s++) {
+      const c = s * 3, n = (s + 1) * 3;
+      indices.push(c, n, c + 1, c + 1, n, n + 1);
+      indices.push(c + 1, n + 1, c + 2, c + 2, n + 1, n + 2);
+    }
+
+    const mesh = new BABYLON.Mesh(name, scene);
+    const vd = new BABYLON.VertexData();
+    vd.positions = positions;
+    vd.indices = indices;
+    const normals = [];
+    BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    vd.normals = normals;
+    vd.applyToMesh(mesh, false);
+    mesh.setVerticesData('shore', new Float32Array(shore), false, 1);
+    mesh.alphaIndex = 2;
+    mesh.material = material;
+    mesh.isPickable = false;
+    return mesh;
   }
 
   // Sandy beach: an annulus draped over the terrain around the lake
@@ -536,7 +626,7 @@ function buildWaterMaterial(scene, opts = {}) {
   BABYLON.Effect.ShadersStore['ashwoodWaterFragmentShader'] = WATER_FRAG;
 
   const reflect = !!opts.reflect;
-  const mat = new BABYLON.ShaderMaterial(reflect ? 'ashwood_lakewater' : 'ashwood_water', scene, 'ashwoodWater', {
+  const mat = new BABYLON.ShaderMaterial(opts.name ?? (reflect ? 'ashwood_lakewater' : 'ashwood_water'), scene, 'ashwoodWater', {
     attributes: ['position', 'shore'],
     uniforms: ['world', 'viewProjection', 'cameraPosition',
                't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
@@ -570,7 +660,7 @@ function buildWaterMaterial(scene, opts = {}) {
   mat.setColor3('deep',    BABYLON.Color3.FromHexString('#0b2128'));
   mat.setColor3('shallow', BABYLON.Color3.FromHexString('#29646a'));
   mat.setColor3('skyCol',  BABYLON.Color3.FromHexString('#9db8c8'));
-  mat.setFloat('alphaV', 0.84);
+  mat.setFloat('alphaV', opts.alpha ?? 0.84);
   mat.setFloat('night', 0);
   mat.setFloat('t', 0);
 
