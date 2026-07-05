@@ -109,7 +109,7 @@ export default function CookingPanel({ inv, sceneRef, onClose, onToast }) {
         })}
       </div>
       <p style={{ color: '#64748b', fontSize: 11, margin: '14px 0 0', fontFamily: FONT }}>
-        Eating restores HP once server healing is enabled — for now it's a taste of things to come.
+        Eating restores HP via the server. Cooking still uses local ingredients until the next P4 phase syncs campfires.
       </p>
     </WorldModal>
   );

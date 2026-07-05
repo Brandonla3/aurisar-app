@@ -1,30 +1,47 @@
 /**
- * InventoryPanel — grid of held items. Click a food item to eat it (cosmetic;
- * see useInventory.eat). Items come from the client-side useInventory hook.
+ * InventoryPanel — grid of held items. Click a consumable to eat (server heal).
  */
 
 import React from 'react';
 import WorldModal from './ui/WorldModal.jsx';
-import { ITEMS } from './game/items.js';
+import { ITEMS } from './content/index';
+import { formatCopper } from './hooks/useServerInventory.js';
 import { FONT } from './ui/panelTheme.js';
 
-const SLOT_COUNT = 24; // padded grid
+const SLOT_COUNT = 24;
+
+function isEdible(item) {
+  return item && (item.type === 'consumable' || item.type === 'food') && (item.heal ?? 0) > 0;
+}
 
 export default function InventoryPanel({ inv, onClose, onToast }) {
   const owned = Object.entries(inv.counts).filter(([, n]) => n > 0);
   const slots = [...owned];
   while (slots.length < SLOT_COUNT) slots.push(null);
+  const copperLabel = formatCopper(inv.copper);
 
   const eat = (id) => {
+    const item = ITEMS[id];
+    if (!isEdible(item)) return;
     const heal = inv.eat(id);
-    if (heal > 0) onToast?.(`You eat the ${ITEMS[id].name}.`);
+    if (heal > 0) onToast?.(`You eat the ${item.name}. (+${heal} HP)`);
+    else if ((inv.counts[id] ?? 0) > 0) onToast?.(`You eat the ${item.name}.`);
   };
 
   return (
     <WorldModal title="Inventory" onClose={onClose} width={360}>
+      <div
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: 10, fontFamily: FONT, fontSize: 13, color: '#f0d060',
+        }}
+      >
+        <span>Copper</span>
+        <span style={{ fontWeight: 700 }}>{copperLabel} 🪙</span>
+      </div>
       {owned.length === 0 && (
         <p style={{ color: '#94a3b8', fontSize: 13, margin: '4px 0 12px' }}>
-          Your pack is empty. Explore and walk onto chests to gather items.
+          Your pack is empty. Slay creatures for loot or walk onto chests to gather items.
         </p>
       )}
       <div
@@ -43,13 +60,13 @@ export default function InventoryPanel({ inv, onClose, onToast }) {
           const [id, count] = entry;
           const item = ITEMS[id];
           if (!item) return <div key={i} style={emptySlot} />;
-          const isFood = item.type === 'food';
+          const edible = isEdible(item);
           return (
             <button
               key={i}
-              style={{ ...filledSlot, cursor: isFood ? 'pointer' : 'default' }}
-              title={isFood ? `${item.name} — click to eat` : item.name}
-              onClick={isFood ? () => eat(id) : undefined}
+              style={{ ...filledSlot, cursor: edible ? 'pointer' : 'default' }}
+              title={edible ? `${item.name} — click to eat (+${item.heal} HP)` : item.name}
+              onClick={edible ? () => eat(id) : undefined}
             >
               <span style={{ fontSize: 22, lineHeight: 1 }}>{item.icon}</span>
               <span style={countBadge}>{count}</span>
@@ -58,7 +75,7 @@ export default function InventoryPanel({ inv, onClose, onToast }) {
         })}
       </div>
       <p style={{ color: '#64748b', fontSize: 11, margin: '14px 0 0', fontFamily: FONT }}>
-        Tip: cook ingredients into food at the Cooking station (press C).
+        Tip: cook ingredients at the Cooking station (C) near a campfire.
       </p>
     </WorldModal>
   );

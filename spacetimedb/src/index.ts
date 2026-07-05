@@ -63,6 +63,20 @@ import {
   worldMToPx,
 } from './castle/validate.js';
 import { CASTLE_LEVELS, CASTLE_STEP_UP } from './castle/navGrids.js';
+import {
+  addCopper,
+  addItemStack,
+  applyHeal,
+  getOrCreateWallet,
+  grantMobLoot,
+  grantQuestReward,
+  grantStartingKit,
+  isConsumable,
+  lootSeedFromKill,
+  removeItemStack,
+  type InventoryCtx,
+} from './inventory/helpers.js';
+import { getItemDef, ITEMS } from './content/items/index.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -395,6 +409,34 @@ const spacetimedb = schema({
     }
   ),
 
+  /**
+   * P4 — copper wallet per player. Public so the client can show balance;
+   * `imported` gates the one-time localStorage migration reducer.
+   */
+  playerWallet: table(
+    { public: true },
+    {
+      identity: t.identity().primaryKey(),
+      copper:   t.u64().default(0n),
+      imported: t.bool().default(false),
+    }
+  ),
+
+  /**
+   * P4 — item stacks owned by a player. One row per stack (stackable items
+   * may share itemId across rows when over stack cap). Clients filter to
+   * their own identity.
+   */
+  playerItemStack: table(
+    { public: true },
+    {
+      id:       t.u64().primaryKey().autoInc(),
+      owner:    t.identity(),
+      itemId:   t.string(),
+      quantity: t.u32(),
+    }
+  ),
+
 });
 
 export default spacetimedb;
@@ -460,6 +502,9 @@ export const setPlayerInfo = spacetimedb.reducer(
         dungeonInstanceId: 0n,
         floorYM: 0,
       });
+      const invCtx = ctx as InventoryCtx;
+      getOrCreateWallet(invCtx, identity);
+      grantStartingKit(invCtx, identity);
     }
   }
 );
@@ -497,6 +542,70 @@ export const syncProgress = spacetimedb.reducer(
         worldLevel: level,
       });
     }
+  }
+);
+
+/**
+ * P4 — consume a food/consumable item for server-authoritative healing.
+ */
+export const consumeItem = spacetimedb.reducer(
+  { itemId: t.string() },
+  (ctx, { itemId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const def = getItemDef(itemId);
+    if (!isConsumable(def)) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!removeItemStack(invCtx, identity, itemId, 1)) return;
+    applyHeal(invCtx, identity, def!.heal ?? 0);
+  }
+);
+
+/**
+ * P4 — one-time migration from client localStorage inventory. Converts
+ * legacy `coin` stacks to copper; skips unknown item ids.
+ */
+export const importInventory = spacetimedb.reducer(
+  {
+    itemsJson: t.string(),
+    coinQty:   t.u32(),
+  },
+  (ctx, { itemsJson, coinQty }) => {
+    const identity = ctx.sender;
+    const invCtx = ctx as InventoryCtx;
+    const wallet = getOrCreateWallet(invCtx, identity);
+    if (wallet.imported) return;
+
+    let copperFromCoins = 0;
+    try {
+      const parsed = JSON.parse(itemsJson) as Record<string, number>;
+      if (parsed && typeof parsed === 'object') {
+        for (const [itemId, rawQty] of Object.entries(parsed)) {
+          const qty = Math.floor(Number(rawQty));
+          if (!Number.isFinite(qty) || qty <= 0) continue;
+          if (itemId === 'coin') {
+            copperFromCoins += qty;
+            continue;
+          }
+          if (!ITEMS[itemId]) continue;
+          addItemStack(invCtx, identity, itemId, qty);
+        }
+      }
+    } catch {
+      // malformed JSON — still mark imported so we don't retry forever
+    }
+
+    const totalCopper = copperFromCoins + Math.max(0, Math.floor(coinQty));
+    ctx.db.playerWallet.identity.update({
+      ...wallet,
+      imported: true,
+      copper: wallet.copper + BigInt(totalCopper),
+    });
   }
 );
 
@@ -946,6 +1055,17 @@ export const castAbility = spacetimedb.reducer(
       // P1 quest hook: kill credit goes to whoever lands the killing blow
       // (tap rights / party sharing arrive with P3/P6).
       creditKillToQuests(ctx, player.identity, mob);
+      // P4: mob loot + copper to the killer.
+      const mobDef = MOBS[mob.mobType];
+      if (mobDef) {
+        const seed = lootSeedFromKill(
+          player.identity,
+          mobId,
+          nowMicros,
+          mob.spawnNetId,
+        );
+        grantMobLoot(ctx as InventoryCtx, player.identity, mobDef, seed);
+      }
     } else {
       ctx.db.mob.mobId.update({ ...mob, hp: newHp });
     }
@@ -1482,8 +1602,12 @@ export const turnInQuest = spacetimedb.reducer(
     if (!questIsReady(quest, counts)) return;
     if (!playerInRangeOfNpc(player, quest.turnInNpcId)) return;
 
-    // P2 grants copper/template unlocks here; P4 grants items. gameXp is
-    // gated by GAME_XP_ENABLED (off) per the fitness-only-XP decision.
+    grantQuestReward(
+      ctx as InventoryCtx,
+      ctx.sender,
+      player.classType,
+      quest.reward,
+    );
     ctx.db.playerQuest.id.update({ ...row, state: QUEST_STATE_DONE });
   }
 );

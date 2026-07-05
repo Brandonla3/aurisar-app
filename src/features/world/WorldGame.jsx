@@ -15,6 +15,9 @@ import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 import TestingHud             from './TestingHud.jsx';
 import { useInventory }       from './useInventory.js';
+import {
+  useServerInventory, mergeInventoryCounts, localInventoryImportPayload,
+} from './hooks/useServerInventory.js';
 import WorldMap               from './WorldMap.jsx';
 import GameMenu               from './GameMenu.jsx';
 import InventoryPanel         from './InventoryPanel.jsx';
@@ -23,7 +26,7 @@ import ActionButtons, { actionBtnStyle, actionBtnLabelStyle } from './ActionButt
 import DialoguePanel          from './hud/DialoguePanel.jsx';
 import QuestLogPanel          from './hud/QuestLogPanel.jsx';
 import QuestTracker           from './hud/QuestTracker.jsx';
-import { ITEMS }              from './game/items.js';
+import { ITEMS }              from './content/index';
 import { NPCS, QUESTS, WAYPOINTS } from './content/index';
 import { DUNGEONS } from './content/dungeons/index';
 import {
@@ -221,7 +224,20 @@ export default function WorldGame({ playerInfo, onExit }) {
   // before sceneRef is set and never again while disconnected.
   const [sceneReady, setSceneReady] = useState(false);
 
-  const inv = useInventory(playerInfo?.username);
+  const localInv = useInventory(playerInfo?.username);
+  const {
+    onStackUpsert, onStackDelete, onWalletUpsert,
+    countsFor, copperFor,
+  } = useServerInventory();
+
+  const inventoryImport = React.useMemo(
+    () => localInventoryImportPayload(playerInfo?.username),
+    [playerInfo?.username],
+  );
+  const stdbPlayerInfo = React.useMemo(
+    () => (playerInfo ? { ...playerInfo, inventoryImport } : null),
+    [playerInfo, inventoryImport],
+  );
 
   const togglePanel = useCallback((name) => setActivePanel((p) => (p === name ? null : name)), []);
   const openPanel   = useCallback((name) => setActivePanel(name), []);
@@ -246,12 +262,12 @@ export default function WorldGame({ playerInfo, onExit }) {
 
   // Chest looted (fired by the scene's proximity scan) → grant items + toast.
   const onChestOpen = useCallback((chest) => {
-    const rolled = inv.openChest(chest);
+    const rolled = localInv.openChest(chest);
     if (rolled && rolled.length) {
       const txt = rolled.map((r) => `${r.qty}× ${ITEMS[r.id]?.name ?? r.id}`).join(', ');
       showToast(`Chest opened — found ${txt}`);
     }
-  }, [inv, showToast]);
+  }, [localInv, showToast]);
 
   const inputRef  = useRef(null);
   const joyTouchRef = useRef(null); // { id, baseX, baseY }
@@ -302,11 +318,35 @@ export default function WorldGame({ playerInfo, onExit }) {
   const {
     connected, onlineCount, worldLevel, movePlayer, sendChat, castAbility, buildCampfire,
     acceptQuest, abandonQuest, turnInQuest, reachWaypoint, enterDungeon, leaveDungeon,
-    identity,
-  } = useSpacetimeWorld(playerInfo, {
+    consumeItem, identity,
+  } = useSpacetimeWorld(stdbPlayerInfo, {
     onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
     onCampfireUpsert, onCampfireDelete, onQuestUpsert, onQuestDelete,
+    onStackUpsert, onStackDelete, onWalletUpsert,
   });
+
+  const serverCounts = React.useMemo(
+    () => countsFor(identity),
+    [countsFor, identity],
+  );
+  const copper = React.useMemo(
+    () => copperFor(identity),
+    [copperFor, identity],
+  );
+  const inv = React.useMemo(() => ({
+    counts: mergeInventoryCounts(serverCounts, localInv.counts),
+    copper,
+    cook: localInv.cook,
+    eat: (itemId) => {
+      const item = ITEMS[itemId];
+      const onServer = (serverCounts[itemId] ?? 0) > 0;
+      if (onServer && item && (item.type === 'consumable' || item.type === 'food')) {
+        consumeItem(itemId);
+        return item.heal ?? 0;
+      }
+      return localInv.eat(itemId);
+    },
+  }), [serverCounts, localInv, copper, consumeItem]);
 
   const myQuests = React.useMemo(
     () => myQuestsFrom(questRows, identity),

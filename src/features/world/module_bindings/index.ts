@@ -38,7 +38,9 @@ import AbandonQuestReducer from "./abandon_quest_reducer";
 import AcceptQuestReducer from "./accept_quest_reducer";
 import BuildCampfireReducer from "./build_campfire_reducer";
 import CastAbilityReducer from "./cast_ability_reducer";
+import ConsumeItemReducer from "./consume_item_reducer";
 import EnterDungeonReducer from "./enter_dungeon_reducer";
+import ImportInventoryReducer from "./import_inventory_reducer";
 import LeaveDungeonReducer from "./leave_dungeon_reducer";
 import MovePlayerReducer from "./move_player_reducer";
 import ReachWaypointReducer from "./reach_waypoint_reducer";
@@ -57,7 +59,9 @@ import ChatMessageRow from "./chat_message_table";
 import DungeonInstanceRow from "./dungeon_instance_table";
 import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
+import PlayerItemStackRow from "./player_item_stack_table";
 import PlayerQuestRow from "./player_quest_table";
+import PlayerWalletRow from "./player_wallet_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -114,6 +118,28 @@ const tablesSchema = __schema({
       { name: 'player_quest_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerQuestRow),
+  playerWallet: __table({
+    name: 'player_wallet',
+    indexes: [
+      { accessor: 'identity', name: 'player_wallet_identity_idx_btree', algorithm: 'btree', columns: [
+        'identity',
+      ] },
+    ],
+    constraints: [
+      { name: 'player_wallet_identity_key', constraint: 'unique', columns: ['identity'] },
+    ],
+  }, PlayerWalletRow),
+  playerItemStack: __table({
+    name: 'player_item_stack',
+    indexes: [
+      { accessor: 'id', name: 'player_item_stack_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'player_item_stack_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PlayerItemStackRow),
   dungeonInstance: __table({
     name: 'dungeon_instance',
     indexes: [
@@ -133,7 +159,9 @@ const reducersSchema = __reducers(
   __reducerSchema("accept_quest", AcceptQuestReducer),
   __reducerSchema("build_campfire", BuildCampfireReducer),
   __reducerSchema("cast_ability", CastAbilityReducer),
+  __reducerSchema("consume_item", ConsumeItemReducer),
   __reducerSchema("enter_dungeon", EnterDungeonReducer),
+  __reducerSchema("import_inventory", ImportInventoryReducer),
   __reducerSchema("leave_dungeon", LeaveDungeonReducer),
   __reducerSchema("move_player", MovePlayerReducer),
   __reducerSchema("reach_waypoint", ReachWaypointReducer),
