@@ -67,6 +67,8 @@ import {
   addCopper,
   addItemStack,
   applyHeal,
+  countItemOwned,
+  deductCopper,
   getOrCreateWallet,
   grantMobLoot,
   grantQuestReward,
@@ -85,6 +87,14 @@ import {
 } from './quests/collect.js';
 import { objectiveTarget } from './content/formulas/quests.js';
 import { getItemDef, ITEMS } from './content/items/index.js';
+import {
+  buyPriceCopper,
+  clampTradeQty,
+  isVendorNpc,
+  itemSellPrice,
+  playerNearNpc,
+  vendorSellsItem,
+} from './vendors/helpers.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -614,6 +624,79 @@ export const importInventory = spacetimedb.reducer(
       imported: true,
       copper: wallet.copper + BigInt(totalCopper),
     });
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 3 — buy an item from a vendor NPC's wares while in range.
+ */
+export const buyFromVendor = spacetimedb.reducer(
+  {
+    npcId:    t.string(),
+    itemId:   t.string(),
+    quantity: t.u32(),
+  },
+  (ctx, { npcId, itemId, quantity }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+    if (!isVendorNpc(npcId) || !vendorSellsItem(npcId, itemId)) return;
+    if (!playerNearNpc(player, npcId)) return;
+
+    const def = getItemDef(itemId);
+    if (!def) return;
+    const unitPrice = buyPriceCopper(itemId);
+    if (unitPrice <= 0) return;
+    if (def.minLevel && getPlayerLevel(ctx, identity) < def.minLevel) return;
+
+    const qty = clampTradeQty(quantity, def.stack);
+    if (qty <= 0) return;
+    const totalCost = unitPrice * qty;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!deductCopper(invCtx, identity, totalCost)) return;
+    const granted = addItemStack(invCtx, identity, itemId, qty);
+    if (granted < qty) {
+      addCopper(invCtx, identity, unitPrice * (qty - granted));
+    }
+    if (granted <= 0) return;
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 3 — sell items from inventory to a vendor NPC while in range.
+ */
+export const sellToVendor = spacetimedb.reducer(
+  {
+    npcId:    t.string(),
+    itemId:   t.string(),
+    quantity: t.u32(),
+  },
+  (ctx, { npcId, itemId, quantity }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+    if (!isVendorNpc(npcId)) return;
+    if (!playerNearNpc(player, npcId)) return;
+
+    const def = getItemDef(itemId);
+    if (!def) return;
+    const unitPrice = itemSellPrice(itemId);
+    if (unitPrice <= 0) return;
+
+    const invCtx = ctx as InventoryCtx;
+    const owned = countItemOwned(invCtx, identity, itemId);
+    const qty = clampTradeQty(Math.min(quantity, owned), def.stack);
+    if (qty <= 0) return;
+
+    if (!removeItemStack(invCtx, identity, itemId, qty)) return;
+    addCopper(invCtx, identity, unitPrice * qty);
     refreshCollectQuestProgress(invCtx, identity);
   }
 );

@@ -143,6 +143,23 @@ export function addCopper(ctx: InventoryCtx, identity: unknown, amount: number):
   });
 }
 
+/** Returns false when the wallet cannot cover amount. */
+export function deductCopper(
+  ctx: InventoryCtx,
+  identity: unknown,
+  amount: number,
+): boolean {
+  if (amount <= 0) return true;
+  const wallet = getOrCreateWallet(ctx, identity);
+  const cost = BigInt(amount);
+  if (wallet.copper < cost) return false;
+  ctx.db.playerWallet.identity.update({
+    ...wallet,
+    copper: wallet.copper - cost,
+  });
+  return true;
+}
+
 export function rollLootTable(
   rng: () => number,
   table: LootEntry[] | undefined,

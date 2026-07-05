@@ -139,6 +139,22 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch { /* not connected yet */ }
   }, []);
 
+  const buyFromVendor = useCallback((npcId, itemId, quantity = 1) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.buyFromVendor(npcId, itemId, quantity);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const sellToVendor = useCallback((npcId, itemId, quantity = 1) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.sellToVendor(npcId, itemId, quantity);
+    } catch { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -362,6 +378,8 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     leaveDungeon,
     consumeItem,
     importInventory,
+    buyFromVendor,
+    sellToVendor,
     identity,
   };
 }

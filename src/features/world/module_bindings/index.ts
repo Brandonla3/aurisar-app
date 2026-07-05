@@ -37,6 +37,7 @@ import {
 import AbandonQuestReducer from "./abandon_quest_reducer";
 import AcceptQuestReducer from "./accept_quest_reducer";
 import BuildCampfireReducer from "./build_campfire_reducer";
+import BuyFromVendorReducer from "./buy_from_vendor_reducer";
 import CastAbilityReducer from "./cast_ability_reducer";
 import ConsumeItemReducer from "./consume_item_reducer";
 import EnterDungeonReducer from "./enter_dungeon_reducer";
@@ -45,6 +46,7 @@ import LeaveDungeonReducer from "./leave_dungeon_reducer";
 import MovePlayerReducer from "./move_player_reducer";
 import ReachWaypointReducer from "./reach_waypoint_reducer";
 import SeedWorldReducer from "./seed_world_reducer";
+import SellToVendorReducer from "./sell_to_vendor_reducer";
 import SendChatReducer from "./send_chat_reducer";
 import SetAvatarConfigReducer from "./set_avatar_config_reducer";
 import SetPlayerInfoReducer from "./set_player_info_reducer";
@@ -158,6 +160,7 @@ const reducersSchema = __reducers(
   __reducerSchema("abandon_quest", AbandonQuestReducer),
   __reducerSchema("accept_quest", AcceptQuestReducer),
   __reducerSchema("build_campfire", BuildCampfireReducer),
+  __reducerSchema("buy_from_vendor", BuyFromVendorReducer),
   __reducerSchema("cast_ability", CastAbilityReducer),
   __reducerSchema("consume_item", ConsumeItemReducer),
   __reducerSchema("enter_dungeon", EnterDungeonReducer),
@@ -166,6 +169,7 @@ const reducersSchema = __reducers(
   __reducerSchema("move_player", MovePlayerReducer),
   __reducerSchema("reach_waypoint", ReachWaypointReducer),
   __reducerSchema("seed_world", SeedWorldReducer),
+  __reducerSchema("sell_to_vendor", SellToVendorReducer),
   __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("set_avatar_config", SetAvatarConfigReducer),
   __reducerSchema("set_player_info", SetPlayerInfoReducer),

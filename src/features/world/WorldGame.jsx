@@ -318,7 +318,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const {
     connected, onlineCount, worldLevel, movePlayer, sendChat, castAbility, buildCampfire,
     acceptQuest, abandonQuest, turnInQuest, reachWaypoint, enterDungeon, leaveDungeon,
-    consumeItem, identity,
+    consumeItem, buyFromVendor, sellToVendor, identity,
   } = useSpacetimeWorld(stdbPlayerInfo, {
     onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
     onCampfireUpsert, onCampfireDelete, onQuestUpsert, onQuestDelete,
@@ -636,11 +636,16 @@ export default function WorldGame({ playerInfo, onExit }) {
           npcId={dialogueNpcId}
           myQuests={myQuests}
           itemCounts={inv.counts}
+          serverCounts={serverCounts}
+          copper={copper}
           playerName={playerInfo?.username}
           className={className}
           playerLevel={worldLevel}
           onAcceptQuest={(qid) => { acceptQuest(qid); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
           onTurnInQuest={(qid) => { turnInQuest(qid); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
+          onBuyFromVendor={buyFromVendor}
+          onSellToVendor={sellToVendor}
+          onToast={showToast}
           onClose={() => setDialogueNpcId(null)}
         />
       )}
