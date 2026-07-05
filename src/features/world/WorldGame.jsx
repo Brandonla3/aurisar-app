@@ -227,7 +227,8 @@ export default function WorldGame({ playerInfo, onExit }) {
 
   const {
     onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
-    countsFor, copperFor, openedChestIdsFor,
+    onEquippedUpsert, onEquippedDelete,
+    countsFor, copperFor, openedChestIdsFor, equippedFor,
   } = useServerInventory();
 
   const inventoryImport = React.useMemo(
@@ -313,11 +314,13 @@ export default function WorldGame({ playerInfo, onExit }) {
   const {
     connected, onlineCount, worldLevel, movePlayer, sendChat, castAbility, buildCampfire,
     acceptQuest, abandonQuest, turnInQuest, reachWaypoint, enterDungeon, leaveDungeon,
-    consumeItem, buyFromVendor, sellToVendor, openChest, cookRecipe, identity,
+    consumeItem, buyFromVendor, sellToVendor, openChest, cookRecipe,
+    equipItem, unequipItem, identity,
   } = useSpacetimeWorld(stdbPlayerInfo, {
     onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
     onCampfireUpsert, onCampfireDelete, onQuestUpsert, onQuestDelete,
     onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
+    onEquippedUpsert, onEquippedDelete,
   });
 
   const onChestOpen = useCallback((chest) => {
@@ -342,14 +345,30 @@ export default function WorldGame({ playerInfo, onExit }) {
     () => copperFor(identity),
     [copperFor, identity],
   );
+  const equipped = React.useMemo(
+    () => equippedFor(identity),
+    [equippedFor, identity],
+  );
   const inv = React.useMemo(() => ({
     counts: serverCounts,
     copper,
+    equipped,
     cook: (recipeId, { nearFire = true } = {}) => {
       if (!nearFire) return false;
       const recipe = RECIPES_BY_ID[recipeId];
       if (!recipe || !canCookRecipe(recipe, serverCounts)) return false;
       cookRecipe(recipeId);
+      return true;
+    },
+    equip: (itemId) => {
+      const item = ITEMS[itemId];
+      if (!item || (item.type !== 'weapon' && item.type !== 'armor') || !item.slot) return false;
+      equipItem(itemId);
+      return true;
+    },
+    unequip: (slot) => {
+      if (!equipped[slot]) return false;
+      unequipItem(slot);
       return true;
     },
     eat: (itemId) => {
@@ -361,7 +380,7 @@ export default function WorldGame({ playerInfo, onExit }) {
       }
       return 0;
     },
-  }), [serverCounts, copper, consumeItem, cookRecipe]);
+  }), [serverCounts, copper, equipped, consumeItem, cookRecipe, equipItem, unequipItem]);
 
   const openedChestIds = React.useMemo(
     () => openedChestIdsFor(identity),

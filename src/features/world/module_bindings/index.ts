@@ -42,6 +42,7 @@ import CastAbilityReducer from "./cast_ability_reducer";
 import ConsumeItemReducer from "./consume_item_reducer";
 import CookRecipeReducer from "./cook_recipe_reducer";
 import EnterDungeonReducer from "./enter_dungeon_reducer";
+import EquipItemReducer from "./equip_item_reducer";
 import ImportInventoryReducer from "./import_inventory_reducer";
 import LeaveDungeonReducer from "./leave_dungeon_reducer";
 import MovePlayerReducer from "./move_player_reducer";
@@ -54,6 +55,7 @@ import SetAvatarConfigReducer from "./set_avatar_config_reducer";
 import SetPlayerInfoReducer from "./set_player_info_reducer";
 import SyncProgressReducer from "./sync_progress_reducer";
 import TurnInQuestReducer from "./turn_in_quest_reducer";
+import UnequipItemReducer from "./unequip_item_reducer";
 
 // Import all procedure arg schemas
 
@@ -64,6 +66,7 @@ import DungeonInstanceRow from "./dungeon_instance_table";
 import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
 import PlayerChestOpenedRow from "./player_chest_opened_table";
+import PlayerEquippedRow from "./player_equipped_table";
 import PlayerItemStackRow from "./player_item_stack_table";
 import PlayerQuestRow from "./player_quest_table";
 import PlayerWalletRow from "./player_wallet_table";
@@ -156,6 +159,17 @@ const tablesSchema = __schema({
       { name: 'player_chest_opened_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerChestOpenedRow),
+  playerEquipped: __table({
+    name: 'player_equipped',
+    indexes: [
+      { accessor: 'id', name: 'player_equipped_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'player_equipped_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PlayerEquippedRow),
   dungeonInstance: __table({
     name: 'dungeon_instance',
     indexes: [
@@ -179,6 +193,7 @@ const reducersSchema = __reducers(
   __reducerSchema("consume_item", ConsumeItemReducer),
   __reducerSchema("cook_recipe", CookRecipeReducer),
   __reducerSchema("enter_dungeon", EnterDungeonReducer),
+  __reducerSchema("equip_item", EquipItemReducer),
   __reducerSchema("import_inventory", ImportInventoryReducer),
   __reducerSchema("leave_dungeon", LeaveDungeonReducer),
   __reducerSchema("move_player", MovePlayerReducer),
@@ -191,6 +206,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_player_info", SetPlayerInfoReducer),
   __reducerSchema("sync_progress", SyncProgressReducer),
   __reducerSchema("turn_in_quest", TurnInQuestReducer),
+  __reducerSchema("unequip_item", UnequipItemReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

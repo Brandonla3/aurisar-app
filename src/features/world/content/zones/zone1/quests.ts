@@ -6,9 +6,10 @@
  * Kill objectives: q_wolves, q_bandits → q_ringleader · q_murlocs ·
  * q_mine · q_bones
  * Collect objectives (P4 phase 2): q_greyjaw, q_boars, q_spiders, q_supplies
+ * Edran chain (P4 phase 5): q_whispers → q_names_of_the_dead →
+ * q_silence_the_call → q_rite
  *
- * STAGED FOR LATER: q_whispers → q_names_of_the_dead → q_silence_the_call →
- * q_rite (Edran chain), q_sexton, q_hollow, q_gravecallers_trail (P7).
+ * STAGED FOR LATER: q_sexton, q_hollow, q_gravecallers_trail (P7).
  *
  * gameXp values are theirs, applied only if GAME_XP_ENABLED flips on.
  */
@@ -161,5 +162,65 @@ export const QUESTS: QuestDef[] = [
       { type: 'kill', mobType: 'restless_bones', count: 8, label: 'Restless Bones laid to rest' },
     ],
     reward: { copper: 260, gameXp: 700 },
+  },
+  {
+    id: 'q_whispers',
+    zoneId: 1,
+    name: 'Whispers in the Chapel Yard',
+    giverNpcId: 'brother_edran',
+    turnInNpcId: 'brother_edran',
+    requiresQuestId: 'q_bones',
+    minLevel: 5,
+    text: 'The dead speak in fragments now — cold breath on the back of the neck, words without mouths. Gather 4 vials of Ghostly Essence from the restless bones at Mourner\'s Rest. I must learn what they are trying to say.',
+    completionText: 'These essences still murmur. I will begin the rite of naming tonight.',
+    objectives: [
+      { type: 'collect', itemId: 'ghostly_essence', count: 4, label: 'Ghostly Essence' },
+    ],
+    reward: { copper: 180, gameXp: 480 },
+  },
+  {
+    id: 'q_names_of_the_dead',
+    zoneId: 1,
+    name: 'Names of the Dead',
+    giverNpcId: 'brother_edran',
+    turnInNpcId: 'brother_edran',
+    requiresQuestId: 'q_whispers',
+    minLevel: 5,
+    text: 'Each bone remembers a name, and names have power over what walks again. Bring me 6 sets of Bone Fragments from the undead camp — I will inscribe them on the chapel stones.',
+    completionText: 'Good. The names are written. Now we must quiet the call that woke them.',
+    objectives: [
+      { type: 'collect', itemId: 'bone_fragments', count: 6, label: 'Bone Fragments' },
+    ],
+    reward: { copper: 200, gameXp: 520 },
+  },
+  {
+    id: 'q_silence_the_call',
+    zoneId: 1,
+    name: 'Silence the Call',
+    giverNpcId: 'brother_edran',
+    turnInNpcId: 'brother_edran',
+    requiresQuestId: 'q_names_of_the_dead',
+    minLevel: 5,
+    text: 'The tunnel rats carry blessed tallow stolen from my stores — candles meant to ward the restless. Recover 4 Blessed Tallow from the dig, $N, before the calling spreads beyond the hill.',
+    completionText: 'The tallow is safe. One rite remains before the dead sleep again.',
+    objectives: [
+      { type: 'collect', itemId: 'blessed_wax', count: 4, label: 'Blessed Tallow' },
+    ],
+    reward: { copper: 220, gameXp: 560 },
+  },
+  {
+    id: 'q_rite',
+    zoneId: 1,
+    name: 'The Rite of Rest',
+    giverNpcId: 'brother_edran',
+    turnInNpcId: 'brother_edran',
+    requiresQuestId: 'q_silence_the_call',
+    minLevel: 5,
+    text: 'Meet me at Mourner\'s Rest on the northwest hill. Stand within the old chapel stones while I speak the final prayer — then return, and I will bless your hands for the work ahead.',
+    completionText: 'It is done. The hill is quiet again. Wear these — they are consecrated for a defender of the living.',
+    objectives: [
+      { type: 'find', targetId: 'poi_mourners_rest', label: "Pray at Mourner's Rest" },
+    ],
+    reward: { copper: 320, itemIds: ['boarhide_gloves'], gameXp: 750 },
   },
 ];

@@ -101,6 +101,10 @@ import {
   grantChestLoot,
   playerNearLitCampfire,
 } from './world/chest.js';
+import {
+  equipItemForPlayer,
+  unequipSlotForPlayer,
+} from './equip/helpers.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -470,6 +474,20 @@ const spacetimedb = schema({
       id:      t.u64().primaryKey().autoInc(),
       owner:   t.identity(),
       chestId: t.u32(),
+    }
+  ),
+
+  /**
+   * P4 phase 5 — equipped weapon/armor slots per player. Items leave the
+   * bag while equipped; unequip returns them to player_item_stack.
+   */
+  playerEquipped: table(
+    { public: true },
+    {
+      id:     t.u64().primaryKey().autoInc(),
+      owner:  t.identity(),
+      slot:   t.string(),
+      itemId: t.string(),
     }
   ),
 
@@ -1059,6 +1077,39 @@ export const cookRecipe = spacetimedb.reducer(
     if (!playerNearLitCampfire(invCtx, player)) return;
     if (!cookRecipeForPlayer(invCtx, identity, recipeId)) return;
     refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 5 — equip a weapon or armor piece from the player's bag.
+ */
+export const equipItem = spacetimedb.reducer(
+  { itemId: t.string() },
+  (ctx, { itemId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const invCtx = ctx as InventoryCtx;
+    equipItemForPlayer(invCtx, identity, itemId, getPlayerLevel(ctx, identity));
+  }
+);
+
+/**
+ * P4 phase 5 — unequip a slot and return the item to the bag.
+ */
+export const unequipItem = spacetimedb.reducer(
+  { slot: t.string() },
+  (ctx, { slot }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    unequipSlotForPlayer(ctx as InventoryCtx, identity, slot);
   }
 );
 

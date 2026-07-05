@@ -4,9 +4,8 @@
  * starter zone (see public/assets/ATTRIBUTION.md). The story pass rewrites
  * names and dialogue freely.
  *
- * questIds list quests the server supports (kill + collect objectives).
- * The Edran collect chain and dungeon quests activate with later P4/P7
- * phases.
+ * questIds list quests the server supports (kill + collect + find objectives).
+ * Dungeon quests (q_sexton, q_hollow, q_gravecallers_trail) activate in P7.
  */
 import type { NpcDef } from '../../types';
 
@@ -49,7 +48,7 @@ export const NPCS: NpcDef[] = [
     title: 'Town Priest',
     pos: { x: -14, z: -10 },
     facingRad: 0.8,
-    questIds: ['q_bones'],
+    questIds: ['q_bones', 'q_whispers', 'q_names_of_the_dead', 'q_silence_the_call', 'q_rite'],
     greeting: 'The Light keep you. Even the dead find no rest here of late.',
   },
   {

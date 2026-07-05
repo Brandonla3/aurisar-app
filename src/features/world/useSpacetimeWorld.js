@@ -171,6 +171,22 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch { /* not connected yet */ }
   }, []);
 
+  const equipItem = useCallback((itemId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.equipItem(itemId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const unequipItem = useCallback((slot) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.unequipItem(slot);
+    } catch { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -266,6 +282,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
               'SELECT * FROM player_wallet',
               'SELECT * FROM player_item_stack',
               'SELECT * FROM player_chest_opened',
+              'SELECT * FROM player_equipped',
             ]);
 
           // ── player table events ──
@@ -337,6 +354,15 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           connection.db.playerChestOpened?.onInsert((_ctx, row) => {
             callbacksRef.current?.onChestOpenedInsert?.(row);
           });
+          connection.db.playerEquipped?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onEquippedUpsert?.(row);
+          });
+          connection.db.playerEquipped?.onUpdate((_ctx, _oldRow, row) => {
+            callbacksRef.current?.onEquippedUpsert?.(row);
+          });
+          connection.db.playerEquipped?.onDelete((_ctx, row) => {
+            callbacksRef.current?.onEquippedDelete?.(row);
+          });
         })
         .onDisconnect((_ctx, err) => {
           setConnected(false);
@@ -402,6 +428,8 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     sellToVendor,
     openChest,
     cookRecipe,
+    equipItem,
+    unequipItem,
     identity,
   };
 }

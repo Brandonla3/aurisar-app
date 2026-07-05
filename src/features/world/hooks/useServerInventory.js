@@ -1,6 +1,6 @@
 /**
- * useServerInventory — aggregates player_wallet, player_item_stack, and
- * player_chest_opened rows from SpacetimeDB callbacks.
+ * useServerInventory — aggregates player_wallet, player_item_stack,
+ * player_chest_opened, and player_equipped rows from SpacetimeDB callbacks.
  */
 
 import { useCallback, useState } from 'react';
@@ -14,6 +14,7 @@ export function useServerInventory() {
   const [stacks, setStacks] = useState(() => new Map());
   const [wallet, setWallet] = useState(null);
   const [openedChestRows, setOpenedChestRows] = useState(() => new Map());
+  const [equippedRows, setEquippedRows] = useState(() => new Map());
 
   const onStackUpsert = useCallback((row) => {
     setStacks((prev) => {
@@ -39,6 +40,22 @@ export function useServerInventory() {
     setOpenedChestRows((prev) => {
       const next = new Map(prev);
       next.set(String(row.id), row);
+      return next;
+    });
+  }, []);
+
+  const onEquippedUpsert = useCallback((row) => {
+    setEquippedRows((prev) => {
+      const next = new Map(prev);
+      next.set(String(row.id), row);
+      return next;
+    });
+  }, []);
+
+  const onEquippedDelete = useCallback((row) => {
+    setEquippedRows((prev) => {
+      const next = new Map(prev);
+      next.delete(String(row.id));
       return next;
     });
   }, []);
@@ -70,17 +87,32 @@ export function useServerInventory() {
     return ids;
   }, [openedChestRows]);
 
+  const equippedFor = useCallback((identity) => {
+    const me = idHex(identity);
+    const bySlot = {};
+    if (!me) return bySlot;
+    for (const row of equippedRows.values()) {
+      if (idHex(row.owner) !== me) continue;
+      bySlot[row.slot] = row.itemId;
+    }
+    return bySlot;
+  }, [equippedRows]);
+
   return {
     stacks,
     wallet,
     openedChestRows,
+    equippedRows,
     onStackUpsert,
     onStackDelete,
     onWalletUpsert,
     onChestOpenedInsert,
+    onEquippedUpsert,
+    onEquippedDelete,
     countsFor,
     copperFor,
     openedChestIdsFor,
+    equippedFor,
   };
 }
 
