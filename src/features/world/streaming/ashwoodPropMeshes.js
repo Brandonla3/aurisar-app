@@ -315,7 +315,7 @@ export function buildPropTemplates(scene, opts = {}) {
     // material opaque and the atlas's dilated backdrop renders as solid
     // chartreuse ribbons.
     grassCardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTMODE;
-    grassCardMat.alphaCutOff = 0.35;
+    grassCardMat.alphaCutOff = 0.5;
     const gtex = new BABYLON.Texture(`${TEX_BASE}/grass-cards.png`, scene);
     gtex.hasAlpha = true; // alpha-test cutout, no blending/sorting
     grassCardMat.diffuseTexture = gtex;

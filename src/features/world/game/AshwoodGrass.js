@@ -27,6 +27,11 @@ const CELL = 0.6;
 const RADIUS = 30;
 const HERO_CELL = 2.2;
 const HERO_RADIUS = 12;
+// The hero layer renders real 3D blades from the Meshy GLB, but its baked
+// albedo is nearly uniform green at blade scale, so the clumps read as flat
+// lime ribbons in sun / dark stumps in shade instead of grass. Disabled
+// until the clump has per-blade shading (or a detail-textured re-bake).
+const HERO_ENABLED = false;
 
 const VERT = `
 precision highp float;
@@ -98,7 +103,9 @@ void main() {
   vec4 tex = texture2D(uCardTex, vUV);
   // Alpha cutout — no sorting/blending needed, each layer stays one draw
   // call. The hero clump albedo is opaque (a=1), so it never discards.
-  if (tex.a < 0.35) discard;
+  // 0.5 cutoff (with a near-binary atlas alpha) makes distant mip-averaged
+  // cards thin out instead of solidifying into flat ghost silhouettes.
+  if (tex.a < 0.5) discard;
 
   vec3 N = normalize(vN);
   vec3 L = normalize(uSunDir);
@@ -254,13 +261,16 @@ export class AshwoodGrass {
       // low/mobile so the term is a free no-op there.
       m.setFloat('uBackStrength', tier === 'high' ? 0.25 : 0.0);
     }
-    // Hero clumps render on every tier (~1.3k tris each, a few dozen
-    // instances) — phones just get a tighter ring around the player.
-    const heroR = tier === 'low' || tier === 'mobile' ? 8 : HERO_RADIUS;
-    if (heroR !== this._heroRadius) {
-      this._heroRadius = heroR;
-      this.lastX = 1e9; // force a rebuild with the new ring
+    if (HERO_ENABLED) {
+      // Hero clumps (~1.3k tris each, a few dozen instances) — phones get a
+      // tighter ring around the player.
+      const heroR = tier === 'low' || tier === 'mobile' ? 8 : HERO_RADIUS;
+      if (heroR !== this._heroRadius) {
+        this._heroRadius = heroR;
+        this.lastX = 1e9; // force a rebuild with the new ring
+      }
     }
+    this.heroMesh.setEnabled(HERO_ENABLED);
     if (Math.abs(p.x - this.lastX) + Math.abs(p.z - this.lastZ) > CELL) this._rebuild(p.x, p.z);
   }
 
@@ -319,11 +329,13 @@ export class AshwoodGrass {
 
     // Hero clumps: sparser grid, tighter ring (tier-dependent), higher keep
     // threshold, scaled up so the real 3D blades read above the card field.
-    const h = this._scatter(px, pz, HERO_CELL, this._heroRadius ?? HERO_RADIUS, 0.35,
-                            this._heroMats, this._heroCols, this.heroCap, 1.35);
-    this.heroMesh.thinInstanceSetBuffer('matrix', this._heroMats.subarray(0, Math.max(1, h) * 16), 16, false);
-    this.heroMesh.thinInstanceSetBuffer('color', this._heroCols.subarray(0, Math.max(1, h) * 4), 4, false);
-    this.heroMesh.thinInstanceCount = h;
+    if (HERO_ENABLED) {
+      const h = this._scatter(px, pz, HERO_CELL, this._heroRadius ?? HERO_RADIUS, 0.35,
+                              this._heroMats, this._heroCols, this.heroCap, 1.35);
+      this.heroMesh.thinInstanceSetBuffer('matrix', this._heroMats.subarray(0, Math.max(1, h) * 16), 16, false);
+      this.heroMesh.thinInstanceSetBuffer('color', this._heroCols.subarray(0, Math.max(1, h) * 4), 4, false);
+      this.heroMesh.thinInstanceCount = h;
+    }
 
     this.lastX = px;
     this.lastZ = pz;
