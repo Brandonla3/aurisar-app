@@ -19,6 +19,7 @@ export function createHeightfield(config, zones) {
   const M = config.zones.mountain;
   const FLTS = config.plateaus;
   const { mtnPathInfo, mtnStreamInfo, mtnCliffAt } = zones;
+  const EXPANDED_MTN = Boolean((config.mountainStreams?.length ?? 0) || (config.mountainCliffs?.length ?? 0));
 
   /** Carve the Mirrormere bowl into a base height h. */
   function lakeShape(x, z, h) {
@@ -74,10 +75,44 @@ export function createHeightfield(config, zones) {
     return { mask: maxMask, weight: pw, h: pw > 0 ? pa / pw : 0 };
   }
 
+  function legacyMtnH(x, z) {
+    const dx = x - M.x, dz = z - M.z, d = Math.hypot(dx, dz);
+    if (d >= M.r) return 0;
+    const u = 1 - d / M.r;
+
+    // gentle broad massif — walkable flanks, no needle peaks
+    let h = M.peakH * 0.78 * smoother(u);
+
+    // light ridge character, strongest on the flanks, calm near the top
+    const flank = u * (1 - u) * 2;
+    const ang = Math.atan2(dz, dx);
+    h += flank * (
+      Math.sin(ang * 3 + d * 0.02) * M.peakH * 0.05 +
+      Math.sin(x * 0.02 + z * 0.017) * M.peakH * 0.04 +
+      Math.sin(ang * 6 - 1.2) * M.peakH * 0.028
+    );
+
+    const p = plateauInfo(x, z);
+    if (p.weight > 0) {
+      const w = p.weight > 1 ? 1 : p.weight;
+      h = h * (1 - w) + p.h * w;
+    }
+
+    const pInfo = mtnPathInfo(x, z);
+    if (pInfo.mask > 0) {
+      const b = pInfo.mask * 0.6;
+      h = h * (1 - b) + pInfo.h * b;
+    }
+
+    return h > 0 ? h : 0;
+  }
+
   /** Mountain massif height: broad dome + ridges, with flat plateaus,
    *  unclimbable cliff shoulders, stream gullies, and walkable switchback
    *  corridors carved in. */
   function mtnH(x, z) {
+    if (!EXPANDED_MTN) return legacyMtnH(x, z);
+
     const dx = x - M.x, dz = z - M.z, d = Math.hypot(dx, dz);
     if (d >= M.r) return 0;
     const u = 1 - d / M.r;
