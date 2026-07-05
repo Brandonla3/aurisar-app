@@ -130,6 +130,11 @@ export class CharacterAvatar {
     this._useFallback   = false;
     this._fallbackLimbs = null;
     this._animTime      = 0;
+
+    // Local-only terrain blocker. BabylonWorldScene still owns input and moves
+    // root.position; CharacterAvatar.update() runs immediately afterward, so
+    // this can roll the local player back before camera tracking / server sync.
+    this._lastClimbablePos = null;
   }
 
   // ── Factory ────────────────────────────────────────────────────────────────
@@ -388,11 +393,48 @@ export class CharacterAvatar {
   // ── Per-frame update ───────────────────────────────────────────────────────
 
   update(dt) {
+    this._resolveTerrainMobility();
     if (this._useFallback) {
       this._animateBox(dt);
     } else {
       this._animateGLB();
     }
+  }
+
+  _resolveTerrainMobility() {
+    if (this._id !== 'local' || !this.root) return;
+    const wg = this._scene?.metadata?.ashwood?.worldgen;
+    if (!wg?.terrainMobilityAt || !wg?.surfaceY) return;
+
+    const p = this.root.position;
+    if (!this._lastClimbablePos) {
+      this._lastClimbablePos = { x: p.x, z: p.z };
+      return;
+    }
+
+    const dx = p.x - this._lastClimbablePos.x;
+    const dz = p.z - this._lastClimbablePos.z;
+    const movedSq = dx * dx + dz * dz;
+
+    // Door/fast-travel/dungeon snaps are intentional large moves; accept them
+    // and start the blocker from the new location instead of rubber-banding.
+    if (movedSq > 25 * 25) {
+      this._lastClimbablePos.x = p.x;
+      this._lastClimbablePos.z = p.z;
+      return;
+    }
+
+    const mobility = wg.terrainMobilityAt(p.x, p.z);
+    if (mobility?.climbable === false) {
+      p.x = this._lastClimbablePos.x;
+      p.z = this._lastClimbablePos.z;
+      p.y = wg.surfaceY(p.x, p.z);
+      this.isMoving = false;
+      return;
+    }
+
+    this._lastClimbablePos.x = p.x;
+    this._lastClimbablePos.z = p.z;
   }
 
   _animateBox(dt) {
