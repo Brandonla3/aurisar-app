@@ -12,13 +12,13 @@
  * client-side function of this module.
  */
 
-import { sstep, smoother } from './rng.js';
+import { sstep, smoother, hash2 } from './rng.js';
 
 export function createHeightfield(config, zones) {
   const L = config.lake;
   const M = config.zones.mountain;
   const FLTS = config.plateaus;
-  const { mtnPathInfo } = zones;
+  const { mtnPathInfo, mtnStreamInfo, mtnCliffAt } = zones;
 
   /** Carve the Mirrormere bowl into a base height h. */
   function lakeShape(x, z, h) {
@@ -61,44 +61,71 @@ export function createHeightfield(config, zones) {
     );
   }
 
-  /** Mountain massif height: broad smootherstep dome + ridges, with flat
-   *  plateaus and walkable switchback corridors carved in. */
-  function mtnH(x, z) {
-    const dx = x - M.x, dz = z - M.z, d = Math.hypot(dx, dz);
-    if (d >= M.r) return 0;
-    const u = 1 - d / M.r;
-
-    // gentle broad massif — walkable flanks, no needle peaks
-    let h = M.peakH * 0.78 * smoother(u);
-
-    // light ridge character, strongest on the flanks, calm near the top
-    const flank = u * (1 - u) * 2;
-    const ang = Math.atan2(dz, dx);
-    h += flank * (
-      Math.sin(ang * 3 + d * 0.02) * M.peakH * 0.05 +
-      Math.sin(x * 0.02 + z * 0.017) * M.peakH * 0.04 +
-      Math.sin(ang * 6 - 1.2) * M.peakH * 0.028
-    );
-
-    // carve flat plateaus — weighted blend so overlapping shelves ramp smoothly
-    let pw = 0, pa = 0;
+  function plateauInfo(x, z) {
+    let pw = 0, pa = 0, maxMask = 0;
     for (const f of FLTS) {
       const fd = Math.hypot(x - f[0], z - f[1]);
       if (fd >= f[2] + f[3]) continue;
       const b = 1 - sstep(f[2], f[2] + f[3], fd);
       pw += b;
       pa += b * f[4];
+      if (b > maxMask) maxMask = b;
     }
-    if (pw > 0) {
-      const w = pw > 1 ? 1 : pw;
-      h = h * (1 - w) + (pa / pw) * w;
+    return { mask: maxMask, weight: pw, h: pw > 0 ? pa / pw : 0 };
+  }
+
+  /** Mountain massif height: broad dome + ridges, with flat plateaus,
+   *  unclimbable cliff shoulders, stream gullies, and walkable switchback
+   *  corridors carved in. */
+  function mtnH(x, z) {
+    const dx = x - M.x, dz = z - M.z, d = Math.hypot(dx, dz);
+    if (d >= M.r) return 0;
+    const u = 1 - d / M.r;
+
+    // Larger massif: readable from far away, but still with walkable lower flanks.
+    let h = M.peakH * (0.66 * smoother(u) + 0.16 * sstep(0.08, 0.92, u));
+
+    // Layered ridge character. Angular bands make the silhouette rocky rather
+    // than perfectly conical; high-frequency hash mottling breaks flat slopes.
+    const flank = u * (1 - u) * 2;
+    const ang = Math.atan2(dz, dx);
+    h += flank * (
+      Math.sin(ang * 3.0 + d * 0.022) * M.peakH * 0.060 +
+      Math.sin(x * 0.026 + z * 0.018) * M.peakH * 0.044 +
+      Math.sin(ang * 7.0 - d * 0.010) * M.peakH * 0.034
+    );
+
+    const talus = sstep(0.12, 0.38, u) * (1 - sstep(0.76, 0.96, u));
+    h += talus * (hash2(x * 0.075, z * 0.075) - 0.48) * M.peakH * 0.040;
+    h += talus * (hash2(x * 0.145 + 7.1, z * 0.145 - 3.4) - 0.50) * M.peakH * 0.018;
+
+    // Cliff shoulders: steep faces between authored shelves. The path carve
+    // below cuts traversable notches through these bands.
+    const cliff = mtnCliffAt?.(x, z) ?? 0;
+    if (cliff > 0) {
+      h += cliff * M.peakH * (0.10 + 0.035 * hash2(x * 0.11, z * 0.11));
     }
 
-    // carve wide walkable switchback corridors
+    // Carve flat plateaus — weighted blend so overlapping shelves ramp smoothly.
+    const p = plateauInfo(x, z);
+    if (p.weight > 0) {
+      const w = p.weight > 1 ? 1 : p.weight;
+      h = h * (1 - w) + p.h * w;
+    }
+
+    // Carve wide walkable switchback corridors. Stronger than the old 60% blend
+    // so the authored grades read as usable trail cuts through the rocky mass.
     const pInfo = mtnPathInfo(x, z);
     if (pInfo.mask > 0) {
-      const b = pInfo.mask * 0.6;
+      const b = pInfo.mask * 0.76;
       h = h * (1 - b) + pInfo.h * b;
+    }
+
+    // Carve mountain streams/runoff last so they visibly cut through shelves and
+    // across trail beds as shallow wet gullies.
+    const sInfo = mtnStreamInfo?.(x, z) ?? { mask: 0, depth: 0 };
+    if (sInfo.mask > 0) {
+      h -= sInfo.depth * sInfo.mask * (0.65 + 0.35 * hash2(x * 0.22, z * 0.22));
     }
 
     return h > 0 ? h : 0;
@@ -109,5 +136,46 @@ export function createHeightfield(config, zones) {
     return groundHeight(x, z) + mtnH(x, z);
   }
 
-  return { lakeShape, lakeWaterDepthAt, lakeShoreAt, groundHeight, mtnH, surfaceY };
+  function slopeAt(x, z, sample = 2.4) {
+    const dhdx = (surfaceY(x + sample, z) - surfaceY(x - sample, z)) / (2 * sample);
+    const dhdz = (surfaceY(x, z + sample) - surfaceY(x, z - sample)) / (2 * sample);
+    return Math.hypot(dhdx, dhdz);
+  }
+
+  /**
+   * Terrain mobility hint for consumers that need actual no-climb gameplay.
+   * Current terrain rendering only samples surfaceY, but movement/camera systems
+   * can use this to reject traversal across cliff bands while allowing authored
+   * switchback corridors and plateau shelves.
+   */
+  function terrainMobilityAt(x, z) {
+    if (!zones.inMountain(x, z)) {
+      return { climbable: true, slope: slopeAt(x, z), path: 0, plateau: 0, stream: 0, cliff: 0 };
+    }
+    const pInfo = mtnPathInfo(x, z);
+    const stream = mtnStreamInfo?.(x, z) ?? { mask: 0 };
+    const cliff = mtnCliffAt?.(x, z) ?? 0;
+    const plateau = plateauInfo(x, z).mask;
+    const slope = slopeAt(x, z);
+    const protectedRoute = pInfo.mask > 0.18 || plateau > 0.35;
+    return {
+      climbable: protectedRoute || (slope < 0.78 && cliff < 0.45),
+      slope,
+      path: pInfo.mask,
+      plateau,
+      stream: stream.mask,
+      cliff,
+    };
+  }
+
+  return {
+    lakeShape,
+    lakeWaterDepthAt,
+    lakeShoreAt,
+    groundHeight,
+    mtnH,
+    surfaceY,
+    slopeAt,
+    terrainMobilityAt,
+  };
 }
