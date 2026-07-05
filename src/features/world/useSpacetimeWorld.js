@@ -155,6 +155,22 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch { /* not connected yet */ }
   }, []);
 
+  const openChest = useCallback((chestId, seed) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.openChest(chestId, seed);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const cookRecipe = useCallback((recipeId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.cookRecipe(recipeId);
+    } catch { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -249,6 +265,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             .subscribe([
               'SELECT * FROM player_wallet',
               'SELECT * FROM player_item_stack',
+              'SELECT * FROM player_chest_opened',
             ]);
 
           // ── player table events ──
@@ -317,6 +334,9 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           connection.db.playerItemStack?.onDelete((_ctx, row) => {
             callbacksRef.current?.onStackDelete?.(row);
           });
+          connection.db.playerChestOpened?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onChestOpenedInsert?.(row);
+          });
         })
         .onDisconnect((_ctx, err) => {
           setConnected(false);
@@ -380,6 +400,8 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     importInventory,
     buyFromVendor,
     sellToVendor,
+    openChest,
+    cookRecipe,
     identity,
   };
 }

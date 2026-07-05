@@ -5,8 +5,8 @@
 
 import React, { useEffect, useState } from 'react';
 import WorldModal from './ui/WorldModal.jsx';
-import { ITEMS } from './game/items.js';
-import { RECIPES, canCook } from './game/recipes.js';
+import { ITEMS } from './content/index';
+import { RECIPES, canCookRecipe } from './content/formulas/cooking';
 import { FONT, primaryBtn, ghostBtn } from './ui/panelTheme.js';
 
 // Cooking requires standing near a lit campfire. A campfire only exists in the
@@ -64,7 +64,7 @@ export default function CookingPanel({ inv, sceneRef, onClose, onToast }) {
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {RECIPES.map((recipe) => {
-          const ok = canCook(recipe, counts);
+          const ok = canCookRecipe(recipe, counts);
           const canCookNow = ok && nearFire;
           const out = ITEMS[recipe.output.id];
           return (
@@ -109,7 +109,7 @@ export default function CookingPanel({ inv, sceneRef, onClose, onToast }) {
         })}
       </div>
       <p style={{ color: '#64748b', fontSize: 11, margin: '14px 0 0', fontFamily: FONT }}>
-        Eating restores HP via the server. Cooking still uses local ingredients until the next P4 phase syncs campfires.
+        Cooking consumes ingredients from your server inventory. Stand near a lit campfire — building one costs 3 firewood.
       </p>
     </WorldModal>
   );

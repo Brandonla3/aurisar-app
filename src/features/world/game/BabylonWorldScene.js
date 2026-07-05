@@ -1349,10 +1349,10 @@ export class BabylonWorldScene {
     }
   }
 
-  // Client-side chest looting. Mirrors _checkDungeonProximity's squared-distance
+  // Client-side chest proximity. Mirrors _checkDungeonProximity's squared-distance
   // pattern but throttled to CHEST_SCAN_MS since chests don't move and the count
   // is small. Walking onto an unopened chest fires onChestOpen({ id, seed }) once;
-  // React (useInventory) rolls deterministic loot from the seed.
+  // React calls the server openChest reducer (loot is granted server-side).
   _checkChestProximity() {
     if (!this._local || this._localDead) return;
     const chests = this._worldgen?.sites?.chests;
@@ -2114,6 +2114,11 @@ export class BabylonWorldScene {
   // Store as canonical hex so subsequent comparisons against row.identity
   // (which is a fresh Identity instance each callback) actually match.
   setMyIdentity(id) { this._myIdentity = idKey(id); }
+
+  /** Sync server-authoritative opened chest indices (survives reload via SpacetimeDB). */
+  setOpenedChests(ids) {
+    this._openedChests = new Set(ids);
+  }
 
   applyPlayerUpdate(row) {
     const key = idKey(row.identity);

@@ -40,10 +40,12 @@ import BuildCampfireReducer from "./build_campfire_reducer";
 import BuyFromVendorReducer from "./buy_from_vendor_reducer";
 import CastAbilityReducer from "./cast_ability_reducer";
 import ConsumeItemReducer from "./consume_item_reducer";
+import CookRecipeReducer from "./cook_recipe_reducer";
 import EnterDungeonReducer from "./enter_dungeon_reducer";
 import ImportInventoryReducer from "./import_inventory_reducer";
 import LeaveDungeonReducer from "./leave_dungeon_reducer";
 import MovePlayerReducer from "./move_player_reducer";
+import OpenChestReducer from "./open_chest_reducer";
 import ReachWaypointReducer from "./reach_waypoint_reducer";
 import SeedWorldReducer from "./seed_world_reducer";
 import SellToVendorReducer from "./sell_to_vendor_reducer";
@@ -61,6 +63,7 @@ import ChatMessageRow from "./chat_message_table";
 import DungeonInstanceRow from "./dungeon_instance_table";
 import MobRow from "./mob_table";
 import PlayerRow from "./player_table";
+import PlayerChestOpenedRow from "./player_chest_opened_table";
 import PlayerItemStackRow from "./player_item_stack_table";
 import PlayerQuestRow from "./player_quest_table";
 import PlayerWalletRow from "./player_wallet_table";
@@ -142,6 +145,17 @@ const tablesSchema = __schema({
       { name: 'player_item_stack_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PlayerItemStackRow),
+  playerChestOpened: __table({
+    name: 'player_chest_opened',
+    indexes: [
+      { accessor: 'id', name: 'player_chest_opened_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'player_chest_opened_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PlayerChestOpenedRow),
   dungeonInstance: __table({
     name: 'dungeon_instance',
     indexes: [
@@ -163,10 +177,12 @@ const reducersSchema = __reducers(
   __reducerSchema("buy_from_vendor", BuyFromVendorReducer),
   __reducerSchema("cast_ability", CastAbilityReducer),
   __reducerSchema("consume_item", ConsumeItemReducer),
+  __reducerSchema("cook_recipe", CookRecipeReducer),
   __reducerSchema("enter_dungeon", EnterDungeonReducer),
   __reducerSchema("import_inventory", ImportInventoryReducer),
   __reducerSchema("leave_dungeon", LeaveDungeonReducer),
   __reducerSchema("move_player", MovePlayerReducer),
+  __reducerSchema("open_chest", OpenChestReducer),
   __reducerSchema("reach_waypoint", ReachWaypointReducer),
   __reducerSchema("seed_world", SeedWorldReducer),
   __reducerSchema("sell_to_vendor", SellToVendorReducer),

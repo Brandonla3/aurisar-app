@@ -223,6 +223,7 @@ export const STARTING_KIT: Record<string, number> = {
   berry: 3,
   rawMeat: 1,
   herb: 2,
+  wood: 6,
 };
 
 export function grantStartingKit(ctx: InventoryCtx, identity: unknown): void {

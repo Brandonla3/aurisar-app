@@ -15,6 +15,7 @@ export const CONSUMABLES: ItemDef[] = [
   { id: 'herb',     name: 'Wild Herb',     icon: '🌿', type: 'ingredient', stack: 99, quality: 'common', vendorPriceCopper: 5 },
   { id: 'rawMeat',  name: 'Raw Meat',      icon: '🥩', type: 'ingredient', stack: 99, quality: 'common', vendorPriceCopper: 8 },
   { id: 'fish',     name: 'River Fish',    icon: '🐟', type: 'ingredient', stack: 99, quality: 'common', vendorPriceCopper: 8 },
+  { id: 'wood',     name: 'Firewood',      icon: '🪵', type: 'ingredient', stack: 99, quality: 'common', vendorPriceCopper: 3 },
 
   // ── Cooked foods (recipe outputs) ──────────────────────────────────
   { id: 'stew',        name: 'Hearty Stew',  icon: '🍲', type: 'consumable', stack: 20, quality: 'common', heal: 35, vendorPriceCopper: 30 },

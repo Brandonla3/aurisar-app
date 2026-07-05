@@ -1,9 +1,9 @@
 /**
- * useServerInventory — aggregates player_wallet + player_item_stack rows
- * from SpacetimeDB callbacks into counts + copper for the HUD.
+ * useServerInventory — aggregates player_wallet, player_item_stack, and
+ * player_chest_opened rows from SpacetimeDB callbacks.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 function idHex(identity) {
   if (!identity) return '';
@@ -11,8 +11,9 @@ function idHex(identity) {
 }
 
 export function useServerInventory() {
-  const [stacks, setStacks] = useState(() => new Map()); // rowId → row
-  const [wallet, setWallet] = useState(null); // wallet row for local identity
+  const [stacks, setStacks] = useState(() => new Map());
+  const [wallet, setWallet] = useState(null);
+  const [openedChestRows, setOpenedChestRows] = useState(() => new Map());
 
   const onStackUpsert = useCallback((row) => {
     setStacks((prev) => {
@@ -34,6 +35,14 @@ export function useServerInventory() {
     setWallet(row);
   }, []);
 
+  const onChestOpenedInsert = useCallback((row) => {
+    setOpenedChestRows((prev) => {
+      const next = new Map(prev);
+      next.set(String(row.id), row);
+      return next;
+    });
+  }, []);
+
   const countsFor = useCallback((identity) => {
     const me = idHex(identity);
     const counts = {};
@@ -50,24 +59,29 @@ export function useServerInventory() {
     return wallet.copper ?? 0n;
   }, [wallet]);
 
+  const openedChestIdsFor = useCallback((identity) => {
+    const me = idHex(identity);
+    const ids = new Set();
+    if (!me) return ids;
+    for (const row of openedChestRows.values()) {
+      if (idHex(row.owner) !== me) continue;
+      ids.add(Number(row.chestId));
+    }
+    return ids;
+  }, [openedChestRows]);
+
   return {
     stacks,
     wallet,
+    openedChestRows,
     onStackUpsert,
     onStackDelete,
     onWalletUpsert,
+    onChestOpenedInsert,
     countsFor,
     copperFor,
+    openedChestIdsFor,
   };
-}
-
-/** Merge server + local stack counts (chest/cook overlay until P4 phase 4). */
-export function mergeInventoryCounts(serverCounts, localCounts) {
-  const merged = { ...serverCounts };
-  for (const [id, qty] of Object.entries(localCounts ?? {})) {
-    if (qty > 0) merged[id] = (merged[id] ?? 0) + qty;
-  }
-  return merged;
 }
 
 /**

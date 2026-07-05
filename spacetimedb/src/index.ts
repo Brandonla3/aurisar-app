@@ -95,6 +95,12 @@ import {
   playerNearNpc,
   vendorSellsItem,
 } from './vendors/helpers.js';
+import {
+  chestAlreadyOpened,
+  cookRecipeForPlayer,
+  grantChestLoot,
+  playerNearLitCampfire,
+} from './world/chest.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -132,9 +138,8 @@ const QUEST_STATE_DONE          = 2;
 //
 // Players can build a campfire in front of them (prototype buildFire ~3008).
 // Fires are shared world state: every client renders every burning fire.
-// No wood cost yet — the prototype charged 3 wood, but there's no inventory
-// system; when one lands, add the cost check here.
 
+const CAMPFIRE_WOOD_COST          = 3;
 const CAMPFIRE_BURN_MICROS      = 180_000_000n;       // fires burn for 3 minutes
 const CAMPFIRE_COOLDOWN_MICROS  = 10_000_000n;        // min 10 s between builds per player
 const CAMPFIRE_MAX_PER_PLAYER   = 3;                  // oldest is snuffed when exceeded
@@ -452,6 +457,19 @@ const spacetimedb = schema({
       owner:    t.identity(),
       itemId:   t.string(),
       quantity: t.u32(),
+    }
+  ),
+
+  /**
+   * P4 phase 4 — world chests already looted by a player (chest index from
+   * worldgen). Prevents re-farming across reloads.
+   */
+  playerChestOpened: table(
+    { public: true },
+    {
+      id:      t.u64().primaryKey().autoInc(),
+      owner:   t.identity(),
+      chestId: t.u32(),
     }
   ),
 
@@ -932,8 +950,7 @@ export const sendChat = spacetimedb.reducer(
  *     window since CAMPFIRE_BURN >> CAMPFIRE_COOLDOWN)
  *   • per-player cap — building past it snuffs the oldest fire (its queued
  *     expiry then no-ops on the missing row)
- *
- * No wood cost until an inventory system exists (prototype charged 3 wood).
+ *   • costs CAMPFIRE_WOOD_COST firewood from server inventory (P4 phase 4)
  */
 export const buildCampfire = spacetimedb.reducer(
   {
@@ -951,6 +968,10 @@ export const buildCampfire = spacetimedb.reducer(
     const dx = x - player.x;
     const dy = y - player.y;
     if (dx * dx + dy * dy > CAMPFIRE_PLACE_RANGE_PX * CAMPFIRE_PLACE_RANGE_PX) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (countItemOwned(invCtx, player.identity, 'wood') < CAMPFIRE_WOOD_COST) return;
+    if (!removeItemStack(invCtx, player.identity, 'wood', CAMPFIRE_WOOD_COST)) return;
 
     const fx = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
     const fy = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
@@ -990,6 +1011,54 @@ export const buildCampfire = spacetimedb.reducer(
       scheduledAt: ScheduleAt.time(expiresAt),
       campfireId,
     });
+  }
+);
+
+/**
+ * P4 phase 4 — loot a world chest once. Rolls deterministic loot from seed;
+ * legacy coin drops become copper.
+ */
+export const openChest = spacetimedb.reducer(
+  {
+    chestId: t.u32(),
+    seed:    t.i32(),
+  },
+  (ctx, { chestId, seed }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (chestAlreadyOpened(invCtx, identity, chestId)) return;
+
+    grantChestLoot(invCtx, identity, seed);
+    ctx.db.playerChestOpened.insert({
+      id: 0n,
+      owner: identity,
+      chestId,
+    });
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 4 — cook a recipe near a lit campfire. Consumes inputs server-side.
+ */
+export const cookRecipe = spacetimedb.reducer(
+  { recipeId: t.string() },
+  (ctx, { recipeId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!playerNearLitCampfire(invCtx, player)) return;
+    if (!cookRecipeForPlayer(invCtx, identity, recipeId)) return;
+    refreshCollectQuestProgress(invCtx, identity);
   }
 );
 
