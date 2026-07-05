@@ -8,10 +8,9 @@
  * starter zone (see public/assets/ATTRIBUTION.md). The story pass rewrites
  * names and dialogue freely.
  *
- * questIds list only the quests the current server supports (kill
- * objectives). The collect-objective quests (q_boars, q_spiders,
- * q_supplies, the Edran collect chain) and the dungeon quests activate
- * with P4 (server inventory) and P7 (the crypt dungeon).
+ * questIds list quests the server supports (kill + collect objectives).
+ * The Edran collect chain and dungeon quests activate with later P4/P7
+ * phases.
  */
 import type { NpcDef } from '../../types';
 
@@ -33,7 +32,7 @@ export const NPCS: NpcDef[] = [
     title: 'Provisioner',
     pos: { x: -7, z: 3 },
     facingRad: Math.PI / 2,
-    questIds: [],
+    questIds: ['q_supplies'],
     greeting: 'Fresh bread, clean water, fair prices. What can I get you?',
     vendorItemIds: ['baked_bread', 'spring_water', 'roasted_boar', 'tough_jerky'],
   },
@@ -44,7 +43,7 @@ export const NPCS: NpcDef[] = [
     title: 'Herbalist',
     pos: { x: 11, z: -3 },
     facingRad: -Math.PI / 2,
-    questIds: [],
+    questIds: ['q_boars', 'q_spiders'],
     greeting: 'Careful where you step in the eastern woods, friend.',
   },
   {

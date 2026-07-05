@@ -51,6 +51,7 @@ function rewardLines(quest) {
 
 export default function DialoguePanel({
   npcId, myQuests, playerName, className, playerLevel = 999,
+  itemCounts = {},
   onAcceptQuest, onTurnInQuest, onClose,
 }) {
   const [detailQuest, setDetailQuest] = useState(null); // { quest, mode: 'accept'|'turnIn' }
@@ -58,8 +59,8 @@ export default function DialoguePanel({
   if (!npc) return null;
 
   const available  = availableQuestsAt(npcId, myQuests, playerLevel);
-  const ready      = readyQuestsAt(npcId, myQuests);
-  const inProgress = inProgressQuestsAt(npcId, myQuests);
+  const ready      = readyQuestsAt(npcId, myQuests, itemCounts);
+  const inProgress = inProgressQuestsAt(npcId, myQuests, itemCounts);
 
   const sheetStyle = IS_TOUCH
     ? { ...panel, width: '100%', maxWidth: '100%', maxHeight: '72vh', borderRadius: '16px 16px 0 0', alignSelf: 'flex-end' }
@@ -145,7 +146,7 @@ export default function DialoguePanel({
           <div style={S.section}>In progress</div>
           {inProgress.map((q) => {
             const row = myQuests.get(q.id);
-            const counts = row ? parseCounts(row, q) : [];
+            const counts = row ? parseCounts(row, q, itemCounts) : [];
             return (
               <div key={q.id} style={{ ...S.questBtn, cursor: 'default' }}>
                 <span style={S.questName}>{q.name}</span>

@@ -76,6 +76,14 @@ import {
   removeItemStack,
   type InventoryCtx,
 } from './inventory/helpers.js';
+import {
+  consumeCollectObjectives,
+  effectiveQuestCounts,
+  parseQuestCounts,
+  questReadyWithInventory,
+  refreshCollectQuestProgress,
+} from './quests/collect.js';
+import { objectiveTarget } from './content/formulas/quests.js';
 import { getItemDef, ITEMS } from './content/items/index.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
@@ -606,6 +614,7 @@ export const importInventory = spacetimedb.reducer(
       imported: true,
       copper: wallet.copper + BigInt(totalCopper),
     });
+    refreshCollectQuestProgress(invCtx, identity);
   }
 );
 
@@ -1065,6 +1074,7 @@ export const castAbility = spacetimedb.reducer(
           mob.spawnNetId,
         );
         grantMobLoot(ctx as InventoryCtx, player.identity, mobDef, seed);
+        refreshCollectQuestProgress(ctx as InventoryCtx, player.identity);
       }
     } else {
       ctx.db.mob.mobId.update({ ...mob, hp: newHp });
@@ -1507,24 +1517,17 @@ function findQuestRow(ctx: any, identity: any, questId: string): any | null {
   return null;
 }
 
-function objectiveTarget(obj: QuestDef['objectives'][number]): number {
-  return obj.type === 'find' ? 1 : obj.count;
-}
-
 function parseCounts(json: string, len: number): number[] {
-  try {
-    const arr = JSON.parse(json);
-    if (Array.isArray(arr) && arr.length === len) {
-      return arr.map((n) => Math.max(0, Number(n) || 0));
-    }
-  } catch {
-    // malformed row — treat as fresh progress
-  }
-  return new Array(len).fill(0);
+  return parseQuestCounts(json, len);
 }
 
-function questIsReady(quest: QuestDef, counts: number[]): boolean {
-  return quest.objectives.every((obj, i) => (counts[i] ?? 0) >= objectiveTarget(obj));
+function questIsReady(
+  ctx: InventoryCtx,
+  identity: unknown,
+  quest: QuestDef,
+  counts: number[],
+): boolean {
+  return questReadyWithInventory(ctx, identity, quest, counts);
 }
 
 function playerInRangeOfNpc(player: { x: number; y: number }, npcId: string): boolean {
@@ -1560,12 +1563,21 @@ export const acceptQuest = spacetimedb.reducer(
     if (quest.minLevel && getPlayerLevel(ctx, ctx.sender) < quest.minLevel) return;
     if (!playerInRangeOfNpc(player, quest.giverNpcId)) return;
 
+    const invCtx = ctx as InventoryCtx;
+    const initial = effectiveQuestCounts(
+      invCtx,
+      ctx.sender,
+      quest,
+      new Array(quest.objectives.length).fill(0),
+    );
     ctx.db.playerQuest.insert({
       id: 0n, // auto-inc replaces this
       owner: ctx.sender,
       questId,
-      state: QUEST_STATE_ACTIVE,
-      countsJson: JSON.stringify(new Array(quest.objectives.length).fill(0)),
+      state: questIsReady(invCtx, ctx.sender, quest, initial)
+        ? QUEST_STATE_READY
+        : QUEST_STATE_ACTIVE,
+      countsJson: JSON.stringify(initial),
       acceptedAt: nowMicros,
     });
   }
@@ -1599,11 +1611,13 @@ export const turnInQuest = spacetimedb.reducer(
     if (!row || row.state === QUEST_STATE_DONE) return;
 
     const counts = parseCounts(row.countsJson, quest.objectives.length);
-    if (!questIsReady(quest, counts)) return;
+    const invCtx = ctx as InventoryCtx;
+    if (!questIsReady(invCtx, ctx.sender, quest, counts)) return;
     if (!playerInRangeOfNpc(player, quest.turnInNpcId)) return;
+    if (!consumeCollectObjectives(invCtx, ctx.sender, quest)) return;
 
     grantQuestReward(
-      ctx as InventoryCtx,
+      invCtx,
       ctx.sender,
       player.classType,
       quest.reward,
@@ -1648,7 +1662,9 @@ export const reachWaypoint = spacetimedb.reducer(
     ctx.db.playerQuest.id.update({
       ...row,
       countsJson: JSON.stringify(counts),
-      state: questIsReady(quest, counts) ? QUEST_STATE_READY : QUEST_STATE_ACTIVE,
+      state: questIsReady(ctx as InventoryCtx, ctx.sender, quest, counts)
+        ? QUEST_STATE_READY
+        : QUEST_STATE_ACTIVE,
     });
   }
 );
@@ -1682,7 +1698,9 @@ function creditKillToQuests(
     ctx.db.playerQuest.id.update({
       ...row,
       countsJson: JSON.stringify(counts),
-      state: questIsReady(quest, counts) ? QUEST_STATE_READY : QUEST_STATE_ACTIVE,
+      state: questIsReady(ctx as InventoryCtx, identity, quest, counts)
+        ? QUEST_STATE_READY
+        : QUEST_STATE_ACTIVE,
     });
   }
 }

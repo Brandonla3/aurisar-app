@@ -603,7 +603,9 @@ export default function WorldGame({ playerInfo, onExit }) {
       <TestingHud sceneRef={sceneRef} visible={uiPrefs.minimapVisible} mapData={mapData} />
 
       {/* P1: active-quest tracker (hidden while any modal is open) */}
-      {!activePanel && !dialogueNpcId && <QuestTracker myQuests={myQuests} />}
+      {!activePanel && !dialogueNpcId && (
+        <QuestTracker myQuests={myQuests} itemCounts={inv.counts} />
+      )}
 
       {/* World map */}
       {activePanel === 'map' && mapData && (
@@ -622,6 +624,7 @@ export default function WorldGame({ playerInfo, onExit }) {
       {activePanel === 'quests' && (
         <QuestLogPanel
           myQuests={myQuests}
+          itemCounts={inv.counts}
           onAbandonQuest={abandonQuest}
           onClose={closePanel}
         />
@@ -632,6 +635,7 @@ export default function WorldGame({ playerInfo, onExit }) {
         <DialoguePanel
           npcId={dialogueNpcId}
           myQuests={myQuests}
+          itemCounts={inv.counts}
           playerName={playerInfo?.username}
           className={className}
           playerLevel={worldLevel}

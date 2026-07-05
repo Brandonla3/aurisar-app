@@ -7,20 +7,14 @@
  * design's starter zone (see public/assets/ATTRIBUTION.md). All text is
  * placeholder copy the story pass rewrites.
  *
- * ACTIVE NOW (kill objectives — what the current server supports):
- *   q_wolves → q_greyjaw / q_bandits → q_ringleader · q_murlocs ·
- *   q_mine · q_bones
- * Adaptation: q_greyjaw's collect-the-fang objective runs as
- * kill-Old-Greyjaw until P4's server inventory lands.
+ * Kill objectives: q_wolves, q_bandits → q_ringleader · q_murlocs ·
+ * q_mine · q_bones
+ * Collect objectives (P4 phase 2): q_greyjaw, q_boars, q_spiders, q_supplies
  *
- * STAGED FOR LATER PHASES (kept out of QUESTS so the validator and UI
- * only see implementable content): q_boars, q_spiders, q_supplies (P4 —
- * collect objectives), q_whispers → q_names_of_the_dead →
- * q_silence_the_call → q_rite (P4 chain), q_sexton, q_hollow,
- * q_gravecallers_trail (P7 — Hollow Crypt dungeon).
+ * STAGED FOR LATER: q_whispers → q_names_of_the_dead → q_silence_the_call →
+ * q_rite (Edran chain), q_sexton, q_hollow, q_gravecallers_trail (P7).
  *
- * gameXp values are theirs, applied only if GAME_XP_ENABLED flips on;
- * copper grants land in P2.
+ * gameXp values are theirs, applied only if GAME_XP_ENABLED flips on.
  */
 import type { QuestDef } from '../../types';
 
@@ -47,11 +41,53 @@ export const QUESTS: QuestDef[] = [
     requiresQuestId: 'q_wolves',
     text: "There is one wolf no trap has held: Old Greyjaw. He has taken three hounds and a stable boy's arm. He prowls the deep woods north of the wolf runs. Bring me his fang.",
     completionText: 'So the old devil is dead at last. The stable boy will sleep easier — and so will I.',
-    // P4 swaps this back to collect greyjaw_fang ×1 (his guaranteed drop).
     objectives: [
-      { type: 'kill', mobType: 'old_greyjaw', count: 1, label: 'Old Greyjaw slain' },
+      { type: 'collect', itemId: 'greyjaw_fang', count: 1, label: "Old Greyjaw's Fang" },
     ],
     reward: { copper: 150, itemIds: ['greyjaw_pelt_cloak'], gameXp: 450 },
+  },
+  {
+    id: 'q_boars',
+    zoneId: 1,
+    name: 'Boar Trouble',
+    giverNpcId: 'apothecary_yarrow',
+    turnInNpcId: 'apothecary_yarrow',
+    minLevel: 2,
+    text: 'The boars in Tuskfield to the east have grown vicious, and I need their hides for salves. Hunt the Wild Boars and bring me 6 Bristly Boar Hides, $N.',
+    completionText: 'Good — these will keep the apothecary stocked for a fortnight.',
+    objectives: [
+      { type: 'collect', itemId: 'boar_hide', count: 6, label: 'Bristly Boar Hide' },
+    ],
+    reward: { copper: 120, gameXp: 380 },
+  },
+  {
+    id: 'q_spiders',
+    zoneId: 1,
+    name: 'Webwood Silk',
+    giverNpcId: 'apothecary_yarrow',
+    turnInNpcId: 'apothecary_yarrow',
+    requiresQuestId: 'q_boars',
+    minLevel: 3,
+    text: 'The spiders in Gloomweb spin a silk that binds my poultices better than linen. Slay the lurkers and bring me 6 Webwood Silk Glands.',
+    completionText: 'Ah, fine specimens. The marshals will want some of this batch too.',
+    objectives: [
+      { type: 'collect', itemId: 'webwood_silk', count: 6, label: 'Webwood Silk Gland' },
+    ],
+    reward: { copper: 140, gameXp: 420 },
+  },
+  {
+    id: 'q_supplies',
+    zoneId: 1,
+    name: 'Bandage Run',
+    giverNpcId: 'trader_pell',
+    turnInNpcId: 'trader_pell',
+    minLevel: 3,
+    text: 'The town clinic is short on clean cloth. Bandits and kobolds leave scraps behind — gather 8 Linen Scraps from the vale and the dig, and I will pay fair coin.',
+    completionText: 'Much obliged. These will be bandages by morning.',
+    objectives: [
+      { type: 'collect', itemId: 'linen_scrap', count: 8, label: 'Linen Scrap' },
+    ],
+    reward: { copper: 110, gameXp: 340 },
   },
   {
     id: 'q_murlocs',

@@ -8,7 +8,7 @@
 import React from 'react';
 import { FONT } from '../ui/panelTheme.js';
 import { QUESTS } from '../content/index';
-import { QUEST_STATE, parseCounts, objectiveTarget } from '../hooks/useQuests.js';
+import { QUEST_STATE, parseCounts, objectiveTarget, questRowReady } from '../hooks/useQuests.js';
 
 const S = {
   wrap: {
@@ -27,7 +27,7 @@ const S = {
   objectiveDone: { fontSize: 11, color: '#86efac', lineHeight: 1.45 },
 };
 
-export default function QuestTracker({ myQuests }) {
+export default function QuestTracker({ myQuests, itemCounts = {} }) {
   const tracked = [...myQuests.entries()]
     .map(([questId, row]) => ({ quest: QUESTS[questId], row }))
     .filter((e) => e.quest && e.row.state !== QUEST_STATE.DONE)
@@ -38,11 +38,13 @@ export default function QuestTracker({ myQuests }) {
   return (
     <div style={S.wrap}>
       {tracked.map(({ quest, row }) => {
-        const counts = parseCounts(row, quest);
+        const counts = parseCounts(row, quest, itemCounts);
+        const ready = row.state === QUEST_STATE.READY
+          || questRowReady(row, quest, itemCounts);
         return (
           <div key={quest.id} style={S.quest}>
             <div style={S.name}>{quest.name}</div>
-            {row.state === QUEST_STATE.READY ? (
+            {ready ? (
               <div style={S.ready}>✓ Ready to turn in</div>
             ) : (
               quest.objectives.map((obj, i) => {

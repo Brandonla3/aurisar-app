@@ -222,3 +222,18 @@ export function lootSeedFromKill(
 ): number {
   return seedFrom(String(owner), mobId, nowMicros, spawnNetId);
 }
+
+/** Total quantity of itemId held by owner across all stacks. */
+export function countItemOwned(
+  ctx: InventoryCtx,
+  owner: unknown,
+  itemId: string,
+): number {
+  let total = 0;
+  for (const row of ctx.db.playerItemStack.iter()) {
+    if (!row.owner.isEqual(owner)) continue;
+    if (row.itemId !== itemId) continue;
+    total += row.quantity;
+  }
+  return total;
+}
