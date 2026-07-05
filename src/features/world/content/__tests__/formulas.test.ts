@@ -178,11 +178,14 @@ describe('combat math', () => {
 
 describe('prices', () => {
   it('coin breakdown and formatting', () => {
-    expect(toCoins(0)).toEqual({ gold: 0, silver: 0, copper: 0 });
-    expect(toCoins(12345)).toEqual({ gold: 1, silver: 23, copper: 45 });
+    expect(toCoins(0)).toEqual({ platinum: 0, gold: 0, silver: 0, copper: 0 });
+    expect(toCoins(12345)).toEqual({ platinum: 0, gold: 1, silver: 23, copper: 45 });
+    expect(toCoins(1_234_567)).toEqual({ platinum: 1, gold: 23, silver: 45, copper: 67 });
     expect(formatCopper(0)).toBe('0c');
     expect(formatCopper(12345)).toBe('1g 23s 45c');
     expect(formatCopper(205)).toBe('2s 5c');
+    expect(formatCopper(1_234_567)).toBe('1p 23g 45s 67c');
+    expect(formatCopper(100n)).toBe('1s 0c');
   });
 
   it('sell price is the floor of SELL_RATIO, min 1c, 0 for unsellable', () => {

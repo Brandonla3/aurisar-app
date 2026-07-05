@@ -93,10 +93,3 @@ export function localInventoryImportPayload(playerId) {
     return null;
   }
 }
-
-export function formatCopper(copper) {
-  const n = Number(copper ?? 0n);
-  if (!Number.isFinite(n) || n <= 0) return '0';
-  if (n >= 10000) return `${(n / 100).toFixed(0)}s`; // silver shorthand
-  return String(n);
-}

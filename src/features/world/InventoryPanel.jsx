@@ -5,7 +5,7 @@
 import React from 'react';
 import WorldModal from './ui/WorldModal.jsx';
 import { ITEMS } from './content/index';
-import { formatCopper } from './hooks/useServerInventory.js';
+import { formatCopper } from './content/formulas/prices';
 import { FONT } from './ui/panelTheme.js';
 
 const SLOT_COUNT = 24;
