@@ -155,11 +155,11 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch { /* not connected yet */ }
   }, []);
 
-  const openChest = useCallback((chestId, seed) => {
+  const openChest = useCallback((chestId) => {
     const conn = connRef.current;
     if (!conn) return;
     try {
-      conn.reducers.openChest(chestId, seed);
+      conn.reducers.openChest(chestId);
     } catch { /* not connected yet */ }
   }, []);
 

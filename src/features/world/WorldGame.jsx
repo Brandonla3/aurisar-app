@@ -325,7 +325,7 @@ export default function WorldGame({ playerInfo, onExit }) {
 
   const onChestOpen = useCallback((chest) => {
     if (!connected) return;
-    openChest(chest.id, chest.seed);
+    openChest(chest.id);
     const rolled = rollChestLoot(chest.seed);
     if (rolled.length) {
       const txt = rolled.map((r) => {

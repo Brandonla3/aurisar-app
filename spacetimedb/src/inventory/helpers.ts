@@ -98,13 +98,26 @@ export function removeItemStack(
   if (!def) return false;
 
   if (canStackItem(itemId)) {
-    const row = findItemStack(ctx, owner, itemId);
-    if (!row || row.quantity < qty) return false;
-    const next = row.quantity - qty;
-    if (next > 0) {
-      ctx.db.playerItemStack.id.update({ ...row, quantity: next });
-    } else {
-      ctx.db.playerItemStack.id.delete(row.id);
+    const rows: Array<{ id: bigint; owner: unknown; itemId: string; quantity: number }> = [];
+    for (const row of ctx.db.playerItemStack.iter()) {
+      if (!row.owner.isEqual(owner)) continue;
+      if (row.itemId !== itemId) continue;
+      rows.push(row);
+    }
+    const total = rows.reduce((sum, row) => sum + row.quantity, 0);
+    if (total < qty) return false;
+
+    let need = qty;
+    for (const row of rows) {
+      if (need <= 0) break;
+      const take = Math.min(need, row.quantity);
+      const next = row.quantity - take;
+      if (next > 0) {
+        ctx.db.playerItemStack.id.update({ ...row, quantity: next });
+      } else {
+        ctx.db.playerItemStack.id.delete(row.id);
+      }
+      need -= take;
     }
     return true;
   }

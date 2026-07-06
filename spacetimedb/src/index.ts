@@ -96,9 +96,8 @@ import {
   vendorSellsItem,
 } from './vendors/helpers.js';
 import {
-  chestAlreadyOpened,
   cookRecipeForPlayer,
-  grantChestLoot,
+  openChestForPlayer,
   playerNearLitCampfire,
 } from './world/chest.js';
 import {
@@ -987,10 +986,6 @@ export const buildCampfire = spacetimedb.reducer(
     const dy = y - player.y;
     if (dx * dx + dy * dy > CAMPFIRE_PLACE_RANGE_PX * CAMPFIRE_PLACE_RANGE_PX) return;
 
-    const invCtx = ctx as InventoryCtx;
-    if (countItemOwned(invCtx, player.identity, 'wood') < CAMPFIRE_WOOD_COST) return;
-    if (!removeItemStack(invCtx, player.identity, 'wood', CAMPFIRE_WOOD_COST)) return;
-
     const fx = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
     const fy = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
 
@@ -1009,6 +1004,11 @@ export const buildCampfire = spacetimedb.reducer(
     if (newestLitAt > 0n && nowMicros - newestLitAt < CAMPFIRE_COOLDOWN_MICROS) {
       return; // dropped: over the build cadence
     }
+
+    const invCtx = ctx as InventoryCtx;
+    if (countItemOwned(invCtx, player.identity, 'wood') < CAMPFIRE_WOOD_COST) return;
+    if (!removeItemStack(invCtx, player.identity, 'wood', CAMPFIRE_WOOD_COST)) return;
+
     if (count >= CAMPFIRE_MAX_PER_PLAYER && oldest) {
       ctx.db.campfire.campfireId.delete(oldest.campfireId);
     }
@@ -1033,15 +1033,12 @@ export const buildCampfire = spacetimedb.reducer(
 );
 
 /**
- * P4 phase 4 — loot a world chest once. Rolls deterministic loot from seed;
- * legacy coin drops become copper.
+ * P4 phase 4 — loot a world chest once. Seed and position come from the
+ * baked world chest manifest; the client only supplies chestId.
  */
 export const openChest = spacetimedb.reducer(
-  {
-    chestId: t.u32(),
-    seed:    t.i32(),
-  },
-  (ctx, { chestId, seed }) => {
+  { chestId: t.u32() },
+  (ctx, { chestId }) => {
     const identity = ctx.sender;
     const player = ctx.db.player.identity.find(identity);
     if (!player) return;
@@ -1049,14 +1046,7 @@ export const openChest = spacetimedb.reducer(
     if (player.hp <= 0 || player.deadUntil > nowMicros) return;
 
     const invCtx = ctx as InventoryCtx;
-    if (chestAlreadyOpened(invCtx, identity, chestId)) return;
-
-    grantChestLoot(invCtx, identity, seed);
-    ctx.db.playerChestOpened.insert({
-      id: 0n,
-      owner: identity,
-      chestId,
-    });
+    if (!openChestForPlayer(invCtx, identity, player, chestId)) return;
     refreshCollectQuestProgress(invCtx, identity);
   }
 );

@@ -12,5 +12,4 @@ import {
 
 export default {
   chestId: __t.u32(),
-  seed: __t.i32(),
 };
