@@ -19,6 +19,7 @@ const STDB_MODULE = import.meta.env.VITE_SPACETIMEDB_MODULE ?? 'aurisar-world';
 export function useSpacetimeWorld(playerInfo, callbacks) {
   const connRef      = useRef(null);
   const [connected,    setConnected]    = useState(false);
+  const [identity,     setIdentity]     = useState(null);
   const [onlineCount,  setOnlineCount]  = useState(0);
   const [worldLevel,   setWorldLevel]   = useState(() =>
     worldLevelFromFitnessXp(playerInfo?.fitnessXp ?? 0, playerInfo?.fitnessXpBaseline ?? 0),
@@ -120,6 +121,72 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     } catch { /* not connected yet */ }
   }, []);
 
+  // ── P4 inventory reducers ──────────────────────────────────────────────────
+
+  const consumeItem = useCallback((itemId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.consumeItem(itemId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const importInventory = useCallback((itemsJson, coinQty) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.importInventory(itemsJson, coinQty);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const buyFromVendor = useCallback((npcId, itemId, quantity = 1) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.buyFromVendor(npcId, itemId, quantity);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const sellToVendor = useCallback((npcId, itemId, quantity = 1) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.sellToVendor(npcId, itemId, quantity);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const openChest = useCallback((chestId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.openChest(chestId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const cookRecipe = useCallback((recipeId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.cookRecipe(recipeId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const equipItem = useCallback((itemId) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.equipItem(itemId);
+    } catch { /* not connected yet */ }
+  }, []);
+
+  const unequipItem = useCallback((slot) => {
+    const conn = connRef.current;
+    if (!conn) return;
+    try {
+      conn.reducers.unequipItem(slot);
+    } catch { /* not connected yet */ }
+  }, []);
+
   // ── Connection lifecycle ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -131,8 +198,10 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
       conn = DbConnection.builder()
         .withUri(STDB_URI)
         .withDatabaseName(STDB_MODULE)
-        .onConnect((connection, _identity, _token) => {
+        .onConnect((connection, connIdentity, _token) => {
           setConnected(true);
+          setIdentity(connIdentity ?? null);
+          connRef.current = connection;
 
           // Register our Aurisar display info with the server
           connection.reducers.setPlayerInfo(
@@ -149,6 +218,15 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             );
           } catch (err) {
             console.warn('[useSpacetimeWorld] syncProgress failed (module not republished yet?):', err);
+          }
+
+          if (playerInfo.inventoryImport) {
+            try {
+              const { itemsJson, coinQty } = playerInfo.inventoryImport;
+              connection.reducers.importInventory(itemsJson, coinQty);
+            } catch (err) {
+              console.warn('[useSpacetimeWorld] importInventory failed (module not republished yet?):', err);
+            }
           }
 
           // Seed the world's mobs on first ever connect. Idempotent server-side,
@@ -193,6 +271,19 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
               console.warn('[useSpacetimeWorld] player_quest subscription failed (module not republished yet?):', ctx?.event);
             })
             .subscribe(['SELECT * FROM player_quest']);
+
+          // P4 inventory — separate subscription for module-version tolerance.
+          connection
+            .subscriptionBuilder()
+            .onError((ctx) => {
+              console.warn('[useSpacetimeWorld] inventory subscription failed (module not republished yet?):', ctx?.event);
+            })
+            .subscribe([
+              'SELECT * FROM player_wallet',
+              'SELECT * FROM player_item_stack',
+              'SELECT * FROM player_chest_opened',
+              'SELECT * FROM player_equipped',
+            ]);
 
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {
@@ -243,9 +334,39 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
           connection.db.playerQuest?.onDelete((_ctx, row) => {
             callbacksRef.current?.onQuestDelete?.(row);
           });
+
+          // ── P4 inventory table events ──
+          connection.db.playerWallet?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onWalletUpsert?.(row);
+          });
+          connection.db.playerWallet?.onUpdate((_ctx, _oldRow, row) => {
+            callbacksRef.current?.onWalletUpsert?.(row);
+          });
+          connection.db.playerItemStack?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onStackUpsert?.(row);
+          });
+          connection.db.playerItemStack?.onUpdate((_ctx, _oldRow, row) => {
+            callbacksRef.current?.onStackUpsert?.(row);
+          });
+          connection.db.playerItemStack?.onDelete((_ctx, row) => {
+            callbacksRef.current?.onStackDelete?.(row);
+          });
+          connection.db.playerChestOpened?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onChestOpenedInsert?.(row);
+          });
+          connection.db.playerEquipped?.onInsert((_ctx, row) => {
+            callbacksRef.current?.onEquippedUpsert?.(row);
+          });
+          connection.db.playerEquipped?.onUpdate((_ctx, _oldRow, row) => {
+            callbacksRef.current?.onEquippedUpsert?.(row);
+          });
+          connection.db.playerEquipped?.onDelete((_ctx, row) => {
+            callbacksRef.current?.onEquippedDelete?.(row);
+          });
         })
         .onDisconnect((_ctx, err) => {
           setConnected(false);
+          setIdentity(null);
           if (err) console.error('[SpacetimeDB] Disconnected with error:', err);
         })
         .onConnectError((_ctx, err) => {
@@ -272,6 +393,7 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
       try { conn?.disconnect?.(); } catch (_) {}
       connRef.current = null;
       setConnected(false);
+      setIdentity(null);
       setOnlineCount(0);
     };
   // Reconnect if the user's identity or fitness XP changes
@@ -300,6 +422,14 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
     reachWaypoint,
     enterDungeon,
     leaveDungeon,
-    identity: connRef.current?.identity ?? null,
+    consumeItem,
+    importInventory,
+    buyFromVendor,
+    sellToVendor,
+    openChest,
+    cookRecipe,
+    equipItem,
+    unequipItem,
+    identity,
   };
 }

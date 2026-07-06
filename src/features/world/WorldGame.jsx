@@ -14,7 +14,9 @@ import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 import TestingHud             from './TestingHud.jsx';
-import { useInventory }       from './useInventory.js';
+import {
+  useServerInventory, localInventoryImportPayload,
+} from './hooks/useServerInventory.js';
 import WorldMap               from './WorldMap.jsx';
 import GameMenu               from './GameMenu.jsx';
 import InventoryPanel         from './InventoryPanel.jsx';
@@ -23,7 +25,9 @@ import ActionButtons, { actionBtnStyle, actionBtnLabelStyle } from './ActionButt
 import DialoguePanel          from './hud/DialoguePanel.jsx';
 import QuestLogPanel          from './hud/QuestLogPanel.jsx';
 import QuestTracker           from './hud/QuestTracker.jsx';
-import { ITEMS }              from './game/items.js';
+import { ITEMS }              from './content/index';
+import { rollChestLoot }      from './content/formulas/chestLoot';
+import { RECIPES_BY_ID, canCookRecipe } from './content/formulas/cooking';
 import { NPCS, QUESTS, WAYPOINTS } from './content/index';
 import { DUNGEONS } from './content/dungeons/index';
 import {
@@ -221,7 +225,20 @@ export default function WorldGame({ playerInfo, onExit }) {
   // before sceneRef is set and never again while disconnected.
   const [sceneReady, setSceneReady] = useState(false);
 
-  const inv = useInventory(playerInfo?.username);
+  const {
+    onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
+    onEquippedUpsert, onEquippedDelete,
+    countsFor, copperFor, openedChestIdsFor, equippedFor,
+  } = useServerInventory();
+
+  const inventoryImport = React.useMemo(
+    () => localInventoryImportPayload(playerInfo?.username),
+    [playerInfo?.username],
+  );
+  const stdbPlayerInfo = React.useMemo(
+    () => (playerInfo ? { ...playerInfo, inventoryImport } : null),
+    [playerInfo, inventoryImport],
+  );
 
   const togglePanel = useCallback((name) => setActivePanel((p) => (p === name ? null : name)), []);
   const openPanel   = useCallback((name) => setActivePanel(name), []);
@@ -244,14 +261,9 @@ export default function WorldGame({ playerInfo, onExit }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Chest looted (fired by the scene's proximity scan) → grant items + toast.
-  const onChestOpen = useCallback((chest) => {
-    const rolled = inv.openChest(chest);
-    if (rolled && rolled.length) {
-      const txt = rolled.map((r) => `${r.qty}× ${ITEMS[r.id]?.name ?? r.id}`).join(', ');
-      showToast(`Chest opened — found ${txt}`);
-    }
-  }, [inv, showToast]);
+  // Chest looted (fired by the scene's proximity scan) → server reducer + toast.
+  // Loot preview uses the same deterministic roll as the server for the toast text.
+  const onChestOpenRef = useRef(null);
 
   const inputRef  = useRef(null);
   const joyTouchRef = useRef(null); // { id, baseX, baseY }
@@ -302,11 +314,78 @@ export default function WorldGame({ playerInfo, onExit }) {
   const {
     connected, onlineCount, worldLevel, movePlayer, sendChat, castAbility, buildCampfire,
     acceptQuest, abandonQuest, turnInQuest, reachWaypoint, enterDungeon, leaveDungeon,
-    identity,
-  } = useSpacetimeWorld(playerInfo, {
+    consumeItem, buyFromVendor, sellToVendor, openChest, cookRecipe,
+    equipItem, unequipItem, identity,
+  } = useSpacetimeWorld(stdbPlayerInfo, {
     onPlayerUpdate, onPlayerDelete, onChatMessage, onMobUpsert, onMobDelete,
     onCampfireUpsert, onCampfireDelete, onQuestUpsert, onQuestDelete,
+    onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
+    onEquippedUpsert, onEquippedDelete,
   });
+
+  const onChestOpen = useCallback((chest) => {
+    if (!connected) return;
+    openChest(chest.id);
+    const rolled = rollChestLoot(chest.seed);
+    if (rolled.length) {
+      const txt = rolled.map((r) => {
+        const label = r.itemId === 'coin' ? 'copper' : (ITEMS[r.itemId]?.name ?? r.itemId);
+        return `${r.qty}× ${label}`;
+      }).join(', ');
+      showToast(`Chest opened — found ${txt}`);
+    }
+  }, [connected, openChest, showToast]);
+  onChestOpenRef.current = onChestOpen;
+
+  const serverCounts = React.useMemo(
+    () => countsFor(identity),
+    [countsFor, identity],
+  );
+  const copper = React.useMemo(
+    () => copperFor(identity),
+    [copperFor, identity],
+  );
+  const equipped = React.useMemo(
+    () => equippedFor(identity),
+    [equippedFor, identity],
+  );
+  const inv = React.useMemo(() => ({
+    counts: serverCounts,
+    copper,
+    equipped,
+    cook: (recipeId, { nearFire = true } = {}) => {
+      if (!nearFire) return false;
+      const recipe = RECIPES_BY_ID[recipeId];
+      if (!recipe || !canCookRecipe(recipe, serverCounts)) return false;
+      cookRecipe(recipeId);
+      return true;
+    },
+    equip: (itemId) => {
+      const item = ITEMS[itemId];
+      if (!item || (item.type !== 'weapon' && item.type !== 'armor') || !item.slot) return false;
+      equipItem(itemId);
+      return true;
+    },
+    unequip: (slot) => {
+      if (!equipped[slot]) return false;
+      unequipItem(slot);
+      return true;
+    },
+    eat: (itemId) => {
+      const item = ITEMS[itemId];
+      const onServer = (serverCounts[itemId] ?? 0) > 0;
+      if (onServer && item && (item.type === 'consumable' || item.type === 'food')) {
+        consumeItem(itemId);
+        return item.heal ?? 0;
+      }
+      return 0;
+    },
+  }), [serverCounts, copper, equipped, consumeItem, cookRecipe, equipItem, unequipItem]);
+
+  const openedChestIds = React.useMemo(
+    () => openedChestIdsFor(identity),
+    [openedChestIdsFor, identity],
+  );
 
   const myQuests = React.useMemo(
     () => myQuestsFrom(questRows, identity),
@@ -352,6 +431,12 @@ export default function WorldGame({ playerInfo, onExit }) {
     if (identity) sceneRef.current?.setMyIdentity(identity);
   }, [identity]);
 
+  // Server-authoritative opened chest ids — keeps scene dedup in sync across reloads.
+  useEffect(() => {
+    if (!sceneReady) return;
+    sceneRef.current?.setOpenedChests(openedChestIds);
+  }, [openedChestIds, sceneReady]);
+
   // Slice 5c — local-player HP / death overlay state, driven by BabylonWorldScene
   // when our own row arrives via the player table subscription.
   const onLocalPlayerUpdate = useCallback((state) => {
@@ -366,7 +451,8 @@ export default function WorldGame({ playerInfo, onExit }) {
       canvasRef.current,
       playerInfo,
       { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
-        onLocalPlayerUpdate, onChestOpen, onNearbyNpc, onNearbyDoor,
+        onLocalPlayerUpdate, onChestOpen: (...args) => onChestOpenRef.current?.(...args),
+        onNearbyNpc, onNearbyDoor,
         onEnterDungeon: enterDungeon, onLeaveDungeon: leaveDungeon }
     );
     sceneRef.current = scene;
@@ -397,9 +483,6 @@ export default function WorldGame({ playerInfo, onExit }) {
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onLeaveDungeon = leaveDungeon;
   }, [leaveDungeon]);
-  useEffect(() => {
-    if (sceneRef.current) sceneRef.current.callbacks.onChestOpen = onChestOpen;
-  }, [onChestOpen]);
 
   // Scroll chat to bottom on new messages
   useEffect(() => {
@@ -563,7 +646,9 @@ export default function WorldGame({ playerInfo, onExit }) {
       <TestingHud sceneRef={sceneRef} visible={uiPrefs.minimapVisible} mapData={mapData} />
 
       {/* P1: active-quest tracker (hidden while any modal is open) */}
-      {!activePanel && !dialogueNpcId && <QuestTracker myQuests={myQuests} />}
+      {!activePanel && !dialogueNpcId && (
+        <QuestTracker myQuests={myQuests} itemCounts={inv.counts} />
+      )}
 
       {/* World map */}
       {activePanel === 'map' && mapData && (
@@ -582,6 +667,7 @@ export default function WorldGame({ playerInfo, onExit }) {
       {activePanel === 'quests' && (
         <QuestLogPanel
           myQuests={myQuests}
+          itemCounts={inv.counts}
           onAbandonQuest={abandonQuest}
           onClose={closePanel}
         />
@@ -592,11 +678,17 @@ export default function WorldGame({ playerInfo, onExit }) {
         <DialoguePanel
           npcId={dialogueNpcId}
           myQuests={myQuests}
+          itemCounts={inv.counts}
+          serverCounts={serverCounts}
+          copper={copper}
           playerName={playerInfo?.username}
           className={className}
           playerLevel={worldLevel}
           onAcceptQuest={(qid) => { acceptQuest(qid); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
           onTurnInQuest={(qid) => { turnInQuest(qid); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
+          onBuyFromVendor={buyFromVendor}
+          onSellToVendor={sellToVendor}
+          onToast={showToast}
           onClose={() => setDialogueNpcId(null)}
         />
       )}

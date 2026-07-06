@@ -63,6 +63,47 @@ import {
   worldMToPx,
 } from './castle/validate.js';
 import { CASTLE_LEVELS, CASTLE_STEP_UP } from './castle/navGrids.js';
+import {
+  addCopper,
+  addItemStack,
+  applyHeal,
+  countItemOwned,
+  deductCopper,
+  getOrCreateWallet,
+  grantMobLoot,
+  grantQuestReward,
+  grantStartingKit,
+  isConsumable,
+  lootSeedFromKill,
+  removeItemStack,
+  type InventoryCtx,
+} from './inventory/helpers.js';
+import {
+  consumeCollectObjectives,
+  effectiveQuestCounts,
+  parseQuestCounts,
+  questReadyWithInventory,
+  refreshCollectQuestProgress,
+} from './quests/collect.js';
+import { objectiveTarget } from './content/formulas/quests.js';
+import { getItemDef, ITEMS } from './content/items/index.js';
+import {
+  buyPriceCopper,
+  clampTradeQty,
+  isVendorNpc,
+  itemSellPrice,
+  playerNearNpc,
+  vendorSellsItem,
+} from './vendors/helpers.js';
+import {
+  cookRecipeForPlayer,
+  openChestForPlayer,
+  playerNearLitCampfire,
+} from './world/chest.js';
+import {
+  equipItemForPlayer,
+  unequipSlotForPlayer,
+} from './equip/helpers.js';
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
@@ -100,9 +141,8 @@ const QUEST_STATE_DONE          = 2;
 //
 // Players can build a campfire in front of them (prototype buildFire ~3008).
 // Fires are shared world state: every client renders every burning fire.
-// No wood cost yet — the prototype charged 3 wood, but there's no inventory
-// system; when one lands, add the cost check here.
 
+const CAMPFIRE_WOOD_COST          = 3;
 const CAMPFIRE_BURN_MICROS      = 180_000_000n;       // fires burn for 3 minutes
 const CAMPFIRE_COOLDOWN_MICROS  = 10_000_000n;        // min 10 s between builds per player
 const CAMPFIRE_MAX_PER_PLAYER   = 3;                  // oldest is snuffed when exceeded
@@ -395,6 +435,61 @@ const spacetimedb = schema({
     }
   ),
 
+  /**
+   * P4 — copper wallet per player. Public so the client can show balance;
+   * `imported` gates the one-time localStorage migration reducer.
+   */
+  playerWallet: table(
+    { public: true },
+    {
+      identity: t.identity().primaryKey(),
+      copper:   t.u64().default(0n),
+      imported: t.bool().default(false),
+    }
+  ),
+
+  /**
+   * P4 — item stacks owned by a player. One row per stack (stackable items
+   * may share itemId across rows when over stack cap). Clients filter to
+   * their own identity.
+   */
+  playerItemStack: table(
+    { public: true },
+    {
+      id:       t.u64().primaryKey().autoInc(),
+      owner:    t.identity(),
+      itemId:   t.string(),
+      quantity: t.u32(),
+    }
+  ),
+
+  /**
+   * P4 phase 4 — world chests already looted by a player (chest index from
+   * worldgen). Prevents re-farming across reloads.
+   */
+  playerChestOpened: table(
+    { public: true },
+    {
+      id:      t.u64().primaryKey().autoInc(),
+      owner:   t.identity(),
+      chestId: t.u32(),
+    }
+  ),
+
+  /**
+   * P4 phase 5 — equipped weapon/armor slots per player. Items leave the
+   * bag while equipped; unequip returns them to player_item_stack.
+   */
+  playerEquipped: table(
+    { public: true },
+    {
+      id:     t.u64().primaryKey().autoInc(),
+      owner:  t.identity(),
+      slot:   t.string(),
+      itemId: t.string(),
+    }
+  ),
+
 });
 
 export default spacetimedb;
@@ -460,6 +555,9 @@ export const setPlayerInfo = spacetimedb.reducer(
         dungeonInstanceId: 0n,
         floorYM: 0,
       });
+      const invCtx = ctx as InventoryCtx;
+      getOrCreateWallet(invCtx, identity);
+      grantStartingKit(invCtx, identity);
     }
   }
 );
@@ -497,6 +595,144 @@ export const syncProgress = spacetimedb.reducer(
         worldLevel: level,
       });
     }
+  }
+);
+
+/**
+ * P4 — consume a food/consumable item for server-authoritative healing.
+ */
+export const consumeItem = spacetimedb.reducer(
+  { itemId: t.string() },
+  (ctx, { itemId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const def = getItemDef(itemId);
+    if (!isConsumable(def)) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!removeItemStack(invCtx, identity, itemId, 1)) return;
+    applyHeal(invCtx, identity, def!.heal ?? 0);
+  }
+);
+
+/**
+ * P4 — one-time migration from client localStorage inventory. Converts
+ * legacy `coin` stacks to copper; skips unknown item ids.
+ */
+export const importInventory = spacetimedb.reducer(
+  {
+    itemsJson: t.string(),
+    coinQty:   t.u32(),
+  },
+  (ctx, { itemsJson, coinQty }) => {
+    const identity = ctx.sender;
+    const invCtx = ctx as InventoryCtx;
+    const wallet = getOrCreateWallet(invCtx, identity);
+    if (wallet.imported) return;
+
+    let copperFromCoins = 0;
+    try {
+      const parsed = JSON.parse(itemsJson) as Record<string, number>;
+      if (parsed && typeof parsed === 'object') {
+        for (const [itemId, rawQty] of Object.entries(parsed)) {
+          const qty = Math.floor(Number(rawQty));
+          if (!Number.isFinite(qty) || qty <= 0) continue;
+          if (itemId === 'coin') {
+            copperFromCoins += qty;
+            continue;
+          }
+          if (!ITEMS[itemId]) continue;
+          addItemStack(invCtx, identity, itemId, qty);
+        }
+      }
+    } catch {
+      // malformed JSON — still mark imported so we don't retry forever
+    }
+
+    const totalCopper = copperFromCoins + Math.max(0, Math.floor(coinQty));
+    ctx.db.playerWallet.identity.update({
+      ...wallet,
+      imported: true,
+      copper: wallet.copper + BigInt(totalCopper),
+    });
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 3 — buy an item from a vendor NPC's wares while in range.
+ */
+export const buyFromVendor = spacetimedb.reducer(
+  {
+    npcId:    t.string(),
+    itemId:   t.string(),
+    quantity: t.u32(),
+  },
+  (ctx, { npcId, itemId, quantity }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+    if (!isVendorNpc(npcId) || !vendorSellsItem(npcId, itemId)) return;
+    if (!playerNearNpc(player, npcId)) return;
+
+    const def = getItemDef(itemId);
+    if (!def) return;
+    const unitPrice = buyPriceCopper(itemId);
+    if (unitPrice <= 0) return;
+    if (def.minLevel && getPlayerLevel(ctx, identity) < def.minLevel) return;
+
+    const qty = clampTradeQty(quantity, def.stack);
+    if (qty <= 0) return;
+    const totalCost = unitPrice * qty;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!deductCopper(invCtx, identity, totalCost)) return;
+    const granted = addItemStack(invCtx, identity, itemId, qty);
+    if (granted < qty) {
+      addCopper(invCtx, identity, unitPrice * (qty - granted));
+    }
+    if (granted <= 0) return;
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 3 — sell items from inventory to a vendor NPC while in range.
+ */
+export const sellToVendor = spacetimedb.reducer(
+  {
+    npcId:    t.string(),
+    itemId:   t.string(),
+    quantity: t.u32(),
+  },
+  (ctx, { npcId, itemId, quantity }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+    if (!isVendorNpc(npcId)) return;
+    if (!playerNearNpc(player, npcId)) return;
+
+    const def = getItemDef(itemId);
+    if (!def) return;
+    const unitPrice = itemSellPrice(itemId);
+    if (unitPrice <= 0) return;
+
+    const invCtx = ctx as InventoryCtx;
+    const owned = countItemOwned(invCtx, identity, itemId);
+    const qty = clampTradeQty(Math.min(quantity, owned), def.stack);
+    if (qty <= 0) return;
+
+    if (!removeItemStack(invCtx, identity, itemId, qty)) return;
+    addCopper(invCtx, identity, unitPrice * qty);
+    refreshCollectQuestProgress(invCtx, identity);
   }
 );
 
@@ -731,8 +967,7 @@ export const sendChat = spacetimedb.reducer(
  *     window since CAMPFIRE_BURN >> CAMPFIRE_COOLDOWN)
  *   • per-player cap — building past it snuffs the oldest fire (its queued
  *     expiry then no-ops on the missing row)
- *
- * No wood cost until an inventory system exists (prototype charged 3 wood).
+ *   • costs CAMPFIRE_WOOD_COST firewood from server inventory (P4 phase 4)
  */
 export const buildCampfire = spacetimedb.reducer(
   {
@@ -769,6 +1004,11 @@ export const buildCampfire = spacetimedb.reducer(
     if (newestLitAt > 0n && nowMicros - newestLitAt < CAMPFIRE_COOLDOWN_MICROS) {
       return; // dropped: over the build cadence
     }
+
+    const invCtx = ctx as InventoryCtx;
+    if (countItemOwned(invCtx, player.identity, 'wood') < CAMPFIRE_WOOD_COST) return;
+    if (!removeItemStack(invCtx, player.identity, 'wood', CAMPFIRE_WOOD_COST)) return;
+
     if (count >= CAMPFIRE_MAX_PER_PLAYER && oldest) {
       ctx.db.campfire.campfireId.delete(oldest.campfireId);
     }
@@ -789,6 +1029,77 @@ export const buildCampfire = spacetimedb.reducer(
       scheduledAt: ScheduleAt.time(expiresAt),
       campfireId,
     });
+  }
+);
+
+/**
+ * P4 phase 4 — loot a world chest once. Seed and position come from the
+ * baked world chest manifest; the client only supplies chestId.
+ */
+export const openChest = spacetimedb.reducer(
+  { chestId: t.u32() },
+  (ctx, { chestId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!openChestForPlayer(invCtx, identity, player, chestId)) return;
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 4 — cook a recipe near a lit campfire. Consumes inputs server-side.
+ */
+export const cookRecipe = spacetimedb.reducer(
+  { recipeId: t.string() },
+  (ctx, { recipeId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const invCtx = ctx as InventoryCtx;
+    if (!playerNearLitCampfire(invCtx, player)) return;
+    if (!cookRecipeForPlayer(invCtx, identity, recipeId)) return;
+    refreshCollectQuestProgress(invCtx, identity);
+  }
+);
+
+/**
+ * P4 phase 5 — equip a weapon or armor piece from the player's bag.
+ */
+export const equipItem = spacetimedb.reducer(
+  { itemId: t.string() },
+  (ctx, { itemId }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    const invCtx = ctx as InventoryCtx;
+    equipItemForPlayer(invCtx, identity, itemId, getPlayerLevel(ctx, identity));
+  }
+);
+
+/**
+ * P4 phase 5 — unequip a slot and return the item to the bag.
+ */
+export const unequipItem = spacetimedb.reducer(
+  { slot: t.string() },
+  (ctx, { slot }) => {
+    const identity = ctx.sender;
+    const player = ctx.db.player.identity.find(identity);
+    if (!player) return;
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+    if (player.hp <= 0 || player.deadUntil > nowMicros) return;
+
+    unequipSlotForPlayer(ctx as InventoryCtx, identity, slot);
   }
 );
 
@@ -946,6 +1257,18 @@ export const castAbility = spacetimedb.reducer(
       // P1 quest hook: kill credit goes to whoever lands the killing blow
       // (tap rights / party sharing arrive with P3/P6).
       creditKillToQuests(ctx, player.identity, mob);
+      // P4: mob loot + copper to the killer.
+      const mobDef = MOBS[mob.mobType];
+      if (mobDef) {
+        const seed = lootSeedFromKill(
+          player.identity,
+          mobId,
+          nowMicros,
+          mob.spawnNetId,
+        );
+        grantMobLoot(ctx as InventoryCtx, player.identity, mobDef, seed);
+        refreshCollectQuestProgress(ctx as InventoryCtx, player.identity);
+      }
     } else {
       ctx.db.mob.mobId.update({ ...mob, hp: newHp });
     }
@@ -1387,24 +1710,17 @@ function findQuestRow(ctx: any, identity: any, questId: string): any | null {
   return null;
 }
 
-function objectiveTarget(obj: QuestDef['objectives'][number]): number {
-  return obj.type === 'find' ? 1 : obj.count;
-}
-
 function parseCounts(json: string, len: number): number[] {
-  try {
-    const arr = JSON.parse(json);
-    if (Array.isArray(arr) && arr.length === len) {
-      return arr.map((n) => Math.max(0, Number(n) || 0));
-    }
-  } catch {
-    // malformed row — treat as fresh progress
-  }
-  return new Array(len).fill(0);
+  return parseQuestCounts(json, len);
 }
 
-function questIsReady(quest: QuestDef, counts: number[]): boolean {
-  return quest.objectives.every((obj, i) => (counts[i] ?? 0) >= objectiveTarget(obj));
+function questIsReady(
+  ctx: InventoryCtx,
+  identity: unknown,
+  quest: QuestDef,
+  counts: number[],
+): boolean {
+  return questReadyWithInventory(ctx, identity, quest, counts);
 }
 
 function playerInRangeOfNpc(player: { x: number; y: number }, npcId: string): boolean {
@@ -1440,12 +1756,21 @@ export const acceptQuest = spacetimedb.reducer(
     if (quest.minLevel && getPlayerLevel(ctx, ctx.sender) < quest.minLevel) return;
     if (!playerInRangeOfNpc(player, quest.giverNpcId)) return;
 
+    const invCtx = ctx as InventoryCtx;
+    const initial = effectiveQuestCounts(
+      invCtx,
+      ctx.sender,
+      quest,
+      new Array(quest.objectives.length).fill(0),
+    );
     ctx.db.playerQuest.insert({
       id: 0n, // auto-inc replaces this
       owner: ctx.sender,
       questId,
-      state: QUEST_STATE_ACTIVE,
-      countsJson: JSON.stringify(new Array(quest.objectives.length).fill(0)),
+      state: questIsReady(invCtx, ctx.sender, quest, initial)
+        ? QUEST_STATE_READY
+        : QUEST_STATE_ACTIVE,
+      countsJson: JSON.stringify(initial),
       acceptedAt: nowMicros,
     });
   }
@@ -1479,11 +1804,17 @@ export const turnInQuest = spacetimedb.reducer(
     if (!row || row.state === QUEST_STATE_DONE) return;
 
     const counts = parseCounts(row.countsJson, quest.objectives.length);
-    if (!questIsReady(quest, counts)) return;
+    const invCtx = ctx as InventoryCtx;
+    if (!questIsReady(invCtx, ctx.sender, quest, counts)) return;
     if (!playerInRangeOfNpc(player, quest.turnInNpcId)) return;
+    if (!consumeCollectObjectives(invCtx, ctx.sender, quest)) return;
 
-    // P2 grants copper/template unlocks here; P4 grants items. gameXp is
-    // gated by GAME_XP_ENABLED (off) per the fitness-only-XP decision.
+    grantQuestReward(
+      invCtx,
+      ctx.sender,
+      player.classType,
+      quest.reward,
+    );
     ctx.db.playerQuest.id.update({ ...row, state: QUEST_STATE_DONE });
   }
 );
@@ -1524,7 +1855,9 @@ export const reachWaypoint = spacetimedb.reducer(
     ctx.db.playerQuest.id.update({
       ...row,
       countsJson: JSON.stringify(counts),
-      state: questIsReady(quest, counts) ? QUEST_STATE_READY : QUEST_STATE_ACTIVE,
+      state: questIsReady(ctx as InventoryCtx, ctx.sender, quest, counts)
+        ? QUEST_STATE_READY
+        : QUEST_STATE_ACTIVE,
     });
   }
 );
@@ -1558,7 +1891,9 @@ function creditKillToQuests(
     ctx.db.playerQuest.id.update({
       ...row,
       countsJson: JSON.stringify(counts),
-      state: questIsReady(quest, counts) ? QUEST_STATE_READY : QUEST_STATE_ACTIVE,
+      state: questIsReady(ctx as InventoryCtx, identity, quest, counts)
+        ? QUEST_STATE_READY
+        : QUEST_STATE_ACTIVE,
     });
   }
 }
