@@ -19,6 +19,7 @@
 
 import { mulberry32, hash2 } from '../worldgen/index.js';
 import { parseTileId } from './tileMath.js';
+import { buildBladeClusterVertexData, createGrassMaterial } from '../game/grassBlades.js';
 
 const rand = (rng, a, b) => a + rng() * (b - a);
 
@@ -302,16 +303,37 @@ export function buildPropTemplates(scene, opts = {}) {
   T.bush.bakeTransformIntoVertices(BABYLON.Matrix.Scaling(1, 0.7, 1).multiply(BABYLON.Matrix.Translation(0, 0.55, 0)));
   T.bush.material = bushM;
 
-  // Tuft/fern understory props — template meshes must exist so realize() doesn't
-  // crash, but isVisible=false hides them and all their thin instances.
-  T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
-  T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
-  T.tuft.material = green;
-  T.tuft.isVisible = false;
-  T.fern = BABYLON.MeshBuilder.CreateCylinder('tpl_fern', { diameterTop: 0, diameterBottom: 1.48, height: 0.5, tessellation: 6 }, scene);
-  T.fern.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.25, 0));
-  T.fern.material = green;
-  T.fern.isVisible = false;
+  // Ground details / understory. At runtime tuft/fern are small procedural
+  // blade clusters sharing AshwoodGrass's rooted-arc wind shader (grassBlades),
+  // so the understory sways with the same field it sits in. Bake mode keeps
+  // plain cones (the GLB export contract is geometry + vertex colors).
+  if (!opts.bake) {
+    const meshFromCluster = (name, geo, material) => {
+      const mesh = new BABYLON.Mesh(name, scene);
+      const vd = new BABYLON.VertexData();
+      vd.positions = geo.positions;
+      vd.indices = geo.indices;
+      vd.normals = geo.normals;
+      vd.uvs = geo.uvs;
+      vd.applyToMesh(mesh);
+      mesh.material = material;
+      return mesh;
+    };
+    // tuft = upright grass clump; fern = wider, lower, lusher clump.
+    const tuftGeo = buildBladeClusterVertexData({ planes: 3, segments: 3, height: 0.4, width: 0.07, lean: 0.14 });
+    const fernGeo = buildBladeClusterVertexData({ planes: 3, segments: 3, height: 0.3, width: 0.12, lean: 0.22 });
+    const tuftMat = createGrassMaterial(scene, { maxH: tuftGeo.maxH, name: 'ash_tuftGrass' });
+    const fernMat = createGrassMaterial(scene, { maxH: fernGeo.maxH, name: 'ash_fernGrass' });
+    T.tuft = meshFromCluster('tpl_tuft', tuftGeo, tuftMat);
+    T.fern = meshFromCluster('tpl_fern', fernGeo, fernMat);
+  } else {
+    T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
+    T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
+    T.tuft.material = green;
+    T.fern = BABYLON.MeshBuilder.CreateCylinder('tpl_fern', { diameterTop: 0, diameterBottom: 1.48, height: 0.5, tessellation: 6 }, scene);
+    T.fern.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.25, 0));
+    T.fern.material = green;
+  }
   T.flower = BABYLON.MeshBuilder.CreateIcoSphere('tpl_flower', { radius: 0.3, subdivisions: 1 }, scene);
   T.flower.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.3, 0));
   T.flower.convertToFlatShadedMesh();
@@ -783,7 +805,9 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       if (wg.trailDirtAt(x, z) > 0.1) continue;
       const sc = rand(rng, 0.5, 1.25);
       const gc = bi.grassCol;
-      const col2 = { r: gc[0] * 1.3 + 0.08 * rng(), g: gc[1] * 1.3 + 0.1 * rng(), b: gc[2] * 1.2 };
+      // Match the AshwoodGrass field tone — the blade shader has its own
+      // root→tip ramp, so the old ×1.3 boost (for flat cones) now over-saturates.
+      const col2 = { r: gc[0] + 0.08 * rng(), g: gc[1] + 0.1 * rng(), b: gc[2] };
       acc.tuft.push(x, surfaceY(x, z), z, 0, rng() * 6.28, 0, sc, sc * (0.8 + rng() * 0.7), sc, col2);
     }
   }
