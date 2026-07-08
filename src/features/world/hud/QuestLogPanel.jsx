@@ -7,7 +7,7 @@
 import React from 'react';
 import { FONT, overlayBackdrop, panel, panelTitle, closeBtn, ghostBtn } from '../ui/panelTheme.js';
 import { QUESTS, NPCS } from '../content/index';
-import { QUEST_STATE, parseCounts, objectiveTarget } from '../hooks/useQuests.js';
+import { QUEST_STATE, parseCounts, objectiveTarget, questRowReady } from '../hooks/useQuests.js';
 
 const S = {
   section: { fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#94a3b8', textTransform: 'uppercase', margin: '14px 0 6px' },
@@ -22,14 +22,15 @@ const S = {
   empty: { fontSize: 13, color: '#94a3b8', fontStyle: 'italic', margin: '8px 0' },
 };
 
-function QuestCard({ quest, row, onAbandon }) {
-  const counts = parseCounts(row, quest);
+function QuestCard({ quest, row, itemCounts = {}, onAbandon }) {
+  const counts = parseCounts(row, quest, itemCounts);
+  const ready = row.state === QUEST_STATE.READY || questRowReady(row, quest, itemCounts);
   const turnIn = NPCS[quest.turnInNpcId];
   return (
     <div style={S.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <span style={S.name}>
-          {row.state === QUEST_STATE.READY && <span style={{ color: '#86efac' }}>✓ </span>}
+          {ready && <span style={{ color: '#86efac' }}>✓ </span>}
           {quest.name}
         </span>
         {row.state !== QUEST_STATE.DONE && onAbandon && (
@@ -42,7 +43,7 @@ function QuestCard({ quest, row, onAbandon }) {
         )}
       </div>
       <div style={S.meta}>
-        {row.state === QUEST_STATE.READY
+        {ready
           ? `Return to ${turnIn?.name ?? quest.turnInNpcId}`
           : row.state === QUEST_STATE.DONE
             ? 'Completed'
@@ -61,13 +62,15 @@ function QuestCard({ quest, row, onAbandon }) {
   );
 }
 
-export default function QuestLogPanel({ myQuests, onAbandonQuest, onClose }) {
+export default function QuestLogPanel({ myQuests, itemCounts = {}, onAbandonQuest, onClose }) {
   const entries = [...myQuests.entries()]
     .map(([questId, row]) => ({ quest: QUESTS[questId], row }))
     .filter((e) => e.quest);
 
-  const active = entries.filter((e) => e.row.state === QUEST_STATE.ACTIVE);
-  const ready  = entries.filter((e) => e.row.state === QUEST_STATE.READY);
+  const active = entries.filter((e) =>
+    e.row.state === QUEST_STATE.ACTIVE && !questRowReady(e.row, e.quest, itemCounts));
+  const ready  = entries.filter((e) =>
+    e.row.state === QUEST_STATE.READY || questRowReady(e.row, e.quest, itemCounts));
   const done   = entries.filter((e) => e.row.state === QUEST_STATE.DONE);
 
   return (
@@ -85,13 +88,19 @@ export default function QuestLogPanel({ myQuests, onAbandonQuest, onClose }) {
         )}
 
         {ready.length > 0 && <div style={S.section}>Ready to complete</div>}
-        {ready.map((e) => <QuestCard key={e.quest.id} quest={e.quest} row={e.row} onAbandon={onAbandonQuest} />)}
+        {ready.map((e) => (
+          <QuestCard key={e.quest.id} quest={e.quest} row={e.row} itemCounts={itemCounts} onAbandon={onAbandonQuest} />
+        ))}
 
         {active.length > 0 && <div style={S.section}>Active</div>}
-        {active.map((e) => <QuestCard key={e.quest.id} quest={e.quest} row={e.row} onAbandon={onAbandonQuest} />)}
+        {active.map((e) => (
+          <QuestCard key={e.quest.id} quest={e.quest} row={e.row} itemCounts={itemCounts} onAbandon={onAbandonQuest} />
+        ))}
 
         {done.length > 0 && <div style={S.section}>Completed</div>}
-        {done.map((e) => <QuestCard key={e.quest.id} quest={e.quest} row={e.row} />)}
+        {done.map((e) => (
+          <QuestCard key={e.quest.id} quest={e.quest} row={e.row} itemCounts={itemCounts} />
+        ))}
       </div>
     </div>
   );

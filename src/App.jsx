@@ -6977,6 +6977,8 @@ function App() {
           username={profile?.username}
           aurisarClass={profile?.class_type}
           avatarConfig={avatarConfig}
+          fitnessXp={profile?.xp ?? 0}
+          fitnessXpBaseline={0}
         />
       </React.Suspense>
     )

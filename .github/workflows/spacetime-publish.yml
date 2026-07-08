@@ -84,6 +84,12 @@ jobs:
           cache: npm
           cache-dependency-path: spacetimedb/package-lock.json
 
+      - name: Generate castle nav grids
+        # validate.ts imports spacetimedb/src/castle/navGrids.ts (emitted from
+        # castlePlan.js). Regenerate here so publish never fails on a clean
+        # checkout before tsc bundles the module.
+        run: node scripts/emit-castle-manifest.mjs
+
       - name: Install module dependencies
         # `npm ci` (not `npm install`) so the lockfile is the source of
         # truth — fails if package.json and package-lock.json drift.

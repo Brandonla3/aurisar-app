@@ -7,6 +7,12 @@
 
 import { useCallback, useState } from 'react';
 import { QUESTS } from '../content/index';
+import {
+  objectiveProgress,
+  objectiveTarget,
+  questProgressCounts,
+  questIsReadyFromCounts,
+} from '../content/formulas/quests';
 
 export const QUEST_STATE = { ACTIVE: 0, READY: 1, DONE: 2 };
 
@@ -55,26 +61,35 @@ export function myQuestsFrom(rows, identity) {
 
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 
-export function objectiveTarget(obj) {
-  return obj.type === 'find' ? 1 : obj.count;
-}
+export { objectiveTarget, objectiveProgress, questProgressCounts, questIsReadyFromCounts };
 
 /** Per-objective counts for a row, tolerant of malformed JSON. */
-export function parseCounts(row, quest) {
+export function parseCounts(row, quest, itemCounts = {}) {
   try {
     const arr = JSON.parse(row.countsJson);
     if (Array.isArray(arr) && arr.length === quest.objectives.length) {
-      return arr.map((n) => Math.max(0, Number(n) || 0));
+      const stored = arr.map((n) => Math.max(0, Number(n) || 0));
+      return questProgressCounts(quest, stored, itemCounts);
     }
   } catch { /* fresh */ }
-  return new Array(quest.objectives.length).fill(0);
+  return questProgressCounts(
+    quest,
+    new Array(quest.objectives.length).fill(0),
+    itemCounts,
+  );
+}
+
+/** True when all objectives are met (uses live inventory for collect). */
+export function questRowReady(row, quest, itemCounts = {}) {
+  return questIsReadyFromCounts(quest, parseCounts(row, quest, itemCounts));
 }
 
 /** Quests this NPC offers that the player can accept right now. */
-export function availableQuestsAt(npcId, myQuests) {
+export function availableQuestsAt(npcId, myQuests, playerLevel = 999) {
   return Object.values(QUESTS).filter((q) => {
     if (q.giverNpcId !== npcId) return false;
     if (myQuests.has(q.id)) return false; // active, ready, or done
+    if (q.minLevel && playerLevel < q.minLevel) return false;
     if (q.requiresQuestId) {
       const prereq = myQuests.get(q.requiresQuestId);
       if (!prereq || prereq.state !== QUEST_STATE.DONE) return false;
@@ -84,34 +99,35 @@ export function availableQuestsAt(npcId, myQuests) {
 }
 
 /** Quests ready to be turned in at this NPC. */
-export function readyQuestsAt(npcId, myQuests) {
+export function readyQuestsAt(npcId, myQuests, itemCounts = {}) {
   return Object.values(QUESTS).filter((q) => {
     if (q.turnInNpcId !== npcId) return false;
     const row = myQuests.get(q.id);
-    return !!row && row.state === QUEST_STATE.READY;
+    if (!row || row.state === QUEST_STATE.DONE) return false;
+    return row.state === QUEST_STATE.READY || questRowReady(row, q, itemCounts);
   });
 }
 
 /** Active (not yet ready) quests this NPC gave the player. */
-export function inProgressQuestsAt(npcId, myQuests) {
+export function inProgressQuestsAt(npcId, myQuests, itemCounts = {}) {
   return Object.values(QUESTS).filter((q) => {
     if (q.giverNpcId !== npcId) return false;
     const row = myQuests.get(q.id);
-    return !!row && row.state === QUEST_STATE.ACTIVE;
+    return !!row && row.state === QUEST_STATE.ACTIVE && !questRowReady(row, q, itemCounts);
   });
 }
 
 /** '?' (turn-in ready) wins over '!' (quest available); null = no marker. */
-export function npcMarker(npcId, myQuests) {
+export function npcMarker(npcId, myQuests, playerLevel = 999) {
   if (readyQuestsAt(npcId, myQuests).length > 0) return '?';
-  if (availableQuestsAt(npcId, myQuests).length > 0) return '!';
+  if (availableQuestsAt(npcId, myQuests, playerLevel).length > 0) return '!';
   return null;
 }
 
 /** { npcId: '!' | '?' } map for NpcSystem.setMarkers. */
-export function buildNpcMarkers(npcIds, myQuests) {
+export function buildNpcMarkers(npcIds, myQuests, playerLevel = 999) {
   const out = {};
-  for (const id of npcIds) out[id] = npcMarker(id, myQuests);
+  for (const id of npcIds) out[id] = npcMarker(id, myQuests, playerLevel);
   return out;
 }
 

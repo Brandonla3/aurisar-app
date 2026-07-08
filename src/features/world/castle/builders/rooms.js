@@ -12,29 +12,15 @@
 
 import {
   LEVELS, ROOMS, DOORS, VOIDS, STAIRS, LOCAL_BOUNDS,
-  WALL_T, SLAB_T, stairRects, doorLevel,
+  WALL_T, SLAB_T, stairRects, doorLevel, MATERIAL_SPEC,
 } from '../castlePlan.js';
 import { box, slabBox, rectSubtract, cyl, archTube } from './mergeUtil.js';
 import { hash2 } from '../../worldgen/rng.js';
 
-// Which room kinds read as "royal" (marble floors, cornices) vs wood vs raw.
-const FLOOR_MAT = {
-  entrance: 'marble', corridor: 'marble', gallery: 'marble', stairHall: 'marble',
-  ballroom: 'marble', treasury: 'marble', bathroom: 'marble',
-  dining: 'woodFloor', bedroom: 'woodFloor', master: 'woodFloor', royal: 'woodFloor',
-  sitting: 'woodFloor', library: 'woodFloor', observatory: 'woodFloor',
-  kitchen: 'darkStone', servant: 'woodFloor', storage: 'darkStone',
-  dungeonHall: 'darkStone', cells: 'darkStone', guard: 'darkStone', vault: 'darkStone',
-};
-const WALL_MAT_BY_LEVEL = ['darkStone', 'stone', 'plaster', 'plaster', 'plaster'];
-const WINDOWED_KINDS = new Set([
-  'entrance', 'ballroom', 'bedroom', 'master', 'royal', 'sitting', 'library',
-  'bathroom', 'observatory', 'dining', 'kitchen', 'gallery', 'corridor', 'stairHall',
-]);
-const FANCY_KINDS = new Set([
-  'entrance', 'ballroom', 'gallery', 'royal', 'master', 'library', 'sitting',
-  'dining', 'stairHall', 'treasury',
-]);
+const FLOOR_MAT = MATERIAL_SPEC.floorByKind;
+const WALL_MAT_BY_LEVEL = MATERIAL_SPEC.wallByLevel;
+const WINDOWED_KINDS = new Set(MATERIAL_SPEC.windowedKinds);
+const FANCY_KINDS = new Set(MATERIAL_SPEC.fancyKinds);
 const DOOR_H = { single: 3.8, double: 5.4, iron: 3.4 };
 
 const doorHeight = (d) => (d.iron ? DOOR_H.iron : d.double ? DOOR_H.double : DOOR_H.single);
@@ -390,6 +376,13 @@ export function createRailing(ctx, level, line, lo, hi, ax, az) {
   const L = LEVELS[level];
   const y = L.y;
   const len = hi - lo;
+  // Nav strip along the railing line — keeps players off the void edge.
+  const navInset = 0.15;
+  if (line.axis === 'x') {
+    ctx.addNavBlocker?.(level, line.at - navInset, lo, line.at + navInset, hi, 0);
+  } else {
+    ctx.addNavBlocker?.(level, lo, line.at - navInset, hi, line.at + navInset, 0);
+  }
   const put = (u, v, yy, sx, sy, sz, matKey) => {
     const m = line.axis === 'x'
       ? box(ctx.scene, `rail_${level}`, u + ax, yy, v + az, sx, sy, sz)

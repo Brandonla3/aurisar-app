@@ -4,10 +4,8 @@
  * starter zone (see public/assets/ATTRIBUTION.md). The story pass rewrites
  * names and dialogue freely.
  *
- * questIds list only the quests the current server supports (kill
- * objectives). The collect-objective quests (q_boars, q_spiders,
- * q_supplies, the Edran collect chain) and the dungeon quests activate
- * with P4 (server inventory) and P7 (the crypt dungeon).
+ * questIds list quests the server supports (kill + collect + find objectives).
+ * Dungeon quests (q_sexton, q_hollow, q_gravecallers_trail) activate in P7.
  */
 import type { NpcDef } from '../../types';
 
@@ -29,7 +27,7 @@ export const NPCS: NpcDef[] = [
     title: 'Provisioner',
     pos: { x: -7, z: 3 },
     facingRad: Math.PI / 2,
-    questIds: [],
+    questIds: ['q_supplies'],
     greeting: 'Fresh bread, clean water, fair prices. What can I get you?',
     vendorItemIds: ['baked_bread', 'spring_water', 'roasted_boar', 'tough_jerky'],
   },
@@ -40,7 +38,7 @@ export const NPCS: NpcDef[] = [
     title: 'Herbalist',
     pos: { x: 11, z: -3 },
     facingRad: -Math.PI / 2,
-    questIds: [],
+    questIds: ['q_boars', 'q_spiders'],
     greeting: 'Careful where you step in the eastern woods, friend.',
   },
   {
@@ -50,7 +48,7 @@ export const NPCS: NpcDef[] = [
     title: 'Town Priest',
     pos: { x: -14, z: -10 },
     facingRad: 0.8,
-    questIds: ['q_bones'],
+    questIds: ['q_bones', 'q_whispers', 'q_names_of_the_dead', 'q_silence_the_call', 'q_rite'],
     greeting: 'The Light keep you. Even the dead find no rest here of late.',
   },
   {

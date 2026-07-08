@@ -1,16 +1,13 @@
 /**
  * DialoguePanel — NPC conversation modal: greeting, available quests
- * (accept), ready quests (complete), and in-progress reminders. On touch
- * devices it renders as a bottom sheet so it reads like a conversation.
- *
- * Vendor inventories render as a preview list only — buying lands with the
- * server economy in P4.
+ * (accept), ready quests (complete), in-progress reminders, and vendor
+ * buy/sell when the NPC has wares.
  */
 
 import React, { useState } from 'react';
 import { FONT, overlayBackdrop, panel, panelTitle, closeBtn, primaryBtn, ghostBtn } from '../ui/panelTheme.js';
 import { NPCS, ITEMS } from '../content/index';
-import { formatCopper } from '../content/formulas/prices';
+import { formatCopper, sellPriceCopper } from '../content/formulas/prices';
 import {
   availableQuestsAt, readyQuestsAt, inProgressQuestsAt,
   parseCounts, objectiveTarget, substituteTokens,
@@ -33,7 +30,26 @@ const S = {
   questText: { fontSize: 13, color: '#cbd5e1', lineHeight: 1.6, margin: '10px 0' },
   objective: { fontSize: 12.5, color: '#a7b6cc', margin: '2px 0' },
   reward: { fontSize: 12.5, color: '#86efac', margin: '2px 0' },
-  vendorRow: { display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#cbd5e1', padding: '3px 0' },
+  vendorRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+    fontSize: 12.5, color: '#cbd5e1', padding: '6px 0',
+    borderBottom: '1px solid rgba(148,163,184,0.12)',
+  },
+  vendorName: { flex: 1, minWidth: 0 },
+  vendorPrice: { color: '#f0d060', whiteSpace: 'nowrap' },
+  wallet: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '8px 10px', marginBottom: 8, borderRadius: 8,
+    background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(240,208,96,0.25)',
+    fontSize: 12, fontFamily: FONT, color: '#f0d060',
+  },
+  tradeBtn: {
+    ...ghostBtn,
+    padding: '4px 10px', minHeight: 28, fontSize: 11, flexShrink: 0,
+  },
+  tradeBtnDisabled: {
+    opacity: 0.45, cursor: 'not-allowed',
+  },
 };
 
 function rewardLines(quest) {
@@ -49,17 +65,39 @@ function rewardLines(quest) {
   return lines;
 }
 
+function copperNumber(copper) {
+  const n = Number(copper ?? 0n);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function canBuyItem(item, copper, playerLevel) {
+  const price = item.vendorPriceCopper ?? 0;
+  if (price <= 0) return false;
+  if (item.minLevel && playerLevel < item.minLevel) return false;
+  return copperNumber(copper) >= price;
+}
+
 export default function DialoguePanel({
-  npcId, myQuests, playerName, className,
-  onAcceptQuest, onTurnInQuest, onClose,
+  npcId, myQuests, playerName, className, playerLevel = 999,
+  itemCounts = {},
+  serverCounts = {},
+  copper = 0n,
+  onAcceptQuest, onTurnInQuest, onBuyFromVendor, onSellToVendor, onToast, onClose,
 }) {
   const [detailQuest, setDetailQuest] = useState(null); // { quest, mode: 'accept'|'turnIn' }
   const npc = NPCS[npcId];
   if (!npc) return null;
 
-  const available  = availableQuestsAt(npcId, myQuests);
-  const ready      = readyQuestsAt(npcId, myQuests);
-  const inProgress = inProgressQuestsAt(npcId, myQuests);
+  const available  = availableQuestsAt(npcId, myQuests, playerLevel);
+  const ready      = readyQuestsAt(npcId, myQuests, itemCounts);
+  const inProgress = inProgressQuestsAt(npcId, myQuests, itemCounts);
+  const isVendor = (npc.vendorItemIds?.length ?? 0) > 0;
+
+  const sellable = isVendor
+    ? Object.entries(serverCounts)
+      .filter(([id, qty]) => qty > 0 && sellPriceCopper(ITEMS[id] ?? {}) > 0)
+      .sort(([a], [b]) => (ITEMS[a]?.name ?? a).localeCompare(ITEMS[b]?.name ?? b))
+    : [];
 
   const sheetStyle = IS_TOUCH
     ? { ...panel, width: '100%', maxWidth: '100%', maxHeight: '72vh', borderRadius: '16px 16px 0 0', alignSelf: 'flex-end' }
@@ -68,8 +106,19 @@ export default function DialoguePanel({
     ? { ...overlayBackdrop, alignItems: 'flex-end' }
     : overlayBackdrop;
 
+  const buy = (itemId) => {
+    onBuyFromVendor?.(npcId, itemId, 1);
+    const item = ITEMS[itemId];
+    onToast?.(`Purchased ${item?.name ?? itemId}.`);
+  };
+
+  const sell = (itemId, qty) => {
+    onSellToVendor?.(npcId, itemId, qty);
+    const item = ITEMS[itemId];
+    onToast?.(`Sold ${qty}× ${item?.name ?? itemId}.`);
+  };
+
   const body = detailQuest ? (
-    // ── Quest detail (accept or turn-in confirmation) ──
     <>
       <h2 style={panelTitle}>{detailQuest.quest.name}</h2>
       <div style={S.questText}>
@@ -110,11 +159,17 @@ export default function DialoguePanel({
       </div>
     </>
   ) : (
-    // ── NPC root view ──
     <>
       <h2 style={panelTitle}>{npc.name}</h2>
       {npc.title && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{npc.title}</div>}
       <div style={S.greeting}>“{substituteTokens(npc.greeting, playerName, className)}”</div>
+
+      {isVendor && (
+        <div style={S.wallet}>
+          <span>Your coin</span>
+          <span style={{ fontWeight: 700 }}>{formatCopper(copper)}</span>
+        </div>
+      )}
 
       {ready.length > 0 && (
         <>
@@ -145,7 +200,7 @@ export default function DialoguePanel({
           <div style={S.section}>In progress</div>
           {inProgress.map((q) => {
             const row = myQuests.get(q.id);
-            const counts = row ? parseCounts(row, q) : [];
+            const counts = row ? parseCounts(row, q, itemCounts) : [];
             return (
               <div key={q.id} style={{ ...S.questBtn, cursor: 'default' }}>
                 <span style={S.questName}>{q.name}</span>
@@ -158,16 +213,60 @@ export default function DialoguePanel({
         </>
       )}
 
-      {npc.vendorItemIds?.length > 0 && (
+      {isVendor && (
         <>
-          <div style={S.section}>Wares (browsing only — trading opens soon)</div>
+          <div style={S.section}>Buy</div>
           {npc.vendorItemIds.map((iid) => {
             const item = ITEMS[iid];
             if (!item) return null;
+            const price = item.vendorPriceCopper ?? 0;
+            const affordable = canBuyItem(item, copper, playerLevel);
+            const levelOk = !item.minLevel || playerLevel >= item.minLevel;
             return (
               <div key={iid} style={S.vendorRow}>
-                <span>{item.icon} {item.name}</span>
-                <span style={{ color: '#f0d060' }}>{formatCopper(item.vendorPriceCopper ?? 0)}</span>
+                <span style={S.vendorName}>{item.icon} {item.name}</span>
+                <span style={S.vendorPrice}>{formatCopper(price)}</span>
+                <button
+                  style={{
+                    ...S.tradeBtn,
+                    ...((!affordable || !levelOk) ? S.tradeBtnDisabled : {}),
+                  }}
+                  disabled={!affordable || !levelOk}
+                  title={
+                    !levelOk
+                      ? `Requires level ${item.minLevel}`
+                      : !affordable
+                        ? 'Not enough coin'
+                        : 'Buy 1'
+                  }
+                  onClick={() => buy(iid)}
+                >
+                  Buy
+                </button>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {sellable.length > 0 && (
+        <>
+          <div style={S.section}>Sell</div>
+          {sellable.map(([iid, qty]) => {
+            const item = ITEMS[iid];
+            if (!item) return null;
+            const unit = sellPriceCopper(item);
+            return (
+              <div key={iid} style={S.vendorRow}>
+                <span style={S.vendorName}>
+                  {item.icon} {item.name}
+                  {qty > 1 ? <span style={{ color: '#94a3b8' }}> ×{qty}</span> : null}
+                </span>
+                <span style={S.vendorPrice}>{formatCopper(unit)}</span>
+                <button style={S.tradeBtn} onClick={() => sell(iid, 1)}>Sell</button>
+                {qty > 1 && (
+                  <button style={S.tradeBtn} onClick={() => sell(iid, qty)}>All</button>
+                )}
               </div>
             );
           })}

@@ -61,7 +61,9 @@
       "castle": {
         "placement": "background",
         "scale": "massive",
-        "interior_required": false,
+        "interior_required": true,
+        "interior_mode": "instanced_teleport",
+        "runtime_source": "procedural",
         "visual_role": "objective_anchor"
       }
     },
@@ -78,7 +80,6 @@
     },
     "negative_prompts": [
       "no dense photogrammetry clutter",
-      "no interior castle details",
       "no heavy fog or storms",
       "no very tall grass blocking combat readability",
       "no overly noisy terrain microdetail"
@@ -235,7 +236,7 @@
     "rules": [
       "if target_platforms contains mobile => lod_required must be true",
       "if target_platforms contains mobile => streaming_required must be true",
-      "if castle placement is background => interior_required must be false",
+      "if castle runtime_source is procedural => CASTLE_LOD0/LOD1 are optional future exports",
       "if world_mode is modular_world_slice => active_zone_id required",
       "if is_world_replacement is true => active_zone_id must be root_world"
     ]

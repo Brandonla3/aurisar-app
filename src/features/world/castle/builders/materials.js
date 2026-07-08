@@ -6,70 +6,54 @@
  * DynamicTextures (hash2-based, deterministic — no Math.random) so stone
  * reads as stone and wood as wood without shipping texture assets.
  *
- * maxSimultaneousLights is raised to 8 on lit materials: the CastleLightPool
- * runs up to 6 warm PointLights near the player on top of the scene's
- * hemispheric/directional fills (StandardMaterial's default cap is 4).
+ * Desktop uses 256px textures + procedural bump maps; mobile stays at 128px
+ * with diffuse only to protect fill rate.
  */
 
 /* global BABYLON */
 
 import { hash2 } from '../../worldgen/rng.js';
 
-// The castle's always-on themed ambient (a scoped hemispheric) must ALWAYS be
-// in each material's active light set — otherwise the pool torches (kept
-// enabled at intensity 0) plus the scene fill/bounce fill every slot and the
-// ambient base silently drops out, leaving rooms lit only where a torch pool
-// happens to reach. 10 slots fit fill + bounce + ambient + the 7-light pool
-// exactly; the ambient also gets a high renderPriority so it's never the one
-// evicted. (Pushing this higher risks StandardMaterial exceeding the shader's
-// light budget and failing to compile on weaker GLSL backends — lit meshes
-// then vanish while the unlit emissive flames still draw.)
 const MAX_LIGHTS = 10;
+const MOBILE_TEX = 128;
+const DESKTOP_TEX = 256;
 
-/**
- * 128px procedural diffuse texture. mode:
- *  'stone'   — block speckle + mortar-ish darker joints
- *  'wood'    — lengthwise plank streaks
- *  'marble'  — soft light field with faint veins
- *  'fabric'  — fine crosshatch weave (warp/weft lines)
- *  'plaster' — soft irregular surface noise, no pattern
- */
-function noiseTexture(scene, name, base, accent, mode, seed = 1) {
-  const SIZE = 128;
-  const tex = new BABYLON.DynamicTexture(name, { width: SIZE, height: SIZE }, scene, true);
+/** Shared height field 0..1 for diffuse + bump generation. */
+function sampleNoise(x, y, mode, seed) {
+  if (mode === 'wood') {
+    const wob = hash2(seed, y * 0.13) * 4;
+    return hash2(seed + Math.floor((y + wob) / 10), x * 0.055) * 0.55 +
+           hash2(seed * 3.7, x * 0.9 + y * 7.1) * 0.20;
+  }
+  if (mode === 'marble') {
+    const vein = Math.abs(Math.sin(x * 0.11 + hash2(seed, Math.floor(y / 7)) * 6.28 + y * 0.03));
+    return (vein > 0.94 ? 0.85 : 0) + hash2(seed + x * 0.51, y * 0.47) * 0.16;
+  }
+  if (mode === 'fabric') {
+    const warp = (Math.sin(x * 2.5 + hash2(seed, y) * 0.8) + 1) * 0.5;
+    const weft = (Math.sin(y * 2.5 + hash2(seed * 3, x) * 0.8) + 1) * 0.5;
+    return warp * 0.45 + weft * 0.45 + hash2(seed * 1.9 + x * 0.4, y * 0.4) * 0.14;
+  }
+  if (mode === 'plaster') {
+    return hash2(seed + Math.floor(x / 22), Math.floor(y / 18)) * 0.18 +
+           hash2(seed * 2.1 + x * 0.7, y * 0.6) * 0.14 +
+           hash2(seed * 5.3 + x * 0.22, y * 0.18) * 0.08;
+  }
+  const cell = hash2(seed + Math.floor(x / 16), Math.floor(y / 12)) * 0.4;
+  const fine = hash2(seed * 1.7 + x * 0.83, y * 0.71) * 0.35;
+  const joint = (x % 16 < 1 || y % 12 < 1) ? 0.5 : 0;
+  return cell + fine + joint * 0.6;
+}
+
+function noiseTexture(scene, name, base, accent, mode, seed, size) {
+  const tex = new BABYLON.DynamicTexture(name, { width: size, height: size }, scene, true);
   const ctx = tex.getContext();
   const [br, bg, bb] = base, [ar, ag, ab] = accent;
-  const img = ctx.createImageData(SIZE, SIZE);
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      let t;
-      if (mode === 'wood') {
-        // plank streaks along x with per-row waviness
-        const wob = hash2(seed, y * 0.13) * 4;
-        t = hash2(seed + Math.floor((y + wob) / 10), x * 0.055) * 0.55 +
-            hash2(seed * 3.7, x * 0.9 + y * 7.1) * 0.20;
-      } else if (mode === 'marble') {
-        const vein = Math.abs(Math.sin(x * 0.11 + hash2(seed, Math.floor(y / 7)) * 6.28 + y * 0.03));
-        t = (vein > 0.94 ? 0.85 : 0) + hash2(seed + x * 0.51, y * 0.47) * 0.16;
-      } else if (mode === 'fabric') {
-        // crosshatch weave: thin warp/weft lines at alternating density
-        const warp = (Math.sin(x * 2.5 + hash2(seed, y) * 0.8) + 1) * 0.5;
-        const weft = (Math.sin(y * 2.5 + hash2(seed * 3, x) * 0.8) + 1) * 0.5;
-        t = warp * 0.45 + weft * 0.45 + hash2(seed * 1.9 + x * 0.4, y * 0.4) * 0.14;
-      } else if (mode === 'plaster') {
-        // soft irregular trowel noise — no veins, no cells
-        t = hash2(seed + Math.floor(x / 22), Math.floor(y / 18)) * 0.18 +
-            hash2(seed * 2.1 + x * 0.7, y * 0.6) * 0.14 +
-            hash2(seed * 5.3 + x * 0.22, y * 0.18) * 0.08;
-      } else {
-        // stone: coarse cells + fine speckle
-        const cell = hash2(seed + Math.floor(x / 16), Math.floor(y / 12)) * 0.4;
-        const fine = hash2(seed * 1.7 + x * 0.83, y * 0.71) * 0.35;
-        const joint = (x % 16 < 1 || y % 12 < 1) ? 0.5 : 0;
-        t = cell + fine + joint * 0.6;
-      }
-      t = Math.min(1, Math.max(0, t));
-      const i = (y * SIZE + x) * 4;
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const t = Math.min(1, Math.max(0, sampleNoise(x, y, mode, seed)));
+      const i = (y * size + x) * 4;
       img.data[i]     = Math.round(255 * (br + (ar - br) * t));
       img.data[i + 1] = Math.round(255 * (bg + (ag - bg) * t));
       img.data[i + 2] = Math.round(255 * (bb + (ab - bb) * t));
@@ -82,22 +66,43 @@ function noiseTexture(scene, name, base, accent, mode, seed = 1) {
   return tex;
 }
 
-function mat(scene, name, { diffuse, texture = null, specular = [0.03, 0.03, 0.03],
-  emissive = null, alpha = 1, uv = 0.35, lit = true, backFace = true }) {
+/** Grayscale height map for StandardMaterial.bumpTexture. */
+function bumpTexture(scene, name, mode, seed, size, strength = 1) {
+  const tex = new BABYLON.DynamicTexture(name, { width: size, height: size }, scene, true);
+  const ctx = tex.getContext();
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const t = Math.min(1, Math.max(0, sampleNoise(x, y, mode, seed + 17.3)));
+      const v = Math.round(255 * (0.42 + (t - 0.5) * 0.55 * strength));
+      const i = (y * size + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.update(false);
+  tex.wrapU = tex.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+  return tex;
+}
+
+function mat(scene, name, { diffuse, texture = null, bump = null, bumpScale = 0.35,
+  specular = [0.03, 0.03, 0.03], emissive = null, alpha = 1, uv = 0.35,
+  lit = true, backFace = true }) {
   const m = new BABYLON.StandardMaterial(name, scene);
   if (texture) {
     m.diffuseTexture = texture;
     texture.uScale = texture.vScale = uv;
   }
+  if (bump) {
+    m.bumpTexture = bump;
+    bump.uScale = bump.vScale = uv;
+    m.bumpTexture.level = bumpScale;
+  }
   m.diffuseColor  = new BABYLON.Color3(...diffuse);
   m.specularColor = new BABYLON.Color3(...specular);
   if (emissive) m.emissiveColor = new BABYLON.Color3(...emissive);
   else if (lit) {
-    // faint self-glow floor: a last-resort "never pitch black" guard. The
-    // castle's bright themed ambient (CastleSystem AMBIENT_PALETTES) now owns
-    // room brightness, so this is kept low — a high floor would flatten the
-    // ambient's directional shading — and biased slightly cool to sit under
-    // the royal stone theme rather than fighting it.
     m.emissiveColor = new BABYLON.Color3(
       diffuse[0] * 0.05, diffuse[1] * 0.055, diffuse[2] * 0.065);
   }
@@ -107,67 +112,63 @@ function mat(scene, name, { diffuse, texture = null, specular = [0.03, 0.03, 0.0
   return m;
 }
 
-/** Create the full shared material set. Call once; dispose via disposeAll(). */
-export function createCastleMaterials(scene) {
-  const T = (name, base, accent, mode, seed) => noiseTexture(scene, name, base, accent, mode, seed);
+/** @param {{ isMobile?: boolean }} [opts] */
+export function createCastleMaterials(scene, opts = {}) {
+  const size = opts.isMobile ? MOBILE_TEX : DESKTOP_TEX;
+  const withBump = !opts.isMobile;
+  const T = (name, base, accent, mode, seed) =>
+    noiseTexture(scene, name, base, accent, mode, seed, size);
+  const B = (name, mode, seed, strength) =>
+    withBump ? bumpTexture(scene, name, mode, seed, size, strength) : null;
+  const texPair = (name, base, accent, mode, seed, bumpStrength = 0.35) => ({
+    texture: T(`castle_tex_${name}`, base, accent, mode, seed),
+    bump: B(`castle_bump_${name}`, mode, seed, bumpStrength),
+  });
+
+  const stone = texPair('stone', [0.50, 0.49, 0.46], [0.38, 0.37, 0.35], 'stone', 23);
+  const extStone = texPair('extStone', [0.44, 0.42, 0.38], [0.30, 0.29, 0.27], 'stone', 11, 0.42);
+  const darkStone = texPair('darkStone', [0.50, 0.56, 0.68], [0.36, 0.41, 0.53], 'stone', 37);
+  const marble = texPair('marble', [0.80, 0.78, 0.74], [0.93, 0.92, 0.88], 'marble', 5, 0.22);
+  const marbleDark = texPair('marbleDark', [0.30, 0.30, 0.34], [0.44, 0.44, 0.50], 'marble', 9, 0.2);
+  const woodFloor = texPair('woodFloor', [0.38, 0.25, 0.14], [0.26, 0.16, 0.08], 'wood', 41, 0.45);
+  const woodDark = texPair('woodDark', [0.24, 0.15, 0.08], [0.15, 0.09, 0.045], 'wood', 53, 0.4);
+  const plaster = texPair('plaster', [0.60, 0.58, 0.54], [0.52, 0.50, 0.46], 'plaster', 83, 0.28);
 
   const mats = {
-    // ── stone family ──
     extStone: mat(scene, 'castle_extStone', {
-      diffuse: [0.96, 0.94, 0.90],
-      texture: T('castle_tex_extStone', [0.44, 0.42, 0.38], [0.30, 0.29, 0.27], 'stone', 11),
-      uv: 0.18,
+      diffuse: [0.96, 0.94, 0.90], ...extStone, uv: 0.18,
     }),
     stone: mat(scene, 'castle_stone', {
-      // warm-neutral royal stone (a touch cool, not blue) — grand halls read
-      // vibrant/warm, not steel-blue; wood/fabric stay warm
-      diffuse: [0.97, 0.95, 0.92],
-      texture: T('castle_tex_stone', [0.50, 0.49, 0.46], [0.38, 0.37, 0.35], 'stone', 23),
-      uv: 0.3,
+      diffuse: [0.97, 0.95, 0.92], ...stone, uv: 0.3,
     }),
     darkStone: mat(scene, 'castle_darkStone', {
-      // dungeon stone: distinctly BLUE but lightened well up so the dungeon
-      // reads as a cold blue hall at a brightness near the rest of the castle,
-      // not a black pit
-      diffuse: [0.86, 0.90, 0.98],
-      texture: T('castle_tex_darkStone', [0.50, 0.56, 0.68], [0.36, 0.41, 0.53], 'stone', 37),
-      uv: 0.28,
+      diffuse: [0.86, 0.90, 0.98], ...darkStone, uv: 0.28,
     }),
     marble: mat(scene, 'castle_marble', {
-      // warm ivory royal marble (slightly cool of the original, not blue)
-      diffuse: [0.97, 0.96, 0.93],
-      texture: T('castle_tex_marble', [0.80, 0.78, 0.74], [0.93, 0.92, 0.88], 'marble', 5),
-      specular: [0.32, 0.32, 0.31], uv: 0.2,
+      diffuse: [0.97, 0.96, 0.93], ...marble,
+      specular: [0.32, 0.32, 0.31], uv: 0.2, bumpScale: 0.18,
     }),
     marbleDark: mat(scene, 'castle_marbleDark', {
-      diffuse: [0.95, 0.95, 1.0],
-      texture: T('castle_tex_marbleDark', [0.30, 0.30, 0.34], [0.44, 0.44, 0.50], 'marble', 9),
-      specular: [0.28, 0.28, 0.30], uv: 0.2,
+      diffuse: [0.95, 0.95, 1.0], ...marbleDark,
+      specular: [0.28, 0.28, 0.30], uv: 0.2, bumpScale: 0.16,
     }),
-    // ── wood family ──
     woodFloor: mat(scene, 'castle_woodFloor', {
-      diffuse: [1.0, 0.94, 0.86],
-      texture: T('castle_tex_woodFloor', [0.38, 0.25, 0.14], [0.26, 0.16, 0.08], 'wood', 41),
+      diffuse: [1.0, 0.94, 0.86], ...woodFloor,
       specular: [0.08, 0.06, 0.04], uv: 0.4,
     }),
     woodDark: mat(scene, 'castle_woodDark', {
-      diffuse: [1.0, 0.92, 0.84],
-      texture: T('castle_tex_woodDark', [0.24, 0.15, 0.08], [0.15, 0.09, 0.045], 'wood', 53),
+      diffuse: [1.0, 0.92, 0.84], ...woodDark,
       specular: [0.10, 0.07, 0.05], uv: 0.5,
     }),
-    // ── metal ──
     gold: mat(scene, 'castle_gold', {
       diffuse: [0.86, 0.62, 0.22], specular: [0.95, 0.78, 0.38],
     }),
     iron: mat(scene, 'castle_iron', {
       diffuse: [0.10, 0.10, 0.115], specular: [0.30, 0.30, 0.34],
     }),
-    // dull aged iron: dungeon cells/chains + kitchen pot rack — the
-    // polished specular above reads wrong on props meant to look rusted
     ironRust: mat(scene, 'castle_ironRust', {
       diffuse: [0.14, 0.10, 0.08], specular: [0.10, 0.09, 0.08],
     }),
-    // ── fabric (all woven — flat diffuse read as plastic) ──
     redFabric: mat(scene, 'castle_redFabric', {
       diffuse: [1.0, 0.94, 0.92],
       texture: T('castle_tex_redFabric', [0.38, 0.04, 0.06], [0.30, 0.03, 0.05], 'fabric', 67),
@@ -193,7 +194,6 @@ export function createCastleMaterials(scene) {
       texture: T('castle_tex_carpetBlue', [0.09, 0.14, 0.34], [0.07, 0.10, 0.28], 'fabric', 89),
       specular: [0, 0, 0], uv: 0.45,
     }),
-    // ── glow (unlit — pure emissive, cheap) ──
     windowGlow: mat(scene, 'castle_windowGlow', {
       diffuse: [0.1, 0.06, 0.02], emissive: [1.35, 0.82, 0.38], lit: false,
     }),
@@ -209,7 +209,6 @@ export function createCastleMaterials(scene) {
     candleGlow: mat(scene, 'castle_candleGlow', {
       diffuse: [0, 0, 0], emissive: [1.3, 0.85, 0.45], lit: false, backFace: false,
     }),
-    // ── misc ──
     books: mat(scene, 'castle_books', {
       diffuse: [1.0, 0.95, 0.9],
       texture: T('castle_tex_books', [0.35, 0.16, 0.12], [0.14, 0.24, 0.32], 'wood', 71),
@@ -219,11 +218,7 @@ export function createCastleMaterials(scene) {
       diffuse: [0.25, 0.42, 0.48], specular: [0.5, 0.55, 0.6], alpha: 0.72,
     }),
     plaster: mat(scene, 'castle_plaster', {
-      // warm-neutral plaster: vibrant/warm in the upper rooms, still fine under
-      // the ballroom's royal ambient (wood floors + warm accents carry warmth)
-      diffuse: [0.98, 0.96, 0.92],
-      texture: T('castle_tex_plaster', [0.60, 0.58, 0.54], [0.52, 0.50, 0.46], 'plaster', 83),
-      uv: 0.25,
+      diffuse: [0.98, 0.96, 0.92], ...plaster, uv: 0.25,
     }),
   };
 
@@ -231,9 +226,20 @@ export function createCastleMaterials(scene) {
     for (const m of Object.values(mats)) {
       if (m && typeof m.dispose === 'function') {
         m.diffuseTexture?.dispose();
+        m.bumpTexture?.dispose();
         m.dispose();
       }
     }
   };
   return mats;
+}
+
+/** Evening bias 0..1 — drives warm window emissive intensity. */
+export function applyWindowWarmth(mats, eveningBias) {
+  if (!mats?.windowGlow) return;
+  const b = Math.min(1, Math.max(0, eveningBias));
+  mats.windowGlow.emissiveColor = new BABYLON.Color3(
+    0.85 + b * 0.65, 0.45 + b * 0.5, 0.18 + b * 0.25);
+  mats.windowCool.emissiveColor = new BABYLON.Color3(
+    0.55 - b * 0.25, 0.62 - b * 0.22, 0.85 - b * 0.2);
 }

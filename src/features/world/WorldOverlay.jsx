@@ -28,7 +28,7 @@ function toAvatarColor(aurisarClass) {
  * @param {string}   aurisarClass
  * @param {object}   avatarConfig
  */
-export default function WorldOverlay({ onClose, username, aurisarClass, avatarConfig = null }) {
+export default function WorldOverlay({ onClose, username, aurisarClass, avatarConfig = null, fitnessXp = 0, fitnessXpBaseline = 0 }) {
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -40,6 +40,8 @@ export default function WorldOverlay({ onClose, username, aurisarClass, avatarCo
     classType:    toGameClass(aurisarClass),
     avatarColor:  toAvatarColor(aurisarClass),
     avatarConfig: avatarConfig ?? null,
+    fitnessXp:    fitnessXp ?? 0,
+    fitnessXpBaseline: fitnessXpBaseline ?? 0,
   };
 
   return (

@@ -7,7 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   CASTLE_PLAN, LEVELS, ROOMS, DOORS, STAIRS, VOIDS,
-  LOCAL_BOUNDS, INTERIOR_ANCHOR, ROOMS_BY_ID,
+  LOCAL_BOUNDS, INTERIOR_ANCHOR, ROOMS_BY_ID, PLAN_SCALE,
+  SHELL_COLLISION, PLAYER_R, PLAYER_SKIN, SPAWN_MARKERS,
   stairRects, stairSurfaceY,
 } from '../castlePlan.js';
 
@@ -141,5 +142,21 @@ describe('castlePlan invariants', () => {
   it('plan is JSON-serializable (SEAM:layout-manifest)', () => {
     const json = JSON.stringify(CASTLE_PLAN);
     expect(JSON.parse(json).rooms.length).toBe(ROOMS.length);
+  });
+
+  it('spawn markers sit at scaled room centers', () => {
+    for (const s of SPAWN_MARKERS) {
+      const r = ROOMS_BY_ID[s.roomId];
+      expect(r, s.netId).toBeTruthy();
+      expect(s.pos.x).toBeCloseTo((r.rect.x0 + r.rect.x1) / 2, 3);
+      expect(s.pos.z).toBeCloseTo((r.rect.z0 + r.rect.z1) / 2, 3);
+    }
+    expect(SPAWN_MARKERS.find((s) => s.netId === 'ca_cells')?.pos.x)
+      .toBeLessThan(-10 * PLAN_SCALE);
+  });
+
+  it('shell collision margin matches player radius + skin', () => {
+    expect(SHELL_COLLISION.marginM).toBeCloseTo(PLAYER_R + PLAYER_SKIN, 5);
+    expect(SHELL_COLLISION.playerRadiusM).toBe(PLAYER_R);
   });
 });
