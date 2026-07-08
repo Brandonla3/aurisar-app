@@ -185,7 +185,17 @@ void main() {
 
 const _pumps = new WeakMap(); // scene -> { mats:Set, time:number, obs }
 
+// Lazily-created shared scratch vectors. NOT constructed at module scope: this
+// module can be evaluated (via the static import chain) before window.BABYLON
+// is assigned, so any top-level `new BABYLON.*` would throw ReferenceError and
+// white-screen the world. Every BABYLON access here happens at runtime instead.
+function _ensureVecs() {
+  if (!_windDir) _windDir = new BABYLON.Vector2(0.8, 0.6);
+  if (!_sun) _sun = new BABYLON.Vector3(0, 1, 0);
+}
+
 function _tick(scene, e) {
+  _ensureVecs();
   e.time += scene.getEngine().getDeltaTime() / 1000;
   const md = scene.metadata?.ashwood;
   const wind = Math.max(0.2, Math.min(3, md?.weather?.windStrength ?? 1));
@@ -214,8 +224,8 @@ function _tick(scene, e) {
   }
 }
 
-const _windDir = new BABYLON.Vector2(0.8, 0.6);
-const _sun = new BABYLON.Vector3(0, 1, 0);
+let _windDir = null;
+let _sun = null;
 
 function _ensurePump(scene) {
   let e = _pumps.get(scene);
@@ -256,6 +266,7 @@ export function createGrassMaterial(scene, opts = {}) {
   mat.setFloat('uWindSpeed', 1.0);
   mat.setFloat('uGustScale', 0.12);
   mat.setFloat('uDebugMode', 0);
+  _ensureVecs();
   mat.setVector2('uWindDir', _windDir);
   registerGrassMaterial(scene, mat);
   return mat;
