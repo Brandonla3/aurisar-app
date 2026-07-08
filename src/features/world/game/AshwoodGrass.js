@@ -23,14 +23,17 @@ import { buildBladeClusterVertexData, createGrassMaterial } from './grassBlades.
 // larger than a single blade — density-per-instance rises, triangle count stays
 // mobile-viable. See plan for the budget math.
 const TIERS = {
-  high:   { planes: 4, segments: 5, cell: 0.8, radius: 30 },
-  mobile: { planes: 2, segments: 4, cell: 1.0, radius: 22 },
-  low:    { planes: 2, segments: 4, cell: 1.0, radius: 22 },
+  high:   { planes: 3, segments: 4, cell: 0.7, radius: 30 },
+  mobile: { planes: 2, segments: 3, cell: 0.9, radius: 22 },
+  low:    { planes: 2, segments: 3, cell: 0.9, radius: 22 },
 };
 
+// Wide "cards" (the alpha-cutout texture supplies the fine blades); a fan of
+// them per tuft gives 3D volume. Denser grid + wider cards read as full,
+// realistic grass in bulk rather than sparse chunky ribbons.
 const BLADE_HEIGHT = 0.7;
-const BLADE_WIDTH = 0.09;
-const BLADE_LEAN = 0.16;
+const BLADE_WIDTH = 0.45;
+const BLADE_LEAN = 0.12;
 
 function smoothstep(e0, e1, x) {
   const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0 || 1)));

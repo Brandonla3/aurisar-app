@@ -319,9 +319,10 @@ export function buildPropTemplates(scene, opts = {}) {
       mesh.material = material;
       return mesh;
     };
-    // tuft = upright grass clump; fern = wider, lower, lusher clump.
-    const tuftGeo = buildBladeClusterVertexData({ planes: 3, segments: 3, height: 0.4, width: 0.07, lean: 0.14 });
-    const fernGeo = buildBladeClusterVertexData({ planes: 3, segments: 3, height: 0.3, width: 0.12, lean: 0.22 });
+    // tuft = upright grass clump; fern = wider, lower, lusher clump. Wide
+    // textured cards (fine blades come from the shared alpha-cutout texture).
+    const tuftGeo = buildBladeClusterVertexData({ planes: 2, segments: 3, height: 0.42, width: 0.32, lean: 0.12 });
+    const fernGeo = buildBladeClusterVertexData({ planes: 2, segments: 3, height: 0.32, width: 0.42, lean: 0.18 });
     const tuftMat = createGrassMaterial(scene, { maxH: tuftGeo.maxH, name: 'ash_tuftGrass' });
     const fernMat = createGrassMaterial(scene, { maxH: fernGeo.maxH, name: 'ash_fernGrass' });
     T.tuft = meshFromCluster('tpl_tuft', tuftGeo, tuftMat);
