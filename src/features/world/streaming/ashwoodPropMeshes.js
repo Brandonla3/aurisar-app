@@ -319,10 +319,11 @@ export function buildPropTemplates(scene, opts = {}) {
       mesh.material = material;
       return mesh;
     };
-    // tuft = upright grass clump; fern = wider, lower, lusher clump. Wide
-    // textured cards (fine blades come from the shared alpha-cutout texture).
-    const tuftGeo = buildBladeClusterVertexData({ planes: 2, segments: 3, height: 0.42, width: 0.32, lean: 0.12 });
-    const fernGeo = buildBladeClusterVertexData({ planes: 2, segments: 3, height: 0.32, width: 0.42, lean: 0.18 });
+    // Understory is placed sparsely (a few hundred per tile), so each instance
+    // is a small fan of thin blades — a little grass tuft — rather than a
+    // single blade. Same thin-blade look + wind as the main field.
+    const tuftGeo = buildBladeClusterVertexData({ planes: 5, segments: 3, height: 0.42, width: 0.02, lean: 0.12 });
+    const fernGeo = buildBladeClusterVertexData({ planes: 6, segments: 3, height: 0.3, width: 0.022, lean: 0.2 });
     const tuftMat = createGrassMaterial(scene, { maxH: tuftGeo.maxH, name: 'ash_tuftGrass' });
     const fernMat = createGrassMaterial(scene, { maxH: fernGeo.maxH, name: 'ash_fernGrass' });
     T.tuft = meshFromCluster('tpl_tuft', tuftGeo, tuftMat);

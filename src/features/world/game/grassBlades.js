@@ -1,16 +1,19 @@
 /**
- * grassBlades — shared procedural blade-cluster geometry + material for every
- * grass layer (the player-following field in AshwoodGrass and the per-tile
- * tuft/fern understory in ashwoodPropMeshes).
+ * grassBlades — shared thin-blade geometry + material for every grass layer
+ * (the player-following field in AshwoodGrass and the per-tile tuft/fern
+ * understory in ashwoodPropMeshes).
  *
- * A cluster is a fan of vertical quad strips (a "tuft"), colored by a root→tip
- * ramp from the per-instance tint — no texture, no alpha cutout. Wind is a
- * circular-arc rooted bend applied in world space: the root is pinned (bend
- * angle is 0 at the blade base) while the tip rides a preserved-length arc,
- * driven by travelling gust fronts plus a per-blade chop and tip flutter.
+ * Each INSTANCE is a single thin, pointed grass blade (1-2 crossed planes,
+ * tapered to a tip). Grass-like density comes from scattering MANY blades —
+ * tens of thousands near the player — not from big cards. Textureless: a
+ * root→tip color ramp plus per-blade/clump tint variation does the work.
+ *
+ * Wind is a circular-arc rooted bend in world space: the root is pinned (bend
+ * angle is 0 at the base) while the tip rides a preserved-length arc, driven by
+ * travelling gust fronts plus a per-blade chop and tip flutter.
  *
  * All materials created here register with a single per-scene uniform pump so
- * the field and the understory sway with identical wind and light.
+ * the field and understory sway with identical wind and light.
  */
 
 /* global BABYLON */
@@ -18,16 +21,17 @@
 // ── geometry ────────────────────────────────────────────────────────────────
 
 /**
- * Authored multi-plane blade cluster.
+ * A single thin grass blade: `planes` crossed vertical strips, each tapered to
+ * a point, `segments` rows tall (enough to curve under wind).
  * @param {object} o { planes, segments, height, width, lean }
  * @returns {{positions:number[], indices:number[], normals:number[], uvs:number[], maxH:number}}
  */
 export function buildBladeClusterVertexData(o = {}) {
-  const planes = o.planes ?? 4;
-  const segments = o.segments ?? 5;
-  const height = o.height ?? 0.7;
-  const width = o.width ?? 0.09;
-  const lean = o.lean ?? 0.16;
+  const planes = o.planes ?? 2;
+  const segments = o.segments ?? 3;
+  const height = o.height ?? 0.5;
+  const width = o.width ?? 0.022; // half-width at the base
+  const lean = o.lean ?? 0.1;
 
   const positions = [];
   const indices = [];
@@ -35,41 +39,26 @@ export function buildBladeClusterVertexData(o = {}) {
   const uvs = [];
   let vbase = 0;
 
-  // Each plane is a near-rectangular textured "card" (the alpha-cutout grass
-  // texture supplies the fine blade silhouette); the fan of cards gives the
-  // tuft real 3D volume. This is the combination of the old flat textured
-  // cards (realistic in bulk) with the newer cluster geometry (thickness).
   for (let pl = 0; pl < planes; pl++) {
-    // Spread planes across the half-circle but nudge each by a per-plane offset
-    // so they don't all pass through one axis (reads fuller from every angle).
-    const ang = (pl + 0.5) / planes * Math.PI;
+    const ang = pl * (Math.PI / Math.max(planes, 1)); // planes=2 → 0°, 90° (crossed)
     const ca = Math.cos(ang), sa = Math.sin(ang);
-    const wx = ca, wz = -sa;            // card width axis (horizontal)
-    const lx = sa, lz = ca;            // lean axis (card faces this way)
-    let nx = sa, ny = 0.34, nz = ca;   // Y-biased normal → soft tuft lighting
+    const wx = ca, wz = -sa;           // width axis (horizontal)
+    const lx = sa, lz = ca;           // lean axis (blade curls this way)
+    let nx = sa, ny = 0.4, nz = ca;   // Y-biased normal → soft grass lighting
     const nl = Math.hypot(nx, ny, nz) || 1;
     nx /= nl; ny /= nl; nz /= nl;
-
-    // Alternate which half of the 2-variant atlas each card samples, so a
-    // single tuft shows both clump variants.
-    const u0 = (pl % 2) * 0.5, u1 = u0 + 0.5;
 
     const rowStart = vbase;
     for (let s = 0; s <= segments; s++) {
       const t = s / segments;
-      // Near-full width with only a slight top taper — the texture (not the
-      // geometry) defines the blades, so the card stays card-like.
-      const hw = width * (0.82 + 0.18 * (1 - t));
+      const hw = width * (0.06 + 0.94 * Math.pow(1 - t, 0.8)); // taper to a fine tip
       const y = t * height;
-      const z = Math.pow(t, 1.8) * lean;  // gentle forward lean toward the tip
+      const z = Math.pow(t, 1.7) * lean; // gentle forward curl toward the tip
       const cx = lx * z, cz = lz * z;
       positions.push(cx - wx * hw, y, cz - wz * hw);
       positions.push(cx + wx * hw, y, cz + wz * hw);
       normals.push(nx, ny, nz, nx, ny, nz);
-      // v starts above the texture's dark dirt rows; v=1 is the alpha-cutout
-      // tips. u spans one atlas half.
-      const vt = 0.08 + t * 0.92;
-      uvs.push(u0, vt, u1, vt);
+      uvs.push(0, t, 1, t); // uv.y = t drives the root→tip ramp and wind bladeT
     }
     for (let s = 0; s < segments; s++) {
       const a = rowStart + s * 2;
@@ -103,7 +92,6 @@ uniform float uMaxH;
 uniform vec2 uWindDir;
 varying float vBladeT;
 varying float vWind;
-varying vec2 vUV;
 varying vec3 vTint;
 varying vec3 vN;
 varying vec3 vWp;
@@ -131,7 +119,7 @@ void main() {
   float radius = worldH / max(phi, 1e-3);
   float arc = radius * (1.0 - cos(a));                 // horizontal, along wind
   float drop = radius * sin(a) - position.y * yScale;  // swap straight height for arc height
-  float flutter = sin(uTime * 10.0 + seed * 18.0 + along * 0.8) * 0.05 * smoothstep(0.55, 1.0, bladeT);
+  float flutter = sin(uTime * 10.0 + seed * 18.0 + along * 0.8) * 0.04 * smoothstep(0.55, 1.0, bladeT);
 
   wp.x += windDir.x * arc + sideDir.x * flutter;
   wp.z += windDir.y * arc + sideDir.y * flutter;
@@ -140,7 +128,6 @@ void main() {
   vWp = wp.xyz;
   vBladeT = bladeT;
   vWind = clamp(gust * 0.75 + chop * 0.25, 0.0, 1.0);
-  vUV = uv;
   vTint = instanceColor.rgb;
   vN = normalize(mat3(finalWorld) * normal);
   gl_Position = viewProjection * wp;
@@ -151,39 +138,30 @@ const FRAG = `
 precision highp float;
 varying float vBladeT;
 varying float vWind;
-varying vec2 vUV;
 varying vec3 vTint;
 varying vec3 vN;
 varying vec3 vWp;
-uniform sampler2D uCardTex;
 uniform float uLight;
 uniform float uBackStrength;   // 0 on low/mobile, >0 on high tier
 uniform float fogDensity;
-uniform float uDebugMode;      // 0 final, 1 height, 2 tex, 3 wind
+uniform float uDebugMode;      // 0 final, 1 height, 2 tint, 3 wind
 uniform vec3 uSunDir;
 uniform vec3 vFogColor;
 uniform vec3 cameraPosition;
 void main() {
-  // Alpha-cutout the photographic grass texture — this is where the fine,
-  // realistic blade detail comes from. Opaque grass below the alpha line,
-  // discarded (transparent sky) above it. No blending/sorting: one draw call.
-  vec4 tex = texture2D(uCardTex, vUV);
-  if (tex.a < 0.5) discard;
-
   vec3 N = normalize(vN);
   vec3 L = normalize(uSunDir);
   vec3 V = normalize(cameraPosition - vWp);
 
-  // The texture carries the color; the biome tint (instanceColor.rgb) only
-  // nudges the hue at 35% strength — full-strength tinting reads neon. A gentle
-  // vertical AO darkens the roots and lifts the tips.
-  vec3 tint = mix(vec3(1.0), clamp(vTint * 2.2, 0.0, 1.6), 0.35);
-  float ao = mix(0.7, 1.1, vBladeT);
-  vec3 base = tex.rgb * tint * ao;
+  // Root→tip ramp: darker at the base (fake AO / ground contact), brighter and
+  // slightly warmer at the tip.
+  vec3 rootC = vTint * 0.5;
+  vec3 tipC = clamp(vTint * 1.3 + 0.05, 0.0, 1.6);
+  vec3 base = mix(rootC, tipC, pow(vBladeT, 1.1));
 
   // Wrapped diffuse so blades never read fully unlit when facing away.
   float wrap = clamp((dot(N, L) + 0.5) / 1.5, 0.0, 1.0);
-  float lambert = mix(0.6, 1.0, wrap);
+  float lambert = mix(0.55, 1.0, wrap);
   // Translucency: thin tips glow when backlit (tier-gated, free no-op on low).
   float back = pow(clamp(dot(-V, L), 0.0, 1.0), 2.0) * uBackStrength * pow(vBladeT, 1.5);
 
@@ -194,7 +172,7 @@ void main() {
 
   if (uDebugMode > 0.5) {
     if (uDebugMode < 1.5) c = vec3(vBladeT);
-    else if (uDebugMode < 2.5) c = tex.rgb;
+    else if (uDebugMode < 2.5) c = vTint;
     else c = vec3(vWind, 1.0 - vWind, 0.25);
   }
   gl_FragColor = vec4(c, 1.0);
@@ -247,21 +225,6 @@ function _tick(scene, e) {
 let _windDir = null;
 let _sun = null;
 
-// Shared alpha-cutout grass texture (2 clump variants side by side), one per
-// scene so the field + understory materials reuse the same GPU texture.
-const _texCache = new WeakMap();
-function _grassTexture(scene) {
-  let t = _texCache.get(scene);
-  if (!t) {
-    t = new BABYLON.Texture('/assets/textures/grass-cards.png', scene);
-    t.anisotropicFilteringLevel = 4;
-    t.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
-    t.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
-    _texCache.set(scene, t);
-  }
-  return t;
-}
-
 function _ensurePump(scene) {
   let e = _pumps.get(scene);
   if (!e) {
@@ -284,7 +247,7 @@ export function registerGrassMaterial(scene, mat) {
  * the wind bladeT normalizes correctly. Registers with the per-scene pump.
  */
 export function createGrassMaterial(scene, opts = {}) {
-  const maxH = opts.maxH ?? 0.7;
+  const maxH = opts.maxH ?? 0.5;
   const name = opts.name ?? 'grassBladeMat';
   BABYLON.Effect.ShadersStore['grassBladeVertexShader'] = VERT;
   BABYLON.Effect.ShadersStore['grassBladeFragmentShader'] = FRAG;
@@ -295,10 +258,8 @@ export function createGrassMaterial(scene, opts = {}) {
     uniforms: ['viewProjection', 'world', 'cameraPosition',
                'uTime', 'uWind', 'uWindDir', 'uWindSpeed', 'uGustScale', 'uMaxH',
                'uLight', 'uSunDir', 'uBackStrength', 'vFogColor', 'fogDensity', 'uDebugMode'],
-    samplers: ['uCardTex'],
   });
   mat.backFaceCulling = false;
-  mat.setTexture('uCardTex', _grassTexture(scene));
   mat.setFloat('uMaxH', maxH);
   mat.setFloat('uWindSpeed', 1.0);
   mat.setFloat('uGustScale', 0.12);

@@ -1,15 +1,17 @@
 /**
  * AshwoodGrass — wind-animated instanced grass that follows the player.
  *
- * A deterministic hash2 cell grid (tier-scaled cell/radius) rebuilt whenever
- * the player crosses a cell, rendered as thin instances of an authored
- * blade-cluster "tuft" with a circular-arc rooted wind shader. One draw call.
+ * A deterministic hash2 cell grid (tier-scaled) is rebuilt whenever the player
+ * crosses a cell. Each accepted cell scatters MANY thin blades (perCell), so
+ * the field reads as dense real grass — tens of thousands of blades near the
+ * player — rendered as thin instances of a single pointed-blade template with a
+ * circular-arc rooted wind shader. One draw call.
  *
- * Blades are textureless procedural geometry (grassBlades.js): a root→tip color
- * ramp from the per-instance tint, so there is no alpha atlas to key or mip.
- * A CPU Voronoi pass in _scatter bakes coherent per-clump height and color
- * variation straight into the instance matrix and color buffers — clumps read
- * as tufts of consistent grass rather than uniform noise.
+ * Blades are textureless (grassBlades.js): a root→tip color ramp from the
+ * per-instance tint, with coherent per-clump height/color from a CPU Voronoi
+ * pass baked into the instance matrix + color buffers. Distant ground is
+ * covered by the tiled grass texture on the terrain, so the blade ring can stay
+ * tight while still reading as continuous grass.
  *
  * Placement is pure hash2 math — identical on every client, no manifest.
  */
@@ -19,21 +21,17 @@
 import { hash2 } from '../worldgen/index.js';
 import { buildBladeClusterVertexData, createGrassMaterial } from './grassBlades.js';
 
-// Tier-scaled geometry + grid. Each cluster is a small tuft, so the cell can be
-// larger than a single blade — density-per-instance rises, triangle count stays
-// mobile-viable. See plan for the budget math.
+// Tier-scaled geometry, ring, and per-cell blade count. perCell is the density
+// multiplier — the lever that turns a sparse card field into real grass.
 const TIERS = {
-  high:   { planes: 3, segments: 4, cell: 0.7, radius: 30 },
-  mobile: { planes: 2, segments: 3, cell: 0.9, radius: 22 },
-  low:    { planes: 2, segments: 3, cell: 0.9, radius: 22 },
+  high:   { planes: 2, segments: 3, cell: 0.5, radius: 22, perCell: 11 },
+  mobile: { planes: 1, segments: 3, cell: 0.7, radius: 13, perCell: 5 },
+  low:    { planes: 1, segments: 3, cell: 0.7, radius: 13, perCell: 5 },
 };
 
-// Wide "cards" (the alpha-cutout texture supplies the fine blades); a fan of
-// them per tuft gives 3D volume. Denser grid + wider cards read as full,
-// realistic grass in bulk rather than sparse chunky ribbons.
-const BLADE_HEIGHT = 0.7;
-const BLADE_WIDTH = 0.45;
-const BLADE_LEAN = 0.12;
+const BLADE_HEIGHT = 0.5;
+const BLADE_WIDTH = 0.02;
+const BLADE_LEAN = 0.1;
 
 function smoothstep(e0, e1, x) {
   const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0 || 1)));
@@ -52,8 +50,10 @@ export class AshwoodGrass {
     const cfg = TIERS[tier] ?? TIERS.high;
     this.CELL = cfg.cell;
     this.RADIUS = cfg.radius;
-    // Voronoi clump grid: several cells wide, so tufts share height/color.
-    this.CLUMP = cfg.cell * 3.5;
+    this.PER_CELL = cfg.perCell;
+    // Voronoi clump grid: several cells wide, so neighbouring blades share
+    // height/color and the field clumps like real grass instead of a uniform.
+    this.CLUMP = cfg.cell * 4.0;
 
     const geo = buildBladeClusterVertexData({
       planes: cfg.planes,
@@ -76,7 +76,7 @@ export class AshwoodGrass {
     this.mesh.alwaysSelectAsActiveMesh = true; // it surrounds the camera; skip culling
 
     const n = Math.ceil(this.RADIUS / this.CELL);
-    this.cap = (2 * n + 1) * (2 * n + 1);
+    this.cap = (2 * n + 1) * (2 * n + 1) * this.PER_CELL;
     this._mats = new Float32Array(this.cap * 16);
     this._cols = new Float32Array(this.cap * 4);
 
@@ -92,7 +92,7 @@ export class AshwoodGrass {
   }
 
   // Voronoi clump lookup: nearest jittered cell center in a 3x3 neighborhood.
-  // Returns coherent per-clump seed (0..1) and a center→edge presence falloff.
+  // Returns a coherent per-clump seed (0..1) and a center→edge presence falloff.
   _clumpAt(wx, wz) {
     const cc = this.CLUMP;
     const cgx = Math.floor(wx / cc), cgz = Math.floor(wz / cc);
@@ -109,14 +109,13 @@ export class AshwoodGrass {
     }
     const dist = Math.sqrt(best);
     const radius = cc * 0.7;
-    // presence: 1 at the clump center, fading toward the cell boundary.
     const presence = 1 - smoothstep(radius * 0.5, radius, dist);
     return { seed, presence };
   }
 
   _rebuild(px, pz) {
     const wg = this.wg;
-    const cell = this.CELL, radius = this.RADIUS;
+    const cell = this.CELL, radius = this.RADIUS, perCell = this.PER_CELL;
     const n = Math.ceil(radius / cell);
     const R2 = radius * radius;
     const worldR2 = wg.config.radius * wg.config.radius;
@@ -130,39 +129,47 @@ export class AshwoodGrass {
 
     for (let gz = cz - n; gz <= cz + n && i < cap; gz++) {
       for (let gx = cx - n; gx <= cx + n && i < cap; gx++) {
-        const h1 = hash2(gx, gz);
-        if (h1 < 0.16) continue;
-        const wx = gx * cell + (hash2(gx * 1.3, gz * 0.7) - 0.5) * cell * 0.95;
-        const wz = gz * cell + (hash2(gx * 0.7, gz * 1.3) - 0.5) * cell * 0.95;
-        const dx = wx - px, dz = wz - pz;
-        if (dx * dx + dz * dz > R2) continue;
-        if (wx * wx + wz * wz > worldR2) continue;
-        const bi = wg.biomeAt(wx, wz);
-        if (bi.grass <= 0 || hash2(gx + 3, gz + 9) > bi.grass) continue;
-        if (wg.trailDirtAt(wx, wz) > 0.22) continue;
-        if (wg.lakeWaterDepthAt(wx, wz) > 0.02) continue;
-        if (wg.lakeShoreAt(wx, wz) > 0.4) continue; // bare beach sand strip
-        if (wg.inForest(wx, wz)) continue; // forest floor has its own brush
-
-        const clump = this._clumpAt(wx, wz);
-        // Clump-coherent height + a per-blade jitter; clump edges sit lower.
-        const clumpH = 0.75 + clump.seed * 0.5;                 // 0.75..1.25
-        const edge = 0.45 + 0.55 * clump.presence;              // shorter at edges
-        const sc = 0.7 + hash2(gx + 5, gz - 3) * 0.95;
-        BABYLON.Quaternion.FromEulerAnglesToRef(0, h1 * 6.28, 0, q);
-        sVec.set(sc, sc * (0.8 + hash2(gx, gz + 2) * 0.7) * clumpH * edge, sc);
-        pVec.set(wx, wg.surfaceY(wx, wz), wz);
-        BABYLON.Matrix.ComposeToRef(sVec, q, pVec, mat);
-        mats.set(mat.m, i * 16);
-
-        const tnt = hash2(gx + 7, gz + 11);
-        const ct = 0.9 + clump.seed * 0.22;                     // per-clump tint 0.9..1.12
+        if (hash2(gx, gz) < 0.08) continue; // occasional bare patch
+        // Gate once per cell at its center (biome / trail / lake / forest).
+        const ccx = gx * cell, ccz = gz * cell;
+        if (ccx * ccx + ccz * ccz > worldR2) continue;
+        const bi = wg.biomeAt(ccx, ccz);
+        if (bi.grass <= 0) continue;
+        if (wg.trailDirtAt(ccx, ccz) > 0.22) continue;
+        if (wg.lakeWaterDepthAt(ccx, ccz) > 0.02) continue;
+        if (wg.lakeShoreAt(ccx, ccz) > 0.4) continue; // bare beach sand strip
+        if (wg.inForest(ccx, ccz)) continue; // forest floor has its own brush
+        const cellY = wg.surfaceY(ccx, ccz); // one height sample per cell (blades are short)
         const gc = bi.grassCol;
-        cols[i * 4]     = (gc[0] + 0.10 * tnt) * ct;
-        cols[i * 4 + 1] = (gc[1] + 0.14 * tnt) * ct;
-        cols[i * 4 + 2] = (gc[2] + 0.05 * tnt) * ct;
-        cols[i * 4 + 3] = hash2(gx + 13, gz + 17); // per-blade wind/color seed
-        i++;
+        // Blade count scales with the biome's grass density.
+        const nb = Math.max(1, Math.round(perCell * bi.grass));
+
+        for (let b = 0; b < nb && i < cap; b++) {
+          const hb = hash2(gx * 3.1 + b * 7.7, gz * 2.3 - b * 4.1);
+          const hb2 = hash2(gx * 1.7 - b * 5.3, gz * 4.9 + b * 2.1);
+          const wx = ccx + (hb - 0.5) * cell;
+          const wz = ccz + (hb2 - 0.5) * cell;
+          const dx = wx - px, dz = wz - pz;
+          if (dx * dx + dz * dz > R2) continue;
+
+          const clump = this._clumpAt(wx, wz);
+          const clumpH = 0.7 + clump.seed * 0.5;
+          const edge = 0.55 + 0.45 * clump.presence; // shorter at clump edges
+          const sc = 0.8 + hb * 0.5;
+          BABYLON.Quaternion.FromEulerAnglesToRef(0, hb2 * 6.283, 0, q);
+          sVec.set(sc, sc * (0.8 + hb * 0.7) * clumpH * edge, sc);
+          pVec.set(wx, cellY, wz);
+          BABYLON.Matrix.ComposeToRef(sVec, q, pVec, mat);
+          mats.set(mat.m, i * 16);
+
+          const tnt = hash2(gx + 7 + b, gz + 11 - b);
+          const ct = 0.9 + clump.seed * 0.22; // per-clump tint
+          cols[i * 4]     = (gc[0] + 0.10 * tnt) * ct;
+          cols[i * 4 + 1] = (gc[1] + 0.14 * tnt) * ct;
+          cols[i * 4 + 2] = (gc[2] + 0.05 * tnt) * ct;
+          cols[i * 4 + 3] = hash2(gx + 13 + b, gz + 17 - b); // per-blade wind/color seed
+          i++;
+        }
       }
     }
 
