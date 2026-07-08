@@ -27,11 +27,7 @@ const CELL = 0.6;
 const RADIUS = 30;
 const HERO_CELL = 2.2;
 const HERO_RADIUS = 12;
-// Hero layer re-enabled: a tiling detail overlay (grass-meshy.jpg × 3, blended
-// at 45%) breaks the flat lime-ribbon appearance caused by the 4k→1k bake
-// downscale. uMaxH is computed from the actual clump vertex bounds so the
-// quadratic sway mask normalises correctly for both cards and 3D blades.
-const HERO_ENABLED = true;
+const HERO_ENABLED = false;
 
 const VERT = `
 precision highp float;
