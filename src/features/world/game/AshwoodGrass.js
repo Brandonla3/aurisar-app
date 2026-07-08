@@ -27,11 +27,11 @@ const CELL = 0.6;
 const RADIUS = 30;
 const HERO_CELL = 2.2;
 const HERO_RADIUS = 12;
-// The hero layer renders real 3D blades from the Meshy GLB, but its baked
-// albedo is nearly uniform green at blade scale, so the clumps read as flat
-// lime ribbons in sun / dark stumps in shade instead of grass. Disabled
-// until the clump has per-blade shading (or a detail-textured re-bake).
-const HERO_ENABLED = false;
+// Hero layer re-enabled: a tiling detail overlay (grass-meshy.jpg × 3, blended
+// at 45%) breaks the flat lime-ribbon appearance caused by the 4k→1k bake
+// downscale. uMaxH is computed from the actual clump vertex bounds so the
+// quadratic sway mask normalises correctly for both cards and 3D blades.
+const HERO_ENABLED = true;
 
 const VERT = `
 precision highp float;
@@ -49,6 +49,7 @@ uniform mat4 viewProjection;
 uniform float uTime;
 uniform float uWind;
 uniform float uAtlasHalf;
+uniform float uMaxH;
 varying vec4 vCol;
 varying vec2 vUV;
 varying vec3 vWp;
@@ -58,7 +59,11 @@ void main() {
   vec3 p = position;
   float ph = finalWorld[3].x * 0.25 + finalWorld[3].z * 0.25;
   float b = sin(uTime * 1.6 + ph) * 0.5 + sin(uTime * 3.1 + ph * 1.7) * 0.2;
-  float hq = position.y * position.y;
+  // Normalise height to [0,1] against this geometry's actual range so the
+  // quadratic sway mask behaves consistently for both cards (h=0.7) and hero
+  // clumps (height computed from vertex bounds). Bases (yt=0) stay planted.
+  float yt = clamp(position.y / uMaxH, 0.0, 1.0);
+  float hq = yt * yt;
   p.x += b * 0.7 * hq * uWind;
   p.z += cos(uTime * 1.3 + ph) * 0.35 * hq * uWind;
   vec4 wp = finalWorld * vec4(p, 1.0);
@@ -70,9 +75,9 @@ void main() {
   // whole UV period, a no-op under REPEAT wrapping.
   vUV = vec2(uv.x * uAtlasHalf + instanceColor.a * uAtlasHalf, uv.y);
 
-  // Vertical AO: darken the base (ground contact), brighten the tip — reads
-  // as ambient occlusion for one extra multiply, no extra draw/pass.
-  float ao = mix(0.6, 1.1, clamp(position.y / 0.7, 0.0, 1.0));
+  // Vertical AO: darken the base (ground contact), brighten the tip. Reuse
+  // yt so the ramp is consistent with the sway mask across mesh scales.
+  float ao = mix(0.6, 1.1, yt);
   vCol = vec4(instanceColor.rgb * ao, 1.0);
 
   // Approximate world-space normal: baked per-triangle flat normals (computed
@@ -93,6 +98,8 @@ varying vec2 vUV;
 varying vec3 vWp;
 varying vec3 vN;
 uniform sampler2D uCardTex;
+uniform sampler2D uDetailTex;
+uniform float uDetailStrength;
 uniform float uLight;
 uniform vec3 cameraPosition;
 uniform vec3 vFogColor;
@@ -122,6 +129,13 @@ void main() {
   // source renders.
   vec3 tint = mix(vec3(1.0), clamp(vCol.rgb * 2.2, 0.0, 1.6), 0.35);
   vec3 base = tex.rgb * tint;
+
+  // Detail overlay: tiling ground texture (grass-meshy.jpg × 3) injected at
+  // 45% strength for hero clumps (uDetailStrength=0.45). Breaks the flat
+  // lime-ribbon look from the 4k→1k bake downscale. For card draws
+  // uDetailStrength=0.0 so this is a free multiply-by-one no-op.
+  vec3 detail = texture2D(uDetailTex, vUV * 3.0).rgb;
+  base *= mix(vec3(1.0), detail * 1.8, uDetailStrength);
 
   vec3 V = normalize(cameraPosition - vWp);
   // Translucency / backlight: blades glow when the sun sits behind them from
@@ -170,7 +184,9 @@ function clumpGeometry() {
   const indices = clumpData.indices;
   const normals = new Array(positions.length).fill(0);
   BABYLON.VertexData.ComputeNormals(positions, indices, normals);
-  return { positions, indices, normals, uvs: clumpData.uvs };
+  let maxH = 0;
+  for (let i = 1; i < positions.length; i += 3) if (positions[i] > maxH) maxH = positions[i];
+  return { positions, indices, normals, uvs: clumpData.uvs, maxH: maxH > 0 ? maxH : 0.9 };
 }
 
 export class AshwoodGrass {
@@ -190,25 +206,37 @@ export class AshwoodGrass {
     this._cardTex.anisotropicFilteringLevel = 4;
     this._clumpTex = new BABYLON.Texture('/assets/textures/grass-clump-albedo.jpg', scene);
     this._clumpTex.anisotropicFilteringLevel = 4;
+    // Reused as the detail overlay for hero clumps — same texture already paid
+    // for by the ground PBR, so no extra network cost.
+    this._groundTex = new BABYLON.Texture('/assets/textures/grass-meshy.jpg', scene);
+    this._groundTex.anisotropicFilteringLevel = 4;
 
-    const makeMaterial = (name, texture, atlasHalf) => {
+    const makeMaterial = (name, texture, atlasHalf, maxH, detailTex, detailStrength) => {
       const mat = new BABYLON.ShaderMaterial(name, scene, 'ashwoodGrass', {
         // world0-3 MUST be declared for (thin) instancing — without them the
         // instancesVertex include reads unbound attributes and instance
         // matrices come out as garbage (blades stretched across the sky).
         attributes: ['position', 'normal', 'uv', 'instanceColor', 'world0', 'world1', 'world2', 'world3'],
         uniforms: ['viewProjection', 'world', 'cameraPosition',
-                   'uTime', 'uWind', 'uAtlasHalf', 'uLight', 'vFogColor', 'fogDensity',
-                   'uSunDir', 'uBackStrength'],
-        samplers: ['uCardTex'],
+                   'uTime', 'uWind', 'uAtlasHalf', 'uMaxH', 'uDetailStrength',
+                   'uLight', 'vFogColor', 'fogDensity', 'uSunDir', 'uBackStrength'],
+        samplers: ['uCardTex', 'uDetailTex'],
       });
       mat.backFaceCulling = false;
       mat.setTexture('uCardTex', texture);
+      mat.setTexture('uDetailTex', detailTex);
       mat.setFloat('uAtlasHalf', atlasHalf);
+      mat.setFloat('uMaxH', maxH);
+      mat.setFloat('uDetailStrength', detailStrength);
       return mat;
     };
-    this.material = makeMaterial('ashwoodGrassMat', this._cardTex, 0.5);
-    this.heroMaterial = makeMaterial('ashwoodGrassHeroMat', this._clumpTex, 1.0);
+
+    const clumpGeo = clumpGeometry();
+    // Cards: known height 0.7, no detail overlay (strength 0 → free no-op).
+    this.material = makeMaterial('ashwoodGrassMat', this._cardTex, 0.5, 0.7, this._cardTex, 0.0);
+    // Hero: height from vertex bounds, detail overlay at 45% blends in blade
+    // structure from the ground texture to compensate for lost bake detail.
+    this.heroMaterial = makeMaterial('ashwoodGrassHeroMat', this._clumpTex, 1.0, clumpGeo.maxH, this._groundTex, 0.45);
 
     const makeMesh = (name, geo, mat) => {
       const mesh = new BABYLON.Mesh(name, scene);
@@ -224,7 +252,7 @@ export class AshwoodGrass {
       return mesh;
     };
     this.mesh = makeMesh('ashwoodGrass', cardGeometry(), this.material);
-    this.heroMesh = makeMesh('ashwoodGrassHero', clumpGeometry(), this.heroMaterial);
+    this.heroMesh = makeMesh('ashwoodGrassHero', clumpGeo, this.heroMaterial);
 
     const n = Math.ceil(RADIUS / CELL);
     this.cap = (2 * n + 1) * (2 * n + 1);
@@ -349,5 +377,6 @@ export class AshwoodGrass {
     this.heroMaterial?.dispose();
     this._cardTex?.dispose();
     this._clumpTex?.dispose();
+    this._groundTex?.dispose();
   }
 }
