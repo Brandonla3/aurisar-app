@@ -24,14 +24,14 @@ import { buildBladeClusterVertexData, createGrassMaterial } from './grassBlades.
 // Tier-scaled geometry, ring, and per-cell blade count. perCell is the density
 // multiplier — the lever that turns a sparse card field into real grass.
 const TIERS = {
-  high:   { planes: 2, segments: 3, cell: 0.5, radius: 22, perCell: 11 },
-  mobile: { planes: 1, segments: 3, cell: 0.7, radius: 13, perCell: 5 },
-  low:    { planes: 1, segments: 3, cell: 0.7, radius: 13, perCell: 5 },
+  high:   { planes: 3, segments: 4, cell: 0.5,  radius: 24, perCell: 14 },
+  mobile: { planes: 2, segments: 3, cell: 0.65, radius: 15, perCell: 6 },
+  low:    { planes: 1, segments: 3, cell: 0.7,  radius: 13, perCell: 5 },
 };
 
-const BLADE_HEIGHT = 0.42;
-const BLADE_WIDTH = 0.032; // half-width — substantial blades, not thin wisps
-const BLADE_LEAN = 0.05;   // near-upright at rest; wind supplies the sway
+const BLADE_HEIGHT = 0.50;
+const BLADE_WIDTH = 0.044; // half-width — substantial blades, not thin wisps
+const BLADE_LEAN = 0.04;   // near-upright at rest; wind supplies the sway
 
 function smoothstep(e0, e1, x) {
   const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0 || 1)));
@@ -76,7 +76,11 @@ export class AshwoodGrass {
     this.mesh.alwaysSelectAsActiveMesh = true; // it surrounds the camera; skip culling
 
     const n = Math.ceil(this.RADIUS / this.CELL);
-    this.cap = (2 * n + 1) * (2 * n + 1) * this.PER_CELL;
+    // Blades per cell can exceed perCell (the density formula scales it up in
+    // lush biomes), so size the buffer off the true max to avoid truncating
+    // the ring edge.
+    this._maxNb = Math.max(2, Math.round(this.PER_CELL * (0.45 + 1.15 * 0.7)));
+    this.cap = (2 * n + 1) * (2 * n + 1) * this._maxNb;
     this._mats = new Float32Array(this.cap * 16);
     this._cols = new Float32Array(this.cap * 4);
 
@@ -129,7 +133,7 @@ export class AshwoodGrass {
 
     for (let gz = cz - n; gz <= cz + n && i < cap; gz++) {
       for (let gx = cx - n; gx <= cx + n && i < cap; gx++) {
-        if (hash2(gx, gz) < 0.08) continue; // occasional bare patch
+        if (hash2(gx, gz) < 0.03) continue; // occasional bare patch, but less sparse
         // Gate once per cell at its center (biome / trail / lake / forest).
         const ccx = gx * cell, ccz = gz * cell;
         if (ccx * ccx + ccz * ccz > worldR2) continue;
@@ -141,8 +145,10 @@ export class AshwoodGrass {
         if (wg.inForest(ccx, ccz)) continue; // forest floor has its own brush
         const cellY = wg.surfaceY(ccx, ccz); // one height sample per cell (blades are short)
         const gc = bi.grassCol;
-        // Blade count scales with the biome's grass density.
-        const nb = Math.max(1, Math.round(perCell * bi.grass));
+        // Blade count scales with the biome's grass density, floored so even
+        // sparse biomes keep a base cover.
+        const grassDensity = Math.max(0.35, Math.min(1.15, bi.grass));
+        const nb = Math.max(2, Math.round(perCell * (0.45 + grassDensity * 0.7)));
 
         for (let b = 0; b < nb && i < cap; b++) {
           const hb = hash2(gx * 3.1 + b * 7.7, gz * 2.3 - b * 4.1);
@@ -154,11 +160,11 @@ export class AshwoodGrass {
 
           const clump = this._clumpAt(wx, wz);
           const clumpH = 0.85 + clump.seed * 0.3;
-          const edge = 0.6 + 0.4 * clump.presence; // shorter at clump edges
+          const edge = 0.72 + 0.28 * clump.presence; // fuller clump edges
           // Width and height scale independently so tall blades don't also get
           // wide (and a tight height range keeps blades upright, not floppy).
-          const wsc = 0.9 + hb * 0.35;                    // width 0.9–1.25×
-          const hsc = (0.8 + hb2 * 0.5) * clumpH * edge;  // height ≈ 0.18–0.62 m
+          const wsc = 1.05 + hb * 0.45;
+          const hsc = (0.85 + hb2 * 0.45) * clumpH * edge;
           BABYLON.Quaternion.FromEulerAnglesToRef(0, hb2 * 6.283, 0, q);
           sVec.set(wsc, hsc, wsc);
           pVec.set(wx, cellY, wz);
