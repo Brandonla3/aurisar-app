@@ -51,7 +51,8 @@ export function buildBladeClusterVertexData(o = {}) {
     const rowStart = vbase;
     for (let s = 0; s <= segments; s++) {
       const t = s / segments;
-      const hw = width * (0.06 + 0.94 * Math.pow(1 - t, 0.8)); // taper to a fine tip
+      // Substantial blade that tapers to a soft point (not a needle-thin wisp).
+      const hw = width * (0.22 + 0.78 * Math.pow(1 - t, 0.6));
       const y = t * height;
       const z = Math.pow(t, 1.7) * lean; // gentle forward curl toward the tip
       const cx = lx * z, cz = lz * z;
@@ -109,7 +110,9 @@ void main() {
   float gust = pow(sin(along * uGustScale - uTime * uWindSpeed * 0.6 + jitter * 6.2831) * 0.5 + 0.5, 1.6);
   float chop = sin(along * uGustScale * 2.7 - uTime * uWindSpeed * 1.3 + seed * 6.2831) * 0.5 + 0.5;
   float ampVar = 0.65 + fract(seed * 7.0) * 0.7;
-  float phi = clamp(uWind * (0.25 + gust * 0.85 + chop * 0.18) * ampVar * 0.9, 0.0, 1.45);
+  // Gentler bend so blades sway upright instead of folding flat to the ground
+  // (the old 1.45 cap let storm wind lay the whole field over).
+  float phi = clamp(uWind * (0.18 + gust * 0.5 + chop * 0.12) * ampVar * 0.55, 0.0, 0.8);
 
   // Circular-arc rooted bend: root pinned (a = 0 at bladeT 0), tip rides an
   // arc of preserved length so the blade folds instead of stretching.

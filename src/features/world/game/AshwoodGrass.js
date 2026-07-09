@@ -29,9 +29,9 @@ const TIERS = {
   low:    { planes: 1, segments: 3, cell: 0.7, radius: 13, perCell: 5 },
 };
 
-const BLADE_HEIGHT = 0.5;
-const BLADE_WIDTH = 0.02;
-const BLADE_LEAN = 0.1;
+const BLADE_HEIGHT = 0.42;
+const BLADE_WIDTH = 0.032; // half-width — substantial blades, not thin wisps
+const BLADE_LEAN = 0.05;   // near-upright at rest; wind supplies the sway
 
 function smoothstep(e0, e1, x) {
   const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0 || 1)));
@@ -153,11 +153,14 @@ export class AshwoodGrass {
           if (dx * dx + dz * dz > R2) continue;
 
           const clump = this._clumpAt(wx, wz);
-          const clumpH = 0.7 + clump.seed * 0.5;
-          const edge = 0.55 + 0.45 * clump.presence; // shorter at clump edges
-          const sc = 0.8 + hb * 0.5;
+          const clumpH = 0.85 + clump.seed * 0.3;
+          const edge = 0.6 + 0.4 * clump.presence; // shorter at clump edges
+          // Width and height scale independently so tall blades don't also get
+          // wide (and a tight height range keeps blades upright, not floppy).
+          const wsc = 0.9 + hb * 0.35;                    // width 0.9–1.25×
+          const hsc = (0.8 + hb2 * 0.5) * clumpH * edge;  // height ≈ 0.18–0.62 m
           BABYLON.Quaternion.FromEulerAnglesToRef(0, hb2 * 6.283, 0, q);
-          sVec.set(sc, sc * (0.8 + hb * 0.7) * clumpH * edge, sc);
+          sVec.set(wsc, hsc, wsc);
           pVec.set(wx, cellY, wz);
           BABYLON.Matrix.ComposeToRef(sVec, q, pVec, mat);
           mats.set(mat.m, i * 16);
