@@ -19,6 +19,7 @@
 import { hash2 } from '../worldgen/index.js';
 import { streamingParams, tileBounds } from './tileMath.js';
 import { buildPropTemplates, buildTileProps } from './ashwoodPropMeshes.js';
+import { createTerrainMaterial } from '../game/terrainMaterial.js';
 
 // 96 → ~2.7m vertex spacing on a 256m tile (97² = 9.4k verts). The mountain
 // switchbacks (12-24u wide) and the lake rim read correctly at this density.
@@ -63,20 +64,13 @@ export class AshwoodTileProvider {
       ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
       ground.specularColor = new BABYLON.Color3(0, 0, 0);
     } else {
-      ground = new BABYLON.PBRMaterial('ashwood_ground', scene);
-      ground.metallic = 0;
-      ground.roughness = 0.95;
-      ground.specularIntensity = 0.4;
-      ground.enableSpecularAntiAliasing = true;
-      const grassTex = new BABYLON.Texture('/assets/textures/grass-meshy.jpg', scene);
-      grassTex.uScale = GRASS_REPEATS_PER_TILE;
-      grassTex.vScale = GRASS_REPEATS_PER_TILE;
-      ground.albedoTexture = grassTex;        // modulated by biome vertex colors
-      const grassNm = new BABYLON.Texture('/assets/textures/grass-meshy-nm.jpg', scene);
-      grassNm.uScale = GRASS_REPEATS_PER_TILE;
-      grassNm.vScale = GRASS_REPEATS_PER_TILE;
-      grassNm.level = 0.85;
-      ground.bumpTexture = grassNm;
+      // Splat-blended PBR terrain: grass + procedural dirt/rock/sand/field,
+      // blended per-fragment by the per-vertex terrainSplat weights baked in
+      // _buildGround plus in-shader slope. Keeps all PBR lighting/shadows/fog.
+      ground = createTerrainMaterial(scene, {
+        tier: scene.metadata?.ashwood?.qualityTier,
+        repeats: GRASS_REPEATS_PER_TILE,
+      });
     }
 
     let water, lakeWater, streamWater;
@@ -171,6 +165,9 @@ export class AshwoodTileProvider {
     const normals = ground.getVerticesData(BABYLON.VertexBuffer.NormalKind);
     const count = positions.length / 3;
     const colors = new Float32Array(count * 4);
+    // Runtime only: per-vertex splat weights (dirt, sand, rock, field) read by
+    // the terrain shader. Bake mode keeps the flat vertex-colour washes instead.
+    const splat = this.bake ? null : new Float32Array(count * 4);
 
     // Scratch objects reused across vertices (worldgen colors are engine-free
     // {r,g,b} mutables).
@@ -195,26 +192,45 @@ export class AshwoodTileProvider {
       normals[i * 3 + 1] = inv;
       normals[i * 3 + 2] = -dhdz * inv;
 
-      // Ported ground-color pass: biome IDW blend → beach sand → lakebed
-      // silt → trail dirt → mountain stream wet stone. Sand goes on before
-      // silt so the beach band rings the waterline and stays visible through
-      // the shallows, while deeper water still darkens to silt. A touch of
-      // hash mottling keeps the strip from reading as a flat painted ring.
+      // Biome IDW blend is the base ground tint for BOTH paths.
       wg.biomeColorAt(wx, wz, bc);
       const sh = wg.lakeShoreAt(wx, wz);
-      if (sh > 0) {
-        lerpRgb(bc, sand, sh * (0.78 + 0.16 * hash2(wx * 0.9, wz * 0.9)));
-      }
-      const wd = wg.lakeWaterDepthAt(wx, wz);
-      if (wd > 0) {
-        const k = Math.min(1, wd / 1.8);
-        lerpRgb(bc, silt, 0.35 + 0.45 * k);
-      }
       const td = wg.trailDirtAt(wx, wz);
-      if (td > 0) lerpRgb(bc, dirt, td * 0.85);
       const sm = wg.mtnStreamMask?.(wx, wz) ?? 0;
-      if (sm > 0) {
-        lerpRgb(bc, wet, sm * (0.38 + 0.18 * hash2(wx * 0.48, wz * 0.48)));
+
+      if (this.bake) {
+        // Baked GLB has no runtime shader, so it keeps the flat vertex-colour
+        // washes (ported ground pass): biome → beach sand → lakebed silt →
+        // trail dirt → mountain stream wet stone. Sand before silt so the beach
+        // band rings the waterline and stays visible through the shallows.
+        const wd = wg.lakeWaterDepthAt(wx, wz);
+        if (sh > 0) lerpRgb(bc, sand, sh * (0.78 + 0.16 * hash2(wx * 0.9, wz * 0.9)));
+        if (wd > 0) { const k = Math.min(1, wd / 1.8); lerpRgb(bc, silt, 0.35 + 0.45 * k); }
+        if (td > 0) lerpRgb(bc, dirt, td * 0.85);
+        if (sm > 0) lerpRgb(bc, wet, sm * (0.38 + 0.18 * hash2(wx * 0.48, wz * 0.48)));
+      } else {
+        // Runtime: the washes become real splat surfaces. Bake authored weights
+        // that the shader can't reconstruct from world position alone (trails,
+        // lake shore, biome stoniness, cliffs); slope-driven rock is added in
+        // the shader. Grass is the remainder (baseline weight 1.0 there).
+        const dirtW = clamp01(td * 1.2);
+        const sandW = clamp01(sh);
+        // Stoniness from biome tint "greenness": grey/brown biomes (Highlands,
+        // Mourner's Rise) expose rock/bare earth; lush green biomes don't.
+        const green = bc.g - 0.5 * (bc.r + bc.b);
+        const stony = clamp01(1 - smoothstep01(0.02, 0.16, green));
+        const cliff = wg.mtnCliffAt?.(wx, wz) ?? 0;
+        const alt = positions[i * 3 + 1];
+        const rockW = clamp01(Math.max(stony * 0.65, cliff, smoothstep01(24, 60, alt)));
+        // Field (dry grass / wildflowers) fills lush, level ground away from
+        // trails and shore; the shader breaks it into patches.
+        const fieldW = clamp01(smoothstep01(0.12, 0.20, green) * (1 - dirtW) * (1 - sandW));
+        splat[i * 4]     = dirtW;
+        splat[i * 4 + 1] = sandW;
+        splat[i * 4 + 2] = rockW;
+        splat[i * 4 + 3] = fieldW;
+        // A faint wet darkening near mountain streams still reads under the shader.
+        if (sm > 0) lerpRgb(bc, wet, sm * 0.25);
       }
 
       colors[i * 4]     = bc.r;
@@ -229,6 +245,7 @@ export class AshwoodTileProvider {
     ground.setVerticesData(BABYLON.VertexBuffer.PositionKind, positions, false);
     ground.setVerticesData(BABYLON.VertexBuffer.NormalKind, normals, false);
     ground.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, false, 4);
+    if (splat) ground.setVerticesData('terrainSplat', splat, false, 4);
     ground.refreshBoundingInfo();
 
     ground.position.x = cx;
@@ -708,6 +725,11 @@ function buildWaterMaterial(scene, opts = {}) {
 
 function clamp01(v) {
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function smoothstep01(e0, e1, x) {
+  const t = clamp01((x - e0) / (e1 - e0 || 1));
+  return t * t * (3 - 2 * t);
 }
 
 function wgHexToRgb(hex) {

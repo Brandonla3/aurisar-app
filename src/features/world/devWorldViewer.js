@@ -34,8 +34,15 @@ const scene = new BabylonWorldScene(
   {
     startTimeOfDay: parseFloat(params.get('tod') ?? '10.5'),
     dayLengthSec:   parseFloat(params.get('daylen') ?? '1200'),
+    // ?tier=high|low|mobile — force a quality tier (QA of the terrain shader
+    // permutations); default lets the scene auto-detect from device caps.
+    qualityTier:    params.get('tier') || undefined,
   },
 );
+
+// Dev/QA: expose the scene so headless screenshot harnesses can drive an
+// in-engine render-target capture (reliable under software WebGL).
+if (typeof window !== 'undefined') window.__ashScene = scene;
 
 // Spawn override once the avatar exists (castle testing: ?pos=140,20).
 const posParam = params.get('pos');
