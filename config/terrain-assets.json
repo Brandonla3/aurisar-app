@@ -18,7 +18,7 @@
       "role": "grass",
       "sourceDir": "assets-source/terrain/overworld-meadow-grass-01",
       "resolution": 2048,
-      "tileMeters": 3.5,
+      "tileMeters": 2.1,
       "maps": {
         "albedo": "albedo.jpg",
         "normal": "normal.png",
@@ -28,14 +28,27 @@
       },
       "license": {
         "name": "CC0 1.0",
-        "author": "Poly Haven",
-        "sourceUrl": "https://polyhaven.com/textures"
+        "author": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/view?id=Ground037"
       },
       "acquisition": {
-        "provider": "Poly Haven",
-        "licenseUrl": "https://polyhaven.com/license",
-        "status": "selected-awaiting-binaries",
-        "notes": "Short, muted meadow grass material for the overworld grass baseline. Prefer a seamless nature/grass PBR set with low flower content so procedural color and blade cover stay believable."
+        "provider": "ambientCG",
+        "licenseUrl": "https://docs.ambientcg.com/license/",
+        "status": "source-locked-awaiting-local-fetch",
+        "notes": "First real overworld source lock. Ground037 is a photogrammetry-based grassy woodland/ground material with grass, moss, earth, and rough natural detail; use it as the initial grass/organic ground baseline before adding the dirt, gravel, rock, and field sets.",
+        "assetId": "Ground037",
+        "assetUrl": "https://ambientcg.com/view?id=Ground037",
+        "download": {
+          "url": "https://ambientCG.com/get?file=Ground037_2K-JPG.zip",
+          "format": "2K-JPG.zip",
+          "maps": {
+            "albedo": "Ground037_2K-JPG_Color.jpg",
+            "normal": "Ground037_2K-JPG_NormalGL.jpg",
+            "ao": "Ground037_2K-JPG_AmbientOcclusion.jpg",
+            "roughness": "Ground037_2K-JPG_Roughness.jpg",
+            "height": "Ground037_2K-JPG_Displacement.jpg"
+          }
+        }
       }
     },
     "overworld-packed-dirt-01": {
