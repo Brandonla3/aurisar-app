@@ -12,14 +12,18 @@
  * the terrain keeps all of Babylon's lighting: the directional key light,
  * cascaded shadows, IBL reflections, EXP2 fog and the day/night grade all apply
  * automatically. The plugin only overrides the albedo (and perturbs the normal
- * for procedural relief) inside CUSTOM_FRAGMENT_UPDATE_ALBEDO — which runs after
- * the biome vertex-colour multiply and before the light loop.
+ * for procedural relief) inside CUSTOM_FRAGMENT_BEFORE_LIGHTS — which runs
+ * after the biome vertex-colour multiply and before the light loop.
  *
- * The dirt/rock/sand/field surfaces are procedural (value-noise FBM + ridged
- * strata), so no new binary textures ship: albedo, relief height and the
- * detail normal for each surface all derive from the SAME noise cause (the
- * coupling rule from the procedural-materials skill). Grass keeps the existing
- * grass-meshy albedo+normal texture as its surface.
+ * All five surfaces — grass, DIRT, ROCK, SAND, dry/wildflower FIELD — are
+ * fully procedural (value-noise FBM + ridged strata): no ground textures ship
+ * at all. Albedo, relief height and the detail normal for each surface derive
+ * from the SAME noise cause (the coupling rule from the procedural-materials
+ * skill), so nothing here can read as a static repeating photo — grass is no
+ * exception, built from the per-vertex biome tint plus its own clump/macro
+ * noise instead of a tiled image (the old grass-meshy.jpg, removed: a single
+ * fixed photo repeating on a grid always reads as an obviously pasted-down
+ * static image once more than a couple of repeats are on screen).
  *
  * Determinism: every field is a pure function of world (x,z)/normal, identical
  * on every client and seam-free across tile borders (same math both sides of an
@@ -27,12 +31,6 @@
  */
 
 /* global BABYLON */
-
-const TEX_BASE = '/assets/textures';
-
-// Grass texture repeats per tile (kept from the old single-material terrain so
-// the grass surface is unchanged where grass wins the blend).
-const GRASS_REPEATS_PER_TILE = 24;
 
 // Per-tier shader budget. `oct` caps the FBM/ridged octave loop (a single knob,
 // read as a uniform so no shader recompile per tier). The booleans compile
@@ -179,8 +177,12 @@ float terrVoronoi(vec2 p, out vec2 cell){
   float terrRockSlope = smoothstep(0.34, 0.62, terrSlope + abs(terrJit) * 0.14);
   float wRock = max(terrSplat.z, terrRockSlope);
 
-  // Per-surface relief heights (each surface's single noise cause).
-  float hGrass = terrFbm(terrP * 0.35, terrOct) * 0.55 + 0.18;
+  // Per-surface relief heights (each surface's single noise cause). Grass has
+  // no baseline texture, so its own clump/macro noise IS its cause — reused
+  // below for both the relief height and the albedo mottling.
+  float grassClump = terrFbm(terrP * 0.85 + 1.70, terrOct);   // per-clump patchiness
+  float grassMacro = terrFbm(terrP * 0.20 - 5.30, terrOct);   // broad meadow variation
+  float hGrass = grassClump * 0.6 + grassMacro * 0.4;
   float hDirt  = terrFbm(terrP * 0.60 + 3.10, terrOct);
   float hRock  = terrRidged(terrP * 0.90, terrOct);
 #ifdef TERR_TRIPLANAR
@@ -193,8 +195,14 @@ float terrVoronoi(vec2 p, out vec2 cell){
   float terrPatch = clamp(terrValueNoise(terrP * 0.7) * 0.5 + 0.5, 0.0, 1.0);
   float hField = terrPatch * 0.7 + terrFbm(terrP * 2.0 + 7.70, terrOct) * 0.3;
 
-  // Per-surface albedo. Grass = the pipeline's biome-tinted grass sample.
-  vec3 aGrass = surfaceAlbedo;
+  // Per-surface albedo. Grass has no albedo texture, so surfaceAlbedo here is
+  // still the pure per-vertex biome tint (flat white albedoColor × vColor) —
+  // modulated by the SAME grassClump/grassMacro noise that drives hGrass
+  // above, so grass's colour and relief share one cause like every other
+  // surface instead of coming from a static image.
+  vec3 grassBase = surfaceAlbedo;
+  vec3 aGrass = grassBase * (0.78 + 0.34 * grassClump) * (0.88 + 0.24 * grassMacro);
+  aGrass = mix(aGrass, min(grassBase * 1.22, vec3(1.0)), smoothstep(0.6, 0.9, grassClump) * 0.4);
   vec3 aDirt  = mix(vec3(0.19, 0.13, 0.08), vec3(0.37, 0.26, 0.15), hDirt);
   vec3 aRock  = mix(vec3(0.21, 0.21, 0.20), vec3(0.35, 0.34, 0.32), hRock);
   vec3 aSand  = mix(vec3(0.56, 0.46, 0.29), vec3(0.75, 0.64, 0.42), hSand);
@@ -259,34 +267,24 @@ float terrVoronoi(vec2 p, out vec2 cell){
 // ── public API ───────────────────────────────────────────────────────────────
 
 /**
- * Build the shared runtime terrain material (one per scene). PBR base with the
- * grass albedo/normal texture; the TerrainSplatPlugin adds dirt/rock/sand/field.
+ * Build the shared runtime terrain material (one per scene). Untextured PBR
+ * base (flat white albedo × per-vertex biome tint); the TerrainSplatPlugin
+ * supplies every visible surface — grass included — procedurally, so there is
+ * no ground image asset for it to load at all.
  *
  * @param {BABYLON.Scene} scene
- * @param {object} opts { tier?: 'high'|'low'|'mobile', repeats?: number }
+ * @param {object} opts { tier?: 'high'|'low'|'mobile' }
  * @returns {BABYLON.PBRMaterial} with `._terrainPlugin` attached.
  */
 export function createTerrainMaterial(scene, opts = {}) {
   const tier = opts.tier ?? scene.metadata?.ashwood?.qualityTier ?? 'high';
   const cfg = TERRAIN_TIERS[tier] ?? TERRAIN_TIERS.high;
-  const repeats = opts.repeats ?? GRASS_REPEATS_PER_TILE;
 
   const mat = new BABYLON.PBRMaterial('ashwood_ground', scene);
   mat.metallic = 0;
   mat.roughness = 0.95;
   mat.specularIntensity = 0.4;
   mat.enableSpecularAntiAliasing = true;
-
-  const grassTex = new BABYLON.Texture(`${TEX_BASE}/grass-meshy.jpg`, scene);
-  grassTex.uScale = repeats;
-  grassTex.vScale = repeats;
-  mat.albedoTexture = grassTex;                 // modulated by biome vertex colours
-
-  const grassNm = new BABYLON.Texture(`${TEX_BASE}/grass-meshy-nm.jpg`, scene);
-  grassNm.uScale = repeats;
-  grassNm.vScale = repeats;
-  grassNm.level = 0.85;
-  mat.bumpTexture = grassNm;
 
   mat._terrainPlugin = new TerrainSplatPlugin(mat, cfg);
   return mat;

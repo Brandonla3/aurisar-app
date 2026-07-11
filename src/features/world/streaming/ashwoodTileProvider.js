@@ -25,13 +25,6 @@ import { createTerrainMaterial } from '../game/terrainMaterial.js';
 // switchbacks (12-24u wide) and the lake rim read correctly at this density.
 const DEFAULT_SUBDIVISIONS = 96;
 
-// Grass texture repeats per tile. Integer ⇒ the world-aligned UVs stay
-// continuous across tile borders. 256m / 24 ≈ 10.7m period — the Meshy-derived
-// texture has far fewer, larger blades per repeat than the old grasslight
-// lawn (which used 9 repeats), so it needs a denser tiling to read at a
-// plausible blade scale from player height.
-const GRASS_REPEATS_PER_TILE = 24;
-
 export class AshwoodTileProvider {
   /**
    * @param {object} config    world_build_config.json (tiling/streaming)
@@ -64,12 +57,11 @@ export class AshwoodTileProvider {
       ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
       ground.specularColor = new BABYLON.Color3(0, 0, 0);
     } else {
-      // Splat-blended PBR terrain: grass + procedural dirt/rock/sand/field,
+      // Splat-blended PBR terrain: fully procedural grass/dirt/rock/sand/field,
       // blended per-fragment by the per-vertex terrainSplat weights baked in
       // _buildGround plus in-shader slope. Keeps all PBR lighting/shadows/fog.
       ground = createTerrainMaterial(scene, {
         tier: scene.metadata?.ashwood?.qualityTier,
-        repeats: GRASS_REPEATS_PER_TILE,
       });
     }
 
