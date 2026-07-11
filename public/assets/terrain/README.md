@@ -26,9 +26,16 @@ shader: `grass`, `dirt`, `sand`, `rock`, and `field`.
    original source URL, and acquisition notes.
 3. Run `npm run prepare:terrain-sources` to generate local source folders and
    per-set `SOURCE.md` checklists under `assets-source/terrain/`.
-4. Drop the raw source maps into the generated source folder using the exact
-   configured filenames.
-5. Run:
+4. For a locked downloadable set, run:
+
+```bash
+npm run fetch:terrain-source -- <set-id>
+npm run check:terrain-source -- <set-id>
+```
+
+5. For manually acquired sources, drop the raw source maps into the generated
+   source folder using the exact configured filenames.
+6. Run:
 
 ```bash
 npm run build:terrain-assets
@@ -36,7 +43,7 @@ npm run check:terrain-assets
 npm run build
 ```
 
-6. Visually inspect the generated outputs. Only then set `enabled: true` and
+7. Visually inspect the generated outputs. Only then set `enabled: true` and
    assign the set to a terrain profile slot.
 
 Candidate sets are validated even while disabled, but disabled sets are not
@@ -44,7 +51,7 @@ included in the runtime manifest and do not require local source maps yet.
 
 ## Current selected candidates
 
-PR #250 starts the overworld library with five disabled candidate slots:
+PR #250 started the overworld library with five disabled candidate slots:
 
 - `overworld-meadow-grass-01` → `grass`
 - `overworld-packed-dirt-01` → `dirt`
@@ -52,9 +59,13 @@ PR #250 starts the overworld library with five disabled candidate slots:
 - `overworld-weathered-rock-01` → `rock`
 - `overworld-dry-field-litter-01` → `field`
 
-The first pass is intentionally metadata-first. Raw scanned texture binaries are
-large, ignored in `assets-source/terrain/`, and should only be committed after
-normalization if they are approved as runtime outputs.
+PR #251 locks `overworld-meadow-grass-01` to ambientCG `Ground037` and adds a
+repeatable fetch/extract workflow for that first source archive. The set remains
+disabled until the generated runtime maps are inspected and approved.
+
+Raw scanned texture binaries are large, ignored in `assets-source/terrain/`, and
+should only be committed after normalization if they are approved as runtime
+outputs.
 
 ## Example set
 
@@ -83,7 +94,18 @@ normalization if they are approved as runtime outputs.
         "provider": "Provider name",
         "licenseUrl": "https://original-source.example/license",
         "status": "selected-awaiting-binaries",
-        "notes": "Why this material fits the target terrain slot."
+        "notes": "Why this material fits the target terrain slot.",
+        "download": {
+          "url": "https://original-source.example/material.zip",
+          "format": "2K-JPG.zip",
+          "maps": {
+            "albedo": "Source_Color.jpg",
+            "normal": "Source_NormalGL.jpg",
+            "ao": "Source_AmbientOcclusion.jpg",
+            "roughness": "Source_Roughness.jpg",
+            "height": "Source_Displacement.jpg"
+          }
+        }
       }
     }
   }
