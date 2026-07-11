@@ -81,6 +81,27 @@ setInterval(() => {
 
 window.__worldScene = scene; // console access for debugging
 
+// ?preset=mountain|forest|castle|dungeon — dev-only: swap all streamed ground
+// tiles onto a non-default terrain preset once they exist, for shader/visual
+// QA of createTerrainMaterial's preset system (the live tile provider itself
+// never requests a preset — presets are for future dungeon/castle/mountain
+// zones, so nothing else exercises this path yet).
+const presetParam = params.get('preset');
+if (presetParam) {
+  import('./game/terrainMaterial.js').then(({ createTerrainMaterial }) => {
+    const presetMat = createTerrainMaterial(scene.scene, {
+      tier: scene._qualityTier,
+      preset: presetParam,
+    });
+    const swap = setInterval(() => {
+      const tiles = scene.scene.meshes.filter((m) => /^tile_.*_ground$/.test(m.name));
+      if (!tiles.length) return;
+      clearInterval(swap);
+      for (const t of tiles) t.material = presetMat;
+    }, 300);
+  });
+}
+
 // ?nav=1 — subsampled walkability overlay once the castle is built (dev only).
 if (params.has('nav')) {
   const navLevel = parseInt(params.get('navLevel') ?? '1', 10);
