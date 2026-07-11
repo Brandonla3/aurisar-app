@@ -16,6 +16,23 @@ creators are credited below as a courtesy.
 
 CC0 license: https://creativecommons.org/publicdomain/zero/1.0/
 
+## Textures
+
+`textures/grass-meshy.jpg` and `textures/grass-meshy-nm.jpg` (terrain grass
+albedo + normal map) are derived from a Meshy AI-generated render supplied by
+the project owner: cropped, color-balanced against the previous palette, made
+seamlessly tileable, with the normal map generated from luminance gradients.
+
+`textures/grass-cards.png` (3D grass clump atlas, two alpha-cutout variants)
+is extracted from the same Meshy AI renders by keying out the studio
+backdrop, with edge-color dilation so mipmaps stay grass-colored.
+
+`textures/grass-clump-albedo.jpg` and the hero clump geometry
+(`src/features/world/game/grassClump.json`) are extracted from a Meshy
+AI-generated textured grass GLB supplied by the project owner (baked base
+color downscaled 4096→1024 and brightness-matched to the game palette; a
+66-blade / 1.3k-tri sub-clump lifted from the 22k-tri source mesh).
+
 Replacing any of these files in place (same filename, passing the GLB
 validator) swaps the art with zero code changes — the intended path for
 the custom Blender/Unreal art pass.

@@ -887,10 +887,40 @@ export class BabylonWorldScene {
 
   // ── Sync bootstrap (terrain, engine — no characters yet) ──────────────────
 
+  // Create the WebGL engine defensively. Some mobile GPUs intermittently refuse
+  // a context with antialias/stencil under memory pressure and throw "WebGL not
+  // supported"; retry once with minimal options before surfacing a clear,
+  // actionable error instead of the raw Babylon string.
+  _createEngine() {
+    const make = (antialias, opts) => new BABYLON.Engine(this.canvas, antialias, opts);
+    try {
+      return make(true, { stencil: true, adaptToDeviceRatio: true });
+    } catch (primaryErr) {
+      if (typeof console !== 'undefined') {
+        console.warn('[Aurisar] WebGL engine creation failed; retrying with minimal options.', primaryErr);
+      }
+      try {
+        return make(false, {
+          stencil: false, adaptToDeviceRatio: false, failIfMajorPerformanceCaveat: false,
+        });
+      } catch (fallbackErr) {
+        const e = new Error('Your device or browser could not start WebGL. Close other tabs or graphics-heavy apps, then reload.');
+        e.cause = fallbackErr;
+        throw e;
+      }
+    }
+  }
+
   _initSync() {
-    this.engine = new BABYLON.Engine(this.canvas, true, {
-      stencil: true,
-      adaptToDeviceRatio: true,
+    this.engine = this._createEngine();
+    // A lost context (mobile GPU memory pressure, tab backgrounding) is
+    // recoverable — Babylon recreates GPU resources on restore by default;
+    // log the transitions so a stall is visible rather than silent.
+    this.engine.onContextLostObservable.add(() => {
+      if (typeof console !== 'undefined') console.warn('[Aurisar] WebGL context lost — attempting automatic restore.');
+    });
+    this.engine.onContextRestoredObservable.add(() => {
+      if (typeof console !== 'undefined') console.info('[Aurisar] WebGL context restored.');
     });
 
     // Desktop only: cap effective DPR. Uncapped, a 4K / Retina display renders
@@ -980,10 +1010,19 @@ export class BabylonWorldScene {
 
     this._bindKeys();
 
-    // Render loop guards on _local until CharacterAvatar is ready
+    // Render loop guards on _local until CharacterAvatar is ready. Wrapped so a
+    // throw in any per-frame observer (e.g. a subsystem's onBeforeRender) can't
+    // escalate into a fatal error that white-screens the whole app; log once.
     this.engine.runRenderLoop(() => {
-      if (this._local) this._tick();
-      this.scene.render();
+      try {
+        if (this._local) this._tick();
+        this.scene.render();
+      } catch (err) {
+        if (!this._renderErrLogged) {
+          this._renderErrLogged = true;
+          if (typeof console !== 'undefined') console.error('[Aurisar] Render loop error (further occurrences suppressed):', err);
+        }
+      }
     });
 
     this._onResize = () => this.engine.resize();

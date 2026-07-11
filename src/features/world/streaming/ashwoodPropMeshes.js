@@ -19,6 +19,7 @@
 
 import { mulberry32, hash2 } from '../worldgen/index.js';
 import { parseTileId } from './tileMath.js';
+import { buildBladeClusterVertexData, createGrassMaterial } from '../game/grassBlades.js';
 
 const rand = (rng, a, b) => a + rng() * (b - a);
 
@@ -169,6 +170,15 @@ export function buildPropTemplates(scene, opts = {}) {
     applyOptionalTexture(fTrunkM, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
     applyOptionalTexture(fTrunkM, 'bumpTexture',   `${TEX_BASE}/bark_normal.jpg`, scene, { uScale: 1, vScale: 3, level: 0.8 });
 
+    // Bush blobs + pine cones: flat untextured olive/sage blows out to
+    // chartreuse under full sun + tone mapping — the "neon" outliers once
+    // the grass went photographic. Drape the Meshy clump albedo over them
+    // and pull the base color down so they sit inside the field's palette.
+    applyOptionalTexture(bushM, 'diffuseTexture', `${TEX_BASE}/grass-clump-albedo.jpg`, scene, { uScale: 2, vScale: 1 });
+    bushM.diffuseColor = BABYLON.Color3.FromHexString('#77806a');
+    applyOptionalTexture(pine, 'diffuseTexture', `${TEX_BASE}/grass-clump-albedo.jpg`, scene, { uScale: 3, vScale: 2 });
+    pine.diffuseColor = BABYLON.Color3.FromHexString('#8a967c');
+
     // Broadleaf canopy material: an alpha-cutout leaf card. The source JPG has
     // no alpha channel, so it is preprocessed once into a proper RGBA texture:
     //  - alpha is a HARD key on "not black" (max channel), so dark/shadowed
@@ -293,13 +303,39 @@ export function buildPropTemplates(scene, opts = {}) {
   T.bush.bakeTransformIntoVertices(BABYLON.Matrix.Scaling(1, 0.7, 1).multiply(BABYLON.Matrix.Translation(0, 0.55, 0)));
   T.bush.material = bushM;
 
-  // ground details / understory
-  T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
-  T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
-  T.tuft.material = green;
-  T.fern = BABYLON.MeshBuilder.CreateCylinder('tpl_fern', { diameterTop: 0, diameterBottom: 1.48, height: 0.5, tessellation: 6 }, scene);
-  T.fern.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.25, 0));
-  T.fern.material = green;
+  // Ground details / understory. At runtime tuft/fern are small procedural
+  // blade clusters sharing AshwoodGrass's rooted-arc wind shader (grassBlades),
+  // so the understory sways with the same field it sits in. Bake mode keeps
+  // plain cones (the GLB export contract is geometry + vertex colors).
+  if (!opts.bake) {
+    const meshFromCluster = (name, geo, material) => {
+      const mesh = new BABYLON.Mesh(name, scene);
+      const vd = new BABYLON.VertexData();
+      vd.positions = geo.positions;
+      vd.indices = geo.indices;
+      vd.normals = geo.normals;
+      vd.uvs = geo.uvs;
+      vd.applyToMesh(mesh);
+      mesh.material = material;
+      return mesh;
+    };
+    // Understory is placed sparsely (a few hundred per tile), so each instance
+    // is a small fan of thin blades — a little grass tuft — rather than a
+    // single blade. Same thin-blade look + wind as the main field.
+    const tuftGeo = buildBladeClusterVertexData({ planes: 5, segments: 3, height: 0.4, width: 0.03, lean: 0.06 });
+    const fernGeo = buildBladeClusterVertexData({ planes: 6, segments: 3, height: 0.3, width: 0.033, lean: 0.1 });
+    const tuftMat = createGrassMaterial(scene, { maxH: tuftGeo.maxH, name: 'ash_tuftGrass' });
+    const fernMat = createGrassMaterial(scene, { maxH: fernGeo.maxH, name: 'ash_fernGrass' });
+    T.tuft = meshFromCluster('tpl_tuft', tuftGeo, tuftMat);
+    T.fern = meshFromCluster('tpl_fern', fernGeo, fernMat);
+  } else {
+    T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
+    T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
+    T.tuft.material = green;
+    T.fern = BABYLON.MeshBuilder.CreateCylinder('tpl_fern', { diameterTop: 0, diameterBottom: 1.48, height: 0.5, tessellation: 6 }, scene);
+    T.fern.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.25, 0));
+    T.fern.material = green;
+  }
   T.flower = BABYLON.MeshBuilder.CreateIcoSphere('tpl_flower', { radius: 0.3, subdivisions: 1 }, scene);
   T.flower.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.3, 0));
   T.flower.convertToFlatShadedMesh();
@@ -429,7 +465,16 @@ class Acc {
     mesh.setEnabled(true);
     mesh.isPickable = false;
     mesh.thinInstanceSetBuffer('matrix', new Float32Array(this.mats), 16, true);
-    if (this.cols.length) mesh.thinInstanceSetBuffer('color', new Float32Array(this.cols), 4, true);
+    let cols = this.cols;
+    if (cols.length && template.metadata?.texturedCard) {
+      // Textured-card templates carry their color in the texture; the pushed
+      // biome tints (grassCol-scale, some ×1.3 — the old "neon" understory)
+      // would darken/oversaturate it. Soften to 35% strength around neutral,
+      // mirroring the AshwoodGrass shader's tint formula.
+      cols = cols.map((v, i) =>
+        i % 4 === 3 ? 1 : 0.65 + 0.35 * Math.min(v * 2.2, 1.6));
+    }
+    if (cols.length) mesh.thinInstanceSetBuffer('color', new Float32Array(cols), 4, true);
     mesh.thinInstanceRefreshBoundingInfo();
     container.meshes.push(mesh);
     if (castShadow) castShadow(mesh);
@@ -762,7 +807,9 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       if (wg.trailDirtAt(x, z) > 0.1) continue;
       const sc = rand(rng, 0.5, 1.25);
       const gc = bi.grassCol;
-      const col2 = { r: gc[0] * 1.3 + 0.08 * rng(), g: gc[1] * 1.3 + 0.1 * rng(), b: gc[2] * 1.2 };
+      // Match the AshwoodGrass field tone — the blade shader has its own
+      // root→tip ramp, so the old ×1.3 boost (for flat cones) now over-saturates.
+      const col2 = { r: gc[0] + 0.08 * rng(), g: gc[1] + 0.1 * rng(), b: gc[2] };
       acc.tuft.push(x, surfaceY(x, z), z, 0, rng() * 6.28, 0, sc, sc * (0.8 + rng() * 0.7), sc, col2);
     }
   }
