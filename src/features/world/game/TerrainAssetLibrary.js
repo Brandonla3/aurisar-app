@@ -10,6 +10,13 @@ function assertObject(value, label) {
   return value;
 }
 
+function disposeLoadedSet(set) {
+  set?.baseColor?.dispose?.();
+  set?.normal?.dispose?.();
+  set?.orm?.dispose?.();
+  set?.height?.dispose?.();
+}
+
 export function validateTerrainAssetManifest(manifest) {
   assertObject(manifest, 'manifest');
   if (manifest.version !== 1) {
@@ -92,6 +99,8 @@ export class TerrainAssetLibrary {
     this.manifest = validateTerrainAssetManifest(manifest);
     this._sets = new Map();
     this._inflight = new Map();
+    this._disposed = false;
+    this._disposeGeneration = 0;
   }
 
   static async create(scene, options) {
@@ -104,13 +113,14 @@ export class TerrainAssetLibrary {
   }
 
   async loadSet(id) {
-    if (!id) return null;
+    if (!id || this._disposed) return null;
     if (this._sets.has(id)) return this._sets.get(id);
     if (this._inflight.has(id)) return this._inflight.get(id);
 
     const definition = this.manifest.sets[id];
     if (!definition) return null;
 
+    const generation = this._disposeGeneration;
     const promise = (async () => {
       const anisotropy = Math.max(1, Math.min(16, definition.anisotropy ?? 8));
       const [baseColor, normal, orm, height] = await Promise.all([
@@ -146,6 +156,12 @@ export class TerrainAssetLibrary {
         orm,
         height,
       });
+
+      if (this._disposed || this._disposeGeneration !== generation) {
+        disposeLoadedSet(loaded);
+        return null;
+      }
+
       this._sets.set(id, loaded);
       return loaded;
     })();
@@ -154,17 +170,22 @@ export class TerrainAssetLibrary {
     try {
       return await promise;
     } finally {
-      this._inflight.delete(id);
+      if (this._inflight.get(id) === promise) {
+        this._inflight.delete(id);
+      }
     }
   }
 
   async loadProfile(name) {
+    if (this._disposed) return null;
     const profile = this.getProfileDefinition(name);
     if (!profile) return null;
 
     const entries = await Promise.all(
       TERRAIN_SLOTS.map(async (slot) => [slot, await this.loadSet(profile[slot])]),
     );
+
+    if (this._disposed) return null;
     return Object.freeze(Object.fromEntries(entries));
   }
 
@@ -173,11 +194,12 @@ export class TerrainAssetLibrary {
   }
 
   dispose() {
+    if (this._disposed && this._sets.size === 0 && this._inflight.size === 0) return;
+    this._disposed = true;
+    this._disposeGeneration++;
+
     for (const set of this._sets.values()) {
-      set.baseColor.dispose();
-      set.normal.dispose();
-      set.orm.dispose();
-      set.height?.dispose();
+      disposeLoadedSet(set);
     }
     this._sets.clear();
     this._inflight.clear();
