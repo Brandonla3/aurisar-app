@@ -1,51 +1,43 @@
-/**
- * terrainMaterial — splat-blended PBR ground for the streamed Ashwood terrain.
- *
- * The overworld used to be a single grass texture tinted per-vertex by biome
- * colour, so every surface (trails, lakebed, highlands) read as "grass with a
- * colour wash". This replaces that with real, distinct ground materials —
- * grass, DIRT, ROCK, SAND and dry/wildflower FIELD — blended per fragment by
- * per-vertex splat weights (baked from the worldgen fields in the tile
- * provider) plus in-shader slope.
- *
- * It is implemented as a BABYLON.MaterialPluginBase on a normal PBRMaterial, so
- * the terrain keeps all of Babylon's lighting: the directional key light,
- * cascaded shadows, IBL reflections, EXP2 fog and the day/night grade all apply
- * automatically. The plugin only overrides the albedo (and perturbs the normal
- * for procedural relief) inside CUSTOM_FRAGMENT_BEFORE_LIGHTS — which runs
- * after the biome vertex-colour multiply and before the light loop.
- *
- * All five surfaces — grass, DIRT, ROCK, SAND, dry/wildflower FIELD — are
- * fully procedural (value-noise FBM + ridged strata): no ground textures ship
- * at all. Albedo, relief height and the detail normal for each surface derive
- * from the SAME noise cause (the coupling rule from the procedural-materials
- * skill), so nothing here can read as a static repeating photo — grass is no
- * exception, built from the per-vertex biome tint plus its own clump/macro
- * noise instead of a tiled image (the old grass-meshy.jpg, removed: a single
- * fixed photo repeating on a grid always reads as an obviously pasted-down
- * static image once more than a couple of repeats are on screen).
- *
- * Determinism: every field is a pure function of world (x,z)/normal, identical
- * on every client and seam-free across tile borders (same math both sides of an
- * edge), so nothing here can desync multiplayer.
- */
-
 /* global BABYLON */
 
-// Per-tier shader budget. `oct` caps the FBM/ridged octave loop (a single knob,
-// read as a uniform so no shader recompile per tier). The booleans compile
-// whole feature blocks in/out via #defines.
+/**
+ * Cinematic splat-blended PBR terrain.
+ *
+ * terrainSplat is a vec4 vertex attribute containing dirt, sand/gravel, rock,
+ * and field/organic-cover weights. The shader adds slope-aware rock, coupled
+ * procedural albedo/relief, macro breakup, distance-faded detail normals and
+ * environment-specific material identities.
+ */
+
 const TERRAIN_TIERS = {
   high:   { oct: 6, detail: 0.95, heightBlend: true,  detailNormal: true,  triplanar: true,  flowers: true  },
-  low:    { oct: 4, detail: 0.75, heightBlend: true,  detailNormal: true,  triplanar: false, flowers: false },
+  low:    { oct: 4, detail: 0.72, heightBlend: true,  detailNormal: true,  triplanar: false, flowers: false },
   mobile: { oct: 3, detail: 0.0,  heightBlend: false, detailNormal: false, triplanar: false, flowers: false },
 };
 
-// ── the plugin ───────────────────────────────────────────────────────────────
+/**
+ * Presets are deliberately numeric in the shader so one implementation can be
+ * reused by overworld tiles, mountains, forests, castle courtyards and dungeon
+ * floors without cloning shader code.
+ */
+export const TERRAIN_PRESETS = Object.freeze({
+  overworld: 0,
+  mountain: 1,
+  forest: 2,
+  castle: 3,
+  dungeon: 4,
+});
+
+const PRESET_DEFAULTS = Object.freeze({
+  overworld: { profile: 0, wetness: 0.08, scale: 1.0, roughness: 0.94, specular: 0.38 },
+  mountain:  { profile: 1, wetness: 0.03, scale: 0.82, roughness: 0.91, specular: 0.46 },
+  forest:    { profile: 2, wetness: 0.34, scale: 1.12, roughness: 0.97, specular: 0.28 },
+  castle:    { profile: 3, wetness: 0.10, scale: 1.32, roughness: 0.89, specular: 0.52 },
+  dungeon:   { profile: 4, wetness: 0.62, scale: 1.55, roughness: 0.84, specular: 0.62 },
+});
 
 class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
-  constructor(material, tierCfg) {
-    // Priority 210: after AshwoodLeafSway (200); arbitrary but stable.
+  constructor(material, tierCfg, presetCfg) {
     super(material, 'AshwoodTerrainSplat', 210, {
       TERR_ENABLED: false,
       TERR_HEIGHTBLEND: false,
@@ -54,14 +46,13 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
       TERR_FLOWERS: false,
     });
     this._cfg = tierCfg;
+    this._preset = presetCfg;
     this._debug = 0;
     this._enable(true);
   }
 
   getClassName() { return 'AshwoodTerrainSplatPlugin'; }
 
-  // Feature permutation is fixed per material (per quality tier), so the defines
-  // never change after creation — cheap, one compile.
   prepareDefines(defines) {
     defines.TERR_ENABLED = true;
     defines.TERR_HEIGHTBLEND = !!this._cfg.heightBlend;
@@ -70,21 +61,26 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
     defines.TERR_FLOWERS = !!this._cfg.flowers;
   }
 
-  getAttributes(attributes) {
-    // vec4 per vertex: (dirt, sand, rock, field) authored weights, baked in the
-    // tile provider from the worldgen trail/lake/biome fields.
-    attributes.push('terrainSplat');
-  }
+  getAttributes(attributes) { attributes.push('terrainSplat'); }
 
   getUniforms() {
     return {
       ubo: [
-        { name: 'uTerrOct',    size: 1, type: 'float' },
+        { name: 'uTerrOct', size: 1, type: 'float' },
         { name: 'uTerrDetail', size: 1, type: 'float' },
-        { name: 'uTerrDebug',  size: 1, type: 'float' },
+        { name: 'uTerrDebug', size: 1, type: 'float' },
+        { name: 'uTerrProfile', size: 1, type: 'float' },
+        { name: 'uTerrWetness', size: 1, type: 'float' },
+        { name: 'uTerrScale', size: 1, type: 'float' },
       ],
-      fragment:
-        'uniform float uTerrOct;\nuniform float uTerrDetail;\nuniform float uTerrDebug;\n',
+      fragment: `
+uniform float uTerrOct;
+uniform float uTerrDetail;
+uniform float uTerrDebug;
+uniform float uTerrProfile;
+uniform float uTerrWetness;
+uniform float uTerrScale;
+`,
     };
   }
 
@@ -92,6 +88,9 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
     uniformBuffer.updateFloat('uTerrOct', this._cfg.oct);
     uniformBuffer.updateFloat('uTerrDetail', this._cfg.detail);
     uniformBuffer.updateFloat('uTerrDebug', this._debug);
+    uniformBuffer.updateFloat('uTerrProfile', this._preset.profile);
+    uniformBuffer.updateFloat('uTerrWetness', this._preset.wetness);
+    uniformBuffer.updateFloat('uTerrScale', this._preset.scale);
   }
 
   getCustomCode(shaderType) {
@@ -101,12 +100,11 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
 attribute vec4 terrainSplat;
 varying vec4 vTerrainSplat;
 `,
-        CUSTOM_VERTEX_MAIN_END: `
-vTerrainSplat = terrainSplat;
-`,
+        CUSTOM_VERTEX_MAIN_END: `vTerrainSplat = terrainSplat;`,
       };
     }
     if (shaderType !== 'fragment') return null;
+
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `
 varying vec4 vTerrainSplat;
@@ -119,22 +117,34 @@ float terrHash21(vec2 p){
 float terrValueNoise(vec2 p){
   vec2 i = floor(p), f = fract(p);
   vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(terrHash21(i),               terrHash21(i + vec2(1.0, 0.0)), u.x),
-             mix(terrHash21(i + vec2(0.0,1.0)), terrHash21(i + vec2(1.0, 1.0)), u.x), u.y);
+  return mix(mix(terrHash21(i), terrHash21(i + vec2(1.0, 0.0)), u.x),
+             mix(terrHash21(i + vec2(0.0, 1.0)), terrHash21(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 float terrFbm(vec2 p, int oct){
   float h = 0.0, amp = 0.5;
-  for (int i = 0; i < 8; i++){ if (i >= oct) break; h += amp * terrValueNoise(p); p = TERR_R * p * 2.03; amp *= 0.5; }
+  for (int i = 0; i < 8; i++){
+    if (i >= oct) break;
+    h += amp * terrValueNoise(p);
+    p = TERR_R * p * 2.03;
+    amp *= 0.5;
+  }
   return h;
 }
 float terrRidged(vec2 p, int oct){
   float h = 0.0, amp = 0.5;
-  for (int i = 0; i < 8; i++){ if (i >= oct) break; float n = terrValueNoise(p); h += amp * (1.0 - abs(n * 2.0 - 1.0)); p = TERR_R * p * 2.03; amp *= 0.52; }
+  for (int i = 0; i < 8; i++){
+    if (i >= oct) break;
+    float n = terrValueNoise(p);
+    h += amp * (1.0 - abs(n * 2.0 - 1.0));
+    p = TERR_R * p * 2.03;
+    amp *= 0.52;
+  }
   return h;
 }
 #ifdef TERR_TRIPLANAR
 float terrTriNoise(vec3 wp, vec3 n, float s, int oct){
-  vec3 bw = pow(abs(n), vec3(4.0)); bw /= dot(bw, vec3(1.0));
+  vec3 bw = pow(abs(n), vec3(4.0));
+  bw /= max(dot(bw, vec3(1.0)), 0.0001);
   return terrFbm(wp.yz * s, oct) * bw.x + terrFbm(wp.xz * s, oct) * bw.y + terrFbm(wp.xy * s, oct) * bw.z;
 }
 #endif
@@ -156,106 +166,128 @@ float terrVoronoi(vec2 p, out vec2 cell){
 }
 #endif
 `,
-      // BEFORE_LIGHTS (not UPDATE_ALBEDO): by this point surfaceAlbedo still
-      // holds grass × biome tint AND the working normal `normalW` is declared
-      // (the bump block runs after albedo in this engine build), so we can both
-      // set the blended albedo and perturb the normal for real shading. Both
-      // are consumed downstream (final colour composition multiplies
-      // surfaceAlbedo; the light loop reads normalW).
       CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
 #ifdef TERR_ENABLED
 {
-  vec3  terrWP = vPositionW;
-  vec2  terrP  = terrWP.xz;
-  int   terrOct = int(uTerrOct + 0.5);
-  vec4  terrSplat = clamp(vTerrainSplat, 0.0, 1.0);   // x=dirt y=sand z=rock w=field
-
-  // Slope from the geometric normal (Y-up), jittered so the rock band is a
-  // material edge, not a clean isoline.
-  float terrJit   = terrValueNoise(terrP * 0.05) - 0.5;
+  vec3 terrWP = vPositionW;
+  vec2 terrP = terrWP.xz * uTerrScale;
+  int terrOct = int(uTerrOct + 0.5);
+  vec4 terrSplat = clamp(vTerrainSplat, 0.0, 1.0);
   float terrSlope = 1.0 - clamp(vNormalW.y, 0.0, 1.0);
-  float terrRockSlope = smoothstep(0.34, 0.62, terrSlope + abs(terrJit) * 0.14);
-  float wRock = max(terrSplat.z, terrRockSlope);
+  float terrJit = terrValueNoise(terrP * 0.05) - 0.5;
+  float terrProfile = floor(uTerrProfile + 0.5);
 
-  // Per-surface relief heights (each surface's single noise cause). Grass has
-  // no baseline texture, so its own clump/macro noise IS its cause — reused
-  // below for both the relief height and the albedo mottling.
-  float grassClump = terrFbm(terrP * 0.85 + 1.70, terrOct);   // per-clump patchiness
-  float grassMacro = terrFbm(terrP * 0.20 - 5.30, terrOct);   // broad meadow variation
-  float hGrass = grassClump * 0.6 + grassMacro * 0.4;
-  float hDirt  = terrFbm(terrP * 0.60 + 3.10, terrOct);
-  float hRock  = terrRidged(terrP * 0.90, terrOct);
+  float isMountain = step(0.5, terrProfile) * (1.0 - step(1.5, terrProfile));
+  float isForest = step(1.5, terrProfile) * (1.0 - step(2.5, terrProfile));
+  float isCastle = step(2.5, terrProfile) * (1.0 - step(3.5, terrProfile));
+  float isDungeon = step(3.5, terrProfile);
+
+  float hGrass = terrFbm(terrP * 0.85 + 1.7, terrOct) * 0.62 + terrFbm(terrP * 0.20 - 5.3, terrOct) * 0.38;
+  float hDirt = terrFbm(terrP * 0.64 + 3.1, terrOct);
+  float hRock = terrRidged(terrP * 0.92, terrOct);
 #ifdef TERR_TRIPLANAR
-  hRock = mix(hRock, terrTriNoise(terrWP, vNormalW, 0.9, terrOct), smoothstep(0.42, 0.70, terrSlope));
+  hRock = mix(hRock, terrTriNoise(terrWP, vNormalW, 0.9 * uTerrScale, terrOct), smoothstep(0.38, 0.68, terrSlope));
 #endif
-  vec2  terrWind = vec2(0.94, 0.34);
-  float terrU = dot(terrP, terrWind);
-  float hSand = (sin(terrU * 2.2 + terrFbm(terrP * 0.4, terrOct) * 3.0) * 0.5 + 0.5) * 0.6
-              + terrFbm(terrP * 3.0, terrOct) * 0.4;
-  float terrPatch = clamp(terrValueNoise(terrP * 0.7) * 0.5 + 0.5, 0.0, 1.0);
-  float hField = terrPatch * 0.7 + terrFbm(terrP * 2.0 + 7.70, terrOct) * 0.3;
+  float gravelCell = terrValueNoise(floor(terrP * 5.5));
+  float hSand = terrFbm(terrP * 2.7, terrOct) * 0.42 + (sin(dot(terrP, vec2(0.94, 0.34)) * 2.2) * 0.5 + 0.5) * 0.58;
+  hSand = mix(hSand, gravelCell, max(isCastle, isDungeon));
+  float terrPatch = terrValueNoise(terrP * 0.7);
+  float hField = terrPatch * 0.70 + terrFbm(terrP * 2.0 + 7.7, terrOct) * 0.30;
 
-  // Per-surface albedo. Grass has no albedo texture, so surfaceAlbedo here is
-  // still the pure per-vertex biome tint (flat white albedoColor × vColor) —
-  // modulated by the SAME grassClump/grassMacro noise that drives hGrass
-  // above, so grass's colour and relief share one cause like every other
-  // surface instead of coming from a static image.
   vec3 grassBase = surfaceAlbedo;
-  vec3 aGrass = grassBase * (0.78 + 0.34 * grassClump) * (0.88 + 0.24 * grassMacro);
-  aGrass = mix(aGrass, min(grassBase * 1.22, vec3(1.0)), smoothstep(0.6, 0.9, grassClump) * 0.4);
-  vec3 aDirt  = mix(vec3(0.19, 0.13, 0.08), vec3(0.37, 0.26, 0.15), hDirt);
-  vec3 aRock  = mix(vec3(0.21, 0.21, 0.20), vec3(0.35, 0.34, 0.32), hRock);
-  vec3 aSand  = mix(vec3(0.56, 0.46, 0.29), vec3(0.75, 0.64, 0.42), hSand);
-  vec3 aField = mix(vec3(0.32, 0.35, 0.14), vec3(0.58, 0.55, 0.24), terrPatch);
-  aField = mix(aField, aGrass, 0.30);                 // field follows the biome grass tint
+  vec3 aGrass = grassBase * (0.76 + 0.42 * hGrass);
+  vec3 aDirt = mix(vec3(0.16, 0.105, 0.055), vec3(0.39, 0.275, 0.15), hDirt);
+  vec3 aRock = mix(vec3(0.17, 0.18, 0.18), vec3(0.39, 0.39, 0.37), hRock);
+  vec3 aSand = mix(vec3(0.52, 0.43, 0.27), vec3(0.76, 0.65, 0.43), hSand);
+  vec3 aField = mix(vec3(0.29, 0.32, 0.12), vec3(0.60, 0.57, 0.25), terrPatch);
+  aField = mix(aField, aGrass, 0.28);
+
+  // Forest: dark moist loam, moss and leaf-litter breakup.
+  float litter = smoothstep(0.48, 0.78, terrValueNoise(terrP * 3.8 + 19.0));
+  aDirt = mix(aDirt, mix(vec3(0.075, 0.055, 0.032), vec3(0.22, 0.16, 0.075), hDirt), isForest);
+  aRock = mix(aRock, mix(aRock * 0.62, vec3(0.18, 0.25, 0.12), litter * 0.55), isForest);
+  aField = mix(aField, mix(vec3(0.16, 0.20, 0.07), vec3(0.33, 0.25, 0.10), litter), isForest);
+
+  // Mountains: colder fractured stone, scree and sparse muted vegetation.
+  aRock = mix(aRock, mix(vec3(0.16, 0.18, 0.21), vec3(0.48, 0.49, 0.48), hRock), isMountain);
+  aDirt = mix(aDirt, mix(vec3(0.17, 0.14, 0.11), vec3(0.35, 0.29, 0.21), hDirt), isMountain);
+  aGrass = mix(aGrass, aGrass * vec3(0.76, 0.82, 0.68), isMountain);
+
+  // Castle: compacted earth plus pale crushed gravel and worn masonry fines.
+  vec3 castleGravel = mix(vec3(0.26, 0.25, 0.22), vec3(0.63, 0.59, 0.49), gravelCell);
+  aSand = mix(aSand, castleGravel, isCastle);
+  aDirt = mix(aDirt, mix(vec3(0.18, 0.135, 0.09), vec3(0.42, 0.34, 0.23), hDirt), isCastle);
+  aRock = mix(aRock, mix(vec3(0.24, 0.25, 0.25), vec3(0.52, 0.51, 0.47), hRock), isCastle);
+
+  // Dungeon: near-black wet stone, mineral staining and irregular rubble.
+  float mineral = terrFbm(terrP * 0.36 + 31.0, terrOct);
+  vec3 dungeonRock = mix(vec3(0.055, 0.065, 0.065), vec3(0.24, 0.27, 0.25), hRock);
+  dungeonRock = mix(dungeonRock, vec3(0.16, 0.20, 0.13), smoothstep(0.62, 0.84, mineral) * 0.38);
+  aRock = mix(aRock, dungeonRock, isDungeon);
+  aDirt = mix(aDirt, mix(vec3(0.045, 0.032, 0.022), vec3(0.16, 0.11, 0.065), hDirt), isDungeon);
+  aSand = mix(aSand, mix(vec3(0.09, 0.095, 0.09), vec3(0.31, 0.30, 0.27), gravelCell), isDungeon);
+
 #ifdef TERR_FLOWERS
   vec2 terrCell; float terrF1 = terrVoronoi(terrP * 5.5, terrCell);
-  float terrFlower = smoothstep(0.16, 0.04, terrF1) * step(0.62, terrHash21(terrCell));
-  aField = mix(aField, vec3(0.90, 0.85, 0.42), terrFlower * 0.65);
+  float terrFlower = smoothstep(0.16, 0.04, terrF1) * step(0.64, terrHash21(terrCell));
+  terrFlower *= (1.0 - max(max(isMountain, isCastle), isDungeon));
+  aField = mix(aField, vec3(0.90, 0.84, 0.40), terrFlower * 0.62);
 #endif
 
-  // Control weights. Grass is the baseline (1.0) everywhere; the masks are
-  // scaled so a full mask beats grass in the height blend.
+  float wRock = max(terrSplat.z, smoothstep(0.32, 0.60, terrSlope + abs(terrJit) * 0.15));
   float wGrass = 1.0;
-  float wDirt  = terrSplat.x * 1.70;
-  float wSand  = terrSplat.y * 1.90;
-  float wRockW = wRock * 1.80;
-  float wField = terrSplat.w * 1.25;
+  float wDirt = terrSplat.x * 1.72;
+  float wSand = terrSplat.y * 1.90;
+  float wRockW = wRock * 1.82;
+  float wField = terrSplat.w * 1.24;
+
+  wRockW += isMountain * (0.52 + terrSlope * 0.95);
+  wDirt += isForest * 0.40;
+  wField += isForest * 0.24;
+  wSand += isCastle * 0.78;
+  wDirt += isCastle * 0.34;
+  wRockW += isDungeon * 0.92;
+  wSand += isDungeon * 0.46;
+  wGrass *= 1.0 - isMountain * 0.46 - isCastle * 0.86 - isDungeon * 0.98;
+  wField *= 1.0 - isCastle * 0.86 - isDungeon;
 
 #ifdef TERR_HEIGHTBLEND
-  float terrDepth = 0.22;
+  float depth = mix(0.22, 0.16, max(isCastle, isDungeon));
   float s0 = wGrass + hGrass, s1 = wDirt + hDirt, s2 = wRockW + hRock, s3 = wSand + hSand, s4 = wField + hField;
-  float terrM = max(max(max(s0, s1), max(s2, s3)), s4) - terrDepth;
-  float b0 = max(s0 - terrM, 0.0), b1 = max(s1 - terrM, 0.0), b2 = max(s2 - terrM, 0.0), b3 = max(s3 - terrM, 0.0), b4 = max(s4 - terrM, 0.0);
+  float m = max(max(max(s0, s1), max(s2, s3)), s4) - depth;
+  float b0 = max(s0 - m, 0.0), b1 = max(s1 - m, 0.0), b2 = max(s2 - m, 0.0), b3 = max(s3 - m, 0.0), b4 = max(s4 - m, 0.0);
 #else
   float b0 = wGrass, b1 = wDirt, b2 = wRockW, b3 = wSand, b4 = wField;
 #endif
-  float terrSum = b0 + b1 + b2 + b3 + b4 + 1e-5;
-  b0 /= terrSum; b1 /= terrSum; b2 /= terrSum; b3 /= terrSum; b4 /= terrSum;
+  float sum = b0 + b1 + b2 + b3 + b4 + 0.00001;
+  b0 /= sum; b1 /= sum; b2 /= sum; b3 /= sum; b4 /= sum;
 
   vec3 terrAlb = b0 * aGrass + b1 * aDirt + b2 * aRock + b3 * aSand + b4 * aField;
-  // Low-frequency macro variation breaks obvious tiling.
-  terrAlb *= 1.0 + (terrValueNoise(terrP * 0.11) - 0.5) * 0.34;
+  terrAlb *= 1.0 + (terrValueNoise(terrP * 0.11) - 0.5) * 0.30;
+
+  float pore = terrValueNoise(terrP * 7.0 + 47.0);
+  float wetMask = clamp(uTerrWetness * (0.34 + 0.66 * mineral) * (0.55 + 0.45 * pore), 0.0, 0.88);
+  terrAlb *= 1.0 - wetMask * 0.38;
 
 #ifdef TERR_DETAILNORMAL
-  // Screen-space height -> world normal (Mikkelsen unparametrised-surface
-  // gradient), faded out with camera distance so distant slopes don't shimmer.
-  float terrH = b0 * hGrass + b1 * hDirt + b2 * hRock * 1.4 + b3 * hSand * 0.6 + b4 * hField;
-  vec3  terrDpx = dFdx(terrWP), terrDpy = dFdy(terrWP);
-  vec3  terrR1 = cross(terrDpy, normalW), terrR2 = cross(normalW, terrDpx);
-  float terrDet = dot(terrDpx, terrR1);
-  vec3  terrGrad = sign(terrDet) * (dFdx(terrH) * terrR1 + dFdy(terrH) * terrR2);
-  float terrCam = length(vEyePosition.xyz - terrWP);
-  float terrStr = uTerrDetail * (1.0 - smoothstep(12.0, 60.0, terrCam)) * (1.0 - b0 * 0.45);
-  normalW = normalize(abs(terrDet) * normalW - terrGrad * terrStr);
+  float terrH = b0 * hGrass + b1 * hDirt + b2 * hRock * 1.45 + b3 * hSand * 0.78 + b4 * hField;
+  terrH += max(isCastle, isDungeon) * gravelCell * 0.22;
+  vec3 dpx = dFdx(terrWP), dpy = dFdy(terrWP);
+  vec3 r1 = cross(dpy, normalW), r2 = cross(normalW, dpx);
+  float det = dot(dpx, r1);
+  vec3 grad = sign(det) * (dFdx(terrH) * r1 + dFdy(terrH) * r2);
+  float camDist = length(vEyePosition.xyz - terrWP);
+  float strength = uTerrDetail * (1.0 - smoothstep(13.0, 64.0, camDist));
+  strength *= mix(0.62, 1.12, max(max(isMountain, isCastle), isDungeon));
+  normalW = normalize(abs(det) * normalW - grad * strength);
 #endif
 
   surfaceAlbedo = terrAlb;
-
   if (uTerrDebug > 0.5) {
-    if (uTerrDebug < 1.5)      surfaceAlbedo = vec3(b1, b2, b3);   // dirt / rock / sand
-    else if (uTerrDebug < 2.5) surfaceAlbedo = vec3(b4, b0, 0.0);  // field / grass
-    else                       surfaceAlbedo = vec3(terrSlope);    // slope
+    if (uTerrDebug < 1.5) surfaceAlbedo = vec3(b1, b2, b3);
+    else if (uTerrDebug < 2.5) surfaceAlbedo = vec3(b4, b0, wetMask);
+    else if (uTerrDebug < 3.5) surfaceAlbedo = vec3(terrSlope);
+    else surfaceAlbedo = vec3(isMountain, isForest + isDungeon * 0.5, isCastle + isDungeon);
   }
 }
 #endif
@@ -264,33 +296,43 @@ float terrVoronoi(vec2 p, out vec2 cell){
   }
 }
 
-// ── public API ───────────────────────────────────────────────────────────────
-
 /**
- * Build the shared runtime terrain material (one per scene). Untextured PBR
- * base (flat white albedo × per-vertex biome tint); the TerrainSplatPlugin
- * supplies every visible surface — grass included — procedurally, so there is
- * no ground image asset for it to load at all.
+ * Create a cinematic terrain material.
  *
  * @param {BABYLON.Scene} scene
- * @param {object} opts { tier?: 'high'|'low'|'mobile' }
- * @returns {BABYLON.PBRMaterial} with `._terrainPlugin` attached.
+ * @param {{tier?:'high'|'low'|'mobile', preset?:keyof typeof TERRAIN_PRESETS,
+ *   wetness?:number, scale?:number}} opts
  */
 export function createTerrainMaterial(scene, opts = {}) {
   const tier = opts.tier ?? scene.metadata?.ashwood?.qualityTier ?? 'high';
-  const cfg = TERRAIN_TIERS[tier] ?? TERRAIN_TIERS.high;
+  const tierCfg = TERRAIN_TIERS[tier] ?? TERRAIN_TIERS.high;
+  const presetName = Object.prototype.hasOwnProperty.call(PRESET_DEFAULTS, opts.preset)
+    ? opts.preset : 'overworld';
+  const presetCfg = {
+    ...PRESET_DEFAULTS[presetName],
+    wetness: opts.wetness ?? PRESET_DEFAULTS[presetName].wetness,
+    scale: opts.scale ?? PRESET_DEFAULTS[presetName].scale,
+  };
 
-  const mat = new BABYLON.PBRMaterial('ashwood_ground', scene);
+  const mat = new BABYLON.PBRMaterial(`ashwood_ground_${presetName}`, scene);
   mat.metallic = 0;
-  mat.roughness = 0.95;
-  mat.specularIntensity = 0.4;
+  mat.roughness = presetCfg.roughness;
+  mat.specularIntensity = presetCfg.specular;
   mat.enableSpecularAntiAliasing = true;
-
-  mat._terrainPlugin = new TerrainSplatPlugin(mat, cfg);
+  mat._terrainPreset = presetName;
+  mat._terrainPlugin = new TerrainSplatPlugin(mat, tierCfg, presetCfg);
   return mat;
 }
 
-/** QA hook: 0 final, 1 dirt/rock/sand weights, 2 field/grass weights, 3 slope. */
+/** Build all environment identities once for scene-level reuse. */
+export function createTerrainMaterialSet(scene, opts = {}) {
+  return Object.fromEntries(Object.keys(TERRAIN_PRESETS).map((preset) => [
+    preset,
+    createTerrainMaterial(scene, { ...opts, preset }),
+  ]));
+}
+
+/** QA hook: 0 final, 1 dirt/rock/gravel, 2 field/grass/wetness, 3 slope, 4 profile. */
 export function setTerrainDebugMode(material, mode) {
   if (material?._terrainPlugin) {
     material._terrainPlugin._debug = mode;
