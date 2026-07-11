@@ -20,3 +20,9 @@ __pycache__/
 export/
 # Locally-installed agent skill packs (dev-machine tooling, not app code).
 .claude/skills/
+
+# Raw terrain source scans are local/heavy inputs. Commit only processed runtime
+# outputs and text docs; keep the raw download/source directories out of git.
+assets-source/terrain/**
+!assets-source/terrain/README.md
+!assets-source/terrain/.gitkeep

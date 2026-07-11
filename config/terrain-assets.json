@@ -12,7 +12,133 @@
     "baseColorQuality": 90,
     "roughness": 0.9
   },
-  "sets": {},
+  "sets": {
+    "overworld-meadow-grass-01": {
+      "enabled": false,
+      "role": "grass",
+      "sourceDir": "assets-source/terrain/overworld-meadow-grass-01",
+      "resolution": 2048,
+      "tileMeters": 3.5,
+      "maps": {
+        "albedo": "albedo.jpg",
+        "normal": "normal.png",
+        "ao": "ao.jpg",
+        "roughness": "roughness.jpg",
+        "height": "height.png"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "author": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/textures"
+      },
+      "acquisition": {
+        "provider": "Poly Haven",
+        "licenseUrl": "https://polyhaven.com/license",
+        "status": "selected-awaiting-binaries",
+        "notes": "Short, muted meadow grass material for the overworld grass baseline. Prefer a seamless nature/grass PBR set with low flower content so procedural color and blade cover stay believable."
+      }
+    },
+    "overworld-packed-dirt-01": {
+      "enabled": false,
+      "role": "dirt",
+      "sourceDir": "assets-source/terrain/overworld-packed-dirt-01",
+      "resolution": 2048,
+      "tileMeters": 3,
+      "maps": {
+        "albedo": "albedo.jpg",
+        "normal": "normal.png",
+        "ao": "ao.jpg",
+        "roughness": "roughness.jpg",
+        "height": "height.png"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "author": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/textures"
+      },
+      "acquisition": {
+        "provider": "Poly Haven",
+        "licenseUrl": "https://polyhaven.com/license",
+        "status": "selected-awaiting-binaries",
+        "notes": "Packed earth / trail dirt surface for roads, footpaths, camp clearings, and exposed transition bands. Avoid high-contrast footprints baked into albedo."
+      }
+    },
+    "overworld-river-gravel-01": {
+      "enabled": false,
+      "role": "sand",
+      "sourceDir": "assets-source/terrain/overworld-river-gravel-01",
+      "resolution": 2048,
+      "tileMeters": 2.5,
+      "maps": {
+        "albedo": "albedo.jpg",
+        "normal": "normal.png",
+        "ao": "ao.jpg",
+        "roughness": "roughness.jpg",
+        "height": "height.png"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "author": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/textures"
+      },
+      "acquisition": {
+        "provider": "Poly Haven",
+        "licenseUrl": "https://polyhaven.com/license",
+        "status": "selected-awaiting-binaries",
+        "notes": "Small stone / river gravel material to stand in for sand-gravel shore strips until riverbank and shoreline systems get their own biome-specific pass."
+      }
+    },
+    "overworld-weathered-rock-01": {
+      "enabled": false,
+      "role": "rock",
+      "sourceDir": "assets-source/terrain/overworld-weathered-rock-01",
+      "resolution": 2048,
+      "tileMeters": 4,
+      "maps": {
+        "albedo": "albedo.jpg",
+        "normal": "normal.png",
+        "ao": "ao.jpg",
+        "roughness": "roughness.jpg",
+        "height": "height.png"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "author": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/textures"
+      },
+      "acquisition": {
+        "provider": "Poly Haven",
+        "licenseUrl": "https://polyhaven.com/license",
+        "status": "selected-awaiting-binaries",
+        "notes": "Weathered gray/brown rock material for slopes and exposed stone. Prefer fractured detail with usable displacement height but no strong directional lighting baked into albedo."
+      }
+    },
+    "overworld-dry-field-litter-01": {
+      "enabled": false,
+      "role": "field",
+      "sourceDir": "assets-source/terrain/overworld-dry-field-litter-01",
+      "resolution": 2048,
+      "tileMeters": 3.5,
+      "maps": {
+        "albedo": "albedo.jpg",
+        "normal": "normal.png",
+        "ao": "ao.jpg",
+        "roughness": "roughness.jpg",
+        "height": "height.png"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "author": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/textures"
+      },
+      "acquisition": {
+        "provider": "Poly Haven",
+        "licenseUrl": "https://polyhaven.com/license",
+        "status": "selected-awaiting-binaries",
+        "notes": "Dry grass / field litter / dead vegetation material for sparse fields and transitional organic cover. Should blend with living grass without becoming visually noisy at distance."
+      }
+    }
+  },
   "profiles": {
     "overworld": {
       "grass": null,

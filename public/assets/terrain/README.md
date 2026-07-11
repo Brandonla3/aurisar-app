@@ -21,10 +21,13 @@ shader: `grass`, `dirt`, `sand`, `rock`, and `field`.
 
 ## Adding a scanned material
 
-1. Place the source maps in a stable project-controlled location.
-2. Add a set to `config/terrain-assets.json`.
-3. Record the author, license name, and original source URL.
-4. Enable the set and assign it to one or more terrain profiles.
+1. Add a candidate set to `config/terrain-assets.json` with `enabled: false`.
+2. Record role, source directory, expected map filenames, author, license name,
+   original source URL, and acquisition notes.
+3. Run `npm run prepare:terrain-sources` to generate local source folders and
+   per-set `SOURCE.md` checklists under `assets-source/terrain/`.
+4. Drop the raw source maps into the generated source folder using the exact
+   configured filenames.
 5. Run:
 
 ```bash
@@ -33,13 +36,33 @@ npm run check:terrain-assets
 npm run build
 ```
 
-Example set:
+6. Visually inspect the generated outputs. Only then set `enabled: true` and
+   assign the set to a terrain profile slot.
+
+Candidate sets are validated even while disabled, but disabled sets are not
+included in the runtime manifest and do not require local source maps yet.
+
+## Current selected candidates
+
+PR #250 starts the overworld library with five disabled candidate slots:
+
+- `overworld-meadow-grass-01` → `grass`
+- `overworld-packed-dirt-01` → `dirt`
+- `overworld-river-gravel-01` → `sand`
+- `overworld-weathered-rock-01` → `rock`
+- `overworld-dry-field-litter-01` → `field`
+
+The first pass is intentionally metadata-first. Raw scanned texture binaries are
+large, ignored in `assets-source/terrain/`, and should only be committed after
+normalization if they are approved as runtime outputs.
+
+## Example set
 
 ```json
 {
   "sets": {
     "forest-loam-01": {
-      "enabled": true,
+      "enabled": false,
       "role": "dirt",
       "sourceDir": "assets-source/terrain/forest-loam-01",
       "resolution": 2048,
@@ -55,6 +78,12 @@ Example set:
         "name": "CC0 1.0",
         "author": "Creator name",
         "sourceUrl": "https://original-source.example/material"
+      },
+      "acquisition": {
+        "provider": "Provider name",
+        "licenseUrl": "https://original-source.example/license",
+        "status": "selected-awaiting-binaries",
+        "notes": "Why this material fits the target terrain slot."
       }
     }
   }
@@ -77,10 +106,7 @@ hero patches, decals, or unique landmarks rather than every streamed tile.
 
 ## Current phase boundary
 
-This first step establishes deterministic processing, licensing metadata, the
-runtime manifest, and a scene-owned texture cache. The next commits will:
-
-1. select and ingest the first approved CC0/scanned texture sets;
-2. add optional KTX2 variants;
-3. bind texture sets into `terrainMaterial.js` with procedural fallback;
-4. introduce near-camera height/parallax detail without changing collision.
+This phase selects and prepares the first scanned-material candidates. Later
+commits will enable approved runtime outputs, add optional KTX2 variants, bind
+texture sets into `terrainMaterial.js` with procedural fallback, and introduce
+near-camera height/parallax detail without changing collision.

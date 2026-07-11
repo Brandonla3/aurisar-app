@@ -7,9 +7,11 @@
  *   orm.png        — linear channels: R=AO, G=roughness, B=metalness
  *   height.png     — optional linear height
  *
- * Source files are declared in config/terrain-assets.json. Disabled or absent
- * sets are omitted from the runtime manifest, so the procedural terrain shader
- * remains the safe fallback until scanned assets are approved.
+ * Source files are declared in config/terrain-assets.json. Disabled sets are
+ * treated as selected candidates: their metadata is still validated, but their
+ * source maps are not required and they are omitted from the runtime manifest.
+ * This keeps the procedural terrain shader as the safe fallback until scanned
+ * assets are approved and dropped into assets-source/terrain/.
  *
  * Usage:
  *   npm run build:terrain-assets
@@ -59,6 +61,37 @@ function validateLicense(id, license) {
   requireString(license.author, `${id}.license.author`);
 }
 
+function validateMaps(id, maps) {
+  if (!maps || typeof maps !== 'object' || Array.isArray(maps)) fail(`${id}.maps is required`);
+  requireString(maps.albedo, `${id}.maps.albedo`);
+  requireString(maps.normal, `${id}.maps.normal`);
+  for (const map of Object.keys(maps)) {
+    if (!MAP_NAMES.includes(map)) fail(`${id}.maps.${map} is not supported`);
+  }
+}
+
+function validateAcquisition(id, acquisition) {
+  if (!acquisition) return;
+  if (typeof acquisition !== 'object' || Array.isArray(acquisition)) fail(`${id}.acquisition must be an object`);
+  requireString(acquisition.provider, `${id}.acquisition.provider`);
+  requireString(acquisition.status, `${id}.acquisition.status`);
+  if (acquisition.licenseUrl !== undefined) requireString(acquisition.licenseUrl, `${id}.acquisition.licenseUrl`);
+  if (acquisition.notes !== undefined) requireString(acquisition.notes, `${id}.acquisition.notes`);
+}
+
+function validateSet(id, def, defaults) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) fail(`invalid set id "${id}"`);
+  if (!def || typeof def !== 'object' || Array.isArray(def)) fail(`${id} must be an object`);
+  if (def.role !== undefined && !SLOT_NAMES.includes(def.role)) fail(`${id}.role must be one of: ${SLOT_NAMES.join(', ')}`);
+  requireString(def.sourceDir, `${id}.sourceDir`);
+  validateMaps(id, def.maps);
+
+  const resolution = def.resolution ?? defaults.resolution;
+  if (!isPowerOfTwo(resolution)) fail(`${id}.resolution must be a power of two from 256 to 8192`);
+  validateLicense(id, def.license);
+  validateAcquisition(id, def.acquisition);
+}
+
 function validateConfig(config) {
   if (!config || typeof config !== 'object') fail('config must be an object');
   if (config.version !== 1) fail(`unsupported config version: ${config.version}`);
@@ -74,21 +107,7 @@ function validateConfig(config) {
   if (!config.profiles || typeof config.profiles !== 'object' || Array.isArray(config.profiles)) fail('profiles must be an object');
 
   for (const [id, def] of Object.entries(config.sets)) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) fail(`invalid set id "${id}"`);
-    if (!def || typeof def !== 'object') fail(`${id} must be an object`);
-    if (def.enabled === false) continue;
-
-    requireString(def.sourceDir, `${id}.sourceDir`);
-    if (!def.maps || typeof def.maps !== 'object') fail(`${id}.maps is required`);
-    requireString(def.maps.albedo, `${id}.maps.albedo`);
-    requireString(def.maps.normal, `${id}.maps.normal`);
-    for (const map of Object.keys(def.maps)) {
-      if (!MAP_NAMES.includes(map)) fail(`${id}.maps.${map} is not supported`);
-    }
-
-    const resolution = def.resolution ?? config.defaults.resolution;
-    if (!isPowerOfTwo(resolution)) fail(`${id}.resolution must be a power of two from 256 to 8192`);
-    validateLicense(id, def.license);
+    validateSet(id, def, config.defaults);
   }
 
   for (const [profileName, profile] of Object.entries(config.profiles)) {
@@ -97,6 +116,7 @@ function validateConfig(config) {
       const value = profile[slot] ?? null;
       if (value !== null && typeof value !== 'string') fail(`profiles.${profileName}.${slot} must be a set id or null`);
       if (value !== null && !Object.hasOwn(config.sets, value)) fail(`profiles.${profileName}.${slot} references unknown set "${value}"`);
+      if (value !== null && config.sets[value]?.enabled === false) fail(`profiles.${profileName}.${slot} references disabled set "${value}"`);
     }
   }
 }
@@ -234,13 +254,13 @@ async function main() {
     if (!await exists(manifestPath)) fail(`runtime manifest is missing: ${manifestPath}`);
     const current = await readFile(manifestPath, 'utf8');
     if (current !== serialized) fail('runtime manifest is stale; run npm run build:terrain-assets');
-    console.log(`[terrain-assets] OK — ${enabledEntries.length} enabled set(s), manifest is current`);
+    console.log(`[terrain-assets] OK — ${enabledEntries.length} enabled set(s), ${Object.keys(config.sets).length} selected candidate(s), manifest is current`);
     return;
   }
 
   await mkdir(dirname(manifestPath), { recursive: true });
   await writeFile(manifestPath, serialized);
-  console.log(`[terrain-assets] Built ${enabledEntries.length} set(s) → ${config.output.directory}`);
+  console.log(`[terrain-assets] Built ${enabledEntries.length} enabled set(s) / ${Object.keys(config.sets).length} selected candidate(s) → ${config.output.directory}`);
 }
 
 main().catch((error) => {
