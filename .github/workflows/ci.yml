@@ -38,3 +38,14 @@ jobs:
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Upload generated terrain assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: terrain-assets-${{ github.sha }}
+          path: |
+            public/assets/terrain/manifest.json
+            public/assets/terrain/generated/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
