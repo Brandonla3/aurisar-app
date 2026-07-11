@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "generatedAt": null,
+  "sets": {},
+  "profiles": {
+    "overworld": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "mountain": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "forest": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "castle": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "dungeon": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    }
+  }
+}
