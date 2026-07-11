@@ -1,38 +1,60 @@
 # Terrain Source Assets
 
-This directory is the local staging area for raw scanned or authored terrain PBR maps before they are normalized into `public/assets/terrain/generated/`.
+This directory is the local staging area for raw scanned or authored terrain PBR
+maps before they are normalized into `public/assets/terrain/generated/`.
 
-Raw source maps are intentionally ignored by git because they can be large and may be replaced frequently during art direction. Commit only this README, candidate metadata in `config/terrain-assets.json`, and the generated runtime outputs once a set is approved.
+Raw source maps are intentionally ignored by git. Locked sources are reproduced
+from acquisition metadata in `config/terrain-assets.json`; generated runtime maps
+are also ignored and published as CI artifacts.
 
-## Workflow
+## Enabled-source workflow
 
-1. Run `npm run prepare:terrain-sources` to create candidate folders and `SOURCE.md` instructions.
-2. For a locked downloadable source set, run:
+Run:
 
 ```bash
-npm run fetch:terrain-source -- overworld-meadow-grass-01
-npm run check:terrain-source -- overworld-meadow-grass-01
+npm run sync:terrain-assets
 ```
 
-3. For manually acquired sources, drop maps into each generated candidate folder using the exact filenames listed in that folder's `SOURCE.md`.
-4. Run `npm run build:terrain-assets`.
-5. Inspect the generated files under `public/assets/terrain/generated/<set-id>/`.
-6. Set the selected candidate to `enabled: true` and assign it to the correct profile slot only after visual QA.
+The sync command checks every enabled terrain set. Missing locked sources are
+downloaded and extracted; existing local maps are reused. The command then
+normalizes all enabled sets and regenerates the runtime manifest.
 
-## First locked source
+`npm run dev` and `npm run build` invoke this automatically through `predev` and
+`prebuild`.
 
-`overworld-meadow-grass-01` is locked to ambientCG `Ground037` as the first grass/organic overworld baseline. The fetch script downloads the declared 2K JPG package, extracts only the required maps, and renames them into the standard terrain pipeline filenames.
+To verify an already synchronized checkout without downloading:
 
-The set remains disabled until the generated runtime output is inspected and approved.
+```bash
+npm run sync:terrain-assets:check
+```
 
-## Expected map names
+## Manual candidate workflow
 
-The current terrain pipeline expects:
+1. Run `npm run prepare:terrain-sources` to create candidate folders and
+   `SOURCE.md` instructions.
+2. For a locked source, run:
+
+```bash
+npm run fetch:terrain-source -- <set-id>
+npm run check:terrain-source -- <set-id>
+```
+
+3. For a manually acquired source, place maps in the configured source folder.
+4. Run `npm run sync:terrain-assets` and inspect the generated output.
+5. Enable the candidate and assign it to a profile slot only after review.
+
+## First enabled source
+
+`overworld-meadow-grass-01` is locked to ambientCG `Ground037` and assigned to
+the overworld grass slot. The source fetch uses the declared 2K JPG archive and
+extracts:
 
 - `albedo.jpg`
-- `normal.png`
+- `normal.jpg`
 - `ao.jpg`
 - `roughness.jpg`
-- `height.png` when the source material includes usable displacement or parallax data
+- `height.jpg`
 
-The build step repacks those maps into the runtime contract: sRGB basecolor, linear normal, packed ORM, and optional height.
+The normalization build converts those source maps into the runtime contract:
+sRGB `basecolor.jpg`, linear `normal.png`, packed `orm.png`, and linear
+`height.png`.
