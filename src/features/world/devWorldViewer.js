@@ -40,10 +40,6 @@ const scene = new BabylonWorldScene(
   },
 );
 
-// Dev/QA: expose the scene so headless screenshot harnesses can drive an
-// in-engine render-target capture (reliable under software WebGL).
-if (typeof window !== 'undefined') window.__ashScene = scene;
-
 // Spawn override once the avatar exists (castle testing: ?pos=140,20).
 const posParam = params.get('pos');
 if (posParam) {
@@ -79,7 +75,9 @@ setInterval(() => {
     `bLim=${scene._camera.lowerBetaLimit?.toFixed(2)}..${scene._camera.upperBetaLimit?.toFixed(2)}`;
 }, 250);
 
-window.__worldScene = scene; // console access for debugging
+// Console access for debugging + the handle headless screenshot/QA harnesses
+// use to drive the camera under software WebGL.
+window.__worldScene = scene;
 
 // ?preset=mountain|forest|castle|dungeon — dev-only: swap all streamed ground
 // tiles onto a non-default terrain preset once they exist, for shader/visual
