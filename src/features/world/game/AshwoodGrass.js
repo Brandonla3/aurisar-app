@@ -18,7 +18,7 @@
 
 /* global BABYLON */
 
-import { hash2 } from '../worldgen/index.js';
+import { hash2, computeGroundSplat } from '../worldgen/index.js';
 import { buildBladeClusterVertexData, createGrassMaterial } from './grassBlades.js';
 
 // Tier-scaled geometry, ring, and per-cell blade count. perCell is the density
@@ -83,6 +83,9 @@ export class AshwoodGrass {
     this.cap = (2 * n + 1) * (2 * n + 1) * this._maxNb;
     this._mats = new Float32Array(this.cap * 16);
     this._cols = new Float32Array(this.cap * 4);
+    // Reused scratch for computeGroundSplat's biome-colour out-param (avoids
+    // an allocation per gated cell during _rebuild).
+    this._bc = { r: 0, g: 0, b: 0 };
 
     this._observer = scene.onBeforeRenderObservable.add(() => this._update());
   }
@@ -139,15 +142,24 @@ export class AshwoodGrass {
         if (ccx * ccx + ccz * ccz > worldR2) continue;
         const bi = wg.biomeAt(ccx, ccz);
         if (bi.grass <= 0) continue;
-        if (wg.trailDirtAt(ccx, ccz) > 0.22) continue;
         if (wg.lakeWaterDepthAt(ccx, ccz) > 0.02) continue;
-        if (wg.lakeShoreAt(ccx, ccz) > 0.4) continue; // bare beach sand strip
         if (wg.inForest(ccx, ccz)) continue; // forest floor has its own brush
+
+        // Bare-ground presence at this cell (trail dirt core, beach sand,
+        // exposed rock, dry field) — the SAME composition the terrain shader
+        // paints (computeGroundSplat), so blade density and ground paint
+        // always agree. Thins continuously instead of a hard on/off cutoff,
+        // so dirt/sand/rock/field actually show through at the field's edges
+        // instead of being hidden under a wall of full-density blades.
+        const gs = computeGroundSplat(wg, ccx, ccz, this._bc);
+        const bareCover = Math.min(1, gs.dirt + gs.sand + gs.rock * 0.9 + gs.field * 0.35);
+        if (bareCover > 0.9) continue; // fully bare ground — no blades at all
+
         const cellY = wg.surfaceY(ccx, ccz); // one height sample per cell (blades are short)
         const gc = bi.grassCol;
-        // Blade count scales with the biome's grass density, floored so even
-        // sparse biomes keep a base cover.
-        const grassDensity = Math.max(0.35, Math.min(1.15, bi.grass));
+        // Blade count scales with the biome's grass density (floored so even
+        // sparse biomes keep a base cover) and thins further over bare ground.
+        const grassDensity = Math.max(0.35, Math.min(1.15, bi.grass)) * (1 - bareCover * 0.88);
         const nb = Math.max(2, Math.round(perCell * (0.45 + grassDensity * 0.7)));
 
         for (let b = 0; b < nb && i < cap; b++) {
