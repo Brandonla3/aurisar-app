@@ -17,6 +17,8 @@
     "emit:world-chests:check": "node scripts/emit_world_chests.mjs --check",
     "build:terrain-assets": "node scripts/build_terrain_assets.mjs",
     "check:terrain-assets": "node scripts/build_terrain_assets.mjs --check",
+    "prepare:terrain-sources": "node scripts/prepare_terrain_sources.mjs",
+    "check:terrain-sources": "node scripts/prepare_terrain_sources.mjs --check",
     "prebuild": "npm run build:terrain-assets && npm run emit:castle && npm run emit:world-chests && npm run sync:content",
     "build:glb": "node scripts/build_glb_assets.mjs",
     "build:sentinel": "node scripts/build_gilded_sentinel.mjs",
