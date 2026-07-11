@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "output": {
+    "directory": "public/assets/terrain/generated",
+    "manifest": "public/assets/terrain/manifest.json",
+    "publicBaseUrl": "/assets/terrain/generated"
+  },
+  "defaults": {
+    "resolution": 2048,
+    "tileMeters": 4,
+    "anisotropy": 8,
+    "baseColorQuality": 90,
+    "roughness": 0.9
+  },
+  "sets": {},
+  "profiles": {
+    "overworld": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "mountain": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "forest": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "castle": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    },
+    "dungeon": {
+      "grass": null,
+      "dirt": null,
+      "sand": null,
+      "rock": null,
+      "field": null
+    }
+  }
+}
