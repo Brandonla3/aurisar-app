@@ -21,8 +21,12 @@ export/
 # Locally-installed agent skill packs (dev-machine tooling, not app code).
 .claude/skills/
 
-# Raw terrain source scans are local/heavy inputs. Commit only processed runtime
-# outputs and text docs; keep the raw download/source directories out of git.
+# Raw terrain source scans are local/heavy inputs. Commit only text metadata and
+# reproduce the sources through the locked acquisition scripts.
 assets-source/terrain/**
 !assets-source/terrain/README.md
 !assets-source/terrain/.gitkeep
+
+# Runtime terrain maps are deterministic build products. CI publishes them as an
+# artifact and Vite/production builds regenerate them through predev/prebuild.
+public/assets/terrain/generated/**
