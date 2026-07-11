@@ -34,6 +34,9 @@ const scene = new BabylonWorldScene(
   {
     startTimeOfDay: parseFloat(params.get('tod') ?? '10.5'),
     dayLengthSec:   parseFloat(params.get('daylen') ?? '1200'),
+    // ?tier=high|low|mobile — force a quality tier (QA of the terrain shader
+    // permutations); default lets the scene auto-detect from device caps.
+    qualityTier:    params.get('tier') || undefined,
   },
 );
 
@@ -72,7 +75,30 @@ setInterval(() => {
     `bLim=${scene._camera.lowerBetaLimit?.toFixed(2)}..${scene._camera.upperBetaLimit?.toFixed(2)}`;
 }, 250);
 
-window.__worldScene = scene; // console access for debugging
+// Console access for debugging + the handle headless screenshot/QA harnesses
+// use to drive the camera under software WebGL.
+window.__worldScene = scene;
+
+// ?preset=mountain|forest|castle|dungeon — dev-only: swap all streamed ground
+// tiles onto a non-default terrain preset once they exist, for shader/visual
+// QA of createTerrainMaterial's preset system (the live tile provider itself
+// never requests a preset — presets are for future dungeon/castle/mountain
+// zones, so nothing else exercises this path yet).
+const presetParam = params.get('preset');
+if (presetParam) {
+  import('./game/terrainMaterial.js').then(({ createTerrainMaterial }) => {
+    const presetMat = createTerrainMaterial(scene.scene, {
+      tier: scene._qualityTier,
+      preset: presetParam,
+    });
+    const swap = setInterval(() => {
+      const tiles = scene.scene.meshes.filter((m) => /^tile_.*_ground$/.test(m.name));
+      if (!tiles.length) return;
+      clearInterval(swap);
+      for (const t of tiles) t.material = presetMat;
+    }, 300);
+  });
+}
 
 // ?nav=1 — subsampled walkability overlay once the castle is built (dev only).
 if (params.has('nav')) {

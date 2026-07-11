@@ -16,20 +16,14 @@
 
 /* global BABYLON */
 
-import { hash2 } from '../worldgen/index.js';
+import { hash2, computeGroundSplat } from '../worldgen/index.js';
 import { streamingParams, tileBounds } from './tileMath.js';
 import { buildPropTemplates, buildTileProps } from './ashwoodPropMeshes.js';
+import { createTerrainMaterial } from '../game/terrainMaterial.js';
 
 // 96 → ~2.7m vertex spacing on a 256m tile (97² = 9.4k verts). The mountain
 // switchbacks (12-24u wide) and the lake rim read correctly at this density.
 const DEFAULT_SUBDIVISIONS = 96;
-
-// Grass texture repeats per tile. Integer ⇒ the world-aligned UVs stay
-// continuous across tile borders. 256m / 24 ≈ 10.7m period — the Meshy-derived
-// texture has far fewer, larger blades per repeat than the old grasslight
-// lawn (which used 9 repeats), so it needs a denser tiling to read at a
-// plausible blade scale from player height.
-const GRASS_REPEATS_PER_TILE = 24;
 
 export class AshwoodTileProvider {
   /**
@@ -63,20 +57,12 @@ export class AshwoodTileProvider {
       ground = new BABYLON.StandardMaterial('ashwood_ground', scene);
       ground.specularColor = new BABYLON.Color3(0, 0, 0);
     } else {
-      ground = new BABYLON.PBRMaterial('ashwood_ground', scene);
-      ground.metallic = 0;
-      ground.roughness = 0.95;
-      ground.specularIntensity = 0.4;
-      ground.enableSpecularAntiAliasing = true;
-      const grassTex = new BABYLON.Texture('/assets/textures/grass-meshy.jpg', scene);
-      grassTex.uScale = GRASS_REPEATS_PER_TILE;
-      grassTex.vScale = GRASS_REPEATS_PER_TILE;
-      ground.albedoTexture = grassTex;        // modulated by biome vertex colors
-      const grassNm = new BABYLON.Texture('/assets/textures/grass-meshy-nm.jpg', scene);
-      grassNm.uScale = GRASS_REPEATS_PER_TILE;
-      grassNm.vScale = GRASS_REPEATS_PER_TILE;
-      grassNm.level = 0.85;
-      ground.bumpTexture = grassNm;
+      // Splat-blended PBR terrain: fully procedural grass/dirt/rock/sand/field,
+      // blended per-fragment by the per-vertex terrainSplat weights baked in
+      // _buildGround plus in-shader slope. Keeps all PBR lighting/shadows/fog.
+      ground = createTerrainMaterial(scene, {
+        tier: scene.metadata?.ashwood?.qualityTier,
+      });
     }
 
     let water, lakeWater, streamWater;
@@ -171,6 +157,9 @@ export class AshwoodTileProvider {
     const normals = ground.getVerticesData(BABYLON.VertexBuffer.NormalKind);
     const count = positions.length / 3;
     const colors = new Float32Array(count * 4);
+    // Runtime only: per-vertex splat weights (dirt, sand, rock, field) read by
+    // the terrain shader. Bake mode keeps the flat vertex-colour washes instead.
+    const splat = this.bake ? null : new Float32Array(count * 4);
 
     // Scratch objects reused across vertices (worldgen colors are engine-free
     // {r,g,b} mutables).
@@ -195,26 +184,33 @@ export class AshwoodTileProvider {
       normals[i * 3 + 1] = inv;
       normals[i * 3 + 2] = -dhdz * inv;
 
-      // Ported ground-color pass: biome IDW blend → beach sand → lakebed
-      // silt → trail dirt → mountain stream wet stone. Sand goes on before
-      // silt so the beach band rings the waterline and stays visible through
-      // the shallows, while deeper water still darkens to silt. A touch of
-      // hash mottling keeps the strip from reading as a flat painted ring.
-      wg.biomeColorAt(wx, wz, bc);
-      const sh = wg.lakeShoreAt(wx, wz);
-      if (sh > 0) {
-        lerpRgb(bc, sand, sh * (0.78 + 0.16 * hash2(wx * 0.9, wz * 0.9)));
-      }
-      const wd = wg.lakeWaterDepthAt(wx, wz);
-      if (wd > 0) {
-        const k = Math.min(1, wd / 1.8);
-        lerpRgb(bc, silt, 0.35 + 0.45 * k);
-      }
-      const td = wg.trailDirtAt(wx, wz);
-      if (td > 0) lerpRgb(bc, dirt, td * 0.85);
       const sm = wg.mtnStreamMask?.(wx, wz) ?? 0;
-      if (sm > 0) {
-        lerpRgb(bc, wet, sm * (0.38 + 0.18 * hash2(wx * 0.48, wz * 0.48)));
+
+      if (this.bake) {
+        // Baked GLB has no runtime shader, so it keeps the flat vertex-colour
+        // washes (ported ground pass): biome → beach sand → lakebed silt →
+        // trail dirt → mountain stream wet stone. Sand before silt so the beach
+        // band rings the waterline and stays visible through the shallows.
+        wg.biomeColorAt(wx, wz, bc);
+        const sh = wg.lakeShoreAt(wx, wz);
+        const td = wg.trailDirtAt(wx, wz);
+        const wd = wg.lakeWaterDepthAt(wx, wz);
+        if (sh > 0) lerpRgb(bc, sand, sh * (0.78 + 0.16 * hash2(wx * 0.9, wz * 0.9)));
+        if (wd > 0) { const k = Math.min(1, wd / 1.8); lerpRgb(bc, silt, 0.35 + 0.45 * k); }
+        if (td > 0) lerpRgb(bc, dirt, td * 0.85);
+        if (sm > 0) lerpRgb(bc, wet, sm * (0.38 + 0.18 * hash2(wx * 0.48, wz * 0.48)));
+      } else {
+        // Runtime: the same ground-splat composition that thins AshwoodGrass's
+        // blade density (so what's painted and what's covered in blades always
+        // agree) drives real splat surfaces here. Slope-driven rock is added
+        // in the shader; grass is the remainder (baseline weight 1.0 there).
+        const gs = computeGroundSplat(wg, wx, wz, bc);
+        splat[i * 4]     = gs.dirt;
+        splat[i * 4 + 1] = gs.sand;
+        splat[i * 4 + 2] = gs.rock;
+        splat[i * 4 + 3] = gs.field;
+        // A faint wet darkening near mountain streams still reads under the shader.
+        if (sm > 0) lerpRgb(bc, wet, sm * 0.25);
       }
 
       colors[i * 4]     = bc.r;
@@ -229,6 +225,7 @@ export class AshwoodTileProvider {
     ground.setVerticesData(BABYLON.VertexBuffer.PositionKind, positions, false);
     ground.setVerticesData(BABYLON.VertexBuffer.NormalKind, normals, false);
     ground.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, false, 4);
+    if (splat) ground.setVerticesData('terrainSplat', splat, false, 4);
     ground.refreshBoundingInfo();
 
     ground.position.x = cx;

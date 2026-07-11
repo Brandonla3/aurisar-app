@@ -21,8 +21,9 @@ import { createBiomes } from './biomes.js';
 import { createTrails } from './trails.js';
 import { generateSites, sitesInBounds } from './sites.js';
 import { buildForestLayout, generateForestSites } from './forest.js';
+import { computeGroundSplat } from './groundSplat.js';
 
-export { mulberry32, hash2, sstep, smoother, sitesInBounds };
+export { mulberry32, hash2, sstep, smoother, sitesInBounds, computeGroundSplat };
 
 export function createWorldgen(config) {
   const zones = createZones(config);

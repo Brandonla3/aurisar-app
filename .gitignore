@@ -18,3 +18,5 @@ coverage/
 __pycache__/
 *.pyc
 export/
+# Locally-installed agent skill packs (dev-machine tooling, not app code).
+.claude/skills/
