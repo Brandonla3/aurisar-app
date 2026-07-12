@@ -15,6 +15,25 @@
   from = "/assets/*"
   status = 404
 
+# Raw Radiance HDR panoramas require Babylon to run a GPU PMREM/prefilter
+# render-target pass at startup. That pass fails on the affected desktop
+# WebGL2 path and loses the context. Keep raw authoring inputs out of the
+# runtime surface; production may only use prefiltered .env assets.
+[[redirects]]
+  from = "/env/overworld_day.hdr"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/env/overworld_night.hdr"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/env/dungeon_dim.hdr"
+  status = 404
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
