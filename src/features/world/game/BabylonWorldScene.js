@@ -405,9 +405,10 @@ class LightingManager {
 
     // DefaultRenderingPipeline is desktop-only. On mobile WebGL2 it may succeed
     // in construction (no exception) but produce a black render at frame time
-    // due to missing half-float / float render-target extensions. Skip it
-    // entirely on mobile and go straight to the lightweight fallback path.
-    if (!this._isMobile) {
+    // due to missing half-float / float render-target extensions. Skip it on
+    // mobile — and on a desktop dropped to the 'mobile' tier by graphics
+    // safe-mode — and go straight to the lightweight fallback path.
+    if (!this._isMobile && this._qualityTier !== 'mobile') {
       // High bloom threshold + low weight so daylight scene surfaces don't
       // trigger bloom — only intentional emissives (portal, magic accents)
       // pass the threshold. The earlier 0.88 threshold was lifted from a
@@ -811,6 +812,26 @@ function saveGfxPrefs(prefs) {
   catch { /* quota / private mode */ }
 }
 
+// ── Adaptive graphics safe-mode ──────────────────────────────────────────────
+// Desktop picks its effect tier from WebGL2 *feature* detection, which every
+// desktop GPU passes — so a weak/integrated/software GPU gets the same maximal
+// stack (HDR pipeline + SSAO2 + cascaded shadows + heavy terrain shader) as a
+// discrete card and can lose the WebGL context (driver TDR / VRAM exhaustion).
+// The safe level escalates on each unrecovered context loss and is persisted,
+// so a reload comes back in a lighter configuration until the world is stable;
+// it decays again after a crash-free run so capable machines drift back to full
+// quality.
+//   0 = full (GPU-detected)     1 = force ≤ low  (no SSAO2, classic shadows)
+//   2 = force mobile path       3 = + lower resolution + no shadows
+const MAX_SAFE_LEVEL = 3;
+function loadSafeLevel() {
+  const v = Number(loadGfxPrefs().safeLevel);
+  return Number.isFinite(v) ? Math.max(0, Math.min(MAX_SAFE_LEVEL, Math.round(v))) : 0;
+}
+function saveSafeLevel(level) {
+  saveGfxPrefs({ ...loadGfxPrefs(), safeLevel: Math.max(0, Math.min(MAX_SAFE_LEVEL, level)) });
+}
+
 // ── Dungeon entrance constants ───────────────────────────────────────────────
 const DUNGEON_ENTRANCE      = Object.freeze({ x: 0, z: -37 });
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
@@ -913,26 +934,32 @@ export class BabylonWorldScene {
 
   _initSync() {
     this.engine = this._createEngine();
-    // A lost context (mobile GPU memory pressure, tab backgrounding) is
-    // recoverable — Babylon recreates GPU resources on restore by default;
-    // log the transitions so a stall is visible rather than silent.
-    this.engine.onContextLostObservable.add(() => {
-      if (typeof console !== 'undefined') console.warn('[Aurisar] WebGL context lost — attempting automatic restore.');
-    });
-    this.engine.onContextRestoredObservable.add(() => {
-      if (typeof console !== 'undefined') console.info('[Aurisar] WebGL context restored.');
-    });
+
+    // Persisted safe-mode level from prior context losses (see loadSafeLevel).
+    // Read once here so the DPR cap below, _resolveQualityTier, and _setupShadows
+    // all agree on the same level for this load.
+    this._safeLevel    = loadSafeLevel();
+    this._ctxLossCount = 0;
+
+    // A lost context can be a recoverable blip (tab backgrounding) or a hard
+    // failure (driver TDR / VRAM exhaustion from too heavy a stack). Babylon
+    // recreates GPU resources on restore by default; _handleContextLost adds the
+    // escalating safe-mode fallback + reload for when a restore doesn't stick.
+    this.engine.onContextLostObservable.add(() => this._handleContextLost());
+    this.engine.onContextRestoredObservable.add(() => this._handleContextRestored());
 
     // Desktop only: cap effective DPR. Uncapped, a 4K / Retina display renders
     // at native device-pixel-ratio (often 2× or higher), quadrupling per-frame
     // pixel work and tipping the HDR pipeline + shadow blur passes into
     // mid-teen fps on integrated GPUs. Mobile is left at the device DPR — it
     // already performs fine and capping there is a visible quality regression
-    // (Codex P2 on #193).
+    // (Codex P2 on #193). Deep safe levels tighten the cap further so a
+    // struggling GPU pushes fewer pixels per frame.
     if (!this._isMobile) {
+      const safeCap = this._safeLevel >= 3 ? 0.75 : this._safeLevel >= 2 ? 1.0 : 1.5;
       const dpr = Math.min(
         (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
-        1.5
+        safeCap
       );
       this.engine.setHardwareScalingLevel(1 / dpr);
     }
@@ -1027,6 +1054,11 @@ export class BabylonWorldScene {
 
     this._onResize = () => this.engine.resize();
     window.addEventListener('resize', this._onResize);
+
+    // After a crash-free run, relax the safe level by one so a machine that was
+    // downgraded by a transient stall drifts back toward full quality on its
+    // next visit (takes effect on the next load — never mid-session).
+    this._armGraphicsStabilityDecay();
   }
 
   // ── Async character bootstrap ──────────────────────────────────────────────
@@ -1134,11 +1166,160 @@ export class BabylonWorldScene {
   _resolveQualityTier() {
     if (this.options.qualityTier) return this.options.qualityTier;
     if (this._isMobile) return 'mobile';
+
     const caps = this.engine?.getCaps?.() ?? null;
     const canHeavy = !!caps &&
       (caps.textureHalfFloatRender || caps.textureFloatRender) &&
       !!caps.drawBuffersExtension;
-    return canHeavy ? 'high' : 'low';
+
+    // WebGL2 feature checks alone can't tell an RTX card from an Intel iGPU or a
+    // software rasterizer — they all report the same caps. Sniff the actual
+    // renderer string so known-slow GPUs never start on the maximal stack. When
+    // the browser masks the string this is a no-op and the context-loss
+    // watchdog below is the fallback safety net.
+    const renderer = this._detectGpuRenderer();
+    this._gpuRenderer = renderer;
+    const r = (renderer ?? '').toLowerCase();
+    const isSoftware = /swiftshader|llvmpipe|softpipe|basic render|microsoft basic|software|paravirtual/.test(r);
+    // Shared-memory Intel integrated graphics (the UHD/HD line) can't sustain
+    // SSAO2 + cascaded shadows + the heavy terrain shader together — this is the
+    // classic "works on my discrete card, dies on the office desktop" GPU. Start
+    // it one tier down. Iris Xe / Arc and discrete GPUs don't match and keep
+    // 'high'; the watchdog still catches anything 'low' can't handle.
+    const isWeakIntegrated = /intel.*\b(uhd|hd)\s*graphics/.test(r);
+
+    let tier = 'high';
+    if (!canHeavy || isWeakIntegrated) tier = 'low';
+    if (isSoftware) tier = 'mobile';
+
+    // Apply persisted safe-mode downgrades from prior unrecovered context
+    // losses, stepping DOWN from whatever the GPU-detected base tier is: level 1
+    // drops one tier, level ≥2 pins to the mobile render path (which also sheds
+    // the heavy DefaultRenderingPipeline — see LightingManager._setupPipelines).
+    // Level 3 additionally cuts shadows + resolution (_setupShadows / _initSync).
+    const safe = this._safeLevel ?? 0;
+    if (safe > 0) {
+      const order = ['high', 'low', 'mobile'];
+      const idx = Math.min(order.length - 1, Math.max(0, order.indexOf(tier)) + Math.min(safe, 2));
+      tier = order[idx];
+    }
+
+    if (typeof console !== 'undefined') {
+      console.info(
+        `[Aurisar] GPU: ${renderer ?? 'unknown'} — quality tier: ${tier}` +
+        (safe ? ` (graphics safe level ${safe})` : '')
+      );
+    }
+    return tier;
+  }
+
+  // Real GPU name via WEBGL_debug_renderer_info. Babylon exposes the unmasked
+  // value through getGlInfo(); fall back to the raw extension, then to null when
+  // the browser masks it entirely.
+  _detectGpuRenderer() {
+    try {
+      const info = this.engine?.getGlInfo?.();
+      if (info?.renderer) return info.renderer;
+    } catch { /* fall through */ }
+    try {
+      const gl = this.engine?._gl;
+      const ext = gl?.getExtension?.('WEBGL_debug_renderer_info');
+      if (ext) return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || null;
+    } catch { /* unavailable */ }
+    return null;
+  }
+
+  // ── Adaptive graphics recovery ─────────────────────────────────────────────
+
+  _handleContextLost() {
+    this._ctxLossCount = (this._ctxLossCount ?? 0) + 1;
+    if (typeof console !== 'undefined') {
+      console.warn(`[Aurisar] WebGL context lost (#${this._ctxLossCount}) — attempting recovery.`);
+    }
+
+    // Already at the lightest configuration: nothing left to shed, so let
+    // Babylon's native restore try rather than reload into the same tier and
+    // risk a loop.
+    if ((this._safeLevel ?? 0) >= MAX_SAFE_LEVEL) return;
+
+    // A second loss in one session means the current tier is genuinely
+    // unsustainable (a "restore" that didn't hold) — step down and reload now.
+    if (this._ctxLossCount >= 2) { this._escalateGraphicsAndReload(); return; }
+
+    // First loss: give Babylon its auto-restore window. If the context comes
+    // back and holds, _handleContextRestored cancels this timer; otherwise we
+    // drop a level and reload.
+    if (this._recoveryTimer) return;
+    this._recoveryTimer = setTimeout(() => {
+      this._recoveryTimer = null;
+      this._escalateGraphicsAndReload();
+    }, 2500);
+  }
+
+  _handleContextRestored() {
+    if (typeof console !== 'undefined') console.info('[Aurisar] WebGL context restored.');
+    // Native restore fired — cancel the pending "it never came back" reload.
+    if (this._recoveryTimer) { clearTimeout(this._recoveryTimer); this._recoveryTimer = null; }
+
+    // A restore can be cosmetic: the engine reports back but custom pipelines
+    // stay detached and nothing actually draws. If we're not rendering a few
+    // seconds later, treat it as a hard failure and fall back a level.
+    if (this._restoreCheckTimer) clearTimeout(this._restoreCheckTimer);
+    this._restoreCheckTimer = setTimeout(() => {
+      this._restoreCheckTimer = null;
+      if (this._disposed) return;
+      const fps = this.engine?.getFps?.() ?? 60;
+      if (fps < 1 && (this._safeLevel ?? 0) < MAX_SAFE_LEVEL) this._escalateGraphicsAndReload();
+    }, 3000);
+  }
+
+  _escalateGraphicsAndReload() {
+    if (this._disposed || this._reloadInFlight) return;
+    this._reloadInFlight = true;
+    if (this._recoveryTimer)     { clearTimeout(this._recoveryTimer);     this._recoveryTimer = null; }
+    if (this._restoreCheckTimer) { clearTimeout(this._restoreCheckTimer); this._restoreCheckTimer = null; }
+
+    const next = Math.min(MAX_SAFE_LEVEL, (this._safeLevel ?? 0) + 1);
+    saveSafeLevel(next);
+    // Breadcrumb the app can read post-reload to toast "graphics reduced".
+    try { sessionStorage.setItem('aurisar.world.gfx.downgraded', String(next)); } catch { /* ignore */ }
+    if (typeof console !== 'undefined') {
+      console.warn(`[Aurisar] Reducing graphics to safe level ${next} and reloading to recover.`);
+    }
+    this.callbacks?.onGraphicsDowngrade?.(next);
+
+    // Reload rebuilds the whole stack at the lower tier through the existing,
+    // tested init path — far more reliable than tearing down SSAO2 / CSM / the
+    // pipeline in place. Guarded so the dev viewer and headless QA (which run
+    // under software WebGL on purpose) never reload.
+    const canReload = this.options.autoRecoverGraphics !== false &&
+      typeof window !== 'undefined' && window.location &&
+      typeof window.location.reload === 'function';
+    if (canReload) {
+      setTimeout(() => { if (!this._disposed) window.location.reload(); }, 1200);
+    }
+  }
+
+  // One-level relaxation after a stable, crash-free run so a machine downgraded
+  // by a one-off stall probes back toward full quality on its next visit.
+  _armGraphicsStabilityDecay() {
+    if ((this._safeLevel ?? 0) <= 0) return;
+    if (this.options.autoRecoverGraphics === false) return;
+    this._decayTimer = setTimeout(() => {
+      this._decayTimer = null;
+      if (this._disposed || this._ctxLossCount > 0) return;
+      saveSafeLevel((this._safeLevel ?? 0) - 1);
+      if (typeof console !== 'undefined') {
+        console.info('[Aurisar] Stable run — graphics safe level will relax on next load.');
+      }
+    }, 120000);
+  }
+
+  /** Menu hook: clear all safe-mode downgrades and reload at full quality. */
+  resetGraphicsQuality() {
+    saveSafeLevel(0);
+    try { sessionStorage.removeItem('aurisar.world.gfx.downgraded'); } catch { /* ignore */ }
+    if (typeof window !== 'undefined') window.location?.reload?.();
   }
 
   _setupCamera() {
@@ -1284,6 +1465,10 @@ export class BabylonWorldScene {
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
+    // Deepest safe level: no shadow pass at all. The shadow map + blur is a
+    // large per-frame GPU cost, and level 3 is the "just keep rendering" tier.
+    if ((this._safeLevel ?? 0) >= 3) { this._shadowGen = null; return; }
+
     // High tier: cascaded shadow maps. Multiple cascades pack resolution near
     // the third-person character where it reads, and hold up across the
     // streamed terrain instead of one blurry map. stabilizeCascades is the
@@ -2691,6 +2876,13 @@ export class BabylonWorldScene {
   // ── Dispose ────────────────────────────────────────────────────────────────
 
   dispose() {
+    // Mark disposed first so any in-flight graphics-recovery timers no-op
+    // instead of reloading the page after a React unmount.
+    this._disposed = true;
+    if (this._recoveryTimer)     { clearTimeout(this._recoveryTimer);     this._recoveryTimer = null; }
+    if (this._restoreCheckTimer) { clearTimeout(this._restoreCheckTimer); this._restoreCheckTimer = null; }
+    if (this._decayTimer)        { clearTimeout(this._decayTimer);        this._decayTimer = null; }
+
     window.removeEventListener('keydown', this._kd);
     window.removeEventListener('keyup',   this._ku);
     window.removeEventListener('resize',  this._onResize);

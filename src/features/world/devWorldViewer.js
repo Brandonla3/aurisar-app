@@ -37,6 +37,9 @@ const scene = new BabylonWorldScene(
     // ?tier=high|low|mobile — force a quality tier (QA of the terrain shader
     // permutations); default lets the scene auto-detect from device caps.
     qualityTier:    params.get('tier') || undefined,
+    // The dev viewer + headless screenshot harness run under software WebGL on
+    // purpose; never let a context loss reload the page out from under them.
+    autoRecoverGraphics: false,
   },
 );
 
