@@ -46,6 +46,7 @@ jobs:
           path: |
             public/assets/terrain/manifest.json
             public/assets/terrain/generated/
+            assets-source/terrain/**/ARCHIVE.sha256
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
