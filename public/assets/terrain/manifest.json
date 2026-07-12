@@ -1,10 +1,35 @@
 {
   "version": 1,
   "generatedAt": null,
-  "sets": {},
+  "sets": {
+    "overworld-meadow-grass-01": {
+      "id": "overworld-meadow-grass-01",
+      "role": "grass",
+      "tileMeters": 2.1,
+      "anisotropy": 8,
+      "maps": {
+        "baseColor": "/assets/terrain/generated/overworld-meadow-grass-01/basecolor.jpg",
+        "normal": "/assets/terrain/generated/overworld-meadow-grass-01/normal.png",
+        "orm": "/assets/terrain/generated/overworld-meadow-grass-01/orm.png",
+        "height": "/assets/terrain/generated/overworld-meadow-grass-01/height.png"
+      },
+      "channels": {
+        "orm": {
+          "r": "ambientOcclusion",
+          "g": "roughness",
+          "b": "metalness"
+        }
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "author": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/view?id=Ground037"
+      }
+    }
+  },
   "profiles": {
     "overworld": {
-      "grass": null,
+      "grass": "overworld-meadow-grass-01",
       "dirt": null,
       "sand": null,
       "rock": null,

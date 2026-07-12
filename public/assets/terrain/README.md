@@ -1,8 +1,9 @@
 # Terrain Asset Pipeline
 
 This directory is the runtime destination for scanned or authored terrain PBR
-materials. The live terrain remains fully procedural until a texture set is
-enabled in `config/terrain-assets.json`, so missing art never blocks the world.
+materials. Enabled source sets are fetched and normalized before development and
+production builds; the procedural terrain shader remains the rendering fallback
+until texture sampling is wired into `terrainMaterial.js`.
 
 ## Runtime contract
 
@@ -19,13 +20,44 @@ public/assets/terrain/generated/<set-id>/
 `manifest.json` maps those files to the five terrain slots used by the splat
 shader: `grass`, `dirt`, `sand`, `rock`, and `field`.
 
+Generated texture binaries are deterministic build products and are ignored by
+git. CI publishes the generated terrain package as an artifact for inspection.
+
+## Standard commands
+
+```bash
+npm run sync:terrain-assets
+npm run sync:terrain-assets:check
+npm run dev
+npm run build
+```
+
+`npm run dev` and `npm run build` invoke the terrain sync automatically through
+`predev` and `prebuild`.
+
+The sync step:
+
+1. reads enabled sets from `config/terrain-assets.json`;
+2. reuses cached local source maps when present;
+3. downloads missing locked source archives;
+4. extracts only the configured PBR maps;
+5. normalizes the maps through `build_terrain_assets.mjs`;
+6. regenerates `public/assets/terrain/manifest.json`.
+
+Use check mode when the sources and generated outputs are expected to already be
+present:
+
+```bash
+npm run sync:terrain-assets:check
+```
+
 ## Adding a scanned material
 
 1. Add a candidate set to `config/terrain-assets.json` with `enabled: false`.
-2. Record role, source directory, expected map filenames, author, license name,
-   original source URL, and acquisition notes.
+2. Record role, source directory, source filenames, author, license, original
+   source URL, acquisition status, and download metadata when available.
 3. Run `npm run prepare:terrain-sources` to generate local source folders and
-   per-set `SOURCE.md` checklists under `assets-source/terrain/`.
+   per-set `SOURCE.md` instructions.
 4. For a locked downloadable set, run:
 
 ```bash
@@ -33,25 +65,16 @@ npm run fetch:terrain-source -- <set-id>
 npm run check:terrain-source -- <set-id>
 ```
 
-5. For manually acquired sources, drop the raw source maps into the generated
-   source folder using the exact configured filenames.
-6. Run:
+5. For manually acquired sources, place maps in the configured source directory.
+6. Run `npm run sync:terrain-assets` and inspect the generated output.
+7. Enable the candidate and assign it to a profile slot only after review.
 
-```bash
-npm run build:terrain-assets
-npm run check:terrain-assets
-npm run build
-```
+Candidate metadata is validated even while disabled, but disabled candidates are
+not fetched, normalized, or included in the runtime manifest.
 
-7. Visually inspect the generated outputs. Only then set `enabled: true` and
-   assign the set to a terrain profile slot.
+## Current material status
 
-Candidate sets are validated even while disabled, but disabled sets are not
-included in the runtime manifest and do not require local source maps yet.
-
-## Current selected candidates
-
-PR #250 started the overworld library with five disabled candidate slots:
+The overworld candidate library contains:
 
 - `overworld-meadow-grass-01` → `grass`
 - `overworld-packed-dirt-01` → `dirt`
@@ -59,62 +82,14 @@ PR #250 started the overworld library with five disabled candidate slots:
 - `overworld-weathered-rock-01` → `rock`
 - `overworld-dry-field-litter-01` → `field`
 
-PR #251 locks `overworld-meadow-grass-01` to ambientCG `Ground037` and adds a
-repeatable fetch/extract workflow for that first source archive. The set remains
-disabled until the generated runtime maps are inspected and approved.
+`overworld-meadow-grass-01` is the first enabled set. It is locked to ambientCG
+`Ground037`, fetched as the 2K JPG archive, normalized into base color, normal,
+ORM and height maps, and assigned to `profiles.overworld.grass`.
 
-Raw scanned texture binaries are large, ignored in `assets-source/terrain/`, and
-should only be committed after normalization if they are approved as runtime
-outputs.
-
-## Example set
-
-```json
-{
-  "sets": {
-    "forest-loam-01": {
-      "enabled": false,
-      "role": "dirt",
-      "sourceDir": "assets-source/terrain/forest-loam-01",
-      "resolution": 2048,
-      "tileMeters": 3.5,
-      "maps": {
-        "albedo": "albedo.jpg",
-        "normal": "normal.png",
-        "ao": "ao.jpg",
-        "roughness": "roughness.jpg",
-        "height": "height.png"
-      },
-      "license": {
-        "name": "CC0 1.0",
-        "author": "Creator name",
-        "sourceUrl": "https://original-source.example/material"
-      },
-      "acquisition": {
-        "provider": "Provider name",
-        "licenseUrl": "https://original-source.example/license",
-        "status": "selected-awaiting-binaries",
-        "notes": "Why this material fits the target terrain slot.",
-        "download": {
-          "url": "https://original-source.example/material.zip",
-          "format": "2K-JPG.zip",
-          "maps": {
-            "albedo": "Source_Color.jpg",
-            "normal": "Source_NormalGL.jpg",
-            "ao": "Source_AmbientOcclusion.jpg",
-            "roughness": "Source_Roughness.jpg",
-            "height": "Source_Displacement.jpg"
-          }
-        }
-      }
-    }
-  }
-}
-```
+The remaining four candidates stay disabled until exact source assets are locked
+and reviewed.
 
 ## Art direction targets
-
-The first approved library should cover:
 
 - **Overworld:** short meadow grass, packed trail dirt, river gravel, weathered
   rock, and dry field litter.
@@ -123,12 +98,12 @@ The first approved library should cover:
 - **Castle:** compacted earth, crushed gravel, worn masonry, and mud.
 - **Dungeon:** damp stone, rubble, mineral staining, and puddled grime.
 
-Prefer seamless 2K source maps for general terrain. Reserve 4K assets for close
-hero patches, decals, or unique landmarks rather than every streamed tile.
+Prefer seamless 2K source maps for streamed terrain. Reserve 4K assets for close
+hero patches, decals, or unique landmarks.
 
-## Current phase boundary
+## Next phase boundary
 
-This phase selects and prepares the first scanned-material candidates. Later
-commits will enable approved runtime outputs, add optional KTX2 variants, bind
-texture sets into `terrainMaterial.js` with procedural fallback, and introduce
-near-camera height/parallax detail without changing collision.
+The next PR should connect `TerrainAssetLibrary` to `terrainMaterial.js` and use
+the enabled overworld grass set through world-space sampling, while retaining the
+procedural albedo and relief path when the manifest or textures cannot load.
+KTX2 variants and near-camera parallax follow after that integration is stable.

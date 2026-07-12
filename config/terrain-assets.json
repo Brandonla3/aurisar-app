@@ -14,17 +14,17 @@
   },
   "sets": {
     "overworld-meadow-grass-01": {
-      "enabled": false,
+      "enabled": true,
       "role": "grass",
       "sourceDir": "assets-source/terrain/overworld-meadow-grass-01",
       "resolution": 2048,
       "tileMeters": 2.1,
       "maps": {
         "albedo": "albedo.jpg",
-        "normal": "normal.png",
+        "normal": "normal.jpg",
         "ao": "ao.jpg",
         "roughness": "roughness.jpg",
-        "height": "height.png"
+        "height": "height.jpg"
       },
       "license": {
         "name": "CC0 1.0",
@@ -34,13 +34,14 @@
       "acquisition": {
         "provider": "ambientCG",
         "licenseUrl": "https://docs.ambientcg.com/license/",
-        "status": "source-locked-awaiting-local-fetch",
-        "notes": "First real overworld source lock. Ground037 is a photogrammetry-based grassy woodland/ground material with grass, moss, earth, and rough natural detail; use it as the initial grass/organic ground baseline before adding the dirt, gravel, rock, and field sets.",
+        "status": "enabled-build-synced",
+        "notes": "First enabled overworld terrain source. Ground037 is fetched on demand in clean development and production builds, normalized into the runtime contract, and assigned to the overworld grass slot. Shader sampling remains a separate integration step.",
         "assetId": "Ground037",
         "assetUrl": "https://ambientcg.com/view?id=Ground037",
         "download": {
           "url": "https://ambientCG.com/get?file=Ground037_2K-JPG.zip",
           "format": "2K-JPG.zip",
+          "sha256": "defa9f880ec692eb3ef5435fd7bc7b8721c0d577f7824ea18ac68537f01ab65b",
           "maps": {
             "albedo": "Ground037_2K-JPG_Color.jpg",
             "normal": "Ground037_2K-JPG_NormalGL.jpg",
@@ -154,7 +155,7 @@
   },
   "profiles": {
     "overworld": {
-      "grass": null,
+      "grass": "overworld-meadow-grass-01",
       "dirt": null,
       "sand": null,
       "rock": null,

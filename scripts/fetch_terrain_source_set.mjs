@@ -11,6 +11,7 @@
  *   npm run check:terrain-source -- overworld-meadow-grass-01
  */
 
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,10 @@ const checkOnly = process.argv.includes('--check');
 const positional = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 const requestedSetId = positional[0] ?? 'overworld-meadow-grass-01';
 const MAP_NAMES = ['albedo', 'normal', 'ao', 'roughness', 'height'];
+const DOWNLOAD_ATTEMPTS = 3;
+const DOWNLOAD_TIMEOUT_MS = 120_000;
+const ARCHIVE_DIGEST_FILENAME = 'ARCHIVE.sha256';
+const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
 function fail(message) {
   throw new Error(`[terrain-source] ${message}`);
@@ -39,6 +44,10 @@ async function exists(path) {
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
+}
+
+function sleep(ms) {
+  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
 function assertSafeTarget(sourceRoot, relativePath) {
@@ -131,9 +140,58 @@ async function checkSet(def, sourceRoot) {
 
 async function fetchArchive(url) {
   if (typeof fetch !== 'function') fail('global fetch is unavailable; use Node 18+');
-  const response = await fetch(url, { redirect: 'follow' });
-  if (!response.ok) fail(`download failed for ${url}: HTTP ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
+
+  let lastError = null;
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          accept: 'application/zip, application/octet-stream;q=0.9, */*;q=0.1',
+          'user-agent': 'AurisarTerrainPipeline/1.0',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const archive = Buffer.from(await response.arrayBuffer());
+      if (archive.length < 22) throw new Error(`archive is unexpectedly small (${archive.length} bytes)`);
+      return archive;
+    } catch (error) {
+      const message = error?.name === 'AbortError'
+        ? `timed out after ${DOWNLOAD_TIMEOUT_MS}ms`
+        : (error instanceof Error ? error.message : String(error));
+      lastError = new Error(message);
+      if (attempt < DOWNLOAD_ATTEMPTS) {
+        const delayMs = 1_000 * attempt;
+        console.warn(`[terrain-source] Download attempt ${attempt} failed (${message}); retrying in ${delayMs}ms`);
+        await sleep(delayMs);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  fail(`download failed for ${url} after ${DOWNLOAD_ATTEMPTS} attempts: ${lastError?.message ?? 'unknown error'}`);
+}
+
+function verifyArchiveHash(archive, expectedSha256) {
+  const digest = createHash('sha256').update(archive).digest('hex');
+  console.log(`[terrain-source] Archive SHA-256: ${digest}`);
+
+  if (expectedSha256 !== undefined) {
+    if (typeof expectedSha256 !== 'string' || !SHA256_PATTERN.test(expectedSha256)) {
+      fail('acquisition.download.sha256 must be a 64-character hexadecimal digest');
+    }
+    if (digest !== expectedSha256.toLowerCase()) {
+      fail(`archive SHA-256 mismatch: expected ${expectedSha256.toLowerCase()}, received ${digest}`);
+    }
+  }
+
+  return digest;
 }
 
 async function main() {
@@ -145,6 +203,9 @@ async function main() {
   if (!download?.url || typeof download.url !== 'string') fail(`${requestedSetId}.acquisition.download.url is required`);
   if (!download.maps || typeof download.maps !== 'object') fail(`${requestedSetId}.acquisition.download.maps is required`);
   if (!def.maps || typeof def.maps !== 'object') fail(`${requestedSetId}.maps is required`);
+  if (def.enabled !== false && !SHA256_PATTERN.test(download.sha256 ?? '')) {
+    fail(`${requestedSetId}.acquisition.download.sha256 is required for enabled remotely fetched sets`);
+  }
 
   const sourceRoot = resolve(repoRoot, def.sourceDir);
   if (checkOnly) {
@@ -155,6 +216,12 @@ async function main() {
   await mkdir(sourceRoot, { recursive: true });
   console.log(`[terrain-source] Downloading ${download.url}`);
   const archive = await fetchArchive(download.url);
+  const archiveSha256 = verifyArchiveHash(archive, download.sha256);
+  await writeFile(
+    resolve(sourceRoot, ARCHIVE_DIGEST_FILENAME),
+    `${archiveSha256}  ${download.format ?? download.url}\n`,
+    'utf8',
+  );
   const entries = readZipEntries(archive);
 
   for (const map of MAP_NAMES) {
