@@ -27,6 +27,7 @@ const MAP_NAMES = ['albedo', 'normal', 'ao', 'roughness', 'height'];
 const DOWNLOAD_ATTEMPTS = 3;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 const ARCHIVE_DIGEST_FILENAME = 'ARCHIVE.sha256';
+const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
 function fail(message) {
   throw new Error(`[terrain-source] ${message}`);
@@ -182,7 +183,7 @@ function verifyArchiveHash(archive, expectedSha256) {
   console.log(`[terrain-source] Archive SHA-256: ${digest}`);
 
   if (expectedSha256 !== undefined) {
-    if (typeof expectedSha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(expectedSha256)) {
+    if (typeof expectedSha256 !== 'string' || !SHA256_PATTERN.test(expectedSha256)) {
       fail('acquisition.download.sha256 must be a 64-character hexadecimal digest');
     }
     if (digest !== expectedSha256.toLowerCase()) {
@@ -202,6 +203,9 @@ async function main() {
   if (!download?.url || typeof download.url !== 'string') fail(`${requestedSetId}.acquisition.download.url is required`);
   if (!download.maps || typeof download.maps !== 'object') fail(`${requestedSetId}.acquisition.download.maps is required`);
   if (!def.maps || typeof def.maps !== 'object') fail(`${requestedSetId}.maps is required`);
+  if (def.enabled !== false && !SHA256_PATTERN.test(download.sha256 ?? '')) {
+    fail(`${requestedSetId}.acquisition.download.sha256 is required for enabled remotely fetched sets`);
+  }
 
   const sourceRoot = resolve(repoRoot, def.sourceDir);
   if (checkOnly) {
