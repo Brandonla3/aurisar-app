@@ -26,6 +26,7 @@ const requestedSetId = positional[0] ?? 'overworld-meadow-grass-01';
 const MAP_NAMES = ['albedo', 'normal', 'ao', 'roughness', 'height'];
 const DOWNLOAD_ATTEMPTS = 3;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
+const ARCHIVE_DIGEST_FILENAME = 'ARCHIVE.sha256';
 
 function fail(message) {
   throw new Error(`[terrain-source] ${message}`);
@@ -211,7 +212,12 @@ async function main() {
   await mkdir(sourceRoot, { recursive: true });
   console.log(`[terrain-source] Downloading ${download.url}`);
   const archive = await fetchArchive(download.url);
-  verifyArchiveHash(archive, download.sha256);
+  const archiveSha256 = verifyArchiveHash(archive, download.sha256);
+  await writeFile(
+    resolve(sourceRoot, ARCHIVE_DIGEST_FILENAME),
+    `${archiveSha256}  ${download.format ?? download.url}\n`,
+    'utf8',
+  );
   const entries = readZipEntries(archive);
 
   for (const map of MAP_NAMES) {
