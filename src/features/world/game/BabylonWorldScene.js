@@ -1242,8 +1242,9 @@ export class BabylonWorldScene {
     // risk a loop.
     if ((this._safeLevel ?? 0) >= MAX_SAFE_LEVEL) return;
 
-    // A second loss in one session means the current tier is genuinely
-    // unsustainable (a "restore" that didn't hold) — step down and reload now.
+    // A second loss before the prior one was confirmed recovered (the restore
+    // check resets this counter to 0) means the current tier is genuinely
+    // unsustainable — a "restore" that didn't hold — so step down and reload now.
     if (this._ctxLossCount >= 2) { this._escalateGraphicsAndReload(); return; }
 
     // First loss: give Babylon its auto-restore window. If the context comes
@@ -1269,7 +1270,16 @@ export class BabylonWorldScene {
       this._restoreCheckTimer = null;
       if (this._disposed) return;
       const fps = this.engine?.getFps?.() ?? 60;
-      if (fps < 1 && (this._safeLevel ?? 0) < MAX_SAFE_LEVEL) this._escalateGraphicsAndReload();
+      if (fps < 1 && (this._safeLevel ?? 0) < MAX_SAFE_LEVEL) {
+        this._escalateGraphicsAndReload();
+      } else {
+        // Restore held and we're rendering again — clear the counter so it
+        // tracks only *consecutive* unrecovered losses. Otherwise two
+        // independent benign losses across a long session (tab / GPU
+        // suspend-resume) would later trip the flapping path and needlessly
+        // downgrade + reload even though Babylon recovered from each.
+        this._ctxLossCount = 0;
+      }
     }, 3000);
   }
 
