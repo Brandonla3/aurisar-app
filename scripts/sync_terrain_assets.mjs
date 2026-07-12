@@ -21,6 +21,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 const configPath = resolve(repoRoot, 'config/terrain-assets.json');
 const checkOnly = process.argv.includes('--check');
+const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
 function fail(message) {
   throw new Error(`[terrain-sync] ${message}`);
@@ -60,6 +61,22 @@ function runNodeScript(scriptName, args = []) {
   });
 }
 
+function validateEnabledSet(id, definition) {
+  if (!definition || typeof definition !== 'object') {
+    fail(`${id} must be an object`);
+  }
+
+  const download = definition.acquisition?.download;
+  if (!download) return;
+
+  if (typeof download.url !== 'string' || download.url.trim() === '') {
+    fail(`${id}.acquisition.download.url must be a non-empty string`);
+  }
+  if (!SHA256_PATTERN.test(download.sha256 ?? '')) {
+    fail(`${id}.acquisition.download.sha256 is required for enabled remotely fetched sets`);
+  }
+}
+
 async function missingSourceMaps(definition) {
   if (!definition?.sourceDir || !definition?.maps) {
     fail('enabled terrain set is missing sourceDir or maps');
@@ -80,6 +97,7 @@ async function main() {
     .filter(([, definition]) => definition?.enabled !== false);
 
   for (const [id, definition] of enabledSets) {
+    validateEnabledSet(id, definition);
     const missing = await missingSourceMaps(definition);
 
     if (checkOnly) {
