@@ -22,8 +22,8 @@
 
 # Security headers — applied to every response.
 # CSP allows: self for scripts/styles, Supabase REST + Realtime websockets,
-# Resend (only used server-side, but kept open in case of future browser SDK),
-# inline styles (React inline `style={}` props), data: URIs for icons / embedded JPEGs.
+# Babylon's version-pinned decoder CDN, inline styles (React inline
+# `style={}` props), data/blob URIs for runtime-generated images and workers.
 [[headers]]
   for = "/*"
   [headers.values]
@@ -40,7 +40,7 @@
     # DbConnection.builder().build() and every subscription silently fails.
     # wss://maincloud.spacetimedb.com is the live STDB endpoint (set via
     # VITE_SPACETIMEDB_URI; defaulted in src/features/world/useSpacetimeWorld.js).
-    Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
+    Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.babylonjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
 
 # Cache the immutable Vite-hashed bundle aggressively.
 [[headers]]
