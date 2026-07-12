@@ -29,7 +29,7 @@
   },
   "profiles": {
     "overworld": {
-      "grass": "overworld-meadow-grass-01",
+      "grass": null,
       "dirt": null,
       "sand": null,
       "rock": null,
