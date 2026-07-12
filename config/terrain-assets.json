@@ -35,7 +35,7 @@
         "provider": "ambientCG",
         "licenseUrl": "https://docs.ambientcg.com/license/",
         "status": "enabled-build-synced",
-        "notes": "First enabled overworld terrain source. Ground037 is fetched on demand in clean development and production builds, normalized into the runtime contract, and assigned to the overworld grass slot. Shader sampling remains a separate integration step.",
+        "notes": "First enabled overworld terrain source. Ground037 is fetched on demand in clean development and production builds and normalized into the runtime contract. Runtime profile binding is temporarily disabled while the desktop shader path is revalidated.",
         "assetId": "Ground037",
         "assetUrl": "https://ambientcg.com/view?id=Ground037",
         "download": {
@@ -155,7 +155,7 @@
   },
   "profiles": {
     "overworld": {
-      "grass": "overworld-meadow-grass-01",
+      "grass": null,
       "dirt": null,
       "sand": null,
       "rock": null,
