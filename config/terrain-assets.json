@@ -41,6 +41,7 @@
         "download": {
           "url": "https://ambientCG.com/get?file=Ground037_2K-JPG.zip",
           "format": "2K-JPG.zip",
+          "sha256": "defa9f880ec692eb3ef5435fd7bc7b8721c0d577f7824ea18ac68537f01ab65b",
           "maps": {
             "albedo": "Ground037_2K-JPG_Color.jpg",
             "normal": "Ground037_2K-JPG_NormalGL.jpg",
