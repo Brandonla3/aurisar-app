@@ -1,18 +1,20 @@
 /* global BABYLON */
 
+import { bindTerrainAssetProfile } from './TerrainMaterialAssetBinding.js';
+
 /**
  * Cinematic splat-blended PBR terrain.
  *
  * terrainSplat is a vec4 vertex attribute containing dirt, sand/gravel, rock,
  * and field/organic-cover weights. The shader adds slope-aware rock, coupled
  * procedural albedo/relief, macro breakup, distance-faded detail normals and
- * environment-specific material identities.
+ * environment-specific material identities. Approved scanned maps can hot-bind
+ * after material creation; procedural shading remains the startup/failure path.
  */
-
 const TERRAIN_TIERS = {
-  high:   { oct: 6, detail: 0.95, heightBlend: true,  detailNormal: true,  triplanar: true,  flowers: true  },
-  low:    { oct: 4, detail: 0.72, heightBlend: true,  detailNormal: true,  triplanar: false, flowers: false },
-  mobile: { oct: 3, detail: 0.0,  heightBlend: false, detailNormal: false, triplanar: false, flowers: false },
+  high:   { oct: 6, detail: 0.95, heightBlend: true,  detailNormal: true,  triplanar: true,  flowers: true,  scanned: true  },
+  low:    { oct: 4, detail: 0.72, heightBlend: true,  detailNormal: true,  triplanar: false, flowers: false, scanned: true  },
+  mobile: { oct: 3, detail: 0.0,  heightBlend: false, detailNormal: false, triplanar: false, flowers: false, scanned: false },
 };
 
 /**
@@ -44,14 +46,27 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
       TERR_DETAILNORMAL: false,
       TERR_TRIPLANAR: false,
       TERR_FLOWERS: false,
+      TERR_SCANNED_GRASS: false,
     });
     this._cfg = tierCfg;
     this._preset = presetCfg;
     this._debug = 0;
+    this._grassSet = null;
     this._enable(true);
   }
 
   getClassName() { return 'AshwoodTerrainSplatPlugin'; }
+
+  setAssetProfile(profile) {
+    const candidate = profile?.grass;
+    const next = candidate?.baseColor && candidate?.normal && candidate?.orm
+      ? candidate
+      : null;
+    if (next === this._grassSet) return !!next;
+    this._grassSet = next;
+    this.markAllDefinesAsDirty();
+    return !!next;
+  }
 
   prepareDefines(defines) {
     defines.TERR_ENABLED = true;
@@ -59,9 +74,27 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
     defines.TERR_DETAILNORMAL = !!this._cfg.detailNormal;
     defines.TERR_TRIPLANAR = !!this._cfg.triplanar;
     defines.TERR_FLOWERS = !!this._cfg.flowers;
+    defines.TERR_SCANNED_GRASS = !!this._cfg.scanned && !!this._grassSet;
   }
 
   getAttributes(attributes) { attributes.push('terrainSplat'); }
+
+  getSamplers(samplers) {
+    samplers.push('uTerrGrassBaseColor', 'uTerrGrassNormal', 'uTerrGrassOrm');
+  }
+
+  getActiveTextures(activeTextures) {
+    if (!this._grassSet) return;
+    activeTextures.push(this._grassSet.baseColor, this._grassSet.normal, this._grassSet.orm);
+  }
+
+  hasTexture(texture) {
+    return !!this._grassSet && [
+      this._grassSet.baseColor,
+      this._grassSet.normal,
+      this._grassSet.orm,
+    ].includes(texture);
+  }
 
   getUniforms() {
     return {
@@ -72,6 +105,7 @@ class TerrainSplatPlugin extends BABYLON.MaterialPluginBase {
         { name: 'uTerrProfile', size: 1, type: 'float' },
         { name: 'uTerrWetness', size: 1, type: 'float' },
         { name: 'uTerrScale', size: 1, type: 'float' },
+        { name: 'uTerrGrassTileMeters', size: 1, type: 'float' },
       ],
       fragment: `
 uniform float uTerrOct;
@@ -80,6 +114,12 @@ uniform float uTerrDebug;
 uniform float uTerrProfile;
 uniform float uTerrWetness;
 uniform float uTerrScale;
+uniform float uTerrGrassTileMeters;
+#ifdef TERR_SCANNED_GRASS
+uniform sampler2D uTerrGrassBaseColor;
+uniform sampler2D uTerrGrassNormal;
+uniform sampler2D uTerrGrassOrm;
+#endif
 `,
     };
   }
@@ -91,6 +131,20 @@ uniform float uTerrScale;
     uniformBuffer.updateFloat('uTerrProfile', this._preset.profile);
     uniformBuffer.updateFloat('uTerrWetness', this._preset.wetness);
     uniformBuffer.updateFloat('uTerrScale', this._preset.scale);
+    uniformBuffer.updateFloat(
+      'uTerrGrassTileMeters',
+      Math.max(0.25, this._grassSet?.definition?.tileMeters ?? 4),
+    );
+    if (this._grassSet) {
+      uniformBuffer.setTexture('uTerrGrassBaseColor', this._grassSet.baseColor);
+      uniformBuffer.setTexture('uTerrGrassNormal', this._grassSet.normal);
+      uniformBuffer.setTexture('uTerrGrassOrm', this._grassSet.orm);
+    }
+  }
+
+  dispose() {
+    // TerrainAssetLibrary owns and disposes the scene-shared textures.
+    this._grassSet = null;
   }
 
   getCustomCode(shaderType) {
@@ -167,6 +221,8 @@ float terrVoronoi(vec2 p, out vec2 cell){
 #endif
 `,
       CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
+float terrScannedGrassPbrWeight = 0.0;
+vec3 terrScannedGrassOrm = vec3(1.0, 1.0, 0.0);
 #ifdef TERR_ENABLED
 {
   vec3 terrWP = vPositionW;
@@ -176,6 +232,7 @@ float terrVoronoi(vec2 p, out vec2 cell){
   float terrSlope = 1.0 - clamp(vNormalW.y, 0.0, 1.0);
   float terrJit = terrValueNoise(terrP * 0.05) - 0.5;
   float terrProfile = floor(uTerrProfile + 0.5);
+  float terrCameraDistance = length(vEyePosition.xyz - terrWP);
 
   float isMountain = step(0.5, terrProfile) * (1.0 - step(1.5, terrProfile));
   float isForest = step(1.5, terrProfile) * (1.0 - step(2.5, terrProfile));
@@ -201,6 +258,31 @@ float terrVoronoi(vec2 p, out vec2 cell){
   vec3 aSand = mix(vec3(0.52, 0.43, 0.27), vec3(0.76, 0.65, 0.43), hSand);
   vec3 aField = mix(vec3(0.29, 0.32, 0.12), vec3(0.60, 0.57, 0.25), terrPatch);
   aField = mix(aField, aGrass, 0.28);
+
+#ifdef TERR_SCANNED_GRASS
+  vec2 terrGrassUV = terrWP.xz / max(uTerrGrassTileMeters, 0.25);
+  vec3 terrScannedGrassAlbedo = toLinearSpace(texture2D(uTerrGrassBaseColor, terrGrassUV).rgb);
+  vec3 terrScannedGrassNormal = texture2D(uTerrGrassNormal, terrGrassUV).xyz * 2.0 - 1.0;
+  terrScannedGrassOrm = texture2D(uTerrGrassOrm, terrGrassUV).rgb;
+  float terrScannedAlbedoFade = 1.0 - smoothstep(48.0, 180.0, terrCameraDistance);
+  terrScannedGrassAlbedo *= 0.84 + 0.28 * hGrass;
+  aGrass = mix(aGrass, terrScannedGrassAlbedo, terrScannedAlbedoFade * 0.92);
+
+  vec3 terrQ1 = dFdx(terrWP);
+  vec3 terrQ2 = dFdy(terrWP);
+  vec2 terrSt1 = dFdx(terrGrassUV);
+  vec2 terrSt2 = dFdy(terrGrassUV);
+  vec3 terrQ2Perp = cross(terrQ2, normalW);
+  vec3 terrQ1Perp = cross(normalW, terrQ1);
+  vec3 terrTangent = terrQ2Perp * terrSt1.x + terrQ1Perp * terrSt2.x;
+  vec3 terrBitangent = terrQ2Perp * terrSt1.y + terrQ1Perp * terrSt2.y;
+  float terrTbnScale = inversesqrt(max(max(dot(terrTangent, terrTangent), dot(terrBitangent, terrBitangent)), 0.000001));
+  vec3 terrScannedGrassNormalW = normalize(mat3(
+    terrTangent * terrTbnScale,
+    terrBitangent * terrTbnScale,
+    normalW
+  ) * terrScannedGrassNormal);
+#endif
 
   // Forest: dark moist loam, moss and leaf-litter breakup.
   float litter = smoothstep(0.48, 0.78, terrValueNoise(terrP * 3.8 + 19.0));
@@ -276,10 +358,16 @@ float terrVoronoi(vec2 p, out vec2 cell){
   vec3 r1 = cross(dpy, normalW), r2 = cross(normalW, dpx);
   float det = dot(dpx, r1);
   vec3 grad = sign(det) * (dFdx(terrH) * r1 + dFdy(terrH) * r2);
-  float camDist = length(vEyePosition.xyz - terrWP);
-  float strength = uTerrDetail * (1.0 - smoothstep(13.0, 64.0, camDist));
+  float strength = uTerrDetail * (1.0 - smoothstep(13.0, 64.0, terrCameraDistance));
   strength *= mix(0.62, 1.12, max(max(isMountain, isCastle), isDungeon));
   normalW = normalize(abs(det) * normalW - grad * strength);
+#endif
+
+#ifdef TERR_SCANNED_GRASS
+  float terrScannedNormalFade = 1.0 - smoothstep(12.0, 74.0, terrCameraDistance);
+  float terrScannedNormalWeight = clamp(b0 * terrScannedNormalFade * uTerrDetail * 0.72, 0.0, 0.72);
+  normalW = normalize(mix(normalW, terrScannedGrassNormalW, terrScannedNormalWeight));
+  terrScannedGrassPbrWeight = b0 * (1.0 - smoothstep(48.0, 180.0, terrCameraDistance));
 #endif
 
   surfaceAlbedo = terrAlb;
@@ -292,6 +380,14 @@ float terrVoronoi(vec2 p, out vec2 cell){
 }
 #endif
 `,
+      '!g!(float microSurface = reflectivityOut\\.microSurface;\\s*float roughness = reflectivityOut\\.roughness;\\s*float diffuseRoughness = reflectivityOut\\.diffuseRoughness;)': `$0
+#ifdef TERR_SCANNED_GRASS
+  roughness = mix(roughness, terrScannedGrassOrm.g, terrScannedGrassPbrWeight);
+  microSurface = mix(microSurface, 1.0 - terrScannedGrassOrm.g, terrScannedGrassPbrWeight);
+  diffuseRoughness = mix(diffuseRoughness, terrScannedGrassOrm.g, terrScannedGrassPbrWeight);
+  aoOut.ambientOcclusionColor *= mix(vec3(1.0), vec3(terrScannedGrassOrm.r), terrScannedGrassPbrWeight);
+#endif
+`,
     };
   }
 }
@@ -301,7 +397,8 @@ float terrVoronoi(vec2 p, out vec2 cell){
  *
  * @param {BABYLON.Scene} scene
  * @param {{tier?:'high'|'low'|'mobile', preset?:keyof typeof TERRAIN_PRESETS,
- *   wetness?:number, scale?:number}} opts
+ *   wetness?:number, scale?:number, loadAssets?:boolean,
+ *   assetBinder?:typeof bindTerrainAssetProfile, assetOptions?:object}} opts
  */
 export function createTerrainMaterial(scene, opts = {}) {
   const tier = opts.tier ?? scene.metadata?.ashwood?.qualityTier ?? 'high';
@@ -321,6 +418,16 @@ export function createTerrainMaterial(scene, opts = {}) {
   mat.enableSpecularAntiAliasing = true;
   mat._terrainPreset = presetName;
   mat._terrainPlugin = new TerrainSplatPlugin(mat, tierCfg, presetCfg);
+
+  if (tierCfg.scanned && opts.loadAssets !== false) {
+    const assetBinder = opts.assetBinder ?? bindTerrainAssetProfile;
+    mat._terrainAssetPromise = Promise.resolve(
+      assetBinder(mat, scene, presetName, opts.assetOptions),
+    ).catch(() => null);
+  } else {
+    mat._terrainAssetPromise = Promise.resolve(null);
+  }
+
   return mat;
 }
 
