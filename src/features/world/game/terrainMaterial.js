@@ -380,7 +380,7 @@ vec3 terrScannedGrassOrm = vec3(1.0, 1.0, 0.0);
 }
 #endif
 `,
-      '!g!(float microSurface = reflectivityOut\\.microSurface;\\s*float roughness = reflectivityOut\\.roughness;\\s*float diffuseRoughness = reflectivityOut\\.diffuseRoughness;)': `$0
+      '!g!(float\\s+microSurface\\s*=\\s*reflectivityOut\\.microSurface\\s*;\\s*float\\s+roughness\\s*=\\s*reflectivityOut\\.roughness\\s*;\\s*float\\s+diffuseRoughness\\s*=\\s*reflectivityOut\\.diffuseRoughness\\s*;)': `$0
 #ifdef TERR_SCANNED_GRASS
   roughness = mix(roughness, terrScannedGrassOrm.g, terrScannedGrassPbrWeight);
   microSurface = mix(microSurface, 1.0 - terrScannedGrassOrm.g, terrScannedGrassPbrWeight);
