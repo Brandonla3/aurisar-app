@@ -2,31 +2,47 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const originalBabylon = globalThis.BABYLON;
 let createTerrainMaterial;
+let createTerrainMaterialSet;
+let setTerrainDebugMode;
 
-class FakeMaterialPluginBase {
-  constructor(material) {
-    this._material = material;
-    this.markAllDefinesAsDirty = vi.fn();
+class FakeColor3 {
+  constructor(r = 0, g = 0, b = 0) {
+    this.r = r;
+    this.g = g;
+    this.b = b;
   }
 
-  _enable() {}
+  static FromHexString(hex) {
+    const clean = hex.replace('#', '');
+    const value = Number.parseInt(clean, 16);
+    return new FakeColor3(
+      ((value >> 16) & 255) / 255,
+      ((value >> 8) & 255) / 255,
+      (value & 255) / 255,
+    );
+  }
 }
 
-class FakePBRMaterial {
+class FakeStandardMaterial {
   constructor(name, scene) {
     this.name = name;
     this.scene = scene;
-    this.markDirty = vi.fn();
+    this.backFaceCulling = null;
+    this.disableLighting = null;
   }
 }
 
 beforeEach(async () => {
   vi.resetModules();
   globalThis.BABYLON = {
-    MaterialPluginBase: FakeMaterialPluginBase,
-    PBRMaterial: FakePBRMaterial,
+    Color3: FakeColor3,
+    StandardMaterial: FakeStandardMaterial,
   };
-  ({ createTerrainMaterial } = await import('./terrainMaterial.js'));
+  ({
+    createTerrainMaterial,
+    createTerrainMaterialSet,
+    setTerrainDebugMode,
+  } = await import('./terrainMaterial.js'));
 });
 
 afterEach(() => {
@@ -34,89 +50,48 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function makeGrassSet() {
-  return {
-    id: 'overworld-meadow-grass-01',
-    definition: { tileMeters: 2.1 },
-    baseColor: { name: 'baseColor' },
-    normal: { name: 'normal' },
-    orm: { name: 'orm' },
-    height: null,
-  };
-}
-
-describe('terrainMaterial scanned grass integration', () => {
-  it('enables scanned samplers and binds world-scale PBR maps after a profile loads', () => {
-    const material = createTerrainMaterial({ metadata: {} }, { loadAssets: false });
-    const grass = makeGrassSet();
-
-    expect(material._terrainPlugin.setAssetProfile({ grass })).toBe(true);
-    expect(material._terrainPlugin.markAllDefinesAsDirty).toHaveBeenCalledTimes(1);
-
-    const defines = {};
-    material._terrainPlugin.prepareDefines(defines);
-    expect(defines.TERR_SCANNED_GRASS).toBe(true);
-
-    const samplers = [];
-    material._terrainPlugin.getSamplers(samplers);
-    expect(samplers).toEqual([
-      'uTerrGrassBaseColor',
-      'uTerrGrassNormal',
-      'uTerrGrassOrm',
-    ]);
-
-    const activeTextures = [];
-    material._terrainPlugin.getActiveTextures(activeTextures);
-    expect(activeTextures).toEqual([grass.baseColor, grass.normal, grass.orm]);
-    expect(material._terrainPlugin.hasTexture(grass.normal)).toBe(true);
-
-    const uniformBuffer = {
-      updateFloat: vi.fn(),
-      setTexture: vi.fn(),
-    };
-    material._terrainPlugin.bindForSubMesh(uniformBuffer);
-    expect(uniformBuffer.updateFloat).toHaveBeenCalledWith('uTerrGrassTileMeters', 2.1);
-    expect(uniformBuffer.setTexture).toHaveBeenCalledWith('uTerrGrassBaseColor', grass.baseColor);
-    expect(uniformBuffer.setTexture).toHaveBeenCalledWith('uTerrGrassNormal', grass.normal);
-    expect(uniformBuffer.setTexture).toHaveBeenCalledWith('uTerrGrassOrm', grass.orm);
-
-    const fragmentCode = material._terrainPlugin.getCustomCode('fragment');
-    expect(fragmentCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS).toContain('terrScannedGrassNormalW');
-    const pbrHook = Object.keys(fragmentCode).find((key) => key.startsWith('!g!'));
-    expect(pbrHook).toMatch(/reflectivityOut/);
-    expect(fragmentCode[pbrHook]).toContain('aoOut.ambientOcclusionColor');
-  });
-
-  it('starts asset binding asynchronously on high tier and hot-enables the loaded profile', async () => {
-    const grass = makeGrassSet();
-    const profile = { grass, dirt: null, sand: null, rock: null, field: null };
-    const assetBinder = vi.fn(async (material, _scene, profileName) => {
-      material._terrainPlugin.setAssetProfile(profile);
-      return profile;
-    });
-
-    const material = createTerrainMaterial({ metadata: {} }, { assetBinder });
-    expect(assetBinder).toHaveBeenCalledWith(material, material.scene, 'overworld', undefined);
-    await expect(material._terrainAssetPromise).resolves.toBe(profile);
-
-    const defines = {};
-    material._terrainPlugin.prepareDefines(defines);
-    expect(defines.TERR_SCANNED_GRASS).toBe(true);
-  });
-
-  it('keeps mobile terrain procedural and skips texture acquisition', async () => {
+describe('terrainMaterial desktop stability fallback', () => {
+  it('creates a stock StandardMaterial without custom terrain plugin hooks', async () => {
+    const scene = { metadata: { ashwood: { qualityTier: 'high' } } };
     const assetBinder = vi.fn();
-    const material = createTerrainMaterial({ metadata: {} }, {
-      tier: 'mobile',
-      assetBinder,
-    });
+    const material = createTerrainMaterial(scene, { assetBinder });
 
+    expect(material).toBeInstanceOf(FakeStandardMaterial);
+    expect(material.name).toBe('ashwood_ground_overworld');
+    expect(material.scene).toBe(scene);
+    expect(material.specularColor).toEqual(new FakeColor3(0, 0, 0));
+    expect(material.backFaceCulling).toBe(true);
+    expect(material.disableLighting).toBe(false);
+
+    expect(material._terrainPreset).toBe('overworld');
+    expect(material._terrainPlugin).toBeNull();
     await expect(material._terrainAssetPromise).resolves.toBeNull();
     expect(assetBinder).not.toHaveBeenCalled();
+  });
 
-    material._terrainPlugin.setAssetProfile({ grass: makeGrassSet() });
-    const defines = {};
-    material._terrainPlugin.prepareDefines(defines);
-    expect(defines.TERR_SCANNED_GRASS).toBe(false);
+  it('retains preset-specific material names for scene-level material sets', () => {
+    const set = createTerrainMaterialSet({ metadata: {} });
+
+    expect(Object.keys(set)).toEqual([
+      'overworld',
+      'mountain',
+      'forest',
+      'castle',
+      'dungeon',
+    ]);
+    expect(set.overworld.name).toBe('ashwood_ground_overworld');
+    expect(set.mountain.name).toBe('ashwood_ground_mountain');
+    expect(set.forest.name).toBe('ashwood_ground_forest');
+    expect(set.castle.name).toBe('ashwood_ground_castle');
+    expect(set.dungeon.name).toBe('ashwood_ground_dungeon');
+  });
+
+  it('keeps the debug hook as a no-op compatibility field', () => {
+    const material = createTerrainMaterial({ metadata: {} });
+
+    setTerrainDebugMode(material, 3);
+
+    expect(material._terrainDebugMode).toBe(3);
+    expect(material._terrainPlugin).toBeNull();
   });
 });
