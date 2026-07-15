@@ -30,3 +30,7 @@ assets-source/terrain/**
 # Runtime terrain maps are deterministic build products. CI publishes them as an
 # artifact and Vite/production builds regenerate them through predev/prebuild.
 public/assets/terrain/generated/**
+
+# foglamp codebase-scan data. scan.lock.json holds the secret edit token for the
+# published scan URL — never commit it.
+.foglamp/
