@@ -76,7 +76,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     profile, setProfile,
     allExercises, allExById, cls,
     showToast, setConfirmDelete,
-    setDetailEx, setDetailImgIdx,
+    setLibDetailEx,
     onSchedulePlan, onScheduleEx, onRemoveScheduledWorkout,
     onStatsPrompt, onOpenExEditor,
     setXpFlash, applyAutoCheckIn,
@@ -529,7 +529,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
                       </div>
                       {(isRunningEx && pbDisp || exPBDisp2) && <span style={{ fontSize: FS.fs58, color: "#b4ac9e", flexShrink: 0 }}>{"🏆 "}{isRunningEx && pbDisp ? pbDisp : exPBDisp2}</span>}
                       <div className={"plan-ex-xp"}>{"+"}{exXP}{" XP"}{runBoostPct > 0 && <span style={{ color: UI_COLORS.warning, marginLeft: S.s2 }}>{"⚡"}</span>}</div>
-                      <div className={"ex-info-btn"} style={{ position: "static" }} onClick={() => { setDetailEx(exData); setDetailImgIdx(0); }}>{"ℹ"}</div>
+                      <div className={"ex-info-btn"} style={{ position: "static" }} onClick={() => setLibDetailEx(exData)}>{"ℹ"}</div>
                       <span className={"ex-collapse-btn"} onClick={e => { e.stopPropagation(); toggleDetailEx(vDayIdx, exI); }}>
                         <svg width={"14"} height={"14"} viewBox={"0 0 14 14"} fill={"none"} xmlns={"http://www.w3.org/2000/svg"} style={{ transition: "transform .22s ease", transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}>
                           <defs><linearGradient id={"cg2"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs>

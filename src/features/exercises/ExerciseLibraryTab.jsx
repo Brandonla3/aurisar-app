@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { MUSCLE_META, UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
+import { useScrollRestore } from '../../hooks/useScrollRestore';
+import FilterDropdown from './FilterDropdown';
 
 /**
  * Exercise library tab — extracted from the inline IIFE in App.jsx as the
@@ -39,6 +41,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const {
     // Hook outputs
     libFiltered, libAvailableTypes, libMuscleCardData, libDiscoverRows, libMuscleOpts, libEquipOpts,
+    libTypeCounts, libMuscleCounts, libEquipCounts,
     // Filter state
     libSearch, setLibSearch,
     setLibSearchDebounced,
@@ -56,6 +59,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     // Profile / data
     profile, setProfile,
     allExercises, allExById,
+    _exReady, _exLoadError,
     // Cross-tab navigation
     setActiveTab,
     // Workout builder (for "New Workout" action)
@@ -73,14 +77,21 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   } = props;
 
   const revealRef = useScrollReveal();
+  const [catalogNoteDismissed, setCatalogNoteDismissed] = useState(false);
+  // Separate keys per view: returning to the home carousels shouldn't drop
+  // you at the offset you had in a 1,500-row filtered list.
+  useScrollRestore(`lib-${libBrowseMode}`);
 
+  // Toggling a filter deliberately does NOT reset the page depth. The list is
+  // sliced to libVisibleCount, so a narrower result set just renders shorter;
+  // resetting only threw away the scroll position of anyone tweaking a filter
+  // after paging deep into the catalog.
   const toggleSet = (setter, val) => {
     setter(s => {
       const n = new Set(s);
       n.has(val) ? n.delete(val) : n.add(val);
       return n;
     });
-    setLibVisibleCount(60);
   };
   const clearAll = () => {
     setLibTypeFilters(new Set());
@@ -107,24 +118,33 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   // Recent exercises — deduped from log, padded with favorites. Memoized so
   // the dedup walk doesn't repeat on every render of the tab; deps are the
   // log + favorites + lookup map.
+  // Each card also carries how long it's been since you last did it, so the
+  // carousel reports freshness instead of showing the same few names forever:
+  // recent entries sit at full strength and stale ones visibly fade.
   const yourExercises = useMemo(() => {
-    const recentExIds = [];
+    const now = Date.now();
+    const out = [];
     const seenIds = new Set();
+    const daysSince = ts => {
+      const t = ts ? new Date(ts).getTime() : NaN;
+      return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 86400000)) : null;
+    };
     for (const entry of (profile.log || []).slice(0, 100)) {
       if (entry.exId && !seenIds.has(entry.exId) && allExById[entry.exId]) {
-        recentExIds.push(entry.exId);
         seenIds.add(entry.exId);
+        out.push({ ex: allExById[entry.exId], days: daysSince(entry.date || entry.ts || entry.dateKey) });
       }
-      if (recentExIds.length >= 10) break;
+      if (out.length >= 10) break;
     }
+    // Favorites pad the row out but have no "last done" date of their own.
     for (const fId of profile.favoriteExercises || []) {
       if (!seenIds.has(fId) && allExById[fId]) {
-        recentExIds.push(fId);
         seenIds.add(fId);
+        out.push({ ex: allExById[fId], days: null });
       }
-      if (recentExIds.length >= 10) break;
+      if (out.length >= 10) break;
     }
-    return recentExIds.map(id => allExById[id]).filter(Boolean);
+    return out;
   }, [profile.log, profile.favoriteExercises, allExById]);
 
   // Discover rows — labels + exercise lists are memoized at App body
@@ -149,10 +169,17 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     wrap.classList.toggle('fade-right-off', !atRight);
   };
 
-  return <div> {
+  // Select mode used to look almost identical to browsing — same rows, same
+  // colours, just small checkboxes — so tapping a row to read about it would
+  // silently add it to a batch instead. The whole tab now shifts to a colder
+  // "conscription" palette while it's active, with a one-shot pulse on entry.
+  return <div className={libSelectMode ? "lib-conscript" : undefined}> {
       /* Sticky search bar — translucent material */
     }
-    <div className={"lib-sticky-search"}><div style={{
+    <div className={"lib-sticky-search"}>{libSelectMode && <div className={"lib-conscript-banner"} role="status">
+        <span>{"⊞ Selecting"}</span>
+        <span className={"lib-conscript-banner-count"}>{libSelected.size === 0 ? "tap rows to add" : `${libSelected.size} chosen`}</span>
+      </div>}<div style={{
         display: "flex",
         gap: S.s8,
         alignItems: "center"
@@ -184,18 +211,40 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           fontWeight: libSelectMode ? "700" : "400",
           cursor: "pointer",
           whiteSpace: "nowrap"
-        }}>{libSelectMode ? "✕ Cancel" : "⊞ Select"}</button>}</div></div>{/* ═══ HOME VIEW ═══ */
+        }}>{libSelectMode ? "✕ Cancel" : "⊞ Select"}</button>}</div></div>{
+    /* Catalog status — the bundled list renders immediately and Supabase
+       merges in extra exercises a moment later. Previously that arrival was
+       silent (the search placeholder count just jumped) and a failed fetch
+       was silent too, leaving the user browsing a smaller library with no
+       explanation. */
+    }
+    {!_exReady && <div className={"lib-catalog-note"} role="status">
+      <span className={"lib-catalog-spinner"} aria-hidden="true" />
+      {"Loading the full catalog…"}
+    </div>}
+    {_exReady && _exLoadError && !catalogNoteDismissed && <div className={"lib-catalog-note lib-catalog-note-warn"} role="status">
+      <span aria-hidden="true">{"⚠"}</span>
+      <span style={{ flex: 1 }}>{`Showing the offline catalog (${allExercises.length} exercises) — couldn't reach the server, so newer additions may be missing.`}</span>
+      <button type="button" onClick={() => setCatalogNoteDismissed(true)} aria-label="Dismiss" style={{
+        background: "transparent", border: "none", color: "inherit",
+        cursor: "pointer", fontSize: FS.fs78, lineHeight: 1, padding: S.s2
+      }}>{"✕"}</button>
+    </div>}{/* ═══ HOME VIEW ═══ */
     libBrowseMode === "home" && <div>{/* Your Exercises — hero carousel */
       yourExercises.length > 0 && <div className={"lib-home-section"} style={{
         marginBottom: S.s4
-      }}><div className={"lib-section-hdr"}><span className={"lib-hdr-icon"}>{"⚔️"}</span>{"Your Exercises"}</div><div className={"lib-hscroll-wrap"}><div className={"lib-hscroll"} onScroll={handleHScroll}>{yourExercises.map(ex => {
+      }}><div className={"lib-section-hdr"}><span className={"lib-hdr-icon"}>{"⚔️"}</span>{"Your Exercises"}</div><div className={"lib-hscroll-wrap"}><div className={"lib-hscroll"} onScroll={handleHScroll}>{yourExercises.map(({ ex, days }) => {
               const mgColor = getMuscleColor(ex.muscleGroup);
               const mgLabel = (MUSCLE_META[(ex.muscleGroup || "").toLowerCase()] || {}).label || ex.muscleGroup || "";
+              // 0 days = full torchlight, 21+ days = fully faded. Drives a
+              // CSS filter so the card itself carries the recency signal.
+              const staleness = days == null ? 0.55 : Math.min(1, days / 21);
               return <div key={"yr-" + ex.id} className={"lib-hero-card"} onClick={() => setLibDetailEx(ex)} style={{
-                '--mg-color': mgColor
+                '--mg-color': mgColor,
+                '--staleness': staleness
               }}><div className={"lib-hero-orb"} style={{
                   '--mg-color': mgColor
-                }}><ExIcon ex={ex} size={"1.4rem"} color={mgColor} /></div><span className={"lib-hero-name"}>{ex.name}</span>{mgLabel && <span className={"lib-muscle-pill"} style={{
+                }}><ExIcon ex={ex} size={"1.4rem"} color={mgColor} /></div><span className={"lib-hero-name"}>{ex.name}</span>{days != null && <span className={"lib-hero-when"}>{days === 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`}</span>}{mgLabel && <span className={"lib-muscle-pill"} style={{
                   '--mg-color': mgColor
                 }}>{mgLabel}</span>}</div>;
             })}</div></div></div>}{yourExercises.length > 0 && <div className={"lib-divider"} />} {
@@ -287,210 +336,52 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           position: "fixed",
           inset: 0,
           zIndex: 19
-        }} />} {
-          /* ── Type dropdown ── */
-        }
-        <div style={{
-          position: "relative",
-          flex: "1 1 110px",
-          zIndex: 20
-        }}><button onClick={() => setLibOpenDrop(libOpenDrop === "type" ? null : "type")} style={{
-            width: "100%",
-            padding: "8px 28px 8px 10px",
-            borderRadius: R.xl,
-            border: "1px solid " + (libTypeFilters.size > 0 ? "#C4A044" : "rgba(45,42,36,.3)"),
-            background: "rgba(14,14,12,.95)",
-            color: libTypeFilters.size > 0 ? "#C4A044" : "#8a8478",
-            fontSize: FS.lg,
-            textAlign: "left",
-            cursor: "pointer",
-            position: "relative"
-          }}>{libTypeFilters.size > 0 ? "Type (" + libTypeFilters.size + ")" : "Type"}<span style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(" + (libOpenDrop === "type" ? "180deg" : "0deg") + ")",
-              color: libTypeFilters.size > 0 ? "#C4A044" : "#8a8478",
-              fontSize: FS.sm,
-              transition: "transform .15s",
-              lineHeight: 1
-            }}>{"▼"}</span></button>{libOpenDrop === "type" && <div style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            minWidth: "100%",
-            background: "rgba(16,14,10,.95)",
-            border: "1px solid rgba(180,172,158,.07)",
-            borderRadius: R.xl,
-            padding: "6px 4px",
-            zIndex: 21,
-            boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-          }}>{TYPE_OPTS.map(val => {
-              const sel = libTypeFilters.has(val);
-              const avail = libAvailableTypes.size === 0 || libAvailableTypes.has(val) || sel;
-              return <div key={val} onClick={() => toggleSet(setLibTypeFilters, val)} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8,
-                padding: "6px 10px",
-                borderRadius: R.md,
-                cursor: "pointer",
-                opacity: avail ? 1 : 0.35,
-                background: sel ? "rgba(45,42,36,.22)" : "transparent"
-              }}><div style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: R.r3,
-                  flexShrink: 0,
-                  border: "1.5px solid " + (sel ? getTypeColor(val) : "rgba(180,172,158,.08)"),
-                  background: sel ? "rgba(45,42,36,.32)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>{sel && <span style={{
-                    fontSize: FS.sm,
-                    color: getTypeColor(val),
-                    lineHeight: 1
-                  }}>{"✓"}</span>}</div><span style={{
-                  fontSize: FS.lg,
-                  color: sel ? getTypeColor(val) : avail ? "#b4ac9e" : "#8a8478",
-                  whiteSpace: "nowrap"
-                }}>{TYPE_LABELS[val]}</span></div>;
-            })}</div>}</div> {
-          /* ── Muscle dropdown ── */
-        }
-        <div style={{
-          position: "relative",
-          flex: "1 1 110px",
-          zIndex: 20
-        }}><button onClick={() => setLibOpenDrop(libOpenDrop === "muscle" ? null : "muscle")} style={{
-            width: "100%",
-            padding: "8px 28px 8px 10px",
-            borderRadius: R.xl,
-            border: "1px solid " + (libMuscleFilters.size > 0 ? UI_COLORS.accent : "rgba(45,42,36,.3)"),
-            background: "rgba(14,14,12,.95)",
-            color: libMuscleFilters.size > 0 ? "#7A8F8B" : "#8a8478",
-            fontSize: FS.lg,
-            textAlign: "left",
-            cursor: "pointer",
-            position: "relative"
-          }}>{libMuscleFilters.size > 0 ? "Muscle (" + libMuscleFilters.size + ")" : "Muscle Group"}<span style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(" + (libOpenDrop === "muscle" ? "180deg" : "0deg") + ")",
-              color: libMuscleFilters.size > 0 ? "#7A8F8B" : "#8a8478",
-              fontSize: FS.sm,
-              transition: "transform .15s",
-              lineHeight: 1
-            }}>{"▼"}</span></button>{libOpenDrop === "muscle" && <div style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            minWidth: "100%",
-            background: "rgba(16,14,10,.95)",
-            border: "1px solid rgba(122,143,139,.25)",
-            borderRadius: R.xl,
-            padding: "6px 4px",
-            zIndex: 21,
-            boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-          }}>{MUSCLE_OPTS.map(m => {
-              const sel = libMuscleFilters.has(m);
-              return <div key={m} onClick={() => toggleSet(setLibMuscleFilters, m)} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8,
-                padding: "6px 10px",
-                borderRadius: R.md,
-                cursor: "pointer",
-                background: sel ? "rgba(122,143,139,.12)" : "transparent"
-              }}><div style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: R.r3,
-                  flexShrink: 0,
-                  border: "1.5px solid " + (sel ? "#7A8F8B" : "rgba(122,143,139,.3)"),
-                  background: sel ? "rgba(122,143,139,.25)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>{sel && <span style={{
-                    fontSize: FS.sm,
-                    color: UI_COLORS.accent,
-                    lineHeight: 1
-                  }}>{"✓"}</span>}</div><span style={{
-                  fontSize: FS.lg,
-                  color: sel ? "#7A8F8B" : "#b4ac9e",
-                  whiteSpace: "nowrap"
-                }}>{m.charAt(0).toUpperCase() + m.slice(1).replace("_", " ")}</span></div>;
-            })}</div>}</div> {
-          /* ── Equipment dropdown ── */
-        }
-        <div style={{
-          position: "relative",
-          flex: "1 1 110px",
-          zIndex: 20
-        }}><button onClick={() => setLibOpenDrop(libOpenDrop === "equip" ? null : "equip")} style={{
-            width: "100%",
-            padding: "8px 28px 8px 10px",
-            borderRadius: R.xl,
-            border: "1px solid " + (libEquipFilters.size > 0 ? UI_COLORS.accent : "rgba(45,42,36,.3)"),
-            background: "rgba(14,14,12,.95)",
-            color: libEquipFilters.size > 0 ? UI_COLORS.accent : "#8a8478",
-            fontSize: FS.lg,
-            textAlign: "left",
-            cursor: "pointer",
-            position: "relative"
-          }}>{libEquipFilters.size > 0 ? "Equip (" + libEquipFilters.size + ")" : "Equipment"}<span style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(" + (libOpenDrop === "equip" ? "180deg" : "0deg") + ")",
-              color: libEquipFilters.size > 0 ? UI_COLORS.accent : "#8a8478",
-              fontSize: FS.sm,
-              transition: "transform .15s",
-              lineHeight: 1
-            }}>{"▼"}</span></button>{libOpenDrop === "equip" && <div style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            minWidth: "100%",
-            background: "rgba(16,14,10,.95)",
-            border: "1px solid rgba(196,148,40,0.25)",
-            borderRadius: R.xl,
-            padding: "6px 4px",
-            zIndex: 21,
-            boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-          }}>{EQUIP_OPTS.map(eq => {
-              const sel = libEquipFilters.has(eq);
-              return <div key={eq} onClick={() => toggleSet(setLibEquipFilters, eq)} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8,
-                padding: "6px 10px",
-                borderRadius: R.md,
-                cursor: "pointer",
-                background: sel ? "rgba(196,148,40,0.12)" : "transparent"
-              }}><div style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: R.r3,
-                  flexShrink: 0,
-                  border: "1.5px solid " + (sel ? UI_COLORS.accent : "rgba(196,148,40,0.3)"),
-                  background: sel ? "rgba(196,148,40,0.25)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>{sel && <span style={{
-                    fontSize: FS.sm,
-                    color: UI_COLORS.accent,
-                    lineHeight: 1
-                  }}>{"✓"}</span>}</div><span style={{
-                  fontSize: FS.lg,
-                  color: sel ? UI_COLORS.accent : "#b4ac9e",
-                  whiteSpace: "nowrap"
-                }}>{eq.charAt(0).toUpperCase() + eq.slice(1)}</span></div>;
-            })}</div>}</div></div>{/* Active filter tags — show what's selected, tap to remove */
+        }} />}
+        <FilterDropdown
+          id="type"
+          label="Type"
+          shortLabel="Type"
+          options={TYPE_OPTS}
+          optionLabel={v => TYPE_LABELS[v]}
+          selected={libTypeFilters}
+          counts={libTypeCounts}
+          onToggle={v => toggleSet(setLibTypeFilters, v)}
+          open={libOpenDrop === "type"}
+          setOpen={setLibOpenDrop}
+          accent="#C4A044"
+          optionAccent={getTypeColor}
+          panelBorder="rgba(180,172,158,.07)"
+        />
+        <FilterDropdown
+          id="muscle"
+          label="Muscle Group"
+          shortLabel="Muscle"
+          options={MUSCLE_OPTS}
+          optionLabel={m => m.charAt(0).toUpperCase() + m.slice(1).replace("_", " ")}
+          selected={libMuscleFilters}
+          counts={libMuscleCounts}
+          onToggle={m => toggleSet(setLibMuscleFilters, m)}
+          open={libOpenDrop === "muscle"}
+          setOpen={setLibOpenDrop}
+          accent="#7A8F8B"
+          optionAccent={getMuscleColor}
+          panelBorder="rgba(122,143,139,.25)"
+        />
+        <FilterDropdown
+          id="equip"
+          label="Equipment"
+          shortLabel="Equip"
+          options={EQUIP_OPTS}
+          optionLabel={eq => eq.charAt(0).toUpperCase() + eq.slice(1)}
+          selected={libEquipFilters}
+          counts={libEquipCounts}
+          onToggle={eq => toggleSet(setLibEquipFilters, eq)}
+          open={libOpenDrop === "equip"}
+          setOpen={setLibOpenDrop}
+          accent={UI_COLORS.accent}
+          panelBorder="rgba(196,148,40,0.25)"
+        />
+      </div>{/* Active filter tags — show what's selected, tap to remove */
       (libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0) && <div style={{
         display: "flex",
         gap: S.s6,
@@ -667,9 +558,18 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         display: "flex",
         flexDirection: "column",
         gap: S.s6
-      }}>{libFiltered.length === 0 && <div className={"empty"} style={{
-          padding: "24px 0"
-        }}>{"No exercises match your filters."}</div>}{libFiltered.slice(0, libVisibleCount).map(ex => {
+      }}>{libFiltered.length === 0 && (_exReady
+          ? <div className={"empty"} style={{ padding: "24px 0" }}>{"No exercises match your filters."}</div>
+          // Nothing matched *yet* only because the catalog is still arriving —
+          // an empty-state here would be a lie, so show the shape of the rows.
+          : <div aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <div key={"skel" + i} className={"lib-skel-row"}>
+              <div className={"lib-skel-orb"} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className={"lib-skel-line"} style={{ width: `${68 - i * 5}%`, marginBottom: S.s6 }} />
+                <div className={"lib-skel-line"} style={{ width: `${44 - i * 3}%`, height: 7 }} />
+              </div>
+            </div>)}</div>
+        )}{libFiltered.slice(0, libVisibleCount).map(ex => {
           const isFav = (profile.favoriteExercises || []).includes(ex.id);
           const hasPB = !!(profile.exercisePBs || {})[ex.id];
           const isSel = libSelected.has(ex.id);
@@ -773,198 +673,15 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           fontWeight: 600,
           cursor: "pointer",
           letterSpacing: ".02em"
-        }}>{`Load More (${Math.min(libVisibleCount, libFiltered.length)} of ${libFiltered.length})`}</button>}</div></div>}{/* ── end filtered view ── */
-
-    /* Detail bottom sheet */
-    libDetailEx && <div onClick={() => setLibDetailEx(null)} style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,.85)",
-      zIndex: 500,
-      display: "flex",
-      alignItems: "flex-end",
-      justifyContent: "center",
-      paddingBottom: "var(--bottom-nav-h)"
-    }}><div onClick={e => e.stopPropagation()} className={"sheet-slide-up"} style={{
-        background: "linear-gradient(160deg,rgba(18,16,12,.92),rgba(12,12,10,.95))",
-        border: "1px solid rgba(180,172,158,.06)",
-        borderRadius: "16px 16px 0 0",
-        width: "100%",
-        maxWidth: 520,
-        maxHeight: "calc(90vh - var(--bottom-nav-h))",
-        overflowY: "auto",
-        padding: "20px 18px 32px"
-      }}><div style={{
-          width: 36,
-          height: 4,
-          background: "rgba(45,42,36,.3)",
-          borderRadius: R.r2,
-          margin: "0 auto 16px"
-        }} /><div style={{
-          height: 90,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: S.s12
-        }}><ExIcon ex={libDetailEx} size={"3.5rem"} color={getTypeColor(libDetailEx.category)} /></div><div style={{
-          marginBottom: S.s10
-        }}><div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: S.s8,
-            flexWrap: "wrap",
-            marginBottom: S.s4
-          }}><span style={{
-              fontSize: "1rem",
-              fontWeight: "700",
-              color: "#e8e0d0"
-            }}>{libDetailEx.name}</span>{(profile.exercisePBs || {})[libDetailEx.id] && <span style={{
-              background: "rgba(180,172,158,.1)",
-              color: "#b4ac9e",
-              fontSize: FS.sm,
-              padding: "2px 8px",
-              borderRadius: R.r4,
-              fontWeight: "700"
-            }}>{"🏆 PB"}</span>}</div><div style={{
-            display: "flex",
-            gap: S.s8,
-            flexWrap: "wrap"
-          }}><span style={{
-              fontSize: FS.md,
-              color: getMuscleColor(libDetailEx.muscleGroup),
-              fontStyle: "italic"
-            }}>{libDetailEx.muscleGroup ? libDetailEx.muscleGroup.charAt(0).toUpperCase() + libDetailEx.muscleGroup.slice(1) : ""}</span>{libDetailEx.equipment && <span style={{
-              fontSize: FS.md,
-              color: "#8a8478",
-              fontStyle: "italic"
-            }}>{"· " + libDetailEx.equipment}</span>}{libDetailEx.difficulty && <span style={{
-              fontSize: FS.md,
-              fontWeight: 700,
-              color: libDetailEx.difficulty === "Advanced" ? "#7A2838" : libDetailEx.difficulty === "Beginner" ? "#5A8A58" : "#A8843C"
-            }}>{"· " + libDetailEx.difficulty}</span>}<span style={{
-              fontSize: FS.md,
-              color: "#b4ac9e",
-              fontWeight: "700"
-            }}>{"· " + libDetailEx.baseXP + " XP"}</span></div></div>{libDetailEx.desc && <p style={{
-          fontSize: FS.fs78,
-          color: "#8a8478",
-          lineHeight: 1.55,
-          marginBottom: S.s12
-        }}>{libDetailEx.desc}</p>}{libDetailEx.pbType && <div style={{
-          background: "rgba(45,42,36,.16)",
-          border: "1px solid rgba(180,172,158,.05)",
-          borderRadius: R.lg,
-          padding: "8px 12px",
-          marginBottom: S.s12,
-          fontSize: FS.lg,
-          color: "#8a8478"
-        }}><span style={{
-            color: "#b4ac9e",
-            fontWeight: "700"
-          }}>{"PB: "}</span>{libDetailEx.pbType}{libDetailEx.pbTier === "Leaderboard" && <span style={{
-            marginLeft: S.s8,
-            color: "#b4ac9e",
-            fontSize: FS.fs65
-          }}>{"🏆 Leaderboard"}</span>}</div>}<button onClick={() => setProfile(p => ({
-          ...p,
-          favoriteExercises: (p.favoriteExercises || []).includes(libDetailEx.id) ? (p.favoriteExercises || []).filter(i => i !== libDetailEx.id) : [...(p.favoriteExercises || []), libDetailEx.id]
-        }))} style={{
-          width: "100%",
-          background: "rgba(45,42,36,.2)",
-          border: "1px solid rgba(180,172,158,.06)",
-          color: "#b4ac9e",
-          padding: "11px",
-          borderRadius: R.xl,
-          fontWeight: "700",
-          fontSize: FS.fs82,
-          cursor: "pointer"
-        }}>{(profile.favoriteExercises || []).includes(libDetailEx.id) ? "⭐ Saved to Favorites" : "☆ Save to Favorites"}</button><div style={{
-          display: "flex",
-          gap: S.s8,
-          marginTop: S.s8
-        }}>{libDetailEx.id !== "rest_day" && <button onClick={() => {
-            const exEntry = {
-              exId: libDetailEx.id,
-              sets: libDetailEx.defaultSets != null ? libDetailEx.defaultSets : 3,
-              reps: libDetailEx.defaultReps != null ? libDetailEx.defaultReps : 10,
-              weightLbs: null,
-              durationMin: null,
-              weightPct: 100,
-              distanceMi: null,
-              hrZone: null
-            };
-            setAddToWorkoutPicker({
-              exercises: [exEntry]
-            });
-            setLibDetailEx(null);
-          }} style={{
-            flex: 1,
-            background: "rgba(45,42,36,.2)",
-            border: "1px solid rgba(180,172,158,.06)",
-            color: "#b4ac9e",
-            padding: "10px",
-            borderRadius: R.xl,
-            fontWeight: "600",
-            fontSize: FS.lg,
-            cursor: "pointer",
-            textAlign: "center"
-          }}>{"💪 Add to Workout"}</button>}<button onClick={() => {
-            const ids = [libDetailEx.id];
-            setSavePlanWizard({
-              entries: ids.map(id => ({
-                exId: id,
-                exercise: libDetailEx.name,
-                icon: libDetailEx.icon,
-                _idx: id
-              })),
-              label: libDetailEx.name
-            });
-            setSpwName(libDetailEx.name);
-            setSpwIcon("📋");
-            setSpwDate("");
-            setSpwMode("new");
-            setSpwTargetPlanId(null);
-            setLibDetailEx(null);
-          }} style={{
-            flex: 1,
-            background: "rgba(45,42,36,.2)",
-            border: "1px solid rgba(180,172,158,.06)",
-            color: "#b4ac9e",
-            padding: "10px",
-            borderRadius: R.xl,
-            fontWeight: "600",
-            fontSize: FS.lg,
-            cursor: "pointer",
-            textAlign: "center"
-          }}>{"📋 Add to Plan"}</button></div> {
-          /* Edit & Complete Now */
-        }
-        <button onClick={() => {
-          setSelEx(libDetailEx.id);
-          setSets("");
-          setReps("");
-          setExWeight("");
-          setWeightPct(100);
-          setDistanceVal("");
-          setHrZone(null);
-          setExHHMM("");
-          setExSec("");
-          setQuickRows([]);
-          setLibDetailEx(null);
-          setActiveTab("workout");
-        }} style={{
-          width: "100%",
-          marginTop: S.s8,
-          background: "linear-gradient(135deg,rgba(26,82,118,.25),rgba(41,128,185,.15))",
-          border: "1px solid rgba(41,128,185,.3)",
-          color: UI_COLORS.info,
-          padding: "11px",
-          borderRadius: R.xl,
-          fontWeight: "700",
-          fontSize: FS.fs82,
-          cursor: "pointer",
-          textAlign: "center"
-        }}>{"⚙ Configure"}</button></div></div>}</div>;
+        }}>{`Load More (${Math.min(libVisibleCount, libFiltered.length)} of ${libFiltered.length})`}</button>}</div></div>}{
+    /* ── end filtered view ──
+       The exercise detail bottom sheet used to render here. It now lives at
+       the App root as a portal (features/exercises/ExerciseDetailSheet.jsx)
+       so it can mark the background inert, take Escape, and be opened from
+       any tab — the Plans tab used to open a second, divergent modal for the
+       same data. */
+    }
+  </div>;
 });
 
 export default ExerciseLibraryTab;

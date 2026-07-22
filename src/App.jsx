@@ -21,7 +21,6 @@ import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
 import { useExerciseFilters } from './features/exercises/useExerciseFilters';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
-import GrimoireGridTab from './features/exercises/GrimoireGridTab';
 import MyWorkoutsSubTab from './features/exercises/MyWorkoutsSubTab';
 import MessagesTab from './features/social/MessagesTab';
 import GuildTab from './features/social/GuildTab';
@@ -43,6 +42,7 @@ import OnboardingScreen from './features/onboarding/OnboardingScreen';
 import ClassRevealScreen from './features/onboarding/ClassRevealScreen';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import ExerciseEditorModal from './features/exercises/ExerciseEditorModal';
+import ExerciseDetailSheet from './features/exercises/ExerciseDetailSheet';
 import QuickLogModal from './features/exercises/QuickLogModal';
 
 // ── Debounce utility ──
@@ -231,10 +231,6 @@ function App() {
     setExEditorDraft,
     exEditorMode,
     setExEditorMode,
-    detailEx,
-    setDetailEx,
-    detailImgIdx,
-    setDetailImgIdx,
     savePlanWizard,
     setSavePlanWizard,
     spwName,
@@ -527,13 +523,7 @@ function App() {
   const [exHHMM, setExHHMM] = useState(""); // HH:MM portion of duration
   const [exSec, setExSec] = useState(""); // 0-59 seconds portion
   const [quickRows, setQuickRows] = useState([]); // extra set rows [{sets,reps,weightLbs}]
-  const [exCatFilter, setExCatFilter] = useState("All");
-  const [exCatFilters, setExCatFilters] = useState(() => new Set());
-  const [showFavsOnly, setShowFavsOnly] = useState(false);
-  const [exMuscleFilter, setExMuscleFilter] = useState("All");
-  const [musclePickerOpen, setMusclePickerOpen] = useState(false);
-  const [exSearch, setExSearch] = useState("");
-  const [exSubTab, setExSubTab] = useState("library"); // "log"(hidden) | "library" | "myworkouts"
+  const [exSubTab, setExSubTab] = useState("library"); // "library" | "myworkouts"
   const [favSelectMode, setFavSelectMode] = useState(false);
   const [favSelected, setFavSelected] = useState(() => new Set());
   const [libSearch, setLibSearch] = useState("");
@@ -559,11 +549,8 @@ function App() {
   const [lbAvailableCountries, setLbAvailableCountries] = useState([]);
   const [lbStateDropOpen, setLbStateDropOpen] = useState(false);
   const [lbCountryDropOpen, setLbCountryDropOpen] = useState(false);
-  const [multiSelEx, setMultiSelEx] = useState(() => new Set());
-  const [multiMode, setMultiMode] = useState(false);
   // Plan intensity (shared slider for detail + builder)
 
-  // Exercise detail modal
   // Profile edit
   const [editMode, setEditMode] = useState(false);
   const [securityMode, setSecurityMode] = useState(false);
@@ -722,7 +709,7 @@ function App() {
   // Save-to-Plan wizard mode: "new" | "existing"
 
   // Load Supabase exercises on startup; useExercises() triggers re-render when done
-  const _exReady = useExercises();
+  const { ready: _exReady, error: _exLoadError } = useExercises();
   useEffect(() => {
     loadExercises();
   }, []);
@@ -735,7 +722,6 @@ function App() {
   //   - Restore focus to the element that opened the modal
   // The hook stacks correctly when nested modals open (e.g. picker → config).
   useModalLifecycle(!!exEditorOpen, () => setExEditorOpen(false));
-  useModalLifecycle(detailEx != null, () => setDetailEx(null));
   useModalLifecycle(savePlanWizard != null, () => setSavePlanWizard(null));
   useModalLifecycle(schedulePicker != null, () => setSchedulePicker(null));
   useModalLifecycle(saveWorkoutWizard != null, () => setSaveWorkoutWizard(null));
@@ -2931,13 +2917,15 @@ function App() {
   }, 0), [wbExercises, profile.chosenClass, allExById]);
 
   // ── Exercise filter derivations — extracted to features/exercises ──
-  // Eight memoized derivations the library tab + grimoire grid consume.
-  // The hook keeps the heavy allExercises scans off the App-render hot
-  // path (Finding #5 + #6 from docs/performance-audit.md).
+  // Memoized derivations the library tab consumes. The hook keeps the heavy
+  // allExercises scans off the App-render hot path (Finding #5 + #6 from
+  // docs/performance-audit.md).
   const {
-    grimoireFiltered,
     libFiltered,
     libAvailableTypes,
+    libTypeCounts,
+    libMuscleCounts,
+    libEquipCounts,
     libMuscleCardData,
     libDiscoverRows,
     libMuscleOpts,
@@ -2945,8 +2933,6 @@ function App() {
   } = useExerciseFilters({
     allExercises,
     _exReady,
-    exSearch, exCatFilters, exMuscleFilter, showFavsOnly,
-    favoriteExercises: profile.favoriteExercises,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
 
@@ -5439,203 +5425,14 @@ function App() {
             marginBottom: S.s14
           }}>{[["library", "📖 Library"], ["myworkouts", "💪 My Exercises"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${exSubTab === t ? "on" : ""}`} onClick={() => setExSubTab(t)}>{l}</button>)}</div>
 
-          {
-            /* ══ LOG SUB-TAB (original grimoire view) ══ */
-          }{exSubTab === "log" && <><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Techniques ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
-
-            {
-              /* ══ TECHNIQUE SEARCH ══ */
-            }<div className={"tech-search-wrap"}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={"Search Techniques…"} value={exSearch} onChange={e => setExSearch(e.target.value)} />{exSearch && <span className={"tech-search-clear"} onClick={() => setExSearch("")}>{"✕"}</span>}</div>
-
-            {
-              /* ══ FILTERS ══ */
-            }<div className={"filter-section"}><div className={"filter-pills-row"}>{[{
-                  cat: "strength",
-                  icon: "⚔",
-                  label: "Strength"
-                }, {
-                  cat: "cardio",
-                  icon: "🏃",
-                  label: "Cardio"
-                }, {
-                  cat: "flexibility",
-                  icon: "🧘",
-                  label: "Flexibility"
-                }, {
-                  cat: "endurance",
-                  icon: "🛡",
-                  label: "Endurance"
-                }].map(({
-                  cat,
-                  icon,
-                  label
-                }) => <div key={cat} className={`filter-pill filter-${cat} ${exCatFilters.has(cat) ? "on" : ""}`} onClick={() => setExCatFilters(s => {
-                  const n = new Set(s);
-                  n.has(cat) ? n.delete(cat) : n.add(cat);
-                  return n;
-                })}><span className={"filter-pill-icon"}>{icon}</span>{label}</div>)}</div><div className={"filter-controls-row"}><div style={{
-                  position: "relative",
-                  flexShrink: 0
-                }}><button className={`muscle-filter-btn ${exMuscleFilter !== "All" ? "active" : ""}`} onClick={() => setMusclePickerOpen(s => !s)}>{"🏋️ "}{exMuscleFilter === "All" ? "Muscles" : exMuscleFilter.charAt(0).toUpperCase() + exMuscleFilter.slice(1)}<svg width={"10"} height={"10"} viewBox={"0 0 14 14"} fill={"none"} style={{
-                      marginLeft: S.s4,
-                      transition: "transform .2s",
-                      transform: musclePickerOpen ? "rotate(180deg)" : "rotate(0deg)"
-                    }}><polyline points={"3,5 7,9 11,5"} stroke={"currentColor"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></button>{musclePickerOpen && <div style={{
-                    position: "absolute",
-                    top: "110%",
-                    left: 0,
-                    zIndex: 20,
-                    background: "linear-gradient(145deg,#0c0c0a,#0c0c0a)",
-                    border: "1px solid rgba(180,172,158,.06)",
-                    borderRadius: R.r10,
-                    padding: S.s10,
-                    minWidth: 180,
-                    maxWidth: "calc(100vw - 24px)",
-                    boxShadow: "0 8px 32px rgba(0,0,0,.7)"
-                  }}><div style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: S.s8
-                    }}><span style={{
-                        fontSize: FS.sm,
-                        color: "#8a8478",
-                        textTransform: "uppercase",
-                        letterSpacing: ".08em"
-                      }}>{"Muscle Group"}</span><span style={{
-                        fontSize: FS.fs65,
-                        color: "#b4ac9e",
-                        cursor: "pointer"
-                      }} onClick={() => {
-                        setExMuscleFilter("All");
-                        setMusclePickerOpen(false);
-                      }}>{"Clear"}</span></div>{["chest", "shoulder", "bicep", "tricep", "legs", "back", "glutes", "abs", "calves", "forearm", "cardio"].map(mg => <div key={mg} style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: S.s8,
-                      padding: "5px 0",
-                      cursor: "pointer",
-                      borderBottom: "1px solid rgba(45,42,36,.15)"
-                    }} onClick={() => {
-                      setExMuscleFilter(exMuscleFilter === mg ? "All" : mg);
-                      setMusclePickerOpen(false);
-                    }}><div style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: R.r3,
-                        border: `1.5px solid ${exMuscleFilter === mg ? getMuscleColor(mg) : "rgba(180,172,158,.08)"}`,
-                        background: exMuscleFilter === mg ? "rgba(45,42,36,.3)" : "transparent",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0
-                      }}>{exMuscleFilter === mg && <span style={{
-                          color: getMuscleColor(mg),
-                          fontSize: FS.fs55
-                        }}>{"✓"}</span>}</div><span style={{
-                        fontSize: FS.lg,
-                        color: exMuscleFilter === mg ? getMuscleColor(mg) : "#8a8478",
-                        textTransform: "capitalize"
-                      }}>{mg}</span></div>)}</div>}</div><div className={`filter-pill filter-favs ${showFavsOnly ? "on" : ""}`} onClick={() => setShowFavsOnly(v => !v)} style={{
-                  marginLeft: "auto"
-                }}><span className={"filter-pill-icon"}>{"⭐"}</span>{"Favorites"}</div><button className={`filter-select-btn ${multiMode ? "active" : ""}`} onClick={() => {
-                  setMultiMode(m => !m);
-                  setMultiSelEx(() => new Set());
-                  setSelEx(null);
-                }}>{multiMode ? "✕ Cancel" : "⊞ Select"}</button></div></div>
-
-            {
-              /* ══ COMMAND ACTION BAR ══ */
-            }{multiMode && multiSelEx.size > 0 && <div className={"command-action-bar"}><div className={"cab-count"}><span className={"cab-rune"}>{"⊞"}</span><span className={"cab-num"}>{multiSelEx.size}</span></div><div className={"cab-actions"}><button className={"cab-btn"} onClick={() => {
-                  const ids = [...multiSelEx];
-                  setSpwSelected(ids);
-                  setSavePlanWizard({
-                    entries: ids.map(id => ({
-                      exId: id,
-                      exercise: _optionalChain([allExById, 'access', _ => _[id], 'optionalAccess', _ => _.name]),
-                      icon: _optionalChain([allExById, 'access', _ => _[id], 'optionalAccess', _ => _.icon]),
-                      _idx: id
-                    })),
-                    label: "Selected Exercises"
-                  });
-                  setSpwName("Selected Exercises");
-                  setSpwIcon("📋");
-                  setSpwDate("");
-                  setSpwMode("new");
-                  setSpwTargetPlanId(null);
-                  setMultiMode(false);
-                  setMultiSelEx(() => new Set());
-                }}>{"📋 Add to Plan"}</button><button className={"cab-btn"} onClick={() => {
-                  const exs = [...multiSelEx].map(id => {
-                    const e = allExById[id];
-                    return {
-                      exId: id,
-                      sets: _optionalChain([e, 'optionalAccess', _ => _.defaultSets]) || 3,
-                      reps: _optionalChain([e, 'optionalAccess', _ => _.defaultReps]) || 10,
-                      weightLbs: _optionalChain([e, 'optionalAccess', _ => _.defaultWeightLbs]) || null,
-                      durationMin: _optionalChain([e, 'optionalAccess', _ => _.defaultDurationMin]) || null,
-                      weightPct: 100,
-                      distanceMi: null,
-                      hrZone: null
-                    };
-                  });
-                  setAddToWorkoutPicker({
-                    exercises: exs
-                  });
-                  setMultiMode(false);
-                  setMultiSelEx(() => new Set());
-                }}>{"➕ Workout"}</button><button className={"cab-btn"} onClick={() => {
-                  const exs = [...multiSelEx].map(id => {
-                    const e = allExById[id];
-                    return {
-                      exId: id,
-                      sets: _optionalChain([e, 'optionalAccess', _ => _.defaultSets]) || 3,
-                      reps: _optionalChain([e, 'optionalAccess', _ => _.defaultReps]) || 10,
-                      weightLbs: _optionalChain([e, 'optionalAccess', _ => _.defaultWeightLbs]) || null,
-                      durationMin: _optionalChain([e, 'optionalAccess', _ => _.defaultDurationMin]) || null,
-                      weightPct: 100,
-                      distanceMi: null,
-                      hrZone: null
-                    };
-                  });
-                  setWbExercises(exs);
-                  setWbName("");
-                  setWbIcon("💪");
-                  setWbDesc("");
-                  setWbEditId(null);
-                  setWorkoutView("builder");
-                  setActiveTab("workouts");
-                  setMultiMode(false);
-                  setMultiSelEx(() => new Set());
-                }}>{"💪 Reusable"}</button></div></div>
-
-            /* ══ GRIMOIRE GRID ══ */}<GrimoireGridTab
-              grimoireFiltered={grimoireFiltered}
-              profile={profile}
-              setProfile={setProfile}
-              getMult={getMult}
-              multiMode={multiMode}
-              multiSelEx={multiSelEx}
-              setMultiSelEx={setMultiSelEx}
-              selEx={selEx}
-              setSelEx={setSelEx}
-              setMusclePickerOpen={setMusclePickerOpen}
-              setSets={setSets}
-              setReps={setReps}
-              setExWeight={setExWeight}
-              setWeightPct={setWeightPct}
-              setDistanceVal={setDistanceVal}
-              setHrZone={setHrZone}
-              setExHHMM={setExHHMM}
-              setExSec={setExSec}
-              setQuickRows={setQuickRows}
-              setDetailEx={setDetailEx}
-              setDetailImgIdx={setDetailImgIdx}
-              openExEditor={openExEditor}
-            /></>
-
-          /* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
+          {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
             libAvailableTypes={libAvailableTypes}
+            _exReady={_exReady}
+            _exLoadError={_exLoadError}
+            libTypeCounts={libTypeCounts}
+            libMuscleCounts={libMuscleCounts}
+            libEquipCounts={libEquipCounts}
             libMuscleCardData={libMuscleCardData}
             libDiscoverRows={libDiscoverRows}
             libMuscleOpts={libMuscleOpts}
@@ -5815,7 +5612,7 @@ function App() {
           />
         )
 
-        /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setDetailEx={setDetailEx} setDetailImgIdx={setDetailImgIdx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
+        /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setLibDetailEx={setLibDetailEx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
 
         /* ── CALENDAR TAB ────────────────────── */}{activeTab === "calendar" && (
           <CalendarTab
@@ -6070,48 +5867,33 @@ function App() {
       />
     )
 
-    /* ══ EXERCISE DETAIL MODAL ══════════════════ */}{detailEx && createPortal(<div className={"modal-backdrop"} onClick={() => setDetailEx(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()}><div className={"modal-img-row"}>{detailEx.images.map((src, i) => <img key={i} src={`${src}?w=420&h=260&fit=crop&q=80`} alt={detailEx.name} className={"modal-img"} onError={e => {
-            e.target.style.display = "none";
-            e.target.nextSibling && (e.target.nextSibling.style.display = "flex");
-          }} />)
-          /* Fallback placeholders hidden by default */}{detailEx.images.map((_, i) => <div key={`fb${i}`} className={"modal-img-placeholder"} style={{
-            display: "none"
-          }}>{detailEx.icon}</div>)}</div>
-        {
-          /* Body */
-        }<div className={"modal-body"}><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: S.s2
-          }}><div className={"modal-title"}>{detailEx.icon}{" "}{detailEx.name}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setDetailEx(null)}>{"✕"}</button></div><div className={"modal-muscles"}>{detailEx.muscles}</div><p className={"modal-desc"}>{detailEx.desc}</p><div className={"sec"}>{"Form Tips"}</div><div className={"modal-tips"}>{detailEx.tips.map((tip, i) => <div key={i} className={"modal-tip"}>{tip}</div>)}</div><div className={"div"} /><div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: S.s8
-          }}><div style={{
-              display: "flex",
-              gap: S.s8,
-              flexWrap: "wrap"
-            }}><span style={{
-                fontSize: FS.md,
-                color: "#8a8478"
-              }}>{"Base XP: "}<span style={{
-                  color: "#b4ac9e",
-                  fontFamily: "'Inter',sans-serif"
-                }}>{detailEx.baseXP}</span></span><span style={{
-                fontSize: FS.md,
-                color: "#8a8478"
-              }}>{"Category: "}<span style={{
-                  color: "#b4ac9e",
-                  textTransform: "capitalize"
-                }}>{detailEx.category}</span></span>{cls && <span style={{
-                fontSize: FS.md,
-                color: "#8a8478"
-              }}>{"Mult: "}<span style={{
-                  color: getMult(detailEx) > 1.02 ? UI_COLORS.success : getMult(detailEx) < 0.98 ? UI_COLORS.danger : "#b4ac9e"
-                }}>{Math.round(getMult(detailEx) * 100)}{"%"}</span></span>}</div><div /></div></div></div></div>, document.body)
+    /* ══ EXERCISE DETAIL SHEET ══════════════════ */}{(
+      <ExerciseDetailSheet
+        ex={libDetailEx}
+        setLibDetailEx={setLibDetailEx}
+        siblings={activeTab === "workout" && exSubTab === "library" ? libFiltered : null}
+        profile={profile}
+        setProfile={setProfile}
+        setActiveTab={setActiveTab}
+        setAddToWorkoutPicker={setAddToWorkoutPicker}
+        setSavePlanWizard={setSavePlanWizard}
+        setSpwName={setSpwName}
+        setSpwIcon={setSpwIcon}
+        setSpwDate={setSpwDate}
+        setSpwMode={setSpwMode}
+        setSpwTargetPlanId={setSpwTargetPlanId}
+        setSelEx={setSelEx}
+        setSets={setSets}
+        setReps={setReps}
+        setExWeight={setExWeight}
+        setWeightPct={setWeightPct}
+        setHrZone={setHrZone}
+        setDistanceVal={setDistanceVal}
+        setExHHMM={setExHHMM}
+        setExSec={setExSec}
+        setQuickRows={setQuickRows}
+      />
+    )
 
     /* ══ SAVE-TO-PLAN WIZARD ════════════════════ */}{savePlanWizard && createPortal(<div className={"spw-backdrop"} onClick={e => {
       if (e.target === e.currentTarget) setSavePlanWizard(null);

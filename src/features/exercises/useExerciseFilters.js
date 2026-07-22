@@ -3,7 +3,7 @@ import { MUSCLE_META } from '../../data/constants';
 import { getMuscleColor } from '../../utils/xp';
 
 /**
- * Memoized derivations for the exercise library + grimoire grid.
+ * Memoized derivations for the exercise library tab.
  *
  * Lifted from inline IIFE computations in App.jsx (Finding #5 of the perf
  * audit, see docs/performance-audit.md). The 1500+ exercise list was being
@@ -44,13 +44,6 @@ function libMatchesFilters(ex, tF, mF, eF) {
 export function useExerciseFilters({
   allExercises,
   _exReady,
-  // grimoire grid
-  exSearch,
-  exCatFilters,
-  exMuscleFilter,
-  showFavsOnly,
-  favoriteExercises,
-  // library tab
   libSearchDebounced,
   libTypeFilters,
   libMuscleFilters,
@@ -93,24 +86,64 @@ export function useExerciseFilters({
     });
   }, [allExercises, libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters]);
 
-  // Cascading availability — which muscles/equip/types are still selectable
-  // given the OTHER filters. Each excludes its own filter set.
-  const libAvailableMuscles = useMemo(() => new Set(
-    allExercises.filter(ex => libMatchesFilters(ex, libTypeFilters, new Set(), libEquipFilters))
-      .map(ex => (ex.muscleGroup || "").toLowerCase().trim()).filter(Boolean)
-  ), [allExercises, libTypeFilters, libEquipFilters]);
-  const libAvailableEquip = useMemo(() => new Set(
-    allExercises.filter(ex => libMatchesFilters(ex, libTypeFilters, libMuscleFilters, new Set()))
-      .map(ex => (ex.equipment || "bodyweight").toLowerCase().trim()).filter(Boolean)
-  ), [allExercises, libTypeFilters, libMuscleFilters]);
-  const libAvailableTypes = useMemo(() => new Set(
-    allExercises.filter(ex => libMatchesFilters(ex, new Set(), libMuscleFilters, libEquipFilters))
-      .flatMap(ex => {
-        const types = (ex.exerciseType || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
-        const cat = (ex.category || "").toLowerCase();
-        return cat ? [...types, cat] : types;
-      })
-  ), [allExercises, libMuscleFilters, libEquipFilters]);
+  // Faceted counts — for each dimension, how many exercises each option would
+  // yield given the search and the OTHER two dimensions (a facet never
+  // constrains itself, which is what makes multi-select within a dimension
+  // read as OR). Counting instead of just testing presence lets the dropdown
+  // show "Barbell 212" and grey out the options that would empty the list,
+  // so a zero-result filter combination is visible before it's committed
+  // rather than after.
+  //
+  // Each pass is a single walk over allExercises, same cost as the presence-
+  // only Sets these replaced. The Sets are derived from the count maps so
+  // existing callers keep working.
+  const matchesSearch = useMemo(() => {
+    const q = libSearchDebounced.toLowerCase().trim();
+    return q ? ex => ex.name.toLowerCase().includes(q) : () => true;
+  }, [libSearchDebounced]);
+
+  const libMuscleCounts = useMemo(() => {
+    const counts = new Map();
+    for (const ex of allExercises) {
+      if (!matchesSearch(ex)) continue;
+      if (!libMatchesFilters(ex, libTypeFilters, new Set(), libEquipFilters)) continue;
+      const mg = (ex.muscleGroup || "").toLowerCase().trim();
+      if (mg) counts.set(mg, (counts.get(mg) || 0) + 1);
+    }
+    return counts;
+  }, [allExercises, matchesSearch, libTypeFilters, libEquipFilters]);
+
+  const libEquipCounts = useMemo(() => {
+    const counts = new Map();
+    for (const ex of allExercises) {
+      if (!matchesSearch(ex)) continue;
+      if (!libMatchesFilters(ex, libTypeFilters, libMuscleFilters, new Set())) continue;
+      const eq = (ex.equipment || "bodyweight").toLowerCase().trim();
+      if (eq) counts.set(eq, (counts.get(eq) || 0) + 1);
+    }
+    return counts;
+  }, [allExercises, matchesSearch, libTypeFilters, libMuscleFilters]);
+
+  const libTypeCounts = useMemo(() => {
+    const counts = new Map();
+    for (const ex of allExercises) {
+      if (!matchesSearch(ex)) continue;
+      if (!libMatchesFilters(ex, new Set(), libMuscleFilters, libEquipFilters)) continue;
+      // An exercise can carry several type tags plus a category; count it
+      // once per distinct tag so the numbers match what selecting that tag
+      // would actually return.
+      const tags = new Set((ex.exerciseType || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean));
+      const cat = (ex.category || "").toLowerCase();
+      if (cat) tags.add(cat);
+      for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
+    }
+    return counts;
+  }, [allExercises, matchesSearch, libMuscleFilters, libEquipFilters]);
+
+  // Cascading availability — kept as Sets for callers that only need a yes/no.
+  const libAvailableMuscles = useMemo(() => new Set(libMuscleCounts.keys()), [libMuscleCounts]);
+  const libAvailableEquip = useMemo(() => new Set(libEquipCounts.keys()), [libEquipCounts]);
+  const libAvailableTypes = useMemo(() => new Set(libTypeCounts.keys()), [libTypeCounts]);
 
   // Visible filter pill sets — kept selectable if either available given
   // current other filters, OR already in the user's selection.
@@ -140,24 +173,14 @@ export function useExerciseFilters({
     return rows;
   }, [allExercises, _exReady]);
 
-  // Grimoire grid — separate filter state from the library tab.
-  const grimoireFiltered = useMemo(() => {
-    const q = exSearch.toLowerCase().trim();
-    const favs = favoriteExercises || [];
-    return allExercises.filter(ex =>
-      (exCatFilters.size === 0 || exCatFilters.has(ex.category) || ex.secondaryCategory && exCatFilters.has(ex.secondaryCategory)) &&
-      (exMuscleFilter === "All" || ex.muscleGroup === exMuscleFilter) &&
-      (!showFavsOnly || favs.includes(ex.id)) &&
-      (q === "" || ex.name.toLowerCase().includes(q))
-    );
-  }, [allExercises, exCatFilters, exMuscleFilter, showFavsOnly, favoriteExercises, exSearch]);
-
   return {
-    grimoireFiltered,
     libFiltered,
     libAvailableMuscles,
     libAvailableEquip,
     libAvailableTypes,
+    libMuscleCounts,
+    libEquipCounts,
+    libTypeCounts,
     libMuscleCountsByGroup,
     libMuscleCardData,
     libDiscoverRows,

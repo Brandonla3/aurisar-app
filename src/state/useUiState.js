@@ -25,10 +25,6 @@ export function useUiState() {
   const [exEditorDraft, setExEditorDraft] = useState({});
   const [exEditorMode, setExEditorMode] = useState("create"); // "create"|"edit"|"copy"
 
-  // ── Exercise detail modal (read-only) ────────────────────────────────────
-  const [detailEx, setDetailEx] = useState(null);
-  const [detailImgIdx, setDetailImgIdx] = useState(0);
-
   // ── Save-to-plan wizard ──────────────────────────────────────────────────
   const [savePlanWizard, setSavePlanWizard] = useState(null); // null | {entries, label}
   const [spwName, setSpwName] = useState("");
@@ -116,7 +112,6 @@ export function useUiState() {
     // Exercise editor
     exEditorOpen, setExEditorOpen, exEditorDraft, setExEditorDraft, exEditorMode, setExEditorMode,
     // Exercise detail
-    detailEx, setDetailEx, detailImgIdx, setDetailImgIdx,
     // Save-to-plan wizard
     savePlanWizard, setSavePlanWizard, spwName, setSpwName, spwIcon, setSpwIcon, spwDate, setSpwDate,
     spwSelected, setSpwSelected, spwMode, setSpwMode, spwTargetPlanId, setSpwTargetPlanId,

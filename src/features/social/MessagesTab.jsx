@@ -14,8 +14,8 @@ import { ClassIcon } from '../../components/ClassIcon';
  *
  * Wrapped in React.memo so unrelated App re-renders (toast, xpFlash,
  * modals on other tabs) don't drag the messages tab into a re-render
- * when none of its props changed. Matches the ExerciseLibraryTab and
- * GrimoireGridTab convention.
+ * when none of its props changed. Matches the ExerciseLibraryTab
+ * convention.
  */
 
 const MessagesTab = memo(function MessagesTab({

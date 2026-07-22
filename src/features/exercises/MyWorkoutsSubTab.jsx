@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
@@ -12,6 +12,10 @@ import { S, R, FS } from '../../utils/tokens';
  * Rendered when exSubTab === "myworkouts" inside the Exercises tab.
  * Pure presentational; all state and setters are threaded in as props.
  */
+
+// Favourites render in pages rather than all at once — the list is unbounded
+// and every row does a lookup + colour derivation.
+const FAV_PAGE = 20;
 
 const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
   // Profile data
@@ -48,6 +52,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
   openExEditor,
   deleteCustomEx,
 }) {
+  const [favVisibleCount, setFavVisibleCount] = useState(FAV_PAGE);
   return (
     <div>
       {/* ── Favorites ─────────────────────────────────── */}
@@ -218,7 +223,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: S.s6 }}>
-            {(profile.favoriteExercises || []).slice(0, 20).map(exId => {
+            {(profile.favoriteExercises || []).slice(0, favVisibleCount).map(exId => {
               const ex = allExById[exId];
               if (!ex) return null;
               const hasPB = !!(profile.exercisePBs || {})[ex.id];
@@ -349,6 +354,24 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                 </div>
               );
             })}
+            {/* The list used to hard-slice at 20 with no indication, so
+                favourite #21 onwards simply vanished. */}
+            {(profile.favoriteExercises || []).length > favVisibleCount && (
+              <button
+                type="button"
+                onClick={() => setFavVisibleCount(c => c + FAV_PAGE)}
+                style={{
+                  background: "rgba(45,42,36,.2)",
+                  border: "1px solid rgba(180,172,158,.08)",
+                  color: "#b4ac9e",
+                  padding: "9px",
+                  borderRadius: R.lg,
+                  fontSize: FS.md,
+                  cursor: "pointer",
+                  marginTop: S.s2
+                }}
+              >{`Show more (${favVisibleCount} of ${(profile.favoriteExercises || []).length})`}</button>
+            )}
           </div>
         )}
       </div>
