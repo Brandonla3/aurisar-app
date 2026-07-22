@@ -40,17 +40,25 @@ function FilterDropdown({
     [options, selected, counts]
   );
 
-  // Opening moves focus into the listbox (so arrow keys reach it without a
-  // further Tab) and lands the active option on the first selected entry, or
-  // the first selectable one, so keyboard users don't start from nowhere.
-  // React's autoFocus is unreliable on a conditionally-rendered tabIndex={-1}
-  // element, so this is explicit.
+  // Opening lands the active option on the first selected entry, or the first
+  // selectable one, so keyboard users don't start from nowhere. Adjusted
+  // during render rather than in an effect — setting state from an effect here
+  // would render the list once at the wrong index and then again to correct it.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      const firstSel = options.findIndex(v => selected.has(v));
+      setActiveIdx(firstSel >= 0 ? firstSel : enabled.findIndex(Boolean));
+    } else {
+      setActiveIdx(-1);
+    }
+  }
+
+  // Focus is a DOM side effect, so it does belong in an effect. React's
+  // autoFocus is unreliable on a conditionally-rendered tabIndex={-1} node.
   useEffect(() => {
-    if (!open) { setActiveIdx(-1); return; }
-    listRef.current?.focus();
-    const firstSel = options.findIndex(v => selected.has(v));
-    setActiveIdx(firstSel >= 0 ? firstSel : enabled.findIndex(Boolean));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (open) listRef.current?.focus();
   }, [open]);
 
   useEffect(() => {
@@ -139,6 +147,10 @@ function FilterDropdown({
         role="listbox"
         aria-multiselectable="true"
         aria-label={label}
+        // Focus stays on the listbox and the "current" option is announced via
+        // activedescendant, which is what lets one keydown handler drive the
+        // whole list instead of roving tabindex across every option.
+        aria-activedescendant={activeIdx >= 0 ? `${id}-opt-${activeIdx}` : undefined}
         tabIndex={-1}
         onKeyDown={onListKey}
         style={{
@@ -166,8 +178,10 @@ function FilterDropdown({
           return (
             <div
               key={val}
+              id={`${id}-opt-${i}`}
               ref={el => { optionRefs.current[i] = el; }}
               role="option"
+              tabIndex={-1}
               aria-selected={sel}
               aria-disabled={!isEnabled}
               onClick={() => isEnabled && onToggle(val)}

@@ -43,6 +43,8 @@ import ClassRevealScreen from './features/onboarding/ClassRevealScreen';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import ExerciseEditorModal from './features/exercises/ExerciseEditorModal';
 import ExerciseDetailSheet from './features/exercises/ExerciseDetailSheet';
+import StagingTray from './components/StagingTray';
+import { useExerciseCart, cartEntry } from './hooks/useExerciseCart';
 import QuickLogModal from './features/exercises/QuickLogModal';
 
 // ── Debounce utility ──
@@ -525,7 +527,6 @@ function App() {
   const [quickRows, setQuickRows] = useState([]); // extra set rows [{sets,reps,weightLbs}]
   const [exSubTab, setExSubTab] = useState("library"); // "library" | "myworkouts"
   const [favSelectMode, setFavSelectMode] = useState(false);
-  const [favSelected, setFavSelected] = useState(() => new Set());
   const [libSearch, setLibSearch] = useState("");
   const [libSearchDebounced, setLibSearchDebounced] = useState("");
   const debouncedSetLibSearch = React.useRef(debounce(v => setLibSearchDebounced(v), 200)).current;
@@ -535,7 +536,12 @@ function App() {
   const [libOpenDrop, setLibOpenDrop] = useState(null); // "type"|"muscle"|"equip"|null
   const [libDetailEx, setLibDetailEx] = useState(null);
   const [libSelectMode, setLibSelectMode] = useState(false);
-  const [libSelected, setLibSelected] = useState(() => new Set());
+  // One shared, persisted basket replaces the three throwaway selection Sets
+  // the library, favourites list and builder picker each used to keep.
+  const {
+    cartIds, cartSet, isInCart, addToCart, removeFromCart, toggleCart,
+    clearCart, moveInCart, cartOpen, setCartOpen,
+  } = useExerciseCart();
   const [libBrowseMode, setLibBrowseMode] = useState("home");
   const [libVisibleCount, setLibVisibleCount] = useState(60);
   const [lbFilter, setLbFilter] = useState("overall_xp");
@@ -5427,7 +5433,6 @@ function App() {
 
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
-            libAvailableTypes={libAvailableTypes}
             _exReady={_exReady}
             _exLoadError={_exLoadError}
             libTypeCounts={libTypeCounts}
@@ -5449,12 +5454,13 @@ function App() {
             libOpenDrop={libOpenDrop}
             setLibOpenDrop={setLibOpenDrop}
             debouncedSetLibSearch={debouncedSetLibSearch}
-            libDetailEx={libDetailEx}
             setLibDetailEx={setLibDetailEx}
             libSelectMode={libSelectMode}
+            cartIds={cartIds}
+            isInCart={isInCart}
+            toggleCart={toggleCart}
+            clearCart={clearCart}
             setLibSelectMode={setLibSelectMode}
-            libSelected={libSelected}
-            setLibSelected={setLibSelected}
             libBrowseMode={libBrowseMode}
             setLibBrowseMode={setLibBrowseMode}
             libVisibleCount={libVisibleCount}
@@ -5463,32 +5469,6 @@ function App() {
             setProfile={setProfile}
             allExercises={allExercises}
             allExById={allExById}
-            setActiveTab={setActiveTab}
-            setWbExercises={setWbExercises}
-            setWbName={setWbName}
-            setWbIcon={setWbIcon}
-            setWbDesc={setWbDesc}
-            setWbEditId={setWbEditId}
-            setWbIsOneOff={setWbIsOneOff}
-            setWorkoutView={setWorkoutView}
-            setAddToWorkoutPicker={setAddToWorkoutPicker}
-            setSavePlanWizard={setSavePlanWizard}
-            setSpwName={setSpwName}
-            setSpwIcon={setSpwIcon}
-            setSpwDate={setSpwDate}
-            setSpwMode={setSpwMode}
-            setSpwTargetPlanId={setSpwTargetPlanId}
-            setSpwSelected={setSpwSelected}
-            setSelEx={setSelEx}
-            setSets={setSets}
-            setReps={setReps}
-            setExWeight={setExWeight}
-            setWeightPct={setWeightPct}
-            setHrZone={setHrZone}
-            setDistanceVal={setDistanceVal}
-            setExHHMM={setExHHMM}
-            setExSec={setExSec}
-            setQuickRows={setQuickRows}
           />
           /* ══ MY WORKOUTS SUB-TAB ══ */}{exSubTab === "myworkouts" && (
             <MyWorkoutsSubTab
@@ -5496,26 +5476,12 @@ function App() {
               setProfile={setProfile}
               allExById={allExById}
               favSelectMode={favSelectMode}
+              isInCart={isInCart}
+              toggleCart={toggleCart}
+              clearCart={clearCart}
               setFavSelectMode={setFavSelectMode}
-              favSelected={favSelected}
-              setFavSelected={setFavSelected}
               setExSubTab={setExSubTab}
               setLibDetailEx={setLibDetailEx}
-              setActiveTab={setActiveTab}
-              setWbExercises={setWbExercises}
-              setWbName={setWbName}
-              setWbIcon={setWbIcon}
-              setWbDesc={setWbDesc}
-              setWbEditId={setWbEditId}
-              setWbIsOneOff={setWbIsOneOff}
-              setWorkoutView={setWorkoutView}
-              setAddToWorkoutPicker={setAddToWorkoutPicker}
-              setSavePlanWizard={setSavePlanWizard}
-              setSpwName={setSpwName}
-              setSpwIcon={setSpwIcon}
-              setSpwDate={setSpwDate}
-              setSpwMode={setSpwMode}
-              setSpwTargetPlanId={setSpwTargetPlanId}
               openExEditor={openExEditor}
               deleteCustomEx={deleteCustomEx}
             />
@@ -5864,6 +5830,60 @@ function App() {
         openExEditor={openExEditor}
         deleteCustomEx={deleteCustomEx}
         newExDraft={newExDraft}
+      />
+    )
+
+    /* ══ STAGING TRAY ═══════════════════════════ */}{(
+      <StagingTray
+        cartIds={cartIds}
+        allExById={allExById}
+        // The tray is scoped to the surfaces that stage exercises. Following
+        // it into the 3D world or a chat thread would be noise.
+        isCartRoute={activeTab === "workout" || activeTab === "workouts" || activeTab === "plans"}
+        cartOpen={cartOpen}
+        setCartOpen={setCartOpen}
+        removeFromCart={removeFromCart}
+        clearCart={clearCart}
+        moveInCart={moveInCart}
+        onForgeWorkout={() => {
+          setWbExercises(cartIds.map(id => cartEntry(id, allExById)));
+          setWbName("");
+          setWbIcon("💪");
+          setWbDesc("");
+          setWbEditId(null);
+          setWbIsOneOff(false);
+          setWorkoutView("builder");
+          setActiveTab("workouts");
+          clearCart();
+          setLibSelectMode(false);
+          setFavSelectMode(false);
+        }}
+        onAddToExisting={() => {
+          setAddToWorkoutPicker({ exercises: cartIds.map(id => cartEntry(id, allExById)) });
+          clearCart();
+          setLibSelectMode(false);
+          setFavSelectMode(false);
+        }}
+        onForgePlan={() => {
+          setSpwSelected([...cartIds]);
+          setSavePlanWizard({
+            entries: cartIds.map(id => ({
+              exId: id,
+              exercise: allExById[id] && allExById[id].name,
+              icon: allExById[id] && allExById[id].icon,
+              _idx: id
+            })),
+            label: "Staged Exercises"
+          });
+          setSpwName("Staged Exercises");
+          setSpwIcon("📋");
+          setSpwDate("");
+          setSpwMode("new");
+          setSpwTargetPlanId(null);
+          clearCart();
+          setLibSelectMode(false);
+          setFavSelectMode(false);
+        }}
       />
     )
 

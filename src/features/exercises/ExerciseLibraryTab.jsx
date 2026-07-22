@@ -40,7 +40,7 @@ const TYPE_LABELS = {
 const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const {
     // Hook outputs
-    libFiltered, libAvailableTypes, libMuscleCardData, libDiscoverRows, libMuscleOpts, libEquipOpts,
+    libFiltered, libMuscleCardData, libDiscoverRows, libMuscleOpts, libEquipOpts,
     libTypeCounts, libMuscleCounts, libEquipCounts,
     // Filter state
     libSearch, setLibSearch,
@@ -51,30 +51,17 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     libOpenDrop, setLibOpenDrop,
     debouncedSetLibSearch,
     // View state
-    libDetailEx, setLibDetailEx,
+    setLibDetailEx,
     libSelectMode, setLibSelectMode,
-    libSelected, setLibSelected,
+    cartIds, isInCart, toggleCart, clearCart,
     libBrowseMode, setLibBrowseMode,
     libVisibleCount, setLibVisibleCount,
     // Profile / data
     profile, setProfile,
     allExercises, allExById,
     _exReady, _exLoadError,
-    // Cross-tab navigation
-    setActiveTab,
-    // Workout builder (for "New Workout" action)
-    setWbExercises, setWbName, setWbIcon, setWbDesc, setWbEditId, setWbIsOneOff,
-    setWorkoutView,
-    // Add-to-Workout picker
-    setAddToWorkoutPicker,
-    // Save-to-Plan wizard
-    setSavePlanWizard,
-    setSpwName, setSpwIcon, setSpwDate, setSpwMode, setSpwTargetPlanId,
-    setSpwSelected,
     // Quick-log (for "Configure" action)
-    setSelEx, setSets, setReps, setExWeight, setWeightPct,
-    setHrZone, setDistanceVal, setExHHMM, setExSec, setQuickRows,
-  } = props;
+      } = props;
 
   const revealRef = useScrollReveal();
   const [catalogNoteDismissed, setCatalogNoteDismissed] = useState(false);
@@ -106,11 +93,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   // Aliased so the JSX below stays close to the pre-extraction shape.
   const MUSCLE_OPTS = libMuscleOpts;
   const EQUIP_OPTS = libEquipOpts;
-  const toggleSel = id => setLibSelected(s => {
-    const n = new Set(s);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
-  });
+  const toggleSel = toggleCart;
 
   /* ── Home view computed data ── */
   const MUSCLE_CARD_DATA = libMuscleCardData;
@@ -178,7 +161,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     }
     <div className={"lib-sticky-search"}>{libSelectMode && <div className={"lib-conscript-banner"} role="status">
         <span>{"⊞ Selecting"}</span>
-        <span className={"lib-conscript-banner-count"}>{libSelected.size === 0 ? "tap rows to add" : `${libSelected.size} chosen`}</span>
+        <span className={"lib-conscript-banner-count"}>{cartIds.length === 0 ? "tap rows to stage" : `${cartIds.length} staged`}</span>
       </div>}<div style={{
         display: "flex",
         gap: S.s8,
@@ -197,8 +180,10 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
             setLibVisibleCount(60);
             if (libMuscleFilters.size === 0 && libTypeFilters.size === 0 && libEquipFilters.size === 0) setLibBrowseMode("home");
           }}>{"✕"}</span>}</div>{libBrowseMode === "filtered" && <button onClick={() => {
+          // Leaving select mode empties the staging tray — the tray is the
+          // selection, so keeping it would leave an invisible basket behind.
+          if (libSelectMode) clearCart();
           setLibSelectMode(m => !m);
-          setLibSelected(new Set());
         }} style={{
           flexShrink: 0,
           padding: "6px 12px",
@@ -260,7 +245,6 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
             mg,
             label,
             emoji,
-            icon,
             count,
             color
           }) => <div key={"mc-" + mg} className={"lib-muscle-tile"} onClick={() => {
@@ -438,120 +422,10 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           fontSize: FS.fs68,
           cursor: "pointer"
         }}>{"Clear all filters"}</button>}</div>{/* Select mode action bar */
-      libSelectMode && libSelected.size > 0 && <div style={{
-        background: "rgba(45,42,36,.2)",
-        border: "1px solid rgba(180,172,158,.06)",
-        borderRadius: R.r10,
-        padding: "10px 14px",
-        marginBottom: S.s10,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: S.s8
-      }}><span style={{
-          fontSize: FS.lg,
-          color: "#b4ac9e",
-          fontWeight: "700"
-        }}>{libSelected.size + " selected"}</span><div style={{
-          display: "flex",
-          gap: S.s8,
-          justifyContent: "center"
-        }}><button onClick={() => {
-            const exs = [...libSelected].map(id => {
-              const e = allExById[id];
-              return {
-                exId: id,
-                sets: e && e.defaultSets != null ? e.defaultSets : 3,
-                reps: e && e.defaultReps != null ? e.defaultReps : 10,
-                weightLbs: null,
-                durationMin: e && e.defaultDurationMin || null,
-                weightPct: 100,
-                distanceMi: null,
-                hrZone: null
-              };
-            });
-            setAddToWorkoutPicker({
-              exercises: exs
-            });
-            setLibSelectMode(false);
-            setLibSelected(new Set());
-          }} style={{
-            background: "rgba(45,42,36,.22)",
-            border: "1px solid rgba(180,172,158,.08)",
-            color: "#b4ac9e",
-            padding: "6px 12px",
-            borderRadius: R.lg,
-            fontSize: FS.md,
-            fontWeight: "700",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            textAlign: "center"
-          }}>{"➕ Existing"}</button><button onClick={() => {
-            const exs = [...libSelected].map(id => {
-              const e = allExById[id];
-              return {
-                exId: id,
-                sets: e && e.defaultSets != null ? e.defaultSets : 3,
-                reps: e && e.defaultReps != null ? e.defaultReps : 10,
-                weightLbs: null,
-                durationMin: e && e.defaultDurationMin || null,
-                weightPct: 100,
-                distanceMi: null,
-                hrZone: null
-              };
-            });
-            setWbExercises(exs);
-            setWbName("");
-            setWbIcon("💪");
-            setWbDesc("");
-            setWbEditId(null);
-            setWbIsOneOff(false);
-            setWorkoutView("builder");
-            setActiveTab("workouts");
-            setLibSelectMode(false);
-            setLibSelected(new Set());
-          }} style={{
-            background: "linear-gradient(135deg,#5b2d8e,#7b1fa2)",
-            border: "none",
-            color: "#fff",
-            padding: "6px 12px",
-            borderRadius: R.lg,
-            fontSize: FS.md,
-            fontWeight: "700",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            textAlign: "center"
-          }}>{"⚡ New Workout"}</button><button onClick={() => {
-            const ids = [...libSelected];
-            setSpwSelected(ids);
-            setSavePlanWizard({
-              entries: ids.map(id => ({
-                exId: id,
-                exercise: allExById[id] && allExById[id].name,
-                icon: allExById[id] && allExById[id].icon,
-                _idx: id
-              })),
-              label: "Selected Exercises"
-            });
-            setSpwName("Selected Exercises");
-            setSpwIcon("📋");
-            setSpwDate("");
-            setSpwMode("new");
-            setSpwTargetPlanId(null);
-            setLibSelectMode(false);
-            setLibSelected(new Set());
-          }} style={{
-            background: "rgba(45,42,36,.26)",
-            border: "1px solid rgba(180,172,158,.08)",
-            color: "#b4ac9e",
-            padding: "6px 12px",
-            borderRadius: R.lg,
-            fontSize: FS.md,
-            fontWeight: "700",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            textAlign: "center"
-          }}>{"📋 Plan"}</button></div></div>} {
+      /* The three-destination action bar used to live here; it is now the
+         staging tray's Forge menu (components/StagingTray.jsx), which stays
+         reachable after you navigate away from this list. */
+      null}  {
         /* Exercise list (paginated) */
       }
       <div style={{
@@ -572,7 +446,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         )}{libFiltered.slice(0, libVisibleCount).map(ex => {
           const isFav = (profile.favoriteExercises || []).includes(ex.id);
           const hasPB = !!(profile.exercisePBs || {})[ex.id];
-          const isSel = libSelected.has(ex.id);
+          const isSel = isInCart(ex.id);
           // Derive difficulty — prefer stored value, fall back to baseXP tiers
           const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
           const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";

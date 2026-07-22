@@ -26,28 +26,12 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
   // Favorite-select multi-select state
   favSelectMode,
   setFavSelectMode,
-  favSelected,
-  setFavSelected,
+  isInCart,
+  toggleCart,
+  clearCart,
   // Sub-tab / detail navigation
   setExSubTab,
   setLibDetailEx,
-  setActiveTab,
-  // Workout builder state (for "⚡ New Workout" action)
-  setWbExercises,
-  setWbName,
-  setWbIcon,
-  setWbDesc,
-  setWbEditId,
-  setWbIsOneOff,
-  setWorkoutView,
-  // Pickers / wizards
-  setAddToWorkoutPicker,
-  setSavePlanWizard,
-  setSpwName,
-  setSpwIcon,
-  setSpwDate,
-  setSpwMode,
-  setSpwTargetPlanId,
   // Exercise editor actions
   openExEditor,
   deleteCustomEx,
@@ -72,8 +56,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
           {(profile.favoriteExercises || []).length > 0 && (
             <button
               onClick={() => {
+                if (favSelectMode) clearCart();
                 setFavSelectMode(!favSelectMode);
-                setFavSelected(new Set());
               }}
               style={{
                 background: favSelectMode ? "rgba(45,42,36,.3)" : "transparent",
@@ -90,132 +74,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
           )}
         </div>
 
-        {/* Multi-select action bar */}
-        {favSelectMode && favSelected.size > 0 && (
-          <div style={{
-            background: "rgba(45,42,36,.2)",
-            border: "1px solid rgba(180,172,158,.06)",
-            borderRadius: R.r10,
-            padding: "10px 14px",
-            marginBottom: S.s10,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: S.s8
-          }}>
-            <span style={{ fontSize: FS.lg, color: "#b4ac9e", fontWeight: "700" }}>
-              {favSelected.size + " selected"}
-            </span>
-            <div style={{ display: "flex", gap: S.s8, justifyContent: "center" }}>
-              <button
-                onClick={() => {
-                  const ids = [...favSelected];
-                  const exs = ids.map(id => {
-                    const e = allExById[id];
-                    return {
-                      exId: id,
-                      sets: e && e.defaultSets != null ? e.defaultSets : 3,
-                      reps: e && e.defaultReps != null ? e.defaultReps : 10,
-                      weightLbs: null,
-                      durationMin: e && e.defaultDurationMin || null,
-                      weightPct: 100,
-                      distanceMi: null,
-                      hrZone: null
-                    };
-                  });
-                  setAddToWorkoutPicker({ exercises: exs });
-                  setFavSelectMode(false);
-                  setFavSelected(new Set());
-                }}
-                style={{
-                  background: "rgba(45,42,36,.22)",
-                  border: "1px solid rgba(180,172,158,.08)",
-                  color: "#b4ac9e",
-                  padding: "6px 12px",
-                  borderRadius: R.lg,
-                  fontSize: FS.md,
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  textAlign: "center"
-                }}
-              >{"➕ Existing"}</button>
-              <button
-                onClick={() => {
-                  const ids = [...favSelected];
-                  const exs = ids.map(id => {
-                    const e = allExById[id];
-                    return {
-                      exId: id,
-                      sets: e && e.defaultSets != null ? e.defaultSets : 3,
-                      reps: e && e.defaultReps != null ? e.defaultReps : 10,
-                      weightLbs: null,
-                      durationMin: e && e.defaultDurationMin || null,
-                      weightPct: 100,
-                      distanceMi: null,
-                      hrZone: null
-                    };
-                  });
-                  setWbExercises(exs);
-                  setWbName("");
-                  setWbIcon("💪");
-                  setWbDesc("");
-                  setWbEditId(null);
-                  setWbIsOneOff(false);
-                  setWorkoutView("builder");
-                  setActiveTab("workouts");
-                  setFavSelectMode(false);
-                  setFavSelected(new Set());
-                }}
-                style={{
-                  background: "linear-gradient(135deg,#5b2d8e,#7b1fa2)",
-                  border: "none",
-                  color: "#fff",
-                  padding: "6px 12px",
-                  borderRadius: R.lg,
-                  fontSize: FS.md,
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  textAlign: "center"
-                }}
-              >{"⚡ New Workout"}</button>
-              <button
-                onClick={() => {
-                  const ids = [...favSelected];
-                  setSavePlanWizard({
-                    entries: ids.map(id => ({
-                      exId: id,
-                      exercise: allExById[id] && allExById[id].name,
-                      icon: allExById[id] && allExById[id].icon,
-                      _idx: id
-                    })),
-                    label: "Selected Favorites"
-                  });
-                  setSpwName("Selected Favorites");
-                  setSpwIcon("📋");
-                  setSpwDate("");
-                  setSpwMode("new");
-                  setSpwTargetPlanId(null);
-                  setFavSelectMode(false);
-                  setFavSelected(new Set());
-                }}
-                style={{
-                  background: "rgba(45,42,36,.26)",
-                  border: "1px solid rgba(180,172,158,.08)",
-                  color: "#b4ac9e",
-                  padding: "6px 12px",
-                  borderRadius: R.lg,
-                  fontSize: FS.md,
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  textAlign: "center"
-                }}
-              >{"📋 Plan"}</button>
-            </div>
-          </div>
-        )}
+        {/* The three-destination action bar moved to the staging tray at the
+            App root, so a selection started here survives leaving this list. */}
 
         {(profile.favoriteExercises || []).length === 0 ? (
           <div className={"empty"} style={{ padding: "16px 0" }}>
@@ -227,22 +87,15 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               const ex = allExById[exId];
               if (!ex) return null;
               const hasPB = !!(profile.exercisePBs || {})[ex.id];
-              const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
-              const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
-              const isSel = favSelected.has(exId);
+              const isSel = isInCart(exId);
               return (
                 <div
                   key={exId}
                   onClick={() => {
                     if (favSelectMode) {
-                      setFavSelected(s => {
-                        const n = new Set(s);
-                        if (n.has(exId)) n.delete(exId); else n.add(exId);
-                        return n;
-                      });
+                      toggleCart(exId);
                     } else {
                       setLibDetailEx(ex);
-                      setExSubTab("library");
                     }
                   }}
                   style={{
