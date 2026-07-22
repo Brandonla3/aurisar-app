@@ -78,7 +78,7 @@ jobs:
         # cache-dependency-path targeting the spacetimedb subproject's
         # lockfile so the cache key fingerprint actually represents
         # what we install.
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
