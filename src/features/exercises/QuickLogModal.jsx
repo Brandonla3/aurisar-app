@@ -1,10 +1,12 @@
 import React, { memo, useMemo, useState } from 'react';
 import { UI_COLORS, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
-import { calcExXP, getMuscleColor, hrRange } from '../../utils/xp';
+import { calcExXP, hrRange } from '../../utils/xp';
 import { isMetric, kgToLbs, lbsToKg, kmToMi, miToKm, weightLabel, distLabel, pctToSlider, sliderToPct } from '../../utils/units';
 import { normalizeHHMM, combineHHMMSec } from '../../utils/time';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
+import { useModalLifecycle } from '../../utils/useModalLifecycle';
+import { entryTime } from './logEntryTime';
 
 /**
  * Single-exercise quick-log modal — extracted from the inline IIFE in
@@ -21,11 +23,6 @@ const GHOST_STALE_DAYS = 14;
 // Two entries logged within this window are treated as the same gym session,
 // which is what makes carrying a weight across exercises reasonable.
 const CARRYOVER_WINDOW_MS = 2 * 60 * 1000;
-
-const entryTime = e => {
-  const t = e && (e.loggedAt || e.dateKey) ? new Date(e.loggedAt || e.dateKey).getTime() : NaN;
-  return Number.isFinite(t) ? t : NaN;
-};
 
 const QuickLogModal = memo(function QuickLogModal({
   // Selected exercise
@@ -47,7 +44,7 @@ const QuickLogModal = memo(function QuickLogModal({
   exSpeed, setExSpeed,
   quickRows, setQuickRows,
   weightPct, setWeightPct,
-  pendingSoloRemoveId, setPendingSoloRemoveId,
+  setPendingSoloRemoveId,
   // Action callbacks
   logExercise,
   openExEditor,
@@ -99,6 +96,10 @@ const QuickLogModal = memo(function QuickLogModal({
   // regression, and sets/reps/weight are coupled anyway, so a single quality
   // number is the only comparison that agrees with what the app rewards.
   const [beat, setBeat] = useState(null); // null | "ghost" | "pb"
+
+  // Dialog semantics: Escape to dismiss, background inert, focus restored.
+  // The detail sheet got this when it was portaled; this sheet never had it.
+  useModalLifecycle(ex != null, () => setSelEx(null));
 
   if (!ex) return null;
 
@@ -245,6 +246,9 @@ const QuickLogModal = memo(function QuickLogModal({
         onClick={dismiss}
       >
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={ex.name}
           className={"sheet-slide-up"}
           style={{ width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto", background: "linear-gradient(160deg,#0c0c0a,#0c0c0a)", border: "1px solid rgba(180,172,158,.06)", borderRadius: "18px 18px 0 0", padding: "0 0 24px" }}
           onClick={e => e.stopPropagation()}
@@ -258,7 +262,7 @@ const QuickLogModal = memo(function QuickLogModal({
               }}>{"← Back"}</button>
               <div style={{ fontSize: FS.fs95, color: "#d4cec4", fontFamily: "'Inter',sans-serif", fontWeight: 600 }}>{ex.icon}{" "}{ex.name}</div>
             </div>
-            <button className={"btn btn-ghost btn-sm"} onClick={dismiss}>{"✕"}</button>
+            <button className={"btn btn-ghost btn-sm"} aria-label={"Close"} onClick={dismiss}>{"✕"}</button>
           </div>
 
           <div style={{ padding: "0 14px" }}>

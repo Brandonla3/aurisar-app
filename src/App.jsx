@@ -3368,6 +3368,10 @@ function App() {
           }),
           date: displayDate,
           dateKey: dateStr,
+          // Wall-clock stamp. dateKey alone parses as midnight, which is
+          // useless for anything that reasons about "a moment ago" — the
+          // quick-log carryover window is two minutes.
+          loggedAt: Date.now(),
           exId: ex.id,
           sourceTotalCal: woWithStats.totalCal || null,
           sourceActiveCal: woWithStats.activeCal || null,
@@ -3518,6 +3522,7 @@ function App() {
         }),
         date: new Date().toLocaleDateString(),
         dateKey: todayStr(),
+        loggedAt: Date.now(),
         exId: ex.id,
         sourceTotalCal: woWithStats.totalCal || null,
         sourceActiveCal: woWithStats.activeCal || null,
@@ -5476,7 +5481,6 @@ function App() {
             cartIds={stagedIds}
             isInCart={isInCart}
             toggleCart={toggleCart}
-            clearCart={clearCart}
             setLibSelectMode={setLibSelectMode}
             libBrowseMode={libBrowseMode}
             setLibBrowseMode={setLibBrowseMode}
@@ -5495,7 +5499,6 @@ function App() {
               favSelectMode={favSelectMode}
               isInCart={isInCart}
               toggleCart={toggleCart}
-              clearCart={clearCart}
               setFavSelectMode={setFavSelectMode}
               setExSubTab={setExSubTab}
               setLibDetailEx={setLibDetailEx}
@@ -5887,12 +5890,22 @@ function App() {
           if (!stagedIds.length) return;
           setSpwSelected([...stagedIds]);
           setSavePlanWizard({
-            entries: stagedIds.map(id => ({
-              exId: id,
-              exercise: allExById[id] && allExById[id].name,
-              icon: allExById[id] && allExById[id].icon,
-              _idx: id
-            })),
+            // The wizard renders sets × reps · weight + XP per row and saves
+            // those same fields, so an entry carrying only a name rendered
+            // "undefined×undefined +undefined XP" and then saved as a flat
+            // 3×10, throwing away the exercise's own defaults. Build from
+            // cartEntry() so this path matches the workout forge.
+            entries: stagedIds.map(id => {
+              const e = allExById[id];
+              const base = cartEntry(id, allExById);
+              return {
+                ...base,
+                exercise: e.name,
+                icon: e.icon,
+                xp: calcExXP(id, base.sets, base.reps, profile.chosenClass, allExById),
+                _idx: id
+              };
+            }),
             label: "Staged Exercises"
           });
           setSpwName("Staged Exercises");
@@ -6270,7 +6283,6 @@ function App() {
         exSpeed={exSpeed} setExSpeed={setExSpeed}
         quickRows={quickRows} setQuickRows={setQuickRows}
         weightPct={weightPct} setWeightPct={setWeightPct}
-        pendingSoloRemoveId={pendingSoloRemoveId}
         setPendingSoloRemoveId={setPendingSoloRemoveId}
         logExercise={logExercise}
         openExEditor={openExEditor}

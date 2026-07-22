@@ -43,6 +43,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
   // "enter-left" / "enter-right" drive the one-shot page-turn animation.
   const [turn, setTurn] = useState(null);
   const touchStart = useRef(null);
+  const sheetRef = useRef(null);
 
   const idx = ex && siblings ? siblings.findIndex(s => s.id === ex.id) : -1;
   const prev = idx > 0 ? siblings[idx - 1] : null;
@@ -55,16 +56,25 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
   };
 
   // Arrow keys page through siblings. Escape is already handled by
-  // useModalLifecycle.
+  // useModalLifecycle. Keyed on the three ids the handler actually closes
+  // over — without a dependency array this detached and re-attached a
+  // document-level listener on every render of the sheet.
   useEffect(() => {
-    if (!ex) return;
+    if (!ex) return undefined;
     const onKey = e => {
       if (e.key === 'ArrowRight') { e.preventDefault(); goTo(next, 'next'); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(prev, 'prev'); }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ex && ex.id, prev && prev.id, next && next.id]);
+
+  // Move focus into the sheet on open so a keyboard user lands inside the
+  // dialog rather than wherever the trigger left them.
+  useEffect(() => {
+    if (ex) sheetRef.current?.focus();
+  }, [ex && ex.id]);
 
   if (!ex) return null;
 
@@ -120,6 +130,8 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
       }}
     >
       <div
+        ref={sheetRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={ex.name}
@@ -136,7 +148,9 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           maxWidth: 520,
           maxHeight: "calc(90vh - var(--bottom-nav-h))",
           overflowY: "auto",
-          padding: "20px 18px 32px"
+          padding: "20px 18px 32px",
+          // Focused programmatically on open; the ring would read as an error.
+          outline: "none"
         }}
       >
         <div style={{

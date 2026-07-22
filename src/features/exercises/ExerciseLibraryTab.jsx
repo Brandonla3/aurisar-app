@@ -39,7 +39,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     // View state
     setLibDetailEx,
     libSelectMode, setLibSelectMode,
-    cartIds, isInCart, toggleCart, clearCart,
+    cartIds, isInCart, toggleCart,
     libBrowseMode, setLibBrowseMode,
     libVisibleCount, setLibVisibleCount,
     // Profile / data
@@ -166,9 +166,10 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
             setLibVisibleCount(60);
             if (libMuscleFilters.size === 0 && libTypeFilters.size === 0 && libEquipFilters.size === 0) setLibBrowseMode("home");
           }}>{"✕"}</span>}</div>{libBrowseMode === "filtered" && <button onClick={() => {
-          // Leaving select mode empties the staging tray — the tray is the
-          // selection, so keeping it would leave an invisible basket behind.
-          if (libSelectMode) clearCart();
+          // Cancel leaves select mode only. It used to clear the cart, but the
+          // cart persists across tabs and reloads, so that silently destroyed a
+          // basket the user may have staged from another surface entirely.
+          // Discarding is the tray's explicit "Clear staging".
           setLibSelectMode(m => !m);
         }} style={{
           flexShrink: 0,

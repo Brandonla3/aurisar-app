@@ -13,10 +13,13 @@
  */
 
 // Type labels double as the option list — order is display order.
+// Must cover every `category` and `exerciseType` value in the catalog; the
+// vocabulary test in __tests__/exerciseCart.test.js fails if one drifts out.
 export const TYPE_LABELS = {
   strength: "⚔️ Strength",
   cardio: "🏃 Cardio",
   flexibility: "🧘 Flexibility",
+  endurance: "🛡 Endurance",
   yoga: "🧘 Yoga",
   stretching: "🌿 Stretch",
   plyometric: "⚡ Plyo",
@@ -33,9 +36,17 @@ export const MUSCLE_OPTS = [
   "glutes", "abs", "calves", "forearm", "full_body", "cardio",
 ];
 
+// Every distinct `equipment` value in the catalog. Omitting one doesn't hide
+// the exercise, it makes it unfilterable — medicine ball, landmine and rings
+// (23 exercises) were invisible to the facet, the same drift that hid
+// full_body and warmup from the workout builder.
 export const EQUIP_OPTS = [
   "barbell", "dumbbell", "kettlebell", "cable", "machine", "bodyweight", "band",
+  "medicine ball", "landmine", "rings",
 ];
+
+/** "medicine ball" → "Medicine ball". */
+export const equipLabel = e => e.charAt(0).toUpperCase() + e.slice(1);
 
 /** "full_body" → "Full body". Shared so the two lists label identically. */
 export const muscleLabel = m => {

@@ -28,7 +28,6 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
   setFavSelectMode,
   isInCart,
   toggleCart,
-  clearCart,
   // Sub-tab / detail navigation
   setExSubTab,
   setLibDetailEx,
@@ -56,7 +55,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
           {(profile.favoriteExercises || []).length > 0 && (
             <button
               onClick={() => {
-                if (favSelectMode) clearCart();
+                // Exits select mode only — see ExerciseLibraryTab: the cart is
+                // persistent, so Cancel must not discard it.
                 setFavSelectMode(!favSelectMode);
               }}
               style={{
