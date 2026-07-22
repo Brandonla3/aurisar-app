@@ -41,9 +41,20 @@ function libMatchesFilters(ex, tF, mF, eF) {
   return true;
 }
 
+// Training recency buckets, in days since the muscle group was last worked.
+// "cold" is the fog: never trained, or long enough ago that it no longer
+// counts toward anything.
+const MUSCLE_HEAT = [
+  { state: 'hot', maxDays: 3 },
+  { state: 'warm', maxDays: 7 },
+  { state: 'fading', maxDays: 14 },
+];
+const MUSCLE_VOLUME_WINDOW_DAYS = 14;
+
 export function useExerciseFilters({
   allExercises,
   _exReady,
+  exerciseLog,
   libSearchDebounced,
   libTypeFilters,
   libMuscleFilters,
@@ -156,6 +167,50 @@ export function useExerciseFilters({
     [libAvailableEquip, libEquipFilters]
   );
 
+  // Per-muscle training heat — how recently and how hard each group was
+  // worked. "What should I train today?" is currently a question you answer
+  // from memory; this turns it into something the tab can show. Consumed by
+  // the torch strip on the home view, and the data layer an anatomy map
+  // would sit on.
+  const libMuscleMapData = useMemo(() => {
+    const now = Date.now();
+    const byGroup = new Map(); // mg -> { lastMs, sets }
+    const windowMs = MUSCLE_VOLUME_WINDOW_DAYS * 86400000;
+
+    for (const entry of exerciseLog || []) {
+      const ex = allExercises.find(e => e.id === entry.exId);
+      const mg = (ex && ex.muscleGroup || '').toLowerCase().trim();
+      if (!mg) continue;
+      const t = entry.dateKey ? new Date(entry.dateKey).getTime() : NaN;
+      if (!Number.isFinite(t)) continue;
+      const rec = byGroup.get(mg) || { lastMs: 0, sets: 0 };
+      if (t > rec.lastMs) rec.lastMs = t;
+      if (now - t <= windowMs) rec.sets += parseInt(entry.sets) || 1;
+      byGroup.set(mg, rec);
+    }
+
+    const peak = Math.max(1, ...[...byGroup.values()].map(v => v.sets));
+
+    return LIB_ALL_MUSCLE_OPTS.filter(m => m !== 'full_body').map(mg => {
+      const meta = MUSCLE_META[mg] || { emoji: '💪', label: mg.charAt(0).toUpperCase() + mg.slice(1) };
+      const rec = byGroup.get(mg);
+      const days = rec ? Math.max(0, Math.floor((now - rec.lastMs) / 86400000)) : null;
+      const bucket = days == null ? null : MUSCLE_HEAT.find(b => days <= b.maxDays);
+      return {
+        mg,
+        label: meta.label,
+        emoji: meta.emoji,
+        color: getMuscleColor(mg),
+        daysSinceTrained: days,
+        // 0..1, relative to the busiest group — an absolute set count means
+        // nothing without knowing the rest of the week.
+        volume: rec ? Math.min(1, rec.sets / peak) : 0,
+        state: bucket ? bucket.state : 'cold',
+      };
+    // Coldest first: the whole point is surfacing what you have been avoiding.
+    }).sort((a, b) => (b.daysSinceTrained ?? Infinity) - (a.daysSinceTrained ?? Infinity));
+  }, [exerciseLog, allExercises]);
+
   // Library home view — discover rows. Each row was an independent
   // allExercises.filter() pass per render; now they're cached together.
   const libDiscoverRows = useMemo(() => {
@@ -183,6 +238,7 @@ export function useExerciseFilters({
     libTypeCounts,
     libMuscleCountsByGroup,
     libMuscleCardData,
+    libMuscleMapData,
     libDiscoverRows,
     libMuscleOpts,
     libEquipOpts,

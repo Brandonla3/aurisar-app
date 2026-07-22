@@ -472,6 +472,47 @@
     .lib-hero-card:hover,.lib-hero-card:active{filter:none}
     .lib-hero-when{font-size:.48rem;color:#8a8478;letter-spacing:.03em;line-height:1}
 
+    /* ── Training heat torches ───────────────────────────────────────────
+       One torch per muscle group, coldest first. Brightness carries recency
+       and --volume carries how hard the group was worked, so the row reads
+       as a gauge rather than a list. Horizontally scrollable: 11 groups do
+       not fit a 375px screen, and wrapping would bury the cold end. */
+    .torch-strip{
+      display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0;
+      list-style:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch
+    }
+    .torch-slot{flex:0 0 auto;scroll-snap-align:start;display:flex}
+    .torch-strip::-webkit-scrollbar{height:2px}
+    .torch-strip::-webkit-scrollbar-thumb{background:rgba(180,172,158,.2);border-radius:2px}
+    .torch{
+      flex:0 0 auto;scroll-snap-align:start;
+      display:flex;flex-direction:column;align-items:center;gap:2px;
+      min-width:60px;padding:8px 6px 6px;border-radius:9px;cursor:pointer;
+      background:linear-gradient(180deg,
+        color-mix(in srgb,var(--mg-color) calc(var(--volume,0) * 16%),rgba(45,42,36,.3)),
+        rgba(25,23,20,.35));
+      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
+      transition:all var(--dur-base) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .torch:active{transform:scale(.96)}
+    .torch-flame{font-size:1.05rem;line-height:1;transition:filter var(--dur-base) var(--ease-standard)}
+    .torch-name{font-size:.5rem;color:#b4ac9e;letter-spacing:.02em;white-space:nowrap}
+    .torch-when{font-size:.46rem;color:#6f6a62;font-variant-numeric:tabular-nums}
+
+    /* Recency drives how lit the torch is. Cold groups are the fog: legible,
+       but plainly unlit. */
+    .torch-hot{border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
+      box-shadow:0 0 12px color-mix(in srgb,var(--mg-color) 22%,transparent)}
+    .torch-hot .torch-flame{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--mg-color) 70%,transparent))}
+    .torch-warm{border-color:color-mix(in srgb,var(--mg-color) 30%,transparent)}
+    .torch-warm .torch-flame{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 45%,transparent))}
+    .torch-fading .torch-flame{filter:grayscale(.45) brightness(.82)}
+    .torch-fading .torch-name{color:#8a8478}
+    .torch-cold{background:rgba(20,19,16,.42);border-color:rgba(180,172,158,.05)}
+    .torch-cold .torch-flame{filter:grayscale(.9) brightness(.5)}
+    .torch-cold .torch-name,.torch-cold .torch-when{color:#5f5a52}
+
     /* ── Staging tray ────────────────────────────────────────────────────
        The cart's one visible home, docked above the bottom nav so a selection
        stays in sight and in reach after you leave the list you made it in.

@@ -6,6 +6,7 @@ import { S, R, FS } from '../../utils/tokens';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
+import MuscleTorchStrip from './MuscleTorchStrip';
 
 /**
  * Exercise library tab — extracted from the inline IIFE in App.jsx as the
@@ -40,7 +41,7 @@ const TYPE_LABELS = {
 const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const {
     // Hook outputs
-    libFiltered, libMuscleCardData, libDiscoverRows, libMuscleOpts, libEquipOpts,
+    libFiltered, libMuscleCardData, libMuscleMapData, libDiscoverRows, libMuscleOpts, libEquipOpts,
     libTypeCounts, libMuscleCounts, libEquipCounts,
     // Filter state
     libSearch, setLibSearch,
@@ -235,6 +236,12 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
             })}</div></div></div>}{yourExercises.length > 0 && <div className={"lib-divider"} />} {
         /* Browse by Muscle — feature tiles */
       }
+      <MuscleTorchStrip data={libMuscleMapData} onPick={mg => {
+        setLibMuscleFilters(new Set([mg]));
+        setLibBrowseMode("filtered");
+      }} />
+      {libMuscleMapData.some(d => d.state !== "cold") && <div className={"lib-divider"} />}
+
       <div className={"lib-home-section"} style={{
         marginBottom: S.s4
       }}><div className={"lib-section-hdr"}><span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Browse by Muscle"}</div><div style={{

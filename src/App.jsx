@@ -2933,12 +2933,14 @@ function App() {
     libMuscleCounts,
     libEquipCounts,
     libMuscleCardData,
+    libMuscleMapData,
     libDiscoverRows,
     libMuscleOpts,
     libEquipOpts,
   } = useExerciseFilters({
     allExercises,
     _exReady,
+    exerciseLog: profile.log,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
 
@@ -5439,6 +5441,7 @@ function App() {
             libMuscleCounts={libMuscleCounts}
             libEquipCounts={libEquipCounts}
             libMuscleCardData={libMuscleCardData}
+            libMuscleMapData={libMuscleMapData}
             libDiscoverRows={libDiscoverRows}
             libMuscleOpts={libMuscleOpts}
             libEquipOpts={libEquipOpts}
