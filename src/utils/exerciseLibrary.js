@@ -5,6 +5,10 @@ import { sb } from './supabase';
 
 let _exercisesLoaded = false;
 let _exerciseCallbacks = [];
+// Set when the Supabase fetch fails. The app still works — it falls back to
+// the bundled catalog — but the user is browsing a stale, smaller library and
+// deserves to be told rather than left to wonder why an exercise is missing.
+let _exerciseLoadError = null;
 
 function _notifyExercisesLoaded() {
   _exercisesLoaded = true;
@@ -112,18 +116,25 @@ async function loadExercises() {
     Object.assign(EX_BY_ID, Object.fromEntries(EXERCISES.map(e => [e.id, e])));
     console.log(`✅ Exercise library loaded: ${data.length} from Supabase (${added} new, ${patched} patched)`);
   } catch (err) {
-    console.warn('Exercise library load failed (using hardcoded set):', err.message);
+    _exerciseLoadError = err.message || 'unknown error';
+    console.warn('Exercise library load failed (using hardcoded set):', _exerciseLoadError);
   }
   _notifyExercisesLoaded();
 }
 
-// Re-render hook — triggers when exercises finish loading
+// Re-render hook — triggers when exercises finish loading.
+// `ready` flips true whether the fetch succeeded or fell back to the bundled
+// catalog; `error` is non-null only in the fallback case, so callers can keep
+// rendering the list either way and surface a banner on top.
 function useExercises() {
-  const [ready, setReady] = React.useState(_exercisesLoaded);
+  const [state, setState] = React.useState(() => ({
+    ready: _exercisesLoaded,
+    error: _exerciseLoadError,
+  }));
   React.useEffect(() => {
-    if (!_exercisesLoaded) onExercisesLoaded(() => setReady(true));
+    if (!_exercisesLoaded) onExercisesLoaded(() => setState({ ready: true, error: _exerciseLoadError }));
   }, []);
-  return ready;
+  return state;
 }
 
 // -- Video URL fetcher via Supabase RPC (server-side, no CORS) --

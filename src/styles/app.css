@@ -11,7 +11,25 @@
     :focus-visible{outline:2px solid var(--cls-color,#c49428);outline-offset:2px;border-radius:4px}
     .builder-ex-row:focus-visible{outline:2px solid var(--cls-color,#c49428);outline-offset:2px}
 
-    :root{--bottom-nav-h:calc(58px + env(safe-area-inset-bottom,0px))}
+    :root{
+      --bottom-nav-h:calc(58px + env(safe-area-inset-bottom,0px));
+
+      /* ── Motion tokens ──────────────────────────────────────────────────
+         One vocabulary for every transition and animation in the app. The
+         JS mirror lives in src/utils/tokens.js (M scale) for inline styles.
+         Reach for a token instead of a literal so the reduced-motion block
+         at the bottom of this file can neutralise motion in one place. */
+      --dur-instant:.1s;   /* colour/opacity-only state flips */
+      --dur-fast:.15s;     /* press feedback, hover tints */
+      --dur-base:.2s;      /* the default — most transitions */
+      --dur-slow:.3s;      /* entrances that carry distance */
+      --dur-sheet:.3s;     /* bottom sheets and modals */
+      --dur-reveal:.5s;    /* scroll reveals, staggered list entrances */
+
+      --ease-standard:cubic-bezier(.4,0,.2,1);   /* material standard */
+      --ease-out:cubic-bezier(.16,1,.3,1);       /* decelerate, for entrances */
+      --ease-spring:cubic-bezier(.34,1.56,.64,1);/* slight overshoot, for rewards */
+    }
     html{font-size:17.333px}
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
     .bg{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 60% at 30% 20%,rgba(45,42,36,.3) 0%,transparent 65%),radial-gradient(ellipse 50% 45% at 70% 75%,rgba(32,30,26,.18) 0%,transparent 55%),#0c0c0a}.bg::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 45%,transparent 40%,rgba(0,0,0,.2) 100%);z-index:0}
@@ -98,14 +116,6 @@
     .div{height:1px;background:rgba(45,42,36,.18);margin:12px 0}
     .empty{text-align:center;padding:36px 20px;color:#8a8478;font-style:italic;font-size:.9rem}
     /* Exercise cards */
-    .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px}
-    .ex-card{background:linear-gradient(145deg,rgba(36,34,28,.88),rgba(26,24,20,.84));border:1px solid rgba(180,172,158,.05);border-radius:10px;padding:11px 10px;cursor:pointer;transition:all .18s;position:relative}
-    .ex-card:hover{background:rgba(45,42,36,.2);transform:translateY(-1px)}
-    .ex-card.sel{border-color:var(--cls-color);background:color-mix(in srgb,var(--cls-color) 11%,transparent)}
-    .ex-card.multi-sel{border-color:rgba(180,172,158,.35);background:rgba(45,42,36,.28);box-shadow:0 0 0 1.5px rgba(180,172,158,.3),0 0 12px rgba(180,172,158,.08)}
-    .ex-multi-check{position:absolute;top:6px;left:6px;width:16px;height:16px;border-radius:4px;border:1.5px solid rgba(180,172,158,.1);background:transparent;display:flex;align-items:center;justify-content:center;font-size:.6rem;transition:all .2s}
-    .ex-card.multi-sel .ex-multi-check{background:rgba(180,172,158,.4);border-color:#b4ac9e;color:#0c0c0a}
-    .multi-action-bar{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.06);border-radius:10px;margin-bottom:10px;align-items:center}
     .ex-icon{font-size:1.3rem;display:block;margin-bottom:4px}
     .ex-name{font-size:.78rem;color:#b4ac9e;line-height:1.2}
     .ex-xp{font-size:.66rem;color:#b4ac9e;margin-top:2px}
@@ -267,16 +277,8 @@
     .ex-pick-xp{font-size:.6rem;color:#b4ac9e;margin-top:2px}
     /* EXERCISE DETAIL MODAL */
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9300;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
-    .modal-img-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:14px 14px 0}
-    .modal-img{width:100%;height:160px;object-fit:cover;border-radius:10px;background:rgba(45,42,36,.15)}
-    .modal-img-placeholder{width:100%;height:160px;border-radius:10px;background:linear-gradient(135deg,color-mix(in srgb,var(--cls-color) 14%,transparent),rgba(45,42,36,.12));display:flex;align-items:center;justify-content:center;font-size:3rem}
     .modal-body{padding:14px}
     .modal-title{font-family:'Inter',sans-serif;font-size:1.1rem;color:#d4cec4;margin-bottom:3px}
-    .modal-muscles{font-size:.72rem;color:var(--cls-color);font-style:italic;margin-bottom:10px}
-    .modal-desc{font-size:.88rem;color:#8a8478;line-height:1.65;margin-bottom:12px}
-    .modal-tips{display:flex;flex-direction:column;gap:6px}
-    .modal-tip{display:flex;align-items:flex-start;gap:7px;font-size:.82rem;color:#8a8478;line-height:1.4}
-    .modal-tip::before{content:'▸';color:var(--cls-color);flex-shrink:0;margin-top:1px}
     /* CHECK-IN CARD */
     .checkin-card{background:linear-gradient(145deg,rgba(45,42,36,.22),rgba(32,30,26,.12));border:1px solid rgba(180,172,158,.06);border-radius:12px;padding:14px;margin-bottom:12px}
     .checkin-top{display:flex;align-items:center;gap:12px}
@@ -375,15 +377,21 @@
 
     /* ── LIBRARY HOME: Section Layout ── */
     /* ── Scroll-reveal rows ── */
-    .scroll-reveal{opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease}
+    .scroll-reveal{opacity:0;transform:translateY(10px);transition:opacity var(--dur-reveal) var(--ease-out),transform var(--dur-reveal) var(--ease-out)}
     .scroll-visible{opacity:1;transform:translateY(0)}
 
     /* ── Bottom-sheet slide-up ── */
     @keyframes sheet-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
-    .sheet-slide-up{animation:sheet-slide-up .3s cubic-bezier(0.4,0,0.2,1) both}
+    .sheet-slide-up{animation:sheet-slide-up var(--dur-sheet) var(--ease-standard) both}
+    /* Page-turn between neighbouring exercises — overrides the slide-up so the
+       sheet stays put vertically while its content swaps sideways. */
+    @keyframes sheet-enter-right{from{transform:translateX(26%);opacity:.2}to{transform:translateX(0);opacity:1}}
+    @keyframes sheet-enter-left{from{transform:translateX(-26%);opacity:.2}to{transform:translateX(0);opacity:1}}
+    .sheet-enter-right{animation:sheet-enter-right var(--dur-base) var(--ease-standard) both}
+    .sheet-enter-left{animation:sheet-enter-left var(--dur-base) var(--ease-standard) both}
 
     @keyframes libFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    .lib-home-section{animation:libFadeUp .4s ease-out both}
+    .lib-home-section{animation:libFadeUp var(--dur-reveal) var(--ease-out) both}
     .lib-home-section:nth-child(2){animation-delay:.08s}
     .lib-home-section:nth-child(3){animation-delay:.16s}
     .lib-home-section:nth-child(4){animation-delay:.22s}
@@ -391,7 +399,7 @@
 
     .lib-section-hdr{font-family:'Cinzel',serif;font-size:.8rem;font-weight:600;color:#b4ac9e;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
     .lib-section-hdr .lib-hdr-icon{font-size:.9rem;opacity:.7}
-    .lib-see-all{background:transparent;border:none;color:#8a8478;font-size:.65rem;cursor:pointer;padding:2px 0;transition:color .2s;font-family:'Inter',sans-serif;letter-spacing:.02em}
+    .lib-see-all{background:transparent;border:none;color:#8a8478;font-size:.65rem;cursor:pointer;padding:2px 0;transition:color var(--dur-base) var(--ease-standard);font-family:'Inter',sans-serif;letter-spacing:.02em}
     .lib-see-all:hover{color:#b4ac9e}
     .lib-divider{height:1px;margin:22px 0;background:linear-gradient(90deg,transparent,rgba(180,172,158,.1) 20%,rgba(180,172,158,.14) 50%,rgba(180,172,158,.1) 80%,transparent)}
 
@@ -403,12 +411,12 @@
       background:linear-gradient(165deg,color-mix(in srgb,var(--mg-color) 10%,rgba(45,42,36,.35)),rgba(32,30,26,.2) 60%,color-mix(in srgb,var(--mg-color) 5%,rgba(20,18,14,.3)));
       border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
       box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.03);
-      transition:all .22s;overflow:hidden;scroll-snap-align:start;-webkit-tap-highlight-color:transparent
+      transition:all var(--dur-slow) var(--ease-standard);overflow:hidden;scroll-snap-align:start;-webkit-tap-highlight-color:transparent
     }
-    .lib-hero-card:active{transform:scale(.97);transition:transform .1s ease}
+    .lib-hero-card:active{transform:scale(.97);transition:transform var(--dur-instant) var(--ease-standard)}
     .lib-hero-card::before{
       content:'';position:absolute;top:0;left:10%;right:10%;height:1.5px;
-      background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.35;transition:opacity .22s
+      background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.35;transition:opacity var(--dur-slow) var(--ease-standard)
     }
     .lib-hero-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--mg-color) 28%,transparent);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 20px color-mix(in srgb,var(--mg-color) 10%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
     .lib-hero-card:hover::before{opacity:.65}
@@ -421,6 +429,237 @@
       box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 16px color-mix(in srgb,var(--mg-color) 15%,transparent),inset 0 0 8px rgba(0,0,0,.4);
       animation:libOrbGlow 4s ease-in-out infinite
     }
+    /* ── Conscription (select) mode ──────────────────────────────────────
+       Select mode used to be indistinguishable from browsing apart from small
+       checkboxes, so a tap meant to open an exercise silently recruited it
+       into a batch instead. While active the tab shifts to a colder steel
+       palette and the rows lose their per-muscle tint, so the change of mode
+       is unmissable at a glance rather than something you infer from a row
+       you already mis-tapped. */
+    .lib-conscript{animation:libConscriptIn var(--dur-slow) var(--ease-out) both}
+    @keyframes libConscriptIn{from{filter:brightness(1.3) grayscale(.8)}to{filter:none}}
+    /* Rows carry an inline --mg-color, so desaturate rather than fight it for
+       the custom property — the per-muscle hue stays readable but muted, and
+       the list plainly is not in its normal state. */
+    .lib-conscript .picker-ex-row{filter:grayscale(.7)}
+    .lib-conscript .picker-ex-row.sel{
+      filter:none;
+      border-left-color:#9fb3ae;
+      box-shadow:0 0 0 1.5px rgba(159,179,174,.45),0 4px 16px rgba(122,143,139,.16)
+    }
+    /* The banner rides inside the already-sticky search bar so it stays on
+       screen without a second sticky layer fighting the first. */
+    .lib-conscript .lib-sticky-search{
+      box-shadow:inset 0 -1px 0 rgba(122,143,139,.35);
+      background:linear-gradient(180deg,rgba(22,26,25,.96),rgba(14,16,15,.92))
+    }
+    .lib-conscript-banner{
+      display:flex;align-items:center;justify-content:center;gap:8px;
+      font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.22em;
+      color:#9fb3ae;background:rgba(122,143,139,.1);
+      border:1px solid rgba(122,143,139,.28);border-radius:6px;
+      padding:4px 8px;margin-bottom:8px;text-transform:uppercase
+    }
+    .lib-conscript-banner-count{
+      font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.02em;
+      color:#d4cec4;font-variant-numeric:tabular-nums
+    }
+
+    /* Staleness fade — --staleness runs 0 (done today) to 1 (3+ weeks ago).
+       A stale card desaturates and dims so the carousel reads as a freshness
+       gauge rather than a static list of the same few names. */
+    .lib-hero-card{filter:grayscale(calc(var(--staleness,0) * .7)) brightness(calc(1 - var(--staleness,0) * .28))}
+    .lib-hero-card:hover,.lib-hero-card:active{filter:none}
+    .lib-hero-when{font-size:.48rem;color:#8a8478;letter-spacing:.03em;line-height:1}
+
+    /* ── Training heat torches ───────────────────────────────────────────
+       One torch per muscle group, coldest first. Brightness carries recency
+       and --volume carries how hard the group was worked, so the row reads
+       as a gauge rather than a list. Horizontally scrollable: 11 groups do
+       not fit a 375px screen, and wrapping would bury the cold end. */
+    .torch-strip{
+      display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0;
+      list-style:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch
+    }
+    .torch-slot{flex:0 0 auto;scroll-snap-align:start;display:flex}
+    .torch-strip::-webkit-scrollbar{height:2px}
+    .torch-strip::-webkit-scrollbar-thumb{background:rgba(180,172,158,.2);border-radius:2px}
+    .torch{
+      flex:0 0 auto;scroll-snap-align:start;
+      display:flex;flex-direction:column;align-items:center;gap:2px;
+      min-width:60px;padding:8px 6px 6px;border-radius:9px;cursor:pointer;
+      background:linear-gradient(180deg,
+        color-mix(in srgb,var(--mg-color) calc(var(--volume,0) * 16%),rgba(45,42,36,.3)),
+        rgba(25,23,20,.35));
+      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
+      transition:all var(--dur-base) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .torch:active{transform:scale(.96)}
+    .torch-flame{font-size:1.05rem;line-height:1;transition:filter var(--dur-base) var(--ease-standard)}
+    .torch-name{font-size:.5rem;color:#b4ac9e;letter-spacing:.02em;white-space:nowrap}
+    .torch-when{font-size:.46rem;color:#6f6a62;font-variant-numeric:tabular-nums}
+
+    /* Recency drives how lit the torch is. Cold groups are the fog: legible,
+       but plainly unlit. */
+    .torch-hot{border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
+      box-shadow:0 0 12px color-mix(in srgb,var(--mg-color) 22%,transparent)}
+    .torch-hot .torch-flame{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--mg-color) 70%,transparent))}
+    .torch-warm{border-color:color-mix(in srgb,var(--mg-color) 30%,transparent)}
+    .torch-warm .torch-flame{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 45%,transparent))}
+    .torch-fading .torch-flame{filter:grayscale(.45) brightness(.82)}
+    .torch-fading .torch-name{color:#8a8478}
+    .torch-cold{background:rgba(20,19,16,.42);border-color:rgba(180,172,158,.05)}
+    .torch-cold .torch-flame{filter:grayscale(.9) brightness(.5)}
+    .torch-cold .torch-name,.torch-cold .torch-when{color:#5f5a52}
+
+    /* ── Staging tray ────────────────────────────────────────────────────
+       The cart's one visible home, docked above the bottom nav so a selection
+       stays in sight and in reach after you leave the list you made it in.
+       Absent entirely when the cart is empty — a permanent empty bar would
+       just be furniture eating thumb space on every screen. */
+    .cart-tray{
+      position:fixed;left:50%;transform:translateX(-50%);
+      bottom:var(--bottom-nav-h);z-index:780;
+      width:100%;max-width:520px;
+      background:linear-gradient(180deg,rgba(20,19,14,.94),rgba(12,12,10,.97));
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+      border:1px solid rgba(196,148,40,.22);border-bottom:none;
+      border-radius:12px 12px 0 0;
+      box-shadow:0 -6px 28px rgba(0,0,0,.5);
+      animation:cartTrayIn var(--dur-slow) var(--ease-out) both
+    }
+    @keyframes cartTrayIn{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
+
+    .cart-tray-bar{
+      display:flex;align-items:center;gap:10px;width:100%;
+      padding:9px 14px;background:transparent;border:none;cursor:pointer;
+      -webkit-tap-highlight-color:transparent
+    }
+    .cart-tray-count{
+      flex-shrink:0;min-width:20px;height:20px;padding:0 6px;
+      display:flex;align-items:center;justify-content:center;
+      border-radius:10px;background:rgba(196,148,40,.18);
+      border:1px solid rgba(196,148,40,.4);
+      color:#e8d08a;font-family:'Inter',sans-serif;font-size:.66rem;
+      font-variant-numeric:tabular-nums
+    }
+    .cart-tray-label{
+      flex:1;text-align:left;font-family:'Cinzel',serif;font-size:.62rem;
+      letter-spacing:.1em;text-transform:uppercase;color:#c4a044
+    }
+    .cart-tray-chevron{color:#8a8478;font-size:.7rem;flex-shrink:0}
+
+    .cart-tray-body{
+      padding:0 14px 12px;
+      max-height:min(46vh,340px);overflow-y:auto
+    }
+    .cart-tray-list{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:4px}
+    .cart-tray-item{
+      display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;
+      background:color-mix(in srgb,var(--mg-color) 8%,rgba(45,42,36,.28));
+      border-left:3px solid color-mix(in srgb,var(--mg-color) 45%,transparent)
+    }
+    .cart-tray-idx{
+      flex-shrink:0;width:16px;text-align:center;color:#6f6a62;
+      font-size:.58rem;font-variant-numeric:tabular-nums
+    }
+    .cart-tray-orb{
+      flex-shrink:0;width:24px;height:24px;border-radius:7px;
+      display:flex;align-items:center;justify-content:center;
+      background:color-mix(in srgb,var(--mg-color) 18%,rgba(25,23,20,.6))
+    }
+    .cart-tray-name{
+      flex:1;min-width:0;font-size:.7rem;color:#d4cec4;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .cart-tray-actions{display:flex;gap:2px;flex-shrink:0}
+    .cart-tray-actions button{
+      background:transparent;border:none;color:#8a8478;cursor:pointer;
+      font-size:.72rem;line-height:1;padding:4px 6px;border-radius:5px;
+      transition:all var(--dur-fast) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .cart-tray-actions button:hover:not(:disabled){background:rgba(45,42,36,.5);color:#d4cec4}
+    .cart-tray-actions button:disabled{opacity:.25;cursor:default}
+
+    .cart-tray-forge{display:flex;gap:6px;margin-bottom:6px}
+    .cart-forge-btn{
+      flex:1;padding:8px 6px;border-radius:8px;cursor:pointer;
+      background:rgba(45,42,36,.32);border:1px solid rgba(180,172,158,.1);
+      color:#b4ac9e;font-size:.64rem;font-weight:600;white-space:nowrap;
+      transition:all var(--dur-fast) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .cart-forge-btn:hover{border-color:rgba(180,172,158,.22);color:#d4cec4}
+    .cart-forge-btn:active{transform:scale(.97)}
+    .cart-forge-primary{
+      flex:1.4;background:linear-gradient(135deg,rgba(196,148,40,.28),rgba(140,100,20,.18));
+      border-color:rgba(196,148,40,.42);color:#e8d08a
+    }
+    .cart-tray-clear{
+      width:100%;background:transparent;border:none;cursor:pointer;
+      color:#6f6a62;font-size:.58rem;letter-spacing:.06em;padding:3px;
+      -webkit-tap-highlight-color:transparent
+    }
+    .cart-tray-clear:hover{color:#b4ac9e}
+
+    /* ── Quick-log ghost ─────────────────────────────────────────────────
+       What you did last time, sitting above the inputs. Deliberately quiet:
+       it is a reference point, not a value, so it never reads as something
+       already filled in. "Repeat" copies it into the form in one tap. */
+    .ql-ghost-bar{
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+      margin-bottom:9px;padding:6px 9px;border-radius:8px;
+      background:rgba(196,148,40,.06);border:1px solid rgba(196,148,40,.18)
+    }
+    .ql-ghost-label{
+      font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.14em;
+      text-transform:uppercase;color:#8a8478;flex-shrink:0
+    }
+    .ql-ghost-vals{font-size:.7rem;color:rgba(196,148,40,.85);font-variant-numeric:tabular-nums;flex:1;min-width:0}
+    .ql-ghost-when{font-size:.55rem;color:#6f6a62;flex-shrink:0}
+    .ql-ghost-repeat{
+      flex-shrink:0;background:transparent;border:1px dashed rgba(196,148,40,.35);
+      border-radius:6px;padding:3px 9px;color:#c4a044;font-size:.62rem;
+      cursor:pointer;transition:all var(--dur-fast) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .ql-ghost-repeat:hover{background:rgba(196,148,40,.12);border-style:solid}
+    .ql-ghost-repeat:active{transform:scale(.96)}
+    /* A ghost from weeks ago is a poor target — say so by fading it. */
+    .ql-ghost-stale{opacity:.5;filter:grayscale(.6)}
+    .ql-carryover-bar{background:rgba(122,143,139,.07);border-color:rgba(122,143,139,.22)}
+    .ql-carryover-bar .ql-ghost-vals{color:rgba(159,179,174,.9)}
+    .ql-carryover-bar .ql-ghost-repeat{border-color:rgba(122,143,139,.4);color:#9fb3ae}
+    .ql-carryover-bar .ql-ghost-repeat:hover{background:rgba(122,143,139,.14)}
+
+    /* Beating the ghost — one-shot, on blur, never mid-keystroke. */
+    @keyframes qlXpBeat{
+      0%{transform:scale(1);text-shadow:none}
+      35%{transform:scale(1.18);text-shadow:0 0 12px rgba(232,208,138,.65)}
+      100%{transform:scale(1);text-shadow:none}
+    }
+    .ql-xp-beat{display:inline-block;animation:qlXpBeat .55s var(--ease-spring) both}
+    .ql-beat-tag{
+      margin-left:7px;font-style:normal;font-size:.58rem;letter-spacing:.03em;
+      color:#e8d08a;background:rgba(232,208,138,.1);
+      border:1px solid rgba(232,208,138,.25);border-radius:5px;padding:1px 6px
+    }
+
+    /* Catalog load / fallback notice above the library list. */
+    .lib-catalog-note{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:7px 11px;border-radius:9px;background:rgba(45,42,36,.28);border:1px solid rgba(180,172,158,.08);color:#8a8478;font-size:.66rem;letter-spacing:.02em;line-height:1.4}
+    .lib-catalog-note-warn{background:rgba(196,148,40,.09);border-color:rgba(196,148,40,.26);color:#c4a044}
+    .lib-catalog-spinner{width:11px;height:11px;flex-shrink:0;border-radius:50%;border:1.5px solid rgba(180,172,158,.2);border-top-color:#b4ac9e;animation:spin .7s linear infinite}
+
+    /* Skeleton rows — same silhouette as .picker-ex-row so the list doesn't
+       reflow when the real data lands. */
+    .lib-skel-row{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;background:rgba(45,42,36,.16);border:1px solid rgba(180,172,158,.05);border-left:3px solid rgba(180,172,158,.09);margin-bottom:6px}
+    .lib-skel-orb{width:34px;height:34px;border-radius:9px;flex-shrink:0}
+    .lib-skel-line{height:9px;border-radius:4px}
+    .lib-skel-orb,.lib-skel-line{background:linear-gradient(90deg,rgba(180,172,158,.06) 25%,rgba(180,172,158,.13) 50%,rgba(180,172,158,.06) 75%);background-size:200% 100%;animation:libSkelShimmer 1.4s ease-in-out infinite}
+    @keyframes libSkelShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
     .lib-hero-name{font-size:.66rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
     .lib-muscle-pill{padding:2px 7px;border-radius:9px;font-size:.48rem;font-weight:600;letter-spacing:.02em;color:var(--mg-color);background:color-mix(in srgb,var(--mg-color) 12%,transparent);border:1px solid color-mix(in srgb,var(--mg-color) 15%,transparent);text-transform:capitalize}
 
@@ -432,9 +671,9 @@
       border:1px solid color-mix(in srgb,var(--mg-color) 22%,transparent);
       border-left:3px solid color-mix(in srgb,var(--mg-color) 40%,transparent);
       box-shadow:0 2px 12px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.02);
-      transition:all .22s;-webkit-tap-highlight-color:transparent
+      transition:all var(--dur-slow) var(--ease-standard);-webkit-tap-highlight-color:transparent
     }
-    .lib-muscle-tile:active{transform:scale(.97);transition:transform .1s ease}
+    .lib-muscle-tile:active{transform:scale(.97);transition:transform var(--dur-instant) var(--ease-standard)}
     .lib-muscle-tile:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 32%,transparent);box-shadow:0 6px 22px rgba(0,0,0,.4),0 0 16px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
     .lib-muscle-tile .lib-tile-watermark{position:absolute;top:4px;right:8px;font-size:2rem;opacity:.07;pointer-events:none;filter:grayscale(.3)}
     .lib-tile-orb{
@@ -455,10 +694,10 @@
       border:1px solid color-mix(in srgb,var(--mg-color) 16%,transparent);
       border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);
       box-shadow:0 2px 10px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.025);
-      transition:all .18s;-webkit-tap-highlight-color:transparent
+      transition:all var(--dur-fast) var(--ease-standard);-webkit-tap-highlight-color:transparent
     }
     .picker-ex-row:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--mg-color) 26%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.32),0 0 12px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
-    .picker-ex-row:active{transform:scale(.985);transition:transform .1s ease}
+    .picker-ex-row:active{transform:scale(.985);transition:transform var(--dur-instant) var(--ease-standard)}
     .picker-ex-row.sel{
       background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 22%,rgba(45,42,36,.4)),color-mix(in srgb,var(--mg-color) 9%,rgba(32,30,26,.25)));
       border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
@@ -480,12 +719,12 @@
       background:linear-gradient(160deg,color-mix(in srgb,var(--mg-color) 6%,rgba(45,42,36,.32)),rgba(32,30,26,.18));
       border:1px solid color-mix(in srgb,var(--mg-color) 12%,transparent);
       box-shadow:0 2px 10px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.03);
-      transition:all .22s;scroll-snap-align:start;-webkit-tap-highlight-color:transparent
+      transition:all var(--dur-slow) var(--ease-standard);scroll-snap-align:start;-webkit-tap-highlight-color:transparent
     }
-    .lib-discover-card:active{transform:scale(.97);transition:transform .1s ease}
+    .lib-discover-card:active{transform:scale(.97);transition:transform var(--dur-instant) var(--ease-standard)}
     .lib-discover-card::before{
       content:'';position:absolute;top:0;left:15%;right:15%;height:1px;
-      background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.25;transition:opacity .22s
+      background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.25;transition:opacity var(--dur-slow) var(--ease-standard)
     }
     .lib-discover-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 20%,transparent);box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
     .lib-discover-card:hover::before{opacity:.5}
@@ -724,7 +963,7 @@
       margin-bottom:8px;transition:all .18s;position:relative;overflow:hidden;
       -webkit-tap-highlight-color:transparent
     }
-    .wb-ex-row::before{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.25;transition:opacity .22s}
+    .wb-ex-row::before{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.25;transition:opacity var(--dur-slow) var(--ease-standard)}
     .wb-ex-row:hover{
       border-color:color-mix(in srgb,var(--mg-color) 28%,transparent);
       box-shadow:0 4px 16px rgba(0,0,0,.32),0 0 12px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)
@@ -820,7 +1059,6 @@
     .modal-sheet{background:linear-gradient(160deg,rgba(18,18,14,.88),rgba(12,12,10,.92));border:1px solid rgba(180,172,158,.05);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:520px;max-height:calc(88vh - var(--bottom-nav-h));overflow-y:auto;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
     .modal-sheet::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,rgba(180,172,158,.04),transparent)}
     .modal-title{font-family:'Cinzel',serif;font-size:1.0rem;color:#d4cec4;margin-bottom:4px;letter-spacing:.04em}
-    .modal-muscles{font-size:.7rem;color:var(--cls-color);font-style:italic;margin-bottom:11px;font-family:'Cinzel',serif;letter-spacing:.04em}
     .stats-modal-title{font-family:'Cinzel',serif;font-size:.92rem;color:#d4cec4;letter-spacing:.06em;text-transform:uppercase}
     .stats-modal-subtitle{font-size:.66rem;color:#8a8478;line-height:1.55;margin-top:3px;font-family:'Inter',sans-serif;letter-spacing:.01em}
     /* ── Stats Prompt cards ── */
@@ -955,27 +1193,6 @@
     .tab.on .tab-icon{transform:translateY(-1px)}
     .tab:active .tab-icon{transform:scale(.88)}
 
-    /* ── Multi-select Category Filter ── */
-    .filter-section{margin-bottom:10px;display:flex;flex-direction:column;gap:7px}
-    .filter-pills-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-    .filter-controls-row{display:flex;align-items:center;gap:6px}
-    .filter-pill{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:1px solid rgba(180,172,158,.06);background:rgba(45,42,36,.18);cursor:pointer;transition:all .2s;flex-shrink:0;font-size:.6rem;letter-spacing:.04em;color:#8a8478;text-transform:uppercase;user-select:none;font-family:'Cinzel',serif}
-    .filter-pill:hover{border-color:rgba(180,172,158,.07);color:#b4ac9e}
-    .filter-pill-icon{font-size:.72rem;line-height:1}
-    .filter-pill.on{box-shadow:0 0 8px color-mix(in srgb,var(--pill-color,#b4ac9e) 30%,transparent)}
-    .filter-pill.filter-strength.on{background:rgba(196,160,68,.14);border-color:rgba(196,160,68,.4);color:#C4A044;--pill-color:#C4A044}
-    .filter-pill.filter-cardio.on{background:rgba(196,160,68,.14);border-color:rgba(196,160,68,.4);color:#C4A044;--pill-color:#C4A044}
-    .filter-pill.filter-flexibility.on{background:rgba(196,160,68,.14);border-color:rgba(196,160,68,.4);color:#C4A044;--pill-color:#C4A044}
-    .filter-pill.filter-endurance.on{background:rgba(196,160,68,.14);border-color:rgba(196,160,68,.4);color:#C4A044;--pill-color:#C4A044}
-    .filter-pill.filter-favs.on{background:rgba(176,168,152,.14);border-color:rgba(176,168,152,.4);color:#B0A898;--pill-color:#B0A898}
-    .filter-select-btn{padding:5px 12px;background:transparent;border:1px solid rgba(180,172,158,.06);border-radius:7px;cursor:pointer;font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.07em;color:#8a8478;transition:all .2s;flex-shrink:0;text-transform:uppercase;white-space:nowrap}
-    .filter-select-btn:hover,.filter-select-btn.active{border-color:rgba(180,172,158,.25);color:#b4ac9e;background:rgba(45,42,36,.16)}
-
-    /* ── Favorites star on grimoire cards ── */
-    .grim-fav-btn{position:absolute;bottom:7px;left:7px;font-size:.75rem;cursor:pointer;opacity:.28;transition:all .2s;line-height:1;padding:2px}
-    .grim-fav-btn:hover{opacity:.8;transform:scale(1.15)}
-    .grim-fav-btn.faved{opacity:1;color:#b4ac9e;filter:drop-shadow(0 0 4px rgba(180,172,158,.4))}
-
     /* ── Workout cards (Forge tab) — themed via --mg-color ── */
     .workout-card{
       --mg-color:#B0A090;
@@ -983,7 +1200,7 @@
       background:rgba(26,24,20,.92);
       border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.06));
       border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);
-      transition:all .22s;-webkit-tap-highlight-color:transparent
+      transition:all var(--dur-slow) var(--ease-standard);-webkit-tap-highlight-color:transparent
     }
     .workout-card:hover{border-color:color-mix(in srgb,var(--mg-color) 22%,rgba(180,172,158,.08));background:rgba(30,28,24,.95)}
     .workout-card:active{transform:scale(.985);transition:transform .1s ease}
@@ -1067,7 +1284,7 @@
       border:1px solid rgba(200,200,192,.08);
       border-left:2px solid rgba(200,200,192,.18);
       box-shadow:0 2px 12px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.025);
-      transition:all .22s;-webkit-tap-highlight-color:transparent
+      transition:all var(--dur-slow) var(--ease-standard);-webkit-tap-highlight-color:transparent
     }
     .quest-card::before{
       content:'';position:absolute;top:0;left:14%;right:14%;height:1px;
@@ -1268,47 +1485,6 @@
     .disc-tab.disc-cardio.on{background:rgba(39,174,96,.14);border-color:rgba(39,174,96,.4)}.disc-tab.disc-cardio.on .disc-tab-label{color:#2ecc71}
     .disc-tab.disc-flexibility.on{background:rgba(142,68,173,.14);border-color:rgba(142,68,173,.4)}.disc-tab.disc-flexibility.on .disc-tab-label{color:#9b59b6}
     .disc-tab.disc-endurance.on{background:rgba(52,152,219,.14);border-color:rgba(52,152,219,.4)}.disc-tab.disc-endurance.on .disc-tab-label{color:#3498db}
-    .muscle-filter-btn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:1px solid rgba(180,172,158,.06);background:rgba(45,42,36,.18);cursor:pointer;font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.04em;color:#8a8478;transition:all .2s;flex-shrink:0;text-transform:uppercase}
-    .muscle-filter-btn:hover{border-color:rgba(180,172,158,.08);color:#b4ac9e}
-    .muscle-filter-btn.active{border-color:rgba(180,172,158,.1);color:#b4ac9e;background:rgba(45,42,36,.18)}
-
-    /* ── Command Action Bar (multi-select) ── */
-    .command-action-bar{display:flex;align-items:center;gap:8px;padding:10px 13px;background:linear-gradient(135deg,rgba(45,42,36,.38),rgba(32,30,26,.3));border:1px solid rgba(180,172,158,.08);border-radius:11px;margin-bottom:11px;box-shadow:0 4px 24px rgba(0,0,0,.5),inset 0 1px 0 rgba(180,172,158,.03);flex-wrap:wrap}
-    .cab-count{display:flex;align-items:center;gap:5px;flex-shrink:0;padding-right:10px;border-right:1px solid rgba(180,172,158,.05)}
-    .cab-rune{font-size:.9rem;color:#b4ac9e}
-    .cab-num{font-family:'Cinzel',serif;font-size:.9rem;color:#b4ac9e;min-width:16px}
-    .cab-actions{display:flex;gap:5px;flex-wrap:wrap;flex:1}
-    .cab-btn{padding:4px 10px;border-radius:6px;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.06);color:#b4ac9e;font-family:'Inter',sans-serif;font-size:.56rem;letter-spacing:.04em;cursor:pointer;transition:all .2s;white-space:nowrap}
-    .cab-btn:hover{background:rgba(45,42,36,.28);border-color:rgba(180,172,158,.08);transform:translateY(-1px)}
-
-    /* ── Grimoire Grid ── */
-    .grimoire-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
-    .grimoire-card{background:linear-gradient(145deg,rgba(36,34,28,.88),rgba(26,24,20,.84));border:1px solid rgba(180,172,158,.05);border-radius:11px;padding:11px 10px 10px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center}
-    .grimoire-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:var(--cat-color,rgba(180,172,158,.15));opacity:.3;transition:opacity .22s}
-    .grimoire-card:hover{background:linear-gradient(145deg,rgba(45,42,36,.45),rgba(32,30,26,.28));border-color:rgba(180,172,158,.08);transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.45)}
-    .grimoire-card:hover::before{opacity:.7}
-    .grimoire-card.grim-sel{border-color:var(--cls-color);background:color-mix(in srgb,var(--cls-color) 10%,transparent);box-shadow:0 0 0 1px var(--cls-color),0 4px 18px color-mix(in srgb,var(--cls-color) 20%,transparent)}
-    .grimoire-card.grim-multi-sel{border-color:rgba(180,172,158,.35);background:rgba(45,42,36,.28);box-shadow:0 0 0 1.5px rgba(180,172,158,.3),0 4px 18px rgba(180,172,158,.06)}
-    .grim-mult{position:absolute;top:7px;right:7px;padding:1px 5px;border-radius:4px;font-size:.53rem;font-family:'Inter',sans-serif;letter-spacing:.02em}
-    .grim-bonus{background:rgba(46,204,113,.14);color:#2ecc71;border:1px solid rgba(46,204,113,.28)}
-    .grim-penalty{background:rgba(231,76,60,.14);color:#e74c3c;border:1px solid rgba(231,76,60,.28)}
-    .grim-neutral{background:rgba(45,42,36,.2);color:#b4ac9e;border:1px solid rgba(180,172,158,.06)}
-    .grim-checkbox{position:absolute;top:6px;left:6px;width:16px;height:16px;border-radius:4px;border:1.5px solid rgba(180,172,158,.08);background:transparent;display:flex;align-items:center;justify-content:center;font-size:.6rem;transition:all .2s}
-    .grim-checkbox.checked{background:rgba(180,172,158,.4);border-color:#b4ac9e;color:#0c0c0a}
-    .grim-icon-orb{width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 40% 35%,color-mix(in srgb,var(--cat-color,#b4ac9e) 22%,rgba(32,30,26,.7)),rgba(32,30,26,.25));border:1px solid color-mix(in srgb,var(--cat-color,#b4ac9e) 30%,transparent);display:flex;align-items:center;justify-content:center;margin-bottom:7px;flex-shrink:0;box-shadow:0 3px 12px rgba(0,0,0,.5),inset 0 0 8px rgba(0,0,0,.4)}
-    .grim-icon{font-size:1.15rem;line-height:1}
-    .grim-body{text-align:center;width:100%;min-width:0;flex:1}
-    .grim-name{font-size:.73rem;color:#d4cec4;line-height:1.2;margin-bottom:4px;padding:0 4px;word-break:break-word}
-    .grim-meta{display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
-    .grim-xp{font-size:.6rem;color:#b4ac9e;font-family:'Inter',sans-serif}
-    .grim-sep{font-size:.5rem;color:#8a8478}
-    .grim-muscle{font-size:.56rem;text-transform:capitalize;letter-spacing:.03em}
-    .grim-info-btn{position:absolute;bottom:7px;right:7px;width:17px;height:17px;border-radius:50%;background:rgba(45,42,36,.2);border:1px solid rgba(180,172,158,.06);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#8a8478;cursor:pointer;transition:all .2s}
-    .grim-info-btn:hover{background:rgba(45,42,36,.3);border-color:rgba(180,172,158,.08);color:#b4ac9e}
-    .grimoire-add-card{border-style:dashed;border-color:rgba(180,172,158,.06);background:transparent !important;justify-content:center;gap:5px;flex-direction:row;opacity:.55;transition:all .2s;align-items:center;padding:14px 10px}
-    .grimoire-add-card:hover{opacity:.9 !important;border-color:rgba(180,172,158,.08) !important;background:rgba(45,42,36,.12) !important}
-    .grim-add-icon{font-size:1.1rem;color:#8a8478}
-    .grim-add-label{font-size:.7rem;color:#8a8478}
 
     /* ══ Homepage / Landing Page ══ */
     /* Gold glow pulse for CTA buttons */
@@ -1688,8 +1864,41 @@
       }
       .pt { display: none; }
     }
+    /* ── Reduced motion ────────────────────────────────────────────────────
+       One global opt-out. Users who ask their OS to reduce motion get the
+       same interface with the movement taken out: transitions collapse to
+       near-instant, looping/decorative animations stop, and anything that
+       animates in from an offset (sheets, scroll reveals, staggered lists)
+       starts in its final position rather than never appearing.
+
+       The duration tokens are re-declared here so any rule that reaches for
+       --dur-* is neutralised without needing its own override. The blanket
+       * rule catches the literals that have not been migrated yet. */
     @media (prefers-reduced-motion: reduce) {
+      :root {
+        --dur-instant: .01ms; --dur-fast: .01ms; --dur-base: .01ms;
+        --dur-slow: .01ms; --dur-sheet: .01ms; --dur-reveal: .01ms;
+      }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+      }
+      /* Elements whose visible state is produced BY an animation must not be
+         left stranded mid-keyframe once that animation is neutralised. */
+      .scroll-reveal { opacity: 1; transform: none; }
+      .sheet-slide-up, .sheet-enter-left, .sheet-enter-right,
+      .lib-home-section {
+        animation: none; opacity: 1; transform: none;
+      }
+      /* Purely decorative loops — stop outright rather than run 500×/s. */
+      .lib-hero-orb, .lw-dot { animation: none; }
       .pt { display: none; }
+      /* Hover/press displacement reads as motion too. */
+      .lib-hero-card:hover, .lib-muscle-tile:hover, .lib-discover-card:hover,
+      .picker-ex-row:hover, .lib-hero-card:active, .lib-muscle-tile:active,
+      .lib-discover-card:active, .picker-ex-row:active { transform: none; }
     }
 
     /* ══ LIVE WORKOUT BANNER + SHEET ══════════════════════════════════════ */

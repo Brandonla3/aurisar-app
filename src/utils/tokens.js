@@ -123,6 +123,32 @@ const S = {
   sNeg8: -8,
 };
 
-const TOKENS = { FS, R, S };
+// ── Motion ───────────────────────────────────────────────────────────────────
+// Mirrors the --dur-* / --ease-* custom properties declared on :root in
+// src/styles/app.css. Class-based styling should use the CSS vars directly;
+// these are for inline `style={{}}` and for JS that needs the raw value
+// (e.g. matching a setTimeout to an animation's length).
+//
+// Durations are strings with units so they drop straight into a `transition`
+// or `animation` shorthand. `M.ms.<name>` gives the same value in
+// milliseconds for timer code.
+const M = {
+  instant: ".1s",  // colour/opacity-only state flips
+  fast:    ".15s", // press feedback, hover tints
+  base:    ".2s",  // the default — most transitions
+  slow:    ".3s",  // entrances that carry distance
+  sheet:   ".3s",  // bottom sheets and modals
+  reveal:  ".5s",  // scroll reveals, staggered list entrances
 
-export { TOKENS, FS, R, S };
+  ease: {
+    standard: "cubic-bezier(.4,0,.2,1)",
+    out:      "cubic-bezier(.16,1,.3,1)",
+    spring:   "cubic-bezier(.34,1.56,.64,1)",
+  },
+
+  ms: { instant: 100, fast: 150, base: 200, slow: 300, sheet: 300, reveal: 500 },
+};
+
+const TOKENS = { FS, R, S, M };
+
+export { TOKENS, FS, R, S, M };

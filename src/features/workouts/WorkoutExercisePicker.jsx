@@ -5,6 +5,7 @@ import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
+import { TYPE_OPTS as PTYPE_OPTS, TYPE_LABELS as PTYPE_LABELS, MUSCLE_OPTS as PMUSCLE_OPTS, EQUIP_OPTS as PEQUIP_OPTS, muscleLabel } from '../exercises/exerciseFilterOptions';
 
 /**
  * Workout exercise picker modal — extracted from the inline block in App.jsx
@@ -55,20 +56,6 @@ const WbExPickerRow = React.memo(function WbExPickerRow({
     </div>
   );
 });
-
-// ── Filter option constants (module-level to avoid re-creation per render) ───
-const PTYPE_LABELS = {
-  strength: "⚔️ Strength",
-  cardio: "🏃 Cardio",
-  flexibility: "🧘 Flex",
-  yoga: "🧘 Yoga",
-  stretching: "🌿 Stretch",
-  plyometric: "⚡ Plyo",
-  calisthenics: "🤸 Cali"
-};
-const PTYPE_OPTS = Object.keys(PTYPE_LABELS);
-const PEQUIP_OPTS = ["barbell", "dumbbell", "kettlebell", "cable", "machine", "bodyweight", "band"];
-const PMUSCLE_OPTS = ["chest", "back", "shoulder", "bicep", "tricep", "legs", "glutes", "abs", "calves", "forearm", "cardio"];
 
 const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
   // Filter state
@@ -141,7 +128,7 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
                   fontSize: FS.fs68, textAlign: "left", cursor: "pointer", position: "relative"
                 }}
               >
-                {pickerMuscle === "All" ? "Muscle" : pickerMuscle.charAt(0).toUpperCase() + pickerMuscle.slice(1)}
+                {pickerMuscle === "All" ? "Muscle" : muscleLabel(pickerMuscle)}
                 <span style={{
                   position: "absolute", right: 7, top: "50%",
                   transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "muscle" ? "180deg" : "0deg") + ")",
@@ -156,7 +143,7 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
                 }}>
                   <div onClick={() => { setPickerMuscle("All"); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerMuscle === "All" ? "#b4ac9e" : "#8a8478", background: pickerMuscle === "All" ? "rgba(45,42,36,.2)" : "transparent" }}>{"All Muscles"}</div>
                   {PMUSCLE_OPTS.map(m => (
-                    <div key={m} onClick={() => { setPickerMuscle(m); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerMuscle === m ? getMuscleColor(m) : "#8a8478", background: pickerMuscle === m ? "rgba(45,42,36,.2)" : "transparent", textTransform: "capitalize" }}>{m}</div>
+                    <div key={m} onClick={() => { setPickerMuscle(m); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerMuscle === m ? getMuscleColor(m) : "#8a8478", background: pickerMuscle === m ? "rgba(45,42,36,.2)" : "transparent", textTransform: "none" }}>{muscleLabel(m)}</div>
                   ))}
                 </div>
               )}
