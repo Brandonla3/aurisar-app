@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { UI_COLORS, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 import { calcExXP, getMuscleColor, hrRange } from '../../utils/xp';
 import { isMetric, kgToLbs, lbsToKg, kmToMi, miToKm, weightLabel, distLabel, pctToSlider, sliderToPct } from '../../utils/units';
@@ -14,6 +14,18 @@ import { S, R, FS } from '../../utils/tokens';
  * Rendered when selEx is non-null (an exercise ID is selected for logging).
  * All state and callbacks come in as props; no internal hooks.
  */
+
+// A ghost older than this is shown faded — chasing a number you set six weeks
+// ago is rarely the right target, so the UI stops pushing it.
+const GHOST_STALE_DAYS = 14;
+// Two entries logged within this window are treated as the same gym session,
+// which is what makes carrying a weight across exercises reasonable.
+const CARRYOVER_WINDOW_MS = 2 * 60 * 1000;
+
+const entryTime = e => {
+  const t = e && (e.loggedAt || e.dateKey) ? new Date(e.loggedAt || e.dateKey).getTime() : NaN;
+  return Number.isFinite(t) ? t : NaN;
+};
 
 const QuickLogModal = memo(function QuickLogModal({
   // Selected exercise
@@ -50,6 +62,44 @@ const QuickLogModal = memo(function QuickLogModal({
   setSpwTargetPlanId,
 }) {
   const ex = allExById[selEx];
+
+  // ── Ghost of your last performance ──────────────────────────────────────
+  // The form used to open blank every time, so a set you have done fifty
+  // times still meant retyping it, and there was nothing to push against.
+  // These are read-only derivations from data already in `profile` — no new
+  // persisted state.
+  const ghost = useMemo(() => {
+    if (!ex) return null;
+    const entry = (profile.log || []).find(e => e.exId === ex.id);
+    if (!entry) return null;
+    const t = entryTime(entry);
+    const days = Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : null;
+    return { entry, days, stale: days != null && days > GHOST_STALE_DAYS };
+  }, [profile.log, ex]);
+
+  // Cross-dock carryover: the exercise logged moments ago in the same session
+  // that shares muscle group or equipment. Its load is a far better starting
+  // point than an empty field.
+  const carryover = useMemo(() => {
+    if (!ex) return null;
+    const prev = (profile.log || [])[0];
+    if (!prev || prev.exId === ex.id) return null;
+    const t = entryTime(prev);
+    if (!Number.isFinite(t) || Date.now() - t > CARRYOVER_WINDOW_MS) return null;
+    const prevEx = allExById[prev.exId];
+    if (!prevEx) return null;
+    const sameMuscle = prevEx.muscleGroup && prevEx.muscleGroup === ex.muscleGroup;
+    const sameKit = prevEx.equipment && prevEx.equipment === ex.equipment;
+    if (!sameMuscle && !sameKit) return null;
+    return { entry: prev, from: prevEx.name };
+  }, [profile.log, allExById, ex]);
+
+  // "beat" is evaluated on blur against derived XP rather than per keystroke
+  // against raw fields — typing "1" on the way to "15" briefly looks like a
+  // regression, and sets/reps/weight are coupled anyway, so a single quality
+  // number is the only comparison that agrees with what the app rewards.
+  const [beat, setBeat] = useState(null); // null | "ghost" | "pb"
+
   if (!ex) return null;
 
   const metric = isMetric(profile.units);
@@ -91,7 +141,7 @@ const QuickLogModal = memo(function QuickLogModal({
   const runPace = isRunning && distMi > 0 && durationMin > 0 ? durationMin / distMi : null;
   const runBoostPct = runPace ? runPace <= 8 ? 20 : 5 : 0;
 
-  const estXP = (() => {
+  const estXPNum = (() => {
     const sv = noSets ? 1 : parseInt(sets) || 0;
     const rv = isCardio || isFlex
       ? Math.max(1, Math.floor(combineHHMMSec(exHHMM, exSec) / 60) || parseInt(reps) || 1)
@@ -106,8 +156,79 @@ const QuickLogModal = memo(function QuickLogModal({
         : parseInt(row.reps) || rv;
       return s + calcExXP(ex.id, rs, rr, profile.chosenClass, allExById, parseFloat(row.dist) || distMi || null, effW || null, hrZ, extraCount);
     }, 0);
-    return (baseXP + rowsXP).toLocaleString();
+    return baseXP + rowsXP;
   })();
+  const estXP = estXPNum.toLocaleString();
+
+  // Fill every field from the ghost in one tap.
+  const repeatLast = () => {
+    const g = ghost && ghost.entry;
+    if (!g) return;
+    if (g.sets != null) setSets(String(g.sets));
+    if (g.reps != null) setReps(String(g.reps));
+    if (g.weightLbs != null) setExWeight(String(metric ? parseFloat(lbsToKg(g.weightLbs)).toFixed(1) : g.weightLbs));
+    if (g.weightPct != null) setWeightPct(g.weightPct);
+    if (g.hrZone != null) setHrZone(g.hrZone);
+    if (g.distanceMi != null) setDistanceVal(String(metric ? parseFloat(miToKm(g.distanceMi)).toFixed(2) : g.distanceMi));
+    if (isCardio || isFlex) {
+      const mins = parseInt(g.reps) || 0;
+      setExHHMM(`${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`);
+      setExSec("");
+    }
+    setQuickRows([]);
+  };
+
+  // Pull the compatible parts of the previous exercise across — load and
+  // effort settings, not sets/reps, which are specific to the movement.
+  const applyCarryover = () => {
+    const c = carryover && carryover.entry;
+    if (!c) return;
+    if (c.weightLbs != null) setExWeight(String(metric ? parseFloat(lbsToKg(c.weightLbs)).toFixed(1) : c.weightLbs));
+    if (c.weightPct != null) setWeightPct(c.weightPct);
+    if (c.hrZone != null) setHrZone(c.hrZone);
+  };
+
+  // One compact line rather than a ghost value beside every input — the sheet
+  // is already dense, and the numbers only mean anything together.
+  const ghostSummary = (() => {
+    const g = ghost && ghost.entry;
+    if (!g) return "";
+    const parts = [];
+    if (isCardio || isFlex) {
+      if (g.reps) parts.push(`${g.reps} min`);
+      if (g.distanceMi) parts.push(`${metric ? parseFloat(miToKm(g.distanceMi)).toFixed(2) : g.distanceMi} ${dUnit}`);
+      if (g.hrZone) parts.push(`Z${g.hrZone}`);
+    } else {
+      if (g.sets && g.reps) parts.push(`${g.sets} × ${g.reps}`);
+      else if (g.reps) parts.push(`${g.reps} reps`);
+      if (g.weightLbs) parts.push(`${metric ? parseFloat(lbsToKg(g.weightLbs)).toFixed(1) : g.weightLbs} ${wUnit}`);
+    }
+    if (Number.isFinite(g.xp)) parts.push(`${g.xp.toLocaleString()} XP`);
+    return parts.join(" · ");
+  })();
+
+  // The XP stored on a log entry is the *earned* figure — class multiplier,
+  // streak and quest bonuses already applied — so it is not comparable with
+  // the raw estimate shown here. Re-run the ghost's numbers through the same
+  // calcExXP the estimate uses so both sides measure the same thing.
+  //
+  // Note the weight bonus in calcExXP saturates at 30% (reached around
+  // 150 lbs), so above that a heavier lift at equal reps scores the same and
+  // will not register as beating the ghost. That is the existing XP curve,
+  // not a quirk of this comparison.
+  const ghostXP = (() => {
+    const g = ghost && ghost.entry;
+    if (!g) return null;
+    const sv = noSets ? 1 : parseInt(g.sets) || 0;
+    const rv = parseInt(g.reps) || 0;
+    if (!rv) return null;
+    return calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, g.distanceMi || null, g.weightLbs || null, g.hrZone || null, 0);
+  })();
+
+  const checkBeat = () => {
+    if (ghostXP == null || estXPNum <= 0) { setBeat(null); return; }
+    setBeat(estXPNum > ghostXP ? "ghost" : null);
+  };
 
   const dismiss = () => {
     setSelEx(null);
@@ -147,13 +268,34 @@ const QuickLogModal = memo(function QuickLogModal({
                 <div style={{ textAlign: "center", padding: "18px 0", color: "#8a8478", fontSize: FS.fs78, fontStyle: "italic" }}>{"🛌 Rest day — no stats to track. Recover well!"}</div>
               )}
 
+              {/* Ghost bar — what you did last time, and one tap to match it */}
+              {ex.id !== "rest_day" && ghost && (
+                <div className={`ql-ghost-bar${ghost.stale ? " ql-ghost-stale" : ""}`}>
+                  <span className={"ql-ghost-label"}>{"Last time"}</span>
+                  <span className={"ql-ghost-vals"}>{ghostSummary}</span>
+                  <span className={"ql-ghost-when"}>
+                    {ghost.days == null ? "" : ghost.days === 0 ? "today" : ghost.days === 1 ? "yesterday" : `${ghost.days}d ago`}
+                  </span>
+                  <button type="button" className={"ql-ghost-repeat"} onClick={repeatLast}>{"⟲ Repeat"}</button>
+                </div>
+              )}
+
+              {/* Carryover — same session, same muscle or kit, load already known */}
+              {ex.id !== "rest_day" && carryover && (
+                <div className={"ql-ghost-bar ql-carryover-bar"}>
+                  <span className={"ql-ghost-label"}>{"Carry over"}</span>
+                  <span className={"ql-ghost-vals"}>{`from ${carryover.from}`}</span>
+                  <button type="button" className={"ql-ghost-repeat"} onClick={applyCarryover}>{"↳ Use load"}</button>
+                </div>
+              )}
+
               {/* Top row: Sets/Reps or Duration+Sec+Dist + Weight */}
               {ex.id !== "rest_day" && (
                 <div style={{ display: "flex", gap: S.s6, marginBottom: S.s8, alignItems: "flex-end" }}>
                   {!noSets && !(isCardio || isFlex) && (
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Sets"}</label>
-                      <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"20"} value={sets} onChange={e => setSets(e.target.value)} placeholder={""} />
+                      <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"20"} value={sets} onChange={e => setSets(e.target.value)} onBlur={checkBeat} placeholder={""} />
                     </div>
                   )}
                   {isCardio || isFlex ? (
@@ -178,7 +320,7 @@ const QuickLogModal = memo(function QuickLogModal({
                       {showDist && (
                         <div style={{ flex: 1.5 }}>
                           <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Dist ("}{dUnit}{")"}</label>
-                          <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"200"} step={"0.1"} value={distanceVal} onChange={e => setDistanceVal(e.target.value)} placeholder={"0.0"} />
+                          <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"200"} step={"0.1"} value={distanceVal} onChange={e => setDistanceVal(e.target.value)} onBlur={checkBeat} placeholder={"0.0"} />
                         </div>
                       )}
                     </>
@@ -186,12 +328,12 @@ const QuickLogModal = memo(function QuickLogModal({
                     <>
                       <div style={{ flex: 1 }}>
                         <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Reps"}</label>
-                        <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"200"} value={reps} onChange={e => setReps(e.target.value)} placeholder={""} />
+                        <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"200"} value={reps} onChange={e => setReps(e.target.value)} onBlur={checkBeat} placeholder={""} />
                       </div>
                       {showWeight && (
                         <div style={{ flex: 1.5 }}>
                           <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Weight ("}{wUnit}{")"}</label>
-                          <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"2000"} step={metric ? "0.5" : "2.5"} value={exWeight} onChange={e => setExWeight(e.target.value)} placeholder={metric ? "60" : "135"} />
+                          <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"2000"} step={metric ? "0.5" : "2.5"} value={exWeight} onChange={e => setExWeight(e.target.value)} onBlur={checkBeat} placeholder={metric ? "60" : "135"} />
                         </div>
                       )}
                     </>
@@ -308,7 +450,13 @@ const QuickLogModal = memo(function QuickLogModal({
               {/* XP estimate */}
               {ex.id !== "rest_day" && (
                 <div style={{ marginBottom: S.s8, fontSize: FS.md, color: "#8a8478", fontStyle: "italic" }}>
-                  {"Est. XP: "}<span style={{ color: "#b4ac9e", fontFamily: "'Inter',sans-serif" }}>{estXP}</span>
+                  {"Est. XP: "}<span
+                    key={beat || "flat"}
+                    className={beat ? "ql-xp-beat" : undefined}
+                    onAnimationEnd={() => setBeat(null)}
+                    style={{ color: beat ? "#e8d08a" : "#b4ac9e", fontFamily: "'Inter',sans-serif" }}
+                  >{estXP}</span>
+                  {beat && ghostXP != null && <span className={"ql-beat-tag"}>{`▲ ${(estXPNum - ghostXP).toLocaleString()} over last time`}</span>}
                   {showHR && hrZone && <span style={{ color: "#e67e22", marginLeft: S.s6 }}>{"Z"}{hrZone}{" +"}{(hrZone - 1) * 4}{"% XP"}</span>}
                   {showWeight && effW > 0 && <span style={{ color: UI_COLORS.success, marginLeft: S.s6 }}>{"+"}{Math.round(Math.min(effW / 500, 0.3) * 100)}{"% wt bonus"}</span>}
                   {runBoostPct > 0 && <span style={{ color: UI_COLORS.warning, marginLeft: S.s6 }}>{"⚡ +"}{runBoostPct}{"% pace bonus"}</span>}

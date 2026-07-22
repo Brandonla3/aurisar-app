@@ -472,6 +472,49 @@
     .lib-hero-card:hover,.lib-hero-card:active{filter:none}
     .lib-hero-when{font-size:.48rem;color:#8a8478;letter-spacing:.03em;line-height:1}
 
+    /* ── Quick-log ghost ─────────────────────────────────────────────────
+       What you did last time, sitting above the inputs. Deliberately quiet:
+       it is a reference point, not a value, so it never reads as something
+       already filled in. "Repeat" copies it into the form in one tap. */
+    .ql-ghost-bar{
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+      margin-bottom:9px;padding:6px 9px;border-radius:8px;
+      background:rgba(196,148,40,.06);border:1px solid rgba(196,148,40,.18)
+    }
+    .ql-ghost-label{
+      font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.14em;
+      text-transform:uppercase;color:#8a8478;flex-shrink:0
+    }
+    .ql-ghost-vals{font-size:.7rem;color:rgba(196,148,40,.85);font-variant-numeric:tabular-nums;flex:1;min-width:0}
+    .ql-ghost-when{font-size:.55rem;color:#6f6a62;flex-shrink:0}
+    .ql-ghost-repeat{
+      flex-shrink:0;background:transparent;border:1px dashed rgba(196,148,40,.35);
+      border-radius:6px;padding:3px 9px;color:#c4a044;font-size:.62rem;
+      cursor:pointer;transition:all var(--dur-fast) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .ql-ghost-repeat:hover{background:rgba(196,148,40,.12);border-style:solid}
+    .ql-ghost-repeat:active{transform:scale(.96)}
+    /* A ghost from weeks ago is a poor target — say so by fading it. */
+    .ql-ghost-stale{opacity:.5;filter:grayscale(.6)}
+    .ql-carryover-bar{background:rgba(122,143,139,.07);border-color:rgba(122,143,139,.22)}
+    .ql-carryover-bar .ql-ghost-vals{color:rgba(159,179,174,.9)}
+    .ql-carryover-bar .ql-ghost-repeat{border-color:rgba(122,143,139,.4);color:#9fb3ae}
+    .ql-carryover-bar .ql-ghost-repeat:hover{background:rgba(122,143,139,.14)}
+
+    /* Beating the ghost — one-shot, on blur, never mid-keystroke. */
+    @keyframes qlXpBeat{
+      0%{transform:scale(1);text-shadow:none}
+      35%{transform:scale(1.18);text-shadow:0 0 12px rgba(232,208,138,.65)}
+      100%{transform:scale(1);text-shadow:none}
+    }
+    .ql-xp-beat{display:inline-block;animation:qlXpBeat .55s var(--ease-spring) both}
+    .ql-beat-tag{
+      margin-left:7px;font-style:normal;font-size:.58rem;letter-spacing:.03em;
+      color:#e8d08a;background:rgba(232,208,138,.1);
+      border:1px solid rgba(232,208,138,.25);border-radius:5px;padding:1px 6px
+    }
+
     /* Catalog load / fallback notice above the library list. */
     .lib-catalog-note{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:7px 11px;border-radius:9px;background:rgba(45,42,36,.28);border:1px solid rgba(180,172,158,.08);color:#8a8478;font-size:.66rem;letter-spacing:.02em;line-height:1.4}
     .lib-catalog-note-warn{background:rgba(196,148,40,.09);border-color:rgba(196,148,40,.26);color:#c4a044}
