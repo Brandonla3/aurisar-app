@@ -500,6 +500,23 @@
     .mm-fading rect{opacity:.72;filter:grayscale(.4)}
     .mm-cold rect{opacity:.5;filter:grayscale(.85) url(#mm-fog)}
 
+    /* Groups with no place on a body (cardio). Without these the map would be
+       a strictly worse navigator than the strip. */
+    .mm-offbody{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+    .mm-chip{
+      display:flex;align-items:center;gap:5px;
+      padding:4px 11px;border-radius:12px;cursor:pointer;
+      background:color-mix(in srgb,var(--mg-color) calc(10% + var(--volume,0) * 26%),rgba(45,42,36,.3));
+      border:1px solid color-mix(in srgb,var(--mg-color) 30%,transparent);
+      color:#b4ac9e;font-size:.6rem;font-family:'Inter',sans-serif;
+      transition:all var(--dur-fast) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
+    }
+    .mm-chip:active{transform:scale(.96)}
+    .mm-chip.mm-hot{box-shadow:0 0 8px color-mix(in srgb,var(--mg-color) 34%,transparent)}
+    .mm-chip.mm-fading{opacity:.75}
+    .mm-chip.mm-cold{opacity:.55;filter:grayscale(.8)}
+
     .mm-viewtoggle{display:flex;gap:2px;margin-left:auto}
     .mm-viewtoggle button{
       background:rgba(45,42,36,.3);border:1px solid rgba(180,172,158,.07);

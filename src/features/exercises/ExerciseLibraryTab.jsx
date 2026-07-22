@@ -220,7 +220,14 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         background: "transparent", border: "none", color: "inherit",
         cursor: "pointer", fontSize: FS.fs78, lineHeight: 1, padding: S.s2
       }}>{"✕"}</button>
-    </div>}{/* ═══ HOME VIEW ═══ */
+    </div>}{
+    /* Gym kit sits above both views, not just the filtered one. It shrinks
+       the home view's muscle tiles and discover rows too, so scoping it to
+       the filtered list would leave tiles vanishing with no visible cause and
+       no way to switch it off from where you noticed. */
+    }
+    <GymKitBar gymKit={gymKit} setGymKit={setGymKit} totalShown={libKitCount} totalAll={kitTotalAll} />
+    {/* ═══ HOME VIEW ═══ */
     libBrowseMode === "home" && <div>{/* Your Exercises — hero carousel */
       yourExercises.length > 0 && <div className={"lib-home-section"} style={{
         marginBottom: S.s4
@@ -328,7 +335,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           alignItems: "center",
           gap: S.s4
         }}>{"← Browse Library"}</button></div>
-      <GymKitBar gymKit={gymKit} setGymKit={setGymKit} totalShown={libKitCount} totalAll={kitTotalAll} /> {
+ {
         /* Filter dropdowns row — custom panels that stay open for multi-select */
       }
       <div style={{

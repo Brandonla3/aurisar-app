@@ -49,10 +49,17 @@ const WHEN = d =>
   : d === 1 ? 'trained yesterday'
   : `last trained ${d} days ago`;
 
+// Groups that exist in the data but have no place on a body — cardio today.
+// Rendered as chips below the figure so switching to the map never costs you
+// a route the strip offers, and so a new group added without a region degrades
+// to a chip instead of vanishing.
+const MAPPED = new Set([...FRONT, ...BACK].map(r => r.mg));
+
 const MuscleMap = memo(function MuscleMap({ data, onPick }) {
   const [view, setView] = useState('front');
   const regions = view === 'front' ? FRONT : BACK;
   const byMg = new Map((data || []).map(d => [d.mg, d]));
+  const offBody = (data || []).filter(d => !MAPPED.has(d.mg));
 
   return (
     <div className={"lib-home-section"} style={{ marginBottom: S.s4 }}>
@@ -127,6 +134,23 @@ const MuscleMap = memo(function MuscleMap({ data, onPick }) {
           ))}
         </ul>
       </div>
+
+      {offBody.length > 0 && (
+        <div className={"mm-offbody"}>
+          {offBody.map(d => (
+            <button
+              key={d.mg}
+              type="button"
+              className={`mm-chip mm-${d.state}`}
+              style={{ "--mg-color": d.color, "--volume": d.volume }}
+              aria-label={`${d.label}: ${WHEN(d.daysSinceTrained)}. Show ${d.label} exercises.`}
+              onClick={() => onPick(d.mg)}
+            >
+              <span aria-hidden="true">{d.emoji}</span>{d.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={{ fontSize: FS.fs55, color: "#6f6a62", marginTop: S.s4, letterSpacing: ".02em" }}>
         {"Tap a region to browse its exercises."}
