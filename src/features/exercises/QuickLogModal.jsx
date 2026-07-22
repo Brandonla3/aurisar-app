@@ -7,6 +7,7 @@ import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import { useModalLifecycle } from '../../utils/useModalLifecycle';
 import { entryTime } from './logEntryTime';
+import { planEntry } from './planEntry';
 
 /**
  * Single-exercise quick-log modal — extracted from the inline IIFE in
@@ -498,7 +499,7 @@ const QuickLogModal = memo(function QuickLogModal({
                 )}
                 <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(45,42,36,.3)", color: "#8a8478" }} onClick={() => {
                   setSpwSelected([ex.id]);
-                  setSavePlanWizard({ entries: [{ exId: ex.id, exercise: ex.name, icon: ex.icon, _idx: ex.id }], label: ex.name });
+                  setSavePlanWizard({ entries: [planEntry(ex, profile.chosenClass, allExById)], label: ex.name });
                   setSpwName(ex.name);
                   setSpwIcon(ex.icon || "📋");
                   setSpwDate("");

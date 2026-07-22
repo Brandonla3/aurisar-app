@@ -2942,6 +2942,7 @@ function App() {
   // allExercises scans off the App-render hot path (Finding #5 + #6 from
   // docs/performance-audit.md).
   const {
+    libKitCount,
     libFiltered,
     libAvailableTypes,
     libTypeCounts,
@@ -2956,6 +2957,7 @@ function App() {
     allExercises,
     _exReady,
     exerciseLog: profile.log,
+    gymKit: profile.gymKit,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
 
@@ -5455,6 +5457,10 @@ function App() {
 
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
+            gymKit={profile.gymKit}
+            setGymKit={v => setProfile(p => ({ ...p, gymKit: v }))}
+            libKitCount={libKitCount}
+            kitTotalAll={allExercises.length}
             _exReady={_exReady}
             _exLoadError={_exLoadError}
             libTypeCounts={libTypeCounts}
@@ -5945,6 +5951,9 @@ function App() {
         setExHHMM={setExHHMM}
         setExSec={setExSec}
         setQuickRows={setQuickRows}
+        allExById={allExById}
+        isInCart={isInCart}
+        toggleCart={toggleCart}
       />
     )
 
