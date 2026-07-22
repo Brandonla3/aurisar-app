@@ -540,7 +540,7 @@ function App() {
   // the library, favourites list and builder picker each used to keep.
   const {
     cartIds, cartSet, isInCart, addToCart, removeFromCart, toggleCart,
-    clearCart, moveInCart, cartOpen, setCartOpen,
+    clearCart, moveInCart, pruneMissing, cartOpen, setCartOpen,
   } = useExerciseCart();
   const [libBrowseMode, setLibBrowseMode] = useState("home");
   const [libVisibleCount, setLibVisibleCount] = useState(60);
@@ -2915,6 +2915,20 @@ function App() {
   const _allExercisesIncludingAliases = useMemo(() => [...EXERCISES, ...(_customExRef || [])].filter(e => e && e.id && e.name), [_customExRef, _exReady]);
   const allExById = useMemo(() => Object.fromEntries(_allExercisesIncludingAliases.map(e => [e.id, e])), [_allExercisesIncludingAliases]);
   const allExercises = useMemo(() => _allExercisesIncludingAliases.filter(e => !e.alias), [_allExercisesIncludingAliases]);
+
+  // The cart is persisted, so it can outlive the exercises in it — a custom
+  // exercise deleted while staged, or an ID restored from storage that the
+  // catalog no longer has. Everything downstream reads this resolved list so
+  // the tray's count, the library's banner and the forged workout all agree.
+  const stagedIds = useMemo(() => cartIds.filter(id => allExById[id]), [cartIds, allExById]);
+
+  // Drop the unresolvable ones from storage too, but only once the catalog has
+  // actually loaded — the bundled list is merged with Supabase after mount, so
+  // pruning earlier would delete IDs that are merely late, not missing.
+  useEffect(() => {
+    if (!_exReady || allExercises.length === 0) return;
+    pruneMissing(id => !!allExById[id]);
+  }, [_exReady, allExercises.length, allExById, pruneMissing]);
   const wbTotalXP = useMemo(() => wbExercises.reduce((s, ex) => {
     const extraCount = (ex.extraRows || []).length;
     const b = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
@@ -5459,7 +5473,7 @@ function App() {
             debouncedSetLibSearch={debouncedSetLibSearch}
             setLibDetailEx={setLibDetailEx}
             libSelectMode={libSelectMode}
-            cartIds={cartIds}
+            cartIds={stagedIds}
             isInCart={isInCart}
             toggleCart={toggleCart}
             clearCart={clearCart}
@@ -5838,7 +5852,7 @@ function App() {
 
     /* ══ STAGING TRAY ═══════════════════════════ */}{(
       <StagingTray
-        cartIds={cartIds}
+        cartIds={stagedIds}
         allExById={allExById}
         // The tray is scoped to the surfaces that stage exercises. Following
         // it into the 3D world or a chat thread would be noise.
@@ -5849,7 +5863,8 @@ function App() {
         clearCart={clearCart}
         moveInCart={moveInCart}
         onForgeWorkout={() => {
-          setWbExercises(cartIds.map(id => cartEntry(id, allExById)));
+          if (!stagedIds.length) return;
+          setWbExercises(stagedIds.map(id => cartEntry(id, allExById)));
           setWbName("");
           setWbIcon("💪");
           setWbDesc("");
@@ -5862,15 +5877,17 @@ function App() {
           setFavSelectMode(false);
         }}
         onAddToExisting={() => {
-          setAddToWorkoutPicker({ exercises: cartIds.map(id => cartEntry(id, allExById)) });
+          if (!stagedIds.length) return;
+          setAddToWorkoutPicker({ exercises: stagedIds.map(id => cartEntry(id, allExById)) });
           clearCart();
           setLibSelectMode(false);
           setFavSelectMode(false);
         }}
         onForgePlan={() => {
-          setSpwSelected([...cartIds]);
+          if (!stagedIds.length) return;
+          setSpwSelected([...stagedIds]);
           setSavePlanWizard({
-            entries: cartIds.map(id => ({
+            entries: stagedIds.map(id => ({
               exId: id,
               exercise: allExById[id] && allExById[id].name,
               icon: allExById[id] && allExById[id].icon,

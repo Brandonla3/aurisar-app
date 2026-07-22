@@ -61,6 +61,22 @@ export function useExerciseCart() {
     setCartOpen(false);
   }, []);
 
+  // Drop IDs the catalog can no longer resolve — a custom exercise deleted
+  // while it sat in the cart, or an entry restored from localStorage that no
+  // longer exists. Without this they accumulate silently and get forged into
+  // workouts as phantom rows.
+  //
+  // Timing hazard: the catalog is the bundled list merged with Supabase after
+  // mount, and custom exercises arrive with the profile. Pruning before both
+  // have landed would delete perfectly valid IDs, so callers must only run
+  // this once the catalog is ready.
+  const pruneMissing = useCallback(isKnown => {
+    setCartIds(ids => {
+      const kept = ids.filter(isKnown);
+      return kept.length === ids.length ? ids : kept;
+    });
+  }, []);
+
   // Reorder by one step; the tray exposes this as up/down rather than drag so
   // it works with a thumb, a mouse and a keyboard without a drag library.
   const moveInCart = useCallback((id, dir) => {
@@ -77,12 +93,17 @@ export function useExerciseCart() {
   return {
     cartIds, setCartIds,
     cartSet, isInCart,
-    addToCart, removeFromCart, toggleCart, clearCart, moveInCart,
+    addToCart, removeFromCart, toggleCart, clearCart, moveInCart, pruneMissing,
     cartOpen, setCartOpen,
   };
 }
 
-/** Shape a cart entry the way the workout builder and plan wizard expect. */
+/**
+ * Shape a cart entry the way the workout builder and plan wizard expect.
+ * Callers must pass an ID the catalog can resolve — the builder renders
+ * nothing for an unknown exId but still counts it toward wbExercises.length,
+ * so an unresolvable entry produces a workout that looks empty yet saves.
+ */
 export function cartEntry(id, allExById) {
   const e = allExById[id];
   return {
