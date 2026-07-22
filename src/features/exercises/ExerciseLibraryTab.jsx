@@ -7,6 +7,7 @@ import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
 import MuscleTorchStrip from './MuscleTorchStrip';
+import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
 
 /**
  * Exercise library tab — extracted from the inline IIFE in App.jsx as the
@@ -21,22 +22,6 @@ import MuscleTorchStrip from './MuscleTorchStrip';
  * modals on other tabs) don't drag the library tab into a re-render when
  * none of its props changed. Matches the PlansTabContainer convention.
  */
-
-// ── Library tab — module-level constants (hoisted from the IIFE) ──
-const TYPE_OPTS = ["strength", "cardio", "flexibility", "yoga", "stretching", "plyometric", "calisthenics", "functional", "isometric", "warmup", "cooldown"];
-const TYPE_LABELS = {
-  strength: "⚔️ Strength",
-  cardio: "🏃 Cardio",
-  flexibility: "🧘 Flexibility",
-  yoga: "🧘 Yoga",
-  stretching: "🌿 Stretch",
-  plyometric: "⚡ Plyo",
-  calisthenics: "🤸 Cali",
-  functional: "🔧 Functional",
-  isometric: "🧱 Isometric",
-  warmup: "🌅 Warmup",
-  cooldown: "🌙 Cooldown",
-};
 
 const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const {
@@ -348,7 +333,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           label="Muscle Group"
           shortLabel="Muscle"
           options={MUSCLE_OPTS}
-          optionLabel={m => m.charAt(0).toUpperCase() + m.slice(1).replace("_", " ")}
+          optionLabel={muscleLabel}
           selected={libMuscleFilters}
           counts={libMuscleCounts}
           onToggle={m => toggleSet(setLibMuscleFilters, m)}

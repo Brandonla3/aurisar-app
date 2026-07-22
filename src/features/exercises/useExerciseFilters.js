@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { MUSCLE_META } from '../../data/constants';
 import { getMuscleColor } from '../../utils/xp';
+import { MUSCLE_OPTS, EQUIP_OPTS } from './exerciseFilterOptions';
 
 /**
  * Memoized derivations for the exercise library tab.
@@ -20,8 +21,9 @@ import { getMuscleColor } from '../../utils/xp';
  * a Set/array referenced by identity; React's useMemo handles invalidation.
  */
 
-export const LIB_ALL_MUSCLE_OPTS = ["chest", "back", "shoulder", "bicep", "tricep", "legs", "glutes", "abs", "calves", "forearm", "full_body", "cardio"];
-export const LIB_ALL_EQUIP_OPTS = ["barbell", "dumbbell", "kettlebell", "cable", "machine", "bodyweight", "band"];
+// Re-exported for the call sites that already imported them from here.
+export const LIB_ALL_MUSCLE_OPTS = MUSCLE_OPTS;
+export const LIB_ALL_EQUIP_OPTS = EQUIP_OPTS;
 
 // Pure filter — checks all three filter sets (OR within each, AND across).
 function libMatchesFilters(ex, tF, mF, eF) {
