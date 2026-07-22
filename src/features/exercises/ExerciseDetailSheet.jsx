@@ -117,7 +117,11 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
 
   return createPortal(
     <div
-      onClick={close}
+      role="presentation"
+      // Dismiss only when the backdrop itself is hit, so the sheet no longer
+      // needs its own stopPropagation handler (which made the dialog a
+      // non-interactive element carrying a mouse listener).
+      onClick={e => { if (e.target === e.currentTarget) close(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -135,7 +139,6 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
         role="dialog"
         aria-modal="true"
         aria-label={ex.name}
-        onClick={e => e.stopPropagation()}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onAnimationEnd={() => setTurn(null)}

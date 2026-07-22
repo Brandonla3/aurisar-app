@@ -29,7 +29,6 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
   isInCart,
   toggleCart,
   // Sub-tab / detail navigation
-  setExSubTab,
   setLibDetailEx,
   // Exercise editor actions
   openExEditor,
@@ -91,14 +90,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               return (
                 <div
                   key={exId}
-                  onClick={() => {
-                    if (favSelectMode) {
-                      toggleCart(exId);
-                    } else {
-                      setLibDetailEx(ex);
-                    }
-                  }}
                   style={{
+                    position: "relative",
                     background: isSel ? "rgba(45,42,36,.3)" : "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
                     border: "1px solid " + (isSel ? "rgba(180,172,158,.2)" : "rgba(180,172,158,.05)"),
                     borderRadius: R.r10,
@@ -147,9 +140,14 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                       flexWrap: "wrap",
                       marginBottom: S.s4
                     }}>
-                      <span style={{ fontSize: FS.fs83, fontWeight: 600, color: "#d4cec4", letterSpacing: ".01em" }}>
-                        {ex.name}
-                      </span>
+                      <button
+                        type="button"
+                        className={"picker-ex-main"}
+                        aria-pressed={favSelectMode ? isSel : undefined}
+                        aria-label={favSelectMode ? `Stage ${ex.name}` : `Open ${ex.name}`}
+                        onClick={() => (favSelectMode ? toggleCart(exId) : setLibDetailEx(ex))}
+                        style={{ fontSize: FS.fs83, fontWeight: 600, color: "#d4cec4", letterSpacing: ".01em" }}
+                      >{ex.name}</button>
                       {hasPB && <span style={{ fontSize: FS.sm }}>{"🏆"}</span>}
                     </div>
                     <div style={{ fontSize: FS.fs62, fontStyle: "italic", lineHeight: 1.4 }}>
@@ -250,11 +248,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               return (
                 <div
                   key={ex.id}
-                  onClick={() => {
-                    setLibDetailEx(ex);
-                    setExSubTab("library");
-                  }}
                   style={{
+                    position: "relative",
                     background: "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
                     border: "1px solid rgba(180,172,158,.05)",
                     borderRadius: R.r10,
@@ -287,9 +282,13 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                       flexWrap: "wrap",
                       marginBottom: S.s4
                     }}>
-                      <span style={{ fontSize: FS.fs83, fontWeight: 600, color: "#d4cec4", letterSpacing: ".01em" }}>
-                        {ex.name}
-                      </span>
+                      <button
+                        type="button"
+                        className={"picker-ex-main"}
+                        aria-label={`Open ${ex.name}`}
+                        onClick={() => setLibDetailEx(ex)}
+                        style={{ fontSize: FS.fs83, fontWeight: 600, color: "#d4cec4", letterSpacing: ".01em" }}
+                      >{ex.name}</button>
                       <span className={"custom-ex-badge"} style={{ marginLeft: S.s2 }}>{"custom"}</span>
                       {hasPB && <span style={{ fontSize: FS.sm }}>{"🏆"}</span>}
                     </div>

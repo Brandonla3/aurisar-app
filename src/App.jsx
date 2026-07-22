@@ -609,11 +609,12 @@ function App() {
       [i]: !s[i]
     }));
   }
-  const [pickerMuscle, setPickerMuscle] = useState("All");
+  // Multi-select Sets, matching the library tab's filter model.
+  const [pickerMuscle, setPickerMuscle] = useState(() => new Set());
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerMuscleOpen, setPickerMuscleOpen] = useState(false);
-  const [pickerTypeFilter, setPickerTypeFilter] = useState("all");
-  const [pickerEquipFilter, setPickerEquipFilter] = useState("all");
+  const [pickerTypeFilter, setPickerTypeFilter] = useState(() => new Set());
+  const [pickerEquipFilter, setPickerEquipFilter] = useState(() => new Set());
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null); // "muscle"|"type"|"equip"|null
   const [pickerSelected, setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
   // Quests
@@ -3871,10 +3872,10 @@ function App() {
   function closePicker() {
     setWbExPickerOpen(false);
     setPickerSearch("");
-    setPickerMuscle("All");
+    setPickerMuscle(new Set());
     setPickerMuscleOpen(false);
-    setPickerTypeFilter("all");
-    setPickerEquipFilter("all");
+    setPickerTypeFilter(new Set());
+    setPickerEquipFilter(new Set());
     setPickerOpenDrop(null);
     setPickerSelected([]);
   }
@@ -5500,7 +5501,6 @@ function App() {
               isInCart={isInCart}
               toggleCart={toggleCart}
               setFavSelectMode={setFavSelectMode}
-              setExSubTab={setExSubTab}
               setLibDetailEx={setLibDetailEx}
               openExEditor={openExEditor}
               deleteCustomEx={deleteCustomEx}

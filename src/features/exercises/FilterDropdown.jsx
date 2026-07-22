@@ -94,6 +94,11 @@ function FilterDropdown({
         break;
       case 'Escape':
       case 'Tab':
+        // Escape must close only the innermost layer. Inside the workout
+        // picker the surrounding modal has its own document-level Escape
+        // handler (useModalLifecycle), so without stopping propagation one
+        // press dismissed the panel *and* the whole picker.
+        if (e.key === 'Escape') e.stopPropagation();
         // Escape closes in place; Tab closes and lets focus move on.
         if (e.key === 'Escape') { e.preventDefault(); triggerRef.current?.focus(); }
         setOpen(null);
