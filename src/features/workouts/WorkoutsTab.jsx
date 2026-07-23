@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { ExIcon } from '../../components/ExIcon';
 import { getMuscleColor, getTypeColor, calcExXP } from '../../utils/xp';
 import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
@@ -62,6 +62,30 @@ const RECIPE_CAT_COLORS = {
 function getRecipeMgColor(tpl) {
   if (!tpl) return "#B0A090";
   return RECIPE_CAT_COLORS[tpl.category] || RECIPE_CAT_COLORS[tpl.equipment] || "#B0A090";
+}
+// Recipe facet counts never change — the template list is static.
+const RECIPE_CAT_COUNTS = (() => {
+  const c = new Map();
+  for (const t of WORKOUT_TEMPLATES) {
+    for (const k of [t.category, t.equipment]) {
+      if (k) c.set(k, (c.get(k) || 0) + 1);
+    }
+  }
+  return c;
+})();
+// Recipe XP depends only on the (static) template and the player's class,
+// so cache it per class instead of reducing over every template each render.
+const _recipeXpCache = new Map(); // chosenClass -> Map<tplId, xp>
+function recipeXP(tpl, chosenClass, allExById) {
+  let byTpl = _recipeXpCache.get(chosenClass);
+  if (!byTpl) {
+    byTpl = new Map();
+    _recipeXpCache.set(chosenClass, byTpl);
+  }
+  if (!byTpl.has(tpl.id)) {
+    byTpl.set(tpl.id, tpl.exercises.reduce((t, ex) => t + calcExXP(ex.exId, ex.sets, ex.reps, chosenClass, allExById), 0));
+  }
+  return byTpl.get(tpl.id);
 }
 function getWorkoutMgColor(wo, exById, mgColors) {
   if (!wo || !wo.exercises) return "#B0A090";
@@ -365,17 +389,34 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
       }}>{"▼"}</span></div>{!collapsed && <div className={"ss-section-body"}>{renderWbExFields(ex, idx, exD)}</div>}</div>;
 }
 const metric = isMetric(profile.units);
-const allW = profile.workouts || [];
-const woLabelCounts = new Map();
-for (const w of allW) {
-  for (const l of w.labels || []) woLabelCounts.set(l, (woLabelCounts.get(l) || 0) + 1);
-}
+const allW = useMemo(() => profile.workouts || [], [profile.workouts]);
 const calcWorkoutXP = wo => (wo.exercises || []).reduce((s, ex) => {
   const extraCount = (ex.extraRows || []).length;
   const base = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
   const rowsXP = (ex.extraRows || []).reduce((rs, row) => rs + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
   return s + base + rowsXP;
 }, 0);
+// Per-workout XP + accent, computed once per relevant-input change rather
+// than per card on every render. Keyed on the workout list, the class
+// (multiplier) and the catalog.
+const woMeta = useMemo(() => {
+  const m = new Map();
+  for (const w of allW) {
+    m.set(w.id, {
+      xp: calcWorkoutXP(w),
+      mgColor: getWorkoutMgColor(w, allExById, MUSCLE_COLORS),
+    });
+  }
+  return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [allW, profile.chosenClass, allExById]);
+const woLabelCounts = useMemo(() => {
+  const c = new Map();
+  for (const w of allW) {
+    for (const l of w.labels || []) c.set(l, (c.get(l) || 0) + 1);
+  }
+  return c;
+}, [allW]);
 
 // ── LIST ───────────────────────────────
 if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div style={{
@@ -473,8 +514,9 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
       return null;
     })()}{allW.filter(w => !w.oneOff).filter(w => woLabelFilters.size === 0 || (w.labels || []).some(l => woLabelFilters.has(l))).map(wo => {
       const exCount = wo.exercises.length;
-      const xp = calcWorkoutXP(wo);
-      const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
+      const _meta = woMeta.get(wo.id) || { xp: calcWorkoutXP(wo), mgColor: getWorkoutMgColor(wo, allExById, MUSCLE_COLORS) };
+      const xp = _meta.xp;
+      const woMgColor = _meta.mgColor;
       return <div key={wo.id} className={"workout-card"} style={{
         "--mg-color": woMgColor
       }}><div className={"workout-card-top"} style={{
@@ -689,12 +731,7 @@ if (workoutView === "recipes") {
   const filteredTpls = recipeFilter.size === 0 ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t => recipeFilter.has(t.category) || recipeFilter.has(t.equipment));
   // Faceted counts for the shared FilterDropdown (option => how many results
   // selecting it alone would show).
-  const recipeCatCounts = new Map();
-  for (const t of WORKOUT_TEMPLATES) {
-    for (const k of [t.category, t.equipment]) {
-      if (k) recipeCatCounts.set(k, (recipeCatCounts.get(k) || 0) + 1);
-    }
-  }
+  const recipeCatCounts = RECIPE_CAT_COUNTS;
   return <><div className={"wo-sticky-filters"}><div style={{
         display: "flex",
         alignItems: "center",
@@ -739,7 +776,7 @@ if (workoutView === "recipes") {
           color: "#8a8478",
           alignSelf: "center"
         }} onClick={() => setRecipeFilter(new Set())}>{"Clear"}</button>}</div></div>{filteredTpls.length === 0 && <div className={"empty"}>{"No recipes match the selected categories."}</div>}{filteredTpls.map(tpl => {
-      const xp = tpl.exercises.reduce((t, ex) => t + calcExXP(ex.exId, ex.sets, ex.reps, profile.chosenClass, allExById), 0);
+      const xp = recipeXP(tpl, profile.chosenClass, allExById);
       const descExpanded = expandedRecipeDesc.has(tpl.id);
       const tplMgColor = getRecipeMgColor(tpl);
       const diffCls = tpl.difficulty ? `wo-diff-pill wo-diff-${tpl.difficulty.toLowerCase()}` : null;
