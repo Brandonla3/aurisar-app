@@ -93,7 +93,14 @@ export function locationLabelAt(worldgen, x, z, opts = {}) {
   if (!worldgen) return '';
   const cfg = worldgen.config ?? {};
   if (opts.inDungeon) {
-    return cfg.interiors?.hollowDeep?.name ?? 'Dungeon';
+    // Which dungeon? Resolve the nearest interior anchor to the player's x
+    // (interiors sit at distinct x — castle 840 / hollowDeep 1000 / frostspire
+    // 1300), instead of always naming Hollow Deep.
+    let near = null;
+    for (const d of Object.values(cfg.interiors ?? {})) {
+      if (!near || Math.abs(d.cx - x) < Math.abs(near.cx - x)) near = d;
+    }
+    return near?.name ?? 'Dungeon';
   }
   const lake = cfg.lake;
   if (lake) {
@@ -114,12 +121,12 @@ export function locationLabelAt(worldgen, x, z, opts = {}) {
  * pass the minimap's player-centred projector or the world-map's static one.
  *
  * @param {CanvasRenderingContext2D} ctx
- * @param {object} mapData  { worldgen, config, sites }
+ * @param {object} mapData  { worldgen, config, sites, waypoints, npcs }
  * @param {(x:number,z:number)=>{px:number,py:number}} worldToPx
  * @param {object} [opts]   { labels:boolean, w:number, h:number, font:number }
  */
 export function drawMapMarkers(ctx, mapData, worldToPx, opts = {}) {
-  const { config, sites } = mapData;
+  const { config, sites, waypoints, npcs } = mapData;
   const w = opts.w ?? ctx.canvas.width;
   const h = opts.h ?? ctx.canvas.height;
   const labels = opts.labels ?? false;
@@ -155,6 +162,20 @@ export function drawMapMarkers(ctx, mapData, worldToPx, opts = {}) {
     }
   }
 
+  // Chests — small subtle gold squares (low-key so the full manifest doesn't
+  // dominate the map or over-spoil loot locations)
+  if (sites?.chests) {
+    ctx.fillStyle = 'rgba(230, 190, 90, 0.55)';
+    ctx.strokeStyle = 'rgba(60, 45, 15, 0.7)';
+    ctx.lineWidth = 0.75;
+    for (const c of sites.chests) {
+      const p = worldToPx(c.x, c.z);
+      if (!inView(p)) continue;
+      ctx.fillRect(p.px - 2, p.py - 2, 4, 4);
+      ctx.strokeRect(p.px - 2, p.py - 2, 4, 4);
+    }
+  }
+
   // Dungeon entrances — purple markers (+ labels in full mode)
   const interiors = config?.interiors ?? {};
   for (const key of Object.keys(interiors)) {
@@ -169,6 +190,47 @@ export function drawMapMarkers(ctx, mapData, worldToPx, opts = {}) {
     ctx.fill();
     ctx.stroke();
     if (labels) drawLabel(ctx, d.name ?? key, p.px, p.py - 9, font, '#d7c4ff');
+  }
+
+  // NPCs — friendly green dots (+ names in full mode). Positions nest under
+  // `pos` in the content model.
+  if (npcs) {
+    ctx.strokeStyle = 'rgba(8, 30, 12, 0.9)';
+    ctx.lineWidth = 1;
+    for (const n of npcs) {
+      const p = worldToPx(n.pos.x, n.pos.z);
+      if (!inView(p)) continue;
+      ctx.fillStyle = 'rgba(120, 220, 130, 0.95)';
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (labels) drawLabel(ctx, n.name, p.px, p.py - 8, font, '#bff0c6');
+    }
+  }
+
+  // Waypoints / POIs — cyan pins (+ labels in full mode). The Castle Ashwood
+  // gate (poi_castle_ashwood) gets a distinct gold keep glyph.
+  if (waypoints) {
+    for (const wp of waypoints) {
+      const p = worldToPx(wp.pos.x, wp.pos.z);
+      if (!inView(p)) continue;
+      const isCastle = wp.id === 'poi_castle_ashwood';
+      ctx.strokeStyle = 'rgba(8, 24, 30, 0.9)';
+      ctx.lineWidth = 1;
+      if (isCastle) {
+        ctx.fillStyle = 'rgba(240, 210, 120, 0.98)';
+        ctx.fillRect(p.px - 3.5, p.py - 3.5, 7, 7);
+        ctx.strokeRect(p.px - 3.5, p.py - 3.5, 7, 7);
+      } else {
+        ctx.fillStyle = 'rgba(130, 210, 240, 0.95)';
+        ctx.beginPath();
+        ctx.arc(p.px, p.py, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      if (labels) drawLabel(ctx, wp.label, p.px, p.py - (isCastle ? 10 : 8), font, isCastle ? '#f0d078' : '#a8e6f5');
+    }
   }
 
   if (!labels) return;
