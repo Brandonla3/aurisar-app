@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import { ExIcon } from '../../components/ExIcon';
-import { getMuscleColor, getTypeColor, calcExXP, calcWorkoutXP } from '../../utils/xp';
+import { getMuscleColor, getTypeColor, calcExXP, calcExEntryXP, calcWorkoutXP } from '../../utils/xp';
 import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
 import { formatXP } from '../../utils/format';
 import { todayStr } from '../../utils/helpers';
@@ -240,14 +240,9 @@ const WbExCard = React.memo(function WbExCard({
         fontSize: FS.fs63,
         color: "#b4ac9e",
         flexShrink: 0
-      }}>{(() => {
-          const extraCount = (ex.extraRows || []).length;
-          const b = calcExXP(ex.exId, noSetsEx ? 1 : ex.sets, ex.reps, profile.chosenClass, allExById, distMiVal || null, null, null, extraCount);
-          const r = (ex.extraRows || []).reduce((s, row) => s + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-          return formatXP(b + r, {
-            signed: true
-          });
-        })()}{runBoostPct > 0 && <span style={{
+      }}>{formatXP(calcExEntryXP(ex, profile.chosenClass, allExById), {
+          signed: true
+        })}{runBoostPct > 0 && <span style={{
           color: UI_COLORS.warning,
           marginLeft: S.s2
         }}>{"⚡"}</span>}</span><span style={{
@@ -345,12 +340,7 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
   const _isRunning = exD.id === RUNNING_EX_ID;
   const _runPace = _isRunning && _distMiVal > 0 && _durMin > 0 ? _durMin / _distMiVal : null;
   const _runBoost = _runPace ? _runPace <= 8 ? 20 : 5 : 0;
-  const xpVal = (() => {
-    const extraCount = (ex.extraRows || []).length;
-    const b = calcExXP(ex.exId, _noSets ? 1 : ex.sets, ex.reps, profile.chosenClass, allExById, _distMiVal || null, ex.weightLbs || null, null, extraCount);
-    const r = (ex.extraRows || []).reduce((s, row) => s + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, ex.weightLbs || null, null, extraCount), 0);
-    return b + r;
-  })();
+  const xpVal = calcExEntryXP(ex, profile.chosenClass, allExById);
   const summaryText = (_noSets ? "" : ex.sets + "×") + ex.reps + (ex.weightLbs ? ` · ${displayWt(ex.weightLbs, profile.units)}` : "");
   return <div className={"ss-section"}><div className={"ss-section-hdr"} onClick={() => setSsAccordion(prev => ({
       ...prev,

@@ -3,7 +3,7 @@ import WorkoutsTab from './WorkoutsTab';
 import WorkoutExercisePicker from './WorkoutExercisePicker';
 import { buildWorkoutObject } from './workoutModel';
 import { uid } from '../../utils/helpers';
-import { calcExXP } from '../../utils/xp';
+import { calcExEntryXP } from '../../utils/xp';
 import { secToHHMMSplit, combineHHMMSec } from '../../utils/time';
 
 /**
@@ -87,12 +87,7 @@ const WorkoutsTabContainer = React.memo(React.forwardRef(function WorkoutsTabCon
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null);
   const [pickerSelected, setPickerSelected] = useState([]);
 
-  const wbTotalXP = useMemo(() => wbExercises.reduce((s, ex) => {
-    const extraCount = (ex.extraRows || []).length;
-    const b = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
-    const r = (ex.extraRows || []).reduce((rs, row) => rs + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-    return s + (b + r);
-  }, 0), [wbExercises, profile.chosenClass, allExById]);
+  const wbTotalXP = useMemo(() => wbExercises.reduce((s, ex) => s + calcExEntryXP(ex, profile.chosenClass, allExById), 0), [wbExercises, profile.chosenClass, allExById]);
 
   // ── Builder lifecycle (bodies relocated verbatim from App.jsx) ──
   function initWorkoutBuilder(base) {
