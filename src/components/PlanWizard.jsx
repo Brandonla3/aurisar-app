@@ -11,6 +11,9 @@ import { NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, UI_COLORS } from '../data/cons
 import { FS, R, S } from '../utils/tokens';
 import { CLASSES } from '../data/exercises';
 import { ExIcon } from './ExIcon';
+import FilterDropdown from '../features/exercises/FilterDropdown';
+import { TYPE_OPTS, TYPE_LABELS, MUSCLE_OPTS, EQUIP_OPTS, muscleLabel, equipLabel } from '../features/exercises/exerciseFilterOptions';
+import { matchesAll, facetCounts as countFacet, muscleKeys, typeKeys, equipKeys } from '../features/exercises/matchesFacets';
 
 const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
 
@@ -326,10 +329,10 @@ function PlanWizard(props) {
   const [pickerSearch, setPickerSearch] = useState("");
   const debouncedSetSearch = useRef(debounce(v => setPickerSearch(v), 200)).current;
   const pickerSearchRef = useRef(null);
-  const [pickerMuscle, setPickerMuscle] = useState("All");
-  const [pickerMuscleOpen, setPickerMuscleOpen] = useState(false);
-  const [pickerTypeFilter, setPickerTypeFilter] = useState("all");
-  const [pickerEquipFilter, setPickerEquipFilter] = useState("all");
+  // Multi-select Sets, matching the library tab and the workout builder.
+  const [pickerMuscle, setPickerMuscle] = useState(() => new Set());
+  const [pickerTypeFilter, setPickerTypeFilter] = useState(() => new Set());
+  const [pickerEquipFilter, setPickerEquipFilter] = useState(() => new Set());
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null);
   const [pickerSelected, setPickerSelected] = useState([]);
 
@@ -374,16 +377,27 @@ function PlanWizard(props) {
     });
   },[bDays,bDayIdx,profile.chosenClass,allExById]);
 
-  const filteredExercises = useMemo(()=>{
-    const q=pickerSearch.toLowerCase().trim();
-    return allExercises.filter(e=>{
-      if(pickerMuscle!=="All"&&e.muscleGroup!==pickerMuscle) return false;
-      if(pickerTypeFilter!=="all"){const ty=(e.exerciseType||"").toLowerCase(),ca=(e.category||"").toLowerCase();if(!ty.includes(pickerTypeFilter)&&ca!==pickerTypeFilter) return false;}
-      if(pickerEquipFilter!=="all"&&(e.equipment||"bodyweight").toLowerCase()!==pickerEquipFilter) return false;
-      if(q&&!e.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  },[pickerSearch,pickerMuscle,pickerTypeFilter,pickerEquipFilter,allExercises]);
+  const filteredExercises = useMemo(
+    () => allExercises.filter(e => matchesAll(e, pickerSearch, pickerMuscle, pickerTypeFilter, pickerEquipFilter)),
+    [pickerSearch, pickerMuscle, pickerTypeFilter, pickerEquipFilter, allExercises]
+  );
+
+  // A facet never constrains itself, so each count answers "how many results
+  // would this option leave", given the search and the other two facets.
+  const pickerFacetCounts = useMemo(() => {
+    const NONE = new Set();
+    return {
+      muscle: countFacet(allExercises, muscleKeys, e => matchesAll(e, pickerSearch, NONE, pickerTypeFilter, pickerEquipFilter)),
+      type: countFacet(allExercises, typeKeys, e => matchesAll(e, pickerSearch, pickerMuscle, NONE, pickerEquipFilter)),
+      equip: countFacet(allExercises, equipKeys, e => matchesAll(e, pickerSearch, pickerMuscle, pickerTypeFilter, NONE)),
+    };
+  }, [allExercises, pickerSearch, pickerMuscle, pickerTypeFilter, pickerEquipFilter]);
+
+  const togglePickerFilter = (setter, val) => setter(st => {
+    const next = new Set(st);
+    next.has(val) ? next.delete(val) : next.add(val);
+    return next;
+  });
 
   // ── Functions ──
   function togglePlanEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedPlanEx(s=>({...s,[k]:!s[k]})); }
@@ -527,7 +541,7 @@ function PlanWizard(props) {
 
   function closePicker() {
     setExPickerOpen(false);
-    setPickerSearch(""); if(pickerSearchRef.current) pickerSearchRef.current.value=""; setPickerMuscle("All"); setPickerMuscleOpen(false); setPickerTypeFilter("all"); setPickerEquipFilter("all"); setPickerOpenDrop(null);
+    setPickerSearch(""); if(pickerSearchRef.current) pickerSearchRef.current.value=""; setPickerMuscle(new Set()); setPickerTypeFilter(new Set()); setPickerEquipFilter(new Set()); setPickerOpenDrop(null);
     setPickerSelected([]);
   }
 
@@ -1015,62 +1029,61 @@ function PlanWizard(props) {
                     placeholder={"Search exercises…"} ref={pickerSearchRef}
                     onChange={e=>debouncedSetSearch(e.target.value)} autoFocus={true} />
                 </div>
-                {(()=>{
-                  const PTYPE_LABELS2={strength:"⚔️ Strength",cardio:"🏃 Cardio",flexibility:"🧘 Flex",yoga:"🧘 Yoga",stretching:"🌿 Stretch",plyometric:"⚡ Plyo",calisthenics:"🤸 Cali"};
-                  const PTYPE_OPTS2=Object.keys(PTYPE_LABELS2);
-                  const PEQUIP_OPTS2=["barbell","dumbbell","kettlebell","cable","machine","bodyweight","band"];
-                  const PMUSCLE_OPTS2=["chest","back","shoulder","bicep","legs","glutes","abs","calves","forearm","cardio"];
-                  const closeDrops2=()=>setPickerOpenDrop(null);
-                  return (
-                    <div style={{position:"relative",marginBottom:S.s10}}>
-                      {pickerOpenDrop && <div onClick={closeDrops2} style={{position:"fixed",inset:0,zIndex:19}} />}
-                      <div style={{display:"flex",gap:S.s8}}>
-                        <div style={{position:"relative",flex:1,zIndex:20}}>
-                          <button onClick={()=>setPickerOpenDrop(d=>d==="muscle2"?null:"muscle2")} style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerMuscle!=="All"?"#b4ac9e":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}}>
-                            {pickerMuscle==="All"?"Muscle":pickerMuscle.charAt(0).toUpperCase()+pickerMuscle.slice(1)}
-                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="muscle2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerMuscle!=="All"?"#b4ac9e":"#8a8478",transition:"transform .15s"}}>{"▼"}</span>
-                          </button>
-                          {pickerOpenDrop==="muscle2" && (
-                            <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}}>
-                              <div onClick={()=>{setPickerMuscle("All");closeDrops2();}} style={{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerMuscle==="All"?"#b4ac9e":"#8a8478",background:pickerMuscle==="All"?"rgba(45,42,36,.2)":"transparent"}}>All Muscles</div>
-                              {PMUSCLE_OPTS2.map(m=>(
-                                <div key={m} onClick={()=>{setPickerMuscle(m);closeDrops2();}} style={{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerMuscle===m?getMuscleColor(m):"#8a8478",background:pickerMuscle===m?"rgba(45,42,36,.2)":"transparent",textTransform:"capitalize"}}>{m}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{position:"relative",flex:1,zIndex:20}}>
-                          <button onClick={()=>setPickerOpenDrop(d=>d==="type2"?null:"type2")} style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerTypeFilter!=="all"?"#d4cec4":"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}}>
-                            {pickerTypeFilter==="all"?"Type":(PTYPE_LABELS2[pickerTypeFilter]||pickerTypeFilter)}
-                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="type2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerTypeFilter!=="all"?"#d4cec4":"#8a8478",transition:"transform .15s"}}>{"▼"}</span>
-                          </button>
-                          {pickerOpenDrop==="type2" && (
-                            <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}}>
-                              <div onClick={()=>{setPickerTypeFilter("all");closeDrops2();}} style={{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerTypeFilter==="all"?"#d4cec4":"#8a8478",background:pickerTypeFilter==="all"?"rgba(45,42,36,.2)":"transparent"}}>All Types</div>
-                              {PTYPE_OPTS2.map(t=>(
-                                <div key={t} onClick={()=>{setPickerTypeFilter(t);closeDrops2();}} style={{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerTypeFilter===t?getTypeColor(t):"#8a8478",background:pickerTypeFilter===t?"rgba(45,42,36,.2)":"transparent"}}>{PTYPE_LABELS2[t]}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{position:"relative",flex:1,zIndex:20}}>
-                          <button onClick={()=>setPickerOpenDrop(d=>d==="equip2"?null:"equip2")} style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:R.r8,border:"1px solid "+(pickerEquipFilter!=="all"?UI_COLORS.accent:"rgba(45,42,36,.3)"),background:"rgba(14,14,12,.95)",color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",fontSize:FS.fs68,textAlign:"left",cursor:"pointer",position:"relative"}}>
-                            {pickerEquipFilter==="all"?"Equipment":pickerEquipFilter.charAt(0).toUpperCase()+pickerEquipFilter.slice(1)}
-                            <span style={{position:"absolute",right:7,top:"50%",transform:"translateY(-50%) rotate("+(pickerOpenDrop==="equip2"?"180deg":"0deg")+")",fontSize:FS.fs55,color:pickerEquipFilter!=="all"?UI_COLORS.accent:"#8a8478",transition:"transform .15s"}}>{"▼"}</span>
-                          </button>
-                          {pickerOpenDrop==="equip2" && (
-                            <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,minWidth:"100%",background:"rgba(16,14,10,.95)",border:"1px solid rgba(180,172,158,.06)",borderRadius:R.r8,padding:"6px 4px",zIndex:21,boxShadow:"0 8px 24px rgba(0,0,0,.7)"}}>
-                              <div onClick={()=>{setPickerEquipFilter("all");closeDrops2();}} style={{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerEquipFilter==="all"?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter==="all"?"rgba(196,148,40,0.12)":"transparent"}}>All Equipment</div>
-                              {PEQUIP_OPTS2.map(e=>(
-                                <div key={e} onClick={()=>{setPickerEquipFilter(e);closeDrops2();}} style={{padding:"6px 10px",fontSize:FS.fs72,cursor:"pointer",borderRadius:R.r5,color:pickerEquipFilter===e?UI_COLORS.accent:"#8a8478",background:pickerEquipFilter===e?"rgba(196,148,40,0.12)":"transparent",textTransform:"capitalize"}}>{e}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* Filter dropdowns — the fourth copy of this pattern lived
+                    here, with its own PMUSCLE_OPTS2 that omitted tricep and
+                    full_body, so 188 exercises could not be filtered to while
+                    building a plan. Shared FilterDropdown + vocabulary now,
+                    which also brings multi-select, faceted counts and a
+                    keyboard path in line with the library and the builder. */}
+                <div style={{position:"relative",marginBottom:S.s10}}>
+                  {pickerOpenDrop && <div aria-hidden={"true"} onClick={()=>setPickerOpenDrop(null)} style={{position:"fixed",inset:0,zIndex:19}} />}
+                  <div style={{display:"flex",gap:S.s8}}>
+                    <FilterDropdown
+                      id="pw-muscle"
+                      label="Muscle"
+                      shortLabel="Muscle"
+                      options={MUSCLE_OPTS}
+                      optionLabel={muscleLabel}
+                      selected={pickerMuscle}
+                      counts={pickerFacetCounts.muscle}
+                      onToggle={v=>togglePickerFilter(setPickerMuscle,v)}
+                      open={pickerOpenDrop==="pw-muscle"}
+                      setOpen={setPickerOpenDrop}
+                      accent="#7A8F8B"
+                      optionAccent={getMuscleColor}
+                      panelBorder="rgba(122,143,139,.25)"
+                    />
+                    <FilterDropdown
+                      id="pw-type"
+                      label="Type"
+                      shortLabel="Type"
+                      options={TYPE_OPTS}
+                      optionLabel={v=>TYPE_LABELS[v]}
+                      selected={pickerTypeFilter}
+                      counts={pickerFacetCounts.type}
+                      onToggle={v=>togglePickerFilter(setPickerTypeFilter,v)}
+                      open={pickerOpenDrop==="pw-type"}
+                      setOpen={setPickerOpenDrop}
+                      accent="#C4A044"
+                      optionAccent={getTypeColor}
+                      panelBorder="rgba(180,172,158,.07)"
+                    />
+                    <FilterDropdown
+                      id="pw-equip"
+                      label="Equipment"
+                      shortLabel="Equip"
+                      options={EQUIP_OPTS}
+                      optionLabel={equipLabel}
+                      selected={pickerEquipFilter}
+                      counts={pickerFacetCounts.equip}
+                      onToggle={v=>togglePickerFilter(setPickerEquipFilter,v)}
+                      open={pickerOpenDrop==="pw-equip"}
+                      setOpen={setPickerOpenDrop}
+                      accent={UI_COLORS.accent}
+                      panelBorder="rgba(196,148,40,0.25)"
+                    />
+                  </div>
+                </div>
                 {(()=>{
                   if(filteredExercises.length===0) return <div className="empty" style={{padding:"20px 0"}}>No exercises found.</div>;
                   return (

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { MUSCLE_META } from '../../data/constants';
 import { getMuscleColor } from '../../utils/xp';
 import { MUSCLE_OPTS, EQUIP_OPTS } from './exerciseFilterOptions';
+import { matchesFacets, matchesAll, facetCounts, muscleKeys, typeKeys, equipKeys, NO_FACET } from './matchesFacets';
 
 /**
  * Memoized derivations for the exercise library tab.
@@ -24,24 +25,6 @@ import { MUSCLE_OPTS, EQUIP_OPTS } from './exerciseFilterOptions';
 // Re-exported for the call sites that already imported them from here.
 export const LIB_ALL_MUSCLE_OPTS = MUSCLE_OPTS;
 export const LIB_ALL_EQUIP_OPTS = EQUIP_OPTS;
-
-// Pure filter — checks all three filter sets (OR within each, AND across).
-function libMatchesFilters(ex, tF, mF, eF) {
-  if (tF.size > 0) {
-    const types = (ex.exerciseType || "").toLowerCase();
-    const cat = (ex.category || "").toLowerCase();
-    if (![...tF].some(t => types.includes(t) || cat === t)) return false;
-  }
-  if (mF.size > 0) {
-    const mg = (ex.muscleGroup || "").toLowerCase().trim();
-    if (!mF.has(mg)) return false;
-  }
-  if (eF.size > 0) {
-    const eq = (ex.equipment || "bodyweight").toLowerCase().trim();
-    if (!eF.has(eq)) return false;
-  }
-  return true;
-}
 
 // Training recency buckets, in days since the muscle group was last worked.
 // "cold" is the fog: never trained, or long enough ago that it no longer
@@ -109,7 +92,7 @@ export function useExerciseFilters({
     const q2 = libSearchDebounced.toLowerCase().trim();
     return allExercises.filter(ex => {
       if (q2 && !ex.name.toLowerCase().includes(q2)) return false;
-      return libMatchesFilters(ex, libTypeFilters, libMuscleFilters, libEquipFilters);
+      return matchesFacets(ex, libMuscleFilters, libTypeFilters, libEquipFilters);
     });
   }, [allExercises, libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters]);
 
@@ -124,48 +107,21 @@ export function useExerciseFilters({
   // Each pass is a single walk over allExercises, same cost as the presence-
   // only Sets these replaced. The Sets are derived from the count maps so
   // existing callers keep working.
-  const matchesSearch = useMemo(() => {
-    const q = libSearchDebounced.toLowerCase().trim();
-    return q ? ex => ex.name.toLowerCase().includes(q) : () => true;
-  }, [libSearchDebounced]);
-
-  const libMuscleCounts = useMemo(() => {
-    const counts = new Map();
-    for (const ex of allExercises) {
-      if (!matchesSearch(ex)) continue;
-      if (!libMatchesFilters(ex, libTypeFilters, new Set(), libEquipFilters)) continue;
-      const mg = (ex.muscleGroup || "").toLowerCase().trim();
-      if (mg) counts.set(mg, (counts.get(mg) || 0) + 1);
-    }
-    return counts;
-  }, [allExercises, matchesSearch, libTypeFilters, libEquipFilters]);
-
-  const libEquipCounts = useMemo(() => {
-    const counts = new Map();
-    for (const ex of allExercises) {
-      if (!matchesSearch(ex)) continue;
-      if (!libMatchesFilters(ex, libTypeFilters, libMuscleFilters, new Set())) continue;
-      const eq = (ex.equipment || "bodyweight").toLowerCase().trim();
-      if (eq) counts.set(eq, (counts.get(eq) || 0) + 1);
-    }
-    return counts;
-  }, [allExercises, matchesSearch, libTypeFilters, libMuscleFilters]);
-
-  const libTypeCounts = useMemo(() => {
-    const counts = new Map();
-    for (const ex of allExercises) {
-      if (!matchesSearch(ex)) continue;
-      if (!libMatchesFilters(ex, new Set(), libMuscleFilters, libEquipFilters)) continue;
-      // An exercise can carry several type tags plus a category; count it
-      // once per distinct tag so the numbers match what selecting that tag
-      // would actually return.
-      const tags = new Set((ex.exerciseType || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean));
-      const cat = (ex.category || "").toLowerCase();
-      if (cat) tags.add(cat);
-      for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
-    }
-    return counts;
-  }, [allExercises, matchesSearch, libMuscleFilters, libEquipFilters]);
+  // Each pass is a single walk; the shared facetCounts/keys helpers keep the
+  // definition of "what counts as this facet" identical across the library,
+  // the workout builder and the plan wizard.
+  const libMuscleCounts = useMemo(
+    () => facetCounts(allExercises, muscleKeys, ex => matchesAll(ex, libSearchDebounced, NO_FACET, libTypeFilters, libEquipFilters)),
+    [allExercises, libSearchDebounced, libTypeFilters, libEquipFilters]
+  );
+  const libEquipCounts = useMemo(
+    () => facetCounts(allExercises, equipKeys, ex => matchesAll(ex, libSearchDebounced, libMuscleFilters, libTypeFilters, NO_FACET)),
+    [allExercises, libSearchDebounced, libMuscleFilters, libTypeFilters]
+  );
+  const libTypeCounts = useMemo(
+    () => facetCounts(allExercises, typeKeys, ex => matchesAll(ex, libSearchDebounced, libMuscleFilters, NO_FACET, libEquipFilters)),
+    [allExercises, libSearchDebounced, libMuscleFilters, libEquipFilters]
+  );
 
   // Cascading availability — kept as Sets for callers that only need a yes/no.
   const libAvailableMuscles = useMemo(() => new Set(libMuscleCounts.keys()), [libMuscleCounts]);

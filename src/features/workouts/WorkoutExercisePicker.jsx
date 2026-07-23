@@ -7,6 +7,7 @@ import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import ExerciseRow from '../exercises/ExerciseRow';
 import FilterDropdown from '../exercises/FilterDropdown';
+import { matchesAll, facetCounts as countFacet, NO_FACET, muscleKeys, typeKeys, equipKeys } from '../exercises/matchesFacets';
 import {
   TYPE_OPTS, TYPE_LABELS, MUSCLE_OPTS, EQUIP_OPTS, muscleLabel, equipLabel,
 } from '../exercises/exerciseFilterOptions';
@@ -43,20 +44,6 @@ const WbExPickerRow = React.memo(function WbExPickerRow({
   );
 });
 
-// Same OR-within-a-facet, AND-across-facets rule the library list applies, so
-// "filtered by chest" means the same thing on both surfaces.
-function matchesFacets(e, mF, tF, eF) {
-  if (e.id === "rest_day") return false;
-  if (mF.size && !mF.has((e.muscleGroup || "").toLowerCase().trim())) return false;
-  if (tF.size) {
-    const ty = (e.exerciseType || "").toLowerCase();
-    const ca = (e.category || "").toLowerCase();
-    if (![...tF].some(t => ty.includes(t) || ca === t)) return false;
-  }
-  if (eF.size && !eF.has((e.equipment || "bodyweight").toLowerCase().trim())) return false;
-  return true;
-}
-
 const toggleFilter = (setter, val) => setter(s => {
   const n = new Set(s);
   n.has(val) ? n.delete(val) : n.add(val);
@@ -82,32 +69,15 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
 }) {
   const closeDrops = () => setPickerOpenDrop(null);
 
-  const q = pickerSearch.toLowerCase().trim();
-  const matches = (e, mF, tF, eF) =>
-    matchesFacets(e, mF, tF, eF) && (!q || e.name.toLowerCase().includes(q));
+  const q = pickerSearch;
+  const matches = (e, mF, tF, eF) => matchesAll(e, q, mF, tF, eF);
 
-  // A facet never constrains itself, so each count answers "how many results
-  // would this option leave", given the search and the other two facets.
-  const facetCounts = useMemo(() => {
-    const muscle = new Map(), type = new Map(), equip = new Map();
-    const bump = (m, k) => k && m.set(k, (m.get(k) || 0) + 1);
-    for (const e of allExercises) {
-      if (matches(e, new Set(), pickerTypeFilter, pickerEquipFilter)) {
-        bump(muscle, (e.muscleGroup || "").toLowerCase().trim());
-      }
-      if (matches(e, pickerMuscle, new Set(), pickerEquipFilter)) {
-        const tags = new Set((e.exerciseType || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean));
-        const ca = (e.category || "").toLowerCase();
-        if (ca) tags.add(ca);
-        for (const t of tags) bump(type, t);
-      }
-      if (matches(e, pickerMuscle, pickerTypeFilter, new Set())) {
-        bump(equip, (e.equipment || "bodyweight").toLowerCase().trim());
-      }
-    }
-    return { muscle, type, equip };
+  const facetCounts = useMemo(() => ({
+    muscle: countFacet(allExercises, muscleKeys, e => matches(e, NO_FACET, pickerTypeFilter, pickerEquipFilter)),
+    type: countFacet(allExercises, typeKeys, e => matches(e, pickerMuscle, NO_FACET, pickerEquipFilter)),
+    equip: countFacet(allExercises, equipKeys, e => matches(e, pickerMuscle, pickerTypeFilter, NO_FACET)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allExercises, q, pickerMuscle, pickerTypeFilter, pickerEquipFilter]);
+  }), [allExercises, q, pickerMuscle, pickerTypeFilter, pickerEquipFilter]);
 
   return createPortal(
     <div className={"ex-picker-backdrop"} onClick={e => {
