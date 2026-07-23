@@ -66,7 +66,7 @@ const ExerciseRow = memo(function ExerciseRow({
   return (
     <div
       ref={rowRef}
-      className={`picker-ex-row${selected ? " sel" : ""}${className ? " " + className : ""}`}
+      className={`picker-ex-row stretch-row${selected ? " sel" : ""}${className ? " " + className : ""}`}
       style={{ ...style, "--mg-color": mg }}
       {...rest}
     >
