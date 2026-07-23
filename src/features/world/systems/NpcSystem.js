@@ -87,6 +87,7 @@ export class NpcSystem {
           npcAvatarConfig(def),
           this.scene,
           this.assetLibrary,
+          { excludeFromGlow: this._excludeFromGlow },
         );
         if (this._disposed) { avatar.dispose(); return; }
         const y = this.worldgen.surfaceY(def.pos.x, def.pos.z);

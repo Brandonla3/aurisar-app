@@ -6,7 +6,8 @@
  *   Box path  — neutral box humanoid fallback until GLB assets exist
  *
  * Public API used by BabylonWorldScene:
- *   CharacterAvatar.create(id, username, config, scene, assetLibrary)
+ *   CharacterAvatar.create(id, username, config, scene, assetLibrary, opts)
+ *     opts.excludeFromGlow(mesh) — optional, see LightingManager.excludeFromGlow
  *   avatar.root            — TransformNode for position/rotation
  *   avatar.isMoving        — set by scene movement code each frame
  *   avatar.update(dt)      — call every frame from tick
@@ -139,7 +140,7 @@ export class CharacterAvatar {
 
   // ── Factory ────────────────────────────────────────────────────────────────
 
-  static async create(id, username, config, scene, assetLibrary) {
+  static async create(id, username, config, scene, assetLibrary, { excludeFromGlow } = {}) {
     const av = new CharacterAvatar(id, username, config, scene);
     const modelContainer = av._model
       ? assetLibrary.getModelContainer?.(av._model)
@@ -151,7 +152,7 @@ export class CharacterAvatar {
     } else {
       av._buildBox();
     }
-    av._makeLabel(username);
+    av._makeLabel(username, excludeFromGlow);
     return av;
   }
 
@@ -727,7 +728,7 @@ export class CharacterAvatar {
 
   // ── Label ──────────────────────────────────────────────────────────────────
 
-  _makeLabel(text) {
+  _makeLabel(text, excludeFromGlow) {
     if (!text || !this.root) return;
     const labelY = this._useFallback ? 2.15 : 2.2;
     try {
@@ -770,6 +771,9 @@ export class CharacterAvatar {
       plane.billboardMode   = BABYLON.Mesh.BILLBOARDMODE_ALL;
       plane.renderingGroupId = 1;
       plane.parent          = this.root;
+      // Nameplate is emissive-driven text on a flat plane, not a light source —
+      // exclude it from the mobile GlowLayer (see LightingManager.excludeFromGlow).
+      excludeFromGlow?.(plane);
     } catch (_) { /* non-critical */ }
   }
 

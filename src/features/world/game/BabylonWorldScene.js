@@ -1090,6 +1090,7 @@ export class BabylonWorldScene {
       this.playerInfo?.avatarConfig ?? null,
       this.scene,
       AssetLibrary,
+      { excludeFromGlow: (mesh) => this._lm?.excludeFromGlow(mesh) },
     );
     this._local.root.position.set(0, this._worldgen.surfaceY(0, 0), 0);
     // Flush remote updates that arrived while we were loading.
@@ -2528,6 +2529,7 @@ export class BabylonWorldScene {
       // base-body GLB (no default clothing).
       const rp = await CharacterAvatar.create(
         row.identity, row.username, parsedConfig, this.scene, AssetLibrary,
+        { excludeFromGlow: (mesh) => this._lm?.excludeFromGlow(mesh) },
       );
       if (this._remotePlayers.has(key)) {
         rp.dispose(); // another update already spawned this player
