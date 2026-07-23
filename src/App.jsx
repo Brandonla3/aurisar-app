@@ -4877,8 +4877,11 @@ function App() {
           }}>{c.description}</div>}</div>)}</div><button className={"btn btn-gold"} disabled={!profile.chosenClass} onClick={() => confirmClass(profile.chosenClass)}>{"Confirm Class"}</button></div>
 
     /* ══ MAIN ═══════════════════════════════════ */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
+      height: "100dvh",
       maxHeight: "100dvh",
-      overflow: "hidden"
+      minHeight: 0,
+      overflow: "hidden",
+      paddingBottom: 0
     } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
@@ -4985,7 +4988,7 @@ function App() {
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises"], ["workouts", "Workouts"], ["calendar", "Calendar"], ["social", "Guild"]].map(([t, l]) => {
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"} style={activeTab === "messages" && msgView === "chat" ? { display: "none" } : undefined}><div className={"tabs"}>{[["workout", "Exercises"], ["workouts", "Workouts"], ["calendar", "Calendar"], ["social", "Guild"]].map(([t, l]) => {
             const isOn = activeTab === t;
             return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
               setActiveTab(t);
@@ -5008,7 +5011,9 @@ function App() {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
-        paddingBottom: 0
+        paddingBottom: 0,
+        WebkitMaskImage: "none",
+        maskImage: "none"
       } : {}}>{activeTab === "workout" && <>
 
           {
