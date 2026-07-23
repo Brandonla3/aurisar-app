@@ -16,7 +16,7 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     gap: 14,
-    padding: '28px 48px 0',
+    padding: 'calc(28px + env(safe-area-inset-top,0px)) 48px 0',
     maxWidth: 860,
     margin: '0 auto',
     width: '100%',

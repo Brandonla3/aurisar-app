@@ -46,7 +46,7 @@ const MapOverlay = memo(function MapOverlay({
   });
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.92)", zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "14px 12px 30px" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.92)", zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "calc(14px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) calc(30px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px))" }}>
 
       {/* Header */}
       <div style={{ width: "100%", maxWidth: 420, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: S.s10, flexShrink: 0 }}>
