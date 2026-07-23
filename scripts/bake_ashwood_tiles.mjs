@@ -30,28 +30,32 @@ const GLTF2Export = serializers.GLTF2Export ?? BABYLON.GLTF2Export;
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
-const worldBuildConfig = JSON.parse(
-  readFileSync(join(root, 'src/features/world/config/world_build_config.json'), 'utf8'));
-const ashwoodConfig = JSON.parse(
-  readFileSync(join(root, 'src/features/world/config/ashwood_world.json'), 'utf8'));
-
-const { createWorldgen } = await import('../src/features/world/worldgen/index.js');
-const { AshwoodTileProvider } = await import('../src/features/world/streaming/ashwoodTileProvider.js');
-const { streamingParams, formatTileId, tileBounds } =
-  await import('../src/features/world/streaming/tileMath.js');
-
 // ── args ────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 function argValue(name) {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : null;
 }
+// Which world to bake. Defaults to the LIVE world (zone1_world.json); pass
+// --config <path> (repo-root-relative) to bake a different one, e.g. the
+// ashwood_world.json dev world for regression exports.
+const configPath = argValue('--config') ?? 'src/features/world/config/zone1_world.json';
+
+const worldBuildConfig = JSON.parse(
+  readFileSync(join(root, 'src/features/world/config/world_build_config.json'), 'utf8'));
+const worldConfig = JSON.parse(readFileSync(join(root, configPath), 'utf8'));
+
+const { createWorldgen } = await import('../src/features/world/worldgen/index.js');
+const { AshwoodTileProvider } = await import('../src/features/world/streaming/ashwoodTileProvider.js');
+const { streamingParams, formatTileId, tileBounds } =
+  await import('../src/features/world/streaming/tileMath.js');
+
 const outDir = argValue('--out') ?? join(root, 'public/assets/tiles');
 const params = streamingParams(worldBuildConfig);
 
 function discTiles() {
   // Tiles whose AABB touches the playable world disc (radius from config).
-  const r = ashwoodConfig.radius;
+  const r = worldConfig.radius;
   const ids = [];
   for (let row = 0; row < params.rows; row++) {
     for (let col = 0; col < params.cols; col++) {
@@ -79,7 +83,7 @@ else if (args.includes('--all')) {
 
 // ── bake ────────────────────────────────────────────────────────────────────
 const engine = new BABYLON.NullEngine();
-const worldgen = createWorldgen(ashwoodConfig);
+const worldgen = createWorldgen(worldConfig);
 
 mkdirSync(outDir, { recursive: true });
 
