@@ -856,6 +856,12 @@ export class BabylonWorldScene {
     this._remotePlayers = new Map();
     this._mobs          = new Map(); // mobId(BigInt) -> { root, body, head, hpFill, hpBar, lastHp, maxHp, dead }
     this._campfires     = new Map(); // campfireId(BigInt) -> { root, light, ps, ph }
+    // Shared, cached mob materials. Mob palettes are per-type/family and never
+    // mutated per-instance, so one StandardMaterial per name serves every mob of
+    // that kind — instead of a fresh material per body part per spawn. Freed by
+    // engine.dispose() at teardown. See _stdMat / _buildMobHpBar / _removeMob.
+    this._mobMats       = new Map(); // material name -> shared StandardMaterial
+    this._hpBarMats     = null;      // { bg, fill } — shared across all mob HP bars
     this._lastCampfireBuildAt = 0;
     this._lastAttackAt  = 0;          // ms timestamp; throttles spacebar
     this._localDungeonInstanceId = 0n;
@@ -1735,8 +1741,8 @@ export class BabylonWorldScene {
     this._npcs?.update(dt);
     this._pollNearbyNpc();
 
-    // Make mob HP bars face the camera each frame.
-    this._mobs.forEach(m => { m.hpBar?.lookAt(this._camera.position); });
+    // Mob HP-bar planes use BILLBOARDMODE_ALL, so they already face the camera
+    // in world space every frame — the old per-frame parent lookAt was redundant.
   }
 
   // stream() is a no-op while the player stays inside the current tile —
@@ -1788,7 +1794,12 @@ export class BabylonWorldScene {
   _removeMob(mobId) {
     const m = this._mobs.get(mobId);
     if (!m) return;
-    m.root.dispose(false, true);
+    // Dispose meshes but NOT materials/textures (2nd arg false): mob materials
+    // are shared/cached (per-type primitives via _stdMat, the two HP-bar
+    // materials, and GLB container materials instantiated with cloneMaterials:
+    // false), so a single despawn must not tear them out from under other mobs.
+    // engine.dispose() frees them at teardown.
+    m.root.dispose(false, false);
     this._mobs.delete(mobId);
   }
 
@@ -2007,24 +2018,31 @@ export class BabylonWorldScene {
     hpBar.parent = root;
     hpBar.position.y = 1.6;
 
-    const hpBgMat = new BABYLON.StandardMaterial('mobHpBg', this.scene);
-    hpBgMat.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.08);
-    hpBgMat.disableLighting = true;
+    // HP-bar materials are identical for every mob (dark bg + red fill; the HP
+    // ratio is shown via the fill plane's X scale, not colour). Build once and
+    // share, instead of allocating two StandardMaterials per spawn.
+    if (!this._hpBarMats) {
+      const bg = new BABYLON.StandardMaterial('mobHpBg', this.scene);
+      bg.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.08);
+      bg.disableLighting = true;
+      const fill = new BABYLON.StandardMaterial('mobHpFill', this.scene);
+      fill.emissiveColor = new BABYLON.Color3(0.85, 0.18, 0.18);
+      fill.disableLighting = true;
+      this._hpBarMats = { bg, fill };
+    }
+
     const hpBg = BABYLON.MeshBuilder.CreatePlane(`mob_hpbg_${row.mobId}`, {
       width: 1.0, height: 0.12,
     }, this.scene);
     hpBg.parent = hpBar;
-    hpBg.material = hpBgMat;
+    hpBg.material = this._hpBarMats.bg;
     hpBg.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-    const hpFillMat = new BABYLON.StandardMaterial('mobHpFill', this.scene);
-    hpFillMat.emissiveColor = new BABYLON.Color3(0.85, 0.18, 0.18);
-    hpFillMat.disableLighting = true;
     const hpFill = BABYLON.MeshBuilder.CreatePlane(`mob_hpfill_${row.mobId}`, {
       width: 1.0, height: 0.10,
     }, this.scene);
     hpFill.parent = hpBar;
-    hpFill.material = hpFillMat;
+    hpFill.material = this._hpBarMats.fill;
     hpFill.position.z = -0.001; // sit just in front of background
     hpFill.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
@@ -2599,6 +2617,9 @@ export class BabylonWorldScene {
   // ── Utilities ──────────────────────────────────────────────────────────────
 
   _stdMat(name, color) {
+    // Shared per name (mob type/family) — see _mobMats note in the constructor.
+    const cached = this._mobMats.get(name);
+    if (cached) return cached;
     const m = new BABYLON.StandardMaterial(name + '_mat', this.scene);
     m.diffuseColor  = color;
     m.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
@@ -2613,6 +2634,7 @@ export class BabylonWorldScene {
     if (this._lm?._noPipeline) {
       m.emissiveColor = color.scale(0.25).add(new BABYLON.Color3(0.04, 0.04, 0.05));
     }
+    this._mobMats.set(name, m);
     return m;
   }
 
