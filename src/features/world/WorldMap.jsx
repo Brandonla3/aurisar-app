@@ -35,6 +35,40 @@ function clampToEdge(px, py, w, h, margin = 14) {
   return { x: cx + dx * scale, y: cy + dy * scale, clamped: true, angle: Math.atan2(dy, dx) };
 }
 
+// Small centered pill (used for the "Locating…" state while the avatar loads).
+function drawPill(ctx, cx, cy, text) {
+  ctx.font = '600 12px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const pw = ctx.measureText(text).width + 20, ph = 22, r = 6;
+  const x = cx - pw / 2, y = cy - ph / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + pw, y, x + pw, y + ph, r);
+  ctx.arcTo(x + pw, y + ph, x, y + ph, r);
+  ctx.arcTo(x, y + ph, x, y, r);
+  ctx.arcTo(x, y, x + pw, y, r);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(10, 16, 26, 0.82)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120, 200, 255, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(190, 219, 255, 0.95)';
+  ctx.fillText(text, cx, cy);
+}
+
+// World Map marker legend (icon color → meaning), rendered as DOM under the map.
+const LEGEND = [
+  { c: 'rgba(120,200,255,0.98)', t: 'You' },
+  { c: 'rgba(96,165,250,0.95)', t: 'Players' },
+  { c: 'rgba(120,220,130,0.95)', t: 'NPCs' },
+  { c: 'rgba(130,210,240,0.95)', t: 'Places' },
+  { c: 'rgba(240,210,120,0.98)', t: 'Castle' },
+  { c: 'rgba(230,190,90,0.75)', t: 'Chests' },
+  { c: 'rgba(168,120,255,0.95)', t: 'Dungeons' },
+];
+
 export default function WorldMap({ mapData, sceneRef, onClose }) {
   const canvasRef = useRef(null);
   const headerRef = useRef(null);
@@ -127,9 +161,35 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
         }
       });
 
+      // Other players in this instance — cyan dots + names, edge-clamped when
+      // off the disc (e.g. co-located in a teleport interior).
+      const remotes = sceneRef.current?.getRemotes?.() ?? [];
+      for (const rp of remotes) {
+        const bp = project(rp.x, rp.z);
+        const e = clampToEdge(bp.px, bp.py, size, size);
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.clamped ? 3 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(96, 165, 250, 0.95)';
+        ctx.strokeStyle = 'rgba(10, 20, 40, 0.9)';
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+        if (rp.name && !e.clamped) {
+          ctx.font = '600 10px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+          ctx.strokeText(rp.name, e.x, e.y - 8);
+          ctx.fillStyle = '#bfdbfe';
+          ctx.fillText(rp.name, e.x, e.y - 8);
+        }
+      }
+
       // Player marker. On-map: triangle to heading (matches the minimap).
       // Off-map (e.g. inside a teleport interior): clamp to the border and point
       // toward the true position + draw a ring, so the player is never lost.
+      // While the avatar is still loading (pose null): a "Locating…" pill.
       const pose = sceneRef.current?.getPose?.();
       if (pose) {
         const p = project(pose.x, pose.z);
@@ -155,6 +215,10 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
           ctx.lineWidth = 1.5;
           ctx.stroke();
         }
+      } else {
+        // Avatar still loading — show a "Locating…" pill instead of an absent
+        // player marker (terrain + markers already render).
+        drawPill(ctx, size / 2, size / 2, 'Locating…');
       }
 
       // Header location readout (imperative — no React re-render).
@@ -252,6 +316,16 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
           touchAction: 'none',
         }}
       />
+
+      {/* Legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 10, maxWidth: '92vw' }}>
+        {LEGEND.map(({ c, t }) => (
+          <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#94a3b8', fontSize: 11 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: c, border: '1px solid rgba(0,0,0,0.4)' }} />
+            {t}
+          </span>
+        ))}
+      </div>
 
       {/* Controls */}
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
