@@ -192,6 +192,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           padding: S.s0,
                           lineHeight: 1
                         }}
+                        aria-pressed={true}
+                        aria-label={`Remove ${ex.name} from favourites`}
                       >{"⭐"}</button>
                     </div>
                   )}
@@ -339,7 +341,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           borderRadius: R.r5,
                           fontFamily: "'Barlow',sans-serif"
                         }}
-                      >{"✎ edit"}</button>
+                      aria-label={`Edit ${ex.name}`}>{"✎ edit"}</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -354,7 +356,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           padding: "4px 8px",
                           borderRadius: R.r5
                         }}
-                      >{"🗑"}</button>
+                      aria-label={`Delete ${ex.name}`}>{"🗑"}</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -374,7 +376,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           padding: S.s0,
                           lineHeight: 1
                         }}
-                      >{isFav ? "⭐" : "☆"}</button>
+                      aria-pressed={isFav}
+                      aria-label={isFav ? `Remove ${ex.name} from favourites` : `Add ${ex.name} to favourites`}>{isFav ? "⭐" : "☆"}</button>
                     </div>
                   </div>
                 </div>

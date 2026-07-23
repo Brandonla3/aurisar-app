@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
+import { muscleLabel, equipLabel } from './exerciseFilterOptions';
 
 /**
  * The exercise list row, shared by the library tab and the workout-builder
@@ -53,12 +54,15 @@ const ExerciseRow = memo(function ExerciseRow({
   const diffLabel = difficultyOf(ex);
   const mg = getMuscleColor(ex.muscleGroup);
 
-  // What a screen reader hears instead of an undifferentiated "button".
+  // What a screen reader hears instead of an undifferentiated "button". The
+  // trophy is aria-hidden, so the personal best has to be said here or it is
+  // invisible to anyone not looking at the icon.
   const label = [
     ex.name,
+    showPB ? 'personal best' : null,
     ex.category && cap(ex.category),
-    ex.muscleGroup && cap(ex.muscleGroup),
-    showEquipment && ex.equipment && ex.equipment !== "bodyweight" ? ex.equipment : null,
+    ex.muscleGroup && muscleLabel(ex.muscleGroup),
+    showEquipment && ex.equipment && ex.equipment !== "bodyweight" ? equipLabel(ex.equipment) : null,
     `${ex.baseXP} XP`,
     diffLabel,
   ].filter(Boolean).join(', ');
@@ -102,10 +106,10 @@ const ExerciseRow = memo(function ExerciseRow({
         <div aria-hidden="true" style={{ fontSize: FS.fs62, fontStyle: "italic", lineHeight: 1.4 }}>
           {ex.category && <span style={{ color: getTypeColor(ex.category) }}>{cap(ex.category)}</span>}
           {ex.category && ex.muscleGroup && <span style={{ color: "#8a8478" }}>{" · "}</span>}
-          {ex.muscleGroup && <span style={{ color: mg }}>{cap(ex.muscleGroup)}</span>}
+          {ex.muscleGroup && <span style={{ color: mg }}>{muscleLabel(ex.muscleGroup)}</span>}
           {showEquipment && ex.equipment && ex.equipment !== "bodyweight" && <>
             <span style={{ color: "#8a8478" }}>{" · "}</span>
-            <span style={{ color: "#8a8478" }}>{ex.equipment}</span>
+            <span style={{ color: "#8a8478" }}>{equipLabel(ex.equipment)}</span>
           </>}
         </div>
       </div>
