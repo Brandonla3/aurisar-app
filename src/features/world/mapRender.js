@@ -160,13 +160,15 @@ export function drawMapMarkers(ctx, mapData, worldToPx, opts = {}) {
     }
   }
 
-  // Chests — small subtle gold squares (low-key so the full manifest doesn't
-  // dominate the map or over-spoil loot locations)
-  if (sites?.chests) {
+  // Chests — small subtle gold squares. Drawn from the LIVE unopened list the
+  // caller passes (opts.chests via scene.getUnopenedChests()), NOT the static
+  // manifest, so a looted chest's marker drops off the map.
+  const chests = opts.chests ?? [];
+  if (chests.length) {
     ctx.fillStyle = 'rgba(230, 190, 90, 0.55)';
     ctx.strokeStyle = 'rgba(60, 45, 15, 0.7)';
     ctx.lineWidth = 0.75;
-    for (const c of sites.chests) {
+    for (const c of chests) {
       const p = worldToPx(c.x, c.z);
       if (!inView(p)) continue;
       ctx.fillRect(p.px - 2, p.py - 2, 4, 4);
@@ -196,7 +198,9 @@ export function drawMapMarkers(ctx, mapData, worldToPx, opts = {}) {
     ctx.strokeStyle = 'rgba(8, 30, 12, 0.9)';
     ctx.lineWidth = 1;
     for (const n of npcs) {
-      const p = worldToPx(n.pos.x, n.pos.z);
+      const pos = n?.pos;
+      if (!pos) continue;               // tolerate a malformed content row
+      const p = worldToPx(pos.x, pos.z);
       if (!inView(p)) continue;
       ctx.fillStyle = 'rgba(120, 220, 130, 0.95)';
       ctx.beginPath();
@@ -211,7 +215,9 @@ export function drawMapMarkers(ctx, mapData, worldToPx, opts = {}) {
   // gate (poi_castle_ashwood) gets a distinct gold keep glyph.
   if (waypoints) {
     for (const wp of waypoints) {
-      const p = worldToPx(wp.pos.x, wp.pos.z);
+      const pos = wp?.pos;
+      if (!pos) continue;               // tolerate a malformed content row
+      const p = worldToPx(pos.x, pos.z);
       if (!inView(p)) continue;
       const isCastle = wp.id === 'poi_castle_ashwood';
       ctx.strokeStyle = 'rgba(8, 24, 30, 0.9)';

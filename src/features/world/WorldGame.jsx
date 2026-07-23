@@ -524,6 +524,11 @@ export default function WorldGame({ playerInfo, onExit }) {
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onEnterDungeon = enterDungeon;
   }, [enterDungeon]);
+  // Pause scene gameplay input while a full-screen panel owns the screen, so
+  // background WASD/attack keys don't fire under the map/inventory modal.
+  useEffect(() => {
+    sceneRef.current?.setInputPaused?.(!!activePanel);
+  }, [activePanel]);
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.callbacks.onLeaveDungeon = leaveDungeon;
   }, [leaveDungeon]);

@@ -76,7 +76,10 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
       if (!pose) {
         // Avatar still loading — a "Locating…" placeholder beats a blank circle
         // (the terrain bake is player-centred, so there's no pose to crop it).
+        // Keep the header/compass in sync rather than leaving them stale.
         _renderLocating(ctx);
+        _renderCompass(compass, 0);
+        if (headerRef.current) headerRef.current.textContent = 'Locating…';
         return;
       }
 
@@ -86,6 +89,7 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
         viewRadius: viewRadiusRef.current,
         mapData,
         remotes: scene.getRemotes?.() ?? [],
+        chests: scene.getUnopenedChests?.() ?? [],
       });
       if (headerRef.current) {
         const loc = scene.getLocation?.()
@@ -226,7 +230,7 @@ function _renderLocating(ctx) {
   ctx.fillText('Locating…', w / 2, w / 2);
 }
 
-function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes = [] }) {
+function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes = [], chests = [] }) {
   const w = MAP_SIZE_PX;
   ctx.clearRect(0, 0, w, w);
 
@@ -268,7 +272,7 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes =
   // POI markers (caves / ruins / dungeon entrances), no labels at minimap scale.
   if (mapData) {
     drawMapMarkers(ctx, mapData, (x, z) => ({ px: toMapX(x), py: toMapY(z) }),
-      { labels: false, w, h: w });
+      { labels: false, w, h: w, chests });
   }
 
   // World edge — the playable disc boundary, centred on the world origin (not
@@ -301,8 +305,8 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes =
     const mx = toMapX(rp.x);
     const my = toMapY(rp.z);
     if (mx < -4 || mx > w + 4 || my < -4 || my > w + 4) continue;
-    ctx.fillStyle = 'rgba(96, 165, 250, 0.95)';
-    ctx.strokeStyle = 'rgba(10, 20, 40, 0.9)';
+    ctx.fillStyle = 'rgba(251, 191, 36, 0.95)';
+    ctx.strokeStyle = 'rgba(40, 24, 4, 0.9)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(mx, my, 3, 0, Math.PI * 2);

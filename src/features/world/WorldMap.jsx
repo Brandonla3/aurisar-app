@@ -12,8 +12,10 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { buildWorldMapCanvas, drawMapMarkers } from './mapRender.js';
 import { mapBounds } from './worldSpace.js';
+import { useModalLifecycle } from '../../utils/useModalLifecycle.js';
 import { FONT, ghostBtn } from './ui/panelTheme.js';
 
 const BAKE_SIZE = 640;     // terrain bake resolution (drawImage scales it up)
@@ -61,7 +63,7 @@ function drawPill(ctx, cx, cy, text) {
 // World Map marker legend (icon color → meaning), rendered as DOM under the map.
 const LEGEND = [
   { c: 'rgba(120,200,255,0.98)', t: 'You' },
-  { c: 'rgba(96,165,250,0.95)', t: 'Players' },
+  { c: 'rgba(251,191,36,0.95)', t: 'Players' },
   { c: 'rgba(120,220,130,0.95)', t: 'NPCs' },
   { c: 'rgba(130,210,240,0.95)', t: 'Places' },
   { c: 'rgba(240,210,120,0.98)', t: 'Castle' },
@@ -76,12 +78,18 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
   const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 });
   const dragRef = useRef(null);
   const closeBtnRef = useRef(null);
+  const backdropRef = useRef(null);
 
-  // Dialog focus management: focus Close on open, restore focus on close.
+  // Modal lifecycle: inert the background (#root) so focus/pointer/the a11y tree
+  // can't reach the scene + HUD behind the map, restore focus on close, and
+  // stack Escape. Requires the portal-to-body below so inert-ing #root doesn't
+  // disable the map itself. Declared before the focus-into-dialog effect so it
+  // records the pre-open focus first.
+  useModalLifecycle(true, onClose, backdropRef);
+
+  // Move focus into the dialog on open (useModalLifecycle only restores on close).
   useEffect(() => {
-    const prev = document.activeElement;
     closeBtnRef.current?.focus?.();
-    return () => { if (prev instanceof HTMLElement) prev.focus?.(); };
   }, []);
 
   useEffect(() => {
@@ -100,10 +108,12 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
     const ctx = canvas.getContext('2d');
     let raf = 0;
 
-    // Size the canvas to a square that fits the viewport.
+    // Size the canvas to a square that fits the viewport, reserving ~190px for
+    // the header + legend + controls + hint chrome so they stay on-screen (the
+    // portal's scroll container catches any remainder on very short viewports).
     const fit = () => {
       const dpr = window.devicePixelRatio || 1;
-      const css = Math.min(window.innerWidth * 0.92, window.innerHeight * 0.82);
+      const css = Math.min(window.innerWidth * 0.9, Math.max(220, window.innerHeight - 190));
       canvas.style.width = `${css}px`;
       canvas.style.height = `${css}px`;
       canvas.width = Math.round(css * dpr);
@@ -135,7 +145,10 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
         return { px: bp.px * s + panX, py: bp.py * s + panY };
       };
 
-      drawMapMarkers(ctx, mapData, project, { labels: true, w: size, h: size, font: 12 });
+      drawMapMarkers(ctx, mapData, project, {
+        labels: true, w: size, h: size, font: 12,
+        chests: sceneRef.current?.getUnopenedChests?.() ?? [],
+      });
 
       // Off-map indicators for teleport-only interiors (they sit outside the
       // disc, so disc framing culls them). Labeled chevrons on the border;
@@ -177,8 +190,8 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
         const e = clampToEdge(bp.px, bp.py, size, size);
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.clamped ? 3 : 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(96, 165, 250, 0.95)';
-        ctx.strokeStyle = 'rgba(10, 20, 40, 0.9)';
+        ctx.fillStyle = 'rgba(251, 191, 36, 0.95)';
+        ctx.strokeStyle = 'rgba(40, 24, 4, 0.9)';
         ctx.lineWidth = 1;
         ctx.fill();
         ctx.stroke();
@@ -189,7 +202,7 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
           ctx.lineWidth = 3;
           ctx.strokeStyle = 'rgba(0,0,0,0.7)';
           ctx.strokeText(rp.name, e.x, e.y - 8);
-          ctx.fillStyle = '#bfdbfe';
+          ctx.fillStyle = '#fcd34d';
           ctx.fillText(rp.name, e.x, e.y - 8);
         }
       }
@@ -296,19 +309,29 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
   };
   const reset = () => { viewRef.current = { zoom: 1, panX: 0, panY: 0 }; };
 
-  return (
+  return createPortal(
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-label="World Map"
       style={{
-        position: 'absolute', inset: 0, zIndex: 95,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        position: 'fixed', inset: 0, zIndex: 95, overflowY: 'auto',
         background: 'rgba(2, 6, 14, 0.78)',
         backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
         fontFamily: FONT,
       }}
     >
+      {/* Scroll-safe centered column: grows past the viewport on short/landscape
+          screens and scrolls instead of clipping the controls (WorldGame's
+          overflow:hidden no longer applies now that we portal to <body>). */}
+      <div
+        style={{
+          minHeight: '100%', boxSizing: 'border-box',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: 'max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))',
+        }}
+      >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
         <span style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 700, color: '#f0d060' }}>
@@ -320,6 +343,7 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
 
       <canvas
         ref={canvasRef}
+        aria-hidden="true"
         style={{
           display: 'block', borderRadius: 12, cursor: 'grab',
           border: '1px solid rgba(148,163,184,0.3)',
@@ -349,6 +373,8 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
       <p style={{ color: '#64748b', fontSize: 11, marginTop: 8 }}>
         Scroll or use ＋ / － to zoom · drag to pan · Esc to close
       </p>
-    </div>
+      </div>
+    </div>,
+    document.body
   );
 }

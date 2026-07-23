@@ -869,6 +869,7 @@ export class BabylonWorldScene {
     this._inDungeon     = false;
     this._local         = null;
     this._openedChests  = new Set(); // chest indices already looted this session
+    this._inputPaused   = false;     // true while a full-screen panel owns the screen
     this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
@@ -1698,7 +1699,7 @@ export class BabylonWorldScene {
 
   _bindKeys() {
     this._kd = (e) => {
-      if (this._chatOpen) return;
+      if (this._chatOpen || this._inputPaused) return;
       this._keys[e.code] = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
         e.preventDefault();
@@ -2667,6 +2668,24 @@ export class BabylonWorldScene {
   // Chest manifest (world units) for optional map plotting.
   getChests() {
     return this._worldgen?.sites?.chests ?? [];
+  }
+
+  // Live UNOPENED chests for the maps — filters the static manifest by the
+  // authoritative opened set (updated from server replay), so a looted chest's
+  // marker disappears instead of lingering forever. Fresh array each call.
+  // (Named for the complement of `_openedChests`, i.e. chests not yet looted.)
+  getUnopenedChests() {
+    const chests = this._worldgen?.sites?.chests;
+    if (!chests) return [];
+    return chests.filter((_, i) => !this._openedChests.has(i));
+  }
+
+  // Pause gameplay key input (movement/attack) while a full-screen panel (the
+  // map, inventory, …) owns the screen. Clears held keys so nothing sticks when
+  // the panel closes. Same gate as _chatOpen in _bindKeys.
+  setInputPaused(v) {
+    this._inputPaused = !!v;
+    if (v) this._keys = {};
   }
 
   // Live remote players in this instance, for the maps. Mirrors getMobs(): a
