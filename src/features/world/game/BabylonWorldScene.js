@@ -45,7 +45,7 @@ import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
 import { sameInteriorFloor } from '../castle/castleNavSurface.js';
-import { MOBS as MOB_DEFS } from '../content/index';
+import { MOBS as MOB_DEFS, ALL_WAYPOINTS, ALL_NPCS } from '../content/index';
 import { toWorld, toStdb } from '../worldSpace.js';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -869,6 +869,7 @@ export class BabylonWorldScene {
     this._inDungeon     = false;
     this._local         = null;
     this._openedChests  = new Set(); // chest indices already looted this session
+    this._inputPaused   = false;     // true while a full-screen panel owns the screen
     this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
@@ -1698,7 +1699,7 @@ export class BabylonWorldScene {
 
   _bindKeys() {
     this._kd = (e) => {
-      if (this._chatOpen) return;
+      if (this._chatOpen || this._inputPaused) return;
       this._keys[e.code] = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
         e.preventDefault();
@@ -2069,6 +2070,11 @@ export class BabylonWorldScene {
     // _bindKeys), so keyboard input can't leak into the chat box, but the
     // touch joystick (and any already-held keys) keep moving the player.
     if (this._localDead) { this._local.isMoving = false; return; }   // slice 5c: dead can't walk
+    // A full-screen panel (map / inventory / …) owns the screen — freeze the
+    // player so neither held keys nor a touch-joystick pointer trapped under the
+    // panel can walk them (setInputPaused clears both sources; this is the
+    // authoritative gate on the consumer side).
+    if (this._inputPaused) { this._local.isMoving = false; return; }
 
     const w = this._keys['KeyW'] || this._keys['ArrowUp'];
     const s = this._keys['KeyS'] || this._keys['ArrowDown'];
@@ -2656,15 +2662,52 @@ export class BabylonWorldScene {
   // don't re-run. worldgen is built synchronously in the constructor.
   getMapData() {
     return (this._mapData ??= {
-      worldgen: this._worldgen,
-      config:   this._worldgen.config,
-      sites:    this._worldgen.sites,
+      worldgen:  this._worldgen,
+      config:    this._worldgen.config,
+      sites:     this._worldgen.sites,
+      waypoints: ALL_WAYPOINTS,   // static POIs (incl. the Castle Ashwood gate)
+      npcs:      ALL_NPCS,        // static NPC anchors
     });
   }
 
   // Chest manifest (world units) for optional map plotting.
   getChests() {
     return this._worldgen?.sites?.chests ?? [];
+  }
+
+  // Live UNOPENED chests for the maps — filters the static manifest by the
+  // authoritative opened set (updated from server replay), so a looted chest's
+  // marker disappears instead of lingering forever. Fresh array each call.
+  // (Named for the complement of `_openedChests`, i.e. chests not yet looted.)
+  getUnopenedChests() {
+    const chests = this._worldgen?.sites?.chests;
+    if (!chests) return [];
+    return chests.filter((_, i) => !this._openedChests.has(i));
+  }
+
+  // Pause gameplay key input (movement/attack) while a full-screen panel (the
+  // map, inventory, …) owns the screen. Clears held keys so nothing sticks when
+  // the panel closes. Same gate as _chatOpen in _bindKeys.
+  setInputPaused(v) {
+    this._inputPaused = !!v;
+    // Clear BOTH input sources so nothing sticks: held keyboard keys and the
+    // touch joystick vector. The panel covers the joystick zone, so its
+    // pointer-up may never reach the joystick and _joyDx/_joyDy would otherwise
+    // keep driving _moveLocal behind the panel.
+    if (v) { this._keys = {}; this._joyDx = 0; this._joyDy = 0; }
+  }
+
+  // Live remote players in this instance, for the maps. Mirrors getMobs(): a
+  // fresh array of world-unit positions + display name each call. Positions are
+  // the lerped render positions (see _lerpRemote), so they track smoothly.
+  getRemotes() {
+    const out = [];
+    this._remotePlayers.forEach((rp, key) => {
+      const p = rp?.root?.position;
+      if (!p) return;
+      out.push({ key, x: p.x, z: p.z, name: rp._username, moving: !!rp.isMoving });
+    });
+    return out;
   }
 
   // Current named location for the minimap / map header readout. Combines the

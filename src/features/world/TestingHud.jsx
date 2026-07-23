@@ -73,13 +73,23 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
       const scene = sceneRef.current;
       if (!scene) return;
       const pose = scene.getPose?.();
-      if (!pose) return;
+      if (!pose) {
+        // Avatar still loading — a "Locating…" placeholder beats a blank circle
+        // (the terrain bake is player-centred, so there's no pose to crop it).
+        // Keep the header/compass in sync rather than leaving them stale.
+        _renderLocating(ctx);
+        _renderCompass(compass, 0);
+        if (headerRef.current) headerRef.current.textContent = 'Locating…';
+        return;
+      }
 
       _renderCompass(compass, pose.yaw);
       _renderMinimap(ctx, pose, scene.getMobs?.() ?? [], {
         baked: bakedRef.current,
         viewRadius: viewRadiusRef.current,
         mapData,
+        remotes: scene.getRemotes?.() ?? [],
+        chests: scene.getUnopenedChests?.() ?? [],
       });
       if (headerRef.current) {
         const loc = scene.getLocation?.()
@@ -207,7 +217,20 @@ function _renderCompass(host, yaw) {
   host.innerHTML = html;
 }
 
-function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData }) {
+// Loading placeholder: dark circle + centered "Locating…" until the first pose.
+function _renderLocating(ctx) {
+  const w = MAP_SIZE_PX;
+  ctx.clearRect(0, 0, w, w);
+  ctx.fillStyle = 'rgba(14, 16, 22, 1)';
+  ctx.fillRect(0, 0, w, w);
+  ctx.font = '600 11px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(190, 219, 255, 0.85)';
+  ctx.fillText('Locating…', w / 2, w / 2);
+}
+
+function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes = [], chests = [] }) {
   const w = MAP_SIZE_PX;
   ctx.clearRect(0, 0, w, w);
 
@@ -249,7 +272,7 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData }) {
   // POI markers (caves / ruins / dungeon entrances), no labels at minimap scale.
   if (mapData) {
     drawMapMarkers(ctx, mapData, (x, z) => ({ px: toMapX(x), py: toMapY(z) }),
-      { labels: false, w, h: w });
+      { labels: false, w, h: w, chests });
   }
 
   // World edge — the playable disc boundary, centred on the world origin (not
@@ -275,6 +298,20 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData }) {
     ctx.beginPath();
     ctx.arc(mx, my, m.dead ? 2.5 : 3.5, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // Other players — cyan dots
+  for (const rp of remotes) {
+    const mx = toMapX(rp.x);
+    const my = toMapY(rp.z);
+    if (mx < -4 || mx > w + 4 || my < -4 || my > w + 4) continue;
+    ctx.fillStyle = 'rgba(251, 191, 36, 0.95)';
+    ctx.strokeStyle = 'rgba(40, 24, 4, 0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(mx, my, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   }
 
   // Player — triangle at center, rotated to camera yaw
