@@ -550,23 +550,24 @@ function App() {
   }, []);
   const [exSubTab, setExSubTab] = useState("library"); // "library" | "myworkouts"
   const [favSelectMode, setFavSelectMode] = useState(false);
-  const [libSearch, setLibSearch] = useState("");
+  // Only the DEBOUNCED search value stays in App — it feeds useExerciseFilters,
+  // whose libFiltered output App also uses for the detail-sheet sibling list.
+  // The raw keystroke value lives inside ExerciseLibraryTab so typing no longer
+  // re-renders the whole shell once per character.
   const [libSearchDebounced, setLibSearchDebounced] = useState("");
   const debouncedSetLibSearch = React.useRef(debounce(v => setLibSearchDebounced(v), 200)).current;
   const [libTypeFilters, setLibTypeFilters] = useState(() => new Set());
   const [libMuscleFilters, setLibMuscleFilters] = useState(() => new Set());
   const [libEquipFilters, setLibEquipFilters] = useState(() => new Set());
-  const [libOpenDrop, setLibOpenDrop] = useState(null); // "type"|"muscle"|"equip"|null
   const [libDetailEx, setLibDetailEx] = useState(null);
   const [libSelectMode, setLibSelectMode] = useState(false);
+  const setGymKit = useCallback(v => setProfile(p => ({ ...p, gymKit: v })), []);
   // One shared, persisted basket replaces the three throwaway selection Sets
   // the library, favourites list and builder picker each used to keep.
   const {
     cartIds, cartSet, isInCart, addToCart, removeFromCart, toggleCart,
     clearCart, moveInCart, pruneMissing, cartOpen, setCartOpen,
   } = useExerciseCart();
-  const [libBrowseMode, setLibBrowseMode] = useState("home");
-  const [libVisibleCount, setLibVisibleCount] = useState(60);
   const [lbFilter, setLbFilter] = useState("overall_xp");
   const [lbScope, setLbScope] = useState("world"); // "world" | "friends"
   const [lbStateFilters, setLbStateFilters] = useState(["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"]);
@@ -5137,7 +5138,7 @@ function App() {
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
             gymKit={profile.gymKit}
-            setGymKit={v => setProfile(p => ({ ...p, gymKit: v }))}
+            setGymKit={setGymKit}
             libKitCount={libKitCount}
             kitTotalAll={allExercises.length}
             _exReady={_exReady}
@@ -5150,8 +5151,6 @@ function App() {
             libDiscoverRows={libDiscoverRows}
             libMuscleOpts={libMuscleOpts}
             libEquipOpts={libEquipOpts}
-            libSearch={libSearch}
-            setLibSearch={setLibSearch}
             setLibSearchDebounced={setLibSearchDebounced}
             libTypeFilters={libTypeFilters}
             setLibTypeFilters={setLibTypeFilters}
@@ -5159,8 +5158,6 @@ function App() {
             setLibMuscleFilters={setLibMuscleFilters}
             libEquipFilters={libEquipFilters}
             setLibEquipFilters={setLibEquipFilters}
-            libOpenDrop={libOpenDrop}
-            setLibOpenDrop={setLibOpenDrop}
             debouncedSetLibSearch={debouncedSetLibSearch}
             setLibDetailEx={setLibDetailEx}
             libSelectMode={libSelectMode}
@@ -5168,10 +5165,6 @@ function App() {
             isInCart={isInCart}
             toggleCart={toggleCart}
             setLibSelectMode={setLibSelectMode}
-            libBrowseMode={libBrowseMode}
-            setLibBrowseMode={setLibBrowseMode}
-            libVisibleCount={libVisibleCount}
-            setLibVisibleCount={setLibVisibleCount}
             profile={profile}
             setProfile={setProfile}
             allExercises={allExercises}

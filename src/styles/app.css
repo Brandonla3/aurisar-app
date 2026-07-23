@@ -537,34 +537,34 @@
        palette and the rows lose their per-muscle tint, so the change of mode
        is unmissable at a glance rather than something you infer from a row
        you already mis-tapped. */
-    .lib-conscript{animation:libConscriptIn var(--dur-slow) var(--ease-out) both}
-    @keyframes libConscriptIn{from{filter:brightness(1.3) grayscale(.8)}to{filter:none}}
-    /* Rows carry an inline --mg-color, so desaturate rather than fight it for
-       the custom property — the per-muscle hue stays readable but muted, and
-       the list plainly is not in its normal state. */
-    .lib-conscript .picker-ex-row{filter:grayscale(.7)}
-    .lib-conscript .picker-ex-row.sel{
-      filter:none;
-      border-left-color:#9fb3ae;
-      box-shadow:0 0 0 1.5px rgba(159,179,174,.45),0 4px 16px rgba(122,143,139,.16)
-    }
-    /* The banner rides inside the already-sticky search bar so it stays on
-       screen without a second sticky layer fighting the first. */
-    .lib-conscript .lib-sticky-search{
-      box-shadow:inset 0 -1px 0 rgba(122,143,139,.35);
-      background:linear-gradient(180deg,rgba(22,26,25,.96),rgba(14,16,15,.92))
-    }
-    .lib-conscript-banner{
+    /* Select-mode status banner — rides inside the already-sticky search bar.
+       Communicates the mode without repainting the whole tab. */
+    .lib-select-banner{
       display:flex;align-items:center;justify-content:center;gap:8px;
       font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.22em;
       color:#9fb3ae;background:rgba(122,143,139,.1);
       border:1px solid rgba(122,143,139,.28);border-radius:6px;
       padding:4px 8px;margin-bottom:8px;text-transform:uppercase
     }
-    .lib-conscript-banner-count{
+    .lib-select-banner-count{
       font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.02em;
       color:#d4cec4;font-variant-numeric:tabular-nums
     }
+    /* Resume chip — surfaced on the home view when filters are still active,
+       so a non-destructive back leaves the filtered results visibly reachable. */
+    .lib-resume-chip{
+      display:flex;align-items:center;gap:8px;width:100%;min-height:44px;
+      margin-bottom:10px;padding:8px 12px;border-radius:9px;cursor:pointer;
+      font-family:'Inter',sans-serif;font-size:.68rem;text-align:left;
+      color:#d4cec4;background:rgba(196,160,68,.1);
+      border:1px solid rgba(196,148,40,.28)
+    }
+    .lib-resume-chip-x{
+      margin-left:auto;flex-shrink:0;width:28px;height:28px;display:flex;
+      align-items:center;justify-content:center;border-radius:6px;
+      background:transparent;border:none;color:#8a8478;cursor:pointer;font-size:.7rem
+    }
+    .lib-resume-chip-x:hover{color:#d4cec4;background:rgba(45,42,36,.4)}
 
     /* Staleness fade — --staleness runs 0 (done today) to 1 (3+ weeks ago).
        A stale card desaturates and dims so the carousel reads as a freshness
