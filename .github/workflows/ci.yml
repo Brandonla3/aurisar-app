@@ -31,6 +31,9 @@ jobs:
       - name: Castle manifest up to date
         run: npm run emit:castle:check
 
+      - name: World chest manifest up to date
+        run: npm run emit:world-chests:check
+
       - name: Tests
         run: npm test
 
