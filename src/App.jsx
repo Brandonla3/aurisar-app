@@ -23,6 +23,7 @@ import { useExerciseFilters } from './features/exercises/useExerciseFilters';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
 import MyWorkoutsSubTab from './features/exercises/MyWorkoutsSubTab';
 import MessagesTab from './features/social/MessagesTab';
+import useMessages from './features/social/useMessages';
 import GuildTab from './features/social/GuildTab';
 import HistoryTab from './features/history/HistoryTab';
 import LogEntryEditModal from './features/history/LogEntryEditModal';
@@ -686,19 +687,8 @@ function App() {
   const [friendSearch, setFriendSearch] = useState("");
   const [friendSearchResult, setFriendSearchResult] = useState(null); // null | {found:bool, user?}
   const [friendSearchLoading, setFriendSearchLoading] = useState(false);
-  // Messaging
-  const [msgView, setMsgView] = useState("list"); // "list" | "chat"
-  const [msgConversations, setMsgConversations] = useState([]);
-  const [msgActiveChannel, setMsgActiveChannel] = useState(null); // channel object from conversations
-  const [msgMessages, setMsgMessages] = useState([]);
-  const [msgInput, setMsgInput] = useState("");
-  const [msgLoading, setMsgLoading] = useState(false);
-  const [msgSending, setMsgSending] = useState(false);
-  const [msgUnreadTotal, setMsgUnreadTotal] = useState(0);
-  const msgScrollRef = React.useRef(null);
-  React.useEffect(() => {
-    if (msgScrollRef.current) msgScrollRef.current.scrollTop = msgScrollRef.current.scrollHeight;
-  }, [msgMessages.length]);
+  // Messaging state + actions live in useMessages (called below, after
+  // showToast is defined — see the MESSAGING section).
   // Track which log groups are collapsed (by groupId key). Default all expanded.
   const [logCollapsedGroups, setLogCollapsedGroups] = useState({});
   // Log groups default to collapsed — openLogGroups tracks which ones are OPEN
@@ -2108,119 +2098,32 @@ function App() {
   }
 
   // ── MESSAGING ──────────────────────────────────────────────
-  async function loadConversations() {
-    if (!authUser) return;
-    try {
-      const {
-        data,
-        error
-      } = await sb.rpc('get_my_conversations');
-      if (!error && data) setMsgConversations(data);
-    } catch (e) {/* silent */}
-  }
-  async function loadUnreadCount() {
-    if (!authUser) return;
-    try {
-      const {
-        data,
-        error
-      } = await sb.rpc('get_total_unread_count');
-      if (!error && typeof data === 'number') setMsgUnreadTotal(data);
-    } catch (e) {/* silent */}
-  }
-  async function openDmWithUser(otherUserId) {
-    if (!authUser) return;
-    setMsgLoading(true);
-    try {
-      const {
-        data: channelId,
-        error
-      } = await sb.rpc('get_or_create_dm_channel', {
-        p_other_user_id: otherUserId
-      });
-      if (error) {
-        showToast("Could not open chat: " + error.message);
-        setMsgLoading(false);
-        return;
-      }
-      // Load conversations to get channel details
-      await loadConversations();
-      // Find the channel in conversations
-      const convos = msgConversations.length > 0 ? msgConversations : [];
-      const {
-        data: freshConvos
-      } = await sb.rpc('get_my_conversations');
-      const chan = (freshConvos || []).find(c => c.channel_id === channelId);
-      if (chan) {
-        setMsgActiveChannel(chan);
-        await loadChannelMessages(channelId);
-        setMsgConversations(freshConvos || []);
-      }
-      setActiveTab("messages");
-      setMsgView("chat");
-    } catch (e) {
-      showToast("Chat error: " + e.message);
-    }
-    setMsgLoading(false);
-  }
-  async function loadChannelMessages(channelId) {
-    setMsgLoading(true);
-    try {
-      const {
-        data,
-        error
-      } = await sb.rpc('get_channel_messages', {
-        p_channel_id: channelId,
-        p_limit: 50
-      });
-      if (!error) setMsgMessages(data || []);
-    } catch (e) {/* silent */}
-    setMsgLoading(false);
-  }
-  async function sendMsg() {
-    if (!authUser || !msgActiveChannel || !msgInput.trim()) return;
-    setMsgSending(true);
-    try {
-      const {
-        error
-      } = await sb.rpc('send_message', {
-        p_channel_id: msgActiveChannel.channel_id,
-        p_content: msgInput.trim()
-      });
-      if (error) {
-        showToast("Send failed: " + error.message);
-      } else {
-        setMsgInput("");
-        await loadChannelMessages(msgActiveChannel.channel_id);
-        await loadConversations();
-      }
-    } catch (e) {
-      showToast("Send error: " + e.message);
-    }
-    setMsgSending(false);
-  }
-
-  // Realtime subscription for new messages
-  useEffect(() => {
-    if (!authUser) return;
-    const channel = sb.channel('messages-realtime').on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'messages'
-    }, payload => {
-      const msg = payload.new;
-      // If we're in the active chat, refresh messages
-      if (msgActiveChannel && msg.channel_id === msgActiveChannel.channel_id) {
-        loadChannelMessages(msg.channel_id);
-      }
-      // Always refresh unread + conversations
-      loadUnreadCount();
-      loadConversations();
-    }).subscribe();
-    return () => {
-      sb.removeChannel(channel);
-    };
-  }, [authUser?.id, msgActiveChannel?.channel_id]);
+  // State, RPC calls, realtime subscription, and optimistic send all live in
+  // the useMessages hook (src/features/social/useMessages.js).
+  const {
+    msgView, setMsgView,
+    msgConversations,
+    msgActiveChannel,
+    msgMessages,
+    msgInput, setMsgInput,
+    msgLoading,
+    msgListLoading,
+    msgListError,
+    msgChatError,
+    msgUnreadTotal,
+    loadConversations,
+    loadChannelMessages,
+    openConversation,
+    closeConversation,
+    openDmWithUser,
+    sendMsg,
+    retryFailedMsg,
+    discardFailedMsg,
+  } = useMessages({
+    authUser,
+    showToast,
+    onOpenChat: () => setActiveTab("messages"),
+  });
 
   // Phase 3b: emit a friend_exercise_events row whenever the user adds a new
   // entry to their log. Friends receive these via realtime (RLS-scoped to
@@ -2302,14 +2205,6 @@ function App() {
       sb.removeChannel(channel);
     };
   }, [authUser?.id, friends.map(f => f.id).join(',')]);
-
-  // Load unread on auth and periodically
-  useEffect(() => {
-    if (authUser) {
-      loadUnreadCount();
-      loadConversations();
-    }
-  }, [authUser?.id]);
 
   // ── LEADERBOARD ────────────────────────────────────────────
   async function loadLeaderboard() {
@@ -5716,20 +5611,22 @@ function App() {
         /* ── MESSAGES TAB ─────────────────────── */}{activeTab === "messages" && <MessagesTab
           msgConversations={msgConversations}
           msgActiveChannel={msgActiveChannel}
-          setMsgActiveChannel={setMsgActiveChannel}
           msgMessages={msgMessages}
-          setMsgMessages={setMsgMessages}
           msgInput={msgInput}
           setMsgInput={setMsgInput}
-          msgScrollRef={msgScrollRef}
           msgLoading={msgLoading}
-          msgSending={msgSending}
+          msgListLoading={msgListLoading}
+          msgListError={msgListError}
+          msgChatError={msgChatError}
           msgView={msgView}
-          setMsgView={setMsgView}
           sendMsg={sendMsg}
-          loadChannelMessages={loadChannelMessages}
+          retryFailedMsg={retryFailedMsg}
+          discardFailedMsg={discardFailedMsg}
+          openConversation={openConversation}
+          closeConversation={closeConversation}
           loadConversations={loadConversations}
-          loadUnreadCount={loadUnreadCount}
+          loadChannelMessages={loadChannelMessages}
+          goToGuild={() => guardAll(() => setActiveTab("social"))}
           authUser={authUser}
         />
 
