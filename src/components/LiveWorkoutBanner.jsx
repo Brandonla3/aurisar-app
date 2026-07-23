@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { S, FS } from '../utils/tokens';
 import { isMetric, lbsToKg, kgToLbs, weightLabel } from '../utils/units';
+import Sheet from './ui/Sheet';
+import ConfirmSheet from './ui/ConfirmSheet';
+import SetsEditor from './ui/SetsEditor';
 
 export default function LiveWorkoutBanner({
   liveWorkout,
@@ -10,12 +12,12 @@ export default function LiveWorkoutBanner({
   onUpdateExercise,
   onRemoveExercise,
   onAddExercise,
-  allExById,
   allExercises,
   units,
 }) {
   const [open, setOpen] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [addExOpen, setAddExOpen] = useState(false);
   const [addExSearch, setAddExSearch] = useState('');
@@ -58,31 +60,6 @@ export default function LiveWorkoutBanner({
     setAddExOpen(false);
   }
 
-  function updateExField(i, field, val) {
-    onUpdateExercise(i, { [field]: val });
-  }
-
-  function updateExtraRow(i, ri, field, val) {
-    const rr = [...(exercises[i].extraRows || [])];
-    rr[ri] = { ...rr[ri], [field]: val };
-    onUpdateExercise(i, { extraRows: rr });
-  }
-
-  function removeExtraRow(i, ri) {
-    const rr = (exercises[i].extraRows || []).filter((_, j) => j !== ri);
-    onUpdateExercise(i, { extraRows: rr });
-  }
-
-  function addExtraRow(i) {
-    const ex = exercises[i];
-    const rr = [...(ex.extraRows || []), {
-      sets: ex.sets || '',
-      reps: ex.reps || '',
-      weightLbs: ex.weightLbs || '',
-    }];
-    onUpdateExercise(i, { extraRows: rr });
-  }
-
   // Add exercise search — requires 2+ chars
   const addExResults = addExSearch.length >= 2
     ? (allExercises || [])
@@ -119,18 +96,53 @@ export default function LiveWorkoutBanner({
         <span className="lw-chevron">{"›"}</span>
       </button>
 
-      {open && (
-        <>
-          <div className="lw-overlay" onClick={closeSheet} />
-          <div className="lw-sheet" role="dialog" aria-label="Active workout tracker">
-            <div className="lw-sheet-handle" />
-
-            <div className="lw-sheet-hdr">
-              <span className="lw-sheet-icon">{icon}</span>
-              <span className="lw-sheet-title">{name}</span>
-              <button className="lw-sheet-close-btn" onClick={closeSheet}>{"✕"}</button>
-            </div>
-
+      {/* The tracker sheet sits on the live layer — below every modal, so
+          Finish can stack the stats/completion sheets above it. navOffset
+          is off: like the old .lw-sheet it deliberately covers the tab bar. */}
+      <Sheet
+        open={open}
+        onClose={closeSheet}
+        layer={"live"}
+        navOffset={false}
+        icon={icon}
+        title={name}
+        ariaLabel={"Active workout tracker"}
+        footer={confirmFinish ? (
+              <div className="lw-confirm-panel">
+                <div className="lw-confirm-msg">
+                  {`${total - doneCount} exercise${total - doneCount !== 1 ? 's' : ''} still unchecked — how would you like to finish?`}
+                </div>
+                <div className="lw-confirm-btns">
+                  <button className="btn btn-gold" onClick={() => {
+                    onFinish(exercises.map(e => ({ ...e, done: true })));
+                    closeSheet();
+                  }}>
+                    {`Log All ${total} Exercises`}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => {
+                    onFinish(exercises.filter(e => e.done));
+                    closeSheet();
+                  }}>
+                    {`Log Only Checked (${doneCount})`}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" style={{ color: '#8a8478' }} onClick={() => setConfirmFinish(false)}>
+                    {"← Keep Going"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="lw-sheet-footer">
+                <button className="btn btn-ghost btn-sm" style={{ color: '#8a8478' }} onClick={() => setConfirmDiscard(true)}>
+                  {"Discard"}
+                </button>
+                <button className="btn btn-gold" style={{ flex: 1 }} onClick={handleFinishPress}>
+                  {doneCount < total
+                    ? `✓ Finish (${doneCount}/${total})`
+                    : '✓ Finish Workout'}
+                </button>
+              </div>
+            )}
+      >
             <div className="lw-prog-track">
               <div
                 className="lw-prog-fill"
@@ -149,10 +161,6 @@ export default function LiveWorkoutBanner({
                 const isInSuperset = ex.supersetWith !== null;
                 const expanded = expandedIdx === i;
                 const canEdit = ex.exId !== 'rest_day';
-                const isCardioOrFlex = ex.category === 'cardio' || ex.category === 'flexibility';
-                const showW = !isCardioOrFlex;
-                const noSets = ex.noSets;
-                const rowLabel = isCardioOrFlex ? 'I' : 'S';
 
                 return (
                   <React.Fragment key={i}>
@@ -164,8 +172,15 @@ export default function LiveWorkoutBanner({
                       <div
                         className={`lw-ex-row${ex.done ? ' done' : ''}${isInSuperset ? ' in-superset' : ''}`}
                         onClick={() => onToggleExercise(i)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onToggleExercise(i);
+                          }
+                        }}
                         role="checkbox"
                         aria-checked={ex.done}
+                        tabIndex={0}
                       >
                         <div className={`lw-ex-cb${ex.done ? ' done' : ''}`}>
                           {ex.done && <span className="lw-ex-check-mark">{"✓"}</span>}
@@ -195,99 +210,23 @@ export default function LiveWorkoutBanner({
                       {/* ── Inline edit panel ── */}
                       {expanded && (
                         <div className="lw-ex-edit">
-                          {/* Primary row (S1 / I1) */}
-                          <div className="lw-ex-edit-row">
-                            <span className="lw-ex-edit-row-lbl">{`${rowLabel}1`}</span>
-                            {!noSets && (
-                              <div className="lw-ex-edit-cell">
-                                <span className="lw-ex-edit-col-hdr">{"Sets"}</span>
-                                <input
-                                  className="lw-ex-edit-inp"
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={ex.sets === 0 || ex.sets === '' ? '' : ex.sets || ''}
-                                  onChange={e => updateExField(i, 'sets', e.target.value)}
-                                />
-                              </div>
-                            )}
-                            <div className="lw-ex-edit-cell">
-                              <span className="lw-ex-edit-col-hdr">{"Reps"}</span>
-                              <input
-                                className="lw-ex-edit-inp"
-                                type="text"
-                                inputMode="decimal"
-                                value={ex.reps === 0 || ex.reps === '' ? '' : ex.reps || ''}
-                                onChange={e => updateExField(i, 'reps', e.target.value)}
-                              />
-                            </div>
-                            {showW && (
-                              <div className="lw-ex-edit-cell">
-                                <span className="lw-ex-edit-col-hdr">{wLabel}</span>
-                                <input
-                                  className="lw-ex-edit-inp"
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="—"
-                                  value={dispW(ex.weightLbs)}
-                                  onChange={e => updateExField(i, 'weightLbs', fromW(e.target.value))}
-                                />
-                              </div>
-                            )}
-                            <div className="lw-ex-edit-spacer" />
-                          </div>
-
-                          {/* Extra rows (S2, S3…) */}
-                          {(ex.extraRows || []).map((row, ri) => (
-                            <div key={ri} className="lw-ex-edit-row lw-ex-edit-row-extra">
-                              <span className="lw-ex-edit-row-lbl">{`${rowLabel}${ri + 2}`}</span>
-                              {!noSets && (
-                                <div className="lw-ex-edit-cell">
-                                  <input
-                                    className="lw-ex-edit-inp"
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Sets"
-                                    value={row.sets || ''}
-                                    onChange={e => updateExtraRow(i, ri, 'sets', e.target.value)}
-                                  />
-                                </div>
-                              )}
-                              <div className="lw-ex-edit-cell">
-                                <input
-                                  className="lw-ex-edit-inp"
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="Reps"
-                                  value={row.reps || ''}
-                                  onChange={e => updateExtraRow(i, ri, 'reps', e.target.value)}
-                                />
-                              </div>
-                              {showW && (
-                                <div className="lw-ex-edit-cell">
-                                  <input
-                                    className="lw-ex-edit-inp"
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder={wLabel}
-                                    value={dispW(row.weightLbs)}
-                                    onChange={e => updateExtraRow(i, ri, 'weightLbs', fromW(e.target.value))}
-                                  />
-                                </div>
-                              )}
-                              <button
-                                className="lw-ex-edit-row-remove"
-                                onClick={() => removeExtraRow(i, ri)}
-                                aria-label="Remove row"
-                              >
-                                {"✕"}
-                              </button>
-                            </div>
-                          ))}
-
-                          {/* Add row */}
-                          <button className="lw-add-row-btn" onClick={() => addExtraRow(i)}>
-                            {"＋ Add Row"}{isCardioOrFlex ? " (e.g. interval)" : " (e.g. progressive weight)"}
-                          </button>
+                          {/* Same SetsEditor as the workout builder and the
+                              quick log — the live variant hides HR/treadmill/
+                              distance (never part of mid-session tracking)
+                              and commits extra rows per keystroke. */}
+                          <SetsEditor
+                            exD={{ id: ex.exId, category: ex.category, hasTreadmill: false }}
+                            value={ex}
+                            onField={(field, val) => onUpdateExercise(i, { [field]: val })}
+                            units={units}
+                            variant={"live"}
+                            rowsCommitOn={"change"}
+                            extraWeightMode={"lbs"}
+                            showHR={false}
+                            showTreadmill={false}
+                            showPaceBonus={false}
+                            showDist={false}
+                          />
 
                           {/* Actions */}
                           <div className="lw-ex-edit-actions">
@@ -383,50 +322,24 @@ export default function LiveWorkoutBanner({
                 )}
               </div>
             </div>
+      </Sheet>
 
-            {confirmFinish ? (
-              <div className="lw-confirm-panel">
-                <div className="lw-confirm-msg">
-                  {`${total - doneCount} exercise${total - doneCount !== 1 ? 's' : ''} still unchecked — how would you like to finish?`}
-                </div>
-                <div className="lw-confirm-btns">
-                  <button className="btn btn-gold" onClick={() => {
-                    onFinish(exercises.map(e => ({ ...e, done: true })));
-                    closeSheet();
-                  }}>
-                    {`Log All ${total} Exercises`}
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => {
-                    onFinish(exercises.filter(e => e.done));
-                    closeSheet();
-                  }}>
-                    {`Log Only Checked (${doneCount})`}
-                  </button>
-                  <button className="btn btn-ghost btn-sm" style={{ color: '#8a8478' }} onClick={() => setConfirmFinish(false)}>
-                    {"← Keep Going"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="lw-sheet-footer">
-                <button className="btn btn-ghost btn-sm" style={{ color: '#8a8478' }} onClick={() => {
-                  if (window.confirm(`Discard "${name}"? Your progress will be lost.`)) {
-                    onDiscard();
-                    closeSheet();
-                  }
-                }}>
-                  {"Discard"}
-                </button>
-                <button className="btn btn-gold" style={{ flex: 1 }} onClick={handleFinishPress}>
-                  {doneCount < total
-                    ? `✓ Finish (${doneCount}/${total})`
-                    : '✓ Finish Workout'}
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {/* In-app confirm instead of window.confirm (which is jarring and
+          fails in sandboxed frames — see the note in App.jsx). */}
+      <ConfirmSheet
+        open={confirmDiscard}
+        icon={"🗑"}
+        title={"Discard Workout?"}
+        body={`Discard "${name}"? Your progress will be lost.`}
+        confirmLabel={"Discard"}
+        danger
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          onDiscard();
+          closeSheet();
+        }}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </>
   );
 }

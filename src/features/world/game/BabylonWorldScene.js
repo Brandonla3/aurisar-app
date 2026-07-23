@@ -46,6 +46,7 @@ import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castle
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
 import { sameInteriorFloor } from '../castle/castleNavSurface.js';
 import { MOBS as MOB_DEFS } from '../content/index';
+import { toWorld, toStdb } from '../worldSpace.js';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
 // would z-fight/clip against it. Re-enable once the Phase-5 bake pipeline
@@ -53,11 +54,9 @@ import { MOBS as MOB_DEFS } from '../content/index';
 const USE_GLB_TILES = false;
 
 // ── Coordinate helpers ──────────────────────────────────────────────────────
-const SCALE       = 32;
-const STDB_CENTER = 1600;
-
-function toWorld(v) { return (v - STDB_CENTER) / SCALE; }
-function toStdb(v)  { return Math.round(v * SCALE + STDB_CENTER); }
+// The px<->meter contract (PX_PER_M, the legacy 1600 origin, toWorld/toStdb)
+// now lives in one place — ../worldSpace.js — imported above and shared with
+// both 2D maps so the scene and the maps can never drift apart.
 
 // SpacetimeDB `Identity` is a class instance, not a primitive — every callback
 // constructs a fresh instance for the same logical player, so using the raw

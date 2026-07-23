@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useImperativeHandle }
 import { PLAN_TEMPLATES, HR_ZONES, NO_SETS_EX_IDS, RUNNING_EX_ID, UI_COLORS, QUESTS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 import { _optionalChain, uid, todayStr } from '../utils/helpers';
+import { daysUntil } from '../utils/time';
 import { isMetric, lbsToKg, kgToLbs, miToKm, weightLabel, pctToSlider, sliderToPct } from '../utils/units';
 import { calcPlanXP, calcDayXP, calcExXP, hrRange, checkQuestCompletion, calcExercisePBs, getMuscleColor } from '../utils/xp';
 import { formatXP } from '../utils/format';
@@ -28,15 +29,6 @@ function formatScheduledDate(dateStr) {
   } catch (e) { return dateStr; }
 }
 
-function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  try {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const then = new Date(dateStr + "T00:00:00");
-    return Math.round((then - now) / 86400000);
-  } catch (e) { return null; }
-}
 
 const PlanCard = React.memo(function PlanCard({ plan, planXP, clsColor, onOpen, onSchedule }) {
   const hasSched = !!plan.scheduledDate;

@@ -29,6 +29,28 @@
       --ease-standard:cubic-bezier(.4,0,.2,1);   /* material standard */
       --ease-out:cubic-bezier(.16,1,.3,1);       /* decelerate, for entrances */
       --ease-spring:cubic-bezier(.34,1.56,.64,1);/* slight overshoot, for rewards */
+
+      /* ── Z-index ladder ─────────────────────────────────────────────────
+         One vocabulary for stacking. The JS mirror lives in
+         src/utils/tokens.js (Z scale) for inline styles. Ordering rules:
+         tray < live < modals (finishing a live workout opens sheets above
+         the banner); modal < detail (QuickLog's Back reveals the detail
+         sheet); confirm tops everything. */
+      --z-sticky:5;
+      --z-scrim:19;
+      --z-dropdown:20;
+      --z-fixed-bar:90;
+      --z-nav:100;
+      --z-tray:780;
+      --z-live:810;
+      --z-live-top:820;
+      --z-wizard:9000;
+      --z-picker:9100;
+      --z-editor:9200;
+      --z-modal:9300;
+      --z-detail:9400;
+      --z-confirm:9500;
+      --z-flash:9600;
     }
     html{font-size:17.333px}
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
@@ -50,7 +72,19 @@
     .builder-ex-input::placeholder{color:#8a8478}
     .r2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
     .field{display:flex;flex-direction:column;gap:4px}
+    /* ── Button hierarchy ────────────────────────────────────────────────
+       One ladder, most to least prominent. Pick the highest rung the
+       action deserves; a view should have at most one gold-solid.
+         btn-gold-solid  the single primary commit of a screen (Save)
+         btn-gold        default action
+         btn-glass-yellow  highlighted alternative (Complete/Schedule)
+         btn-ghost       secondary / dismiss
+         btn-danger      destructive
+       Sizes: btn-sm / btn-xs (both get a 44px touch extension on coarse
+       pointers, below). For bare glyph actions use .icon-btn instead. */
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
+    .btn-gold-solid{background:linear-gradient(135deg,#8B7425,#A89030);color:#d4cec4;border:1px solid rgba(196,160,68,.35);box-shadow:0 2px 14px rgba(140,116,37,.28);text-shadow:0 1px 2px rgba(0,0,0,.35)}
+    .btn-gold-solid:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(140,116,37,.4)}
     .btn-gold{background:linear-gradient(135deg,rgba(45,42,36,.5),rgba(45,42,36,.35));color:#d4cec4;box-shadow:none;border:1px solid rgba(180,172,158,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
     .btn-gold:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,0,0,.4)}
     .btn-ghost{background:linear-gradient(135deg,rgba(45,42,36,.25),rgba(32,30,26,.15));color:#8a8478;border:1px solid rgba(180,172,158,.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
@@ -100,7 +134,7 @@
     .xp-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cls-color),var(--cls-glow));transition:width .6s ease}
     .xp-lbl{display:flex;justify-content:space-between;font-size:.6rem;color:#8a8478;margin-top:2px}
     /* Tabs — Bottom Tab Bar (iOS material) */
-    .hud-nav-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(20,18,14,.78);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:0.5px solid rgba(180,172,158,.14);border-radius:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));margin:0;z-index:100;box-shadow:0 -2px 16px rgba(0,0,0,.35)}
+    .hud-nav-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(20,18,14,.78);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:0.5px solid rgba(180,172,158,.14);border-radius:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));margin:0;z-index:var(--z-nav);box-shadow:0 -2px 16px rgba(0,0,0,.35)}
     .tabs{display:flex;gap:0;background:transparent;border-radius:0;padding:0;backdrop-filter:none;-webkit-backdrop-filter:none}
     .tab{flex:1;padding:7px 2px 5px;text-align:center;font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.06em;text-transform:uppercase;color:#8a8478;border-radius:8px;cursor:pointer;transition:color .18s,background .18s;border:none;background:transparent;line-height:1.25;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;-webkit-tap-highlight-color:transparent}
     .tab .tab-icon{display:flex;align-items:center;justify-content:center;width:22px;height:22px;transition:transform .18s}
@@ -250,7 +284,6 @@
     .builder-ex-input{width:58px;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.06);border-radius:5px;padding:4px 6px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;text-align:center;outline:none}
     .builder-ex-input:focus{border-color:rgba(180,172,158,.12)}
     .icon-row{display:flex;gap:7px;flex-wrap:wrap}
-    .icon-opt{font-size:1.2rem;width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);transition:all .2s}
     .icon-opt:hover{background:rgba(45,42,36,.28)}
     .icon-opt.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.25)}
     .tpl-card{background:linear-gradient(145deg,rgba(36,34,28,.88),rgba(26,24,20,.82));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:13px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
@@ -267,16 +300,14 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .reveal-name{font-family:'Inter',sans-serif;font-size:1.35rem;color:var(--cls-glow);margin-bottom:7px}
     /* EX PICKER */
-    .ex-picker-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9100;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .ex-picker-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:var(--z-picker);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .ex-picker-sheet{background:rgba(14,14,12,.88);border:1px solid rgba(180,172,158,.05);border-radius:16px 16px 0 0;padding:17px;width:100%;max-width:520px;max-height:calc(70vh - var(--bottom-nav-h));overflow-y:auto;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-    .ex-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
     .ex-pick-item{background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);border-radius:9px;padding:9px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:8px}
     .ex-pick-item:hover{background:rgba(45,42,36,.22);border-color:rgba(180,172,158,.07)}
-    .ex-pick-icon{font-size:1.1rem;flex-shrink:0}
     .ex-pick-name{font-size:.74rem;color:#b4ac9e;line-height:1.2}
     .ex-pick-xp{font-size:.6rem;color:#b4ac9e;margin-top:2px}
     /* EXERCISE DETAIL MODAL */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9300;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:var(--z-modal);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .modal-body{padding:14px}
     .modal-title{font-family:'Inter',sans-serif;font-size:1.1rem;color:#d4cec4;margin-bottom:3px}
     /* CHECK-IN CARD */
@@ -291,17 +322,17 @@
     .streak-dot.filled{background:rgba(45,42,36,.3);border-color:rgba(180,172,158,.1)}
     .streak-dot.current{background:linear-gradient(135deg,#8a8478,#b4ac9e);border-color:#b4ac9e;box-shadow:0 0 10px rgba(180,172,158,.4),0 0 20px rgba(180,172,158,.15)}
     /* Flash / Toast */
-    .xp-flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Inter',sans-serif;font-size:2rem;color:#b4ac9e;text-shadow:0 0 20px #b4ac9e,0 0 40px rgba(180,172,158,.35);animation:flashUp 2s ease-out forwards;pointer-events:none;z-index:999}
+    .xp-flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Inter',sans-serif;font-size:2rem;color:#b4ac9e;text-shadow:0 0 20px #b4ac9e,0 0 40px rgba(180,172,158,.35);animation:flashUp 2s ease-out forwards;pointer-events:none;z-index:var(--z-flash)}
     @keyframes flashUp{0%{opacity:0;transform:translate(-50%,-40%) scale(.7)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}60%{opacity:1;transform:translate(-50%,-60%) scale(1)}100%{opacity:0;transform:translate(-50%,-80%) scale(.9)}}
     /* XP bar animation overlay */
-    .xp-bar-flash{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:min(280px,72vw);background:rgba(15,13,10,.92);border:1px solid rgba(180,172,158,.18);border-radius:10px;padding:8px 12px;z-index:998;animation:xpBarIn 2s ease forwards;pointer-events:none;font-family:'Inter',sans-serif;box-shadow:0 0 18px rgba(0,0,0,.5)}
+    .xp-bar-flash{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:min(280px,72vw);background:rgba(15,13,10,.92);border:1px solid rgba(180,172,158,.18);border-radius:10px;padding:8px 12px;z-index:var(--z-flash);animation:xpBarIn 2s ease forwards;pointer-events:none;font-family:'Inter',sans-serif;box-shadow:0 0 18px rgba(0,0,0,.5)}
     .xp-bar-flash-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
     .xp-bar-flash-level{font-size:.65rem;font-weight:700;text-shadow:0 0 8px currentColor}
     .xp-bar-flash-amount{font-size:.6rem;color:#c8bfaf}
     .xp-bar-flash-track{height:6px;background:rgba(45,42,36,.5);border-radius:3px;overflow:visible}
     .xp-bar-flash-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.34,1.56,.64,1) .15s;filter:brightness(1.3)}
     @keyframes xpBarIn{0%{opacity:0;transform:translateX(-50%) translateY(8px)}12%{opacity:1;transform:translateX(-50%) translateY(0)}70%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(-4px)}}
-    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.08);color:#b4ac9e;box-shadow:0 0 12px rgba(0,0,0,.2);font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.09em;padding:8px 16px;border-radius:8px;z-index:998;animation:tIn .3s ease;white-space:nowrap}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.08);color:#b4ac9e;box-shadow:0 0 12px rgba(0,0,0,.2);font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.09em;padding:8px 16px;border-radius:8px;z-index:var(--z-flash);animation:tIn .3s ease;white-space:nowrap}
     @keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     /* Friend exercise banner */
     .friend-ex-banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:linear-gradient(155deg,rgba(34,32,26,.92),rgba(20,18,14,.9));border:1px solid rgba(180,172,158,.12);color:#d4cec4;box-shadow:0 4px 20px rgba(0,0,0,.4),0 0 12px rgba(180,172,158,.06);font-family:'Inter',sans-serif;padding:10px 16px;border-radius:12px;z-index:1000;display:flex;align-items:center;gap:10px;animation:fbIn .4s ease-out,fbOut .5s ease-in 4.5s forwards;cursor:pointer;max-width:92vw}
@@ -319,7 +350,7 @@
     .intensity-val{font-family:'Inter',sans-serif;font-size:.88rem;color:#b4ac9e;min-width:40px;text-align:right}
     /* HR ZONES */
     .hr-zone-row{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
-    .hr-zone-btn{flex:1;min-width:52px;padding:6px 4px;border-radius:7px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .2s;text-align:center}
+    .hr-zone-btn{flex:1;min-width:52px;min-height:44px;padding:6px 4px;border-radius:7px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .2s;text-align:center;font-family:inherit;color:inherit}
     .hr-zone-btn.sel{border-width:1.5px;box-shadow:0 0 10px var(--zc,#b4ac9e)}
     .hz-name{font-family:'Inter',sans-serif;font-size:.47rem;letter-spacing:.04em;display:block;margin-bottom:1px}
     .hz-bpm{font-size:.58rem;display:block;opacity:.7}
@@ -357,7 +388,18 @@
 
     .intensity-title{font-family:'Inter',sans-serif;font-size:.58rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
     /* LIBRARY HOME — sticky translucent search bar (iOS material) */
-    .lib-sticky-search{position:sticky;top:-1px;z-index:5;margin:0 -12px 10px;padding:8px 12px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
+    .lib-sticky-search{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
+
+    /* Virtualised filtered list: the .scroll-area is locked into a non-scrolling
+       flex column so react-window's List is the ONLY scroller (no scroll-in-
+       scroll). Applied only while the filtered view is mounted (toggled from the
+       tab via useLayoutEffect). Home mode gets none of these rules and keeps
+       normal window scroll. */
+    .scroll-area.lib-list-locked{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0;-webkit-mask-image:none;mask-image:none;overscroll-behavior:contain}
+    .lib-tab-root--filtered{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+    .lib-filtered-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+    .lib-vlist-wrap{flex:1 1 auto;min-height:0}
+    .lib-vlist-wrap > [role="list"]{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
     /* LIBRARY HOME SCROLL */
     .lib-hscroll-wrap{position:relative;overflow:hidden}
@@ -389,6 +431,74 @@
     @keyframes sheet-enter-left{from{transform:translateX(-26%);opacity:.2}to{transform:translateX(0);opacity:1}}
     .sheet-enter-right{animation:sheet-enter-right var(--dur-base) var(--ease-standard) both}
     .sheet-enter-left{animation:sheet-enter-left var(--dur-base) var(--ease-standard) both}
+
+    /* ── Sheet primitive (src/components/ui/Sheet.jsx) ───────────────────
+       The one modal shell. Backdrop, radius, motion, z and the close
+       affordance are decided here; feature modals only supply content.
+       Column layout: handle? / header? / body (the ONLY scroller) /
+       footer?. */
+    .ui-sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;justify-content:center}
+    .ui-sheet-backdrop--bottom{align-items:flex-end}
+    .ui-sheet-backdrop--nav{padding-bottom:var(--bottom-nav-h)}
+    .ui-sheet-backdrop--center{align-items:center;padding:20px}
+    .ui-sheet{display:flex;flex-direction:column;width:100%;background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.08);box-shadow:0 -8px 60px rgba(0,0,0,.6)}
+    .ui-sheet--bottom{border-radius:16px 16px 0 0;border-bottom:none;max-height:85dvh;padding:10px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+    .ui-sheet--center{border-radius:16px;max-height:85dvh;padding:20px;box-shadow:0 0 60px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.7)}
+    .ui-sheet--tall{max-height:92dvh}
+    .ui-sheet:focus{outline:none}
+    @keyframes ui-sheet-pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+    .ui-sheet-pop{animation:ui-sheet-pop var(--dur-sheet) var(--ease-out) both}
+    .ui-sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(180,172,158,.22);margin:0 auto 8px;flex-shrink:0}
+    .ui-sheet-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0;min-height:32px}
+    .ui-sheet-title{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;font-size:.88rem;font-weight:600;color:#d4cec4;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ui-sheet-title--cinzel{font-family:'Cinzel',serif;font-weight:600}
+    .ui-sheet-title-icon{font-size:1.1rem;flex-shrink:0}
+    .ui-sheet-close{flex-shrink:0;width:44px;height:44px;margin:-6px -12px -6px 0;display:flex;align-items:center;justify-content:center;background:none;border:none;color:#8a8478;font-size:.85rem;cursor:pointer;border-radius:10px;transition:color var(--dur-fast),background var(--dur-fast)}
+    .ui-sheet-close:hover{color:#d4cec4;background:rgba(45,42,36,.35)}
+    .ui-sheet-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+    .ui-sheet-body--fixed{overflow:hidden;display:flex;flex-direction:column}
+    .ui-sheet-footer{flex-shrink:0;padding-top:12px}
+
+    /* ── SetsEditor primitive (src/components/ui/SetsEditor.jsx) ─────────
+       One field grid for sets/reps/weight and duration/distance/HR across
+       the builder, superset accordion, live tracker and quick log. Visual
+       vocabulary lifted from the live tracker's .lw-ex-edit-* family. */
+    .se{display:flex;flex-direction:column}
+    .se-row{display:flex;align-items:flex-end;gap:6px;padding:5px 0;border-bottom:1px solid rgba(45,42,36,.18)}
+    .se-row:last-of-type{border-bottom:none}
+    .se-row-lbl{font-family:'Cinzel',serif;font-size:.54rem;color:#8a8478;letter-spacing:.06em;min-width:18px;flex-shrink:0;align-self:center}
+    .se-cell{display:flex;flex-direction:column;flex:1;min-width:0}
+    .se-cell:has(.se-inp--wide){flex:1.6}
+    .se-col-hdr{font-size:.54rem;color:#8a8478;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .se-inp{background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.1);border-radius:6px;padding:6px 4px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;width:100%;min-width:0;outline:none;-webkit-appearance:none;appearance:none;text-align:center}
+    .se-inp:focus{border-color:rgba(180,172,158,.22)}
+    .se-row--extra .se-inp{background:rgba(45,42,36,.25);flex:1}
+    .se-row--extra .se-inp--wide{flex:1.6}
+    .se-row-remove{background:transparent;border:none;color:#8a8478;font-size:.7rem;cursor:pointer;padding:8px 10px;min-width:32px;min-height:32px;flex-shrink:0;align-self:center;-webkit-tap-highlight-color:transparent;border-radius:6px}
+    .se-row-remove:hover,.se-row-remove:active{color:#c0392b}
+    .se-add-row{width:100%;min-height:36px;margin-top:6px;background:transparent;border:1px dashed rgba(180,172,158,.16);border-radius:7px;color:#8a8478;font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.04em;cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast)}
+    .se-add-row:hover{color:#b4ac9e;border-color:rgba(180,172,158,.3)}
+    .se-pace{font-size:.65rem;padding:4px 0 2px 24px}
+    .se-hr{margin-top:8px}
+    /* Density variants: the live sheet is the most compact context. */
+    .se--live .se-inp{padding:5px 4px}
+    .se--live .se-add-row{min-height:32px}
+
+    /* ConfirmSheet content (src/components/ui/ConfirmSheet.jsx) */
+    .ui-confirm-title{display:flex;align-items:center;gap:9px;font-family:'Cinzel',serif;font-size:.88rem;color:#d4cec4;margin-bottom:8px}
+    .ui-confirm-icon{font-size:1.15rem}
+    .ui-confirm-body{font-size:.75rem;color:#8a8478;line-height:1.5;margin-bottom:18px}
+    .ui-confirm-actions{display:flex;gap:10px}
+    .ui-confirm-btn{min-height:44px}
+
+    /* IconButton (src/components/ui/IconButton.jsx) — 44px real box,
+       compact visible chip. Stack-safe: hit areas cannot overlap. */
+    .icon-btn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:#b4ac9e;-webkit-tap-highlight-color:transparent}
+    .icon-btn-glyph{display:flex;align-items:center;justify-content:center;border-radius:7px;background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.1);font-size:.68rem;line-height:1;transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
+    .icon-btn:hover .icon-btn-glyph{background:rgba(45,42,36,.65);border-color:rgba(180,172,158,.2);color:#d4cec4}
+    .icon-btn:active .icon-btn-glyph{transform:scale(.92)}
+    .icon-btn:disabled{cursor:not-allowed}
+    .icon-btn:disabled .icon-btn-glyph{opacity:.28}
 
     @keyframes libFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     .lib-home-section{animation:libFadeUp var(--dur-reveal) var(--ease-out) both}
@@ -436,34 +546,35 @@
        palette and the rows lose their per-muscle tint, so the change of mode
        is unmissable at a glance rather than something you infer from a row
        you already mis-tapped. */
-    .lib-conscript{animation:libConscriptIn var(--dur-slow) var(--ease-out) both}
-    @keyframes libConscriptIn{from{filter:brightness(1.3) grayscale(.8)}to{filter:none}}
-    /* Rows carry an inline --mg-color, so desaturate rather than fight it for
-       the custom property — the per-muscle hue stays readable but muted, and
-       the list plainly is not in its normal state. */
-    .lib-conscript .picker-ex-row{filter:grayscale(.7)}
-    .lib-conscript .picker-ex-row.sel{
-      filter:none;
-      border-left-color:#9fb3ae;
-      box-shadow:0 0 0 1.5px rgba(159,179,174,.45),0 4px 16px rgba(122,143,139,.16)
-    }
-    /* The banner rides inside the already-sticky search bar so it stays on
-       screen without a second sticky layer fighting the first. */
-    .lib-conscript .lib-sticky-search{
-      box-shadow:inset 0 -1px 0 rgba(122,143,139,.35);
-      background:linear-gradient(180deg,rgba(22,26,25,.96),rgba(14,16,15,.92))
-    }
-    .lib-conscript-banner{
+    /* Select-mode status banner — rides inside the already-sticky search bar.
+       Communicates the mode without repainting the whole tab. */
+    .lib-select-banner{
       display:flex;align-items:center;justify-content:center;gap:8px;
       font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.22em;
       color:#9fb3ae;background:rgba(122,143,139,.1);
       border:1px solid rgba(122,143,139,.28);border-radius:6px;
       padding:4px 8px;margin-bottom:8px;text-transform:uppercase
     }
-    .lib-conscript-banner-count{
+    .lib-select-banner-count{
       font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.02em;
       color:#d4cec4;font-variant-numeric:tabular-nums
     }
+    /* Resume chip — surfaced on the home view when filters are still active,
+       so a non-destructive back leaves the filtered results visibly reachable. */
+    .lib-resume-chip-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .lib-resume-chip{
+      display:flex;align-items:center;gap:8px;width:100%;min-height:44px;
+      margin-bottom:10px;padding:8px 12px;border-radius:9px;cursor:pointer;
+      font-family:'Inter',sans-serif;font-size:.68rem;text-align:left;
+      color:#d4cec4;background:rgba(196,160,68,.1);
+      border:1px solid rgba(196,148,40,.28)
+    }
+    .lib-resume-chip-x{
+      margin-left:auto;flex-shrink:0;width:28px;height:28px;display:flex;
+      align-items:center;justify-content:center;border-radius:6px;
+      background:transparent;border:none;color:#8a8478;cursor:pointer;font-size:.7rem
+    }
+    .lib-resume-chip-x:hover{color:#d4cec4;background:rgba(45,42,36,.4)}
 
     /* Staleness fade — --staleness runs 0 (done today) to 1 (3+ weeks ago).
        A stale card desaturates and dims so the carousel reads as a freshness
@@ -645,7 +756,7 @@
        just be furniture eating thumb space on every screen. */
     .cart-tray{
       position:fixed;left:50%;transform:translateX(-50%);
-      bottom:var(--bottom-nav-h);z-index:780;
+      bottom:var(--bottom-nav-h);z-index:var(--z-tray);
       width:100%;max-width:520px;
       background:linear-gradient(180deg,rgba(20,19,14,.94),rgba(12,12,10,.97));
       backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
@@ -946,7 +1057,7 @@
     .ex-edit-btn{position:absolute;top:7px;left:7px;font-size:.58rem;color:#8a8478;cursor:pointer;width:18px;height:18px;border-radius:50%;background:rgba(45,42,36,.15);display:flex;align-items:center;justify-content:center;transition:all .2s}
     .ex-edit-btn:hover{color:#b4ac9e;background:rgba(45,42,36,.22)}
     /* SAVE-AS-PLAN WIZARD */
-    .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-wizard);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .spw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
     .spw-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
     .spw-title{font-family:'Inter',sans-serif;font-size:.88rem;color:#d4cec4}
@@ -960,7 +1071,7 @@
     .spw-ex-name{font-family:'Inter',sans-serif;font-size:.7rem;color:#b4ac9e;flex:1}
     .spw-ex-meta{font-size:.63rem;color:#8a8478}
     /* SCHEDULE PICKER */
-    .sched-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9300;display:flex;align-items:center;justify-content:center;padding:20px}
+    .sched-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-modal);display:flex;align-items:center;justify-content:center;padding:20px}
     .sched-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:16px;width:100%;max-width:380px;padding:20px;display:flex;flex-direction:column;gap:14px}
     .sched-title{font-family:'Inter',sans-serif;font-size:.84rem;color:#d4cec4}
     .sched-target{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.06)}
@@ -972,7 +1083,6 @@
     .upcoming-card{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid rgba(180,172,158,.06);background:rgba(45,42,36,.14);margin-bottom:7px;cursor:pointer}
     .upcoming-card:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.2)}
     /* WORKOUTS TAB — base style (overridden by Forge card block below) */
-    .workout-card{background:rgba(26,24,20,.92);border:1px solid rgba(180,172,158,.06);border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:all .18s}
     .workout-card:hover{border-color:rgba(180,172,158,.1)}
     .workout-card-top{display:flex;align-items:center;gap:11px}
     .workout-icon{font-size:1.6rem;flex-shrink:0}
@@ -1005,18 +1115,14 @@
     .inp[type="number"]{-moz-appearance:textfield}
     .wb-ex-lbl{font-size:.58rem;color:#8a8478}
     /* Add-to-plan picker */
-    .atp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:84;display:flex;align-items:center;justify-content:center;padding:20px}
-    .atp-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
-    .atp-plan-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .18s}
+    /* .atp-backdrop/.atp-sheet removed — add-to-plan now renders via Sheet. */
+    .atp-plan-row{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;font-family:inherit;color:inherit;padding:9px 12px;border-radius:9px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .18s}
     .atp-plan-row:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.18)}
-    /* Workout completion modal */
-    .completion-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:86;display:flex;align-items:center;justify-content:center;padding:20px}
-    .completion-sheet{background:rgba(16,15,12,.97);border:1px solid rgba(180,172,158,.06);border-radius:16px;width:100%;max-width:380px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 0 40px rgba(0,0,0,.4)}
+    /* Workout completion modal (renders via Sheet; .completion-backdrop removed) */
     .completion-wo-card{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:10px;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.06)}
     .completion-wo-icon{font-size:1.8rem}
     .completion-wo-name{font-family:'Inter',sans-serif;font-size:.82rem;color:#d4cec4}
     .completion-wo-sub{font-size:.65rem;color:#8a8478;margin-top:2px}
-    .completion-option{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:11px;border:1.5px solid rgba(180,172,158,.06);background:rgba(45,42,36,.12);cursor:pointer;transition:all .2s}
     .completion-option:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.18)}
     .completion-option.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.25);box-shadow:0 0 0 1px rgba(180,172,158,.2)}
     .completion-option-icon{font-size:1.4rem;flex-shrink:0}
@@ -1031,7 +1137,7 @@
     .cdel-name{color:#d4cec4;font-weight:bold}
     .cdel-warning{font-size:.65rem;color:rgba(231,76,60,.8);text-align:center;font-style:italic}
     /* Save-as-workout wizard */
-    .saw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .saw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-wizard);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .saw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
     /* CALENDAR */
     .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -1186,31 +1292,26 @@
     .bday-tab:hover .bday-tab-del{opacity:1}
 
     /* ── Icon picker ── */
-    .icon-opt{font-size:1.2rem;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.05);transition:all .2s}
+    .icon-opt{font-size:1.2rem;width:44px;height:44px;padding:0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.05);transition:all .2s;font-family:inherit}
     .icon-opt:hover{background:rgba(45,42,36,.22);border-color:rgba(180,172,158,.06);transform:scale(1.08)}
     .icon-opt.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.28);box-shadow:0 0 8px rgba(180,172,158,.08)}
 
     /* ── Exercise Editor Modal — themed by muscle group --mg-color ── */
-    .ex-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9200;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    /* Muscle-tint skin applied on top of the Sheet primitive — geometry
+       (radius, padding, scrolling, backdrop) is owned by .ui-sheet; this
+       class only recolors the surface per the selected muscle group. */
     .ex-editor-sheet{
       --mg-color:#B0A090;
       position:relative;
       background:
         radial-gradient(ellipse 70% 40% at 50% 0%, color-mix(in srgb,var(--mg-color) 14%,transparent), transparent 70%),
         linear-gradient(160deg,rgba(18,16,12,.96),rgba(12,12,10,.98));
-      border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.07));
-      border-bottom:none;
-      border-radius:18px 18px 0 0;
-      padding:0;width:100%;max-width:520px;
-      max-height:calc(92vh - var(--bottom-nav-h));overflow-y:auto;
-      box-shadow:0 -8px 40px rgba(0,0,0,.7),0 -2px 30px color-mix(in srgb,var(--mg-color) 10%,transparent);
-      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)
+      border-color:color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.07));
+      box-shadow:0 -8px 40px rgba(0,0,0,.7),0 -2px 30px color-mix(in srgb,var(--mg-color) 10%,transparent)
     }
     .ex-editor-sheet::before{content:'';position:absolute;top:0;left:18%;right:18%;height:1.5px;background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.45;border-radius:2px}
-    .ex-editor-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 4px;position:relative}
-    .ex-editor-title{font-family:'Cinzel',serif;font-size:.92rem;color:#e8e0d0;letter-spacing:.05em;text-shadow:0 1px 8px color-mix(in srgb,var(--mg-color) 20%,transparent)}
-    .ex-editor-subtitle{font-size:.62rem;color:#8a8478;margin-top:4px;font-style:italic;font-family:'Inter',sans-serif;letter-spacing:.01em}
-    .ex-editor-body{padding:12px 16px 18px;display:flex;flex-direction:column;gap:13px}
+    .ex-editor-subtitle{font-size:.62rem;color:#8a8478;margin-top:-6px;font-style:italic;font-family:'Inter',sans-serif;letter-spacing:.01em}
+    .ex-editor-body{padding:4px 0 6px;display:flex;flex-direction:column;gap:13px}
     .ex-editor-section{
       background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 6%,rgba(45,42,36,.22)),color-mix(in srgb,var(--mg-color) 2%,rgba(32,30,26,.12)));
       border:1px solid color-mix(in srgb,var(--mg-color) 12%,rgba(180,172,158,.05));
@@ -1245,7 +1346,9 @@
     .completion-wo-icon{font-size:1.9rem}
     .completion-wo-name{font-family:'Cinzel',serif;font-size:.84rem;color:#d4cec4;letter-spacing:.04em;font-weight:600}
     .completion-wo-sub{font-size:.62rem;color:#8a8478;margin-top:3px;font-family:'Inter',sans-serif;letter-spacing:.02em}
-    .completion-option{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:11px;border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 36%,transparent);background:rgba(28,26,22,.88);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+    /* Real <button>s since the radio-group conversion — inherit the app
+       typography and fill the row like the old divs did. */
+    .completion-option{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font-family:inherit;color:inherit;padding:13px 16px;border-radius:11px;border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 36%,transparent);background:rgba(28,26,22,.88);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
     .completion-option::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,color-mix(in srgb,var(--mg-color) 8%,transparent),transparent);opacity:0;transition:opacity .2s}
     .completion-option:hover{border-color:color-mix(in srgb,var(--mg-color) 24%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.32),0 0 12px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
     .completion-option:hover::before{opacity:1}
@@ -1293,14 +1396,24 @@
     .wb-sub-hdr-icon{font-size:.72rem;color:#d4cec4}
     .wb-identity-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
     .wb-identity-row .inp{flex:1;min-width:0}
-    .wb-icon-btn{width:42px;height:42px;border-radius:9px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.35rem;flex-shrink:0;transition:background .2s,border-color .2s;position:relative}
+    .wb-icon-btn{width:42px;height:42px;border-radius:9px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.35rem;flex-shrink:0;transition:background .2s,border-color .2s;position:relative;color:inherit;font-family:inherit;padding:0;line-height:1}
     .wb-icon-btn:hover{background:rgba(45,42,36,.4);border-color:rgba(180,172,158,.2)}
     .wb-icon-btn-caret{position:absolute;bottom:2px;right:3px;font-size:.42rem;color:rgba(180,172,158,.55);line-height:1}
-    .wb-icon-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;padding:10px;background:rgba(14,14,12,.55);border-radius:9px;border:1px solid rgba(180,172,158,.07)}
+    .wb-icon-picker{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+
+    /* Builder save/complete bar — sticky in normal flow instead of a fixed
+       overlay with a spacer hack, so it never covers the last exercise. */
+    .wb-footer{position:sticky;bottom:0;z-index:var(--z-sticky);display:flex;gap:8px;margin:14px -12px 0;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(14,13,10,.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid rgba(180,172,158,.12)}
+    .wb-footer .btn{min-height:44px}
+
+    /* Reorder ▲/▼ column — IconButtons whose 44px hit boxes must not overlap,
+       so the visual chips are small but the column has room for two of them. */
+    .wb-reorder{display:flex;flex-direction:column;flex-shrink:0;margin:-4px 0}
+    .wb-reorder .icon-btn{height:36px}
     .wb-dur-hint{font-size:.6rem;color:#8a8478;margin-top:3px;font-style:italic;text-align:center}
 
     /* ── Plan Wizard Full-Screen Overlay ── */
-    .plan-wizard-backdrop{position:fixed;inset:0;background:rgba(12,12,10,.97);z-index:9000;display:flex;flex-direction:column;align-items:center;overflow:hidden}
+    .plan-wizard-backdrop{position:fixed;inset:0;background:rgba(12,12,10,.97);z-index:var(--z-wizard);display:flex;flex-direction:column;align-items:center;overflow:hidden}
     .plan-wizard-inner{width:100%;max-width:520px;height:100%;display:flex;flex-direction:column;padding:12px 14px;overscroll-behavior:contain}
     .plan-wizard-hdr{display:flex;align-items:center;gap:9px;padding:10px 0 12px;border-bottom:1px solid rgba(180,172,158,.08);margin-bottom:14px;flex-shrink:0}
     .plan-wizard-hdr-title{font-family:'Cinzel',serif;font-size:.82rem;color:#d4cec4;letter-spacing:.04em;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1397,7 +1510,7 @@
     .wo-divider{height:1px;margin:18px 0;background:linear-gradient(90deg,transparent,rgba(180,172,158,.1) 20%,rgba(180,172,158,.14) 50%,rgba(180,172,158,.1) 80%,transparent)}
 
     /* ── Workouts/Recipes sticky filter bar (iOS material) ── */
-    .wo-sticky-filters{position:sticky;top:-1px;z-index:5;margin:0 -12px 10px;padding:8px 12px 4px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
+    .wo-sticky-filters{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px 4px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
 
     /* ── Recipe filter bar ── */
     .recipe-filter-bar{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-ms-overflow-style:none}
@@ -2074,7 +2187,7 @@
          left stranded mid-keyframe once that animation is neutralised. */
       .scroll-reveal { opacity: 1; transform: none; }
       .sheet-slide-up, .sheet-enter-left, .sheet-enter-right,
-      .lib-home-section {
+      .ui-sheet-pop, .lib-home-section {
         animation: none; opacity: 1; transform: none;
       }
       /* Purely decorative loops — stop outright rather than run 500×/s. */
@@ -2105,15 +2218,6 @@
     .lw-chevron{color:#8a8478;font-size:1rem;flex-shrink:0;line-height:1}
 
     /* Overlay + bottom sheet */
-    .lw-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:810;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-    .lw-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(14,14,10,.58);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border-top:1px solid rgba(180,172,158,.12);border-radius:16px 16px 0 0;z-index:811;padding:12px 16px calc(24px + env(safe-area-inset-bottom,0px));max-height:82dvh;overflow-y:auto;animation:lwSheetUp .26s cubic-bezier(.34,1.2,.64,1)}
-    @keyframes lwSheetUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
-    .lw-sheet-handle{width:36px;height:4px;background:rgba(180,172,158,.18);border-radius:2px;margin:0 auto 14px}
-    .lw-sheet-hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-    .lw-sheet-icon{font-size:1.25rem;flex-shrink:0}
-    .lw-sheet-title{font-family:'Cinzel',serif;font-size:.88rem;color:#d4cec4;letter-spacing:.04em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .lw-sheet-close-btn{background:transparent;border:none;color:#8a8478;font-size:.85rem;cursor:pointer;padding:4px 6px;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
-    .lw-sheet-close-btn:active{color:#d4cec4}
 
     /* Progress bar */
     .lw-prog-track{height:4px;background:rgba(45,42,36,.3);border-radius:2px;overflow:hidden;margin-bottom:6px}

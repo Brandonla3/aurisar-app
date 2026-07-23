@@ -3,6 +3,7 @@ import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
+import { diffColor, diffBg } from './difficulty';
 
 /**
  * My Workouts sub-tab (Favorites + Custom Exercises) — extracted from the
@@ -246,7 +247,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               const hasPB = !!(profile.exercisePBs || {})[ex.id];
               const isFav = (profile.favoriteExercises || []).includes(ex.id);
               const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
-              const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
+              const rowDiffColor = diffColor(diffLabel);
               return (
                 <div
                   key={ex.id}
@@ -321,8 +322,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                         fontSize: FS.fs58,
                         fontWeight: 700,
                         letterSpacing: ".05em",
-                        color: diffColor,
-                        background: diffLabel === "Advanced" ? "#2e1515" : diffLabel === "Beginner" ? "#1a2e1a" : "#2e2010"
+                        color: rowDiffColor,
+                        background: diffBg(diffLabel)
                       }}>{diffLabel}</span>
                     )}
                     <div style={{ display: "flex", gap: S.s6, alignItems: "center" }}>

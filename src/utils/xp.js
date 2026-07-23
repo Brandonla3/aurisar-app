@@ -132,16 +132,24 @@ function calcDayXP(day,classKey,exLookup) {
   return day.exercises.reduce((s,ex)=>s+calcExXP(ex.exId,ex.sets,ex.reps,classKey,exLookup),0);
 }
 
+// Projected XP for a single workout exercise entry. Mirrors the per-row loop
+// in useWorkoutCompletion.js (the award path) EXACTLY: the base row falls back
+// to sets:3/reps:10, each extra row scores independently on its own sets||3 /
+// reps||10 (a blank extra row is 3x10, NOT the base row's values), distance /
+// weight / HR are null in the projection, and any extra rows flip the cardio
+// interval bonus (1.25x) on for every row via extraCount. Single source of
+// truth for both calcWorkoutXP and the builder XP previews.
+function calcExEntryXP(ex,classKey,exLookup) {
+  const allRows=[{sets:ex.sets||3,reps:ex.reps||10,weightLbs:ex.weightLbs||null},...(ex.extraRows||[])];
+  const extraCount=(ex.extraRows||[]).length;
+  return allRows.reduce((s,row)=>s+calcExXP(ex.exId,row.sets||3,row.reps||10,classKey,exLookup,null,null,null,extraCount),0);
+}
+
 // Mirrors the per-row loop in useWorkoutCompletion.js so the projected XP
 // shown in the Complete Deed modal matches the XP actually awarded on log.
 function calcWorkoutXP(workout,classKey,exLookup) {
   if(!workout || !workout.exercises) return 0;
-  return workout.exercises.reduce((total,ex)=>{
-    const allRows=[{sets:ex.sets||3,reps:ex.reps||10,weightLbs:ex.weightLbs||null},...(ex.extraRows||[])];
-    const extraCount=(ex.extraRows||[]).length;
-    const exXp=allRows.reduce((s,row)=>s+calcExXP(ex.exId,row.sets||3,row.reps||10,classKey,exLookup,null,null,null,extraCount),0);
-    return total+exXp;
-  },0);
+  return workout.exercises.reduce((total,ex)=>total+calcExEntryXP(ex,classKey,exLookup),0);
 }
 
 // ── PERSONAL BEST CALCULATOR ─────────────────────────────────────
@@ -378,6 +386,7 @@ export {
   calcPlanXP,
   calcDayXP,
   calcWorkoutXP,
+  calcExEntryXP,
   calcExercisePBs,
   CLASS_FLAT,
   calcDecisionTreeBonus,

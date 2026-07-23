@@ -1,11 +1,11 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
-import { useModalLifecycle } from '../../utils/useModalLifecycle';
+import Sheet from '../../components/ui/Sheet';
 import { planEntry } from './planEntry';
+import { diffColor } from './difficulty';
 
 /**
  * Exercise detail bottom sheet.
@@ -31,16 +31,13 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
   siblings,
   profile,
   setProfile,
-  setActiveTab,
   setAddToWorkoutPicker,
   openSavePlanWizard,
-  setSelEx, setSets, setReps, setExWeight, setWeightPct,
-  setHrZone, setDistanceVal, setExHHMM, setExSec, setQuickRows,
+  openQuickLog,
   isInCart, toggleCart, stagedCount = 0,
   allExById,
 }) {
   const close = () => setLibDetailEx(null);
-  useModalLifecycle(ex != null, close);
 
   // "enter-left" / "enter-right" drive the one-shot page-turn animation.
   const [turn, setTurn] = useState(null);
@@ -123,55 +120,20 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
     >{label}</button>
   );
 
-  return createPortal(
-    <div
-      role="presentation"
-      // Dismiss only when the backdrop itself is hit, so the sheet no longer
-      // needs its own stopPropagation handler (which made the dialog a
-      // non-interactive element carrying a mouse listener).
-      onClick={e => { if (e.target === e.currentTarget) close(); }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.85)",
-        zIndex: 9400,
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        paddingBottom: "var(--bottom-nav-h)"
-      }}
+  return (
+    <Sheet
+      open
+      onClose={close}
+      layer={"detail"}
+      ariaLabel={ex.name}
+      tabIndex={-1}
+      sheetRef={sheetRef}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onAnimationEnd={() => setTurn(null)}
+      className={turn ? `sheet-${turn}` : ""}
     >
-      <div
-        ref={sheetRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ex.name}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        onAnimationEnd={() => setTurn(null)}
-        className={`sheet-slide-up ${turn ? `sheet-${turn}` : ""}`}
-        style={{
-          background: "linear-gradient(160deg,rgba(18,16,12,.92),rgba(12,12,10,.95))",
-          border: "1px solid rgba(180,172,158,.06)",
-          borderRadius: "16px 16px 0 0",
-          width: "100%",
-          maxWidth: 520,
-          maxHeight: "calc(90vh - var(--bottom-nav-h))",
-          overflowY: "auto",
-          padding: "20px 18px 32px",
-          // Focused programmatically on open; the ring would read as an error.
-          outline: "none"
-        }}
-      >
-        <div style={{
-          width: 36,
-          height: 4,
-          background: "rgba(45,42,36,.3)",
-          borderRadius: R.r2,
-          margin: "0 auto 16px"
-        }} />
-
+      <div>
         {/* Pager — only rendered when there is a list to page through. */}
         {(prev || next) && <div style={{
           display: "flex",
@@ -226,7 +188,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             {ex.difficulty && <span style={{
               fontSize: FS.md,
               fontWeight: 700,
-              color: ex.difficulty === "Advanced" ? "#7A2838" : ex.difficulty === "Beginner" ? "#5A8A58" : "#A8843C"
+              color: diffColor(ex.difficulty)
             }}>{"· " + ex.difficulty}</span>}
             <span style={{
               fontSize: FS.md,
@@ -380,19 +342,12 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           }}>{"📋 Add to Plan"}</button>
         </div>
 
+        {/* Opens the quick-log sheet in place — the log form is a root portal
+            with no tab dependency, so the user stays on whatever tab they
+            came from and "← Back" (origin-aware) returns to this sheet. */}
         <button onClick={() => {
-          setSelEx(ex.id);
-          setSets("");
-          setReps("");
-          setExWeight("");
-          setWeightPct(100);
-          setDistanceVal("");
-          setHrZone(null);
-          setExHHMM("");
-          setExSec("");
-          setQuickRows([]);
+          openQuickLog(ex.id, { origin: { type: "detail", ex } });
           close();
-          setActiveTab("workout");
         }} style={{
           width: "100%",
           marginTop: S.s8,
@@ -407,8 +362,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           textAlign: "center"
         }}>{"⚙ Configure"}</button>
       </div>
-    </div>,
-    document.body
+    </Sheet>
   );
 });
 

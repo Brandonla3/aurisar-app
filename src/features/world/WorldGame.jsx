@@ -34,8 +34,7 @@ import {
   QUEST_STATE, useQuestRows, myQuestsFrom, buildNpcMarkers, parseCounts,
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
-import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen } from './chatUtils.js';
-import { PROXIMITY_RADIUS }   from './game/constants.js';
+import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen, PROXIMITY_RADIUS } from './chatUtils.js';
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
 if (typeof window !== 'undefined' && !window.BABYLON) {

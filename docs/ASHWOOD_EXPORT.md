@@ -18,15 +18,21 @@ a ±1008 m streamed tile world.
 
 ## Artifacts
 
-All bake output lands in `export/` (gitignored — artifacts are derived, not
-committed). Regenerate at will; the canon seed guarantees identical output.
+All bake scripts default to the **live world** (`zone1_world.json`) and derive
+their output name/dir from it; pass `--config <path>` to bake another world
+(e.g. the `ashwood_world.json` dev world). Heightmaps and alternate-config
+tiles land in `export/<slug>/` (gitignored — derived, not committed); only the
+live zone1 tile bake writes the production `public/assets/tiles/`. Regenerate
+at will; the config seed guarantees identical output.
 
 ### 1. Terrain tiles → GLB (`npm run bake:tiles`)
 
 ```
-node scripts/bake_ashwood_tiles.mjs                  # 20 tiles touching the world disc
+node scripts/bake_ashwood_tiles.mjs                  # live zone1 → public/assets/tiles
 node scripts/bake_ashwood_tiles.mjs --tiles T_03_03  # specific tiles
 node scripts/bake_ashwood_tiles.mjs --all            # full 8×8 grid
+node scripts/bake_ashwood_tiles.mjs --config src/features/world/config/ashwood_world.json
+                                                     # dev world → export/ashwood/tiles
 ```
 
 - Runs the **same `AshwoodTileProvider` the client streams from** under a
@@ -48,8 +54,9 @@ node scripts/bake_ashwood_tiles.mjs --all            # full 8×8 grid
 ### 2. Heightmap → 16-bit PNG (`npm run bake:heightmap`)
 
 ```
-node scripts/bake_ashwood_heightmap.mjs              # 2017×2017, 1 m/px, ±1008 m
+node scripts/bake_ashwood_heightmap.mjs              # live zone1 → export/zone1/zone1_heightmap_2017.png
 node scripts/bake_ashwood_heightmap.mjs --size 1009  # quick preview
+node scripts/bake_ashwood_heightmap.mjs --config src/features/world/config/ashwood_world.json
 ```
 
 - 16-bit grayscale PNG (UE-recommended 2017 resolution), north up,

@@ -22,6 +22,11 @@ export function shouldFlagUnseen(row, myIdHex, chatOpen) {
   return idHex(row.senderId) !== myIdHex;
 }
 
+// Proximity-chat radius in SpacetimeDB px (chat_message x/y are server px).
+// 400 px = 12.5 m at 32 px/m — the range a 'proximity' message carries.
+// (Relocated here from the removed dead-Phaser game/constants.js.)
+export const PROXIMITY_RADIUS = 400;
+
 /**
  * Should this message be shown to a player standing at myPos?
  * - 'world' and 'emote' messages are always visible.
