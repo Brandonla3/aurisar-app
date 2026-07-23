@@ -588,7 +588,7 @@ const WorkoutsTab = memo(function WorkoutsTab({
   setCompletionDate,
   setCompletionAction,
   setConfirmDelete,
-  setSelEx,
+  openQuickLog,
   setPendingSoloRemoveId,
   quickLogSoloEx,
   openScheduleEx,
@@ -1233,7 +1233,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
                   padding: "4px 6px"
                 }} onClick={e => {
                   e.stopPropagation();
-                  setSelEx(sw.exId);
+                  openQuickLog(sw.exId);
                   setPendingSoloRemoveId(sw.id);
                 }}>{"✎"}</button><button className={"btn btn-ghost btn-sm"} style={{
                   color: UI_COLORS.danger

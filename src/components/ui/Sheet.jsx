@@ -45,6 +45,8 @@ export default function Sheet({
   navOffset = true,           // keep the sheet above the bottom tab bar
   scroll = 'body',            // "body" | "none"
   ariaLabel,
+  style,                      // merged onto the sheet (e.g. a --mg-color skin var)
+  tabIndex,                   // for sheets that take programmatic focus
   sheetRef,                   // passthroughs for swipe pagers etc.
   onTouchStart,
   onTouchMove,
@@ -67,6 +69,7 @@ export default function Sheet({
   if (onTouchMove) passthrough.onTouchMove = onTouchMove;
   if (onTouchEnd) passthrough.onTouchEnd = onTouchEnd;
   if (onAnimationEnd) passthrough.onAnimationEnd = onAnimationEnd;
+  if (tabIndex != null) passthrough.tabIndex = tabIndex;
 
   return createPortal(
     <div
@@ -81,7 +84,7 @@ export default function Sheet({
         aria-label={ariaLabel || title || undefined}
         ref={sheetRef}
         className={`ui-sheet ${isBottom ? 'ui-sheet--bottom sheet-slide-up' : 'ui-sheet--center ui-sheet-pop'}${tall ? ' ui-sheet--tall' : ''} ${className}`}
-        style={{ maxWidth }}
+        style={{ maxWidth, ...style }}
         {...passthrough}
       >
         {isBottom && showHandle && <div className={'ui-sheet-handle'} aria-hidden={'true'} />}

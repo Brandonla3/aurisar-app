@@ -47,6 +47,8 @@ import StagingTray from './components/StagingTray';
 import { useExerciseCart, cartEntry } from './hooks/useExerciseCart';
 import { planEntry } from './features/exercises/planEntry';
 import QuickLogModal from './features/exercises/QuickLogModal';
+import ErrorBoundary from './components/ErrorBoundary';
+import ConfirmSheet from './components/ui/ConfirmSheet';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -526,6 +528,28 @@ function App() {
   const [exHHMM, setExHHMM] = useState(""); // HH:MM portion of duration
   const [exSec, setExSec] = useState(""); // 0-59 seconds portion
   const [quickRows, setQuickRows] = useState([]); // extra set rows [{sets,reps,weightLbs}]
+  // Where the quick-log sheet was opened from: null | {type:"detail", ex}.
+  // Drives its contextual "← Back" (only a detail-sheet origin gets one).
+  const [quickLogOrigin, setQuickLogOrigin] = useState(null);
+  // The one opener for the quick-log sheet. Resets the form (unless the
+  // caller is returning to fields the user already typed — preserve:true),
+  // records the origin, and never touches the active tab: the sheet is a
+  // root portal, so logging works from Library, Workouts and Plans alike.
+  const openQuickLog = useCallback((exId, { origin = null, preserve = false } = {}) => {
+    if (!preserve) {
+      setSets("");
+      setReps("");
+      setExWeight("");
+      setWeightPct(100);
+      setHrZone(null);
+      setDistanceVal("");
+      setExHHMM("");
+      setExSec("");
+      setQuickRows([]);
+    }
+    setQuickLogOrigin(origin);
+    setSelEx(exId);
+  }, []);
   const [exSubTab, setExSubTab] = useState("library"); // "library" | "myworkouts"
   const [favSelectMode, setFavSelectMode] = useState(false);
   const [libSearch, setLibSearch] = useState("");
@@ -5595,7 +5619,7 @@ function App() {
             setCompletionDate={setCompletionDate}
             setCompletionAction={setCompletionAction}
             setConfirmDelete={setConfirmDelete}
-            setSelEx={setSelEx}
+            openQuickLog={openQuickLog}
             setPendingSoloRemoveId={setPendingSoloRemoveId}
             quickLogSoloEx={quickLogSoloEx}
             openScheduleEx={openScheduleEx}
@@ -5854,6 +5878,18 @@ function App() {
       }</div>
 
     /* ══ EXERCISE EDITOR MODAL ══════════════════ */}{exEditorOpen && exEditorDraft && (
+      <ErrorBoundary fallback={(error, reset) => (
+        <ConfirmSheet
+          open
+          icon={"⚠️"}
+          title={"Exercise editor hit an error"}
+          body={String(error?.message || error)}
+          confirmLabel={"Close"}
+          cancelLabel={"Try again"}
+          onConfirm={() => { reset(); setExEditorOpen(false); }}
+          onCancel={reset}
+        />
+      )}>
       <ExerciseEditorModal
         exEditorDraft={exEditorDraft}
         setExEditorDraft={setExEditorDraft}
@@ -5867,6 +5903,7 @@ function App() {
         deleteCustomEx={deleteCustomEx}
         newExDraft={newExDraft}
       />
+      </ErrorBoundary>
     )
 
     /* ══ STAGING TRAY ═══════════════════════════ */}{(
@@ -5923,19 +5960,9 @@ function App() {
         siblings={activeTab === "workout" && exSubTab === "library" ? libFiltered : null}
         profile={profile}
         setProfile={setProfile}
-        setActiveTab={setActiveTab}
         setAddToWorkoutPicker={setAddToWorkoutPicker}
         openSavePlanWizard={openSavePlanWizard}
-        setSelEx={setSelEx}
-        setSets={setSets}
-        setReps={setReps}
-        setExWeight={setExWeight}
-        setWeightPct={setWeightPct}
-        setHrZone={setHrZone}
-        setDistanceVal={setDistanceVal}
-        setExHHMM={setExHHMM}
-        setExSec={setExSec}
-        setQuickRows={setQuickRows}
+        openQuickLog={openQuickLog}
         allExById={allExById}
         isInCart={isInCart}
         toggleCart={toggleCart}
@@ -6262,9 +6289,23 @@ function App() {
     /* ══ WORKOUT COMPLETION MODAL ════════════════ */
     /* ══ ONE-OFF NAMING MODAL ════════════════════ */
     /* ══ SINGLE EXERCISE QUICK-LOG MODAL ════════ */}{selEx && (
+      <ErrorBoundary fallback={(error, reset) => (
+        <ConfirmSheet
+          open
+          icon={"⚠️"}
+          title={"Quick Log hit an error"}
+          body={String(error?.message || error)}
+          confirmLabel={"Close"}
+          cancelLabel={"Try again"}
+          onConfirm={() => { reset(); setSelEx(null); }}
+          onCancel={reset}
+        />
+      )}>
       <QuickLogModal
         selEx={selEx}
         setSelEx={setSelEx}
+        quickLogOrigin={quickLogOrigin}
+        setQuickLogOrigin={setQuickLogOrigin}
         allExById={allExById}
         profile={profile}
         sets={sets} setSets={setSets}
@@ -6285,6 +6326,7 @@ function App() {
         setAddToWorkoutPicker={setAddToWorkoutPicker}
         openSavePlanWizard={openSavePlanWizard}
       />
+      </ErrorBoundary>
     )}
 
     {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)} style={{ alignItems: "center" }}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
@@ -6331,7 +6373,9 @@ function App() {
                 }} onClick={() => {
                   setStatsPromptModal(null);
                   if (statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId) {
-                    setSelEx(statsPromptModal.wo._soloExId);
+                    // Return to the form the user was mid-way through —
+                    // preserve their typed values rather than resetting.
+                    openQuickLog(statsPromptModal.wo._soloExId, { preserve: true });
                   } else if (!statsPromptModal.wo.soloEx) {
                     setWorkoutView("builder");
                     setActiveTab("workouts");

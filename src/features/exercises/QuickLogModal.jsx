@@ -3,9 +3,8 @@ import { UI_COLORS, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/c
 import { calcExXP, hrRange } from '../../utils/xp';
 import { isMetric, kgToLbs, lbsToKg, kmToMi, miToKm, weightLabel, distLabel, pctToSlider, sliderToPct } from '../../utils/units';
 import { normalizeHHMM, combineHHMMSec } from '../../utils/time';
-import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
-import { useModalLifecycle } from '../../utils/useModalLifecycle';
+import Sheet from '../../components/ui/Sheet';
 import { entryTime } from './logEntryTime';
 import { planEntry } from './planEntry';
 
@@ -46,6 +45,11 @@ const QuickLogModal = memo(function QuickLogModal({
   quickRows, setQuickRows,
   weightPct, setWeightPct,
   setPendingSoloRemoveId,
+  // Where the sheet was opened from. {type:"detail", ex} adds a "← Back"
+  // that returns to the detail sheet; any other origin gets no Back button,
+  // so dismissal is exactly X / backdrop / Escape.
+  quickLogOrigin,
+  setQuickLogOrigin,
   // Action callbacks
   logExercise,
   openExEditor,
@@ -91,10 +95,6 @@ const QuickLogModal = memo(function QuickLogModal({
   // regression, and sets/reps/weight are coupled anyway, so a single quality
   // number is the only comparison that agrees with what the app rewards.
   const [beat, setBeat] = useState(null); // null | "ghost" | "pb"
-
-  // Dialog semantics: Escape to dismiss, background inert, focus restored.
-  // The detail sheet got this when it was portaled; this sheet never had it.
-  useModalLifecycle(ex != null, () => setSelEx(null));
 
   if (!ex) return null;
 
@@ -232,35 +232,29 @@ const QuickLogModal = memo(function QuickLogModal({
     setExSec("");
     setQuickRows([]);
     setPendingSoloRemoveId(null);
+    if (setQuickLogOrigin) setQuickLogOrigin(null);
   };
 
-  try {
-    return (
-      <div
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.78)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-        onClick={dismiss}
-      >
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={ex.name}
-          className={"sheet-slide-up"}
-          style={{ width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto", background: "linear-gradient(160deg,#0c0c0a,#0c0c0a)", border: "1px solid rgba(180,172,158,.06)", borderRadius: "18px 18px 0 0", padding: "0 0 24px" }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 4px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: S.s8 }}>
-              <button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75 }} onClick={() => {
-                dismiss();
-                setLibDetailEx(ex);
-              }}>{"← Back"}</button>
-              <div style={{ fontSize: FS.fs95, color: "#d4cec4", fontFamily: "'Inter',sans-serif", fontWeight: 600 }}>{ex.icon}{" "}{ex.name}</div>
-            </div>
-            <button className={"btn btn-ghost btn-sm"} aria-label={"Close"} onClick={dismiss}>{"✕"}</button>
-          </div>
+  const fromDetail = quickLogOrigin && quickLogOrigin.type === "detail";
+  const backToDetail = () => {
+    const origin = quickLogOrigin.ex;
+    dismiss();
+    setLibDetailEx(origin);
+  };
 
-          <div style={{ padding: "0 14px" }}>
+  return (
+    <Sheet
+      open
+      onClose={dismiss}
+      layer={"modal"}
+      tall
+      title={`${ex.icon || ""} ${ex.name}`.trim()}
+      ariaLabel={ex.name}
+      headerLeft={fromDetail ? (
+        <button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={backToDetail}>{"← Back"}</button>
+      ) : null}
+    >
+      <div>
             <div className={"log-form"}>
               {/* Rest day */}
               {ex.id === "rest_day" && (
@@ -427,10 +421,10 @@ const QuickLogModal = memo(function QuickLogModal({
                       const range = hrRange(age, z);
                       const sel = hrZone === z.z;
                       return (
-                        <div key={z.z} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{ "--zc": z.color, borderColor: sel ? z.color : "rgba(45,42,36,.2)", background: sel ? `${z.color}22` : "rgba(45,42,36,.12)" }} onClick={() => setHrZone(sel ? null : z.z)}>
+                        <button type={"button"} key={z.z} aria-pressed={sel} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{ "--zc": z.color, borderColor: sel ? z.color : "rgba(45,42,36,.2)", background: sel ? `${z.color}22` : "rgba(45,42,36,.12)" }} onClick={() => setHrZone(sel ? null : z.z)}>
                           <span className={"hz-name"} style={{ color: sel ? z.color : "#8a8478" }}>{"Z"}{z.z}{" "}{z.name}</span>
                           <span className={"hz-bpm"} style={{ color: sel ? z.color : "#8a8478" }}>{range.lo}{"–"}{range.hi}</span>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -498,14 +492,9 @@ const QuickLogModal = memo(function QuickLogModal({
                 }}>{"📋 Add to Plan"}</button>
               </div>
             </div>
-          </div>
-        </div>
       </div>
-    );
-  } catch (e) {
-    console.error("Quick-log render error:", e);
-    return null;
-  }
+    </Sheet>
+  );
 });
 
 export default QuickLogModal;

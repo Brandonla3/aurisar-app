@@ -353,7 +353,7 @@
     .intensity-val{font-family:'Inter',sans-serif;font-size:.88rem;color:#b4ac9e;min-width:40px;text-align:right}
     /* HR ZONES */
     .hr-zone-row{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
-    .hr-zone-btn{flex:1;min-width:52px;padding:6px 4px;border-radius:7px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .2s;text-align:center}
+    .hr-zone-btn{flex:1;min-width:52px;min-height:44px;padding:6px 4px;border-radius:7px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .2s;text-align:center;font-family:inherit;color:inherit}
     .hr-zone-btn.sel{border-width:1.5px;box-shadow:0 0 10px var(--zc,#b4ac9e)}
     .hz-name{font-family:'Inter',sans-serif;font-size:.47rem;letter-spacing:.04em;display:block;margin-bottom:1px}
     .hz-bpm{font-size:.58rem;display:block;opacity:.7}
@@ -437,6 +437,7 @@
     .ui-sheet--bottom{border-radius:16px 16px 0 0;border-bottom:none;max-height:85dvh;padding:10px 16px calc(16px + env(safe-area-inset-bottom,0px))}
     .ui-sheet--center{border-radius:16px;max-height:85dvh;padding:20px;box-shadow:0 0 60px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.7)}
     .ui-sheet--tall{max-height:92dvh}
+    .ui-sheet:focus{outline:none}
     @keyframes ui-sheet-pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
     .ui-sheet-pop{animation:ui-sheet-pop var(--dur-sheet) var(--ease-out) both}
     .ui-sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(180,172,158,.22);margin:0 auto 8px;flex-shrink:0}
@@ -1265,26 +1266,21 @@
     .icon-opt.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.28);box-shadow:0 0 8px rgba(180,172,158,.08)}
 
     /* ── Exercise Editor Modal — themed by muscle group --mg-color ── */
-    .ex-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:var(--z-editor);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    /* Muscle-tint skin applied on top of the Sheet primitive — geometry
+       (radius, padding, scrolling, backdrop) is owned by .ui-sheet; this
+       class only recolors the surface per the selected muscle group. */
     .ex-editor-sheet{
       --mg-color:#B0A090;
       position:relative;
       background:
         radial-gradient(ellipse 70% 40% at 50% 0%, color-mix(in srgb,var(--mg-color) 14%,transparent), transparent 70%),
         linear-gradient(160deg,rgba(18,16,12,.96),rgba(12,12,10,.98));
-      border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.07));
-      border-bottom:none;
-      border-radius:18px 18px 0 0;
-      padding:0;width:100%;max-width:520px;
-      max-height:calc(92vh - var(--bottom-nav-h));overflow-y:auto;
-      box-shadow:0 -8px 40px rgba(0,0,0,.7),0 -2px 30px color-mix(in srgb,var(--mg-color) 10%,transparent);
-      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)
+      border-color:color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.07));
+      box-shadow:0 -8px 40px rgba(0,0,0,.7),0 -2px 30px color-mix(in srgb,var(--mg-color) 10%,transparent)
     }
     .ex-editor-sheet::before{content:'';position:absolute;top:0;left:18%;right:18%;height:1.5px;background:linear-gradient(90deg,transparent,var(--mg-color),transparent);opacity:.45;border-radius:2px}
-    .ex-editor-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 4px;position:relative}
-    .ex-editor-title{font-family:'Cinzel',serif;font-size:.92rem;color:#e8e0d0;letter-spacing:.05em;text-shadow:0 1px 8px color-mix(in srgb,var(--mg-color) 20%,transparent)}
-    .ex-editor-subtitle{font-size:.62rem;color:#8a8478;margin-top:4px;font-style:italic;font-family:'Inter',sans-serif;letter-spacing:.01em}
-    .ex-editor-body{padding:12px 16px 18px;display:flex;flex-direction:column;gap:13px}
+    .ex-editor-subtitle{font-size:.62rem;color:#8a8478;margin-top:-6px;font-style:italic;font-family:'Inter',sans-serif;letter-spacing:.01em}
+    .ex-editor-body{padding:4px 0 6px;display:flex;flex-direction:column;gap:13px}
     .ex-editor-section{
       background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 6%,rgba(45,42,36,.22)),color-mix(in srgb,var(--mg-color) 2%,rgba(32,30,26,.12)));
       border:1px solid color-mix(in srgb,var(--mg-color) 12%,rgba(180,172,158,.05));
