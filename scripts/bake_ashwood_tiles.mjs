@@ -39,7 +39,11 @@ function argValue(name) {
 // Which world to bake. Defaults to the LIVE world (zone1_world.json); pass
 // --config <path> (repo-root-relative) to bake a different one, e.g. the
 // ashwood_world.json dev world for regression exports.
-const configPath = argValue('--config') ?? 'src/features/world/config/zone1_world.json';
+const LIVE_CONFIG = 'src/features/world/config/zone1_world.json';
+const configPath = argValue('--config') ?? LIVE_CONFIG;
+// Non-live configs must NOT overwrite the live zone1 production tiles in
+// public/assets/tiles — route them to a config-specific export dir instead.
+const slug = configPath.split('/').pop().replace(/(_world)?\.json$/, '');
 
 const worldBuildConfig = JSON.parse(
   readFileSync(join(root, 'src/features/world/config/world_build_config.json'), 'utf8'));
@@ -50,7 +54,10 @@ const { AshwoodTileProvider } = await import('../src/features/world/streaming/as
 const { streamingParams, formatTileId, tileBounds } =
   await import('../src/features/world/streaming/tileMath.js');
 
-const outDir = argValue('--out') ?? join(root, 'public/assets/tiles');
+const outDir = argValue('--out')
+  ?? (configPath === LIVE_CONFIG
+    ? join(root, 'public/assets/tiles')
+    : join(root, 'export', slug, 'tiles'));
 const params = streamingParams(worldBuildConfig);
 
 function discTiles() {
