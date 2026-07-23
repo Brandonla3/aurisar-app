@@ -575,7 +575,16 @@ void main() {
   vec3 n = normalize(vN + vec3(detail.x, 0.0, detail.z) * 0.5);
   vec3 V = normalize(cameraPosition - vWp);
   float fres = pow(1.0 - max(dot(V, n), 0.0), 3.0);
-  vec3 col = mix(deep, shallow, clamp(0.4 + 0.35 * (n.x + n.z), 0.0, 1.0));
+  // Beer-Lambert body colour driven by the baked vShore depth proxy (0 deep
+  // -> 1 at the shore/bank; see _applyShore) instead of wave slope, so the
+  // water actually darkens with real depth toward the lake centre rather than
+  // just shimmering one flat tint. This is a VERTICAL-DEPTH absorption
+  // (terrain-height-derived), not a reconstructed view-path/scene-thickness
+  // estimate. col is the transmitted colour; the Fresnel mix below then blends
+  // it toward the sky/mirror reflection, keeping transmitted -> reflected
+  // energy order intact.
+  float depthT = 1.0 - clamp(vShore, 0.0, 1.0);
+  vec3 col = mix(shallow, deep, 1.0 - exp(-depthT * 3.0));
   vec3 skyRefl = skyCol;
 #ifdef REFLECT
   // Planar reflection: project the fragment to screen space, nudge by the
