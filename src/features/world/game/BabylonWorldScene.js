@@ -740,15 +740,9 @@ class LightingManager {
     light.setEnabled(this.profile === 'dungeon');
 
     const phase = Math.random() * Math.PI * 2;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      if (!light.isEnabled()) return;
-      const t = performance.now() * 0.001;
-      const noise =
-        Math.sin(t * flickerSpeed         + phase)       * 0.6 +
-        Math.sin(t * flickerSpeed * 2.37  + phase * 1.7) * 0.4;
-      light.intensity = intensity * (1 + noise * flickerAmount);
+    this._registerFlickerLight(light, {
+      light, kind: 'torch', intensity, speed: flickerSpeed, amount: flickerAmount, phase,
     });
-    light.onDisposeObservable.add(() => this.scene.onBeforeRenderObservable.remove(obs));
 
     return light;
   }
@@ -768,14 +762,43 @@ class LightingManager {
     light.setEnabled(this.profile === 'dungeon');
 
     const phase = Math.random() * Math.PI * 2;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      if (!light.isEnabled()) return;
-      const t = performance.now() * 0.001;
-      light.intensity = intensity * (1 + Math.sin(t * pulseSpeed + phase) * pulseAmount);
+    this._registerFlickerLight(light, {
+      light, kind: 'accent', intensity, speed: pulseSpeed, amount: pulseAmount, phase,
     });
-    light.onDisposeObservable.add(() => this.scene.onBeforeRenderObservable.remove(obs));
 
     return light;
+  }
+
+  // Register a dungeon light with the shared flicker observer (created lazily on
+  // first use). One onBeforeRender loops all torches + accents rather than each
+  // light adding its own; the per-light phase/speed/amount keep every flame
+  // independent, and the flicker maths is unchanged. Cleans its own entry on
+  // dispose.
+  _registerFlickerLight(light, entry) {
+    this._flickerLights.push(entry);
+    if (!this._flickerObserver) {
+      this._flickerObserver = this.scene.onBeforeRenderObservable.add(() => {
+        const arr = this._flickerLights;
+        if (!arr.length) return;
+        const t = performance.now() * 0.001;
+        for (let i = 0; i < arr.length; i++) {
+          const f = arr[i];
+          if (!f.light.isEnabled()) continue;
+          if (f.kind === 'torch') {
+            const noise =
+              Math.sin(t * f.speed        + f.phase)       * 0.6 +
+              Math.sin(t * f.speed * 2.37 + f.phase * 1.7) * 0.4;
+            f.light.intensity = f.intensity * (1 + noise * f.amount);
+          } else { // 'accent' — single-sine pulse
+            f.light.intensity = f.intensity * (1 + Math.sin(t * f.speed + f.phase) * f.amount);
+          }
+        }
+      });
+    }
+    light.onDisposeObservable.add(() => {
+      const i = this._flickerLights.indexOf(entry);
+      if (i >= 0) this._flickerLights.splice(i, 1);
+    });
   }
 
   // ── Utils ─────────────────────────────────────────────────────────────────
@@ -862,6 +885,10 @@ export class BabylonWorldScene {
     // engine.dispose() at teardown. See _stdMat / _buildMobHpBar / _removeMob.
     this._mobMats       = new Map(); // material name -> shared StandardMaterial
     this._hpBarMats     = null;      // { bg, fill } — shared across all mob HP bars
+    // Dungeon torch/magic-accent flicker: ONE shared observer loops this list
+    // instead of one observer per light (up to 12 torches + 10 accents).
+    this._flickerLights = [];        // { light, kind, intensity, speed, amount, phase }
+    this._flickerObserver = null;
     this._lastCampfireBuildAt = 0;
     this._lastAttackAt  = 0;          // ms timestamp; throttles spacebar
     this._localDungeonInstanceId = 0n;
