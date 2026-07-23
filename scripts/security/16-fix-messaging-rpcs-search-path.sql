@@ -17,6 +17,19 @@
 -- unqualified, so with search_path='' every send_message() insert raised
 -- "relation channels does not exist" — i.e. sending was broken even once
 -- the RPCs themselves were fixed. It is repinned here too.
+--
+-- Alongside the repin this script also hardens the messaging RPCs:
+--   * send_message coerces message_type to the client allowlist ('text') so a
+--     member cannot spoof 'system'/'event' rows, and validates p_reply_to.
+--   * get_channel_messages clamps p_limit to [1,100].
+--   * get_or_create_dm_channel takes a per-pair advisory lock to prevent
+--     duplicate DM channels under concurrent opens.
+--
+-- DEPLOYMENT: scripts/security/*.sql are applied MANUALLY, in numbered order,
+-- to each environment (there is no automated migration runner, and the Supabase
+-- branching integration ignores this repo because there is no supabase/ dir).
+-- A fresh or preview environment must apply the full 01…16 sequence — the
+-- frontend improvements alone cannot fix empty-search_path RPCs.
 
 BEGIN;
 
@@ -46,6 +59,13 @@ DECLARE
 BEGIN
   IF me IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
   IF me = p_other_user_id THEN RAISE EXCEPTION 'Cannot DM yourself'; END IF;
+
+  -- Serialize concurrent DM creation for this unordered pair so two
+  -- simultaneous opens can't both pass the check-then-insert below and create
+  -- duplicate DM channels. The lock is keyed on the sorted (me, other) pair and
+  -- released at transaction end.
+  PERFORM pg_advisory_xact_lock(hashtextextended(
+    least(me::text, p_other_user_id::text) || '|' || greatest(me::text, p_other_user_id::text), 0));
 
   -- Check if DM channel already exists between these two users
   SELECT cm1.channel_id INTO existing_channel
@@ -168,6 +188,9 @@ DECLARE
 BEGIN
   IF me IS NULL THEN RETURN '[]'::jsonb; END IF;
 
+  -- Clamp the page size so a client can't request an unbounded window.
+  p_limit := least(greatest(coalesce(p_limit, 50), 1), 100);
+
   -- Verify membership
   IF NOT EXISTS (SELECT 1 FROM channel_members WHERE channel_id = p_channel_id AND user_id = me) THEN
     RETURN '[]'::jsonb;
@@ -224,6 +247,10 @@ AS $$
 DECLARE
   me UUID := auth.uid();
   new_msg_id UUID;
+  -- Only 'text' is client-sendable. 'system'/'event' render as centered system
+  -- copy in the UI, so accepting an arbitrary p_message_type here would let any
+  -- member spoof system messages — coerce anything else to 'text'.
+  v_type TEXT := CASE WHEN p_message_type IN ('text') THEN p_message_type ELSE 'text' END;
 BEGIN
   IF me IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
   IF p_content IS NULL OR trim(p_content) = '' THEN RAISE EXCEPTION 'Message cannot be empty'; END IF;
@@ -233,8 +260,15 @@ BEGIN
     RAISE EXCEPTION 'Not a member of this channel';
   END IF;
 
+  -- A reply target must be a live message in the same channel.
+  IF p_reply_to IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM messages WHERE id = p_reply_to AND channel_id = p_channel_id AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Reply target is not in this channel';
+  END IF;
+
   INSERT INTO messages (channel_id, sender_id, message_type, content, metadata, reply_to)
-  VALUES (p_channel_id, me, p_message_type, trim(p_content), p_metadata, p_reply_to)
+  VALUES (p_channel_id, me, v_type, trim(p_content), p_metadata, p_reply_to)
   RETURNING id INTO new_msg_id;
 
   -- Update sender's last_read to now
