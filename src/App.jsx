@@ -8,7 +8,7 @@ import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/
 import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './utils/storage';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
-import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, getMuscleColor, getTypeColor, hrRange, scaleWeight, scaleDur } from './utils/xp';
+import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
 import { formatXP } from './utils/format';
 import { FS, R, S } from './utils/tokens';
@@ -609,11 +609,11 @@ function App() {
       [i]: !s[i]
     }));
   }
-  const [pickerMuscle, setPickerMuscle] = useState("All");
+  // Multi-select Sets, matching the library tab's filter model.
+  const [pickerMuscle, setPickerMuscle] = useState(() => new Set());
   const [pickerSearch, setPickerSearch] = useState("");
-  const [pickerMuscleOpen, setPickerMuscleOpen] = useState(false);
-  const [pickerTypeFilter, setPickerTypeFilter] = useState("all");
-  const [pickerEquipFilter, setPickerEquipFilter] = useState("all");
+  const [pickerTypeFilter, setPickerTypeFilter] = useState(() => new Set());
+  const [pickerEquipFilter, setPickerEquipFilter] = useState(() => new Set());
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null); // "muscle"|"type"|"equip"|null
   const [pickerSelected, setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
   // Quests
@@ -731,7 +731,7 @@ function App() {
   useModalLifecycle(savePlanWizard != null, () => setSavePlanWizard(null));
   useModalLifecycle(schedulePicker != null, () => setSchedulePicker(null));
   useModalLifecycle(saveWorkoutWizard != null, () => setSaveWorkoutWizard(null));
-  useModalLifecycle(!!wbExPickerOpen, () => setWbExPickerOpen(false));
+  useModalLifecycle(!!wbExPickerOpen, () => closePicker());
   useModalLifecycle(addToPlanPicker != null, () => setAddToPlanPicker(null));
   useModalLifecycle(!!retroCheckInModal, () => setRetroCheckInModal(false));
   useModalLifecycle(statsPromptModal != null, () => setStatsPromptModal(null));
@@ -3871,10 +3871,9 @@ function App() {
   function closePicker() {
     setWbExPickerOpen(false);
     setPickerSearch("");
-    setPickerMuscle("All");
-    setPickerMuscleOpen(false);
-    setPickerTypeFilter("all");
-    setPickerEquipFilter("all");
+    setPickerMuscle(new Set());
+    setPickerTypeFilter(new Set());
+    setPickerEquipFilter(new Set());
     setPickerOpenDrop(null);
     setPickerSelected([]);
   }
@@ -5500,7 +5499,6 @@ function App() {
               isInCart={isInCart}
               toggleCart={toggleCart}
               setFavSelectMode={setFavSelectMode}
-              setExSubTab={setExSubTab}
               setLibDetailEx={setLibDetailEx}
               openExEditor={openExEditor}
               deleteCustomEx={deleteCustomEx}

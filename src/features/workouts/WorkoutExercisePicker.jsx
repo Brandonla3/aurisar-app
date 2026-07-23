@@ -1,11 +1,15 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
-import { TYPE_OPTS as PTYPE_OPTS, TYPE_LABELS as PTYPE_LABELS, MUSCLE_OPTS as PMUSCLE_OPTS, EQUIP_OPTS as PEQUIP_OPTS, muscleLabel } from '../exercises/exerciseFilterOptions';
+import ExerciseRow from '../exercises/ExerciseRow';
+import FilterDropdown from '../exercises/FilterDropdown';
+import {
+  TYPE_OPTS, TYPE_LABELS, MUSCLE_OPTS, EQUIP_OPTS, muscleLabel, equipLabel,
+} from '../exercises/exerciseFilterOptions';
 
 /**
  * Workout exercise picker modal — extracted from the inline block in App.jsx
@@ -17,44 +21,46 @@ import { TYPE_OPTS as PTYPE_OPTS, TYPE_LABELS as PTYPE_LABELS, MUSCLE_OPTS as PM
  * Uses createPortal to render into document.body.
  */
 
-// ── Row component for the virtualized exercise list ──────────────────────────
-// Moved from module scope of App.jsx.
+// Row adapter for the virtualised list. The row itself is the shared
+// ExerciseRow — this only maps react-window's props onto it. The picker used
+// to carry its own hand-written copy that had already drifted from the
+// library's.
 const WbExPickerRow = React.memo(function WbExPickerRow({
-  ariaAttributes,
-  index,
-  style,
-  exercises,
-  selIds,
-  onToggle
+  ariaAttributes, index, style, exercises, selIds, onToggle
 }) {
   const ex = exercises[index];
   if (!ex) return null;
-  const sel = selIds.has(ex.id);
-  const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
-  const diffColor = diffLabel === "Advanced" ? "#7A2838" : diffLabel === "Beginner" ? "#5A8A58" : "#A8843C";
-  const diffBg = diffLabel === "Advanced" ? "#2e1515" : diffLabel === "Beginner" ? "#1a2e1a" : "#2e2010";
-  const exMgColor = getMuscleColor(ex.muscleGroup);
   return (
     <div style={{ ...style, paddingTop: 4, paddingBottom: 4 }} {...ariaAttributes}>
-      <div className={"picker-ex-row" + (sel ? " sel" : "")} onClick={() => onToggle(ex.id)} style={{ "--mg-color": exMgColor }}>
-        <div className="picker-ex-orb"><ExIcon ex={ex} size=".95rem" color="#d4cec4" /></div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: FS.fs80, fontWeight: 600, color: "#d4cec4", marginBottom: S.s2 }}>
-            {ex.name}{ex.custom && <span className="custom-ex-badge" style={{ marginLeft: S.s4 }}>custom</span>}
-          </div>
-          <div style={{ fontSize: FS.sm, fontStyle: "italic" }}>
-            {ex.category && <span style={{ color: getTypeColor(ex.category) }}>{ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</span>}
-            {ex.category && ex.muscleGroup && <span style={{ color: "#8a8478" }}>{" · "}</span>}
-            {ex.muscleGroup && <span style={{ color: getMuscleColor(ex.muscleGroup) }}>{ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}</span>}
-          </div>
-        </div>
-        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: S.s4 }}>
-          <span style={{ fontSize: FS.fs63, fontWeight: 700, color: "#b4ac9e" }}>{ex.baseXP + " XP"}</span>
-          <span style={{ fontSize: FS.fs56, fontWeight: 700, color: diffColor, background: diffBg, padding: "2px 6px", borderRadius: R.r3, letterSpacing: ".04em" }}>{diffLabel}</span>
-        </div>
-      </div>
+      <ExerciseRow
+        ex={ex}
+        selected={selIds.has(ex.id)}
+        selectable
+        showCustomBadge
+        onActivate={() => onToggle(ex.id)}
+      />
     </div>
   );
+});
+
+// Same OR-within-a-facet, AND-across-facets rule the library list applies, so
+// "filtered by chest" means the same thing on both surfaces.
+function matchesFacets(e, mF, tF, eF) {
+  if (e.id === "rest_day") return false;
+  if (mF.size && !mF.has((e.muscleGroup || "").toLowerCase().trim())) return false;
+  if (tF.size) {
+    const ty = (e.exerciseType || "").toLowerCase();
+    const ca = (e.category || "").toLowerCase();
+    if (![...tF].some(t => ty.includes(t) || ca === t)) return false;
+  }
+  if (eF.size && !eF.has((e.equipment || "bodyweight").toLowerCase().trim())) return false;
+  return true;
+}
+
+const toggleFilter = (setter, val) => setter(s => {
+  const n = new Set(s);
+  n.has(val) ? n.delete(val) : n.add(val);
+  return n;
 });
 
 const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
@@ -68,7 +74,6 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
   pickerSelected,
   // Exercise data
   allExercises,
-  allExById,
   // Action callbacks
   closePicker,
   openExEditor,
@@ -76,6 +81,33 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
   commitPickerToWorkout,
 }) {
   const closeDrops = () => setPickerOpenDrop(null);
+
+  const q = pickerSearch.toLowerCase().trim();
+  const matches = (e, mF, tF, eF) =>
+    matchesFacets(e, mF, tF, eF) && (!q || e.name.toLowerCase().includes(q));
+
+  // A facet never constrains itself, so each count answers "how many results
+  // would this option leave", given the search and the other two facets.
+  const facetCounts = useMemo(() => {
+    const muscle = new Map(), type = new Map(), equip = new Map();
+    const bump = (m, k) => k && m.set(k, (m.get(k) || 0) + 1);
+    for (const e of allExercises) {
+      if (matches(e, new Set(), pickerTypeFilter, pickerEquipFilter)) {
+        bump(muscle, (e.muscleGroup || "").toLowerCase().trim());
+      }
+      if (matches(e, pickerMuscle, new Set(), pickerEquipFilter)) {
+        const tags = new Set((e.exerciseType || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean));
+        const ca = (e.category || "").toLowerCase();
+        if (ca) tags.add(ca);
+        for (const t of tags) bump(type, t);
+      }
+      if (matches(e, pickerMuscle, pickerTypeFilter, new Set())) {
+        bump(equip, (e.equipment || "bodyweight").toLowerCase().trim());
+      }
+    }
+    return { muscle, type, equip };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allExercises, q, pickerMuscle, pickerTypeFilter, pickerEquipFilter]);
 
   return createPortal(
     <div className={"ex-picker-backdrop"} onClick={e => {
@@ -112,125 +144,66 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
           />
         </div>
 
-        {/* ── Filter dropdowns ── */}
+        {/* ── Filter dropdowns ──
+            Three hand-rolled single-select panels used to live here: ~100
+            lines of div-with-onClick, no roles, no keyboard path, no counts,
+            duplicating what the library tab already had in an accessible
+            form. They are the shared FilterDropdown now, which also brings
+            multi-select and faceted counts in line with the library. */}
         <div style={{ position: "relative", marginBottom: S.s10 }}>
-          {pickerOpenDrop && <div onClick={closeDrops} style={{ position: "fixed", inset: 0, zIndex: 19 }} />}
+          {pickerOpenDrop && <div aria-hidden={"true"} onClick={closeDrops} style={{ position: "fixed", inset: 0, zIndex: 19 }} />}
           <div style={{ display: "flex", gap: S.s8 }}>
-            {/* Muscle */}
-            <div style={{ position: "relative", flex: 1, zIndex: 20 }}>
-              <button
-                onClick={() => setPickerOpenDrop(d => d === "muscle" ? null : "muscle")}
-                style={{
-                  width: "100%", padding: "6px 24px 6px 8px", borderRadius: R.lg,
-                  border: "1px solid " + (pickerMuscle !== "All" ? "#b4ac9e" : "rgba(45,42,36,.3)"),
-                  background: "rgba(14,14,12,.95)",
-                  color: pickerMuscle !== "All" ? "#b4ac9e" : "#8a8478",
-                  fontSize: FS.fs68, textAlign: "left", cursor: "pointer", position: "relative"
-                }}
-              >
-                {pickerMuscle === "All" ? "Muscle" : muscleLabel(pickerMuscle)}
-                <span style={{
-                  position: "absolute", right: 7, top: "50%",
-                  transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "muscle" ? "180deg" : "0deg") + ")",
-                  fontSize: FS.fs55, color: pickerMuscle !== "All" ? "#b4ac9e" : "#8a8478", transition: "transform .15s"
-                }}>{"▼"}</span>
-              </button>
-              {pickerOpenDrop === "muscle" && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 4px)", left: 0, minWidth: "100%",
-                  background: "rgba(16,14,10,.95)", border: "1px solid rgba(180,172,158,.06)",
-                  borderRadius: R.lg, padding: "6px 4px", zIndex: 21, boxShadow: "0 8px 24px rgba(0,0,0,.7)"
-                }}>
-                  <div onClick={() => { setPickerMuscle("All"); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerMuscle === "All" ? "#b4ac9e" : "#8a8478", background: pickerMuscle === "All" ? "rgba(45,42,36,.2)" : "transparent" }}>{"All Muscles"}</div>
-                  {PMUSCLE_OPTS.map(m => (
-                    <div key={m} onClick={() => { setPickerMuscle(m); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerMuscle === m ? getMuscleColor(m) : "#8a8478", background: pickerMuscle === m ? "rgba(45,42,36,.2)" : "transparent", textTransform: "none" }}>{muscleLabel(m)}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Type */}
-            <div style={{ position: "relative", flex: 1, zIndex: 20 }}>
-              <button
-                onClick={() => setPickerOpenDrop(d => d === "type" ? null : "type")}
-                style={{
-                  width: "100%", padding: "6px 24px 6px 8px", borderRadius: R.lg,
-                  border: "1px solid " + (pickerTypeFilter !== "all" ? "#d4cec4" : "rgba(45,42,36,.3)"),
-                  background: "rgba(14,14,12,.95)",
-                  color: pickerTypeFilter !== "all" ? "#d4cec4" : "#8a8478",
-                  fontSize: FS.fs68, textAlign: "left", cursor: "pointer", position: "relative"
-                }}
-              >
-                {pickerTypeFilter === "all" ? "Type" : PTYPE_LABELS[pickerTypeFilter] || pickerTypeFilter}
-                <span style={{
-                  position: "absolute", right: 7, top: "50%",
-                  transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "type" ? "180deg" : "0deg") + ")",
-                  fontSize: FS.fs55, color: pickerTypeFilter !== "all" ? "#d4cec4" : "#8a8478", transition: "transform .15s"
-                }}>{"▼"}</span>
-              </button>
-              {pickerOpenDrop === "type" && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 4px)", left: 0, minWidth: "100%",
-                  background: "rgba(16,14,10,.95)", border: "1px solid rgba(180,172,158,.06)",
-                  borderRadius: R.lg, padding: "6px 4px", zIndex: 21, boxShadow: "0 8px 24px rgba(0,0,0,.7)"
-                }}>
-                  <div onClick={() => { setPickerTypeFilter("all"); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerTypeFilter === "all" ? "#d4cec4" : "#8a8478", background: pickerTypeFilter === "all" ? "rgba(45,42,36,.2)" : "transparent" }}>{"All Types"}</div>
-                  {PTYPE_OPTS.map(t => (
-                    <div key={t} onClick={() => { setPickerTypeFilter(t); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerTypeFilter === t ? getTypeColor(t) : "#8a8478", background: pickerTypeFilter === t ? "rgba(45,42,36,.2)" : "transparent" }}>{PTYPE_LABELS[t]}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Equipment */}
-            <div style={{ position: "relative", flex: 1, zIndex: 20 }}>
-              <button
-                onClick={() => setPickerOpenDrop(d => d === "equip" ? null : "equip")}
-                style={{
-                  width: "100%", padding: "6px 24px 6px 8px", borderRadius: R.lg,
-                  border: "1px solid " + (pickerEquipFilter !== "all" ? UI_COLORS.accent : "rgba(45,42,36,.3)"),
-                  background: "rgba(14,14,12,.95)",
-                  color: pickerEquipFilter !== "all" ? UI_COLORS.accent : "#8a8478",
-                  fontSize: FS.fs68, textAlign: "left", cursor: "pointer", position: "relative"
-                }}
-              >
-                {pickerEquipFilter === "all" ? "Equipment" : pickerEquipFilter.charAt(0).toUpperCase() + pickerEquipFilter.slice(1)}
-                <span style={{
-                  position: "absolute", right: 7, top: "50%",
-                  transform: "translateY(-50%) rotate(" + (pickerOpenDrop === "equip" ? "180deg" : "0deg") + ")",
-                  fontSize: FS.fs55, color: pickerEquipFilter !== "all" ? UI_COLORS.accent : "#8a8478", transition: "transform .15s"
-                }}>{"▼"}</span>
-              </button>
-              {pickerOpenDrop === "equip" && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 4px)", left: 0, minWidth: "100%",
-                  background: "rgba(16,14,10,.95)", border: "1px solid rgba(180,172,158,.06)",
-                  borderRadius: R.lg, padding: "6px 4px", zIndex: 21, boxShadow: "0 8px 24px rgba(0,0,0,.7)"
-                }}>
-                  <div onClick={() => { setPickerEquipFilter("all"); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerEquipFilter === "all" ? UI_COLORS.accent : "#8a8478", background: pickerEquipFilter === "all" ? "rgba(196,148,40,0.12)" : "transparent" }}>{"All Equipment"}</div>
-                  {PEQUIP_OPTS.map(e => (
-                    <div key={e} onClick={() => { setPickerEquipFilter(e); closeDrops(); }} style={{ padding: "6px 10px", fontSize: FS.lg, cursor: "pointer", borderRadius: R.r5, color: pickerEquipFilter === e ? UI_COLORS.accent : "#8a8478", background: pickerEquipFilter === e ? "rgba(196,148,40,0.12)" : "transparent", textTransform: "capitalize" }}>{e}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FilterDropdown
+              id="wb-muscle"
+              label="Muscle"
+              shortLabel="Muscle"
+              options={MUSCLE_OPTS}
+              optionLabel={muscleLabel}
+              selected={pickerMuscle}
+              counts={facetCounts.muscle}
+              onToggle={v => toggleFilter(setPickerMuscle, v)}
+              open={pickerOpenDrop === "wb-muscle"}
+              setOpen={setPickerOpenDrop}
+              accent="#7A8F8B"
+              optionAccent={getMuscleColor}
+              panelBorder="rgba(122,143,139,.25)"
+            />
+            <FilterDropdown
+              id="wb-type"
+              label="Type"
+              shortLabel="Type"
+              options={TYPE_OPTS}
+              optionLabel={v => TYPE_LABELS[v]}
+              selected={pickerTypeFilter}
+              counts={facetCounts.type}
+              onToggle={v => toggleFilter(setPickerTypeFilter, v)}
+              open={pickerOpenDrop === "wb-type"}
+              setOpen={setPickerOpenDrop}
+              accent="#C4A044"
+              optionAccent={getTypeColor}
+              panelBorder="rgba(180,172,158,.07)"
+            />
+            <FilterDropdown
+              id="wb-equip"
+              label="Equipment"
+              shortLabel="Equip"
+              options={EQUIP_OPTS}
+              optionLabel={equipLabel}
+              selected={pickerEquipFilter}
+              counts={facetCounts.equip}
+              onToggle={v => toggleFilter(setPickerEquipFilter, v)}
+              open={pickerOpenDrop === "wb-equip"}
+              setOpen={setPickerOpenDrop}
+              accent={UI_COLORS.accent}
+              panelBorder="rgba(196,148,40,0.25)"
+            />
           </div>
         </div>
 
         {/* ── Exercise list (virtualized) ── */}
         {(() => {
-          const q = pickerSearch.toLowerCase().trim();
-          const filtered = allExercises.filter(e => {
-            if (e.id === "rest_day") return false;
-            if (pickerMuscle !== "All" && e.muscleGroup !== pickerMuscle) return false;
-            if (pickerTypeFilter !== "all") {
-              const ty = (e.exerciseType || "").toLowerCase(), ca = (e.category || "").toLowerCase();
-              if (!ty.includes(pickerTypeFilter) && ca !== pickerTypeFilter) return false;
-            }
-            if (pickerEquipFilter !== "all" && (e.equipment || "bodyweight").toLowerCase() !== pickerEquipFilter) return false;
-            if (q && !e.name.toLowerCase().includes(q)) return false;
-            return true;
-          });
+          const filtered = allExercises.filter(e => matches(e, pickerMuscle, pickerTypeFilter, pickerEquipFilter));
+
           if (filtered.length === 0) return <div className={"empty"} style={{ padding: "20px 0" }}>{"No exercises found."}</div>;
           const selIds = new Set(pickerSelected.map(e => e.exId));
           return (

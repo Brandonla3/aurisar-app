@@ -71,10 +71,15 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
   }, [ex && ex.id, prev && prev.id, next && next.id]);
 
   // Move focus into the sheet on open so a keyboard user lands inside the
-  // dialog rather than wherever the trigger left them.
+  // dialog rather than wherever the trigger left them. Keyed on open/closed,
+  // not on the exercise: paging with Prev/Next changes ex.id, and refocusing
+  // there yanked focus off the very button the user had just pressed.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (ex) sheetRef.current?.focus();
-  }, [ex && ex.id]);
+    const open = ex != null;
+    if (open && !wasOpen.current) sheetRef.current?.focus();
+    wasOpen.current = open;
+  }, [ex]);
 
   if (!ex) return null;
 
@@ -117,7 +122,11 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
 
   return createPortal(
     <div
-      onClick={close}
+      role="presentation"
+      // Dismiss only when the backdrop itself is hit, so the sheet no longer
+      // needs its own stopPropagation handler (which made the dialog a
+      // non-interactive element carrying a mouse listener).
+      onClick={e => { if (e.target === e.currentTarget) close(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -135,7 +144,6 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
         role="dialog"
         aria-modal="true"
         aria-label={ex.name}
-        onClick={e => e.stopPropagation()}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onAnimationEnd={() => setTurn(null)}
