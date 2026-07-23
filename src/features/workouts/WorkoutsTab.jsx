@@ -1,11 +1,12 @@
 import React, { memo } from 'react';
 import { ExIcon } from '../../components/ExIcon';
-import { getMuscleColor, getTypeColor, calcExXP, hrRange } from '../../utils/xp';
-import { lbsToKg, kgToLbs, miToKm, kmToMi, isMetric, weightLabel, distLabel, displayWt } from '../../utils/units';
+import { getMuscleColor, getTypeColor, calcExXP } from '../../utils/xp';
+import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
 import { formatXP } from '../../utils/format';
 import { uid, todayStr } from '../../utils/helpers';
-import { normalizeHHMM, secToHHMMSplit, combineHHMMSec } from '../../utils/time';
+import { normalizeHHMM, combineHHMMSec } from '../../utils/time';
 import { S, R, FS } from '../../utils/tokens';
+import SetsEditor from '../../components/ui/SetsEditor';
 import { UI_COLORS, MUSCLE_COLORS, WORKOUT_TEMPLATES, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 
 /**
@@ -83,7 +84,6 @@ const WbExCard = React.memo(function WbExCard({
   profile,
   allExById,
   metric,
-  wUnit,
   setWbExercises,
   setCollapsedWbEx,
   setSsChecked,
@@ -142,16 +142,9 @@ const WbExCard = React.memo(function WbExCard({
       });
     });
   }
-  const isC = exD.category === "cardio";
-  const isF = exD.category === "flexibility";
-  const showW = !isC && !isF;
-  const showHR = isC;
-  const isTreadmill = exD.hasTreadmill || false;
   const noSetsEx = NO_SETS_EX_IDS.has(exD.id);
   const isRunningEx = exD.id === RUNNING_EX_ID;
   const age = profile.age || 30;
-  const dispW = ex.weightLbs ? metric ? lbsToKg(ex.weightLbs) : ex.weightLbs : "";
-  const dispDist = ex.distanceMi ? metric ? String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)) : String(ex.distanceMi) : "";
   const pbPaceMi = profile.runningPB || null;
   const pbDisp = pbPaceMi ? metric ? parseFloat((pbPaceMi * 1.60934).toFixed(2)) + " min/km" : parseFloat(pbPaceMi.toFixed(2)) + " min/mi" : null;
   const exPB = (profile.exercisePBs || {})[exD.id] || null;
@@ -256,288 +249,9 @@ const WbExCard = React.memo(function WbExCard({
       }}>{"▼"}</span><button type={"button"} aria-label={`Remove ${exD.name}`} title={"Remove"} className={"btn btn-danger btn-xs"} onClick={e => {
         e.stopPropagation();
         removeEx();
-      }}>{"✕"}</button></div>{!collapsed && exD.id !== "rest_day" && <div className={"wb-ex-body"}><div style={{
-        display: "flex",
-        gap: S.s8,
-        marginBottom: S.s6
-      }}>{!noSetsEx && <div style={{
-          flex: 1
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Sets"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "6px 8px"
-          }} type={"text"} inputMode={"decimal"} value={ex.sets === 0 || ex.sets === "" ? "" : ex.sets || ""} onChange={e => updateField("sets", e.target.value)} /></div>}{isC || isF ? <><div style={{
-            flex: 1.6,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Duration (HH:MM)"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"numeric"} value={ex._durHHMM !== undefined ? ex._durHHMM : ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps ? "00:" + String(ex.reps).padStart(2, "0") : ""} onChange={e => updateField("_durHHMM", e.target.value)} onBlur={e => {
-              const hhmm = normalizeHHMM(e.target.value);
-              updateField("_durHHMM", hhmm || undefined);
-              const sec = combineHHMMSec(hhmm, ex._durSecRaw || ex.durationSec ? secToHHMMSplit(ex.durationSec || 0).sec : "");
-              updateField("durationSec", sec);
-              if (sec) updateField("reps", Math.max(1, Math.floor(sec / 60)));
-            }} placeholder={"00:00"} /></div><div style={{
-            flex: 0.9,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Sec"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px",
-              textAlign: "center"
-            }} type={"number"} min={"0"} max={"59"} value={ex._durSecRaw !== undefined ? String(ex._durSecRaw).padStart(2, "0") : ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2, "0") : ""} onChange={e => {
-              const v = e.target.value;
-              updateField("_durSecRaw", v);
-              const hhmm = ex._durHHMM || (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : "");
-              const sec = combineHHMMSec(hhmm, v);
-              updateField("durationSec", sec);
-              if (sec) updateField("reps", Math.max(1, Math.floor(sec / 60)));
-            }} placeholder={"00"} /></div><div style={{
-            flex: 1.4,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Dist ("}{metric ? "km" : "mi"}{")"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"decimal"} value={dispDist} placeholder={"0"} onChange={e => {
-              const v = e.target.value;
-              const mi = v && metric ? kmToMi(v) : v;
-              updateField("distanceMi", mi || null);
-            }} /></div></> : <><div style={{
-            flex: 1,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Reps"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"decimal"} value={ex.reps === 0 || ex.reps === "" ? "" : ex.reps || ""} onChange={e => updateField("reps", e.target.value)} /></div>{showW && <div style={{
-            flex: 1.2,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{wUnit}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"decimal"} step={metric ? "0.5" : "2.5"} value={dispW} placeholder={"—"} onChange={e => {
-              const v = e.target.value;
-              const lbs = v && metric ? kgToLbs(v) : v;
-              updateField("weightLbs", lbs || null);
-            }} /></div>}</>}</div>{isRunningEx && runBoostPct > 0 && <div style={{
-        fontSize: FS.fs65,
-        color: UI_COLORS.warning,
-        marginBottom: S.s6
-      }}>{"⚡ +"}{runBoostPct}{"% pace bonus"}{runBoostPct === 20 ? " (sub-8 mi!)" : ""}</div>}{isTreadmill && <div style={{
-        marginBottom: S.s6
-      }}><div style={{
-          display: "flex",
-          gap: S.s8
-        }}><div style={{
-            flex: 1
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Incline "}<span style={{
-                opacity: .6,
-                fontSize: FS.fs55
-              }}>{"(0.5–15)"}</span></label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} value={ex.incline || ""} onChange={e => updateField("incline", e.target.value ? parseFloat(e.target.value) : null)} /></div><div style={{
-            flex: 1
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Speed "}<span style={{
-                opacity: .6,
-                fontSize: FS.fs55
-              }}>{"(0.5–15)"}</span></label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} value={ex.speed || ""} onChange={e => updateField("speed", e.target.value ? parseFloat(e.target.value) : null)} /></div></div></div>}{(ex.extraRows || []).map((row, ri) => <div key={ri} style={{
-        display: "flex",
-        gap: S.s4,
-        marginTop: S.s4,
-        padding: "6px 8px",
-        background: "rgba(45,42,36,.18)",
-        borderRadius: R.md,
-        alignItems: "center",
-        flexWrap: "wrap"
-      }}><span style={{
-          fontSize: FS.fs58,
-          color: "#9a8a78",
-          flexShrink: 0,
-          minWidth: 18
-        }}>{isC || isF ? `I${ri + 2}` : `S${ri + 2}`}</span>{isC || isF ? <><input className={"wb-ex-inp"} style={{
-            flex: 1.5,
-            minWidth: 52,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"numeric"} placeholder={"HH:MM"} defaultValue={row.hhmm || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              hhmm: normalizeHHMM(e.target.value)
-            };
-            updateField("extraRows", rr);
-          }} /><input className={"wb-ex-inp"} style={{
-            flex: 0.8,
-            minWidth: 34,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"number"} min={"0"} max={"59"} placeholder={"Sec"} defaultValue={row.sec || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              sec: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} /><input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 38,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={metric ? "km" : "mi"} defaultValue={row.distanceMi || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              distanceMi: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />{isTreadmill && <input className={"wb-ex-inp"} style={{
-            flex: 0.8,
-            minWidth: 34,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"Inc"} defaultValue={row.incline || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              incline: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />}{isTreadmill && <input className={"wb-ex-inp"} style={{
-            flex: 0.8,
-            minWidth: 34,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"Spd"} defaultValue={row.speed || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              speed: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />}</> : <>{!noSetsEx && <input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 40,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={"Sets"} defaultValue={row.sets || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              sets: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />}<input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 40,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={"Reps"} defaultValue={row.reps || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              reps: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />{showW && <input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 38,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={wUnit} defaultValue={row.weightLbs || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              weightLbs: e.target.value || null
-            };
-            updateField("extraRows", rr);
-          }} />}</>}<button className={"btn btn-danger btn-xs"} style={{
-          padding: "2px 6px",
-          flexShrink: 0
-        }} onClick={() => {
-          const rr = (ex.extraRows || []).filter((_, j) => j !== ri);
-          updateField("extraRows", rr);
-        }}>{"✕"}</button></div>)}<button className={"btn btn-ghost btn-xs"} style={{
-        width: "100%",
-        marginTop: S.s4,
-        marginBottom: S.s8,
-        fontSize: FS.sm,
-        color: "#8a8478",
-        borderStyle: "dashed"
-      }} onClick={() => {
-        const rr = [...(ex.extraRows || []), isC || isF ? {
-          hhmm: "",
-          sec: "",
-          distanceMi: "",
-          incline: "",
-          speed: ""
-        } : {
-          sets: ex.sets || "",
-          reps: ex.reps || "",
-          weightLbs: ex.weightLbs || ""
-        }];
-        updateField("extraRows", rr);
-      }}>{"＋ Add Row (e.g. "}{isC || isF ? "interval" : "progressive weight"}{")"}</button>{showHR && <div><label style={{
-          fontSize: FS.sm,
-          color: "#b0a898",
-          marginBottom: S.s4,
-          display: "block"
-        }}>{"Avg Heart Rate Zone "}<span style={{
-            opacity: .6,
-            fontSize: FS.fs55
-          }}>{"(optional)"}</span></label><div className={"hr-zone-row"}>{HR_ZONES.map(z => {
-            const sel = ex.hrZone === z.z;
-            const range = hrRange(age, z);
-            return <div key={z.z} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{
-              "--zc": z.color,
-              borderColor: sel ? z.color : "rgba(45,42,36,.2)",
-              background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
-            }} onClick={() => updateField("hrZone", sel ? null : z.z)}><span className={"hz-name"} style={{
-                color: sel ? z.color : "#8a8478"
-              }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                color: sel ? z.color : "#8a8478"
-              }}>{range.lo}{"–"}{range.hi}</span></div>;
-          })}</div>{ex.hrZone && <div style={{
-          fontSize: FS.fs65,
-          color: "#8a8478",
-          fontStyle: "italic",
-          marginTop: S.s4
-        }}>{HR_ZONES[ex.hrZone - 1].desc}</div>}</div>}</div>}</>;
+      }}>{"✕"}</button></div>{!collapsed && exD.id !== "rest_day" && <div className={"wb-ex-body"}>
+    <SetsEditor exD={exD} value={ex} onField={updateField} units={profile.units} age={age} variant={"builder"} />
+  </div>}</>;
 });
 
 const WorkoutsTab = memo(function WorkoutsTab({
@@ -610,260 +324,7 @@ const WorkoutsTab = memo(function WorkoutsTab({
     setWbExercises(exs => exs.map((e, i) => i === idx ? { ...e, [field]: val } : e));
   }
 function renderWbExFields(ex, idx, exD) {
-  const _isC = exD.category === "cardio";
-  const _isF = exD.category === "flexibility";
-  const _showW = !_isC && !_isF;
-  const _noSets = NO_SETS_EX_IDS.has(exD.id);
-  const _isRunning = exD.id === RUNNING_EX_ID;
-  const _isTread = exD.hasTreadmill || false;
-  const _metric = isMetric(profile.units);
-  const _wUnit = weightLabel(profile.units);
-  const _dUnit = distLabel(profile.units);
-  const _age = profile.age || 30;
-  const _distMiVal = ex.distanceMi ? parseFloat(ex.distanceMi) : 0;
-  const _durMin = parseFloat(ex.reps || 0);
-  const _runPace = _isRunning && _distMiVal > 0 && _durMin > 0 ? _durMin / _distMiVal : null;
-  const _runBoost = _runPace ? _runPace <= 8 ? 20 : 5 : 0;
-  const _dispW = ex.weightLbs ? _metric ? lbsToKg(ex.weightLbs) : ex.weightLbs : "";
-  const _dispDist = ex.distanceMi ? _metric ? String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)) : String(ex.distanceMi) : "";
-  return <><div style={{
-      display: "flex",
-      gap: S.s8,
-      marginBottom: S.s6
-    }}>{!_noSets && <div style={{
-        flex: 1
-      }}><label style={{
-          fontSize: FS.sm,
-          color: "#b0a898",
-          marginBottom: S.s4,
-          display: "block"
-        }}>{"Sets"}</label><input className={"wb-ex-inp"} style={{
-          width: "100%",
-          padding: "6px 8px"
-        }} type={"text"} inputMode={"decimal"} value={ex.sets === 0 || ex.sets === "" ? "" : ex.sets || ""} onChange={e => updateWbEx(idx, "sets", e.target.value)} /></div>}{_isC || _isF ? <><div style={{
-          flex: 1.6,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Duration (HH:MM)"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} type={"text"} inputMode={"numeric"} value={ex._durHHMM !== undefined ? ex._durHHMM : ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps ? "00:" + String(ex.reps).padStart(2, "0") : ""} onChange={e => updateWbEx(idx, "_durHHMM", e.target.value)} onBlur={e => {
-            const h = normalizeHHMM(e.target.value);
-            updateWbEx(idx, "_durHHMM", h || undefined);
-            const s = combineHHMMSec(h, ex._durSecRaw || ex.durationSec ? secToHHMMSplit(ex.durationSec || 0).sec : "");
-            updateWbEx(idx, "durationSec", s);
-            if (s) updateWbEx(idx, "reps", Math.max(1, Math.floor(s / 60)));
-          }} placeholder={"00:00"} /></div><div style={{
-          flex: 0.9,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Sec"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "4px 6px",
-            textAlign: "center"
-          }} type={"number"} min={"0"} max={"59"} value={ex._durSecRaw !== undefined ? String(ex._durSecRaw).padStart(2, "0") : ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2, "0") : ""} onChange={e => {
-            const v = e.target.value;
-            updateWbEx(idx, "_durSecRaw", v);
-            const h2 = ex._durHHMM || (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : "");
-            const s2 = combineHHMMSec(h2, v);
-            updateWbEx(idx, "durationSec", s2);
-            if (s2) updateWbEx(idx, "reps", Math.max(1, Math.floor(s2 / 60)));
-          }} placeholder={"00"} /></div><div style={{
-          flex: 1.4,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Dist ("}{_dUnit}{")"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} type={"text"} inputMode={"decimal"} value={_dispDist} onChange={e => {
-            const v = e.target.value;
-            const mi = v && _metric ? kmToMi(v) : v;
-            updateWbEx(idx, "distanceMi", mi || null);
-          }} placeholder={"0"} /></div></> : <><div style={{
-          flex: 1,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Reps"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "6px 8px"
-          }} type={"text"} inputMode={"decimal"} value={ex.reps === 0 || ex.reps === "" ? "" : ex.reps || ""} onChange={e => updateWbEx(idx, "reps", e.target.value)} /></div>{_showW && <div style={{
-          flex: 1.2,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Weight ("}{_wUnit}{")"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "6px 8px"
-          }} type={"text"} inputMode={"decimal"} value={_dispW} onChange={e => {
-            const v = e.target.value;
-            const lbs = v && _metric ? kgToLbs(v) : v;
-            updateWbEx(idx, "weightLbs", lbs || null);
-          }} placeholder={"—"} /></div>}</>}</div>{_isRunning && _runBoost > 0 && <div style={{
-      fontSize: FS.fs58,
-      color: UI_COLORS.warning,
-      marginBottom: S.s4
-    }}>{"⚡ Pace bonus: +"}{_runBoost}{"% XP"}</div>}{_isTread && <div style={{
-      marginBottom: S.s6
-    }}><div style={{
-        display: "flex",
-        gap: S.s8
-      }}><div style={{
-          flex: 1
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Incline (0.5–15)"}</label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} value={ex.incline || ""} onChange={e => updateWbEx(idx, "incline", e.target.value ? parseFloat(e.target.value) : null)} /></div><div style={{
-          flex: 1
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Speed (0.5–15)"}</label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} value={ex.speed || ""} onChange={e => updateWbEx(idx, "speed", e.target.value ? parseFloat(e.target.value) : null)} /></div></div></div>}{(ex.extraRows || []).map((row, ri) => <div key={ri} style={{
-      display: "flex",
-      gap: S.s4,
-      marginTop: S.s4,
-      padding: "6px 8px",
-      background: "rgba(45,42,36,.18)",
-      borderRadius: R.md,
-      alignItems: "center",
-      flexWrap: "wrap"
-    }}><span style={{
-        fontSize: FS.fs52,
-        color: "#9a8a78",
-        flexShrink: 0,
-        minWidth: 16
-      }}>{_isC || _isF ? `I${ri + 2}` : `S${ri + 2}`}</span>{_isC || _isF ? <><input className={"wb-ex-inp"} style={{
-          flex: 1.5,
-          minWidth: 52,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"numeric"} placeholder={"HH:MM"} value={row.hhmm || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            hhmm: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} onBlur={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            hhmm: normalizeHHMM(e.target.value)
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 0.7,
-          minWidth: 36,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"number"} min={"0"} max={"59"} placeholder={"Sec"} value={row.sec || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            sec: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={_dUnit} value={row.distanceMi || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            distanceMi: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /></> : <><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={"Sets"} value={row.sets || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            sets: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={"Reps"} value={row.reps || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            reps: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={_wUnit} value={row.weightLbs || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            weightLbs: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /></>}<button className={"btn btn-danger btn-xs"} style={{
-        padding: "2px 4px",
-        flexShrink: 0
-      }} onClick={() => {
-        const rr = (ex.extraRows || []).filter((_, j) => j !== ri);
-        updateWbEx(idx, "extraRows", rr);
-      }}>{"✕"}</button></div>)}<button className={"btn btn-ghost btn-xs"} style={{
-      width: "100%",
-      marginTop: S.s4,
-      marginBottom: S.s4,
-      fontSize: FS.sm,
-      color: "#8a8478",
-      borderStyle: "dashed"
-    }} onClick={() => {
-      const rr = [...(ex.extraRows || []), _isC || _isF ? {
-        hhmm: "",
-        sec: "",
-        distanceMi: ""
-      } : {
-        sets: ex.sets || "",
-        reps: ex.reps || "",
-        weightLbs: ex.weightLbs || ""
-      }];
-      updateWbEx(idx, "extraRows", rr);
-    }}>{"＋ Add Row (e.g. "}{_isC || _isF ? "interval" : "progressive weight"}{")"}</button></>;
+  return <SetsEditor exD={exD} value={ex} onField={(field, val) => updateWbEx(idx, field, val)} units={profile.units} age={profile.age || 30} variant={"builder"} />;
 }
 function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
   const collapsed = !!ssAccordion[sectionKey];
@@ -921,7 +382,6 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
       }}>{"▼"}</span></div>{!collapsed && <div className={"ss-section-body"}>{renderWbExFields(ex, idx, exD)}</div>}</div>;
 }
 const metric = isMetric(profile.units);
-const wUnit = weightLabel(profile.units);
 const allW = profile.workouts || [];
 const calcWorkoutXP = wo => (wo.exercises || []).reduce((s, ex) => {
   const extraCount = (ex.extraRows || []).length;
@@ -1821,7 +1281,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
           e.preventDefault();
           reorderWbEx(dragWbExIdx, i);
           setDragWbExIdx(null);
-        }} onDragEnd={() => setDragWbExIdx(null)}><WbExCard ex={ex} i={i} exD={exD} collapsed={!!collapsedWbEx[i]} profile={profile} allExById={allExById} metric={metric} wUnit={wUnit} setWbExercises={setWbExercises} setCollapsedWbEx={setCollapsedWbEx} setSsChecked={setSsChecked} ssChecked={ssChecked} exCount={wbExercises.length} openExEditor={openExEditor} /></div></>;
+        }} onDragEnd={() => setDragWbExIdx(null)}><WbExCard ex={ex} i={i} exD={exD} collapsed={!!collapsedWbEx[i]} profile={profile} allExById={allExById} metric={metric} setWbExercises={setWbExercises} setCollapsedWbEx={setCollapsedWbEx} setSsChecked={setSsChecked} ssChecked={ssChecked} exCount={wbExercises.length} openExEditor={openExEditor} /></div></>;
     });
   })()}<div style={{ height: 80 }} /><div style={{
     position: "fixed",

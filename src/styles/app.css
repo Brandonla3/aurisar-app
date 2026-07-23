@@ -451,6 +451,31 @@
     .ui-sheet-body--fixed{overflow:hidden;display:flex;flex-direction:column}
     .ui-sheet-footer{flex-shrink:0;padding-top:12px}
 
+    /* ── SetsEditor primitive (src/components/ui/SetsEditor.jsx) ─────────
+       One field grid for sets/reps/weight and duration/distance/HR across
+       the builder, superset accordion, live tracker and quick log. Visual
+       vocabulary lifted from the live tracker's .lw-ex-edit-* family. */
+    .se{display:flex;flex-direction:column}
+    .se-row{display:flex;align-items:flex-end;gap:6px;padding:5px 0;border-bottom:1px solid rgba(45,42,36,.18)}
+    .se-row:last-of-type{border-bottom:none}
+    .se-row-lbl{font-family:'Cinzel',serif;font-size:.54rem;color:#8a8478;letter-spacing:.06em;min-width:18px;flex-shrink:0;align-self:center}
+    .se-cell{display:flex;flex-direction:column;flex:1;min-width:0}
+    .se-cell:has(.se-inp--wide){flex:1.6}
+    .se-col-hdr{font-size:.54rem;color:#8a8478;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .se-inp{background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.1);border-radius:6px;padding:6px 4px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;width:100%;min-width:0;outline:none;-webkit-appearance:none;appearance:none;text-align:center}
+    .se-inp:focus{border-color:rgba(180,172,158,.22)}
+    .se-row--extra .se-inp{background:rgba(45,42,36,.25);flex:1}
+    .se-row--extra .se-inp--wide{flex:1.6}
+    .se-row-remove{background:transparent;border:none;color:#8a8478;font-size:.7rem;cursor:pointer;padding:8px 10px;min-width:32px;min-height:32px;flex-shrink:0;align-self:center;-webkit-tap-highlight-color:transparent;border-radius:6px}
+    .se-row-remove:hover,.se-row-remove:active{color:#c0392b}
+    .se-add-row{width:100%;min-height:36px;margin-top:6px;background:transparent;border:1px dashed rgba(180,172,158,.16);border-radius:7px;color:#8a8478;font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.04em;cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast)}
+    .se-add-row:hover{color:#b4ac9e;border-color:rgba(180,172,158,.3)}
+    .se-pace{font-size:.65rem;padding:4px 0 2px 24px}
+    .se-hr{margin-top:8px}
+    /* Density variants: the live sheet is the most compact context. */
+    .se--live .se-inp{padding:5px 4px}
+    .se--live .se-add-row{min-height:32px}
+
     /* ConfirmSheet content (src/components/ui/ConfirmSheet.jsx) */
     .ui-confirm-title{display:flex;align-items:center;gap:9px;font-family:'Cinzel',serif;font-size:.88rem;color:#d4cec4;margin-bottom:8px}
     .ui-confirm-icon{font-size:1.15rem}
