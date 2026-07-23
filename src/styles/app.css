@@ -1881,7 +1881,10 @@
     .msg-bubble.other{background:linear-gradient(155deg,rgba(38,35,29,.85),rgba(28,26,20,.7));border:1px solid rgba(180,172,158,.06);color:#d4cec4;align-self:flex-start;border-bottom-left-radius:3px}
     .msg-bubble.system{align-self:center;background:rgba(45,42,36,.2);color:#8a8478;font-style:italic;font-size:.62rem;border-radius:8px;max-width:90%}
     .msg-input-bar{display:flex;gap:8px;padding:8px 14px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid rgba(180,172,158,.06);flex-shrink:0;background:rgba(12,12,10,.95)}
-    .msg-input{flex:1;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.06);border-radius:10px;padding:8px 12px;color:#d4cec4;font-size:.74rem;outline:none;font-family:'Inter',sans-serif}
+    /* font-size must be >= 16px or iOS Safari auto-zooms the page when the
+       field is focused; 16px is the accessibility-friendly fix (vs disabling
+       user-scalable in the viewport meta). */
+    .msg-input{flex:1;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.06);border-radius:10px;padding:8px 12px;color:#d4cec4;font-size:16px;outline:none;font-family:'Inter',sans-serif}
     .msg-input::placeholder{color:#8a8478}
     .msg-input:focus{border-color:rgba(180,172,158,.14)}
     .msg-send-btn{padding:6px 16px;border-radius:8px;border:1px solid color-mix(in srgb,var(--cls-color,#2980b9) 25%,rgba(180,172,158,.08));background:color-mix(in srgb,var(--cls-color,#2980b9) 14%,rgba(45,42,36,.3));color:#b4ac9e;font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.06em;cursor:pointer;transition:all .18s}
