@@ -55,7 +55,12 @@ export function mergeIncomingMessage(list, incoming) {
   if (list.some(m => m.id === incoming.id)) return list;
   let next = list;
   if (incoming.is_mine) {
-    const idx = next.findIndex(m => (m.pending || m.failed) && m.content === incoming.content);
+    // Reconcile only against a *pending* echo, never a failed one: a failed
+    // row is a message whose send errored, so an incoming echo with the same
+    // text must belong to a different (successful) send. Matching failed rows
+    // here would silently erase the "tap to retry" bubble and, once its own
+    // RPC resolved, produce two rows with the same server id.
+    const idx = next.findIndex(m => m.pending && m.content === incoming.content);
     if (idx !== -1) next = [...next.slice(0, idx), ...next.slice(idx + 1)];
   }
   return sortByCreatedAt([...next, incoming]);
@@ -63,6 +68,12 @@ export function mergeIncomingMessage(list, incoming) {
 
 /** Mark an optimistic row confirmed once send_message returns the real id. */
 export function resolveOptimistic(list, tmpId, realId) {
+  // If the realtime echo already delivered this id (it can beat the RPC's own
+  // HTTP response), drop the optimistic row instead of rewriting it to a
+  // duplicate id.
+  if (realId != null && list.some(m => m.id === realId)) {
+    return list.filter(m => m.id !== tmpId);
+  }
   return list.map(m => {
     if (m.id !== tmpId) return m;
     const copy = { ...m, id: realId ?? m.id };

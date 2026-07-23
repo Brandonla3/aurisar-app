@@ -65,6 +65,18 @@ describe('mergeIncomingMessage', () => {
     const out = mergeIncomingMessage([tmp], msg({ id: 'other-1', content: 'yo' }));
     expect(out).toHaveLength(2);
   });
+  it('reconciles the pending row, never a same-content failed row', () => {
+    // Send "ok" (fails), then send "ok" again (pending); the echo for the
+    // second send must consume the pending row and leave the failed bubble.
+    const failed = { ...buildOptimisticMessage('ok', ME), pending: false, failed: true, id: 'tmp-failed' };
+    const pending = { ...buildOptimisticMessage('ok', ME), id: 'tmp-pending' };
+    const echo = msg({ id: 'real-2', sender_id: ME, is_mine: true, content: 'ok' });
+    const out = mergeIncomingMessage([failed, pending], echo);
+    expect(out.some(m => m.id === 'tmp-failed' && m.failed)).toBe(true); // failed bubble preserved
+    expect(out.some(m => m.id === 'tmp-pending')).toBe(false);           // pending consumed
+    expect(out.some(m => m.id === 'real-2')).toBe(true);
+    expect(out).toHaveLength(2);
+  });
 });
 
 describe('optimistic lifecycle', () => {
@@ -74,6 +86,15 @@ describe('optimistic lifecycle', () => {
     expect(out[0].id).toBe('real-9');
     expect(out[0].pending).toBeUndefined();
     expect(out[0].failed).toBeUndefined();
+  });
+  it('resolveOptimistic drops the tmp row when the echo already delivered the id', () => {
+    // Echo (real-9) arrived first and removed the pending row; when the RPC
+    // then resolves, resolving to real-9 must not create a duplicate.
+    const tmp = buildOptimisticMessage('yo', ME);
+    const delivered = msg({ id: 'real-9', sender_id: ME, is_mine: true, content: 'yo' });
+    const out = resolveOptimistic([delivered, tmp], tmp.id, 'real-9');
+    expect(out).toHaveLength(1);
+    expect(out.filter(m => m.id === 'real-9')).toHaveLength(1);
   });
   it('failOptimistic marks the row failed and not pending', () => {
     const tmp = buildOptimisticMessage('yo', ME);

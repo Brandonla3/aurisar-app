@@ -61,6 +61,7 @@ const MessagesTab = memo(function MessagesTab({
   // scrolled up, don't yank — surface a "new messages" pill instead.
   const scrollRef = useRef(null);
   const nearBottomRef = useRef(true);
+  const lastChannelRef = useRef(null);
   const [showJump, setShowJump] = useState(false);
   const scrollToBottom = (smooth) => {
     const el = scrollRef.current;
@@ -68,15 +69,25 @@ const MessagesTab = memo(function MessagesTab({
     setShowJump(false);
   };
   const lastMsg = msgMessages[msgMessages.length - 1];
+  const activeChannelId = msgActiveChannel?.channel_id ?? null;
   useEffect(() => {
     if (!scrollRef.current) return;
+    // Opening a different conversation always pins to the newest message —
+    // reset the scroll-position ref so a scroll-up left over from a previous
+    // conversation can't suppress it (and show a spurious "new messages" pill).
+    if (lastChannelRef.current !== activeChannelId) {
+      lastChannelRef.current = activeChannelId;
+      nearBottomRef.current = true;
+      scrollToBottom(false);
+      return;
+    }
     if (nearBottomRef.current || (lastMsg && lastMsg.is_mine)) {
       scrollToBottom(false);
     } else {
       setShowJump(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [msgMessages.length, msgActiveChannel?.channel_id, msgLoading]);
+  }, [msgMessages.length, activeChannelId, msgLoading]);
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
