@@ -2156,15 +2156,6 @@
     .lw-chevron{color:#8a8478;font-size:1rem;flex-shrink:0;line-height:1}
 
     /* Overlay + bottom sheet */
-    .lw-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:var(--z-live);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-    .lw-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(14,14,10,.58);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border-top:1px solid rgba(180,172,158,.12);border-radius:16px 16px 0 0;z-index:calc(var(--z-live) + 1);padding:12px 16px calc(24px + env(safe-area-inset-bottom,0px));max-height:82dvh;overflow-y:auto;animation:lwSheetUp .26s cubic-bezier(.34,1.2,.64,1)}
-    @keyframes lwSheetUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
-    .lw-sheet-handle{width:36px;height:4px;background:rgba(180,172,158,.18);border-radius:2px;margin:0 auto 14px}
-    .lw-sheet-hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-    .lw-sheet-icon{font-size:1.25rem;flex-shrink:0}
-    .lw-sheet-title{font-family:'Cinzel',serif;font-size:.88rem;color:#d4cec4;letter-spacing:.04em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .lw-sheet-close-btn{background:transparent;border:none;color:#8a8478;font-size:.85rem;cursor:pointer;padding:4px 6px;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
-    .lw-sheet-close-btn:active{color:#d4cec4}
 
     /* Progress bar */
     .lw-prog-track{height:4px;background:rgba(45,42,36,.3);border-radius:2px;overflow:hidden;margin-bottom:6px}
