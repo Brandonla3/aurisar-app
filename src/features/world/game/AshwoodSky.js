@@ -300,7 +300,19 @@ export class AshwoodSky {
     // Cross-fade: invisible by day (HDRI skybox shows), opaque at night. If no
     // skybox loaded (env assets missing) the dome is the only sky → stay solid.
     const hasSkybox = !!this.lm.skybox;
-    m.setFloat('skyAlpha', hasSkybox ? Math.max(0, Math.min(1, night + dusk)) : 1);
+    const skyA = hasSkybox ? Math.max(0, Math.min(1, night + dusk)) : 1;
+    m.setFloat('skyAlpha', skyA);
+
+    // P7 (perf): skip rendering the dome entirely when it contributes nothing.
+    // Its output alpha is max(skyAlpha, cloudA) — so it can be skipped only when
+    // BOTH are ~0: fully transparent over the HDRI (skyA≈0 = daytime) AND its
+    // 2-D cloud deck is inactive (cover eased to the ~0.06 haze the volumetric
+    // layer leaves). That's the redundant heavy case — HDRI owns the background,
+    // the volumetric dome owns the clouds — where the dome's 5-octave FBM
+    // fragment shader is pure overdraw. On low/mobile (no volumetric layer)
+    // cover stays ~0.38, so the dome keeps drawing its daytime clouds. Both
+    // signals ease in over ~seconds, so re-enabling never pops.
+    this.dome.setEnabled(skyA > 0.012 || this._cloudCover > 0.10);
 
     // Fog: horizon color blended toward the biome fog at the player. Blend
     // strength scales with weather wetness (same wet signal AshwoodGrass
