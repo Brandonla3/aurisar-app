@@ -106,6 +106,7 @@ describe('filter vocabulary has a single source', () => {
       'src/components/PlanWizard.jsx',
       'src/features/workouts/WorkoutExercisePicker.jsx',
       'src/features/exercises/ExerciseLibraryTab.jsx',
+      'src/features/exercises/ExerciseEditorModal.jsx',
     ];
     for (const file of suspects) {
       const src = read(file);

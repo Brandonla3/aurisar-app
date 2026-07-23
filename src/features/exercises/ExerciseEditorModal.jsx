@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { S, R, FS } from '../../utils/tokens';
 import Sheet from '../../components/ui/Sheet';
+import { MUSCLE_OPTS, muscleLabel } from './exerciseFilterOptions';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, weightLabel, distLabel, pctToSlider, sliderToPct } from '../../utils/units';
 import { getMuscleColor, hrRange } from '../../utils/xp';
 import { HR_ZONES } from '../../data/constants';
@@ -115,13 +116,12 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 display: "flex",
                 gap: S.s4,
                 flexWrap: "wrap"
-              }}>{["chest", "back", "shoulder", "bicep", "tricep", "forearm", "legs", "glutes", "calves", "abs"].map(mg => <button key={mg} className={`btn btn-sm ${ed.muscleGroup === mg ? "btn-gold" : "btn-ghost"}`} style={{
-                  textTransform: "capitalize",
+              }}>{MUSCLE_OPTS.map(mg => <button key={mg} className={`btn btn-sm ${ed.muscleGroup === mg ? "btn-gold" : "btn-ghost"}`} style={{
                   fontSize: FS.fs54,
                   padding: "4px 8px"
                 }} onClick={() => setEd({
                   muscleGroup: mg
-                })}>{mg}</button>)}</div></div>
+                })}>{muscleLabel(mg)}</button>)}</div></div>
 
             {
               /* Base XP */

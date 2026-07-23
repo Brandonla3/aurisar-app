@@ -9,7 +9,7 @@ import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './u
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, hrRange, scaleWeight, scaleDur } from './utils/xp';
-import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
+import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec, daysUntil } from './utils/time';
 import { formatXP } from './utils/format';
 import { FS, R, S } from './utils/tokens';
 import { sb } from './utils/supabase';
@@ -4084,18 +4084,6 @@ function App() {
       });
     } catch (e) {
       return dateStr;
-    }
-  }
-  function daysUntil(dateStr) {
-    if (!dateStr) return null;
-    try {
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const then = new Date(dateStr + "T00:00:00");
-      const diff = Math.round((then - now) / 86400000);
-      return diff;
-    } catch (e) {
-      return null;
     }
   }
 

@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import { ExIcon } from '../../components/ExIcon';
-import { getMuscleColor, getTypeColor, calcExXP } from '../../utils/xp';
+import { getMuscleColor, getTypeColor, calcExXP, calcWorkoutXP } from '../../utils/xp';
 import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
 import { formatXP } from '../../utils/format';
 import { todayStr } from '../../utils/helpers';
@@ -390,12 +390,6 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
 }
 const metric = isMetric(profile.units);
 const allW = useMemo(() => profile.workouts || [], [profile.workouts]);
-const calcWorkoutXP = wo => (wo.exercises || []).reduce((s, ex) => {
-  const extraCount = (ex.extraRows || []).length;
-  const base = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
-  const rowsXP = (ex.extraRows || []).reduce((rs, row) => rs + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-  return s + base + rowsXP;
-}, 0);
 // Per-workout XP + accent, computed once per relevant-input change rather
 // than per card on every render. Keyed on the workout list, the class
 // (multiplier) and the catalog.
@@ -403,7 +397,7 @@ const woMeta = useMemo(() => {
   const m = new Map();
   for (const w of allW) {
     m.set(w.id, {
-      xp: calcWorkoutXP(w),
+      xp: calcWorkoutXP(w, profile.chosenClass, allExById),
       mgColor: getWorkoutMgColor(w, allExById, MUSCLE_COLORS),
     });
   }
@@ -514,7 +508,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
       return null;
     })()}{allW.filter(w => !w.oneOff).filter(w => woLabelFilters.size === 0 || (w.labels || []).some(l => woLabelFilters.has(l))).map(wo => {
       const exCount = wo.exercises.length;
-      const _meta = woMeta.get(wo.id) || { xp: calcWorkoutXP(wo), mgColor: getWorkoutMgColor(wo, allExById, MUSCLE_COLORS) };
+      const _meta = woMeta.get(wo.id) || { xp: calcWorkoutXP(wo, profile.chosenClass, allExById), mgColor: getWorkoutMgColor(wo, allExById, MUSCLE_COLORS) };
       const xp = _meta.xp;
       const woMgColor = _meta.mgColor;
       return <div key={wo.id} className={"workout-card"} style={{
@@ -582,7 +576,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
           activeCal: null,
           totalCal: null
         };
-        const xp = calcWorkoutXP(wo);
+        const xp = calcWorkoutXP(wo, profile.chosenClass, allExById);
         const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
         return <div key={g.id} className={"workout-card"} style={{
           "--mg-color": woMgColor
@@ -954,7 +948,7 @@ if (workoutView === "recipes") {
 // ── DETAIL ─────────────────────────────
 if (workoutView === "detail" && activeWorkout) {
   const wo = activeWorkout;
-  const xp = calcWorkoutXP(wo);
+  const xp = calcWorkoutXP(wo, profile.chosenClass, allExById);
   return <><div style={{
       display: "flex",
       alignItems: "center",
