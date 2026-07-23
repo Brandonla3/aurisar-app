@@ -13,25 +13,26 @@
 
 import React, { useEffect, useRef } from 'react';
 import { buildWorldMapCanvas, drawMapMarkers } from './mapRender.js';
+import { mapBounds } from './worldSpace.js';
 import { FONT, ghostBtn } from './ui/panelTheme.js';
 
 const BAKE_SIZE = 640;     // terrain bake resolution (drawImage scales it up)
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 6;
 
-// Combined bounds so the disc AND the eastern dungeons fit, kept square+centred
-// so the round world isn't distorted.
-function combinedBounds(config) {
-  const radius = config.radius ?? 520;
-  let maxX = radius;
-  const interiors = config.interiors ?? {};
-  for (const k of Object.keys(interiors)) maxX = Math.max(maxX, interiors[k].cx ?? 0);
-  maxX += 120; // padding past the furthest dungeon
-  let minX = -radius, minZ = -radius, maxZ = radius;
-  const cx = (minX + maxX) / 2;
-  const cz = (minZ + maxZ) / 2;
-  const half = Math.max(maxX - minX, maxZ - minZ) / 2;
-  return { minX: cx - half, maxX: cx + half, minZ: cz - half, maxZ: cz + half };
+// Clamp a projected point to the map's inner border along the ray from center,
+// so off-canvas things — the player inside a teleport interior (x≥840), or the
+// off-disc dungeon anchors — become directional edge indicators instead of
+// silently vanishing once the map is framed to the playable disc.
+function clampToEdge(px, py, w, h, margin = 14) {
+  const cx = w / 2, cy = h / 2;
+  if (px >= margin && px <= w - margin && py >= margin && py <= h - margin) {
+    return { x: px, y: py, clamped: false, angle: 0 };
+  }
+  const dx = px - cx, dy = py - cy;
+  const hw = w / 2 - margin, hh = h / 2 - margin;
+  const scale = Math.min(hw / Math.max(Math.abs(dx), 1e-6), hh / Math.max(Math.abs(dy), 1e-6));
+  return { x: cx + dx * scale, y: cy + dy * scale, clamped: true, angle: Math.atan2(dy, dx) };
 }
 
 export default function WorldMap({ mapData, sceneRef, onClose }) {
@@ -46,7 +47,11 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const bounds = combinedBounds(mapData.config);
+    // Frame the map to the playable disc (the round world), NOT the far-off
+    // teleport-only dungeon interiors — those become off-map markers in a later
+    // batch. This keeps the player centred on the actual world instead of
+    // squished into one half beside a large void.
+    const bounds = mapBounds(mapData.config?.radius);
     const baked = buildWorldMapCanvas(mapData.worldgen, { size: BAKE_SIZE, bounds });
     bakedRef.current = baked;
 
@@ -90,13 +95,48 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
 
       drawMapMarkers(ctx, mapData, project, { labels: true, w: size, h: size, font: 12 });
 
-      // Player marker (triangle to heading). Matches TestingHud's convention.
+      // Off-map indicators for teleport-only interiors (they sit outside the
+      // disc, so disc framing culls them). Labeled chevrons on the border;
+      // index-offset since all three share the eastern direction (cz=0).
+      const interiors = mapData.config?.interiors ?? {};
+      const offMap = Object.values(interiors)
+        .map((d) => ({ d, p: project(d.cx, d.cz) }))
+        .filter(({ p }) => p.px < 0 || p.px > size || p.py < 0 || p.py > size);
+      offMap.forEach(({ d, p }, i) => {
+        const e = clampToEdge(p.px, p.py, size, size, 20);
+        const y = Math.max(16, Math.min(size - 16, e.y + (i - (offMap.length - 1) / 2) * 16));
+        ctx.save();
+        ctx.translate(e.x, y);
+        ctx.rotate(e.angle + Math.PI / 2);
+        ctx.fillStyle = 'rgba(168, 120, 255, 0.95)';
+        ctx.strokeStyle = 'rgba(10, 8, 20, 0.9)';
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.moveTo(0, -6); ctx.lineTo(4.5, 4); ctx.lineTo(-4.5, 4); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
+        if (d.name) {
+          ctx.font = '600 10px Inter, system-ui, sans-serif';
+          ctx.textAlign = e.x > size / 2 ? 'right' : 'left';
+          ctx.textBaseline = 'middle';
+          const lx = e.x > size / 2 ? e.x - 10 : e.x + 10;
+          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+          ctx.strokeText(d.name, lx, y);
+          ctx.fillStyle = '#d7c4ff';
+          ctx.fillText(d.name, lx, y);
+        }
+      });
+
+      // Player marker. On-map: triangle to heading (matches the minimap).
+      // Off-map (e.g. inside a teleport interior): clamp to the border and point
+      // toward the true position + draw a ring, so the player is never lost.
       const pose = sceneRef.current?.getPose?.();
       if (pose) {
         const p = project(pose.x, pose.z);
+        const e = clampToEdge(p.px, p.py, size, size);
         ctx.save();
-        ctx.translate(p.px, p.py);
-        ctx.rotate(-pose.yaw);
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.clamped ? e.angle + Math.PI / 2 : -pose.yaw);
         ctx.fillStyle = 'rgba(120, 200, 255, 0.98)';
         ctx.strokeStyle = 'rgba(10, 20, 30, 0.95)';
         ctx.lineWidth = 1.5;
@@ -108,6 +148,13 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
         ctx.fill();
         ctx.stroke();
         ctx.restore();
+        if (e.clamped) {
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, 11, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(120, 200, 255, 0.55)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
       }
 
       // Header location readout (imperative — no React re-render).

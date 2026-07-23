@@ -7,15 +7,20 @@
  * Deploy:  spacetime publish --server mainnet aurisar-world
  * Regen:   spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings
  *
- * Coordinate system (must stay in sync with the client):
+ * Coordinate system — the client's single source of truth is
+ * src/features/world/worldSpace.js (PX_PER_M, WORLD_ORIGIN_PX, toWorld/toStdb);
+ * these MUST stay in sync with it:
  *   STDB px → world units:   (px - 1600) / 32     (client toWorld)
  *   world units → STDB px:   units * 32 + 1600    (client toStdb)
  *   Spawn at STDB (1600, 1600) = world origin.
  *
- * World bounds match world_build_config.tiling_streaming.world_bounds_m
- * (canonical: src/features/world/config/world_build_config.json):
- *   world_bounds_m: ±1000 world units (2km × 2km playable area)
- *   In STDB px:      1600 ± 32000 → [-30400, 33600]
+ * Server MOVEMENT bounds are an intentionally symmetric legacy clamp — distinct
+ * from tile coverage. The tiling grid (world_build_config.tiling_streaming.
+ * world_bounds_m) spans -1000..+1048 m (8 × 256), while the server clamps player
+ * movement to a symmetric ±1000 m box; both comfortably contain the ~520 m
+ * playable disc, so the difference is not player-visible. The px/meter/origin
+ * constants mirror src/features/world/worldSpace.js (client source of truth).
+ *   ±1000 world units → in STDB px: 1600 ± 32000 → [-30400, 33600]
  *   With 32 px (= 1 world unit) player half-width buffer: clamp to
  *   [-30368, 33568] on both axes.
  */
@@ -107,7 +112,7 @@ import {
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
-const WORLD_CENTER_PX = 1600;       // legacy origin offset (matches client STDB_CENTER)
+const WORLD_CENTER_PX = 1600;       // legacy origin offset; mirrors client worldSpace.js WORLD_ORIGIN_PX
 const PLAYER_HALF_PX = 32;          // 1 world unit player half-width
 const WORLD_MIN_PX = WORLD_CENTER_PX - WORLD_HALF_PX + PLAYER_HALF_PX; // -30368
 const WORLD_MAX_PX = WORLD_CENTER_PX + WORLD_HALF_PX - PLAYER_HALF_PX; // 33568

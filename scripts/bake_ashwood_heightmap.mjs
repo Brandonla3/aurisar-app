@@ -23,17 +23,23 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
-const ashwoodConfig = JSON.parse(
-  readFileSync(join(root, 'src/features/world/config/ashwood_world.json'), 'utf8'));
-const { createWorldgen } = await import('../src/features/world/worldgen/index.js');
-
 const args = process.argv.slice(2);
 const argValue = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
+// Which world to bake. Defaults to the LIVE world (zone1_world.json); pass
+// --config <path> (repo-root-relative) to bake a different one (e.g. ashwood).
+const configPath = argValue('--config') ?? 'src/features/world/config/zone1_world.json';
+// Output stem derived from the selected world so a zone1 bake never lands under
+// ashwood-named files (and vice-versa). e.g. zone1_world.json -> "zone1".
+const slug = configPath.split('/').pop().replace(/(_world)?\.json$/, '');
+
+const worldConfig = JSON.parse(readFileSync(join(root, configPath), 'utf8'));
+const { createWorldgen } = await import('../src/features/world/worldgen/index.js');
+
 const size = parseInt(argValue('--size') ?? '2017', 10);
 const half = parseFloat(argValue('--half-extent') ?? '1008');
-const outDir = argValue('--out') ?? join(root, 'export/ashwood');
+const outDir = argValue('--out') ?? join(root, 'export', slug);
 
-const wg = createWorldgen(ashwoodConfig);
+const wg = createWorldgen(worldConfig);
 const step = (2 * half) / (size - 1);
 
 console.log(`sampling ${size}×${size} (${(2 * half).toFixed(0)} m at ${step.toFixed(2)} m/px)…`);
@@ -98,15 +104,15 @@ const png = Buffer.concat([
 ]);
 
 mkdirSync(outDir, { recursive: true });
-const base = `ashwood_heightmap_${size}`;
+const base = `${slug}_heightmap_${size}`;
 writeFileSync(join(outDir, `${base}.png`), png);
 
 // UE Landscape: at Z scale 100 the 16-bit range spans 512 m (-256..+255.992).
 // zScale below makes the imported landscape match world meters exactly.
 const sidecar = {
   source: 'scripts/bake_ashwood_heightmap.mjs',
-  worldConfig: 'src/features/world/config/ashwood_world.json',
-  seed: ashwoodConfig.seed,
+  worldConfig: configPath,
+  seed: worldConfig.seed,
   width: size,
   height: size,
   metersPerPixel: step,

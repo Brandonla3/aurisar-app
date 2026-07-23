@@ -41,10 +41,13 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
 
   const sendChat = useCallback((text, msgType = 'proximity') => {
     const conn = connRef.current;
-    if (!conn) return;
+    if (!conn) return false;
     try {
       conn.reducers.sendChat(text, msgType);
-    } catch (_) { /* not connected yet */ }
+      return true;
+    } catch (_) {
+      return false; // not connected yet — caller surfaces feedback
+    }
   }, []);
 
   const setAvatarConfig = useCallback((configJson) => {

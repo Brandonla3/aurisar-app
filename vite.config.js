@@ -16,10 +16,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Split heavy libraries into their own chunks so the main bundle
-        // doesn't pay for three.js / recharts on first paint. Combined with
-        // React.lazy at the call sites, these chunks only load on demand.
+        // doesn't pay for recharts on first paint. Combined with React.lazy at
+        // the call sites, these chunks only load on demand.
         manualChunks(id) {
-          if (id.includes('node_modules/three/')) return 'three';
           if (id.includes('node_modules/babylonjs')) return 'babylon';
           if (id.includes('node_modules/recharts/')) return 'recharts';
           if (id.includes('node_modules/@supabase/')) return 'supabase';
