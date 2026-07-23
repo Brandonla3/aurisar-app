@@ -1895,7 +1895,7 @@
     .msg-bubble.failed{border:1px solid rgba(192,57,43,.45);opacity:.8}
     .msg-retry{display:flex;gap:6px;margin-top:2px}
     .msg-retry button{background:transparent;border:none;color:#c0392b;font-size:.5rem;cursor:pointer;padding:2px 4px}
-    .msg-jump-pill{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:linear-gradient(155deg,rgba(196,148,40,.28),rgba(196,148,40,.14));border:1px solid rgba(196,148,40,.4);color:#d4cec4;font-family:'Cinzel',serif;font-size:.56rem;letter-spacing:.06em;padding:6px 14px;border-radius:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:5;transition:all .18s}
+    .msg-jump-pill{position:absolute;bottom:calc(64px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:linear-gradient(155deg,rgba(196,148,40,.28),rgba(196,148,40,.14));border:1px solid rgba(196,148,40,.4);color:#d4cec4;font-family:'Cinzel',serif;font-size:.56rem;letter-spacing:.06em;padding:6px 14px;border-radius:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:5;transition:all .18s}
     .msg-jump-pill:hover{background:linear-gradient(155deg,rgba(196,148,40,.38),rgba(196,148,40,.2))}
     .msg-error-panel{text-align:center;padding:22px 14px;margin:10px 14px;border-radius:10px;background:linear-gradient(155deg,rgba(60,32,28,.35),rgba(38,26,22,.3));border:1px solid rgba(192,57,43,.2)}
     .msg-skeleton-card{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;margin-bottom:5px;background:linear-gradient(155deg,rgba(38,35,29,.5),rgba(28,26,20,.45));border:1px solid rgba(180,172,158,.04)}
