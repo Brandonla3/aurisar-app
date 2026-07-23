@@ -2070,6 +2070,11 @@ export class BabylonWorldScene {
     // _bindKeys), so keyboard input can't leak into the chat box, but the
     // touch joystick (and any already-held keys) keep moving the player.
     if (this._localDead) { this._local.isMoving = false; return; }   // slice 5c: dead can't walk
+    // A full-screen panel (map / inventory / …) owns the screen — freeze the
+    // player so neither held keys nor a touch-joystick pointer trapped under the
+    // panel can walk them (setInputPaused clears both sources; this is the
+    // authoritative gate on the consumer side).
+    if (this._inputPaused) { this._local.isMoving = false; return; }
 
     const w = this._keys['KeyW'] || this._keys['ArrowUp'];
     const s = this._keys['KeyS'] || this._keys['ArrowDown'];
@@ -2685,7 +2690,11 @@ export class BabylonWorldScene {
   // the panel closes. Same gate as _chatOpen in _bindKeys.
   setInputPaused(v) {
     this._inputPaused = !!v;
-    if (v) this._keys = {};
+    // Clear BOTH input sources so nothing sticks: held keyboard keys and the
+    // touch joystick vector. The panel covers the joystick zone, so its
+    // pointer-up may never reach the joystick and _joyDx/_joyDy would otherwise
+    // keep driving _moveLocal behind the panel.
+    if (v) { this._keys = {}; this._joyDx = 0; this._joyDy = 0; }
   }
 
   // Live remote players in this instance, for the maps. Mirrors getMobs(): a

@@ -316,7 +316,11 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
       aria-modal="true"
       aria-label="World Map"
       style={{
-        position: 'fixed', inset: 0, zIndex: 95, overflowY: 'auto',
+        // Sits ABOVE WorldOverlay's fixed z-index:9999. This portal mounts on
+        // <body> (a sibling of #root, so useModalLifecycle can inert #root) which
+        // drops it out of the overlay's stacking context — at 95 the world would
+        // paint over it and the map would be invisible/non-interactive.
+        position: 'fixed', inset: 0, zIndex: 10000, overflowY: 'auto',
         background: 'rgba(2, 6, 14, 0.78)',
         backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
         fontFamily: FONT,
