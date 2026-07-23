@@ -64,7 +64,7 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import LoginScreen from './components/LoginScreen';
 import PrivacyPolicy from './components/PrivacyPolicy';
 // Heavy / route-scoped components are lazy-loaded so first paint doesn't pay for
-// recharts (~150KB), three.js (~600KB), or the landing page assets.
+// recharts (~150KB) or the landing page assets.
 const TrendsTab = lazyWithRetry(() => import('./components/TrendsTab').then(m => ({
   default: m.TrendsTab
 })));

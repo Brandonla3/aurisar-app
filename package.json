@@ -44,8 +44,7 @@
     "react-is": "^19.2.7",
     "react-window": "^2.2.7",
     "recharts": "^3.9.2",
-    "spacetimedb": "^2.6.1",
-    "three": "^0.185.1"
+    "spacetimedb": "^2.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
