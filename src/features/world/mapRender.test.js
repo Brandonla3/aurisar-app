@@ -17,24 +17,33 @@ const baseWorldgen = () => ({
   biomeAt: () => ({ name: 'Meadow' }),
 });
 
-describe('locationLabelAt — dungeon resolves to the nearest interior (the label bug)', () => {
-  it('names the actual dungeon by nearest interior x, not always Hollow Deep', () => {
+describe('locationLabelAt — dungeon gate label', () => {
+  // `inDungeon` is set ONLY by proximity to the north dungeon gate at (0,-37)
+  // (BabylonWorldScene DUNGEON_ENTRANCE); the castle has its own isInside()
+  // path before this. So the label must reflect that gate — NOT the nearest
+  // interior anchor by x (Castle Ashwood at cx 840 is nearest to the gate's
+  // x≈0, which is the regression this guards against).
+  it('names the hub dungeon gate (0,-37) the Hollow Crypt, not Castle Ashwood', () => {
     const wg = baseWorldgen();
-    expect(locationLabelAt(wg, 1000, 0, { inDungeon: true })).toBe('The Hollow Crypt');
-    expect(locationLabelAt(wg, 1300, 0, { inDungeon: true })).toBe('The Frostspire Halls');
-    expect(locationLabelAt(wg, 840, 0, { inDungeon: true })).toBe('Castle Ashwood');
-    // a small offset from the anchor still resolves the same dungeon
-    expect(locationLabelAt(wg, 1290, 4, { inDungeon: true })).toBe('The Frostspire Halls');
+    const label = locationLabelAt(wg, 0, -37, { inDungeon: true });
+    expect(label).toBe('The Hollow Crypt');
+    expect(label).not.toBe('Castle Ashwood');
   });
 
-  it('falls back to "Dungeon" when no interiors are configured', () => {
+  it('dungeon wins over overworld geography (even on the mountain)', () => {
     const wg = baseWorldgen();
-    wg.config.interiors = {};
-    expect(locationLabelAt(wg, 1000, 0, { inDungeon: true })).toBe('Dungeon');
+    wg.inMountain = () => true;
+    expect(locationLabelAt(wg, 0, -37, { inDungeon: true })).toBe('The Hollow Crypt');
+  });
+
+  it('falls back to "Dungeon" when hollowDeep is absent', () => {
+    const wg = baseWorldgen();
+    delete wg.config.interiors.hollowDeep;
+    expect(locationLabelAt(wg, 0, -37, { inDungeon: true })).toBe('Dungeon');
   });
 });
 
-describe('locationLabelAt — geographic priority (dungeon > lake > mountain > forest > biome)', () => {
+describe('locationLabelAt — geographic priority (lake > mountain > forest > biome)', () => {
   it('lake by proximity to the water', () => {
     const wg = baseWorldgen();
     expect(locationLabelAt(wg, -92, 88)).toBe('Stillmere');           // at the lake center
@@ -51,12 +60,6 @@ describe('locationLabelAt — geographic priority (dungeon > lake > mountain > f
     expect(locationLabelAt(wg, 0, 0)).toBe('Meadow');                 // biome name
     wg.biomeAt = () => null;
     expect(locationLabelAt(wg, 0, 0)).toBe('The Wilds');              // final fallback
-  });
-
-  it('dungeon wins over everything when inDungeon is set', () => {
-    const wg = baseWorldgen();
-    wg.inMountain = () => true; // even on the mountain, inDungeon short-circuits
-    expect(locationLabelAt(wg, 1000, 0, { inDungeon: true })).toBe('The Hollow Crypt');
   });
 
   it('an absent worldgen returns an empty string', () => {

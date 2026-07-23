@@ -93,14 +93,12 @@ export function locationLabelAt(worldgen, x, z, opts = {}) {
   if (!worldgen) return '';
   const cfg = worldgen.config ?? {};
   if (opts.inDungeon) {
-    // Which dungeon? Resolve the nearest interior anchor to the player's x
-    // (interiors sit at distinct x — castle 840 / hollowDeep 1000 / frostspire
-    // 1300), instead of always naming Hollow Deep.
-    let near = null;
-    for (const d of Object.values(cfg.interiors ?? {})) {
-      if (!near || Math.abs(d.cx - x) < Math.abs(near.cx - x)) near = d;
-    }
-    return near?.name ?? 'Dungeon';
+    // `inDungeon` is the north dungeon-gate proximity mood — the ONLY thing that
+    // sets it is BabylonWorldScene's DUNGEON_ENTRANCE trigger at (0,-37), and the
+    // castle has its own isInside() path before this. That gate leads to the
+    // Hollow Crypt, so name it that. (A nearest-interior-by-x attempt regressed
+    // the gate to "Castle Ashwood" — anchor 840 is nearest to the gate's x≈0.)
+    return cfg.interiors?.hollowDeep?.name ?? 'Dungeon';
   }
   const lake = cfg.lake;
   if (lake) {
