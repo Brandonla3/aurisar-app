@@ -34,7 +34,7 @@ import {
   QUEST_STATE, useQuestRows, myQuestsFrom, buildNpcMarkers, parseCounts,
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
-import { idHex, isChatVisible, insertChatMessage, joinCutoff } from './chatUtils.js';
+import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen } from './chatUtils.js';
 import { PROXIMITY_RADIUS }   from './game/constants.js';
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
@@ -301,11 +301,11 @@ export default function WorldGame({ playerInfo, onExit }) {
   }, []);
 
   const onChatMessage = useCallback((row) => {
-    if (joinCutoffRef.current == null) joinCutoffRef.current = joinCutoff(Date.now());
+    if (joinCutoffRef.current == null) joinCutoffRef.current = joinCutoffMs(Date.now());
     if (row?.sentAt != null && row.sentAt < joinCutoffRef.current) return; // pre-join history
     if (!isChatVisible(row, myPosRef.current, PROXIMITY_RADIUS)) return;
     setChatMessages(prev => insertChatMessage(prev, row));
-    if (!chatOpenRef.current) setChatUnseen(true);
+    if (shouldFlagUnseen(row, myIdentityHexRef.current, chatOpenRef.current)) setChatUnseen(true);
   }, []);
 
   const onMobUpsert = useCallback((row) => {
@@ -354,6 +354,19 @@ export default function WorldGame({ playerInfo, onExit }) {
   useEffect(() => {
     myIdentityHexRef.current = idHex(identity);
   }, [identity]);
+
+  // Reset the replay cutoff whenever the world (re)connects. useSpacetimeWorld
+  // tears down and rebuilds the connection when fitness XP changes, and on
+  // reconnect SpacetimeDB replays the whole chat_message table as inserts —
+  // without this, a long session's reconnect would repopulate the log with old
+  // messages (and evict current ones via the 60-row cap).
+  const prevConnectedRef = useRef(false);
+  useEffect(() => {
+    if (connected && !prevConnectedRef.current) {
+      joinCutoffRef.current = joinCutoffMs(Date.now());
+    }
+    prevConnectedRef.current = connected;
+  }, [connected]);
 
   const onChestOpen = useCallback((chest) => {
     if (!connected) return;
@@ -634,9 +647,13 @@ export default function WorldGame({ playerInfo, onExit }) {
       showToast('Slow down — one message per second');
       return;
     }
-    // '/g ' sends globally ('/w ' kept as a legacy alias); default is nearby-only.
-    const isGlobal = text.startsWith('/g ') || text.startsWith('/w ');
-    const sent = sendChat(text.replace(/^\/[gw] /, ''), isGlobal ? 'world' : 'proximity');
+    // '/g' or '/global' send globally ('/w' kept as a legacy alias); default is
+    // nearby-only. Match the command with or without trailing text, then strip it.
+    const globalCmd = /^\/(g|global|w)\b\s*/i;
+    const isGlobal = globalCmd.test(text);
+    const body = text.replace(globalCmd, '');
+    if (!body) { closeChat(); return; } // command with no message — just dismiss
+    const sent = sendChat(body, isGlobal ? 'world' : 'proximity');
     if (sent === false) {
       showToast('Not connected to the world yet — message not sent');
       return;
@@ -922,6 +939,7 @@ export default function WorldGame({ playerInfo, onExit }) {
               ref={inputRef}
               style={S.input}
               value={chatInput}
+              aria-label="World chat message"
               placeholder="Message nearby players… (/g for global, Esc to cancel)"
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => {

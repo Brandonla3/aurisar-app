@@ -12,6 +12,17 @@ export function idHex(id) {
 }
 
 /**
+ * Whether an incoming chat row should flag the "unseen" dot on the closed
+ * chat button. Never flag the local player's own echo (submitChat closes the
+ * chat immediately, so your own row arrives with the chat already closed).
+ */
+export function shouldFlagUnseen(row, myIdHex, chatOpen) {
+  if (chatOpen) return false;
+  if (!row) return false;
+  return idHex(row.senderId) !== myIdHex;
+}
+
+/**
  * Should this message be shown to a player standing at myPos?
  * - 'world' and 'emote' messages are always visible.
  * - 'proximity' messages only within `radius` of the sender's position.
@@ -38,15 +49,19 @@ function cmpSentAt(a, b) {
  * all existing subscription rows as inserts on connect), dedupe by id, keep
  * sorted by sentAt, cap the buffer.
  */
-export function insertChatMessage(list, msg, { cap = 60, joinCutoffMicros = null } = {}) {
+export function insertChatMessage(list, msg, { cap = 60, joinCutoffMs = null } = {}) {
   if (!msg) return list;
-  if (joinCutoffMicros != null && msg.sentAt != null && msg.sentAt < joinCutoffMicros) return list;
+  if (joinCutoffMs != null && msg.sentAt != null && msg.sentAt < joinCutoffMs) return list;
   if (msg.id != null && list.some(m => m.id === msg.id)) return list;
   const next = [...list, msg].sort(cmpSentAt);
   return next.length > cap ? next.slice(next.length - cap) : next;
 }
 
-/** Micros timestamp (BigInt) for "now minus windowMs", for the join cutoff. */
-export function joinCutoff(nowMs, windowMs = 60000) {
-  return BigInt(Math.max(0, nowMs - windowMs)) * 1000n;
+/**
+ * Millisecond cutoff (BigInt) for "now minus windowMs". The server stores
+ * chatMessage.sentAt in ms (spacetimedb/src/index.ts: `sentAt: nowMicros / 1000n`),
+ * so this must be ms too — comparing against microseconds would drop every row.
+ */
+export function joinCutoffMs(nowMs, windowMs = 60000) {
+  return BigInt(Math.max(0, nowMs - windowMs));
 }
