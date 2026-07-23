@@ -5,15 +5,15 @@
  * imperatively (no React re-renders) so it's cheap to leave on permanently.
  *
  * Minimap: top-right circular canvas showing the actual baked terrain (biome
- * colors) centered on the player, with the 8x8 tile grid, POI markers, live
- * mobs (red dots), the player (triangle), and the world bounds. A compass
- * strip sits directly on top of the circle showing the cardinal letters that
- * scroll based on camera-forward yaw; +/- and the mouse wheel zoom the view.
+ * colors) centered on the player, with POI markers, live mobs (red dots), the
+ * player (triangle), and the playable-disc edge. A compass strip sits directly
+ * on top of the circle showing the cardinal letters that scroll based on
+ * camera-forward yaw; +/- and the mouse wheel zoom the view.
  */
 
 import { useEffect, useRef } from 'react';
 import { buildWorldMapCanvas, drawMapMarkers, locationLabelAt } from './mapRender.js';
-import { mapBounds } from './worldSpace.js';
+import { mapBounds, DEFAULT_PLAYABLE_RADIUS_M } from './worldSpace.js';
 
 // Minimap config
 const MAP_SIZE_PX = 160;
@@ -256,7 +256,7 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData }) {
   // the streaming-grid box, which over-covers the world and never lined up).
   // As the player nears the rim the curve slides into view; the CSS circular
   // clip hides any overshoot.
-  const discR = (mapData?.config?.radius ?? 520) * scale;
+  const discR = (mapData?.config?.radius ?? DEFAULT_PLAYABLE_RADIUS_M) * scale;
   const ex = toMapX(0), ez = toMapY(0);
   ctx.strokeStyle = 'rgba(255, 220, 80, 0.55)';
   ctx.lineWidth = 2;

@@ -41,7 +41,7 @@ Prioritized hotspots (target: **balanced desktop + mobile**):
 
 | # | Finding | Evidence | Fix direction |
 |---|---------|----------|---------------|
-| **P1** | **Leaf-card explosion** — 150–210 alpha-tested `DOUBLESIDE` quads per broadleaf tree, up to 220 per Wildwood tree, × **880** overworld trees. Authors flagged "perf out of scope" twice. Largest fill-rate/overdraw risk in the active ring. | `streaming/ashwoodPropMeshes.js:537,740,259-262`; scatter counts in `config/zone1_world.json` | Cap cards by distance/tier; billboard-merge far canopies; add LOD (P2). `threejs-procedural-vegetation` |
+| **P1** | **Leaf-card explosion** — 150–210 alpha-tested `DOUBLESIDE` quads per broadleaf tree, up to 220 per Wildwood tree. The overworld scatter *requests* 880 trees (`scatter.treeCount`) but the generator actually places **~359** (rest rejected by biome/forest/mountain/exclusion); the dense Wildwood forest adds more, counted separately. Still the largest fill-rate/overdraw risk in the active ring; authors flagged "perf out of scope" twice. | `streaming/ashwoodPropMeshes.js:537,740,259-262`; `worldgen/forest.js`; realized counts via `scripts/verify_worldgen.mjs` | Cap cards by distance/tier; billboard-merge far canopies; add LOD (P2). `threejs-procedural-vegetation` |
 | **P2** | **Declared-but-missing LOD** — config sets `lod_required:true` with full profiles (trees 60/180/450 m, grass 45/80 m, castle 300 m), but there is **zero** `addLODLevel`/`simplify` in code. | `config/world_build_config.json:78,159-175`; grep | Wire `mesh.addLODLevel()` per the config profiles; `babylonjs-engine` §Performance |
 | **P3** | **Lake `MirrorTexture` = a full second scene render every frame** (high tier), on top of SSAO2 + 4-cascade CSM + 2 pipelines. This is the exact stack the safe-mode blames for context loss. | `streaming/ashwoodTileProvider.js:648-653`; `BabylonWorldScene.js:817-826` | Gate behind tier/distance; drop to a cheap planar/cubemap or SSR fallback |
 | **P4** | **No global scene freeze toggles** — no `scene.freezeActiveMeshes()`, `material.freeze()`, or `blockMaterialDirtyMechanism`; props + avatars are never frozen, and the multi-octave terrain splat shader (FBM/ridged/triplanar/voronoi per fragment) is unfrozen. | `game/terrainMaterial.js:39-297`; grep | Freeze static materials/meshes; `scene.freezeActiveMeshes()` after load; `babylonjs-engine` §Scene Optimization |
@@ -93,7 +93,11 @@ The authored `biomes[].danger` gradient (0.15→1.0) exists but **nothing wires 
 - Introduced **`src/features/world/worldSpace.js`** as the single client coordinate source
   of truth (`PX_PER_M`, the legacy `1600` origin, `toWorld`/`toStdb`, `mapBounds()`),
   imported by the scene and both 2D maps; the server mirrors it with a pointer comment.
-- Fixed the off-by-48 (`world_bounds_m` max → 1048).
+- Fixed the off-by-48 (`world_bounds_m` max → 1048). The bounds are intentionally
+  asymmetric (`-1000..+1048`): `min` stays −1000 so the origin tile `T_03_03` (and its baked
+  asset) don't shift; only `max` is corrected to the grid's true `8×256 = 2048` extent.
+  (`tileMath` never reads `max`, so this is descriptive; a client/server parity + tile-bounds
+  test now locks it — `worldSpace.test.js`.)
 
 ### Deferred (see §7)
 Normalizing the `1600` server origin to zero is a **live-data migration** and is out of
@@ -129,8 +133,11 @@ Still open, and scheduled for **Batch 1**:
   but there is no `getRemotes()` accessor), chests (`getChests()` exists at `:2667` but is
   never plotted), NPCs, POIs/waypoints, the castle, zone boundaries, and height/relief
   shading are all absent though the data exists.
-- **Wrong hardcoded names** — dungeons are always labeled `hollowDeep.name`; the lake is
-  hardcoded "Mirrormere" though the live lake is "Stillmere". `mapRender.js:58,96,103`.
+- **Label fallbacks vs one real hardcode** — the lake and marker labels already use the
+  config name with a fallback (`lake.name ?? 'Mirrormere'`, per-interior `d.name`), so the
+  live lake already reads "Stillmere". The one genuine bug: `locationLabelAt`'s in-dungeon
+  case returns `hollowDeep.name` for *any* dungeon (`mapRender.js:96`), so the header
+  mislabels Frostspire Halls as the Hollow Crypt.
 
 The scene already exposes the accessors a richer map needs: `getPose()` (`:2625`),
 `getMobs()` (`:2642`), `getMapData()` (`:2658`), `getChests()` (`:2667`), `getLocation()`

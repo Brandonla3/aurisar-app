@@ -14,10 +14,13 @@
  *   world units → STDB px:   units * 32 + 1600    (client toStdb)
  *   Spawn at STDB (1600, 1600) = world origin.
  *
- * World bounds match world_build_config.tiling_streaming.world_bounds_m
- * (canonical: src/features/world/config/world_build_config.json):
- *   world_bounds_m: ±1000 world units (2km × 2km playable area)
- *   In STDB px:      1600 ± 32000 → [-30400, 33600]
+ * Server MOVEMENT bounds are an intentionally symmetric legacy clamp — distinct
+ * from tile coverage. The tiling grid (world_build_config.tiling_streaming.
+ * world_bounds_m) spans -1000..+1048 m (8 × 256), while the server clamps player
+ * movement to a symmetric ±1000 m box; both comfortably contain the ~520 m
+ * playable disc, so the difference is not player-visible. The px/meter/origin
+ * constants mirror src/features/world/worldSpace.js (client source of truth).
+ *   ±1000 world units → in STDB px: 1600 ± 32000 → [-30400, 33600]
  *   With 32 px (= 1 world unit) player half-width buffer: clamp to
  *   [-30368, 33568] on both axes.
  */
