@@ -256,8 +256,15 @@ export function buildPropTemplates(scene, opts = {}) {
   // broadleaf leaf card: a single quad; the ~1.83:1 aspect of the card is set
   // per-instance via (sx, sy) scale. Only exists when the leaf art loaded.
   if (leafCardMat) {
+    // Single-sided quad. The material ALREADY draws both faces
+    // (backFaceCulling = false) and lights them correctly (twoSidedLighting =
+    // true), so DOUBLESIDE geometry was pure waste: it doubled the vertex count
+    // and rendered a second, coincident back quad every frame (with culling off
+    // it isn't culled) — 2x overdraw on the map's single dominant fill-rate
+    // cost. Dropping it ~halves leaf-card geometry and overdraw with no visual
+    // change (cards stay visible and lit from both sides; they cast no shadows).
     T.leafCard = BABYLON.MeshBuilder.CreatePlane('tpl_leafcard', {
-      size: 1, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
+      size: 1,
     }, scene);
     T.leafCard.material = leafCardMat;
   }
@@ -515,6 +522,14 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // to it) is unaffected.
   const onBeach = (x, z) => wg.lakeShoreAt?.(x, z) > 0.05;
 
+  // Tier-aware leaf-card budget. The alpha-tested canopy quads are the map's
+  // single dominant fill-rate cost, so thin their count on the weaker tiers;
+  // high/desktop is unchanged. Canopies keep generous card overlap, so the
+  // crown still reads as full. Combined with the single-sided leaf-card
+  // geometry this roughly thirds the mobile leaf fill cost.
+  const tier = scene.metadata?.ashwood?.qualityTier ?? 'high';
+  const leafScale = tier === 'mobile' ? 0.6 : tier === 'low' ? 0.8 : 1;
+
   // ── overworld trees (prototype spawnTree) ──
   for (const t of s.trees) {
     if (!inBounds(t.x, t.z)) continue;
@@ -534,7 +549,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
         // Pure leaf cards — no geometric core at all. Density alone fills the
         // canopy: enough overlapping cards that interior gaps read as natural
         // light holes, not missing geometry.
-        const cards = 150 + ((rng() * 60) | 0);   // dense shell (perf out of scope)
+        const cards = Math.round((150 + ((rng() * 60) | 0)) * leafScale);   // dense shell, tier-scaled
         const ccy = cy + 1.1;             // canopy (ellipsoid) center height
         for (let i = 0; i < cards; i++) {
           const w = rand(rng, 2.5, 3.9);
@@ -737,7 +752,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
       // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
       // (Performance is explicitly out of scope this round; thin instances keep
       // this one draw call per tile regardless of card count.)
-      const cards = Math.min(220, (90 + cr * 16) | 0);
+      const cards = Math.round(Math.min(220, (90 + cr * 16) | 0) * leafScale);
       const ccy = cby + ch * 0.2;           // canopy (ellipsoid) center height
       for (let c = 0; c < cards; c++) {
         // flattened ellipsoid, outer-shell biased → dense rounded crown
