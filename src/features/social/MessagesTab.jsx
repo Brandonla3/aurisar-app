@@ -1,16 +1,15 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { CLASSES } from '../../data/exercises';
 import { UI_COLORS } from '../../data/constants';
 import { S, FS } from '../../utils/tokens';
 import { ClassIcon } from '../../components/ClassIcon';
+import { groupMessages } from './messageUtils';
 
 /**
  * Messages tab — extracted from the inline IIFE in App.jsx as the
  * fourth slice of Finding #6 (App.jsx decomposition) per
- * docs/performance-audit.md (PR #116).
- *
- * Pure presentational tab. State + setters come in as props from App;
- * no derivation work to lift into a hook (unlike the library tab).
+ * docs/performance-audit.md (PR #116). State + actions now live in
+ * useMessages.js; this stays purely presentational.
  *
  * Wrapped in React.memo so unrelated App re-renders (toast, xpFlash,
  * modals on other tabs) don't drag the messages tab into a re-render
@@ -18,33 +17,96 @@ import { ClassIcon } from '../../components/ClassIcon';
  * convention.
  */
 
+function timeAgoLabel(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return mins + "m";
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + "h";
+  return Math.floor(hrs / 24) + "d";
+}
+
+function ErrorPanel({ message, onRetry }) {
+  return <div className={"msg-error-panel"} role="alert">
+    <div style={{ fontSize: "1.4rem", marginBottom: S.s6 }}>{"⚠️"}</div>
+    <div style={{ fontSize: FS.fs68, color: "#b4ac9e", marginBottom: S.s8 }}>{message}</div>
+    <button className={"btn btn-ghost btn-xs"} onClick={onRetry}>{"↺ Retry"}</button>
+  </div>;
+}
+
 const MessagesTab = memo(function MessagesTab({
-  // Conversation list state
   msgConversations,
-  // Active conversation
-  msgActiveChannel, setMsgActiveChannel,
-  // Chat content
-  msgMessages, setMsgMessages,
+  msgActiveChannel,
+  msgMessages,
   msgInput, setMsgInput,
-  msgScrollRef,
-  // Loading / sending flags
   msgLoading,
-  msgSending,
-  // View toggle (list ↔ chat)
-  msgView, setMsgView,
-  // Action callbacks (defined in App)
+  msgListLoading,
+  msgListError,
+  msgChatError,
+  msgView,
   sendMsg,
-  loadChannelMessages,
+  retryFailedMsg,
+  discardFailedMsg,
+  openConversation,
+  closeConversation,
   loadConversations,
-  loadUnreadCount,
-  // Auth (used to label own messages "You: ")
+  loadChannelMessages,
+  goToGuild,
   authUser,
 }) {
   const CLASSES_REF = CLASSES;
 
+  // Smart auto-scroll: pin to bottom on open + own sends; if the reader has
+  // scrolled up, don't yank — surface a "new messages" pill instead.
+  const scrollRef = useRef(null);
+  const nearBottomRef = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+  const scrollToBottom = (smooth) => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    setShowJump(false);
+  };
+  const lastMsg = msgMessages[msgMessages.length - 1];
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    if (nearBottomRef.current || (lastMsg && lastMsg.is_mine)) {
+      scrollToBottom(false);
+    } else {
+      setShowJump(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msgMessages.length, msgActiveChannel?.channel_id, msgLoading]);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    nearBottomRef.current = nearBottom;
+    if (nearBottom) setShowJump(false);
+  };
+
+  // ── Signed out ──
+  if (!authUser) {
+    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Messages ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
+      <div style={{ textAlign: "center", padding: "30px 14px" }}>
+        <div style={{ fontSize: "2.5rem", marginBottom: S.s10, opacity: .3 }}>{"💬"}</div>
+        <div style={{ fontSize: FS.fs78, color: "#8a8478", marginBottom: S.s6 }}>{"Sign in to send messages"}</div>
+        <div style={{ fontSize: FS.fs62, color: "#8a8478" }}>{"Messaging is only available with an account — preview mode can't chat."}</div>
+      </div></div>;
+  }
+
   // ── Conversation List ──
   if (msgView === "list") {
-    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Messages ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>{msgConversations.length === 0 && <div style={{
+    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Messages ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
+      {msgListError && <ErrorPanel message={msgListError} onRetry={loadConversations} />}
+      {!msgListError && msgListLoading && msgConversations.length === 0 && [0, 1, 2].map(i => <div key={i} className={"msg-skeleton-card"}>
+        <div className={"msg-skeleton-dot"} />
+        <div style={{ flex: 1 }}>
+          <div className={"msg-skeleton-line"} style={{ width: "45%" }} />
+          <div className={"msg-skeleton-line"} style={{ width: "75%", marginTop: 6 }} />
+        </div>
+      </div>)}
+      {!msgListError && !msgListLoading && msgConversations.length === 0 && <div style={{
         textAlign: "center",
         padding: "30px 14px"
       }}><div style={{
@@ -57,35 +119,32 @@ const MessagesTab = memo(function MessagesTab({
           marginBottom: S.s6
         }}>{"No conversations yet"}</div><div style={{
           fontSize: FS.fs62,
-          color: "#8a8478"
+          color: "#8a8478",
+          marginBottom: S.s10
         }}>{"Tap "}<span style={{
             color: UI_COLORS.info
-          }}>{"💬 Chat"}</span>{" on a friend’s card in the Guild tab to start a conversation."}</div></div>}{msgConversations.map(conv => {
+          }}>{"💬 Chat"}</span>{" on a friend’s card in the Guild tab to start a conversation."}</div>
+        {goToGuild && <button className={"btn btn-ghost btn-xs"} style={{ color: UI_COLORS.info }} onClick={goToGuild}>{"👥 Go to Guild"}</button>}</div>}
+      {!msgListError && msgConversations.map(conv => {
         const other = conv.other_user;
         const otherCls = other ? CLASSES_REF[other.chosen_class] : null;
-        const lastMsg = conv.last_message;
+        const convLastMsg = conv.last_message;
         const unread = conv.unread_count || 0;
-        const timeAgo = lastMsg ? (() => {
-          const diff = Date.now() - new Date(lastMsg.created_at).getTime();
-          const mins = Math.floor(diff / 60000);
-          if (mins < 1) return "now";
-          if (mins < 60) return mins + "m";
-          const hrs = Math.floor(mins / 60);
-          if (hrs < 24) return hrs + "h";
-          const days = Math.floor(hrs / 24);
-          return days + "d";
-        })() : "";
-        return <div key={conv.channel_id} className={`msg-conv-card${unread > 0 ? " unread" : ""}`} onClick={() => {
-          setMsgActiveChannel(conv);
-          loadChannelMessages(conv.channel_id);
-          setMsgView("chat");
-        }}>
-          // Avatar
+        const timeAgo = convLastMsg ? timeAgoLabel(convLastMsg.created_at) : "";
+        return <div key={conv.channel_id} role="button" tabIndex={0}
+          aria-label={`Open conversation with ${other ? other.player_name : conv.name || "chat"}${unread > 0 ? `, ${unread} unread` : ""}`}
+          className={`msg-conv-card${unread > 0 ? " unread" : ""}`}
+          onClick={() => openConversation(conv)}
+          onKeyDown={e => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openConversation(conv);
+            }
+          }}>
           <div className={"msg-avatar"} style={{
             background: (otherCls ? otherCls.color : "#8a8478") + "18",
             border: "1px solid " + (otherCls ? otherCls.color : "#8a8478") + "44"
           }}>{otherCls ? <ClassIcon classKey={other.chosen_class} size={18} color={otherCls.color} /> : "💬"}</div>
-          // Name + last message
           <div style={{
             flex: 1,
             minWidth: 0
@@ -103,13 +162,12 @@ const MessagesTab = memo(function MessagesTab({
                 fontSize: FS.fs52,
                 color: "#8a8478",
                 flexShrink: 0
-              }}>{timeAgo}</span></div>{lastMsg && <div className={`msg-conv-preview${unread > 0 ? " unread" : ""}`}>{lastMsg.sender_id === authUser?.id ? "You: " : ""}{lastMsg.content}</div>}{!lastMsg && <div style={{
+              }}>{timeAgo}</span></div>{convLastMsg && <div className={`msg-conv-preview${unread > 0 ? " unread" : ""}`}>{convLastMsg.sender_id === authUser?.id ? "You: " : ""}{convLastMsg.content}</div>}{!convLastMsg && <div style={{
               fontSize: FS.fs62,
               color: "#8a8478",
               fontStyle: "italic",
               marginTop: S.s2
             }}>{"No messages yet"}</div>}</div>{
-          // Unread badge
           unread > 0 && <div className={"msg-unread-badge"}>{unread > 99 ? "99+" : unread}</div>}</div>;
       })}</div>;
   }
@@ -117,27 +175,22 @@ const MessagesTab = memo(function MessagesTab({
   // ── Chat View ──
   const other = msgActiveChannel?.other_user;
   const otherCls = other ? CLASSES_REF[other.chosen_class] : null;
+  const grouped = groupMessages(msgMessages);
   return <div style={{
     display: "flex",
     flexDirection: "column",
     flex: 1,
-    minHeight: 0
+    minHeight: 0,
+    position: "relative"
   }}>
-    // Chat header
-    <div className={"msg-chat-hdr"}><button style={{
+    <div className={"msg-chat-hdr"}><button aria-label={"Back to conversations"} style={{
         background: "transparent",
         border: "none",
         color: "#b4ac9e",
         fontSize: FS.fs82,
         cursor: "pointer",
         padding: "4px"
-      }} onClick={() => {
-        setMsgView("list");
-        setMsgActiveChannel(null);
-        setMsgMessages([]);
-        loadConversations();
-        loadUnreadCount();
-      }}>{"←"}</button><div style={{
+      }} onClick={closeConversation}>{"←"}</button><div style={{
         width: 30,
         height: 30,
         borderRadius: "50%",
@@ -159,8 +212,7 @@ const MessagesTab = memo(function MessagesTab({
           fontSize: FS.fs52,
           color: "#8a8478"
         }}>{otherCls ? otherCls.name : "Unknown"}{" · Lv."}{other.level || 1}{other.public_id ? " · #" + other.public_id : ""}</div>}</div></div>
-    // Messages area
-    <div ref={msgScrollRef} style={{
+    <div ref={scrollRef} onScroll={onScroll} aria-label={"Message history"} style={{
       flex: 1,
       minHeight: 0,
       overflowY: "auto",
@@ -170,7 +222,7 @@ const MessagesTab = memo(function MessagesTab({
       gap: S.s6,
       scrollbarWidth: "thin",
       scrollbarColor: "rgba(180,172,158,.1) transparent"
-    }}>{msgLoading && <div style={{
+    }}>{msgChatError && <ErrorPanel message={msgChatError} onRetry={() => msgActiveChannel && loadChannelMessages(msgActiveChannel.channel_id)} />}{!msgChatError && msgLoading && <div style={{
         textAlign: "center",
         padding: "20px 0"
       }}><div style={{
@@ -184,53 +236,54 @@ const MessagesTab = memo(function MessagesTab({
         }} /><div style={{
           fontSize: FS.fs58,
           color: "#8a8478"
-        }}>{"Loading…"}</div></div>}{!msgLoading && msgMessages.length === 0 && <div style={{
+        }}>{"Loading…"}</div></div>}{!msgChatError && !msgLoading && msgMessages.length === 0 && <div style={{
         textAlign: "center",
         padding: "30px 0",
         fontSize: FS.fs68,
         color: "#8a8478",
         fontStyle: "italic"
-      }}>{"No messages yet. Say hello!"}</div>}{!msgLoading && msgMessages.map(msg => {
+      }}>{"No messages yet. Say hello!"}</div>}{!msgChatError && !msgLoading && grouped.map(msg => {
         const isMine = msg.is_mine;
         const isSystem = msg.message_type === "system" || msg.message_type === "event";
+        const daySep = msg._daySep && <div className={"msg-day-sep"}><span>{msg._daySep}</span></div>;
         if (isSystem) {
-          return <div key={msg.id} style={{
+          return <React.Fragment key={msg.id}>{daySep}<div style={{
             textAlign: "center",
             padding: "4px 0"
-          }}><span className={"msg-bubble system"}>{msg.content}</span></div>;
+          }}><span className={"msg-bubble system"}>{msg.content}</span></div></React.Fragment>;
         }
         const time = new Date(msg.created_at).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit"
         });
-        return <div key={msg.id} style={{
+        return <React.Fragment key={msg.id}>{daySep}<div style={{
           display: "flex",
           flexDirection: "column",
           alignItems: isMine ? "flex-end" : "flex-start",
           maxWidth: "80%",
           alignSelf: isMine ? "flex-end" : "flex-start"
-        }}>{!isMine && <div style={{
+        }}>{msg._showSender && <div style={{
             fontSize: FS.fs48,
             color: "#8a8478",
             marginBottom: S.s2,
             marginLeft: S.s4
-          }}>{msg.sender_name}</div>}<div className={`msg-bubble ${isMine ? "own" : "other"}`}>{msg.content}</div><div className={"msg-timestamp"} style={{
+          }}>{msg.sender_name}</div>}<div className={`msg-bubble ${isMine ? "own" : "other"}${msg.pending ? " pending" : ""}${msg.failed ? " failed" : ""}`}>{msg.content}</div>{msg.failed && <div className={"msg-retry"}><button onClick={() => retryFailedMsg(msg.id)}>{"⚠ Failed — tap to retry"}</button><button aria-label={"Discard message"} onClick={() => discardFailedMsg(msg.id)}>{"✕"}</button></div>}{msg._showTime && !msg.failed && <div className={"msg-timestamp"} style={{
             marginLeft: S.s4,
             marginRight: S.s4
-          }}>{time}{msg.edited_at ? " · edited" : ""}</div></div>;
+          }}>{msg.pending ? "Sending…" : time}{msg.edited_at ? " · edited" : ""}</div>}</div></React.Fragment>;
       })}</div>
-    // Input bar
-    <div className={"msg-input-bar"}><input className={"msg-input"} placeholder={"Type a message…"} value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => {
+    {showJump && <button className={"msg-jump-pill"} onClick={() => scrollToBottom(true)}>{"↓ New messages"}</button>}
+    <div className={"msg-input-bar"}><input className={"msg-input"} placeholder={"Type a message…"} aria-label={"Message text"} value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           sendMsg();
         }
-      }} /><button className={"msg-send-btn"} style={{
+      }} /><button className={"msg-send-btn"} aria-label={"Send message"} style={{
         width: 40,
         height: 40,
         opacity: msgInput.trim() ? 1 : .4,
         cursor: msgInput.trim() ? "pointer" : "default"
-      }} disabled={msgSending || !msgInput.trim()} onClick={sendMsg}>{msgSending ? "…" : "↑"}</button></div></div>;
+      }} disabled={!msgInput.trim()} onClick={sendMsg}>{"↑"}</button></div></div>;
 });
 
 export default MessagesTab;
