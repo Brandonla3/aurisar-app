@@ -33,6 +33,7 @@ const GymKitBar = memo(function GymKitBar({ gymKit, setGymKit, totalShown, total
           type="button"
           className={"gymkit-toggle"}
           aria-expanded={open}
+          aria-controls={"gymkit-panel"}
           onClick={() => setOpen(o => !o)}
         >
           <span aria-hidden="true">{active ? "🎒" : "🎒"}</span>
@@ -50,7 +51,7 @@ const GymKitBar = memo(function GymKitBar({ gymKit, setGymKit, totalShown, total
       </div>
 
       {open && (
-        <div className={"gymkit-panel"}>
+        <div className={"gymkit-panel"} id={"gymkit-panel"}>
           <p className={"gymkit-hint"}>
             {"Pick what you can train with. Bodyweight is always included."}
           </p>
@@ -69,7 +70,7 @@ const GymKitBar = memo(function GymKitBar({ gymKit, setGymKit, totalShown, total
             })}
           </div>
           {active && owned.size === 0 && (
-            <p className={"gymkit-hint gymkit-warn"}>
+            <p className={"gymkit-hint gymkit-warn"} role={"status"}>
               {"Nothing selected — showing bodyweight exercises only."}
             </p>
           )}

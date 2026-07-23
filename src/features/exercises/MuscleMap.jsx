@@ -16,9 +16,10 @@ import { S, FS } from '../../utils/tokens';
  * It echoes the armour vocabulary already in the muscle icons
  * (chest-armor, shoulder-armor, leg-armor).
  *
- * Ships as an opt-in view: the tile grid stays the default, and the torch
- * strip remains the accessible linear reading of the same numbers. Every
- * region is a real <button>, so the map is operable by keyboard too.
+ * Ships as an opt-in view: the torch strip stays the default and remains the
+ * linear reading of the same numbers. Regions are SVG <g> elements carrying
+ * role="button" and tabIndex, not native <button>s — SVG cannot host one —
+ * so each handles Enter/Space itself and names itself with aria-label.
  */
 
 // Region geometry per view. Each entry is [x, y, width, height, radius] —
@@ -55,7 +56,7 @@ const WHEN = d =>
 // to a chip instead of vanishing.
 const MAPPED = new Set([...FRONT, ...BACK].map(r => r.mg));
 
-const MuscleMap = memo(function MuscleMap({ data, onPick }) {
+const MuscleMap = memo(function MuscleMap({ data, onPick, viewToggle }) {
   const [view, setView] = useState('front');
   const regions = view === 'front' ? FRONT : BACK;
   const byMg = new Map((data || []).map(d => [d.mg, d]));
@@ -65,24 +66,28 @@ const MuscleMap = memo(function MuscleMap({ data, onPick }) {
     <div className={"lib-home-section"} style={{ marginBottom: S.s4 }}>
       <div className={"lib-section-hdr"} style={{ display: "flex", alignItems: "center" }}>
         <span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Body Map"}
-        <div className={"mm-viewtoggle"} role="group" aria-label="Body view">
-          {['front', 'back'].map(v => (
-            <button
-              key={v}
-              type="button"
-              className={view === v ? "on" : undefined}
-              aria-pressed={view === v}
-              onClick={() => setView(v)}
-            >{v === 'front' ? 'Front' : 'Back'}</button>
-          ))}
+        <div className={"mm-hdr-controls"}>
+          {viewToggle}
+          <div className={"mm-viewtoggle"} role="group" aria-label="Body view">
+            {['front', 'back'].map(v => (
+              <button
+                key={v}
+                type="button"
+                className={view === v ? "on" : undefined}
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+              >{v === 'front' ? 'Front' : 'Back'}</button>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className={"mm-wrap"}>
         <svg className={"mm-svg"} viewBox="0 0 220 372" role="group" aria-label={`${view} body map`}>
           <defs>
-            {/* Fog over untrained regions — a soft, drifting veil rather than
-                a flat grey, so "unknown" reads as atmosphere not as disabled. */}
+            {/* Fog over untrained regions — displaced and blurred rather than
+                a flat grey, so "unknown" reads as atmosphere not as disabled.
+                Static, not animated; reduced-motion drops it entirely. */}
             <filter id="mm-fog" x="-30%" y="-30%" width="160%" height="160%">
               <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7" />
               <feDisplacementMap in="SourceGraphic" scale="7" />
@@ -108,8 +113,9 @@ const MuscleMap = memo(function MuscleMap({ data, onPick }) {
                 className={`mm-region mm-${state}`}
                 style={{ "--mg-color": d.color, "--volume": d.volume }}
               >
-                {/* One button per region; the mirrored halves share it via a
-                    <title> so a screen reader hears one control, not two. */}
+                {/* One control per region: the mirrored left/right plates sit
+                    inside a single role="button" group with one aria-label, so a
+                    screen reader hears one control rather than two. */}
                 <g
                   role="button"
                   tabIndex={0}

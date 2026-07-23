@@ -66,6 +66,22 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     setBrowseView(v);
     try { localStorage.setItem('aurisar-heat-view', v); } catch { /* private mode */ }
   };
+  // Rendered inside the heat section header rather than under "Browse by
+  // Muscle", which sits below it — a control has to live with the thing it
+  // controls or it reads as belonging to the next section down.
+  const heatToggle = (
+    <div className={"mm-viewtoggle"} role={"group"} aria-label={"Heat display"}>
+      {[["strip", "▦ Strip"], ["map", "🗺 Map"]].map(([v, label]) => (
+        <button
+          key={v}
+          type="button"
+          className={browseView === v ? "on" : undefined}
+          aria-pressed={browseView === v}
+          onClick={() => setHeatView(v)}
+        >{label}</button>
+      ))}
+    </div>
+  );
   const pickMuscle = mg => {
     setLibMuscleFilters(new Set([mg]));
     setLibBrowseMode("filtered");
@@ -249,23 +265,13 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         /* Browse by Muscle — feature tiles */
       }
       {browseView === "map"
-        ? <MuscleMap data={libMuscleMapData} onPick={pickMuscle} />
-        : <MuscleTorchStrip data={libMuscleMapData} onPick={pickMuscle} />}
+        ? <MuscleMap data={libMuscleMapData} onPick={pickMuscle} viewToggle={heatToggle} />
+        : <MuscleTorchStrip data={libMuscleMapData} onPick={pickMuscle} viewToggle={heatToggle} />}
       {libMuscleMapData.some(d => d.state !== "cold") && <div className={"lib-divider"} />}
 
       <div className={"lib-home-section"} style={{
         marginBottom: S.s4
-      }}><div className={"lib-section-hdr"} style={{ display: "flex", alignItems: "center" }}><span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Browse by Muscle"}<div className={"mm-viewtoggle"} role={"group"} aria-label={"Heat display"}>
-          {[["strip", "▦ Strip"], ["map", "🗺 Map"]].map(([v, label]) => (
-            <button
-              key={v}
-              type="button"
-              className={browseView === v ? "on" : undefined}
-              aria-pressed={browseView === v}
-              onClick={() => setHeatView(v)}
-            >{label}</button>
-          ))}
-        </div></div><div style={{
+      }}><div className={"lib-section-hdr"} style={{ display: "flex", alignItems: "center" }}><span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Browse by Muscle"}</div><div style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: S.s10

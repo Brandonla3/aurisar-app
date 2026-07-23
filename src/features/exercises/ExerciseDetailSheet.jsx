@@ -33,11 +33,10 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
   setProfile,
   setActiveTab,
   setAddToWorkoutPicker,
-  setSavePlanWizard,
-  setSpwName, setSpwIcon, setSpwDate, setSpwMode, setSpwTargetPlanId,
+  openSavePlanWizard,
   setSelEx, setSets, setReps, setExWeight, setWeightPct,
   setHrZone, setDistanceVal, setExHHMM, setExSec, setQuickRows,
-  isInCart, toggleCart,
+  isInCart, toggleCart, stagedCount = 0,
   allExById,
 }) {
   const close = () => setLibDetailEx(null);
@@ -315,6 +314,17 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             }}
           >{staged ? "⊟ Staged — tap to remove" : "⊞ Stage for later"}</button>
         )}
+        {/* The tray sits at z-index 780 and the sheet at 9400, so staging from
+            here updates a bar the user cannot see. Report the count inline
+            rather than leaving the button's own state as the only signal. */}
+        {ex.id !== "rest_day" && toggleCart && stagedCount > 0 && (
+          <div role="status" style={{
+            fontSize: FS.fs62,
+            color: "#8a8478",
+            textAlign: "center",
+            marginTop: S.s4
+          }}>{`In staging tray · ${stagedCount}`}</div>
+        )}
 
         <div style={{ display: "flex", gap: S.s8, marginTop: S.s8 }}>
           {ex.id !== "rest_day" && <button onClick={() => {
@@ -345,19 +355,11 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           }}>{"💪 Add to Workout"}</button>}
 
           <button onClick={() => {
-            setSavePlanWizard({
-              // The wizard renders sets × reps + XP per row and saves those
-              // fields; an entry carrying only a name showed
-              // "undefined×undefined +undefined XP" and then saved a flat
-              // 3×10. Same defect the cart path had (#260 review).
-              entries: [planEntry(ex, profile.chosenClass, allExById)],
-              label: ex.name
-            });
-            setSpwName(ex.name);
-            setSpwIcon("📋");
-            setSpwDate("");
-            setSpwMode("new");
-            setSpwTargetPlanId(null);
+            // Via the shared opener, which also seeds spwSelected — opening
+            // the wizard without it left Save refusing with "Select at least
+            // one exercise", or worse, silently reusing a previous run's
+            // selection.
+            openSavePlanWizard([planEntry(ex, profile.chosenClass, allExById)], ex.name, ex.name);
             close();
           }} style={{
             flex: 1,

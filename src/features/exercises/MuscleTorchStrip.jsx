@@ -25,7 +25,7 @@ const LABEL = {
   cold: 'not trained',
 };
 
-const MuscleTorchStrip = memo(function MuscleTorchStrip({ data, onPick }) {
+const MuscleTorchStrip = memo(function MuscleTorchStrip({ data, onPick, viewToggle }) {
   if (!data || !data.length) return null;
 
   // Nothing logged at all — a strip of uniformly dark runes tells the user
@@ -34,8 +34,9 @@ const MuscleTorchStrip = memo(function MuscleTorchStrip({ data, onPick }) {
 
   return (
     <div className={"lib-home-section"} style={{ marginBottom: S.s4 }}>
-      <div className={"lib-section-hdr"}>
+      <div className={"lib-section-hdr"} style={{ display: "flex", alignItems: "center" }}>
         <span className={"lib-hdr-icon"}>{"🔥"}</span>{"Training Heat"}
+        {viewToggle}
       </div>
       {/* A real list wrapping real buttons: the group is a list to a screen
           reader, each torch stays a button. */}

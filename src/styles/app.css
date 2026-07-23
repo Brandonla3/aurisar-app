@@ -517,6 +517,8 @@
     .mm-chip.mm-fading{opacity:.75}
     .mm-chip.mm-cold{opacity:.55;filter:grayscale(.8)}
 
+    .mm-hdr-controls{display:flex;align-items:center;gap:6px;margin-left:auto}
+    .mm-hdr-controls .mm-viewtoggle{margin-left:0}
     .mm-viewtoggle{display:flex;gap:2px;margin-left:auto}
     .mm-viewtoggle button{
       background:rgba(45,42,36,.3);border:1px solid rgba(180,172,158,.07);
@@ -579,10 +581,13 @@
     .gymkit-hint{font-size:.58rem;color:#6f6a62;margin:0 0 7px;line-height:1.45}
     .gymkit-warn{color:#c4a044;margin:7px 0 0}
     .gymkit-opts{display:flex;flex-wrap:wrap;gap:5px}
+    /* Sized for a thumb on a gym floor, not a mouse: the 24px-tall chips this
+       started as were too small to hit reliably mid-session. */
     .gymkit-opt{
-      padding:4px 10px;border-radius:12px;cursor:pointer;
+      min-height:36px;display:inline-flex;align-items:center;
+      padding:0 14px;border-radius:18px;cursor:pointer;
       background:rgba(45,42,36,.28);border:1px solid rgba(180,172,158,.08);
-      color:#8a8478;font-size:.6rem;font-family:'Inter',sans-serif;
+      color:#8a8478;font-size:.66rem;font-family:'Inter',sans-serif;
       transition:all var(--dur-fast) var(--ease-standard);
       -webkit-tap-highlight-color:transparent
     }
