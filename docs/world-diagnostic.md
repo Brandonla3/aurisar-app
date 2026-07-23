@@ -53,6 +53,50 @@ Reference context: shadows use `CascadedShadowGenerator(2048)` with 4 cascades o
 tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivisions =
 **9,409 verts/tile** × 9 active tiles ≈ 85 k terrain verts (`ashwoodTileProvider.js:26`).
 
+### Batch 2 status (implemented)
+
+**Delivered** — verifiable, behaviour-preserving or tier-gated:
+
+- **P1 — leaf-card fill.** Canopy quads are now single-sided: the material already
+  draws both faces (`backFaceCulling=false` + `twoSidedLighting`), so the `DOUBLESIDE`
+  geometry was doubling vertices *and* overdraw for no visual gain — ~halved on every
+  tier. Plus a tier-scaled card budget (mobile 0.6×, low 0.8×, high unchanged), so
+  mobile leaf fill drops ~⅔ overall. (`ashwoodPropMeshes.js`)
+- **P5 — mob material churn.** `_stdMat` caches per type/family; the two HP-bar
+  materials are shared; `_removeMob` no longer disposes the shared materials; the
+  redundant per-frame HP-bar `lookAt` is gone (the planes already billboard).
+- **P6 — observer count.** The per-torch (≤12) and per-magic-accent (≤10) flicker
+  observers collapse into one shared loop observer (matching the already-consolidated
+  campfire / CastleLightPool patterns); the flicker maths is unchanged.
+- **P7 — sky overdraw.** The `AshwoodSky` gradient dome (a full-screen 5-octave FBM
+  shader) is skipped when it contributes nothing — daytime (`skyAlpha≈0`) with its 2-D
+  cloud deck faded to the volumetric layer's haze — removing a redundant sky pass on
+  the heaviest (high-tier + volumetric) config. The cloud dome was already
+  high-tier/opt-in gated.
+
+**Deferred** — real, but they need on-device GPU validation rather than a blind edit:
+
+- **P3 — the lake mirror is ALREADY tier-gated:** reflective water is built only when
+  `qualityTier === 'high'` (`ashwoodTileProvider.js:82`); `water`/`streamWater` never
+  mirror, so the core ask is met. A further *distance* skip (the half-res mirror still
+  re-renders the whole scene each frame even when the player is far from the lake) is
+  worthwhile but risks the reflection popping while the lake is still visible — a
+  threshold to tune live.
+- **P4 — freeze:** `material.freeze()` skips per-submesh CPU readiness checks but does
+  **not** reduce a material's per-fragment cost, so it would not cut the heavy terrain
+  splat shader — which is already tier-scaled (oct 6/4/3; triplanar/voronoi high-only,
+  `terrainMaterial.js:12-16`). Blind freezing also risks recompile-timing regressions
+  (e.g. dungeon torches added after a freeze failing to relight the floor).
+  `scene.freezeActiveMeshes()` is unsafe here — a chase camera + tile streaming
+  constantly change the active-mesh set.
+- **P2 — per-instance tree LOD is not expressible** on the current thin-instance foliage
+  (one mesh per prop-type per tile; `addLODLevel` keys off the whole mesh, not per
+  instance), and the config's 60/180/450 m thresholds barely trigger inside the
+  3×3 × 256 m active ring (everything loaded is within ~360 m). Grass already self-culls
+  per blade at a tier radius (13–24 m), tighter than the config's 45/80 m. The P1 leaf
+  work is the pragmatic substitute; true tree LOD wants the deferred streaming re-tile /
+  billboard-impostor work (§7).
+
 ---
 
 ## 2. World layout — the coordinate problem
@@ -205,9 +249,11 @@ a GPU budget.
   "locating…" state; plot other players / chests / NPCs / POIs / castle / zone labels via
   `drawMapMarkers`; off-map edge markers for teleport dungeons; fix hardcoded names; optional
   height/relief shading in the bake.
-- **Batch 2 — Performance.** P2 LOD → P1 leaf budget → P4 freeze toggles → P3 lake-mirror
-  gating → P5 mob material cache + billboarding → P6 observer consolidation → P7 dome de-dup.
-  Guided by `babylonjs-engine`; measured with a `threejs-visual-validation` harness.
+- **Batch 2 — Performance.** *Delivered:* P1 leaf-card fill (single-sided + tier budget),
+  P5 mob material cache + HP-bar billboarding, P6 dungeon-observer consolidation, P7 sky-dome
+  overdraw skip. *Deferred (on-device validation):* P3 (mirror already tier-gated; distance
+  skip), P4 (selective material freeze), P2 (per-instance tree LOD needs the re-tile /
+  impostor work). See §1 "Batch 2 status" for the rationale. Guided by `babylonjs-engine`.
 - **Batch 3 — Visual quality via skills.** Apply the `threejs-*` techniques to the
   `Ashwood*` systems (grass, clouds, sky, water, shadows, color) with a single tone-map owner.
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
