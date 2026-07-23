@@ -853,6 +853,9 @@
        to be remembered for each new button is a rule that gets forgotten —
        which is exactly how the favourite star and the custom-exercise
        edit/delete controls became unclickable. */
+    /* The search clear is a <button> now, not a span with onClick; strip the
+       UA chrome so the conversion is semantic only. */
+    .tech-search-clear{background:none;border:none;font:inherit;color:inherit;cursor:pointer}
     .stretch-row{position:relative}
     .stretch-row button:not(.picker-ex-main),
     .stretch-row a,

@@ -195,12 +195,12 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
             setLibSearch(v);
             debouncedSetLibSearch(v);
             if (v && libBrowseMode === "home") setLibBrowseMode("filtered");
-          }} />{libSearch && <span className={"tech-search-clear"} onClick={() => {
+          }} />{libSearch && <button type={"button"} aria-label={"Clear search"} className={"tech-search-clear"} onClick={() => {
             setLibSearch("");
             setLibSearchDebounced("");
             setLibVisibleCount(60);
             if (libMuscleFilters.size === 0 && libTypeFilters.size === 0 && libEquipFilters.size === 0) setLibBrowseMode("home");
-          }}>{"✕"}</span>}</div>{libBrowseMode === "filtered" && <button onClick={() => {
+          }}>{"✕"}</button>}</div>{libBrowseMode === "filtered" && <button onClick={() => {
           // Cancel leaves select mode only. It used to clear the cart, but the
           // cart persists across tabs and reloads, so that silently destroyed a
           // basket the user may have staged from another surface entirely.
