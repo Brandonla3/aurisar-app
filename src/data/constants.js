@@ -1135,6 +1135,11 @@ const EMPTY_PROFILE = {
   exercisePBs:{},
   travelBoost:null,
   favoriteExercises:[],
+  // Equipment the user actually has. null means "not set" — the library shows
+  // everything, which must stay the default so nobody silently loses two
+  // thirds of the catalog. An array (even an empty one) means the kit filter
+  // is active; bodyweight is always implicitly available.
+  gymKit:null,
   chartOrder:["dow","sets","muscleFreq","volume","consistency","topEx"],
   deletedItems:[], // [{id, type:"workout"|"plan", item, deletedAt (ISO)}]
   notificationPrefs:{

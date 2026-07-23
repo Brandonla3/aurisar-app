@@ -7,6 +7,8 @@ import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
 import MuscleTorchStrip from './MuscleTorchStrip';
+import GymKitBar from './GymKitBar';
+import MuscleMap from './MuscleMap';
 import ExerciseRow from './ExerciseRow';
 import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
 
@@ -47,11 +49,43 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     profile, setProfile,
     allExercises, allExById,
     _exReady, _exLoadError,
+    gymKit, setGymKit, kitTotalAll, libKitCount,
     // Quick-log (for "Configure" action)
       } = props;
 
   const revealRef = useScrollReveal();
   const [catalogNoteDismissed, setCatalogNoteDismissed] = useState(false);
+
+  // Which reading of the training-heat data to show. The strip is the default
+  // and the accessible fallback; the map is opt-in and remembered.
+  const [browseView, setBrowseView] = useState(() => {
+    try { return localStorage.getItem('aurisar-heat-view') === 'map' ? 'map' : 'strip'; }
+    catch { return 'strip'; }
+  });
+  const setHeatView = v => {
+    setBrowseView(v);
+    try { localStorage.setItem('aurisar-heat-view', v); } catch { /* private mode */ }
+  };
+  // Rendered inside the heat section header rather than under "Browse by
+  // Muscle", which sits below it — a control has to live with the thing it
+  // controls or it reads as belonging to the next section down.
+  const heatToggle = (
+    <div className={"mm-viewtoggle"} role={"group"} aria-label={"Heat display"}>
+      {[["strip", "▦ Strip"], ["map", "🗺 Map"]].map(([v, label]) => (
+        <button
+          key={v}
+          type="button"
+          className={browseView === v ? "on" : undefined}
+          aria-pressed={browseView === v}
+          onClick={() => setHeatView(v)}
+        >{label}</button>
+      ))}
+    </div>
+  );
+  const pickMuscle = mg => {
+    setLibMuscleFilters(new Set([mg]));
+    setLibBrowseMode("filtered");
+  };
   // Separate keys per view: returning to the home carousels shouldn't drop
   // you at the offset you had in a 1,500-row filtered list.
   useScrollRestore(`lib-${libBrowseMode}`);
@@ -156,7 +190,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       }}><div className={"tech-search-wrap"} style={{
           flex: 1,
           marginBottom: S.s0
-        }}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={`Search ${allExercises.length} exercises…`} value={libSearch} onChange={e => {
+        }}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={`Search ${libKitCount} exercises…`} value={libSearch} onChange={e => {
             const v = e.target.value;
             setLibSearch(v);
             debouncedSetLibSearch(v);
@@ -202,7 +236,14 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         background: "transparent", border: "none", color: "inherit",
         cursor: "pointer", fontSize: FS.fs78, lineHeight: 1, padding: S.s2
       }}>{"✕"}</button>
-    </div>}{/* ═══ HOME VIEW ═══ */
+    </div>}{
+    /* Gym kit sits above both views, not just the filtered one. It shrinks
+       the home view's muscle tiles and discover rows too, so scoping it to
+       the filtered list would leave tiles vanishing with no visible cause and
+       no way to switch it off from where you noticed. */
+    }
+    <GymKitBar gymKit={gymKit} setGymKit={setGymKit} totalShown={libKitCount} totalAll={kitTotalAll} />
+    {/* ═══ HOME VIEW ═══ */
     libBrowseMode === "home" && <div>{/* Your Exercises — hero carousel */
       yourExercises.length > 0 && <div className={"lib-home-section"} style={{
         marginBottom: S.s4
@@ -223,15 +264,14 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
             })}</div></div></div>}{yourExercises.length > 0 && <div className={"lib-divider"} />} {
         /* Browse by Muscle — feature tiles */
       }
-      <MuscleTorchStrip data={libMuscleMapData} onPick={mg => {
-        setLibMuscleFilters(new Set([mg]));
-        setLibBrowseMode("filtered");
-      }} />
+      {browseView === "map"
+        ? <MuscleMap data={libMuscleMapData} onPick={pickMuscle} viewToggle={heatToggle} />
+        : <MuscleTorchStrip data={libMuscleMapData} onPick={pickMuscle} viewToggle={heatToggle} />}
       {libMuscleMapData.some(d => d.state !== "cold") && <div className={"lib-divider"} />}
 
       <div className={"lib-home-section"} style={{
         marginBottom: S.s4
-      }}><div className={"lib-section-hdr"}><span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Browse by Muscle"}</div><div style={{
+      }}><div className={"lib-section-hdr"} style={{ display: "flex", alignItems: "center" }}><span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Browse by Muscle"}</div><div style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: S.s10
@@ -300,7 +340,8 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           display: "flex",
           alignItems: "center",
           gap: S.s4
-        }}>{"← Browse Library"}</button></div> {
+        }}>{"← Browse Library"}</button></div>
+ {
         /* Filter dropdowns row — custom panels that stay open for multi-select */
       }
       <div style={{

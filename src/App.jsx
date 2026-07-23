@@ -45,6 +45,7 @@ import ExerciseEditorModal from './features/exercises/ExerciseEditorModal';
 import ExerciseDetailSheet from './features/exercises/ExerciseDetailSheet';
 import StagingTray from './components/StagingTray';
 import { useExerciseCart, cartEntry } from './hooks/useExerciseCart';
+import { planEntry } from './features/exercises/planEntry';
 import QuickLogModal from './features/exercises/QuickLogModal';
 
 // ── Debounce utility ──
@@ -2941,6 +2942,7 @@ function App() {
   // allExercises scans off the App-render hot path (Finding #5 + #6 from
   // docs/performance-audit.md).
   const {
+    libKitCount,
     libFiltered,
     libAvailableTypes,
     libTypeCounts,
@@ -2955,6 +2957,7 @@ function App() {
     allExercises,
     _exReady,
     exerciseLog: profile.log,
+    gymKit: profile.gymKit,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
 
@@ -3572,12 +3575,23 @@ function App() {
 
   // Save a set of log entries (from history) as a custom plan template
   // Open "Save To Plan" wizard from history (renamed from Save as Plan)
-  function openSavePlanWizard(entries, label) {
+  /**
+   * The single way to open the save-to-plan wizard.
+   *
+   * confirmSavePlanWizard() only persists entries whose `_idx` is in
+   * spwSelected, so any caller that opened the wizard without seeding it got a
+   * sheet where Save just said "Select at least one exercise" — and if
+   * spwSelected still held a previous run's ids, it looked fine until it
+   * silently saved the wrong thing. Every entry point routes through here so
+   * that cannot drift again; `name` defaults to the history path's
+   * "<label> Repeat" convention.
+   */
+  function openSavePlanWizard(entries, label, name) {
     setSavePlanWizard({
       entries,
       label
     });
-    setSpwName(label + " Repeat");
+    setSpwName(name != null ? name : label + " Repeat");
     setSpwIcon("📋");
     setSpwDate("");
     setSpwSelected(entries.map(e => e._idx)); // all pre-selected
@@ -5453,6 +5467,10 @@ function App() {
 
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
+            gymKit={profile.gymKit}
+            setGymKit={v => setProfile(p => ({ ...p, gymKit: v }))}
+            libKitCount={libKitCount}
+            kitTotalAll={allExercises.length}
             _exReady={_exReady}
             _exLoadError={_exLoadError}
             libTypeCounts={libTypeCounts}
@@ -5886,31 +5904,11 @@ function App() {
         }}
         onForgePlan={() => {
           if (!stagedIds.length) return;
-          setSpwSelected([...stagedIds]);
-          setSavePlanWizard({
-            // The wizard renders sets × reps · weight + XP per row and saves
-            // those same fields, so an entry carrying only a name rendered
-            // "undefined×undefined +undefined XP" and then saved as a flat
-            // 3×10, throwing away the exercise's own defaults. Build from
-            // cartEntry() so this path matches the workout forge.
-            entries: stagedIds.map(id => {
-              const e = allExById[id];
-              const base = cartEntry(id, allExById);
-              return {
-                ...base,
-                exercise: e.name,
-                icon: e.icon,
-                xp: calcExXP(id, base.sets, base.reps, profile.chosenClass, allExById),
-                _idx: id
-              };
-            }),
-            label: "Staged Exercises"
-          });
-          setSpwName("Staged Exercises");
-          setSpwIcon("📋");
-          setSpwDate("");
-          setSpwMode("new");
-          setSpwTargetPlanId(null);
+          openSavePlanWizard(
+            stagedIds.map(id => planEntry(allExById[id], profile.chosenClass, allExById)),
+            "Staged Exercises",
+            "Staged Exercises"
+          );
           clearCart();
           setLibSelectMode(false);
           setFavSelectMode(false);
@@ -5927,12 +5925,7 @@ function App() {
         setProfile={setProfile}
         setActiveTab={setActiveTab}
         setAddToWorkoutPicker={setAddToWorkoutPicker}
-        setSavePlanWizard={setSavePlanWizard}
-        setSpwName={setSpwName}
-        setSpwIcon={setSpwIcon}
-        setSpwDate={setSpwDate}
-        setSpwMode={setSpwMode}
-        setSpwTargetPlanId={setSpwTargetPlanId}
+        openSavePlanWizard={openSavePlanWizard}
         setSelEx={setSelEx}
         setSets={setSets}
         setReps={setReps}
@@ -5943,6 +5936,10 @@ function App() {
         setExHHMM={setExHHMM}
         setExSec={setExSec}
         setQuickRows={setQuickRows}
+        allExById={allExById}
+        isInCart={isInCart}
+        toggleCart={toggleCart}
+        stagedCount={stagedIds.length}
       />
     )
 
@@ -6286,13 +6283,7 @@ function App() {
         openExEditor={openExEditor}
         setLibDetailEx={setLibDetailEx}
         setAddToWorkoutPicker={setAddToWorkoutPicker}
-        setSavePlanWizard={setSavePlanWizard}
-        setSpwSelected={setSpwSelected}
-        setSpwName={setSpwName}
-        setSpwIcon={setSpwIcon}
-        setSpwDate={setSpwDate}
-        setSpwMode={setSpwMode}
-        setSpwTargetPlanId={setSpwTargetPlanId}
+        openSavePlanWizard={openSavePlanWizard}
       />
     )}
 

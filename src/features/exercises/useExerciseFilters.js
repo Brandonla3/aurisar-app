@@ -54,14 +54,28 @@ const MUSCLE_HEAT = [
 const MUSCLE_VOLUME_WINDOW_DAYS = 14;
 
 export function useExerciseFilters({
-  allExercises,
+  allExercises: rawExercises,
   _exReady,
   exerciseLog,
+  gymKit,
   libSearchDebounced,
   libTypeFilters,
   libMuscleFilters,
   libEquipFilters,
 }) {
+  // Gym kit — the equipment the user actually has. Applied once here as a
+  // pre-filter rather than threaded through each derivation, so the list, the
+  // faceted counts, the muscle tiles and the discover rows all agree without
+  // any of them having to know the setting exists.
+  //
+  // null means unset: show everything. Bodyweight is always available, so it
+  // is never gated — otherwise an empty kit would empty the catalog.
+  const allExercises = useMemo(() => {
+    if (!Array.isArray(gymKit)) return rawExercises;
+    const owned = new Set([...gymKit, "bodyweight"]);
+    return rawExercises.filter(ex => owned.has((ex.equipment || "bodyweight").toLowerCase().trim()));
+  }, [rawExercises, gymKit]);
+
   // Single-pass per-muscle count index. Replaces the 12 separate
   // allExercises.filter passes the old MUSCLE_CARD_DATA did per render.
   const libMuscleCountsByGroup = useMemo(() => {
@@ -180,7 +194,10 @@ export function useExerciseFilters({
     const windowMs = MUSCLE_VOLUME_WINDOW_DAYS * 86400000;
 
     for (const entry of exerciseLog || []) {
-      const ex = allExercises.find(e => e.id === entry.exId);
+      // Deliberately the unfiltered list: you may have logged something with
+      // equipment you no longer own, and that history still counts toward
+      // whether the muscle has been trained.
+      const ex = rawExercises.find(e => e.id === entry.exId);
       const mg = (ex && ex.muscleGroup || '').toLowerCase().trim();
       if (!mg) continue;
       const t = entry.dateKey ? new Date(entry.dateKey).getTime() : NaN;
@@ -211,7 +228,7 @@ export function useExerciseFilters({
       };
     // Coldest first: the whole point is surfacing what you have been avoiding.
     }).sort((a, b) => (b.daysSinceTrained ?? Infinity) - (a.daysSinceTrained ?? Infinity));
-  }, [exerciseLog, allExercises]);
+  }, [exerciseLog, rawExercises]);
 
   // Library home view — discover rows. Each row was an independent
   // allExercises.filter() pass per render; now they're cached together.
@@ -231,6 +248,8 @@ export function useExerciseFilters({
   }, [allExercises, _exReady]);
 
   return {
+    // How many exercises the gym-kit filter leaves, for the UI to report.
+    libKitCount: allExercises.length,
     libFiltered,
     libAvailableMuscles,
     libAvailableEquip,

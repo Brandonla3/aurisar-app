@@ -5,6 +5,7 @@ import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import { useModalLifecycle } from '../../utils/useModalLifecycle';
+import { planEntry } from './planEntry';
 
 /**
  * Exercise detail bottom sheet.
@@ -32,10 +33,11 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
   setProfile,
   setActiveTab,
   setAddToWorkoutPicker,
-  setSavePlanWizard,
-  setSpwName, setSpwIcon, setSpwDate, setSpwMode, setSpwTargetPlanId,
+  openSavePlanWizard,
   setSelEx, setSets, setReps, setExWeight, setWeightPct,
   setHrZone, setDistanceVal, setExHHMM, setExSec, setQuickRows,
+  isInCart, toggleCart, stagedCount = 0,
+  allExById,
 }) {
   const close = () => setLibDetailEx(null);
   useModalLifecycle(ex != null, close);
@@ -85,6 +87,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
 
   const isFav = (profile.favoriteExercises || []).includes(ex.id);
   const hasPB = !!(profile.exercisePBs || {})[ex.id];
+  const staged = isInCart ? isInCart(ex.id) : false;
 
   const onTouchStart = e => {
     const t = e.touches[0];
@@ -294,6 +297,40 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           cursor: "pointer"
         }}>{isFav ? "⭐ Saved to Favorites" : "☆ Save to Favorites"}</button>
 
+        {/* Staging was reachable only from a list in select mode, so the sheet
+            — the one place showing enough detail to actually decide — couldn't
+            add to the basket it was deciding for. */}
+        {ex.id !== "rest_day" && toggleCart && (
+          <button
+            type="button"
+            aria-pressed={!!staged}
+            onClick={() => toggleCart(ex.id)}
+            style={{
+              width: "100%",
+              marginTop: S.s8,
+              background: staged ? "rgba(196,148,40,.16)" : "rgba(45,42,36,.2)",
+              border: `1px solid ${staged ? "rgba(196,148,40,.42)" : "rgba(180,172,158,.06)"}`,
+              color: staged ? "#e8d08a" : "#b4ac9e",
+              padding: "11px",
+              borderRadius: R.xl,
+              fontWeight: "700",
+              fontSize: FS.fs82,
+              cursor: "pointer"
+            }}
+          >{staged ? "⊟ Staged — tap to remove" : "⊞ Stage for later"}</button>
+        )}
+        {/* The tray sits at z-index 780 and the sheet at 9400, so staging from
+            here updates a bar the user cannot see. Report the count inline
+            rather than leaving the button's own state as the only signal. */}
+        {ex.id !== "rest_day" && toggleCart && stagedCount > 0 && (
+          <div role="status" style={{
+            fontSize: FS.fs62,
+            color: "#8a8478",
+            textAlign: "center",
+            marginTop: S.s4
+          }}>{`In staging tray · ${stagedCount}`}</div>
+        )}
+
         <div style={{ display: "flex", gap: S.s8, marginTop: S.s8 }}>
           {ex.id !== "rest_day" && <button onClick={() => {
             setAddToWorkoutPicker({
@@ -323,15 +360,11 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           }}>{"💪 Add to Workout"}</button>}
 
           <button onClick={() => {
-            setSavePlanWizard({
-              entries: [{ exId: ex.id, exercise: ex.name, icon: ex.icon, _idx: ex.id }],
-              label: ex.name
-            });
-            setSpwName(ex.name);
-            setSpwIcon("📋");
-            setSpwDate("");
-            setSpwMode("new");
-            setSpwTargetPlanId(null);
+            // Via the shared opener, which also seeds spwSelected — opening
+            // the wizard without it left Save refusing with "Select at least
+            // one exercise", or worse, silently reusing a previous run's
+            // selection.
+            openSavePlanWizard([planEntry(ex, profile.chosenClass, allExById)], ex.name, ex.name);
             close();
           }} style={{
             flex: 1,

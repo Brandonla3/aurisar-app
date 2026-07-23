@@ -7,6 +7,7 @@ import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import { useModalLifecycle } from '../../utils/useModalLifecycle';
 import { entryTime } from './logEntryTime';
+import { planEntry } from './planEntry';
 
 /**
  * Single-exercise quick-log modal — extracted from the inline IIFE in
@@ -50,13 +51,7 @@ const QuickLogModal = memo(function QuickLogModal({
   openExEditor,
   setLibDetailEx,
   setAddToWorkoutPicker,
-  setSavePlanWizard,
-  setSpwSelected,
-  setSpwName,
-  setSpwIcon,
-  setSpwDate,
-  setSpwMode,
-  setSpwTargetPlanId,
+  openSavePlanWizard,
 }) {
   const ex = allExById[selEx];
 
@@ -497,13 +492,8 @@ const QuickLogModal = memo(function QuickLogModal({
                   }}>{"➕ Add to Workout"}</button>
                 )}
                 <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(45,42,36,.3)", color: "#8a8478" }} onClick={() => {
-                  setSpwSelected([ex.id]);
-                  setSavePlanWizard({ entries: [{ exId: ex.id, exercise: ex.name, icon: ex.icon, _idx: ex.id }], label: ex.name });
-                  setSpwName(ex.name);
-                  setSpwIcon(ex.icon || "📋");
-                  setSpwDate("");
-                  setSpwMode("new");
-                  setSpwTargetPlanId(null);
+                  // Shared opener seeds spwSelected for every entry point.
+                  openSavePlanWizard([planEntry(ex, profile.chosenClass, allExById)], ex.name, ex.name);
                   setSelEx(null);
                 }}>{"📋 Add to Plan"}</button>
               </div>
