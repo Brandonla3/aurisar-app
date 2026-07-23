@@ -72,7 +72,19 @@
     .builder-ex-input::placeholder{color:#8a8478}
     .r2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
     .field{display:flex;flex-direction:column;gap:4px}
+    /* ── Button hierarchy ────────────────────────────────────────────────
+       One ladder, most to least prominent. Pick the highest rung the
+       action deserves; a view should have at most one gold-solid.
+         btn-gold-solid  the single primary commit of a screen (Save)
+         btn-gold        default action
+         btn-glass-yellow  highlighted alternative (Complete/Schedule)
+         btn-ghost       secondary / dismiss
+         btn-danger      destructive
+       Sizes: btn-sm / btn-xs (both get a 44px touch extension on coarse
+       pointers, below). For bare glyph actions use .icon-btn instead. */
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
+    .btn-gold-solid{background:linear-gradient(135deg,#8B7425,#A89030);color:#d4cec4;border:1px solid rgba(196,160,68,.35);box-shadow:0 2px 14px rgba(140,116,37,.28);text-shadow:0 1px 2px rgba(0,0,0,.35)}
+    .btn-gold-solid:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(140,116,37,.4)}
     .btn-gold{background:linear-gradient(135deg,rgba(45,42,36,.5),rgba(45,42,36,.35));color:#d4cec4;box-shadow:none;border:1px solid rgba(180,172,158,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
     .btn-gold:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,0,0,.4)}
     .btn-ghost{background:linear-gradient(135deg,rgba(45,42,36,.25),rgba(32,30,26,.15));color:#8a8478;border:1px solid rgba(180,172,158,.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
@@ -411,6 +423,48 @@
     @keyframes sheet-enter-left{from{transform:translateX(-26%);opacity:.2}to{transform:translateX(0);opacity:1}}
     .sheet-enter-right{animation:sheet-enter-right var(--dur-base) var(--ease-standard) both}
     .sheet-enter-left{animation:sheet-enter-left var(--dur-base) var(--ease-standard) both}
+
+    /* ── Sheet primitive (src/components/ui/Sheet.jsx) ───────────────────
+       The one modal shell. Backdrop, radius, motion, z and the close
+       affordance are decided here; feature modals only supply content.
+       Column layout: handle? / header? / body (the ONLY scroller) /
+       footer?. */
+    .ui-sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;justify-content:center}
+    .ui-sheet-backdrop--bottom{align-items:flex-end}
+    .ui-sheet-backdrop--nav{padding-bottom:var(--bottom-nav-h)}
+    .ui-sheet-backdrop--center{align-items:center;padding:20px}
+    .ui-sheet{display:flex;flex-direction:column;width:100%;background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.08);box-shadow:0 -8px 60px rgba(0,0,0,.6)}
+    .ui-sheet--bottom{border-radius:16px 16px 0 0;border-bottom:none;max-height:85dvh;padding:10px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+    .ui-sheet--center{border-radius:16px;max-height:85dvh;padding:20px;box-shadow:0 0 60px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.7)}
+    .ui-sheet--tall{max-height:92dvh}
+    @keyframes ui-sheet-pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+    .ui-sheet-pop{animation:ui-sheet-pop var(--dur-sheet) var(--ease-out) both}
+    .ui-sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(180,172,158,.22);margin:0 auto 8px;flex-shrink:0}
+    .ui-sheet-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0;min-height:32px}
+    .ui-sheet-title{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;font-size:.88rem;font-weight:600;color:#d4cec4;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ui-sheet-title--cinzel{font-family:'Cinzel',serif;font-weight:600}
+    .ui-sheet-title-icon{font-size:1.1rem;flex-shrink:0}
+    .ui-sheet-close{flex-shrink:0;width:44px;height:44px;margin:-6px -12px -6px 0;display:flex;align-items:center;justify-content:center;background:none;border:none;color:#8a8478;font-size:.85rem;cursor:pointer;border-radius:10px;transition:color var(--dur-fast),background var(--dur-fast)}
+    .ui-sheet-close:hover{color:#d4cec4;background:rgba(45,42,36,.35)}
+    .ui-sheet-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+    .ui-sheet-body--fixed{overflow:hidden;display:flex;flex-direction:column}
+    .ui-sheet-footer{flex-shrink:0;padding-top:12px}
+
+    /* ConfirmSheet content (src/components/ui/ConfirmSheet.jsx) */
+    .ui-confirm-title{display:flex;align-items:center;gap:9px;font-family:'Cinzel',serif;font-size:.88rem;color:#d4cec4;margin-bottom:8px}
+    .ui-confirm-icon{font-size:1.15rem}
+    .ui-confirm-body{font-size:.75rem;color:#8a8478;line-height:1.5;margin-bottom:18px}
+    .ui-confirm-actions{display:flex;gap:10px}
+    .ui-confirm-btn{min-height:44px}
+
+    /* IconButton (src/components/ui/IconButton.jsx) — 44px real box,
+       compact visible chip. Stack-safe: hit areas cannot overlap. */
+    .icon-btn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:#b4ac9e;-webkit-tap-highlight-color:transparent}
+    .icon-btn-glyph{display:flex;align-items:center;justify-content:center;border-radius:7px;background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.1);font-size:.68rem;line-height:1;transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
+    .icon-btn:hover .icon-btn-glyph{background:rgba(45,42,36,.65);border-color:rgba(180,172,158,.2);color:#d4cec4}
+    .icon-btn:active .icon-btn-glyph{transform:scale(.92)}
+    .icon-btn:disabled{cursor:not-allowed}
+    .icon-btn:disabled .icon-btn-glyph{opacity:.28}
 
     @keyframes libFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     .lib-home-section{animation:libFadeUp var(--dur-reveal) var(--ease-out) both}
@@ -2074,7 +2128,7 @@
          left stranded mid-keyframe once that animation is neutralised. */
       .scroll-reveal { opacity: 1; transform: none; }
       .sheet-slide-up, .sheet-enter-left, .sheet-enter-right,
-      .lib-home-section {
+      .ui-sheet-pop, .lib-home-section {
         animation: none; opacity: 1; transform: none;
       }
       /* Purely decorative loops — stop outright rather than run 500×/s. */
