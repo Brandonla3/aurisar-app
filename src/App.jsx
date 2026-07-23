@@ -46,6 +46,7 @@ import { useExerciseCart, cartEntry } from './hooks/useExerciseCart';
 import { planEntry } from './features/exercises/planEntry';
 import QuickLogModal from './features/exercises/QuickLogModal';
 import ErrorBoundary from './components/ErrorBoundary';
+import TabIcon from './components/TabIcons';
 import Sheet from './components/ui/Sheet';
 import ConfirmSheet from './components/ui/ConfirmSheet';
 
@@ -5089,11 +5090,8 @@ function App() {
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises", "mdi:dumbbell"], ["workouts", "Workouts", "mdi:weight-lifter"], ["calendar", "Calendar", "mdi:calendar-blank"], ["social", "Guild", "game-icons:tribal-pendant"]].map(([t, l, iconName]) => {
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises"], ["workouts", "Workouts"], ["calendar", "Calendar"], ["social", "Guild"]].map(([t, l]) => {
             const isOn = activeTab === t;
-            const tabColor = isOn ? "#d4cec4" : "#8a8478";
-            const iconPath = iconName.replace(":", "/");
-            const iconSrc = `https://api.iconify.design/${iconPath}.svg?color=${encodeURIComponent(tabColor)}`;
             return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
               setActiveTab(t);
               if (t === "workouts") workoutsRef.current?.showList();
@@ -5101,10 +5099,8 @@ function App() {
                 loadSocialData();
                 loadIncomingShares();
               }
-            })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
-                  display: "block"
-                }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}<button key="world" className={`tab ${activeTab === "world" ? "on" : ""}`} title="Enter Aurisar World" onClick={() => guardAll(() => { setPrevTab(activeTab); setActiveTab("world"); })} style={{position:"relative"}}><span className={"tab-icon"}><img src={`https://api.iconify.design/mdi/earth.svg?color=${encodeURIComponent(activeTab === "world" ? "#d4cec4" : "#8a8478")}`} alt={""} width={22} height={22} style={{display:"block"}} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
+            })}><span className={"tab-icon"}><TabIcon name={t} size={22} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
+          })}<button key="world" className={`tab ${activeTab === "world" ? "on" : ""}`} title="Enter Aurisar World" onClick={() => guardAll(() => { setPrevTab(activeTab); setActiveTab("world"); })} style={{position:"relative"}}><span className={"tab-icon"}><TabIcon name="world" size={22} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
         open
         icon={"⚡"}
         title={"Replace Active Workout?"}
