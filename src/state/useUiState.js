@@ -45,9 +45,6 @@ export function useUiState() {
   const [swwIcon, setSwwIcon] = useState("💪");
   const [swwSelected, setSwwSelected] = useState([]);
 
-  // ── Workout-builder exercise picker ──────────────────────────────────────
-  const [wbExPickerOpen, setWbExPickerOpen] = useState(false);
-
   // ── Add-to-plan / add-to-workout pickers ─────────────────────────────────
   const [addToPlanPicker, setAddToPlanPicker] = useState(null);
   const [addToWorkoutPicker, setAddToWorkoutPicker] = useState(null); // {exercises} — pick existing workout
@@ -119,8 +116,6 @@ export function useUiState() {
     schedulePicker, setSchedulePicker, spDate, setSpDate, spNotes, setSpNotes,
     // Save-as-workout wizard
     saveWorkoutWizard, setSaveWorkoutWizard, swwName, setSwwName, swwIcon, setSwwIcon, swwSelected, setSwwSelected,
-    // Workout-builder picker
-    wbExPickerOpen, setWbExPickerOpen,
     // Add-to-plan / add-to-workout
     addToPlanPicker, setAddToPlanPicker, addToWorkoutPicker, setAddToWorkoutPicker,
     // Retro

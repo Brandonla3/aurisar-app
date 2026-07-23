@@ -87,7 +87,10 @@ describe('picker dismissal runs the full teardown', () => {
   });
 
   it('clears every picker facet in closePicker', () => {
-    const body = app.slice(app.indexOf('function closePicker()'));
+    // closePicker moved into WorkoutsTabContainer with the rest of the
+    // builder/picker state; the teardown invariant is unchanged.
+    const container = read('src/features/workouts/WorkoutsTabContainer.jsx');
+    const body = container.slice(container.indexOf('function closePicker()'));
     const fn = body.slice(0, body.indexOf('\n  }') + 4);
     for (const setter of ['setPickerSearch', 'setPickerMuscle', 'setPickerTypeFilter', 'setPickerEquipFilter', 'setPickerSelected']) {
       expect(fn, `closePicker does not reset ${setter}`).toContain(setter);

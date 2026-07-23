@@ -32,8 +32,7 @@ import CharacterTab from './features/character/CharacterTab';
 import XpBarFlash from './features/profile/XpBarFlash';
 import { useAvatarConfig } from './features/avatar/useAvatarConfig.js';
 import MapOverlay from './features/character/MapOverlay';
-import WorkoutsTab from './features/workouts/WorkoutsTab';
-import WorkoutExercisePicker from './features/workouts/WorkoutExercisePicker';
+import WorkoutsTabContainer from './features/workouts/WorkoutsTabContainer';
 import CompletionModal from './features/workouts/CompletionModal';
 import CalendarTab from './features/calendar/CalendarTab';
 import LeaderboardTab from './features/leaderboard/LeaderboardTab';
@@ -265,8 +264,6 @@ function App() {
     setSwwIcon,
     swwSelected,
     setSwwSelected,
-    wbExPickerOpen,
-    setWbExPickerOpen,
     addToPlanPicker,
     setAddToPlanPicker,
     addToWorkoutPicker,
@@ -625,23 +622,7 @@ function App() {
   const [bodyTypeLocked, setBodyTypeLocked] = useState(false);
   const plansContainerRef = useRef(null);
   const [plansPendingOpen, setPlansPendingOpen] = useState(null);
-  const [dragWbExIdx, setDragWbExIdx] = useState(null);
-  const [ssChecked, setSsChecked] = useState(() => new Set()); // indices checked for superset grouping
-  const [ssAccordion, setSsAccordion] = useState({}); // collapse state for superset accordion sections in workout builder
-  const [collapsedWbEx, setCollapsedWbEx] = useState({}); // {i: bool}
-  function toggleWbEx(i) {
-    setCollapsedWbEx(s => ({
-      ...s,
-      [i]: !s[i]
-    }));
-  }
-  // Multi-select Sets, matching the library tab's filter model.
-  const [pickerMuscle, setPickerMuscle] = useState(() => new Set());
-  const [pickerSearch, setPickerSearch] = useState("");
-  const [pickerTypeFilter, setPickerTypeFilter] = useState(() => new Set());
-  const [pickerEquipFilter, setPickerEquipFilter] = useState(() => new Set());
-  const [pickerOpenDrop, setPickerOpenDrop] = useState(null); // "muscle"|"type"|"equip"|null
-  const [pickerSelected, setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
+  // Workout-builder superset/collapse state moved to WorkoutsTabContainer.
   // Quests
   const [questCat, setQuestCat] = useState("All");
   // Calendar
@@ -656,40 +637,15 @@ function App() {
   // Exercise editor
   // Save-as-Plan wizard (from history)
   // Schedule picker (for existing plans or exercises)
-  // Workouts tab
-  const [workoutView, setWorkoutView] = useState("list"); // "list"|"detail"|"builder"|"templates"
-  const [activeWorkout, setActiveWorkout] = useState(null);
+  // Workouts tab — view/builder/picker state lives in WorkoutsTabContainer;
+  // only the live tracker (rendered at App root, feeds completion) stays.
   const [liveWorkout, setLiveWorkout] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
   });
   const [pendingLiveWorkout, setPendingLiveWorkout] = useState(null);
-  const [wbName, setWbName] = useState("");
-  const [wbIcon, setWbIcon] = useState("💪");
-  const [wbIconPickerOpen, setWbIconPickerOpen] = useState(false);
-  const [wbDesc, setWbDesc] = useState("");
-  const [wbExercises, setWbExercises] = useState([]); // [{exId,sets,reps,weightLbs,durationMin,...}]
-  // wbExCompleted removed — Mark Complete feature removed from builder UX
-  const [wbEditId, setWbEditId] = useState(null); // id of workout being edited
-  const [wbCopySource, setWbCopySource] = useState(null);
-  const [wbIsOneOff, setWbIsOneOff] = useState(false); // true when building a one-off workout
   const [pendingSoloRemoveId, setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
-  const [workoutSubTab, setWorkoutSubTab] = useState("reusable"); // "reusable"|"oneoff"
-  const [collapsedWo, setCollapsedWo] = useState(new Set());
-  const [expandedRecipeDesc, setExpandedRecipeDesc] = useState(new Set()); // which recipe descs are expanded
-  const [expandedRecipeEx, setExpandedRecipeEx] = useState(new Set()); // which recipe exercise lists are expanded
-  const [recipeFilter, setRecipeFilter] = useState(() => new Set(["Bodyweight"])); // multi-select category filter
-  const [recipeCatDrop, setRecipeCatDrop] = useState(false); // category dropdown open
-  // Workout-level optional stats (builder)
-  const [wbDuration, setWbDuration] = useState(""); // HH:MM string
-  const [wbDurSec, setWbDurSec] = useState(""); // 0-59 seconds
-  const [wbActiveCal, setWbActiveCal] = useState(""); // active calories
-  const [wbTotalCal, setWbTotalCal] = useState(""); // total calories
   const [bootStep, setBootStep] = useState(0);
-  // Workout label filter & builder
-  const [woLabelFilters, setWoLabelFilters] = useState(() => new Set());
-  const [woLabelDropOpen, setWoLabelDropOpen] = useState(false);
-  const [wbLabels, setWbLabels] = useState([]); // labels for workout being built/edited
-  const [newLabelInput, setNewLabelInput] = useState("");
+  const workoutsRef = useRef(null);
   // Workout completion modal
   // In-app confirm delete (replaces window.confirm which fails in sandbox)
   // Log tab sub-tabs
@@ -2947,12 +2903,6 @@ function App() {
     if (!_exReady || allExercises.length === 0) return;
     pruneMissing(id => !!allExById[id]);
   }, [_exReady, allExercises.length, allExById, pruneMissing]);
-  const wbTotalXP = useMemo(() => wbExercises.reduce((s, ex) => {
-    const extraCount = (ex.extraRows || []).length;
-    const b = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
-    const r = (ex.extraRows || []).reduce((rs, row) => rs + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-    return s + (b + r);
-  }, 0), [wbExercises, profile.chosenClass, allExById]);
 
   // ── Exercise filter derivations — extracted to features/exercises ──
   // Memoized derivations the library tab consumes. The hook keeps the heavy
@@ -3727,329 +3677,7 @@ function App() {
   }
 
   // Workout builder helpers
-  function initWorkoutBuilder(base) {
-    setWbIconPickerOpen(false);
-    if (base) {
-      setWbName(base.name);
-      setWbIcon(base.icon);
-      setWbDesc(base.desc || "");
-      setWbExercises(base.exercises.map(e => ({
-        ...e
-      })));
-      setWbEditId(base.id);
-      const split = base.durationMin ? secToHHMMSplit(Number(base.durationMin)) : {
-        hhmm: "",
-        sec: ""
-      };
-      const hasSec = split.sec && split.sec !== 0 && split.sec !== "";
-      setWbDuration(hasSec ? `${split.hhmm}:${String(split.sec).padStart(2,"0")}` : (split.hhmm || ""));
-      setWbDurSec("");
-      setWbActiveCal(base.activeCal || "");
-      setWbTotalCal(base.totalCal || "");
-      setWbLabels(base.labels || []);
-    } else {
-      setWbName("");
-      setWbIcon("💪");
-      setWbDesc("");
-      setWbExercises([]);
-      setWbEditId(null);
-      setWbDuration("");
-      setWbDurSec("");
-      setWbActiveCal("");
-      setWbTotalCal("");
-      setWbLabels([]);
-    }
-    setWbIsOneOff(false);
-    setNewLabelInput("");
-    setWorkoutView("builder");
-  }
-  function saveBuiltWorkout() {
-    if (!wbName.trim()) {
-      showToast("Name your workout first!");
-      return;
-    }
-    if (wbExercises.length === 0) {
-      showToast("Add at least one exercise.");
-      return;
-    }
-    const w = {
-      id: wbEditId || uid(),
-      name: wbName.trim(),
-      icon: wbIcon,
-      desc: wbDesc.trim(),
-      exercises: wbExercises,
-      createdAt: new Date().toLocaleDateString(),
-      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
-      labels: wbLabels
-    };
-    if (wbEditId) {
-      setProfile(pr => ({
-        ...pr,
-        workouts: (pr.workouts || []).map(wo => wo.id === wbEditId ? w : wo)
-      }));
-      showToast("Workout updated! 💪");
-    } else {
-      setProfile(pr => ({
-        ...pr,
-        workouts: [w, ...(pr.workouts || [])]
-      }));
-      showToast("Workout created! 💪");
-    }
-    setWorkoutView("list");
-    setActiveWorkout(null);
-    setWbEditId(null);
-    setWbCopySource(null);
-    setWbDuration("");
-    setWbDurSec("");
-    setWbActiveCal("");
-    setWbTotalCal("");
-    setWbLabels([]);
-    setNewLabelInput("");
-  }
-  function saveAsNewWorkout() {
-    if (!wbName.trim()) {
-      showToast("Name your workout first!");
-      return;
-    }
-    if (wbExercises.length === 0) {
-      showToast("Add at least one exercise.");
-      return;
-    }
-    const w = {
-      id: uid(),
-      name: wbName.trim(),
-      icon: wbIcon,
-      desc: wbDesc.trim(),
-      exercises: wbExercises,
-      createdAt: new Date().toLocaleDateString(),
-      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
-      labels: wbLabels
-    };
-    setProfile(pr => ({
-      ...pr,
-      workouts: [w, ...(pr.workouts || [])]
-    }));
-    showToast("Saved as new workout! 💪");
-    setWorkoutView("list");
-    setActiveWorkout(null);
-    setWbEditId(null);
-    setWbCopySource(null);
-    setWbDuration("");
-    setWbDurSec("");
-    setWbActiveCal("");
-    setWbTotalCal("");
-    setWbLabels([]);
-    setNewLabelInput("");
-  }
-  function copyWorkout(wo) {
-    setWbName("Copy of " + wo.name);
-    setWbIcon(wo.icon);
-    setWbDesc(wo.desc || "");
-    setWbExercises(wo.exercises.map(e => ({
-      ...e
-    })));
-    setWbEditId(null); // new id on save
-    setWbCopySource(wo.name);
-    setWbLabels(wo.labels || []);
-    setNewLabelInput("");
-    setWorkoutView("builder");
-  }
-  function deleteWorkout(id) {
-    const wo = (profile.workouts || []).find(w => w.id === id);
-    setConfirmDelete({
-      type: "workout",
-      id,
-      name: wo ? wo.name : "this workout",
-      icon: wo ? wo.icon : "💪"
-    });
-  }
-  function _doDeleteWorkout(id) {
-    const wo = (profile.workouts || []).find(w => w.id === id);
-    if (!wo) return;
-    const bin = [...(profile.deletedItems || []), {
-      id: uid(),
-      type: "workout",
-      item: wo,
-      deletedAt: new Date().toISOString()
-    }];
-    setProfile(p => ({
-      ...p,
-      workouts: (p.workouts || []).filter(w => w.id !== id),
-      deletedItems: bin
-    }));
-    setWorkoutView("list");
-    setActiveWorkout(null);
-    showToast("Workout moved to Deleted — recoverable for 7 days.");
-  }
-  function addExToWorkout(exId) {
-    const exd = allExById[exId] || {};
-    setWbExercises(ex => [...ex, {
-      exId,
-      sets: exd.defaultSets != null ? exd.defaultSets : 3,
-      reps: exd.defaultReps != null ? exd.defaultReps : 10,
-      weightLbs: exd.defaultWeightLbs || null,
-      durationMin: exd.defaultDurationMin || null,
-      weightPct: exd.defaultWeightPct || 100,
-      distanceMi: exd.defaultDistanceMi || null,
-      hrZone: exd.defaultHrZone || null
-    }]);
-    setWbExPickerOpen(false);
-  }
-  function closePicker() {
-    setWbExPickerOpen(false);
-    setPickerSearch("");
-    setPickerMuscle(new Set());
-    setPickerTypeFilter(new Set());
-    setPickerEquipFilter(new Set());
-    setPickerOpenDrop(null);
-    setPickerSelected([]);
-  }
-  function pickerToggleEx(exId) {
-    const exd = allExById[exId] || {};
-    setPickerSelected(prev => {
-      const exists = prev.find(e => e.exId === exId);
-      if (exists) return prev.filter(e => e.exId !== exId);
-      return [...prev, {
-        exId,
-        sets: "3",
-        reps: "10",
-        weightLbs: "",
-        weightPct: 100,
-        durationMin: "",
-        distanceMi: "",
-        hrZone: null
-      }];
-    });
-  }
-  function commitPickerToWorkout() {
-    if (pickerSelected.length === 0) return;
-    setWbExercises(ex => [...ex, ...pickerSelected.map(e => ({
-      ...e,
-      sets: e.sets || "",
-      reps: e.reps || "",
-      weightLbs: e.weightLbs || null,
-      durationMin: e.durationMin || null,
-      distanceMi: e.distanceMi || null
-    }))]);
-    closePicker();
-  }
-
-  /* ── Reorder a superset pair as a single unit ── */
-  function reorderSupersetPair(anchorIdx, partnerIdx, direction) {
-    setWbExercises(exs => {
-      const arr = [...exs];
-      const minI = Math.min(anchorIdx, partnerIdx);
-      const maxI = Math.max(anchorIdx, partnerIdx);
-      // We need to move both exercises. For simplicity, ensure they're adjacent first.
-      // If not adjacent, move partner next to anchor first.
-      if (maxI - minI !== 1) {
-        // Make them adjacent: move maxI to minI+1
-        const [moved] = arr.splice(maxI, 1);
-        arr.splice(minI + 1, 0, moved);
-        // Remap supersetWith
-        const idxMap = {};
-        const temp = exs.map((_, i) => i);
-        const [movedI] = temp.splice(maxI, 1);
-        temp.splice(minI + 1, 0, movedI);
-        temp.forEach((oldI, newI) => {
-          idxMap[oldI] = newI;
-        });
-        arr.forEach((e, ei) => {
-          if (e.supersetWith != null && idxMap[e.supersetWith] != null) arr[ei] = {
-            ...e,
-            supersetWith: idxMap[e.supersetWith]
-          };
-        });
-        return arr;
-      }
-      // Now move the pair up or down
-      if (direction === "up" && minI > 0) {
-        // Swap the pair with the element above
-        const above = arr[minI - 1];
-        arr[minI - 1] = arr[minI];
-        arr[minI] = arr[minI + 1];
-        arr[minI + 1] = above;
-        // Remap
-        arr.forEach((e, ei) => {
-          if (e.supersetWith === minI - 1) arr[ei] = {
-            ...e,
-            supersetWith: minI + 1
-          };else if (e.supersetWith === minI) arr[ei] = {
-            ...e,
-            supersetWith: minI - 1
-          };else if (e.supersetWith === minI + 1) arr[ei] = {
-            ...e,
-            supersetWith: minI
-          };
-        });
-      } else if (direction === "down" && maxI < arr.length - 1) {
-        const below = arr[maxI + 1];
-        arr[maxI + 1] = arr[maxI];
-        arr[maxI] = arr[minI];
-        arr[minI] = below;
-        arr.forEach((e, ei) => {
-          if (e.supersetWith === minI) arr[ei] = {
-            ...e,
-            supersetWith: minI + 1
-          };else if (e.supersetWith === minI + 1) arr[ei] = {
-            ...e,
-            supersetWith: minI + 2
-          };else if (e.supersetWith === maxI + 1) arr[ei] = {
-            ...e,
-            supersetWith: minI
-          };
-        });
-      }
-      return arr;
-    });
-  }
-  function removeWbEx(idx) {
-    setWbExercises(exs => {
-      const updated = exs.map((e, i) => {
-        if (i === idx) return null;
-        if (e.supersetWith === idx) return {
-          ...e,
-          supersetWith: null
-        };
-        if (e.supersetWith != null && e.supersetWith > idx) {
-          return {
-            ...e,
-            supersetWith: e.supersetWith - 1
-          };
-        }
-        return e;
-      }).filter(Boolean);
-      return updated;
-    });
-  }
-  function reorderWbEx(fromIdx, toIdx) {
-    if (fromIdx === toIdx) return;
-    setWbExercises(exs => {
-      const arr = [...exs];
-      const [moved] = arr.splice(fromIdx, 1);
-      arr.splice(toIdx, 0, moved);
-      const indexMap = {};
-      const temp = exs.map((_, i) => i);
-      const [movedIdx] = temp.splice(fromIdx, 1);
-      temp.splice(toIdx, 0, movedIdx);
-      temp.forEach((oldIdx, newIdx) => {
-        indexMap[oldIdx] = newIdx;
-      });
-      return arr.map(e => {
-        if (e.supersetWith != null && indexMap[e.supersetWith] != null) {
-          return {
-            ...e,
-            supersetWith: indexMap[e.supersetWith]
-          };
-        }
-        return e;
-      });
-    });
-  }
+  // Workout builder + picker functions moved to WorkoutsTabContainer.
   // Add a workout's exercises as a new day in a plan
   function addWorkoutToPlan(workout, planId) {
     const plan = profile.plans.find(p => p.id === planId);
@@ -4200,10 +3828,25 @@ function App() {
   // Workout completion handler is extracted into useWorkoutCompletion (finding
   // #3 in docs/performance-audit.md) — modal close happens before the heavy
   // setProfile re-render and the rest is wrapped in startTransition.
+  // The one completion entry point the Workouts container needs: stats
+  // prompt first (skippable via prefs), then the completion sheet primed
+  // for "today". Collapses what used to be four separate props.
+  const openCompletionFlow = useCallback(wo => {
+    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
+      setCompletionModal({
+        workout: woWithStats,
+        fromStats: _sr
+      });
+      setCompletionDate(todayStr());
+      setCompletionAction("today");
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { confirmWorkoutComplete } = useWorkoutCompletion({
     profile, setProfile,
     allExById, applyAutoCheckIn, getMult,
-    showToast, setXpFlash, setWorkoutSubTab,
+    showToast, setXpFlash,
+    showWorkoutsSubTab: t => workoutsRef.current?.showSubTab(t),
     completionModal, setCompletionModal,
     completionDate, setCompletionDate,
     completionAction, setCompletionAction,
@@ -4407,7 +4050,7 @@ function App() {
         showToast(p.icon + " " + p.name + " scheduled for " + formatScheduledDate(spDate) + " \u2726");
       }
       setActiveTab("workouts");
-      setWorkoutSubTab("oneoff");
+      workoutsRef.current?.showSubTab("oneoff");
     }
     setSchedulePicker(null);
   }
@@ -5461,7 +5104,7 @@ function App() {
             const iconSrc = `https://api.iconify.design/${iconPath}.svg?color=${encodeURIComponent(tabColor)}`;
             return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
               setActiveTab(t);
-              if (t === "workouts") setWorkoutView("list");
+              if (t === "workouts") workoutsRef.current?.showList();
               if (t === "social" && authUser) {
                 loadSocialData();
                 loadIncomingShares();
@@ -5549,96 +5192,32 @@ function App() {
             />
           )}</>
 
-        /* ── WORKOUTS TAB ────────────────────── */}{activeTab === "workouts" && (
-          <WorkoutsTab
-            workoutView={workoutView}
-            setWorkoutView={setWorkoutView}
-            workoutSubTab={workoutSubTab}
-            setWorkoutSubTab={setWorkoutSubTab}
-            woLabelFilters={woLabelFilters}
-            setWoLabelFilters={setWoLabelFilters}
-            woLabelDropOpen={woLabelDropOpen}
-            setWoLabelDropOpen={setWoLabelDropOpen}
-            newLabelInput={newLabelInput}
-            setNewLabelInput={setNewLabelInput}
-            activeWorkout={activeWorkout}
-            setActiveWorkout={setActiveWorkout}
-            liveWorkout={liveWorkout}
-            startLiveWorkout={startLiveWorkout}
-            collapsedWo={collapsedWo}
-            setCollapsedWo={setCollapsedWo}
+        /* ── WORKOUTS TAB ────────────────────── */}{<div style={activeTab !== "workouts" ? { display: "none" } : undefined}>
+          {/* Keep-alive like PlansTabContainer: the container holds the
+              builder draft, so unmounting on tab switch would lose it. The
+              ref must also stay live for cross-tab entry points (StagingTray
+              forge, stats-prompt Back, completion sub-tab jumps). */}
+          <WorkoutsTabContainer
+            ref={workoutsRef}
             profile={profile}
             setProfile={setProfile}
-            recipeFilter={recipeFilter}
-            setRecipeFilter={setRecipeFilter}
-            recipeCatDrop={recipeCatDrop}
-            setRecipeCatDrop={setRecipeCatDrop}
-            expandedRecipeDesc={expandedRecipeDesc}
-            setExpandedRecipeDesc={setExpandedRecipeDesc}
-            expandedRecipeEx={expandedRecipeEx}
-            setExpandedRecipeEx={setExpandedRecipeEx}
-            wbName={wbName}
-            setWbName={setWbName}
-            wbIcon={wbIcon}
-            setWbIcon={setWbIcon}
-            wbDesc={wbDesc}
-            setWbDesc={setWbDesc}
-            wbExercises={wbExercises}
-            setWbExercises={setWbExercises}
-            wbEditId={wbEditId}
-            setWbEditId={setWbEditId}
-            wbIsOneOff={wbIsOneOff}
-            setWbIsOneOff={setWbIsOneOff}
-            wbLabels={wbLabels}
-            setWbLabels={setWbLabels}
-            wbDuration={wbDuration}
-            setWbDuration={setWbDuration}
-            wbDurSec={wbDurSec}
-            setWbDurSec={setWbDurSec}
-            wbActiveCal={wbActiveCal}
-            setWbActiveCal={setWbActiveCal}
-            wbTotalCal={wbTotalCal}
-            setWbTotalCal={setWbTotalCal}
-            wbCopySource={wbCopySource}
-            setWbCopySource={setWbCopySource}
-            wbIconPickerOpen={wbIconPickerOpen}
-            setWbIconPickerOpen={setWbIconPickerOpen}
-            wbExPickerOpen={wbExPickerOpen}
-            setWbExPickerOpen={setWbExPickerOpen}
-            wbTotalXP={wbTotalXP}
-            collapsedWbEx={collapsedWbEx}
-            setCollapsedWbEx={setCollapsedWbEx}
-            ssChecked={ssChecked}
-            setSsChecked={setSsChecked}
-            ssAccordion={ssAccordion}
-            setSsAccordion={setSsAccordion}
-            dragWbExIdx={dragWbExIdx}
-            setDragWbExIdx={setDragWbExIdx}
-            initWorkoutBuilder={initWorkoutBuilder}
-            copyWorkout={copyWorkout}
-            openStatsPromptIfNeeded={openStatsPromptIfNeeded}
-            setCompletionModal={setCompletionModal}
-            setCompletionDate={setCompletionDate}
-            setCompletionAction={setCompletionAction}
-            setConfirmDelete={setConfirmDelete}
-            openQuickLog={openQuickLog}
-            setPendingSoloRemoveId={setPendingSoloRemoveId}
-            quickLogSoloEx={quickLogSoloEx}
-            openScheduleEx={openScheduleEx}
-            setAddToWorkoutPicker={setAddToWorkoutPicker}
-            openExEditor={openExEditor}
-            setAddToPlanPicker={setAddToPlanPicker}
-            deleteWorkout={deleteWorkout}
-            reorderSupersetPair={reorderSupersetPair}
-            reorderWbEx={reorderWbEx}
-            saveBuiltWorkout={saveBuiltWorkout}
-            saveAsNewWorkout={saveAsNewWorkout}
-            daysUntil={daysUntil}
-            showToast={showToast}
+            allExercises={allExercises}
             allExById={allExById}
             clsColor={cls.color}
+            liveWorkout={liveWorkout}
+            startLiveWorkout={startLiveWorkout}
+            showToast={showToast}
+            setConfirmDelete={setConfirmDelete}
+            openCompletionFlow={openCompletionFlow}
+            quickLogSoloEx={quickLogSoloEx}
+            openQuickLog={openQuickLog}
+            setPendingSoloRemoveId={setPendingSoloRemoveId}
+            openScheduleEx={openScheduleEx}
+            openExEditor={openExEditor}
+            setAddToWorkoutPicker={setAddToWorkoutPicker}
+            setAddToPlanPicker={setAddToPlanPicker}
           />
-        )
+        </div>
 
         /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setLibDetailEx={setLibDetailEx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
 
@@ -5922,13 +5501,7 @@ function App() {
         moveInCart={moveInCart}
         onForgeWorkout={() => {
           if (!stagedIds.length) return;
-          setWbExercises(stagedIds.map(id => cartEntry(id, allExById)));
-          setWbName("");
-          setWbIcon("💪");
-          setWbDesc("");
-          setWbEditId(null);
-          setWbIsOneOff(false);
-          setWorkoutView("builder");
+          workoutsRef.current?.openBuilderWithExercises(stagedIds.map(id => cartEntry(id, allExById)));
           setActiveTab("workouts");
           clearCart();
           setLibSelectMode(false);
@@ -6161,29 +5734,10 @@ function App() {
               flex: 1
             }} onClick={() => setSaveWorkoutWizard(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>, document.body)
+            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>, document.body)}
 
-    /* ══ WORKOUT EXERCISE PICKER ═════════════════ */}{wbExPickerOpen && (
-      <WorkoutExercisePicker
-        pickerSearch={pickerSearch}
-        setPickerSearch={setPickerSearch}
-        pickerMuscle={pickerMuscle}
-        setPickerMuscle={setPickerMuscle}
-        pickerTypeFilter={pickerTypeFilter}
-        setPickerTypeFilter={setPickerTypeFilter}
-        pickerEquipFilter={pickerEquipFilter}
-        setPickerEquipFilter={setPickerEquipFilter}
-        pickerOpenDrop={pickerOpenDrop}
-        setPickerOpenDrop={setPickerOpenDrop}
-        pickerSelected={pickerSelected}
-        allExercises={allExercises}
-        allExById={allExById}
-        closePicker={closePicker}
-        openExEditor={openExEditor}
-        pickerToggleEx={pickerToggleEx}
-        commitPickerToWorkout={commitPickerToWorkout}
-      />
-    )}
+    {/* Workout exercise picker renders inside WorkoutsTabContainer now. */}
+
     {/* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && <Sheet open onClose={() => setAddToPlanPicker(null)} layer={"modal"} title={"📋 Add to Plan"} ariaLabel={"Add workout to plan"}><div style={{ display: "flex", flexDirection: "column", gap: S.s12 }}><div style={{
           display: "flex",
           alignItems: "center",
@@ -6339,7 +5893,7 @@ function App() {
           // preserve their typed values rather than resetting.
           openQuickLog(statsPromptModal.wo._soloExId, { preserve: true });
         } else if (!statsPromptModal.wo.soloEx) {
-          setWorkoutView("builder");
+          workoutsRef.current?.showBuilder();
           setActiveTab("workouts");
         }
       }}>{"← Back"}</button>}
@@ -6789,7 +6343,7 @@ function App() {
         confirmDelete={confirmDelete}
         setConfirmDelete={setConfirmDelete}
         plansContainerRef={plansContainerRef}
-        _doDeleteWorkout={_doDeleteWorkout}
+        _doDeleteWorkout={id => workoutsRef.current?.doDeleteWorkout(id)}
         _doDeleteCustomEx={_doDeleteCustomEx}
         _doDeleteLogEntry={_doDeleteLogEntry}
         _doResetChar={_doResetChar}

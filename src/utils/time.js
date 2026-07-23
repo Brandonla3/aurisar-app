@@ -59,11 +59,26 @@ function combineHHMMSec(hhmm, sec) {
   return base + Math.min(s, 59);
 }
 
+// Whole days from today until dateStr ("YYYY-MM-DD"); negative when past,
+// null when unparseable. Was duplicated in App.jsx and PlansTabContainer.
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const then = new Date(dateStr + "T00:00:00");
+    return Math.round((then - now) / 86400000);
+  } catch {
+    return null;
+  }
+}
+
 export {
   secToHMS,
   HMSToSec,
   normalizeHHMM,
   secToHHMMSplit,
   HHMMToSec,
-  combineHHMMSec
+  combineHHMMSec,
+  daysUntil
 };

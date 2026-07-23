@@ -3,11 +3,12 @@ import { ExIcon } from '../../components/ExIcon';
 import { getMuscleColor, getTypeColor, calcExXP } from '../../utils/xp';
 import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
 import { formatXP } from '../../utils/format';
-import { uid, todayStr } from '../../utils/helpers';
-import { normalizeHHMM, combineHHMMSec } from '../../utils/time';
+import { todayStr } from '../../utils/helpers';
+import { normalizeHHMM, combineHHMMSec, daysUntil } from '../../utils/time';
 import { S, R, FS } from '../../utils/tokens';
 import SetsEditor from '../../components/ui/SetsEditor';
 import FilterDropdown from '../exercises/FilterDropdown';
+import { buildWorkoutObject } from './workoutModel';
 import { UI_COLORS, MUSCLE_COLORS, WORKOUT_TEMPLATES, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 
 /**
@@ -298,10 +299,7 @@ const WorkoutsTab = memo(function WorkoutsTab({
   // Callbacks (defined in App)
   initWorkoutBuilder,
   copyWorkout,
-  openStatsPromptIfNeeded,
-  setCompletionModal,
-  setCompletionDate,
-  setCompletionAction,
+  openCompletionFlow,
   setConfirmDelete,
   openQuickLog,
   setPendingSoloRemoveId,
@@ -315,7 +313,6 @@ const WorkoutsTab = memo(function WorkoutsTab({
   reorderWbEx,
   saveBuiltWorkout,
   saveAsNewWorkout,
-  daysUntil,
   showToast,
   // Computed
   allExById,
@@ -605,17 +602,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
             }}>{"💪 Make Reusable"}</button><div style={{
               flex: 1
             }} /><button className={"btn btn-gold btn-sm"} onClick={() => {
-              openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-                setCompletionModal({
-                  workout: {
-                    ...woWithStats,
-                    oneOff: true
-                  },
-                  fromStats: _sr
-                });
-                setCompletionDate(todayStr());
-                setCompletionAction("today");
-              });
+openCompletionFlow({ ...wo, oneOff: true });
             }}>{"✓ Complete"}</button></div></div>;
       });
     })()}{(() => {
@@ -903,16 +890,13 @@ if (workoutView === "recipes") {
         }}><button className={"btn btn-gold btn-sm"} style={{
             flex: 1
           }} onClick={() => {
-            const wo = {
-              id: uid(),
+            const wo = buildWorkoutObject({
               name: tpl.name,
               icon: tpl.icon,
               desc: tpl.desc,
-              exercises: tpl.exercises.map(e => ({
-                ...e
-              })),
+              exercises: tpl.exercises.map(e => ({ ...e })),
               createdAt: new Date().toLocaleDateString()
-            };
+            });
             setProfile(pr => ({
               ...pr,
               workouts: [...(pr.workouts || []), wo]
@@ -1008,14 +992,7 @@ if (workoutView === "detail" && activeWorkout) {
         flex: 2,
         fontSize: FS.sm
       }} onClick={() => {
-        openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-          setCompletionModal({
-            workout: woWithStats,
-            fromStats: _sr
-          });
-          setCompletionDate(todayStr());
-          setCompletionAction("today");
-        });
+openCompletionFlow(wo);
       }}>{"✓ Mark Complete or Schedule"}</button><button className={"btn btn-gold btn-sm"} style={{
         flex: 1
       }} onClick={() => setAddToPlanPicker({
@@ -1265,28 +1242,19 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
       showToast("Add at least one exercise.");
       return;
     }
-    const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
-    const wo = {
-      id: uid(),
-      name: wbName.trim(),
+    const wo = buildWorkoutObject({
+      name: wbName,
       icon: wbIcon,
-      desc: wbDesc.trim(),
+      desc: wbDesc,
       exercises: wbExercises,
       createdAt: todayStr(),
       oneOff: true,
-      durationMin: dur || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
+      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
+      activeCal: wbActiveCal,
+      totalCal: wbTotalCal,
       labels: wbLabels
-    };
-    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-      setCompletionModal({
-        workout: woWithStats,
-        fromStats: _sr
-      });
-      setCompletionDate(todayStr());
-      setCompletionAction("today");
     });
+    openCompletionFlow(wo);
     setWorkoutView("list");
   }}>{"Next: Log or Schedule →"}</button> : wbEditId ? <>
   <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button>
@@ -1305,28 +1273,19 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
       showToast("Add at least one exercise.");
       return;
     }
-    const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
-    const wo = {
-      id: uid(),
-      name: wbName.trim(),
+    const wo = buildWorkoutObject({
+      name: wbName,
       icon: wbIcon,
-      desc: wbDesc.trim(),
+      desc: wbDesc,
       exercises: wbExercises,
       createdAt: todayStr(),
       oneOff: true,
-      durationMin: dur || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
+      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
+      activeCal: wbActiveCal,
+      totalCal: wbTotalCal,
       labels: wbLabels
-    };
-    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-      setCompletionModal({
-        workout: woWithStats,
-        fromStats: _sr
-      });
-      setCompletionDate(todayStr());
-      setCompletionAction("today");
     });
+    openCompletionFlow(wo);
     setWorkoutView("list");
   }}>{"✓ Complete / Schedule"}</button>
   </>}</div></>;
