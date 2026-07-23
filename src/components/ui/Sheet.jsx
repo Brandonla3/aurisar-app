@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useEffect, useRef } from 'react';
 import { useModalLifecycle } from '../../utils/useModalLifecycle';
 import { Z } from '../../utils/tokens';
 
@@ -26,6 +27,10 @@ const LAYER_Z = {
  *
  * `placement="bottom"` is the mobile-first default; `"center"` is for the
  * few dialogs whose character is a centered card (completion, confirms).
+ *
+ * On open, focus moves into the dialog (unless a caller has already placed
+ * focus inside — e.g. ConfirmSheet focuses its Cancel), so keyboard and
+ * screen-reader users land in the sheet rather than on the trigger behind it.
  */
 export default function Sheet({
   open,
@@ -46,7 +51,7 @@ export default function Sheet({
   scroll = 'body',            // "body" | "none"
   ariaLabel,
   style,                      // merged onto the sheet (e.g. a --mg-color skin var)
-  tabIndex,                   // for sheets that take programmatic focus
+  tabIndex,                   // dialog tabIndex; defaults to -1 (programmatic focus)
   sheetRef,                   // passthroughs for swipe pagers etc.
   onTouchStart,
   onTouchMove,
@@ -56,7 +61,30 @@ export default function Sheet({
   bodyClassName = '',
   children,
 }) {
-  useModalLifecycle(!!open, onClose);
+  const backdropRef = useRef(null);
+  const internalDialogRef = useRef(null);
+  // When a caller passes a ref (the detail sheet, for its swipe/focus logic),
+  // use it AS the dialog ref so there's a single source of truth — no merged
+  // callback ref mutating a prop. All callers pass a ref object or nothing.
+  const dialogRef = sheetRef || internalDialogRef;
+
+  // containerRef (the backdrop) lets useModalLifecycle inert this modal when a
+  // newer one covers it — not just #root.
+  useModalLifecycle(!!open, onClose, backdropRef);
+
+  // Move focus into the dialog on open, deferred a frame so the portal is in
+  // the DOM and useModalLifecycle has applied inert. Skip if focus is already
+  // inside (a caller — e.g. ConfirmSheet — may have targeted a specific action).
+  useEffect(() => {
+    if (!open) return undefined;
+    if (typeof requestAnimationFrame !== 'function') return undefined;
+    const id = requestAnimationFrame(() => {
+      const el = dialogRef.current;
+      if (el && !el.contains(document.activeElement)) el.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
   if (!open) return null;
 
   const zIndex = typeof layer === 'number' ? layer : (LAYER_Z[layer] ?? Z.modal);
@@ -69,10 +97,10 @@ export default function Sheet({
   if (onTouchMove) passthrough.onTouchMove = onTouchMove;
   if (onTouchEnd) passthrough.onTouchEnd = onTouchEnd;
   if (onAnimationEnd) passthrough.onAnimationEnd = onAnimationEnd;
-  if (tabIndex != null) passthrough.tabIndex = tabIndex;
 
   return createPortal(
     <div
+      ref={backdropRef}
       role="presentation"
       className={`ui-sheet-backdrop ${isBottom ? 'ui-sheet-backdrop--bottom' : 'ui-sheet-backdrop--center'}${isBottom && navOffset ? ' ui-sheet-backdrop--nav' : ''}`}
       style={{ zIndex }}
@@ -82,7 +110,8 @@ export default function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel || title || undefined}
-        ref={sheetRef}
+        ref={dialogRef}
+        tabIndex={tabIndex != null ? tabIndex : -1}
         className={`ui-sheet ${isBottom ? 'ui-sheet--bottom sheet-slide-up' : 'ui-sheet--center ui-sheet-pop'}${tall ? ' ui-sheet--tall' : ''} ${className}`}
         style={{ maxWidth, ...style }}
         {...passthrough}

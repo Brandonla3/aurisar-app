@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import Sheet from './Sheet';
 
 /**
@@ -5,6 +6,9 @@ import Sheet from './Sheet';
  * inline confirm modals: centered card on the confirm layer (tops every
  * other overlay), Cancel + Confirm with ≥44px targets, `danger` switches
  * the confirm action to the destructive style.
+ *
+ * On open, focus lands on Cancel — the safe default, so an accidental
+ * Enter/Space on a destructive prompt dismisses rather than confirms.
  */
 export default function ConfirmSheet({
   open,
@@ -17,6 +21,14 @@ export default function ConfirmSheet({
   onConfirm,
   onCancel,
 }) {
+  const cancelRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    if (typeof requestAnimationFrame !== 'function') return undefined;
+    const id = requestAnimationFrame(() => cancelRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
   return (
     <Sheet
       open={open}
@@ -34,7 +46,7 @@ export default function ConfirmSheet({
       </div>
       {body && <div className={'ui-confirm-body'}>{body}</div>}
       <div className={'ui-confirm-actions'}>
-        <button className={'btn btn-ghost ui-confirm-btn'} style={{ flex: 1 }} onClick={onCancel}>
+        <button ref={cancelRef} className={'btn btn-ghost ui-confirm-btn'} style={{ flex: 1 }} onClick={onCancel}>
           {cancelLabel}
         </button>
         <button
