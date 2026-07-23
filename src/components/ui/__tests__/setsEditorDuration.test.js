@@ -36,8 +36,16 @@ describe('commitDurationBlur', () => {
     const v = { durationSec: null };
     const patches = commitDurationBlur(v, '');
     expect(patches[0]).toEqual({ field: '_durHHMM', val: undefined });
-    // no reps patch when there is no duration
-    expect(patches.find(p => p.field === 'reps')).toBeUndefined();
+  });
+
+  it('clears the stale minute reps when an existing timed exercise is cleared', () => {
+    // Start with a real prior duration/reps and blank both fields to zero.
+    const v = { durationSec: 90 * 60, reps: 90, _durSecRaw: '' };
+    const next = apply(v, commitDurationBlur(v, ''));
+    expect(next.durationSec).toBe(0);
+    // reps MUST be cleared, not left at 90 (else it stays saved + XP-scored
+    // and durationDisplay resurfaces it).
+    expect(next.reps).toBe('');
   });
 
   it('a sub-minute duration still yields at least 1 rep-minute', () => {
@@ -63,6 +71,13 @@ describe('commitSecChange', () => {
     expect(next.durationSec).toBe(60 * 60 + 15);
     expect(next.reps).toBe(60);
   });
+
+  it('clears reps when the seconds change empties the total', () => {
+    const v = { durationSec: 45, reps: 1, _durHHMM: '00:00' };
+    const next = apply(v, commitSecChange(v, ''));
+    expect(next.durationSec).toBe(0);
+    expect(next.reps).toBe('');
+  });
 });
 
 describe('durationDisplay', () => {
@@ -79,5 +94,10 @@ describe('durationDisplay', () => {
 
   it('falls back to legacy minute-reps when only reps exist', () => {
     expect(durationDisplay({ reps: 45 }).hhmm).toBe('00:45');
+  });
+
+  it('normalizes an over-60 legacy reps value (90 → 01:30, not 00:90)', () => {
+    expect(durationDisplay({ reps: 90 }).hhmm).toBe('01:30');
+    expect(durationDisplay({ reps: 125 }).hhmm).toBe('02:05');
   });
 });

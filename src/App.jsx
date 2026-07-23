@@ -3793,7 +3793,11 @@ function App() {
       onConfirm(wo);
       return;
     }
-    const _bsPrefs = profile.notificationPrefs || {};
+    // Read the live prefs via the ref, not the closed-over `profile`: this
+    // function is captured by the [] -memoized openCompletionFlow, so a stale
+    // closure would otherwise see the initial EMPTY_PROFILE prefs and ignore a
+    // user who later disabled the stats prompt.
+    const _bsPrefs = notifPrefsRef.current || {};
     if (_bsPrefs.reviewBattleStats === false) {
       onConfirm(wo);
       return;

@@ -323,6 +323,7 @@ const QuickLogModal = memo(function QuickLogModal({
                   valueMode={"display"}
                   distKey={"dist"}
                   showPaceBonus={false}
+                  allowExtraRows={false}
                   onPrimaryBlur={checkBeat}
                 />
               )}
@@ -387,7 +388,7 @@ const QuickLogModal = memo(function QuickLogModal({
                 {ex.id !== "rest_day" && (
                   <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.sm, padding: "8px 6px" }} onClick={() => {
                     ex.custom ? openExEditor("edit", ex) : openExEditor("copy", ex);
-                    setSelEx(null);
+                    dismiss();
                   }}>{ex.custom ? "✎ Edit" : "📋 Copy"}</button>
                 )}
               </div>
@@ -407,13 +408,13 @@ const QuickLogModal = memo(function QuickLogModal({
                       hrZone: hrZone || null
                     };
                     setAddToWorkoutPicker({ exercises: [exEntry] });
-                    setSelEx(null);
+                    dismiss();
                   }}>{"➕ Add to Workout"}</button>
                 )}
                 <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(45,42,36,.3)", color: "#8a8478" }} onClick={() => {
                   // Shared opener seeds spwSelected for every entry point.
                   openSavePlanWizard([planEntry(ex, profile.chosenClass, allExById)], ex.name, ex.name);
-                  setSelEx(null);
+                  dismiss();
                 }}>{"📋 Add to Plan"}</button>
               </div>
             </div>

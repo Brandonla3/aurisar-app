@@ -28,7 +28,11 @@ export function commitDurationBlur(value, rawHHMM) {
       : value.durationSec ? secToHHMMSplit(value.durationSec).sec : ''
   );
   patches.push({ field: 'durationSec', val: sec });
-  if (sec) patches.push({ field: 'reps', val: Math.max(1, Math.floor(sec / 60)) });
+  // reps doubles as the stored minute count. When the duration is cleared to
+  // zero we MUST clear reps too, otherwise a previously-entered minute value
+  // stays saved (and scored for XP) and durationDisplay resurfaces it via its
+  // legacy fallback. Emit an explicit empty reps at zero.
+  patches.push({ field: 'reps', val: sec ? Math.max(1, Math.floor(sec / 60)) : '' });
   return patches;
 }
 
@@ -38,16 +42,19 @@ export function commitSecChange(value, rawSec) {
   const hhmm = value._durHHMM || (value.durationSec ? secToHHMMSplit(value.durationSec).hhmm : '');
   const sec = combineHHMMSec(hhmm, rawSec);
   patches.push({ field: 'durationSec', val: sec });
-  if (sec) patches.push({ field: 'reps', val: Math.max(1, Math.floor(sec / 60)) });
+  patches.push({ field: 'reps', val: sec ? Math.max(1, Math.floor(sec / 60)) : '' });
   return patches;
 }
 
 /** What the duration inputs should display for a given entry. */
 export function durationDisplay(value) {
+  // Legacy fallback: older entries stored duration only as `reps` minutes.
+  // Normalize through secToHHMMSplit so reps:90 shows 01:30, not 00:90.
+  const legacy = value.reps ? secToHHMMSplit(Number(value.reps) * 60) : { hhmm: '', sec: '' };
   return {
     hhmm: value._durHHMM !== undefined ? value._durHHMM
       : value.durationSec ? secToHHMMSplit(value.durationSec).hhmm
-      : value.reps ? '00:' + String(value.reps).padStart(2, '0') : '',
+      : legacy.hhmm,
     sec: value._durSecRaw !== undefined ? String(value._durSecRaw).padStart(2, '0')
       : value.durationSec ? String(secToHHMMSplit(value.durationSec).sec).padStart(2, '0') : '',
   };

@@ -46,6 +46,7 @@ const SetsEditor = React.memo(function SetsEditor({
   showTreadmill = true,   // incline/speed pair (treadmill exercises only)
   showPaceBonus = true,   // running pace-bonus hint line
   showDist = true,        // distance field on cardio rows
+  allowExtraRows = true,  // the "＋ Add Row" progressive-row affordance
   onPrimaryBlur,          // optional blur hook (quick-log's ghost comparison)
 }) {
   const isC = exD.category === 'cardio';
@@ -118,10 +119,14 @@ const SetsEditor = React.memo(function SetsEditor({
   };
   const removeRow = ri => onField('extraRows', rows.filter((_, j) => j !== ri));
 
+  // The visible column header isn't programmatically tied to its input, so
+  // give each field an aria-label ("Set 1 Reps", "Interval 1 Duration…") and
+  // hide the header text from the a11y tree to avoid a double announcement.
+  const primaryRowName = timed ? 'Interval 1' : 'Set 1';
   const cell = (hdr, input) => (
     <div className={'se-cell'}>
-      <span className={'se-col-hdr'}>{hdr}</span>
-      {input}
+      <span className={'se-col-hdr'} aria-hidden={'true'}>{hdr}</span>
+      {React.cloneElement(input, { 'aria-label': `${primaryRowName} ${hdr}` })}
     </div>
   );
 
@@ -198,39 +203,41 @@ const SetsEditor = React.memo(function SetsEditor({
       {/* ── Extra rows ── */}
       {rows.map((row, ri) => (
         <div key={ri} className={'se-row se-row--extra'}>
-          <span className={'se-row-lbl'}>{`${rowLbl}${ri + 2}`}</span>
-          {timed ? (
+          <span className={'se-row-lbl'} aria-hidden={'true'}>{`${rowLbl}${ri + 2}`}</span>
+          {(() => { const rn = `${timed ? 'Interval' : 'Set'} ${ri + 2}`; return timed ? (
             <>
-              <input className={'se-inp se-inp--wide'} type={'text'} inputMode={'numeric'} placeholder={'HH:MM'}
+              <input className={'se-inp se-inp--wide'} type={'text'} inputMode={'numeric'} placeholder={'HH:MM'} aria-label={`${rn} duration`}
                 {...rowInputProps(ri, 'hhmm', v => normalizeHHMM(v))} />
-              <input className={'se-inp'} type={'number'} min={'0'} max={'59'} placeholder={'Sec'}
+              <input className={'se-inp'} type={'number'} min={'0'} max={'59'} placeholder={'Sec'} aria-label={`${rn} seconds`}
                 {...rowInputProps(ri, 'sec')} />
-              {showDist && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={dUnit}
+              {showDist && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={dUnit} aria-label={`${rn} distance`}
                 {...rowInputProps(ri, distKey)} />}
-              {isTread && showTreadmill && <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'Inc'}
+              {isTread && showTreadmill && <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'Inc'} aria-label={`${rn} incline`}
                 {...rowInputProps(ri, 'incline')} />}
-              {isTread && showTreadmill && <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'Spd'}
+              {isTread && showTreadmill && <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'Spd'} aria-label={`${rn} speed`}
                 {...rowInputProps(ri, 'speed')} />}
             </>
           ) : (
             <>
-              {!noSets && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'Sets'}
+              {!noSets && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'Sets'} aria-label={`${rn} sets`}
                 {...rowInputProps(ri, 'sets')} />}
-              <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'Reps'}
+              <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'Reps'} aria-label={`${rn} reps`}
                 {...rowInputProps(ri, 'reps')} />
-              {showW && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={wUnit}
+              {showW && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={wUnit} aria-label={`${rn} weight`}
                 {...rowWeightProps(ri)} />}
             </>
-          )}
-          <button type={'button'} className={'se-row-remove'} aria-label={`Remove row ${ri + 2}`}
+          ); })()}
+          <button type={'button'} className={'se-row-remove'} aria-label={`Remove ${timed ? 'interval' : 'set'} ${ri + 2}`}
             onClick={() => removeRow(ri)}>{'✕'}</button>
         </div>
       ))}
 
       {/* ── Add row ── */}
-      <button type={'button'} className={'se-add-row'} onClick={addRow}>
-        {'＋ Add Row ('}{timed ? 'e.g. interval' : 'e.g. progressive weight'}{')'}
-      </button>
+      {allowExtraRows && (
+        <button type={'button'} className={'se-add-row'} onClick={addRow}>
+          {'＋ Add Row ('}{timed ? 'e.g. interval' : 'e.g. progressive weight'}{')'}
+        </button>
+      )}
 
       {/* ── HR zone ── */}
       {showHR && isC && (

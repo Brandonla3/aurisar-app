@@ -90,8 +90,33 @@ const WorkoutsTabContainer = React.memo(React.forwardRef(function WorkoutsTabCon
   const wbTotalXP = useMemo(() => wbExercises.reduce((s, ex) => s + calcExEntryXP(ex, profile.chosenClass, allExById), 0), [wbExercises, profile.chosenClass, allExById]);
 
   // ── Builder lifecycle (bodies relocated verbatim from App.jsx) ──
-  function initWorkoutBuilder(base) {
+  // Clear EVERY builder field to its empty default. This container is
+  // keep-alive (display:none), so any path that opens a fresh builder must go
+  // through here first — otherwise a prior draft's duration/calories/labels/
+  // copy-source/superset state leaks into the new workout and is saved with it.
+  function resetBuilderFields() {
+    setWbName("");
+    setWbIcon("💪");
     setWbIconPickerOpen(false);
+    setWbDesc("");
+    setWbExercises([]);
+    setWbEditId(null);
+    setWbCopySource(null);
+    setWbIsOneOff(false);
+    setWbDuration("");
+    setWbDurSec("");
+    setWbActiveCal("");
+    setWbTotalCal("");
+    setWbLabels([]);
+    setNewLabelInput("");
+    setCollapsedWbEx({});
+    setSsChecked(new Set());
+    setSsAccordion({});
+    setDragWbExIdx(null);
+  }
+
+  function initWorkoutBuilder(base) {
+    resetBuilderFields();
     if (base) {
       setWbName(base.name);
       setWbIcon(base.icon);
@@ -101,24 +126,10 @@ const WorkoutsTabContainer = React.memo(React.forwardRef(function WorkoutsTabCon
       const split = base.durationMin ? secToHHMMSplit(Number(base.durationMin)) : { hhmm: "", sec: "" };
       const hasSec = split.sec && split.sec !== 0 && split.sec !== "";
       setWbDuration(hasSec ? `${split.hhmm}:${String(split.sec).padStart(2, "0")}` : (split.hhmm || ""));
-      setWbDurSec("");
       setWbActiveCal(base.activeCal || "");
       setWbTotalCal(base.totalCal || "");
       setWbLabels(base.labels || []);
-    } else {
-      setWbName("");
-      setWbIcon("💪");
-      setWbDesc("");
-      setWbExercises([]);
-      setWbEditId(null);
-      setWbDuration("");
-      setWbDurSec("");
-      setWbActiveCal("");
-      setWbTotalCal("");
-      setWbLabels([]);
     }
-    setWbIsOneOff(false);
-    setNewLabelInput("");
     setWorkoutView("builder");
   }
 
@@ -361,12 +372,10 @@ const WorkoutsTabContainer = React.memo(React.forwardRef(function WorkoutsTabCon
       setWorkoutSubTab(t);
     },
     openBuilderWithExercises: entries => {
+      // Full reset first (keep-alive container may hold an abandoned draft's
+      // duration/labels/calories/superset state), THEN seed the staged rows.
+      resetBuilderFields();
       setWbExercises(entries);
-      setWbName("");
-      setWbIcon("💪");
-      setWbDesc("");
-      setWbEditId(null);
-      setWbIsOneOff(false);
       setWorkoutView("builder");
     },
     doDeleteWorkout: _doDeleteWorkout,
