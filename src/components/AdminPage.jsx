@@ -448,7 +448,7 @@ export default function AdminPage({ authUser, onBack }) {
         background: "rgba(12,12,10,.92)",
         backdropFilter: "blur(8px)",
         borderBottom: "1px solid rgba(180,172,158,.08)",
-        padding: "calc(12px + env(safe-area-inset-top,0px)) 20px 12px",
+        padding: "calc(12px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-right,0px)) 12px calc(20px + env(safe-area-inset-left,0px))",
         display: "flex", alignItems: "center", gap: 12,
       }}>
         <button
@@ -471,7 +471,7 @@ export default function AdminPage({ authUser, onBack }) {
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px calc(16px + env(safe-area-inset-right,0px)) 24px calc(16px + env(safe-area-inset-left,0px))" }}>
 
         {/* Search bar */}
         <div style={{ marginBottom: 20 }}>
@@ -551,7 +551,7 @@ export default function AdminPage({ authUser, onBack }) {
       {/* Toast */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", bottom: "calc(24px + env(safe-area-inset-bottom,0px))", left: "50%", transform: "translateX(-50%)",
           zIndex: 3000,
           background: toast.isErr ? "rgba(122,40,56,.95)" : "rgba(40,60,40,.95)",
           border: `1px solid ${toast.isErr ? "rgba(196,120,120,.3)" : "rgba(120,176,120,.3)"}`,

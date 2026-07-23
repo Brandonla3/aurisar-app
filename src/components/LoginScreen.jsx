@@ -159,7 +159,7 @@ export default function LoginScreen({
       {/* ── Top nav ── */}
       <header style={{
         position: 'relative', zIndex: 3,
-        padding: '24px 40px',
+        padding: 'calc(24px + env(safe-area-inset-top,0px)) 40px 24px',
       }}>
         <button
           onClick={onBack}

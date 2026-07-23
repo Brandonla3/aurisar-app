@@ -51,15 +51,20 @@ export default function WorldOverlay({ onClose, username, aurisarClass, avatarCo
         top: 0, right: 0, bottom: 0, left: 0,
         zIndex:   9999,
         background: '#000',
-        // Respect notch / home-bar on iOS
+        display: 'flex',
+        // Respect notch / home-bar on iOS. The game wrapper below is in-flow
+        // (flex child) so this padding actually shrinks it — an absolutely
+        // positioned inset:0 child would fill the padding box and make these
+        // insets a no-op, leaving the HUD controls at the raw screen edges.
         paddingTop:    'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         paddingLeft:   'env(safe-area-inset-left, 0px)',
         paddingRight:  'env(safe-area-inset-right, 0px)',
       }}
     >
-      {/* Game fills the whole overlay */}
-      <div style={{ position: 'absolute', inset: 0 }}>
+      {/* Game fills the safe area; its HUD (WorldGame root is position:relative,
+          width/height 100%) is inset with it. */}
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0 }}>
         <WorldGame playerInfo={playerInfo} onExit={onClose} />
       </div>
     </div>
