@@ -5,6 +5,7 @@ import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import Sheet from '../../components/ui/Sheet';
 import { planEntry } from './planEntry';
+import { diffColor } from './difficulty';
 
 /**
  * Exercise detail bottom sheet.
@@ -187,7 +188,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             {ex.difficulty && <span style={{
               fontSize: FS.md,
               fontWeight: 700,
-              color: ex.difficulty === "Advanced" ? "#7A2838" : ex.difficulty === "Beginner" ? "#5A8A58" : "#A8843C"
+              color: diffColor(ex.difficulty)
             }}>{"· " + ex.difficulty}</span>}
             <span style={{
               fontSize: FS.md,

@@ -7,6 +7,7 @@ import { uid, todayStr } from '../../utils/helpers';
 import { normalizeHHMM, combineHHMMSec } from '../../utils/time';
 import { S, R, FS } from '../../utils/tokens';
 import SetsEditor from '../../components/ui/SetsEditor';
+import FilterDropdown from '../exercises/FilterDropdown';
 import { UI_COLORS, MUSCLE_COLORS, WORKOUT_TEMPLATES, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 
 /**
@@ -383,6 +384,10 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
 }
 const metric = isMetric(profile.units);
 const allW = profile.workouts || [];
+const woLabelCounts = new Map();
+for (const w of allW) {
+  for (const l of w.labels || []) woLabelCounts.set(l, (woLabelCounts.get(l) || 0) + 1);
+}
 const calcWorkoutXP = wo => (wo.exercises || []).reduce((s, ex) => {
   const extraCount = (ex.extraRows || []).length;
   const base = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
@@ -422,102 +427,55 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
     gap: S.s8,
     marginBottom: S.s10,
     position: "relative"
-  }}>{woLabelDropOpen && <div onClick={() => setWoLabelDropOpen(false)} style={{
+  }}>{woLabelDropOpen && <div aria-hidden={"true"} onClick={() => setWoLabelDropOpen(false)} style={{
       position: "fixed",
       inset: 0,
       zIndex: 19
-    }} />}<div style={{
-      position: "relative",
-      zIndex: 20
-    }}><button onClick={() => setWoLabelDropOpen(!woLabelDropOpen)} style={{
-        padding: "8px 28px 8px 10px",
-        borderRadius: R.xl,
-        border: "1px solid " + (woLabelFilters.size > 0 ? "#C4A044" : "rgba(45,42,36,.3)"),
-        background: "rgba(14,14,12,.95)",
-        color: woLabelFilters.size > 0 ? "#C4A044" : "#8a8478",
-        fontSize: FS.lg,
-        textAlign: "left",
-        cursor: "pointer",
-        position: "relative"
-      }}>{woLabelFilters.size > 0 ? "Labels (" + woLabelFilters.size + ")" : "Labels"}<span style={{
-          position: "absolute",
-          right: 8,
-          top: "50%",
-          transform: "translateY(-50%) rotate(" + (woLabelDropOpen ? "180deg" : "0deg") + ")",
-          color: woLabelFilters.size > 0 ? "#C4A044" : "#8a8478",
-          fontSize: FS.sm,
-          transition: "transform .15s",
-          lineHeight: 1
-        }}>{"▼"}</span></button>{woLabelDropOpen && <div style={{
-        position: "absolute",
-        top: "calc(100% + 4px)",
-        left: 0,
-        minWidth: 180,
-        background: "rgba(16,14,10,.95)",
-        border: "1px solid rgba(180,172,158,.07)",
-        borderRadius: R.xl,
-        padding: "6px 4px",
-        zIndex: 21,
-        boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-      }}>{(profile.workoutLabels || []).map(l => {
-          const sel = woLabelFilters.has(l);
-          return <div key={l} onClick={() => setWoLabelFilters(s => {
-            const n = new Set(s);
-            n.has(l) ? n.delete(l) : n.add(l);
-            return n;
-          })} style={{
-            display: "flex",
-            alignItems: "center",
-            gap: S.s8,
-            padding: "6px 10px",
-            borderRadius: R.md,
-            cursor: "pointer",
-            background: sel ? "rgba(196,160,68,.12)" : "transparent"
-          }}><div style={{
-              width: 14,
-              height: 14,
-              borderRadius: R.r3,
-              flexShrink: 0,
-              border: "1.5px solid " + (sel ? "#C4A044" : "rgba(180,172,158,.08)"),
-              background: sel ? "rgba(196,160,68,.25)" : "transparent",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}>{sel && <span style={{
-                fontSize: FS.sm,
-                color: "#C4A044",
-                lineHeight: 1
-              }}>{"✓"}</span>}</div><span style={{
-              fontSize: FS.lg,
-              color: sel ? "#C4A044" : "#b4ac9e",
-              whiteSpace: "nowrap"
-            }}>{l}</span></div>;
-        })}<div className={"wo-label-new-row"}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onClick={e => e.stopPropagation()} onKeyDown={e => {
-            if (e.key === "Enter" && newLabelInput.trim()) {
-              const lbl = newLabelInput.trim();
-              if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
-                setProfile(p => ({
-                  ...p,
-                  workoutLabels: [...(p.workoutLabels || []), lbl]
-                }));
-              }
-              setNewLabelInput("");
-            }
-          }} placeholder={"+ New label…"} /><button className={"btn btn-ghost btn-xs"} style={{
-            padding: "2px 6px",
-            fontSize: FS.sm
-          }} onClick={e => {
-            e.stopPropagation();
-            const lbl = newLabelInput.trim();
-            if (!lbl) return;
-            if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
-              setProfile(p => ({
-                ...p,
-                workoutLabels: [...(p.workoutLabels || []), lbl]
-              }));
-            }
-            setNewLabelInput("");
-          }}>{"+"}</button></div></div>}</div>{woLabelFilters.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
+    }} />}<FilterDropdown
+      id={"wo-labels"}
+      label={"Labels"}
+      shortLabel={"Labels"}
+      options={profile.workoutLabels || []}
+      optionLabel={l => l}
+      selected={woLabelFilters}
+      counts={woLabelCounts}
+      onToggle={l => setWoLabelFilters(sHas => {
+        const n = new Set(sHas);
+        n.has(l) ? n.delete(l) : n.add(l);
+        return n;
+      })}
+      open={!!woLabelDropOpen}
+      setOpen={v => setWoLabelDropOpen(v === "wo-labels")}
+      accent={"#C4A044"}
+      panelBorder={"rgba(196,148,40,0.25)"}
+      footer={<div className={"wo-label-new-row"}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onClick={e => e.stopPropagation()} onKeyDown={e => {
+        e.stopPropagation();
+        if (e.key === "Enter" && newLabelInput.trim()) {
+          const lbl = newLabelInput.trim();
+          if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
+            setProfile(pf => ({
+              ...pf,
+              workoutLabels: [...(pf.workoutLabels || []), lbl]
+            }));
+          }
+          setNewLabelInput("");
+        }
+      }} placeholder={"+ New label…"} /><button className={"btn btn-ghost btn-xs"} style={{
+        padding: "2px 6px",
+        fontSize: FS.sm
+      }} onClick={e => {
+        e.stopPropagation();
+        const lbl = newLabelInput.trim();
+        if (!lbl) return;
+        if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
+          setProfile(pf => ({
+            ...pf,
+            workoutLabels: [...(pf.workoutLabels || []), lbl]
+          }));
+        }
+        setNewLabelInput("");
+      }}>{"+"}</button></div>}
+    />{woLabelFilters.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
       fontSize: FS.sm,
       color: "#8a8478",
       alignSelf: "center"
@@ -747,6 +705,14 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
 // ── TEMPLATES ──────────────────────────
 if (workoutView === "recipes") {
   const filteredTpls = recipeFilter.size === 0 ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t => recipeFilter.has(t.category) || recipeFilter.has(t.equipment));
+  // Faceted counts for the shared FilterDropdown (option => how many results
+  // selecting it alone would show).
+  const recipeCatCounts = new Map();
+  for (const t of WORKOUT_TEMPLATES) {
+    for (const k of [t.category, t.equipment]) {
+      if (k) recipeCatCounts.set(k, (recipeCatCounts.get(k) || 0) + 1);
+    }
+  }
   return <><div className={"wo-sticky-filters"}><div style={{
         display: "flex",
         alignItems: "center",
@@ -764,79 +730,29 @@ if (workoutView === "recipes") {
         gap: S.s8,
         marginBottom: S.s0,
         position: "relative"
-      }}>{recipeCatDrop && <div onClick={() => setRecipeCatDrop(false)} style={{
+      }}>{recipeCatDrop && <div aria-hidden={"true"} onClick={() => setRecipeCatDrop(false)} style={{
           position: "fixed",
           inset: 0,
           zIndex: 19
-        }} />}<div style={{
-          position: "relative",
-          zIndex: 20
-        }}><button onClick={() => setRecipeCatDrop(!recipeCatDrop)} style={{
-            padding: "8px 28px 8px 10px",
-            borderRadius: R.xl,
-            border: "1px solid " + (recipeFilter.size > 0 ? "#C4A044" : "rgba(45,42,36,.3)"),
-            background: "rgba(14,14,12,.95)",
-            color: recipeFilter.size > 0 ? "#C4A044" : "#8a8478",
-            fontSize: FS.lg,
-            textAlign: "left",
-            cursor: "pointer",
-            position: "relative"
-          }}>{recipeFilter.size > 0 ? "Category (" + recipeFilter.size + ")" : "Category"}<span style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(" + (recipeCatDrop ? "180deg" : "0deg") + ")",
-              color: recipeFilter.size > 0 ? "#C4A044" : "#8a8478",
-              fontSize: FS.sm,
-              transition: "transform .15s",
-              lineHeight: 1
-            }}>{"▼"}</span></button>{recipeCatDrop && <div style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            minWidth: 200,
-            maxHeight: 280,
-            overflowY: "auto",
-            background: "rgba(16,14,10,.95)",
-            border: "1px solid rgba(180,172,158,.07)",
-            borderRadius: R.xl,
-            padding: "6px 4px",
-            zIndex: 21,
-            boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-          }}>{RECIPE_CATS.filter(c => c !== "All").map(cat => {
-              const sel = recipeFilter.has(cat);
-              return <div key={cat} onClick={() => setRecipeFilter(s => {
-                const n = new Set(s);
-                n.has(cat) ? n.delete(cat) : n.add(cat);
-                return n;
-              })} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8,
-                padding: "6px 10px",
-                borderRadius: R.md,
-                cursor: "pointer",
-                background: sel ? "rgba(196,160,68,.12)" : "transparent"
-              }}><div style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: R.r3,
-                  flexShrink: 0,
-                  border: "1.5px solid " + (sel ? "#C4A044" : "rgba(180,172,158,.08)"),
-                  background: sel ? "rgba(196,160,68,.25)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>{sel && <span style={{
-                    fontSize: FS.sm,
-                    color: "#C4A044",
-                    lineHeight: 1
-                  }}>{"✓"}</span>}</div><span style={{
-                  fontSize: FS.lg,
-                  color: sel ? "#C4A044" : "#b4ac9e",
-                  whiteSpace: "nowrap"
-                }}>{cat}</span></div>;
-            })}</div>}</div>{recipeFilter.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
+        }} />}<FilterDropdown
+          id={"recipe-cat"}
+          label={"Category"}
+          shortLabel={"Category"}
+          options={RECIPE_CATS.filter(c => c !== "All")}
+          optionLabel={c => c}
+          selected={recipeFilter}
+          counts={recipeCatCounts}
+          onToggle={cat => setRecipeFilter(sHas => {
+            const n = new Set(sHas);
+            n.has(cat) ? n.delete(cat) : n.add(cat);
+            return n;
+          })}
+          open={!!recipeCatDrop}
+          setOpen={v => setRecipeCatDrop(v === "recipe-cat")}
+          accent={"#C4A044"}
+          optionAccent={c => RECIPE_CAT_COLORS[c] || "#C4A044"}
+          panelBorder={"rgba(196,148,40,0.25)"}
+        />{recipeFilter.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
           fontSize: FS.sm,
           color: "#8a8478",
           alignSelf: "center"

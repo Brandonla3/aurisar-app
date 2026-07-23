@@ -29,6 +29,9 @@ function FilterDropdown({
   accent,         // colour for the selected state
   optionAccent,   // optional value => colour, for per-option tinting
   panelBorder,
+  footer,         // optional slot rendered below the options (e.g. an
+                  // add-new-value row); clicks inside it must not toggle
+                  // options, so it manages its own handlers
 }) {
   const [activeIdx, setActiveIdx] = useState(-1);
   const triggerRef = useRef(null);
@@ -233,6 +236,7 @@ function FilterDropdown({
             </div>
           );
         })}
+        {footer}
       </div>}
     </div>
   );

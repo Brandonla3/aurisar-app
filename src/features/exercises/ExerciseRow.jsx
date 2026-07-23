@@ -3,6 +3,7 @@ import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
 import { muscleLabel, equipLabel } from './exerciseFilterOptions';
+import { DIFF_FG, DIFF_BG } from './difficulty';
 
 /**
  * The exercise list row, shared by the library tab and the workout-builder
@@ -26,8 +27,8 @@ import { muscleLabel, equipLabel } from './exerciseFilterOptions';
 function difficultyOf(ex) {
   return ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
 }
-const DIFF_FG = { Advanced: "#7A2838", Beginner: "#5A8A58", Intermediate: "#A8843C" };
-const DIFF_BG = { Advanced: "#2e1515", Beginner: "#1a2e1a", Intermediate: "#2e2010" };
+// Difficulty colors live in ./difficulty (shared with the detail sheet and
+// My Exercises rows).
 
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
