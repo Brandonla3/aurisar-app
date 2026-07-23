@@ -448,7 +448,7 @@ export default function AdminPage({ authUser, onBack }) {
         background: "rgba(12,12,10,.92)",
         backdropFilter: "blur(8px)",
         borderBottom: "1px solid rgba(180,172,158,.08)",
-        padding: "12px 20px",
+        padding: "calc(12px + env(safe-area-inset-top,0px)) 20px 12px",
         display: "flex", alignItems: "center", gap: 12,
       }}>
         <button
