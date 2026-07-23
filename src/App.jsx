@@ -5224,7 +5224,9 @@ function App() {
           }}>{c.description}</div>}</div>)}</div><button className={"btn btn-gold"} disabled={!profile.chosenClass} onClick={() => confirmClass(profile.chosenClass)}>{"Confirm Class"}</button></div>
 
     /* ══ MAIN ═══════════════════════════════════ */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
+      height: "100dvh",
       maxHeight: "100dvh",
+      minHeight: 0,
       overflow: "hidden",
       paddingBottom: 0
     } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
