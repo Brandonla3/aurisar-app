@@ -183,6 +183,11 @@ const C = {
   diffBeginner:     "#5A8A58",
   diffIntermediate: "#A8843C",
   diffAdvanced:     "#7A2838",
+
+  // Exercise difficulty badge backgrounds (deep tints behind the FG colors)
+  diffBgBeginner:     "#1a2e1a",
+  diffBgIntermediate: "#2e2010",
+  diffBgAdvanced:     "#2e1515",
 };
 
 // ── Z-index ──────────────────────────────────────────────────────────────────

@@ -14,9 +14,9 @@ export const DIFF_FG = {
 };
 
 export const DIFF_BG = {
-  Advanced: '#2e1515',
-  Beginner: '#1a2e1a',
-  Intermediate: '#2e2010',
+  Advanced: C.diffBgAdvanced,
+  Beginner: C.diffBgBeginner,
+  Intermediate: C.diffBgIntermediate,
 };
 
 export const diffColor = difficulty => DIFF_FG[difficulty] || DIFF_FG.Intermediate;

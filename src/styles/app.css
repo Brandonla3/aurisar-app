@@ -302,10 +302,8 @@
     /* EX PICKER */
     .ex-picker-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:var(--z-picker);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .ex-picker-sheet{background:rgba(14,14,12,.88);border:1px solid rgba(180,172,158,.05);border-radius:16px 16px 0 0;padding:17px;width:100%;max-width:520px;max-height:calc(70vh - var(--bottom-nav-h));overflow-y:auto;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-    .ex-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
     .ex-pick-item{background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);border-radius:9px;padding:9px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:8px}
     .ex-pick-item:hover{background:rgba(45,42,36,.22);border-color:rgba(180,172,158,.07)}
-    .ex-pick-icon{font-size:1.1rem;flex-shrink:0}
     .ex-pick-name{font-size:.74rem;color:#b4ac9e;line-height:1.2}
     .ex-pick-xp{font-size:.6rem;color:#b4ac9e;margin-top:2px}
     /* EXERCISE DETAIL MODAL */
@@ -324,17 +322,17 @@
     .streak-dot.filled{background:rgba(45,42,36,.3);border-color:rgba(180,172,158,.1)}
     .streak-dot.current{background:linear-gradient(135deg,#8a8478,#b4ac9e);border-color:#b4ac9e;box-shadow:0 0 10px rgba(180,172,158,.4),0 0 20px rgba(180,172,158,.15)}
     /* Flash / Toast */
-    .xp-flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Inter',sans-serif;font-size:2rem;color:#b4ac9e;text-shadow:0 0 20px #b4ac9e,0 0 40px rgba(180,172,158,.35);animation:flashUp 2s ease-out forwards;pointer-events:none;z-index:999}
+    .xp-flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Inter',sans-serif;font-size:2rem;color:#b4ac9e;text-shadow:0 0 20px #b4ac9e,0 0 40px rgba(180,172,158,.35);animation:flashUp 2s ease-out forwards;pointer-events:none;z-index:var(--z-flash)}
     @keyframes flashUp{0%{opacity:0;transform:translate(-50%,-40%) scale(.7)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}60%{opacity:1;transform:translate(-50%,-60%) scale(1)}100%{opacity:0;transform:translate(-50%,-80%) scale(.9)}}
     /* XP bar animation overlay */
-    .xp-bar-flash{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:min(280px,72vw);background:rgba(15,13,10,.92);border:1px solid rgba(180,172,158,.18);border-radius:10px;padding:8px 12px;z-index:998;animation:xpBarIn 2s ease forwards;pointer-events:none;font-family:'Inter',sans-serif;box-shadow:0 0 18px rgba(0,0,0,.5)}
+    .xp-bar-flash{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:min(280px,72vw);background:rgba(15,13,10,.92);border:1px solid rgba(180,172,158,.18);border-radius:10px;padding:8px 12px;z-index:var(--z-flash);animation:xpBarIn 2s ease forwards;pointer-events:none;font-family:'Inter',sans-serif;box-shadow:0 0 18px rgba(0,0,0,.5)}
     .xp-bar-flash-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
     .xp-bar-flash-level{font-size:.65rem;font-weight:700;text-shadow:0 0 8px currentColor}
     .xp-bar-flash-amount{font-size:.6rem;color:#c8bfaf}
     .xp-bar-flash-track{height:6px;background:rgba(45,42,36,.5);border-radius:3px;overflow:visible}
     .xp-bar-flash-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.34,1.56,.64,1) .15s;filter:brightness(1.3)}
     @keyframes xpBarIn{0%{opacity:0;transform:translateX(-50%) translateY(8px)}12%{opacity:1;transform:translateX(-50%) translateY(0)}70%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(-4px)}}
-    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.08);color:#b4ac9e;box-shadow:0 0 12px rgba(0,0,0,.2);font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.09em;padding:8px 16px;border-radius:8px;z-index:998;animation:tIn .3s ease;white-space:nowrap}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.08);color:#b4ac9e;box-shadow:0 0 12px rgba(0,0,0,.2);font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.09em;padding:8px 16px;border-radius:8px;z-index:var(--z-flash);animation:tIn .3s ease;white-space:nowrap}
     @keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     /* Friend exercise banner */
     .friend-ex-banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:linear-gradient(155deg,rgba(34,32,26,.92),rgba(20,18,14,.9));border:1px solid rgba(180,172,158,.12);color:#d4cec4;box-shadow:0 4px 20px rgba(0,0,0,.4),0 0 12px rgba(180,172,158,.06);font-family:'Inter',sans-serif;padding:10px 16px;border-radius:12px;z-index:1000;display:flex;align-items:center;gap:10px;animation:fbIn .4s ease-out,fbOut .5s ease-in 4.5s forwards;cursor:pointer;max-width:92vw}
@@ -1047,7 +1045,7 @@
     .ex-edit-btn{position:absolute;top:7px;left:7px;font-size:.58rem;color:#8a8478;cursor:pointer;width:18px;height:18px;border-radius:50%;background:rgba(45,42,36,.15);display:flex;align-items:center;justify-content:center;transition:all .2s}
     .ex-edit-btn:hover{color:#b4ac9e;background:rgba(45,42,36,.22)}
     /* SAVE-AS-PLAN WIZARD */
-    .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-wizard);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .spw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
     .spw-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
     .spw-title{font-family:'Inter',sans-serif;font-size:.88rem;color:#d4cec4}
@@ -1127,7 +1125,7 @@
     .cdel-name{color:#d4cec4;font-weight:bold}
     .cdel-warning{font-size:.65rem;color:rgba(231,76,60,.8);text-align:center;font-style:italic}
     /* Save-as-workout wizard */
-    .saw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
+    .saw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-wizard);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .saw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
     /* CALENDAR */
     .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -1386,7 +1384,7 @@
     .wb-sub-hdr-icon{font-size:.72rem;color:#d4cec4}
     .wb-identity-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
     .wb-identity-row .inp{flex:1;min-width:0}
-    .wb-icon-btn{width:42px;height:42px;border-radius:9px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.35rem;flex-shrink:0;transition:background .2s,border-color .2s;position:relative}
+    .wb-icon-btn{width:42px;height:42px;border-radius:9px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.35rem;flex-shrink:0;transition:background .2s,border-color .2s;position:relative;color:inherit;font-family:inherit;padding:0;line-height:1}
     .wb-icon-btn:hover{background:rgba(45,42,36,.4);border-color:rgba(180,172,158,.2)}
     .wb-icon-btn-caret{position:absolute;bottom:2px;right:3px;font-size:.42rem;color:rgba(180,172,158,.55);line-height:1}
     .wb-icon-picker{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}

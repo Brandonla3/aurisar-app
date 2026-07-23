@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { MUSCLE_META, UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
-import { S, R, FS } from '../../utils/tokens';
+import { S, R, FS, Z } from '../../utils/tokens';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
@@ -381,7 +381,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         libOpenDrop && <div aria-hidden={"true"} onClick={() => setLibOpenDrop(null)} style={{
           position: "fixed",
           inset: 0,
-          zIndex: 19
+          zIndex: Z.scrim
         }} />}
         <FilterDropdown
           id="type"
