@@ -62,11 +62,16 @@ function npcAvatarConfig(npc) {
 }
 
 export class NpcSystem {
-  constructor(scene, worldgen, assetLibrary, { zoneId = 1 } = {}) {
+  constructor(scene, worldgen, assetLibrary, { zoneId = 1, excludeFromGlow } = {}) {
     this.scene = scene;
     this.worldgen = worldgen;
     this.assetLibrary = assetLibrary;
     this.zoneId = zoneId;
+    // Optional (LightingManager.excludeFromGlow, injected rather than imported
+    // so this system stays decoupled from lighting) — the mobile GlowLayer has
+    // no bloom threshold, so the marker's white emissive would otherwise glow
+    // like a light source over every NPC.
+    this._excludeFromGlow = excludeFromGlow;
     this._npcs = new Map(); // npcId → { def, avatar, marker, markerTex, markerChar }
     this._disposed = false;
   }
@@ -113,6 +118,7 @@ export class NpcSystem {
     plane.position.set(0, 2.6, 0);
     plane.isPickable = false;
     plane.setEnabled(false);
+    this._excludeFromGlow?.(plane);
     return { plane, tex };
   }
 
