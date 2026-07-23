@@ -66,15 +66,20 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   materials are shared; `_removeMob` no longer disposes the shared materials; the
   redundant per-frame HP-bar `lookAt` is gone (the planes already billboard).
 - **P6 — observer count.** The per-torch (≤12) and per-magic-accent (≤10) flicker
-  observers collapse into one shared loop observer (matching the already-consolidated
-  campfire / CastleLightPool patterns); the flicker maths is unchanged.
-- **P7 — sky overdraw.** The `AshwoodSky` gradient dome (a full-screen 5-octave FBM
-  shader) is skipped when it contributes nothing — daytime (`skyAlpha≈0`) with its 2-D
-  cloud deck faded to the volumetric layer's haze — removing a redundant sky pass on
-  the heaviest (high-tier + volumetric) config. The cloud dome was already
-  high-tier/opt-in gated.
+  observers collapse into one shared loop observer (a `FlickerLights` registry that owns
+  its own list + observer; matching the already-consolidated campfire / CastleLightPool
+  patterns); the flicker maths is unchanged. Covered by `flickerLights.test.js`.
 
 **Deferred** — real, but they need on-device GPU validation rather than a blind edit:
+
+- **P7 — sky-dome overdraw** was attempted (skip the gradient dome when it looks
+  invisible by day) but reverted after review: the gate keyed off `_cloudCover`, which is
+  the FBM *threshold*, not the resulting `cloudA`, so even at the cutoff dense samples can
+  still produce visible cloud/haze pixels — a boolean `setEnabled(false)` pops them, and
+  the residual deck is an *intended* thin-haze layer when volumetric clouds are on. A safe
+  version fades an explicit dome-opacity uniform to true zero (with hysteresis) or gates on
+  measured output alpha — both need on-device tuning. The volumetric-cloud dome is already
+  high-tier/opt-in gated.
 
 - **P3 — the lake mirror is ALREADY tier-gated:** reflective water is built only when
   `qualityTier === 'high'` (`ashwoodTileProvider.js:82`); `water`/`streamWater` never
@@ -250,10 +255,12 @@ a GPU budget.
   `drawMapMarkers`; off-map edge markers for teleport dungeons; fix hardcoded names; optional
   height/relief shading in the bake.
 - **Batch 2 — Performance.** *Delivered:* P1 leaf-card fill (single-sided + tier budget),
-  P5 mob material cache + HP-bar billboarding, P6 dungeon-observer consolidation, P7 sky-dome
-  overdraw skip. *Deferred (on-device validation):* P3 (mirror already tier-gated; distance
-  skip), P4 (selective material freeze), P2 (per-instance tree LOD needs the re-tile /
-  impostor work). See §1 "Batch 2 status" for the rationale. Guided by `babylonjs-engine`.
+  P5 mob material cache + HP-bar billboarding, P6 dungeon-observer consolidation (with a
+  `flickerLights.test.js` regression test). *Deferred (on-device validation):* P7 (sky-dome
+  skip — reverted; the boolean toggle can pop the intended thin-haze), P3 (mirror already
+  tier-gated; distance skip), P4 (selective material freeze), P2 (per-instance tree LOD needs
+  the re-tile / impostor work). See §1 "Batch 2 status" for the rationale. Guided by
+  `babylonjs-engine`.
 - **Batch 3 — Visual quality via skills.** Apply the `threejs-*` techniques to the
   `Ashwood*` systems (grass, clouds, sky, water, shadows, color) with a single tone-map owner.
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
