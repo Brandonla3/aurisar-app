@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { idHex, isChatVisible, insertChatMessage, joinCutoff } from '../chatUtils';
+import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen } from '../chatUtils';
 
 const RADIUS = 400;
 const world = (over = {}) => ({ id: 1n, senderName: 'A', text: 'hi', sentAt: 1000n, msgType: 'world', x: 0, y: 0, ...over });
@@ -47,19 +47,35 @@ describe('insertChatMessage', () => {
   });
   it('drops rows older than the join cutoff', () => {
     const cutoff = 5000n;
-    const list = insertChatMessage([], world({ id: 1n, sentAt: 4000n }), { joinCutoffMicros: cutoff });
+    const list = insertChatMessage([], world({ id: 1n, sentAt: 4000n }), { joinCutoffMs: cutoff });
     expect(list).toHaveLength(0);
-    const kept = insertChatMessage([], world({ id: 2n, sentAt: 6000n }), { joinCutoffMicros: cutoff });
+    const kept = insertChatMessage([], world({ id: 2n, sentAt: 6000n }), { joinCutoffMs: cutoff });
     expect(kept).toHaveLength(1);
   });
 });
 
-describe('joinCutoff', () => {
-  it('converts ms-minus-window to microseconds', () => {
-    expect(joinCutoff(100000, 60000)).toBe(40000000n);
+describe('joinCutoffMs', () => {
+  it('returns milliseconds (now minus window), matching the server sentAt unit', () => {
+    // Server stores sentAt in ms, so the cutoff must be ms — NOT microseconds.
+    expect(joinCutoffMs(100000, 60000)).toBe(40000n);
   });
   it('clamps at zero', () => {
-    expect(joinCutoff(1000, 60000)).toBe(0n);
+    expect(joinCutoffMs(1000, 60000)).toBe(0n);
+  });
+});
+
+describe('shouldFlagUnseen', () => {
+  const remote = { senderId: { toHexString: () => 'remote' } };
+  const mine = { senderId: { toHexString: () => 'me' } };
+  it('flags a remote message while chat is closed', () => {
+    expect(shouldFlagUnseen(remote, 'me', false)).toBe(true);
+  });
+  it('never flags the local player’s own echo', () => {
+    // submitChat closes chat immediately, so own rows arrive with chat closed.
+    expect(shouldFlagUnseen(mine, 'me', false)).toBe(false);
+  });
+  it('never flags while chat is open', () => {
+    expect(shouldFlagUnseen(remote, 'me', true)).toBe(false);
   });
 });
 

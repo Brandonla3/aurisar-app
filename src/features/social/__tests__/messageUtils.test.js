@@ -3,6 +3,7 @@ import {
   normalizeIncomingRow,
   buildOptimisticMessage,
   mergeIncomingMessage,
+  mergeSnapshot,
   resolveOptimistic,
   failOptimistic,
   removeMessage,
@@ -64,6 +65,18 @@ describe('mergeIncomingMessage', () => {
     const tmp = buildOptimisticMessage('yo', ME);
     const out = mergeIncomingMessage([tmp], msg({ id: 'other-1', content: 'yo' }));
     expect(out).toHaveLength(2);
+  });
+  it('leaves both rows when two identical pending sends are in flight', () => {
+    // Ambiguous: we can't tell which echo this is, so strip neither — dedupe by
+    // id + resolveOptimistic collapse the duplicate once each RPC returns.
+    const p1 = { ...buildOptimisticMessage('gg', ME), id: 'tmp-1' };
+    const p2 = { ...buildOptimisticMessage('gg', ME), id: 'tmp-2' };
+    const echo = msg({ id: 'real-1', sender_id: ME, is_mine: true, content: 'gg' });
+    const out = mergeIncomingMessage([p1, p2], echo);
+    expect(out.some(m => m.id === 'tmp-1')).toBe(true);
+    expect(out.some(m => m.id === 'tmp-2')).toBe(true);
+    expect(out.some(m => m.id === 'real-1')).toBe(true);
+    expect(out).toHaveLength(3);
   });
   it('reconciles the pending row, never a same-content failed row', () => {
     // Send "ok" (fails), then send "ok" again (pending); the echo for the
@@ -142,6 +155,24 @@ describe('groupMessages', () => {
   it('never shows sender labels on own messages', () => {
     const out = groupMessages([msg({ id: 'a', sender_id: ME, is_mine: true })], now);
     expect(out[0]._showSender).toBe(false);
+  });
+});
+
+describe('mergeSnapshot', () => {
+  it('preserves a realtime message that arrived mid-fetch instead of dropping it', () => {
+    // list held a realtime row 'r1' that the snapshot (taken earlier) lacks.
+    const current = [msg({ id: 'r1', content: 'live', created_at: '2026-07-23T12:05:00Z' })];
+    const snapshot = [msg({ id: 's1', content: 'old', created_at: '2026-07-23T12:00:00Z' })];
+    const out = mergeSnapshot(current, snapshot);
+    expect(out.map(m => m.id)).toEqual(['s1', 'r1']); // sorted by created_at, both kept
+  });
+  it('dedupes by id with the server row winning', () => {
+    const current = [{ ...msg({ id: 'x', content: 'optimistic' }), pending: true }];
+    const snapshot = [msg({ id: 'x', content: 'confirmed' })];
+    const out = mergeSnapshot(current, snapshot);
+    expect(out).toHaveLength(1);
+    expect(out[0].content).toBe('confirmed');
+    expect(out[0].pending).toBeUndefined();
   });
 });
 
