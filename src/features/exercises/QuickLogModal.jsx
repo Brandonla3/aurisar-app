@@ -1,10 +1,11 @@
 import React, { memo, useMemo, useState } from 'react';
 import { UI_COLORS, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
-import { calcExXP, hrRange } from '../../utils/xp';
+import { calcExXP } from '../../utils/xp';
 import { isMetric, kgToLbs, lbsToKg, kmToMi, miToKm, weightLabel, distLabel, pctToSlider, sliderToPct } from '../../utils/units';
-import { normalizeHHMM, combineHHMMSec } from '../../utils/time';
+import { combineHHMMSec } from '../../utils/time';
 import { S, R, FS } from '../../utils/tokens';
 import Sheet from '../../components/ui/Sheet';
+import SetsEditor from '../../components/ui/SetsEditor';
 import { entryTime } from './logEntryTime';
 import { planEntry } from './planEntry';
 
@@ -106,7 +107,6 @@ const QuickLogModal = memo(function QuickLogModal({
   const showDist = isCardio;
   const noSets = NO_SETS_EX_IDS.has(ex.id);
   const isRunning = ex.id === RUNNING_EX_ID;
-  const isTreadmill = ex.hasTreadmill || false;
   const age = profile.age || 30;
 
   const rawW = parseFloat(exWeight || 0);
@@ -226,6 +226,35 @@ const QuickLogModal = memo(function QuickLogModal({
     setBeat(estXPNum > ghostXP ? "ghost" : null);
   };
 
+  // ── SetsEditor adapter ──────────────────────────────────────────────────
+  // The quick log predates the entry-object shape: each field is its own
+  // useState, weight/distance are stored in DISPLAY units (converted at
+  // submit inside logExercise), and extra-row distance is keyed `dist`.
+  // SetsEditor's display valueMode + distKey cover those differences; the
+  // adapter just fans onField out to the per-field setters. `durationSec`
+  // patches are intentionally dropped — the submit path derives seconds from
+  // exHHMM/exSec itself.
+  const seValue = {
+    sets, reps, weightLbs: exWeight,
+    _durHHMM: exHHMM === "" ? undefined : exHHMM,
+    _durSecRaw: exSec === "" ? undefined : exSec,
+    distanceMi: distanceVal, hrZone,
+    incline: exIncline, speed: exSpeed,
+    extraRows: quickRows,
+  };
+  const seField = (field, val) => {
+    if (field === "sets") setSets(val);
+    else if (field === "reps") setReps(String(val));
+    else if (field === "weightLbs") setExWeight(val || "");
+    else if (field === "_durHHMM") setExHHMM(val ?? "");
+    else if (field === "_durSecRaw") setExSec(val ?? "");
+    else if (field === "distanceMi") setDistanceVal(val || "");
+    else if (field === "hrZone") setHrZone(val);
+    else if (field === "incline") setExIncline(val);
+    else if (field === "speed") setExSpeed(val);
+    else if (field === "extraRows") setQuickRows(val);
+  };
+
   const dismiss = () => {
     setSelEx(null);
     setExHHMM("");
@@ -282,83 +311,20 @@ const QuickLogModal = memo(function QuickLogModal({
                 </div>
               )}
 
-              {/* Top row: Sets/Reps or Duration+Sec+Dist + Weight */}
+              {/* One SetsEditor across builder / live / quick log */}
               {ex.id !== "rest_day" && (
-                <div style={{ display: "flex", gap: S.s6, marginBottom: S.s8, alignItems: "flex-end" }}>
-                  {!noSets && !(isCardio || isFlex) && (
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Sets"}</label>
-                      <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"20"} value={sets} onChange={e => setSets(e.target.value)} onBlur={checkBeat} placeholder={""} />
-                    </div>
-                  )}
-                  {isCardio || isFlex ? (
-                    <>
-                      <div style={{ flex: 2 }}>
-                        <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Duration (HH:MM)"}</label>
-                        <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"text"} inputMode={"numeric"} value={exHHMM} onChange={e => setExHHMM(e.target.value)} onBlur={e => {
-                          const norm = normalizeHHMM(e.target.value);
-                          setExHHMM(norm);
-                          const sec = combineHHMMSec(norm, exSec);
-                          if (sec) setReps(String(Math.max(1, Math.floor(sec / 60))));
-                        }} placeholder={"00:00"} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Seconds"}</label>
-                        <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"59"} value={exSec} onChange={e => {
-                          setExSec(e.target.value);
-                          const sec = combineHHMMSec(exHHMM, e.target.value);
-                          if (sec) setReps(String(Math.max(1, Math.floor(sec / 60))));
-                        }} placeholder={"00"} />
-                      </div>
-                      {showDist && (
-                        <div style={{ flex: 1.5 }}>
-                          <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Dist ("}{dUnit}{")"}</label>
-                          <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"200"} step={"0.1"} value={distanceVal} onChange={e => setDistanceVal(e.target.value)} onBlur={checkBeat} placeholder={"0.0"} />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Reps"}</label>
-                        <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"200"} value={reps} onChange={e => setReps(e.target.value)} onBlur={checkBeat} placeholder={""} />
-                      </div>
-                      {showWeight && (
-                        <div style={{ flex: 1.5 }}>
-                          <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Weight ("}{wUnit}{")"}</label>
-                          <input className={"inp"} style={{ padding: "6px 8px", textAlign: "center" }} type={"number"} min={"0"} max={"2000"} step={metric ? "0.5" : "2.5"} value={exWeight} onChange={e => setExWeight(e.target.value)} onBlur={checkBeat} placeholder={metric ? "60" : "135"} />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Extra rows */}
-              {ex.id !== "rest_day" && (
-                <div style={{ marginBottom: S.s8 }}>
-                  {quickRows.map((row, ri) => (
-                    <div key={ri} style={{ display: "flex", gap: S.s4, marginBottom: S.s4, padding: "6px 8px", background: "rgba(45,42,36,.18)", borderRadius: R.md, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: FS.sm, color: "#a09080", flexShrink: 0, minWidth: 18 }}>{isCardio || isFlex ? `I${ri + 2}` : `S${ri + 2}`}</span>
-                      {isCardio || isFlex ? (
-                        <>
-                          <input className={"inp"} style={{ flex: 1.5, minWidth: 52, padding: "4px 8px", fontSize: FS.lg }} type={"text"} inputMode={"numeric"} placeholder={"HH:MM"} defaultValue={row.hhmm || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], hhmm: normalizeHHMM(e.target.value) }; setQuickRows(rr); }} />
-                          <input className={"inp"} style={{ flex: 0.8, minWidth: 36, padding: "4px 8px", fontSize: FS.lg }} type={"number"} min={"0"} max={"59"} placeholder={"Sec"} defaultValue={row.sec || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], sec: e.target.value }; setQuickRows(rr); }} />
-                          <input className={"inp"} style={{ flex: 1, minWidth: 40, padding: "4px 8px", fontSize: FS.lg }} type={"text"} inputMode={"decimal"} placeholder={dUnit} defaultValue={row.dist || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], dist: e.target.value }; setQuickRows(rr); }} />
-                          {isTreadmill && <input className={"inp"} style={{ flex: 0.8, minWidth: 34, padding: "4px 8px", fontSize: FS.lg }} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"Inc"} defaultValue={row.incline || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], incline: e.target.value }; setQuickRows(rr); }} />}
-                          {isTreadmill && <input className={"inp"} style={{ flex: 0.8, minWidth: 34, padding: "4px 8px", fontSize: FS.lg }} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"Spd"} defaultValue={row.speed || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], speed: e.target.value }; setQuickRows(rr); }} />}
-                        </>
-                      ) : (
-                        <>
-                          {!noSets && <input className={"inp"} style={{ flex: 1, minWidth: 40, padding: "4px 8px", fontSize: FS.lg }} type={"number"} min={"1"} max={"20"} placeholder={"Sets"} defaultValue={row.sets || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], sets: e.target.value }; setQuickRows(rr); }} />}
-                          <input className={"inp"} style={{ flex: 1, minWidth: 40, padding: "4px 8px", fontSize: FS.lg }} type={"number"} min={"1"} max={"200"} placeholder={"Reps"} defaultValue={row.reps || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], reps: e.target.value }; setQuickRows(rr); }} />
-                          {showWeight && <input className={"inp"} style={{ flex: 1, minWidth: 40, padding: "4px 8px", fontSize: FS.lg }} type={"number"} min={"0"} placeholder={wUnit} defaultValue={row.weightLbs || ""} onBlur={e => { const rr = [...quickRows]; rr[ri] = { ...rr[ri], weightLbs: e.target.value }; setQuickRows(rr); }} />}
-                        </>
-                      )}
-                      <button className={"btn btn-danger btn-xs"} style={{ padding: "2px 6px", flexShrink: 0 }} onClick={() => setQuickRows(quickRows.filter((_, j) => j !== ri))}>{"✕"}</button>
-                    </div>
-                  ))}
-                </div>
+                <SetsEditor
+                  exD={ex}
+                  value={seValue}
+                  onField={seField}
+                  units={profile.units}
+                  age={age}
+                  variant={"quicklog"}
+                  valueMode={"display"}
+                  distKey={"dist"}
+                  showPaceBonus={false}
+                  onPrimaryBlur={checkBeat}
+                />
               )}
 
               {/* Distance bonus info */}
@@ -367,27 +333,6 @@ const QuickLogModal = memo(function QuickLogModal({
                   {metric ? `${rawDist} km = ${parseFloat(kmToMi(rawDist)).toFixed(2)} mi` : `${rawDist} mi = ${parseFloat(miToKm(rawDist)).toFixed(2)} km`}
                   <span style={{ color: "#e67e22", marginLeft: S.s6 }}>{"+"}{Math.round(Math.min(distMi * 0.05, 0.5) * 100)}{"% dist bonus"}</span>
                 </div>
-              )}
-
-              {/* Treadmill: Incline + Speed */}
-              {ex.id !== "rest_day" && isTreadmill && (
-                <div style={{ display: "flex", gap: S.s8, marginBottom: S.s10 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Incline (0.5–15)"}</label>
-                    <input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} value={exIncline || ""} onChange={e => setExIncline(e.target.value ? parseFloat(e.target.value) : null)} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: FS.sm, color: "#b0a898", display: "block", marginBottom: S.s4 }}>{"Speed (0.5–15)"}</label>
-                    <input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} value={exSpeed || ""} onChange={e => setExSpeed(e.target.value ? parseFloat(e.target.value) : null)} />
-                  </div>
-                </div>
-              )}
-
-              {/* Add Row button */}
-              {ex.id !== "rest_day" && (isCardio || isFlex || showWeight) && (
-                <button className={"btn btn-ghost btn-xs"} style={{ width: "100%", marginBottom: S.s8, fontSize: FS.sm, color: "#8a8478", borderStyle: "dashed" }} onClick={() => setQuickRows([...quickRows, isCardio || isFlex ? { hhmm: "", sec: "", dist: "", incline: "", speed: "" } : { sets: sets || "", reps: reps || "", weightLbs: exWeight || "" }])}>
-                  {"＋ Add Row ("}{isCardio || isFlex ? "e.g. interval" : "progressive weight/sets"}{")"}
-                </button>
               )}
 
               {/* Weight Intensity slider */}
@@ -409,26 +354,6 @@ const QuickLogModal = memo(function QuickLogModal({
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: FS.fs58, color: "#8a8478", marginTop: S.s2 }}>
                     <span>{"50% Deload"}</span><span>{"100% Normal"}</span><span>{"200% Max"}</span>
                   </div>
-                </div>
-              )}
-
-              {/* HR Zone */}
-              {ex.id !== "rest_day" && showHR && (
-                <div style={{ marginBottom: S.s12 }}>
-                  <label>{"Avg Heart Rate Zone "}{profile.age ? `(Age ${profile.age})` : ""}</label>
-                  <div className={"hr-zone-row"}>
-                    {HR_ZONES.map(z => {
-                      const range = hrRange(age, z);
-                      const sel = hrZone === z.z;
-                      return (
-                        <button type={"button"} key={z.z} aria-pressed={sel} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{ "--zc": z.color, borderColor: sel ? z.color : "rgba(45,42,36,.2)", background: sel ? `${z.color}22` : "rgba(45,42,36,.12)" }} onClick={() => setHrZone(sel ? null : z.z)}>
-                          <span className={"hz-name"} style={{ color: sel ? z.color : "#8a8478" }}>{"Z"}{z.z}{" "}{z.name}</span>
-                          <span className={"hz-bpm"} style={{ color: sel ? z.color : "#8a8478" }}>{range.lo}{"–"}{range.hi}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {hrZone && <div style={{ fontSize: FS.md, color: "#8a8478", fontStyle: "italic", marginTop: S.s6 }}>{HR_ZONES[hrZone - 1].desc}</div>}
                 </div>
               )}
 

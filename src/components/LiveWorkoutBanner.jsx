@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { isMetric, lbsToKg, kgToLbs, weightLabel } from '../utils/units';
 import Sheet from './ui/Sheet';
 import ConfirmSheet from './ui/ConfirmSheet';
+import SetsEditor from './ui/SetsEditor';
 
 export default function LiveWorkoutBanner({
   liveWorkout,
@@ -57,31 +58,6 @@ export default function LiveWorkoutBanner({
     e.stopPropagation();
     setExpandedIdx(prev => prev === i ? null : i);
     setAddExOpen(false);
-  }
-
-  function updateExField(i, field, val) {
-    onUpdateExercise(i, { [field]: val });
-  }
-
-  function updateExtraRow(i, ri, field, val) {
-    const rr = [...(exercises[i].extraRows || [])];
-    rr[ri] = { ...rr[ri], [field]: val };
-    onUpdateExercise(i, { extraRows: rr });
-  }
-
-  function removeExtraRow(i, ri) {
-    const rr = (exercises[i].extraRows || []).filter((_, j) => j !== ri);
-    onUpdateExercise(i, { extraRows: rr });
-  }
-
-  function addExtraRow(i) {
-    const ex = exercises[i];
-    const rr = [...(ex.extraRows || []), {
-      sets: ex.sets || '',
-      reps: ex.reps || '',
-      weightLbs: ex.weightLbs || '',
-    }];
-    onUpdateExercise(i, { extraRows: rr });
   }
 
   // Add exercise search — requires 2+ chars
@@ -185,10 +161,6 @@ export default function LiveWorkoutBanner({
                 const isInSuperset = ex.supersetWith !== null;
                 const expanded = expandedIdx === i;
                 const canEdit = ex.exId !== 'rest_day';
-                const isCardioOrFlex = ex.category === 'cardio' || ex.category === 'flexibility';
-                const showW = !isCardioOrFlex;
-                const noSets = ex.noSets;
-                const rowLabel = isCardioOrFlex ? 'I' : 'S';
 
                 return (
                   <React.Fragment key={i}>
@@ -238,99 +210,23 @@ export default function LiveWorkoutBanner({
                       {/* ── Inline edit panel ── */}
                       {expanded && (
                         <div className="lw-ex-edit">
-                          {/* Primary row (S1 / I1) */}
-                          <div className="lw-ex-edit-row">
-                            <span className="lw-ex-edit-row-lbl">{`${rowLabel}1`}</span>
-                            {!noSets && (
-                              <div className="lw-ex-edit-cell">
-                                <span className="lw-ex-edit-col-hdr">{"Sets"}</span>
-                                <input
-                                  className="lw-ex-edit-inp"
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={ex.sets === 0 || ex.sets === '' ? '' : ex.sets || ''}
-                                  onChange={e => updateExField(i, 'sets', e.target.value)}
-                                />
-                              </div>
-                            )}
-                            <div className="lw-ex-edit-cell">
-                              <span className="lw-ex-edit-col-hdr">{"Reps"}</span>
-                              <input
-                                className="lw-ex-edit-inp"
-                                type="text"
-                                inputMode="decimal"
-                                value={ex.reps === 0 || ex.reps === '' ? '' : ex.reps || ''}
-                                onChange={e => updateExField(i, 'reps', e.target.value)}
-                              />
-                            </div>
-                            {showW && (
-                              <div className="lw-ex-edit-cell">
-                                <span className="lw-ex-edit-col-hdr">{wLabel}</span>
-                                <input
-                                  className="lw-ex-edit-inp"
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="—"
-                                  value={dispW(ex.weightLbs)}
-                                  onChange={e => updateExField(i, 'weightLbs', fromW(e.target.value))}
-                                />
-                              </div>
-                            )}
-                            <div className="lw-ex-edit-spacer" />
-                          </div>
-
-                          {/* Extra rows (S2, S3…) */}
-                          {(ex.extraRows || []).map((row, ri) => (
-                            <div key={ri} className="lw-ex-edit-row lw-ex-edit-row-extra">
-                              <span className="lw-ex-edit-row-lbl">{`${rowLabel}${ri + 2}`}</span>
-                              {!noSets && (
-                                <div className="lw-ex-edit-cell">
-                                  <input
-                                    className="lw-ex-edit-inp"
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Sets"
-                                    value={row.sets || ''}
-                                    onChange={e => updateExtraRow(i, ri, 'sets', e.target.value)}
-                                  />
-                                </div>
-                              )}
-                              <div className="lw-ex-edit-cell">
-                                <input
-                                  className="lw-ex-edit-inp"
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="Reps"
-                                  value={row.reps || ''}
-                                  onChange={e => updateExtraRow(i, ri, 'reps', e.target.value)}
-                                />
-                              </div>
-                              {showW && (
-                                <div className="lw-ex-edit-cell">
-                                  <input
-                                    className="lw-ex-edit-inp"
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder={wLabel}
-                                    value={dispW(row.weightLbs)}
-                                    onChange={e => updateExtraRow(i, ri, 'weightLbs', fromW(e.target.value))}
-                                  />
-                                </div>
-                              )}
-                              <button
-                                className="lw-ex-edit-row-remove"
-                                onClick={() => removeExtraRow(i, ri)}
-                                aria-label="Remove row"
-                              >
-                                {"✕"}
-                              </button>
-                            </div>
-                          ))}
-
-                          {/* Add row */}
-                          <button className="lw-add-row-btn" onClick={() => addExtraRow(i)}>
-                            {"＋ Add Row"}{isCardioOrFlex ? " (e.g. interval)" : " (e.g. progressive weight)"}
-                          </button>
+                          {/* Same SetsEditor as the workout builder and the
+                              quick log — the live variant hides HR/treadmill/
+                              distance (never part of mid-session tracking)
+                              and commits extra rows per keystroke. */}
+                          <SetsEditor
+                            exD={{ id: ex.exId, category: ex.category, hasTreadmill: false }}
+                            value={ex}
+                            onField={(field, val) => onUpdateExercise(i, { [field]: val })}
+                            units={units}
+                            variant={"live"}
+                            rowsCommitOn={"change"}
+                            extraWeightMode={"lbs"}
+                            showHR={false}
+                            showTreadmill={false}
+                            showPaceBonus={false}
+                            showDist={false}
+                          />
 
                           {/* Actions */}
                           <div className="lw-ex-edit-actions">
