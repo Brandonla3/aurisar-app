@@ -149,6 +149,73 @@ const M = {
   ms: { instant: 100, fast: 150, base: 200, slow: 300, sheet: 300, reveal: 500 },
 };
 
-const TOKENS = { FS, R, S, M };
+// ── Color ────────────────────────────────────────────────────────────────────
+// The parchment/gold palette the app already uses everywhere as hex literals,
+// named once. Same philosophy as the other scales: for inline `style={{}}`;
+// CSS files keep their literals. Semantic status colors (success/danger/xp)
+// stay in UI_COLORS (src/data/constants.js) — no overlap.
+const C = {
+  // Parchment ink ramp — text, brightest to faintest
+  inkBright: "#e8e0d0", // headline emphasis
+  ink:       "#d4cec4", // primary text
+  inkMid:    "#b4ac9e", // secondary text, active-filter accents
+  inkLabel:  "#b0a898", // form labels
+  inkDim:    "#8a8478", // muted text, placeholders
+  inkFaint:  "#5f5a52", // disabled, decorative
 
-export { TOKENS, FS, R, S, M };
+  // Gold accents
+  gold:     "#C4A044", // brand accent (matches UI_COLORS.accent usage)
+  goldDeep: "#c49428", // focus rings, gradients
+
+  // Surfaces
+  bg:        "#0c0c0a", // app background
+  panel:     "#12120e", // raised panels
+  panelWarm: "#16140e", // warm-tinted sheets
+
+  // Hairlines and edges (rgba strings, ready for `border`)
+  line:       "rgba(180,172,158,.06)",
+  lineMid:    "rgba(180,172,158,.08)",
+  lineStrong: "rgba(180,172,158,.12)",
+  edge:       "rgba(45,42,36,.2)",
+  edgeStrong: "rgba(45,42,36,.3)",
+
+  // Exercise difficulty (single home for the badge colors)
+  diffBeginner:     "#5A8A58",
+  diffIntermediate: "#A8843C",
+  diffAdvanced:     "#7A2838",
+
+  // Exercise difficulty badge backgrounds (deep tints behind the FG colors)
+  diffBgBeginner:     "#1a2e1a",
+  diffBgIntermediate: "#2e2010",
+  diffBgAdvanced:     "#2e1515",
+};
+
+// ── Z-index ──────────────────────────────────────────────────────────────────
+// One ladder for every stacking decision, mirrored as --z-* custom properties
+// on :root in src/styles/app.css. The ordering encodes real UX rules:
+//   • the staging tray must sit above tab content but below every sheet
+//   • the live-workout banner sits above the tray but below modals, because
+//     finishing a live workout opens the stats/completion sheets on top of it
+//   • detail sits above modal so QuickLog's "← Back" can reveal the sheet
+//   • confirm tops everything — a destructive prompt may interrupt any layer
+const Z = {
+  sticky:   5,    // in-flow sticky headers
+  scrim:    19,   // outside-click catcher for dropdowns
+  dropdown: 20,   // open dropdown panels (21 for the listbox itself)
+  fixedBar: 90,   // fixed action bars within a tab
+  nav:      100,  // bottom tab bar
+  tray:     780,  // staging tray
+  live:     810,  // live-workout banner + its sheet
+  liveTop:  820,  // prompts owned by the live banner
+  wizard:   9000, // plan wizard overlay
+  picker:   9100, // exercise pickers
+  editor:   9200, // exercise editor
+  modal:    9300, // general modals/sheets (quick log, completion, stats)
+  detail:   9400, // exercise detail sheet
+  confirm:  9500, // confirmation prompts
+  flash:    9600, // XP flash / transient celebration
+};
+
+const TOKENS = { FS, R, S, M, C, Z };
+
+export { TOKENS, FS, R, S, M, C, Z };

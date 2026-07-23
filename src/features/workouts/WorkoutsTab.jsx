@@ -1,11 +1,16 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { ExIcon } from '../../components/ExIcon';
-import { getMuscleColor, getTypeColor, calcExXP, hrRange } from '../../utils/xp';
-import { lbsToKg, kgToLbs, miToKm, kmToMi, isMetric, weightLabel, distLabel, displayWt } from '../../utils/units';
+import { getMuscleColor, getTypeColor, calcExXP, calcExEntryXP, calcWorkoutXP } from '../../utils/xp';
+import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
 import { formatXP } from '../../utils/format';
-import { uid, todayStr } from '../../utils/helpers';
-import { normalizeHHMM, secToHHMMSplit, combineHHMMSec } from '../../utils/time';
-import { S, R, FS } from '../../utils/tokens';
+import { todayStr } from '../../utils/helpers';
+import { normalizeHHMM, combineHHMMSec, daysUntil } from '../../utils/time';
+import { S, R, FS, Z } from '../../utils/tokens';
+import SetsEditor from '../../components/ui/SetsEditor';
+import FilterDropdown from '../exercises/FilterDropdown';
+import IconButton from '../../components/ui/IconButton';
+import Sheet from '../../components/ui/Sheet';
+import { buildWorkoutObject } from './workoutModel';
 import { UI_COLORS, MUSCLE_COLORS, WORKOUT_TEMPLATES, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 
 /**
@@ -58,6 +63,30 @@ function getRecipeMgColor(tpl) {
   if (!tpl) return "#B0A090";
   return RECIPE_CAT_COLORS[tpl.category] || RECIPE_CAT_COLORS[tpl.equipment] || "#B0A090";
 }
+// Recipe facet counts never change — the template list is static.
+const RECIPE_CAT_COUNTS = (() => {
+  const c = new Map();
+  for (const t of WORKOUT_TEMPLATES) {
+    for (const k of [t.category, t.equipment]) {
+      if (k) c.set(k, (c.get(k) || 0) + 1);
+    }
+  }
+  return c;
+})();
+// Recipe XP depends only on the (static) template and the player's class,
+// so cache it per class instead of reducing over every template each render.
+const _recipeXpCache = new Map(); // chosenClass -> Map<tplId, xp>
+function recipeXP(tpl, chosenClass, allExById) {
+  let byTpl = _recipeXpCache.get(chosenClass);
+  if (!byTpl) {
+    byTpl = new Map();
+    _recipeXpCache.set(chosenClass, byTpl);
+  }
+  if (!byTpl.has(tpl.id)) {
+    byTpl.set(tpl.id, tpl.exercises.reduce((t, ex) => t + calcExXP(ex.exId, ex.sets, ex.reps, chosenClass, allExById), 0));
+  }
+  return byTpl.get(tpl.id);
+}
 function getWorkoutMgColor(wo, exById, mgColors) {
   if (!wo || !wo.exercises) return "#B0A090";
   const counts = {};
@@ -83,7 +112,6 @@ const WbExCard = React.memo(function WbExCard({
   profile,
   allExById,
   metric,
-  wUnit,
   setWbExercises,
   setCollapsedWbEx,
   setSsChecked,
@@ -142,16 +170,9 @@ const WbExCard = React.memo(function WbExCard({
       });
     });
   }
-  const isC = exD.category === "cardio";
-  const isF = exD.category === "flexibility";
-  const showW = !isC && !isF;
-  const showHR = isC;
-  const isTreadmill = exD.hasTreadmill || false;
   const noSetsEx = NO_SETS_EX_IDS.has(exD.id);
   const isRunningEx = exD.id === RUNNING_EX_ID;
   const age = profile.age || 30;
-  const dispW = ex.weightLbs ? metric ? lbsToKg(ex.weightLbs) : ex.weightLbs : "";
-  const dispDist = ex.distanceMi ? metric ? String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)) : String(ex.distanceMi) : "";
   const pbPaceMi = profile.runningPB || null;
   const pbDisp = pbPaceMi ? metric ? parseFloat((pbPaceMi * 1.60934).toFixed(2)) + " min/km" : parseFloat(pbPaceMi.toFixed(2)) + " min/mi" : null;
   const exPB = (profile.exercisePBs || {})[exD.id] || null;
@@ -161,30 +182,13 @@ const WbExCard = React.memo(function WbExCard({
   const runPace = isRunningEx && distMiVal > 0 && durationMin > 0 ? durationMin / distMiVal : null;
   const runBoostPct = runPace ? runPace <= 8 ? 20 : 5 : 0;
   const mgColor = getMuscleColor(exD.muscleGroup);
-  return <><div className={"wb-ex-hdr"} onClick={() => toggleCollapse()}><div style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: S.s2,
-        flexShrink: 0
-      }}><button type={"button"} aria-label={`Move ${exD.name} up`} title={"Move up"} className={"btn btn-ghost btn-xs"} style={{
-          padding: "2px 6px",
-          fontSize: FS.fs65,
-          lineHeight: 1,
-          minWidth: 0,
-          opacity: i === 0 ? .3 : 1
-        }} disabled={i === 0} onClick={e => {
+  return <><div className={"wb-ex-hdr"} onClick={() => toggleCollapse()}><div className={"wb-reorder"}><IconButton label={`Move ${exD.name} up`} size={20} disabled={i === 0} onClick={e => {
           e.stopPropagation();
           reorder(i - 1);
-        }}>{"▲"}</button><button type={"button"} aria-label={`Move ${exD.name} down`} title={"Move down"} className={"btn btn-ghost btn-xs"} style={{
-          padding: "2px 6px",
-          fontSize: FS.fs65,
-          lineHeight: 1,
-          minWidth: 0,
-          opacity: i === exCount - 1 ? .3 : 1
-        }} disabled={i === exCount - 1} onClick={e => {
+        }}>{"▲"}</IconButton><IconButton label={`Move ${exD.name} down`} size={20} disabled={i === exCount - 1} onClick={e => {
           e.stopPropagation();
           reorder(i + 1);
-        }}>{"▼"}</button></div>{ex.supersetWith == null && exCount >= 2 && <div style={{
+        }}>{"▼"}</IconButton></div>{ex.supersetWith == null && exCount >= 2 && <div style={{
         display: "flex",
         alignItems: "center",
         gap: S.s4,
@@ -236,14 +240,9 @@ const WbExCard = React.memo(function WbExCard({
         fontSize: FS.fs63,
         color: "#b4ac9e",
         flexShrink: 0
-      }}>{(() => {
-          const extraCount = (ex.extraRows || []).length;
-          const b = calcExXP(ex.exId, noSetsEx ? 1 : ex.sets, ex.reps, profile.chosenClass, allExById, distMiVal || null, null, null, extraCount);
-          const r = (ex.extraRows || []).reduce((s, row) => s + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-          return formatXP(b + r, {
-            signed: true
-          });
-        })()}{runBoostPct > 0 && <span style={{
+      }}>{formatXP(calcExEntryXP(ex, profile.chosenClass, allExById), {
+          signed: true
+        })}{runBoostPct > 0 && <span style={{
           color: UI_COLORS.warning,
           marginLeft: S.s2
         }}>{"⚡"}</span>}</span><span style={{
@@ -256,288 +255,9 @@ const WbExCard = React.memo(function WbExCard({
       }}>{"▼"}</span><button type={"button"} aria-label={`Remove ${exD.name}`} title={"Remove"} className={"btn btn-danger btn-xs"} onClick={e => {
         e.stopPropagation();
         removeEx();
-      }}>{"✕"}</button></div>{!collapsed && exD.id !== "rest_day" && <div className={"wb-ex-body"}><div style={{
-        display: "flex",
-        gap: S.s8,
-        marginBottom: S.s6
-      }}>{!noSetsEx && <div style={{
-          flex: 1
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Sets"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "6px 8px"
-          }} type={"text"} inputMode={"decimal"} value={ex.sets === 0 || ex.sets === "" ? "" : ex.sets || ""} onChange={e => updateField("sets", e.target.value)} /></div>}{isC || isF ? <><div style={{
-            flex: 1.6,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Duration (HH:MM)"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"numeric"} value={ex._durHHMM !== undefined ? ex._durHHMM : ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps ? "00:" + String(ex.reps).padStart(2, "0") : ""} onChange={e => updateField("_durHHMM", e.target.value)} onBlur={e => {
-              const hhmm = normalizeHHMM(e.target.value);
-              updateField("_durHHMM", hhmm || undefined);
-              const sec = combineHHMMSec(hhmm, ex._durSecRaw || ex.durationSec ? secToHHMMSplit(ex.durationSec || 0).sec : "");
-              updateField("durationSec", sec);
-              if (sec) updateField("reps", Math.max(1, Math.floor(sec / 60)));
-            }} placeholder={"00:00"} /></div><div style={{
-            flex: 0.9,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Sec"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px",
-              textAlign: "center"
-            }} type={"number"} min={"0"} max={"59"} value={ex._durSecRaw !== undefined ? String(ex._durSecRaw).padStart(2, "0") : ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2, "0") : ""} onChange={e => {
-              const v = e.target.value;
-              updateField("_durSecRaw", v);
-              const hhmm = ex._durHHMM || (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : "");
-              const sec = combineHHMMSec(hhmm, v);
-              updateField("durationSec", sec);
-              if (sec) updateField("reps", Math.max(1, Math.floor(sec / 60)));
-            }} placeholder={"00"} /></div><div style={{
-            flex: 1.4,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Dist ("}{metric ? "km" : "mi"}{")"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"decimal"} value={dispDist} placeholder={"0"} onChange={e => {
-              const v = e.target.value;
-              const mi = v && metric ? kmToMi(v) : v;
-              updateField("distanceMi", mi || null);
-            }} /></div></> : <><div style={{
-            flex: 1,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Reps"}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"decimal"} value={ex.reps === 0 || ex.reps === "" ? "" : ex.reps || ""} onChange={e => updateField("reps", e.target.value)} /></div>{showW && <div style={{
-            flex: 1.2,
-            minWidth: 0
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{wUnit}</label><input className={"wb-ex-inp"} style={{
-              width: "100%",
-              padding: "4px 6px"
-            }} type={"text"} inputMode={"decimal"} step={metric ? "0.5" : "2.5"} value={dispW} placeholder={"—"} onChange={e => {
-              const v = e.target.value;
-              const lbs = v && metric ? kgToLbs(v) : v;
-              updateField("weightLbs", lbs || null);
-            }} /></div>}</>}</div>{isRunningEx && runBoostPct > 0 && <div style={{
-        fontSize: FS.fs65,
-        color: UI_COLORS.warning,
-        marginBottom: S.s6
-      }}>{"⚡ +"}{runBoostPct}{"% pace bonus"}{runBoostPct === 20 ? " (sub-8 mi!)" : ""}</div>}{isTreadmill && <div style={{
-        marginBottom: S.s6
-      }}><div style={{
-          display: "flex",
-          gap: S.s8
-        }}><div style={{
-            flex: 1
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Incline "}<span style={{
-                opacity: .6,
-                fontSize: FS.fs55
-              }}>{"(0.5–15)"}</span></label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} value={ex.incline || ""} onChange={e => updateField("incline", e.target.value ? parseFloat(e.target.value) : null)} /></div><div style={{
-            flex: 1
-          }}><label style={{
-              fontSize: FS.sm,
-              color: "#b0a898",
-              marginBottom: S.s4,
-              display: "block"
-            }}>{"Speed "}<span style={{
-                opacity: .6,
-                fontSize: FS.fs55
-              }}>{"(0.5–15)"}</span></label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} value={ex.speed || ""} onChange={e => updateField("speed", e.target.value ? parseFloat(e.target.value) : null)} /></div></div></div>}{(ex.extraRows || []).map((row, ri) => <div key={ri} style={{
-        display: "flex",
-        gap: S.s4,
-        marginTop: S.s4,
-        padding: "6px 8px",
-        background: "rgba(45,42,36,.18)",
-        borderRadius: R.md,
-        alignItems: "center",
-        flexWrap: "wrap"
-      }}><span style={{
-          fontSize: FS.fs58,
-          color: "#9a8a78",
-          flexShrink: 0,
-          minWidth: 18
-        }}>{isC || isF ? `I${ri + 2}` : `S${ri + 2}`}</span>{isC || isF ? <><input className={"wb-ex-inp"} style={{
-            flex: 1.5,
-            minWidth: 52,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"numeric"} placeholder={"HH:MM"} defaultValue={row.hhmm || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              hhmm: normalizeHHMM(e.target.value)
-            };
-            updateField("extraRows", rr);
-          }} /><input className={"wb-ex-inp"} style={{
-            flex: 0.8,
-            minWidth: 34,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"number"} min={"0"} max={"59"} placeholder={"Sec"} defaultValue={row.sec || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              sec: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} /><input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 38,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={metric ? "km" : "mi"} defaultValue={row.distanceMi || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              distanceMi: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />{isTreadmill && <input className={"wb-ex-inp"} style={{
-            flex: 0.8,
-            minWidth: 34,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"Inc"} defaultValue={row.incline || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              incline: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />}{isTreadmill && <input className={"wb-ex-inp"} style={{
-            flex: 0.8,
-            minWidth: 34,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"Spd"} defaultValue={row.speed || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              speed: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />}</> : <>{!noSetsEx && <input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 40,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={"Sets"} defaultValue={row.sets || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              sets: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />}<input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 40,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={"Reps"} defaultValue={row.reps || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              reps: e.target.value
-            };
-            updateField("extraRows", rr);
-          }} />{showW && <input className={"wb-ex-inp"} style={{
-            flex: 1,
-            minWidth: 38,
-            padding: "4px 6px",
-            fontSize: FS.md
-          }} type={"text"} inputMode={"decimal"} placeholder={wUnit} defaultValue={row.weightLbs || ""} onBlur={e => {
-            const rr = [...(ex.extraRows || [])];
-            rr[ri] = {
-              ...rr[ri],
-              weightLbs: e.target.value || null
-            };
-            updateField("extraRows", rr);
-          }} />}</>}<button className={"btn btn-danger btn-xs"} style={{
-          padding: "2px 6px",
-          flexShrink: 0
-        }} onClick={() => {
-          const rr = (ex.extraRows || []).filter((_, j) => j !== ri);
-          updateField("extraRows", rr);
-        }}>{"✕"}</button></div>)}<button className={"btn btn-ghost btn-xs"} style={{
-        width: "100%",
-        marginTop: S.s4,
-        marginBottom: S.s8,
-        fontSize: FS.sm,
-        color: "#8a8478",
-        borderStyle: "dashed"
-      }} onClick={() => {
-        const rr = [...(ex.extraRows || []), isC || isF ? {
-          hhmm: "",
-          sec: "",
-          distanceMi: "",
-          incline: "",
-          speed: ""
-        } : {
-          sets: ex.sets || "",
-          reps: ex.reps || "",
-          weightLbs: ex.weightLbs || ""
-        }];
-        updateField("extraRows", rr);
-      }}>{"＋ Add Row (e.g. "}{isC || isF ? "interval" : "progressive weight"}{")"}</button>{showHR && <div><label style={{
-          fontSize: FS.sm,
-          color: "#b0a898",
-          marginBottom: S.s4,
-          display: "block"
-        }}>{"Avg Heart Rate Zone "}<span style={{
-            opacity: .6,
-            fontSize: FS.fs55
-          }}>{"(optional)"}</span></label><div className={"hr-zone-row"}>{HR_ZONES.map(z => {
-            const sel = ex.hrZone === z.z;
-            const range = hrRange(age, z);
-            return <div key={z.z} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{
-              "--zc": z.color,
-              borderColor: sel ? z.color : "rgba(45,42,36,.2)",
-              background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
-            }} onClick={() => updateField("hrZone", sel ? null : z.z)}><span className={"hz-name"} style={{
-                color: sel ? z.color : "#8a8478"
-              }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                color: sel ? z.color : "#8a8478"
-              }}>{range.lo}{"–"}{range.hi}</span></div>;
-          })}</div>{ex.hrZone && <div style={{
-          fontSize: FS.fs65,
-          color: "#8a8478",
-          fontStyle: "italic",
-          marginTop: S.s4
-        }}>{HR_ZONES[ex.hrZone - 1].desc}</div>}</div>}</div>}</>;
+      }}>{"✕"}</button></div>{!collapsed && exD.id !== "rest_day" && <div className={"wb-ex-body"}>
+    <SetsEditor exD={exD} value={ex} onField={updateField} units={profile.units} age={age} variant={"builder"} />
+  </div>}</>;
 });
 
 const WorkoutsTab = memo(function WorkoutsTab({
@@ -583,12 +303,9 @@ const WorkoutsTab = memo(function WorkoutsTab({
   // Callbacks (defined in App)
   initWorkoutBuilder,
   copyWorkout,
-  openStatsPromptIfNeeded,
-  setCompletionModal,
-  setCompletionDate,
-  setCompletionAction,
+  openCompletionFlow,
   setConfirmDelete,
-  setSelEx,
+  openQuickLog,
   setPendingSoloRemoveId,
   quickLogSoloEx,
   openScheduleEx,
@@ -600,7 +317,6 @@ const WorkoutsTab = memo(function WorkoutsTab({
   reorderWbEx,
   saveBuiltWorkout,
   saveAsNewWorkout,
-  daysUntil,
   showToast,
   // Computed
   allExById,
@@ -610,260 +326,7 @@ const WorkoutsTab = memo(function WorkoutsTab({
     setWbExercises(exs => exs.map((e, i) => i === idx ? { ...e, [field]: val } : e));
   }
 function renderWbExFields(ex, idx, exD) {
-  const _isC = exD.category === "cardio";
-  const _isF = exD.category === "flexibility";
-  const _showW = !_isC && !_isF;
-  const _noSets = NO_SETS_EX_IDS.has(exD.id);
-  const _isRunning = exD.id === RUNNING_EX_ID;
-  const _isTread = exD.hasTreadmill || false;
-  const _metric = isMetric(profile.units);
-  const _wUnit = weightLabel(profile.units);
-  const _dUnit = distLabel(profile.units);
-  const _age = profile.age || 30;
-  const _distMiVal = ex.distanceMi ? parseFloat(ex.distanceMi) : 0;
-  const _durMin = parseFloat(ex.reps || 0);
-  const _runPace = _isRunning && _distMiVal > 0 && _durMin > 0 ? _durMin / _distMiVal : null;
-  const _runBoost = _runPace ? _runPace <= 8 ? 20 : 5 : 0;
-  const _dispW = ex.weightLbs ? _metric ? lbsToKg(ex.weightLbs) : ex.weightLbs : "";
-  const _dispDist = ex.distanceMi ? _metric ? String(parseFloat(miToKm(ex.distanceMi)).toFixed(2)) : String(ex.distanceMi) : "";
-  return <><div style={{
-      display: "flex",
-      gap: S.s8,
-      marginBottom: S.s6
-    }}>{!_noSets && <div style={{
-        flex: 1
-      }}><label style={{
-          fontSize: FS.sm,
-          color: "#b0a898",
-          marginBottom: S.s4,
-          display: "block"
-        }}>{"Sets"}</label><input className={"wb-ex-inp"} style={{
-          width: "100%",
-          padding: "6px 8px"
-        }} type={"text"} inputMode={"decimal"} value={ex.sets === 0 || ex.sets === "" ? "" : ex.sets || ""} onChange={e => updateWbEx(idx, "sets", e.target.value)} /></div>}{_isC || _isF ? <><div style={{
-          flex: 1.6,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Duration (HH:MM)"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} type={"text"} inputMode={"numeric"} value={ex._durHHMM !== undefined ? ex._durHHMM : ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : ex.reps ? "00:" + String(ex.reps).padStart(2, "0") : ""} onChange={e => updateWbEx(idx, "_durHHMM", e.target.value)} onBlur={e => {
-            const h = normalizeHHMM(e.target.value);
-            updateWbEx(idx, "_durHHMM", h || undefined);
-            const s = combineHHMMSec(h, ex._durSecRaw || ex.durationSec ? secToHHMMSplit(ex.durationSec || 0).sec : "");
-            updateWbEx(idx, "durationSec", s);
-            if (s) updateWbEx(idx, "reps", Math.max(1, Math.floor(s / 60)));
-          }} placeholder={"00:00"} /></div><div style={{
-          flex: 0.9,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Sec"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "4px 6px",
-            textAlign: "center"
-          }} type={"number"} min={"0"} max={"59"} value={ex._durSecRaw !== undefined ? String(ex._durSecRaw).padStart(2, "0") : ex.durationSec ? String(secToHHMMSplit(ex.durationSec).sec).padStart(2, "0") : ""} onChange={e => {
-            const v = e.target.value;
-            updateWbEx(idx, "_durSecRaw", v);
-            const h2 = ex._durHHMM || (ex.durationSec ? secToHHMMSplit(ex.durationSec).hhmm : "");
-            const s2 = combineHHMMSec(h2, v);
-            updateWbEx(idx, "durationSec", s2);
-            if (s2) updateWbEx(idx, "reps", Math.max(1, Math.floor(s2 / 60)));
-          }} placeholder={"00"} /></div><div style={{
-          flex: 1.4,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Dist ("}{_dUnit}{")"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} type={"text"} inputMode={"decimal"} value={_dispDist} onChange={e => {
-            const v = e.target.value;
-            const mi = v && _metric ? kmToMi(v) : v;
-            updateWbEx(idx, "distanceMi", mi || null);
-          }} placeholder={"0"} /></div></> : <><div style={{
-          flex: 1,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Reps"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "6px 8px"
-          }} type={"text"} inputMode={"decimal"} value={ex.reps === 0 || ex.reps === "" ? "" : ex.reps || ""} onChange={e => updateWbEx(idx, "reps", e.target.value)} /></div>{_showW && <div style={{
-          flex: 1.2,
-          minWidth: 0
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Weight ("}{_wUnit}{")"}</label><input className={"wb-ex-inp"} style={{
-            width: "100%",
-            padding: "6px 8px"
-          }} type={"text"} inputMode={"decimal"} value={_dispW} onChange={e => {
-            const v = e.target.value;
-            const lbs = v && _metric ? kgToLbs(v) : v;
-            updateWbEx(idx, "weightLbs", lbs || null);
-          }} placeholder={"—"} /></div>}</>}</div>{_isRunning && _runBoost > 0 && <div style={{
-      fontSize: FS.fs58,
-      color: UI_COLORS.warning,
-      marginBottom: S.s4
-    }}>{"⚡ Pace bonus: +"}{_runBoost}{"% XP"}</div>}{_isTread && <div style={{
-      marginBottom: S.s6
-    }}><div style={{
-        display: "flex",
-        gap: S.s8
-      }}><div style={{
-          flex: 1
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Incline (0.5–15)"}</label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} value={ex.incline || ""} onChange={e => updateWbEx(idx, "incline", e.target.value ? parseFloat(e.target.value) : null)} /></div><div style={{
-          flex: 1
-        }}><label style={{
-            fontSize: FS.sm,
-            color: "#b0a898",
-            marginBottom: S.s4,
-            display: "block"
-          }}>{"Speed (0.5–15)"}</label><input className={"inp"} type={"number"} min={"0.5"} max={"15"} step={"0.5"} placeholder={"—"} style={{
-            width: "100%",
-            padding: "4px 6px"
-          }} value={ex.speed || ""} onChange={e => updateWbEx(idx, "speed", e.target.value ? parseFloat(e.target.value) : null)} /></div></div></div>}{(ex.extraRows || []).map((row, ri) => <div key={ri} style={{
-      display: "flex",
-      gap: S.s4,
-      marginTop: S.s4,
-      padding: "6px 8px",
-      background: "rgba(45,42,36,.18)",
-      borderRadius: R.md,
-      alignItems: "center",
-      flexWrap: "wrap"
-    }}><span style={{
-        fontSize: FS.fs52,
-        color: "#9a8a78",
-        flexShrink: 0,
-        minWidth: 16
-      }}>{_isC || _isF ? `I${ri + 2}` : `S${ri + 2}`}</span>{_isC || _isF ? <><input className={"wb-ex-inp"} style={{
-          flex: 1.5,
-          minWidth: 52,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"numeric"} placeholder={"HH:MM"} value={row.hhmm || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            hhmm: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} onBlur={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            hhmm: normalizeHHMM(e.target.value)
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 0.7,
-          minWidth: 36,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"number"} min={"0"} max={"59"} placeholder={"Sec"} value={row.sec || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            sec: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={_dUnit} value={row.distanceMi || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            distanceMi: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /></> : <><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={"Sets"} value={row.sets || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            sets: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={"Reps"} value={row.reps || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            reps: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /><input className={"wb-ex-inp"} style={{
-          flex: 1,
-          minWidth: 40,
-          padding: "4px 6px",
-          fontSize: FS.md
-        }} type={"text"} inputMode={"decimal"} placeholder={_wUnit} value={row.weightLbs || ""} onChange={e => {
-          const rr = [...(ex.extraRows || [])];
-          rr[ri] = {
-            ...rr[ri],
-            weightLbs: e.target.value
-          };
-          updateWbEx(idx, "extraRows", rr);
-        }} /></>}<button className={"btn btn-danger btn-xs"} style={{
-        padding: "2px 4px",
-        flexShrink: 0
-      }} onClick={() => {
-        const rr = (ex.extraRows || []).filter((_, j) => j !== ri);
-        updateWbEx(idx, "extraRows", rr);
-      }}>{"✕"}</button></div>)}<button className={"btn btn-ghost btn-xs"} style={{
-      width: "100%",
-      marginTop: S.s4,
-      marginBottom: S.s4,
-      fontSize: FS.sm,
-      color: "#8a8478",
-      borderStyle: "dashed"
-    }} onClick={() => {
-      const rr = [...(ex.extraRows || []), _isC || _isF ? {
-        hhmm: "",
-        sec: "",
-        distanceMi: ""
-      } : {
-        sets: ex.sets || "",
-        reps: ex.reps || "",
-        weightLbs: ex.weightLbs || ""
-      }];
-      updateWbEx(idx, "extraRows", rr);
-    }}>{"＋ Add Row (e.g. "}{_isC || _isF ? "interval" : "progressive weight"}{")"}</button></>;
+  return <SetsEditor exD={exD} value={ex} onField={(field, val) => updateWbEx(idx, field, val)} units={profile.units} age={profile.age || 30} variant={"builder"} />;
 }
 function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
   const collapsed = !!ssAccordion[sectionKey];
@@ -877,12 +340,7 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
   const _isRunning = exD.id === RUNNING_EX_ID;
   const _runPace = _isRunning && _distMiVal > 0 && _durMin > 0 ? _durMin / _distMiVal : null;
   const _runBoost = _runPace ? _runPace <= 8 ? 20 : 5 : 0;
-  const xpVal = (() => {
-    const extraCount = (ex.extraRows || []).length;
-    const b = calcExXP(ex.exId, _noSets ? 1 : ex.sets, ex.reps, profile.chosenClass, allExById, _distMiVal || null, ex.weightLbs || null, null, extraCount);
-    const r = (ex.extraRows || []).reduce((s, row) => s + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, ex.weightLbs || null, null, extraCount), 0);
-    return b + r;
-  })();
+  const xpVal = calcExEntryXP(ex, profile.chosenClass, allExById);
   const summaryText = (_noSets ? "" : ex.sets + "×") + ex.reps + (ex.weightLbs ? ` · ${displayWt(ex.weightLbs, profile.units)}` : "");
   return <div className={"ss-section"}><div className={"ss-section-hdr"} onClick={() => setSsAccordion(prev => ({
       ...prev,
@@ -921,14 +379,28 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
       }}>{"▼"}</span></div>{!collapsed && <div className={"ss-section-body"}>{renderWbExFields(ex, idx, exD)}</div>}</div>;
 }
 const metric = isMetric(profile.units);
-const wUnit = weightLabel(profile.units);
-const allW = profile.workouts || [];
-const calcWorkoutXP = wo => (wo.exercises || []).reduce((s, ex) => {
-  const extraCount = (ex.extraRows || []).length;
-  const base = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
-  const rowsXP = (ex.extraRows || []).reduce((rs, row) => rs + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-  return s + base + rowsXP;
-}, 0);
+const allW = useMemo(() => profile.workouts || [], [profile.workouts]);
+// Per-workout XP + accent, computed once per relevant-input change rather
+// than per card on every render. Keyed on the workout list, the class
+// (multiplier) and the catalog.
+const woMeta = useMemo(() => {
+  const m = new Map();
+  for (const w of allW) {
+    m.set(w.id, {
+      xp: calcWorkoutXP(w, profile.chosenClass, allExById),
+      mgColor: getWorkoutMgColor(w, allExById, MUSCLE_COLORS),
+    });
+  }
+  return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [allW, profile.chosenClass, allExById]);
+const woLabelCounts = useMemo(() => {
+  const c = new Map();
+  for (const w of allW) {
+    for (const l of w.labels || []) c.set(l, (c.get(l) || 0) + 1);
+  }
+  return c;
+}, [allW]);
 
 // ── LIST ───────────────────────────────
 if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div style={{
@@ -962,102 +434,55 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
     gap: S.s8,
     marginBottom: S.s10,
     position: "relative"
-  }}>{woLabelDropOpen && <div onClick={() => setWoLabelDropOpen(false)} style={{
+  }}>{woLabelDropOpen && <div aria-hidden={"true"} onClick={() => setWoLabelDropOpen(false)} style={{
       position: "fixed",
       inset: 0,
-      zIndex: 19
-    }} />}<div style={{
-      position: "relative",
-      zIndex: 20
-    }}><button onClick={() => setWoLabelDropOpen(!woLabelDropOpen)} style={{
-        padding: "8px 28px 8px 10px",
-        borderRadius: R.xl,
-        border: "1px solid " + (woLabelFilters.size > 0 ? "#C4A044" : "rgba(45,42,36,.3)"),
-        background: "rgba(14,14,12,.95)",
-        color: woLabelFilters.size > 0 ? "#C4A044" : "#8a8478",
-        fontSize: FS.lg,
-        textAlign: "left",
-        cursor: "pointer",
-        position: "relative"
-      }}>{woLabelFilters.size > 0 ? "Labels (" + woLabelFilters.size + ")" : "Labels"}<span style={{
-          position: "absolute",
-          right: 8,
-          top: "50%",
-          transform: "translateY(-50%) rotate(" + (woLabelDropOpen ? "180deg" : "0deg") + ")",
-          color: woLabelFilters.size > 0 ? "#C4A044" : "#8a8478",
-          fontSize: FS.sm,
-          transition: "transform .15s",
-          lineHeight: 1
-        }}>{"▼"}</span></button>{woLabelDropOpen && <div style={{
-        position: "absolute",
-        top: "calc(100% + 4px)",
-        left: 0,
-        minWidth: 180,
-        background: "rgba(16,14,10,.95)",
-        border: "1px solid rgba(180,172,158,.07)",
-        borderRadius: R.xl,
-        padding: "6px 4px",
-        zIndex: 21,
-        boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-      }}>{(profile.workoutLabels || []).map(l => {
-          const sel = woLabelFilters.has(l);
-          return <div key={l} onClick={() => setWoLabelFilters(s => {
-            const n = new Set(s);
-            n.has(l) ? n.delete(l) : n.add(l);
-            return n;
-          })} style={{
-            display: "flex",
-            alignItems: "center",
-            gap: S.s8,
-            padding: "6px 10px",
-            borderRadius: R.md,
-            cursor: "pointer",
-            background: sel ? "rgba(196,160,68,.12)" : "transparent"
-          }}><div style={{
-              width: 14,
-              height: 14,
-              borderRadius: R.r3,
-              flexShrink: 0,
-              border: "1.5px solid " + (sel ? "#C4A044" : "rgba(180,172,158,.08)"),
-              background: sel ? "rgba(196,160,68,.25)" : "transparent",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}>{sel && <span style={{
-                fontSize: FS.sm,
-                color: "#C4A044",
-                lineHeight: 1
-              }}>{"✓"}</span>}</div><span style={{
-              fontSize: FS.lg,
-              color: sel ? "#C4A044" : "#b4ac9e",
-              whiteSpace: "nowrap"
-            }}>{l}</span></div>;
-        })}<div className={"wo-label-new-row"}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onClick={e => e.stopPropagation()} onKeyDown={e => {
-            if (e.key === "Enter" && newLabelInput.trim()) {
-              const lbl = newLabelInput.trim();
-              if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
-                setProfile(p => ({
-                  ...p,
-                  workoutLabels: [...(p.workoutLabels || []), lbl]
-                }));
-              }
-              setNewLabelInput("");
-            }
-          }} placeholder={"+ New label…"} /><button className={"btn btn-ghost btn-xs"} style={{
-            padding: "2px 6px",
-            fontSize: FS.sm
-          }} onClick={e => {
-            e.stopPropagation();
-            const lbl = newLabelInput.trim();
-            if (!lbl) return;
-            if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
-              setProfile(p => ({
-                ...p,
-                workoutLabels: [...(p.workoutLabels || []), lbl]
-              }));
-            }
-            setNewLabelInput("");
-          }}>{"+"}</button></div></div>}</div>{woLabelFilters.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
+      zIndex: Z.scrim
+    }} />}<FilterDropdown
+      id={"wo-labels"}
+      label={"Labels"}
+      shortLabel={"Labels"}
+      options={profile.workoutLabels || []}
+      optionLabel={l => l}
+      selected={woLabelFilters}
+      counts={woLabelCounts}
+      onToggle={l => setWoLabelFilters(sHas => {
+        const n = new Set(sHas);
+        n.has(l) ? n.delete(l) : n.add(l);
+        return n;
+      })}
+      open={!!woLabelDropOpen}
+      setOpen={v => setWoLabelDropOpen(v === "wo-labels")}
+      accent={"#C4A044"}
+      panelBorder={"rgba(196,148,40,0.25)"}
+      footer={<div className={"wo-label-new-row"}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onClick={e => e.stopPropagation()} onKeyDown={e => {
+        e.stopPropagation();
+        if (e.key === "Enter" && newLabelInput.trim()) {
+          const lbl = newLabelInput.trim();
+          if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
+            setProfile(pf => ({
+              ...pf,
+              workoutLabels: [...(pf.workoutLabels || []), lbl]
+            }));
+          }
+          setNewLabelInput("");
+        }
+      }} placeholder={"+ New label…"} /><button className={"btn btn-ghost btn-xs"} style={{
+        padding: "2px 6px",
+        fontSize: FS.sm
+      }} onClick={e => {
+        e.stopPropagation();
+        const lbl = newLabelInput.trim();
+        if (!lbl) return;
+        if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
+          setProfile(pf => ({
+            ...pf,
+            workoutLabels: [...(pf.workoutLabels || []), lbl]
+          }));
+        }
+        setNewLabelInput("");
+      }}>{"+"}</button></div>}
+    />{woLabelFilters.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
       fontSize: FS.sm,
       color: "#8a8478",
       alignSelf: "center"
@@ -1073,8 +498,9 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
       return null;
     })()}{allW.filter(w => !w.oneOff).filter(w => woLabelFilters.size === 0 || (w.labels || []).some(l => woLabelFilters.has(l))).map(wo => {
       const exCount = wo.exercises.length;
-      const xp = calcWorkoutXP(wo);
-      const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
+      const _meta = woMeta.get(wo.id) || { xp: calcWorkoutXP(wo, profile.chosenClass, allExById), mgColor: getWorkoutMgColor(wo, allExById, MUSCLE_COLORS) };
+      const xp = _meta.xp;
+      const woMgColor = _meta.mgColor;
       return <div key={wo.id} className={"workout-card"} style={{
         "--mg-color": woMgColor
       }}><div className={"workout-card-top"} style={{
@@ -1114,7 +540,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
         return (wo && wo.labels || []).some(l => woLabelFilters.has(l));
       }).sort((a, b) => a.date.localeCompare(b.date));
       const hasSoloExs = (profile.scheduledWorkouts || []).some(sw => !sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today);
-      if (scheduled.length === 0 && !hasSoloExs && woLabelFilters.size === 0) return <div className={"empty"}>{"No upcoming one-off workouts."}<br />{"Select exercises and tap ⚡ One-Off Workout to schedule one."}</div>;
+      if (scheduled.length === 0 && !hasSoloExs && woLabelFilters.size === 0) return <div className={"empty"} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: S.s12 }}><div>{"No upcoming one-off workouts."}<br />{"Stage exercises from the Library, or build one now."}</div><button className={"btn btn-gold-solid btn-sm"} onClick={() => { initWorkoutBuilder(null); setWbIsOneOff(true); }}>{"＋ Build One-Off"}</button></div>;
       if (scheduled.length === 0 && !hasSoloExs && woLabelFilters.size > 0) return <div className={"empty"}>{"No one-off workouts match the selected labels."}</div>;
       if (scheduled.length === 0) return null;
       return scheduled.map(g => {
@@ -1140,7 +566,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
           activeCal: null,
           totalCal: null
         };
-        const xp = calcWorkoutXP(wo);
+        const xp = calcWorkoutXP(wo, profile.chosenClass, allExById);
         const woMgColor = getWorkoutMgColor(wo, allExById, MUSCLE_COLORS);
         return <div key={g.id} className={"workout-card"} style={{
           "--mg-color": woMgColor
@@ -1187,17 +613,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
             }}>{"💪 Make Reusable"}</button><div style={{
               flex: 1
             }} /><button className={"btn btn-gold btn-sm"} onClick={() => {
-              openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-                setCompletionModal({
-                  workout: {
-                    ...woWithStats,
-                    oneOff: true
-                  },
-                  fromStats: _sr
-                });
-                setCompletionDate(todayStr());
-                setCompletionAction("today");
-              });
+openCompletionFlow({ ...wo, oneOff: true });
             }}>{"✓ Complete"}</button></div></div>;
       });
     })()}{(() => {
@@ -1233,16 +649,26 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
                   padding: "4px 6px"
                 }} onClick={e => {
                   e.stopPropagation();
-                  setSelEx(sw.exId);
+                  openQuickLog(sw.exId);
                   setPendingSoloRemoveId(sw.id);
                 }}>{"✎"}</button><button className={"btn btn-ghost btn-sm"} style={{
                   color: UI_COLORS.danger
                 }} onClick={() => {
-                  setProfile(p => ({
-                    ...p,
-                    scheduledWorkouts: (p.scheduledWorkouts || []).filter(s => s.id !== sw.id)
-                  }));
-                  showToast("Scheduled exercise removed.");
+                  // Confirm before removing, matching workout deletion — the
+                  // ✕ used to delete instantly with only a toast.
+                  setConfirmDelete({
+                    title: "Remove Scheduled Exercise?",
+                    body: `Remove ${ex.name} from your schedule?`,
+                    icon: "🗑",
+                    confirmLabel: "🗑 Remove",
+                    onConfirm: () => {
+                      setProfile(p => ({
+                        ...p,
+                        scheduledWorkouts: (p.scheduledWorkouts || []).filter(s => s.id !== sw.id)
+                      }));
+                      showToast("Scheduled exercise removed.");
+                    }
+                  });
                 }}>{"✕"}</button></div></div><div style={{
               display: "flex",
               gap: S.s6,
@@ -1287,6 +713,9 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
 // ── TEMPLATES ──────────────────────────
 if (workoutView === "recipes") {
   const filteredTpls = recipeFilter.size === 0 ? WORKOUT_TEMPLATES : WORKOUT_TEMPLATES.filter(t => recipeFilter.has(t.category) || recipeFilter.has(t.equipment));
+  // Faceted counts for the shared FilterDropdown (option => how many results
+  // selecting it alone would show).
+  const recipeCatCounts = RECIPE_CAT_COUNTS;
   return <><div className={"wo-sticky-filters"}><div style={{
         display: "flex",
         alignItems: "center",
@@ -1304,84 +733,34 @@ if (workoutView === "recipes") {
         gap: S.s8,
         marginBottom: S.s0,
         position: "relative"
-      }}>{recipeCatDrop && <div onClick={() => setRecipeCatDrop(false)} style={{
+      }}>{recipeCatDrop && <div aria-hidden={"true"} onClick={() => setRecipeCatDrop(false)} style={{
           position: "fixed",
           inset: 0,
           zIndex: 19
-        }} />}<div style={{
-          position: "relative",
-          zIndex: 20
-        }}><button onClick={() => setRecipeCatDrop(!recipeCatDrop)} style={{
-            padding: "8px 28px 8px 10px",
-            borderRadius: R.xl,
-            border: "1px solid " + (recipeFilter.size > 0 ? "#C4A044" : "rgba(45,42,36,.3)"),
-            background: "rgba(14,14,12,.95)",
-            color: recipeFilter.size > 0 ? "#C4A044" : "#8a8478",
-            fontSize: FS.lg,
-            textAlign: "left",
-            cursor: "pointer",
-            position: "relative"
-          }}>{recipeFilter.size > 0 ? "Category (" + recipeFilter.size + ")" : "Category"}<span style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(" + (recipeCatDrop ? "180deg" : "0deg") + ")",
-              color: recipeFilter.size > 0 ? "#C4A044" : "#8a8478",
-              fontSize: FS.sm,
-              transition: "transform .15s",
-              lineHeight: 1
-            }}>{"▼"}</span></button>{recipeCatDrop && <div style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            minWidth: 200,
-            maxHeight: 280,
-            overflowY: "auto",
-            background: "rgba(16,14,10,.95)",
-            border: "1px solid rgba(180,172,158,.07)",
-            borderRadius: R.xl,
-            padding: "6px 4px",
-            zIndex: 21,
-            boxShadow: "0 8px 24px rgba(0,0,0,.6)"
-          }}>{RECIPE_CATS.filter(c => c !== "All").map(cat => {
-              const sel = recipeFilter.has(cat);
-              return <div key={cat} onClick={() => setRecipeFilter(s => {
-                const n = new Set(s);
-                n.has(cat) ? n.delete(cat) : n.add(cat);
-                return n;
-              })} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8,
-                padding: "6px 10px",
-                borderRadius: R.md,
-                cursor: "pointer",
-                background: sel ? "rgba(196,160,68,.12)" : "transparent"
-              }}><div style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: R.r3,
-                  flexShrink: 0,
-                  border: "1.5px solid " + (sel ? "#C4A044" : "rgba(180,172,158,.08)"),
-                  background: sel ? "rgba(196,160,68,.25)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>{sel && <span style={{
-                    fontSize: FS.sm,
-                    color: "#C4A044",
-                    lineHeight: 1
-                  }}>{"✓"}</span>}</div><span style={{
-                  fontSize: FS.lg,
-                  color: sel ? "#C4A044" : "#b4ac9e",
-                  whiteSpace: "nowrap"
-                }}>{cat}</span></div>;
-            })}</div>}</div>{recipeFilter.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
+        }} />}<FilterDropdown
+          id={"recipe-cat"}
+          label={"Category"}
+          shortLabel={"Category"}
+          options={RECIPE_CATS.filter(c => c !== "All")}
+          optionLabel={c => c}
+          selected={recipeFilter}
+          counts={recipeCatCounts}
+          onToggle={cat => setRecipeFilter(sHas => {
+            const n = new Set(sHas);
+            n.has(cat) ? n.delete(cat) : n.add(cat);
+            return n;
+          })}
+          open={!!recipeCatDrop}
+          setOpen={v => setRecipeCatDrop(v === "recipe-cat")}
+          accent={"#C4A044"}
+          optionAccent={c => RECIPE_CAT_COLORS[c] || "#C4A044"}
+          panelBorder={"rgba(196,148,40,0.25)"}
+        />{recipeFilter.size > 0 && <button className={"btn btn-ghost btn-xs"} style={{
           fontSize: FS.sm,
           color: "#8a8478",
           alignSelf: "center"
         }} onClick={() => setRecipeFilter(new Set())}>{"Clear"}</button>}</div></div>{filteredTpls.length === 0 && <div className={"empty"}>{"No recipes match the selected categories."}</div>}{filteredTpls.map(tpl => {
-      const xp = tpl.exercises.reduce((t, ex) => t + calcExXP(ex.exId, ex.sets, ex.reps, profile.chosenClass, allExById), 0);
+      const xp = recipeXP(tpl, profile.chosenClass, allExById);
       const descExpanded = expandedRecipeDesc.has(tpl.id);
       const tplMgColor = getRecipeMgColor(tpl);
       const diffCls = tpl.difficulty ? `wo-diff-pill wo-diff-${tpl.difficulty.toLowerCase()}` : null;
@@ -1527,16 +906,13 @@ if (workoutView === "recipes") {
         }}><button className={"btn btn-gold btn-sm"} style={{
             flex: 1
           }} onClick={() => {
-            const wo = {
-              id: uid(),
+            const wo = buildWorkoutObject({
               name: tpl.name,
               icon: tpl.icon,
               desc: tpl.desc,
-              exercises: tpl.exercises.map(e => ({
-                ...e
-              })),
+              exercises: tpl.exercises.map(e => ({ ...e })),
               createdAt: new Date().toLocaleDateString()
-            };
+            });
             setProfile(pr => ({
               ...pr,
               workouts: [...(pr.workouts || []), wo]
@@ -1562,7 +938,7 @@ if (workoutView === "recipes") {
 // ── DETAIL ─────────────────────────────
 if (workoutView === "detail" && activeWorkout) {
   const wo = activeWorkout;
-  const xp = calcWorkoutXP(wo);
+  const xp = calcWorkoutXP(wo, profile.chosenClass, allExById);
   return <><div style={{
       display: "flex",
       alignItems: "center",
@@ -1632,14 +1008,7 @@ if (workoutView === "detail" && activeWorkout) {
         flex: 2,
         fontSize: FS.sm
       }} onClick={() => {
-        openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-          setCompletionModal({
-            workout: woWithStats,
-            fromStats: _sr
-          });
-          setCompletionDate(todayStr());
-          setCompletionAction("today");
-        });
+openCompletionFlow(wo);
       }}>{"✓ Mark Complete or Schedule"}</button><button className={"btn btn-gold btn-sm"} style={{
         flex: 1
       }} onClick={() => setAddToPlanPicker({
@@ -1669,7 +1038,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
     }}><div className={"builder-nav-title"}>{wbIsOneOff ? wbEditId ? "✎ Edit One-Off" : "⚡ New One-Off Workout" : wbEditId ? "✎ Edit Workout" : wbCopySource ? "⎘ Copy Workout" : "⚔ New Workout"}</div>{wbCopySource && <div className={"builder-nav-sub"}>{"Forging from: "}{wbCopySource}</div>}</div></div>
   {
     /* Combined Identity + Labels + Session Stats panel */
-  }<div className={"wb-section"}><div className={"field"}><label>{"Name "}<span className={"req-star"}>{"*"}</span></label><div className={"wb-identity-row"}><div className={"wb-icon-btn"} title={"Change icon"} onClick={() => setWbIconPickerOpen(v => !v)}>{wbIcon}<span className={"wb-icon-btn-caret"}>{"▾"}</span></div><input className={"inp"} value={wbName} onChange={e => setWbName(e.target.value)} placeholder={"e.g. Morning Push Day…"} /></div></div>{wbIconPickerOpen && <div className={"wb-icon-picker"}>{["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾","🏅","🥇","⛹️","🤼","🧗","🤾","🎿","🏄","⛷️","🚣","🏹","🏇","🌿","🫀","🦴","💨","🌊","🏔️","🌄","🐉","🦅","🔱","☀️","🌙","🌪️","💫","🎖️","⚒️","🧱","🥋"].map(ic => <div key={ic} className={`icon-opt ${wbIcon === ic ? "sel" : ""}`} onClick={() => { setWbIcon(ic); setWbIconPickerOpen(false); }}>{ic}</div>)}</div>}<div className={"field"} style={{marginTop: S.s8}}><label>{"Description "}<span style={{color:"#8a8478",fontWeight:"normal",textTransform:"none"}}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div><div className={"wb-section-divider"} /><div className={"wb-sub-hdr"}><span className={"wb-sub-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{color:"#8a8478",fontWeight:"normal",letterSpacing:".05em",marginLeft:S.s6,textTransform:"none"}}>{"(optional)"}</span></div><div style={{display:"flex",gap:S.s6,flexWrap:"wrap",alignItems:"center"}}>{(profile.workoutLabels || []).map(l => <span key={l} className={"wo-label-chip" + (wbLabels.includes(l) ? " sel" : "")} onClick={() => setWbLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}>{l}</span>)}<span style={{display:"inline-flex",alignItems:"center",gap:S.s4}}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onKeyDown={e => {
+  }<div className={"wb-section"}><div className={"field"}><label>{"Name "}<span className={"req-star"}>{"*"}</span></label><div className={"wb-identity-row"}><button type={"button"} className={"wb-icon-btn"} title={"Change icon"} aria-label={"Change workout icon"} aria-haspopup={"dialog"} aria-expanded={wbIconPickerOpen} onClick={() => setWbIconPickerOpen(v => !v)}>{wbIcon}<span className={"wb-icon-btn-caret"} aria-hidden={"true"}>{"▾"}</span></button><input className={"inp"} value={wbName} onChange={e => setWbName(e.target.value)} placeholder={"e.g. Morning Push Day…"} /></div></div>{<Sheet open={wbIconPickerOpen} onClose={() => setWbIconPickerOpen(false)} layer={"modal"} placement={"center"} maxWidth={360} title={"Choose an icon"} ariaLabel={"Choose a workout icon"}><div className={"wb-icon-picker"} role={"group"} aria-label={"Workout icons"}>{["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾","🏅","🥇","⛹️","🤼","🧗","🤾","🎿","🏄","⛷️","🚣","🏹","🏇","🌿","🫀","🦴","💨","🌊","🏔️","🌄","🐉","🦅","🔱","☀️","🌙","🌪️","💫","🎖️","⚒️","🧱","🥋"].map(ic => <button type={"button"} key={ic} aria-label={`Icon ${ic}`} aria-pressed={wbIcon === ic} className={`icon-opt ${wbIcon === ic ? "sel" : ""}`} onClick={() => { setWbIcon(ic); setWbIconPickerOpen(false); }}>{ic}</button>)}</div></Sheet>}<div className={"field"} style={{marginTop: S.s8}}><label>{"Description "}<span style={{color:"#8a8478",fontWeight:"normal",textTransform:"none"}}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div><div className={"wb-section-divider"} /><div className={"wb-sub-hdr"}><span className={"wb-sub-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{color:"#8a8478",fontWeight:"normal",letterSpacing:".05em",marginLeft:S.s6,textTransform:"none"}}>{"(optional)"}</span></div><div style={{display:"flex",gap:S.s6,flexWrap:"wrap",alignItems:"center"}}>{(profile.workoutLabels || []).map(l => <span key={l} className={"wo-label-chip" + (wbLabels.includes(l) ? " sel" : "")} onClick={() => setWbLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}>{l}</span>)}<span style={{display:"inline-flex",alignItems:"center",gap:S.s4}}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onKeyDown={e => {
           if (e.key === "Enter" && newLabelInput.trim()) {
             const lbl = newLabelInput.trim();
             if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
@@ -1794,7 +1163,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
               supersetWith: null
             } : x))}>{"✕ Ungroup"}</button></div>{renderSsAccordionSection(ex, i, exD, "A", i + "_a")}{renderSsAccordionSection(partnerEx, partnerIdx, partnerExD, "B", i + "_b")}</div>;
       }
-      return <>{i === minSsChecked && ssChecked.size > 0 && <div className={"ss-action-bar"}><span className={"ss-action-text"}>{ssChecked.size + " exercise" + (ssChecked.size !== 1 ? "s" : "") + " selected"}</span>{ssChecked.size === 2 && <button className={"ss-action-btn"} onClick={() => {
+      return <>{i === minSsChecked && ssChecked.size > 0 && <div className={"ss-action-bar"}><span className={"ss-action-text"}>{ssChecked.size === 1 ? "Select 1 more to superset" : "🔗 2 selected — ready to group"}</span>{ssChecked.size === 2 && <button className={"ss-action-btn"} onClick={() => {
             const [a, b] = [...ssChecked];
             setWbExercises(exs => exs.map((x, xi) => xi === a ? {
               ...x,
@@ -1821,26 +1190,9 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
           e.preventDefault();
           reorderWbEx(dragWbExIdx, i);
           setDragWbExIdx(null);
-        }} onDragEnd={() => setDragWbExIdx(null)}><WbExCard ex={ex} i={i} exD={exD} collapsed={!!collapsedWbEx[i]} profile={profile} allExById={allExById} metric={metric} wUnit={wUnit} setWbExercises={setWbExercises} setCollapsedWbEx={setCollapsedWbEx} setSsChecked={setSsChecked} ssChecked={ssChecked} exCount={wbExercises.length} openExEditor={openExEditor} /></div></>;
+        }} onDragEnd={() => setDragWbExIdx(null)}><WbExCard ex={ex} i={i} exD={exD} collapsed={!!collapsedWbEx[i]} profile={profile} allExById={allExById} metric={metric} setWbExercises={setWbExercises} setCollapsedWbEx={setCollapsedWbEx} setSsChecked={setSsChecked} ssChecked={ssChecked} exCount={wbExercises.length} openExEditor={openExEditor} /></div></>;
     });
-  })()}<div style={{ height: 80 }} /><div style={{
-    position: "fixed",
-    bottom: "calc(var(--bottom-nav-h) + 10px)",
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "calc(100% - 32px)",
-    maxWidth: 488,
-    zIndex: 90,
-    display: "flex",
-    gap: S.s8,
-    padding: "10px 14px",
-    background: "rgba(14,13,10,.95)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    borderRadius: 14,
-    border: "1px solid rgba(180,172,158,.12)",
-    boxShadow: "0 -4px 24px rgba(0,0,0,.45)",
-  }}>{wbIsOneOff ? wbEditId ?
+  })()}<div className={"wb-footer"}>{wbIsOneOff ? wbEditId ?
   // Editing an existing scheduled one-off — save changes in place
   <button className={"btn btn-gold"} style={{
     flex: 1
@@ -1889,37 +1241,27 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
       showToast("Add at least one exercise.");
       return;
     }
-    const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
-    const wo = {
-      id: uid(),
-      name: wbName.trim(),
+    const wo = buildWorkoutObject({
+      name: wbName,
       icon: wbIcon,
-      desc: wbDesc.trim(),
+      desc: wbDesc,
       exercises: wbExercises,
       createdAt: todayStr(),
       oneOff: true,
-      durationMin: dur || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
+      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
+      activeCal: wbActiveCal,
+      totalCal: wbTotalCal,
       labels: wbLabels
-    };
-    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-      setCompletionModal({
-        workout: woWithStats,
-        fromStats: _sr
-      });
-      setCompletionDate(todayStr());
-      setCompletionAction("today");
     });
+    openCompletionFlow(wo);
     setWorkoutView("list");
   }}>{"Next: Log or Schedule →"}</button> : wbEditId ? <>
-  <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button>
+  <button className={"btn btn-gold-solid"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button>
   <button className={"btn btn-ghost"} style={{ flex: 1 }} onClick={saveAsNewWorkout}>{"📋 Save As New"}</button>
   </> : <>
-  <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Save Workout"}</button>
-  <button className={"btn btn-gold"} style={{
-    flex: 1,
-    background: "linear-gradient(135deg,#8B7425,#A89030)"
+  <button className={"btn btn-gold-solid"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Save Workout"}</button>
+  <button className={"btn btn-glass-yellow"} style={{
+    flex: 1
   }} onClick={() => {
     if (!wbName.trim()) {
       showToast("Name your workout first!");
@@ -1929,28 +1271,19 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
       showToast("Add at least one exercise.");
       return;
     }
-    const dur = combineHHMMSec(wbDuration, wbDurSec) || null;
-    const wo = {
-      id: uid(),
-      name: wbName.trim(),
+    const wo = buildWorkoutObject({
+      name: wbName,
       icon: wbIcon,
-      desc: wbDesc.trim(),
+      desc: wbDesc,
       exercises: wbExercises,
       createdAt: todayStr(),
       oneOff: true,
-      durationMin: dur || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
+      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
+      activeCal: wbActiveCal,
+      totalCal: wbTotalCal,
       labels: wbLabels
-    };
-    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
-      setCompletionModal({
-        workout: woWithStats,
-        fromStats: _sr
-      });
-      setCompletionDate(todayStr());
-      setCompletionAction("today");
     });
+    openCompletionFlow(wo);
     setWorkoutView("list");
   }}>{"✓ Complete / Schedule"}</button>
   </>}</div></>;

@@ -39,7 +39,7 @@ const scheduleAfterPaint = typeof requestIdleCallback === 'function'
 export function useWorkoutCompletion({
   profile, setProfile,
   allExById, applyAutoCheckIn, getMult,
-  showToast, setXpFlash, setWorkoutSubTab,
+  showToast, setXpFlash, showWorkoutsSubTab,
   completionModal, setCompletionModal,
   completionDate, setCompletionDate,
   completionAction, setCompletionAction,
@@ -176,7 +176,7 @@ export function useWorkoutCompletion({
         });
         setTimeout(() => setXpFlash(null), 2500);
         if (wo.makeReusable) {
-          setWorkoutSubTab("reusable");
+          showWorkoutsSubTab("reusable");
         }
         const label = dateStr === todayStr() ? "today" : displayDate;
         const reusableNote = wo.makeReusable ? " · Saved to Re-Usable tab!" : "";

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { S, R, FS } from '../../utils/tokens';
+import { S, R, FS, Z } from '../../utils/tokens';
 
 /**
  * Multi-select filter dropdown for the exercise library.
@@ -29,6 +29,9 @@ function FilterDropdown({
   accent,         // colour for the selected state
   optionAccent,   // optional value => colour, for per-option tinting
   panelBorder,
+  footer,         // optional slot rendered below the options (e.g. an
+                  // add-new-value row); clicks inside it must not toggle
+                  // options, so it manages its own handlers
 }) {
   const [activeIdx, setActiveIdx] = useState(-1);
   const triggerRef = useRef(null);
@@ -111,7 +114,7 @@ function FilterDropdown({
   const triggerColor = count > 0 ? accent : "#8a8478";
 
   return (
-    <div style={{ position: "relative", flex: "1 1 110px", zIndex: 20 }}>
+    <div style={{ position: "relative", flex: "1 1 110px", zIndex: Z.dropdown }}>
       <button
         ref={triggerRef}
         type="button"
@@ -169,7 +172,7 @@ function FilterDropdown({
           border: `1px solid ${panelBorder}`,
           borderRadius: R.xl,
           padding: "6px 4px",
-          zIndex: 21,
+          zIndex: Z.dropdown + 1, // listbox sits one above its dropdown container; no exact Z token
           boxShadow: "0 8px 24px rgba(0,0,0,.6)",
           outline: "none"
         }}
@@ -233,6 +236,7 @@ function FilterDropdown({
             </div>
           );
         })}
+        {footer}
       </div>}
     </div>
   );

@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { List } from 'react-window';
 import { MUSCLE_META, UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
-import { S, R, FS } from '../../utils/tokens';
-import { useScrollReveal } from '../../hooks/useScrollReveal';
+import { S, R, FS, Z } from '../../utils/tokens';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
 import MuscleTorchStrip from './MuscleTorchStrip';
@@ -11,6 +11,33 @@ import GymKitBar from './GymKitBar';
 import MuscleMap from './MuscleMap';
 import ExerciseRow from './ExerciseRow';
 import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
+
+// Row adapter for the virtualised filtered list — mirrors
+// WorkoutExercisePicker's WbExPickerRow: maps react-window's props onto the
+// shared ExerciseRow. Recycled rows must NOT carry the scroll-reveal entrance
+// class (a recycled node would re-fire or stick at opacity:0), so the fade is
+// intentionally dropped inside the virtual list.
+const LibExRow = React.memo(function LibExRow({
+  ariaAttributes, index, style,
+  exercises, cartSet, favSet, pbSet, selectable, onOpen, onToggleCart, onToggleFav,
+}) {
+  const ex = exercises[index];
+  if (!ex) return null;
+  return (
+    <div style={{ ...style, paddingTop: 4, paddingBottom: 4 }} {...ariaAttributes}>
+      <ExerciseRow
+        ex={ex}
+        selected={cartSet.has(ex.id)}
+        selectable={selectable}
+        showEquipment
+        showPB={pbSet.has(ex.id)}
+        isFav={favSet.has(ex.id)}
+        onToggleFav={selectable ? undefined : onToggleFav}
+        onActivate={() => (selectable ? onToggleCart(ex.id) : onOpen(ex))}
+      />
+    </div>
+  );
+});
 
 /**
  * Exercise library tab — extracted from the inline IIFE in App.jsx as the
@@ -32,19 +59,15 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     libFiltered, libMuscleCardData, libMuscleMapData, libDiscoverRows, libMuscleOpts, libEquipOpts,
     libTypeCounts, libMuscleCounts, libEquipCounts,
     // Filter state
-    libSearch, setLibSearch,
     setLibSearchDebounced,
     libTypeFilters, setLibTypeFilters,
     libMuscleFilters, setLibMuscleFilters,
     libEquipFilters, setLibEquipFilters,
-    libOpenDrop, setLibOpenDrop,
     debouncedSetLibSearch,
     // View state
     setLibDetailEx,
     libSelectMode, setLibSelectMode,
-    cartIds, isInCart, toggleCart,
-    libBrowseMode, setLibBrowseMode,
-    libVisibleCount, setLibVisibleCount,
+    cartIds, toggleCart,
     // Profile / data
     profile, setProfile,
     allExercises, allExById,
@@ -53,8 +76,16 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     // Quick-log (for "Configure" action)
       } = props;
 
-  const revealRef = useScrollReveal();
   const [catalogNoteDismissed, setCatalogNoteDismissed] = useState(false);
+
+  // Raw search keystrokes, the open dropdown, the browse mode and the page
+  // depth are all local now — none is read by App, and keeping the raw search
+  // value here means typing re-renders only this memoized tab, not the shell.
+  // The DEBOUNCED value still flows up (debouncedSetLibSearch) to drive the
+  // filter pipeline in App.
+  const [search, setSearch] = useState("");
+  const [libOpenDrop, setLibOpenDrop] = useState(null); // "type"|"muscle"|"equip"|null
+  const [libBrowseMode, setLibBrowseMode] = useState("home"); // "home"|"filtered"
 
   // Which reading of the training-heat data to show. The strip is the default
   // and the accessible fallback; the map is opt-in and remembered.
@@ -90,6 +121,65 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   // you at the offset you had in a 1,500-row filtered list.
   useScrollRestore(`lib-${libBrowseMode}`);
 
+  // ── Virtual-list plumbing ──
+  const rootRef = useRef(null);          // tab root, used to find the .scroll-area to lock
+  const listRef = useRef(null);          // react-window imperative API ({ element, scrollToRow })
+  const listSaveTimer = useRef(null);
+  const LIB_ROW_H = 88;                  // ~78px row (fav star) + 8px wrapper padding
+  const LIST_SCROLL_KEY = 'aurisar-scroll:lib-filtered-list';
+
+  // O(1) row lookups; memoised so rowProps values stay stable between renders
+  // (react-window re-renders rows when any rowProps value changes by identity).
+  const cartSet = useMemo(() => new Set(cartIds), [cartIds]);
+  const favSet = useMemo(() => new Set(profile.favoriteExercises || []), [profile.favoriteExercises]);
+  const pbSet = useMemo(() => new Set(Object.keys(profile.exercisePBs || {})), [profile.exercisePBs]);
+
+  // Persist the List's own scrollTop (v2.2.7 has no onScroll prop, but a native
+  // onScroll passes through ...rest to the scroller). Throttled.
+  const saveListScroll = useCallback(() => {
+    if (listSaveTimer.current) return;
+    listSaveTimer.current = setTimeout(() => {
+      listSaveTimer.current = null;
+      const el = listRef.current?.element;
+      if (el) { try { sessionStorage.setItem(LIST_SCROLL_KEY, String(el.scrollTop)); } catch { /* private mode */ } }
+    }, 120);
+  }, []);
+
+  // Restore the List offset on each entry into the filtered view. Retry ladder:
+  // the flex height + Supabase catalog merge settle after first paint, so an
+  // early write would clamp short.
+  useEffect(() => {
+    if (libBrowseMode !== 'filtered') return undefined;
+    let saved = 0;
+    try { saved = parseInt(sessionStorage.getItem(LIST_SCROLL_KEY) || '0', 10) || 0; } catch { /* ignore */ }
+    if (saved <= 0) return undefined;
+    let cancelled = false;
+    const timers = [40, 120, 260, 500].map(d => setTimeout(() => {
+      if (cancelled) return;
+      const el = listRef.current?.element;
+      if (el && el.scrollHeight > el.clientHeight && Math.abs(el.scrollTop - saved) > 2) el.scrollTop = saved;
+    }, d));
+    return () => { cancelled = true; timers.forEach(clearTimeout); };
+  }, [libBrowseMode]);
+
+  // Lock the shared .scroll-area into a non-scrolling flex column while the
+  // filtered view is up, so the List is the ONLY scroller (kills scroll-in-
+  // scroll). useLayoutEffect so the class is removed BEFORE useScrollRestore's
+  // useEffect re-resolves its scroller on the return-to-home transition.
+  useLayoutEffect(() => {
+    const scroller = rootRef.current?.closest('.scroll-area');
+    if (!scroller) return undefined;
+    if (libBrowseMode === 'filtered') {
+      scroller.classList.add('lib-list-locked');
+      return () => scroller.classList.remove('lib-list-locked');
+    }
+    scroller.classList.remove('lib-list-locked');
+    return undefined;
+  }, [libBrowseMode]);
+
+  // Tidy the throttle timer on unmount.
+  useEffect(() => () => clearTimeout(listSaveTimer.current), []);
+
   // Toggling a filter deliberately does NOT reset the page depth. The list is
   // sliced to libVisibleCount, so a narrower result set just renders shorter;
   // resetting only threw away the scroll position of anyone tweaking a filter
@@ -101,20 +191,43 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       return n;
     });
   };
+  // Full reset: wipe filters + search AND leave the filtered view. This is the
+  // destructive "Clear all filters" / filter-chip path — distinct from the
+  // non-destructive "← Browse Library" back, which only changes the view.
   const clearAll = () => {
     setLibTypeFilters(new Set());
     setLibMuscleFilters(new Set());
     setLibEquipFilters(new Set());
-    setLibSearch("");
+    setSearch("");
     setLibSearchDebounced("");
-    setLibVisibleCount(60);
     setLibBrowseMode("home");
   };
-  const hasFilters = libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0 || libSearch;
+  const hasFilters = libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0 || !!search;
+  const activeFilterCount = libTypeFilters.size + libMuscleFilters.size + libEquipFilters.size;
+  // Resume-chip state: the non-destructive "← Browse Library" keeps BOTH
+  // filters and the search term, so the home chip must appear for a search-only
+  // browse too — not just active facets.
+  const trimmedSearch = search.trim();
+  const hasResumeState = activeFilterCount > 0 || trimmedSearch.length > 0;
+  const resumeSummary = [
+    activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount !== 1 ? "s" : ""}` : null,
+    trimmedSearch ? `“${trimmedSearch}”` : null,
+  ].filter(Boolean).join(" · ");
+  const resumeIcon = activeFilterCount > 0 ? "⚙" : "🔍";
   // Aliased so the JSX below stays close to the pre-extraction shape.
   const MUSCLE_OPTS = libMuscleOpts;
   const EQUIP_OPTS = libEquipOpts;
   const toggleSel = toggleCart;
+
+  // Stable across renders so the memoized ExerciseRow isn't handed a fresh
+  // closure every keystroke — otherwise every visible row re-renders on each
+  // filter tweak even though nothing about the row changed.
+  const toggleFav = useCallback(id => setProfile(p => ({
+    ...p,
+    favoriteExercises: (p.favoriteExercises || []).includes(id)
+      ? (p.favoriteExercises || []).filter(i => i !== id)
+      : [...(p.favoriteExercises || []), id]
+  })), [setProfile]);
 
   /* ── Home view computed data ── */
   const MUSCLE_CARD_DATA = libMuscleCardData;
@@ -173,16 +286,15 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     wrap.classList.toggle('fade-right-off', !atRight);
   };
 
-  // Select mode used to look almost identical to browsing — same rows, same
-  // colours, just small checkboxes — so tapping a row to read about it would
-  // silently add it to a batch instead. The whole tab now shifts to a colder
-  // "conscription" palette while it's active, with a one-shot pulse on entry.
-  return <div className={libSelectMode ? "lib-conscript" : undefined}> {
+  // Select mode is signalled by a status banner and the rows' own checkbox
+  // affordance, not by repainting the whole tab to a colder palette — a
+  // full-surface theme swap to communicate a mode change reads as clunky.
+  return <div ref={rootRef} className={libBrowseMode === "filtered" ? "lib-tab-root lib-tab-root--filtered" : "lib-tab-root"}> {
       /* Sticky search bar — translucent material */
     }
-    <div className={"lib-sticky-search"}>{libSelectMode && <div className={"lib-conscript-banner"} role="status">
+    <div className={"lib-sticky-search"}>{libSelectMode && <div className={"lib-select-banner"} role="status">
         <span>{"⊞ Selecting"}</span>
-        <span className={"lib-conscript-banner-count"}>{cartIds.length === 0 ? "tap rows to stage" : `${cartIds.length} staged`}</span>
+        <span className={"lib-select-banner-count"}>{cartIds.length === 0 ? "tap rows to stage" : `${cartIds.length} staged`}</span>
       </div>}<div style={{
         display: "flex",
         gap: S.s8,
@@ -190,15 +302,14 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       }}><div className={"tech-search-wrap"} style={{
           flex: 1,
           marginBottom: S.s0
-        }}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={`Search ${libKitCount} exercises…`} value={libSearch} onChange={e => {
+        }}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={`Search ${libKitCount} exercises…`} value={search} onChange={e => {
             const v = e.target.value;
-            setLibSearch(v);
+            setSearch(v);
             debouncedSetLibSearch(v);
             if (v && libBrowseMode === "home") setLibBrowseMode("filtered");
-          }} />{libSearch && <button type={"button"} aria-label={"Clear search"} className={"tech-search-clear"} onClick={() => {
-            setLibSearch("");
+          }} />{search && <button type={"button"} aria-label={"Clear search"} className={"tech-search-clear"} onClick={() => {
+            setSearch("");
             setLibSearchDebounced("");
-            setLibVisibleCount(60);
             if (libMuscleFilters.size === 0 && libTypeFilters.size === 0 && libEquipFilters.size === 0) setLibBrowseMode("home");
           }}>{"✕"}</button>}</div>{libBrowseMode === "filtered" && <button onClick={() => {
           // Cancel leaves select mode only. It used to clear the cart, but the
@@ -244,7 +355,14 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     }
     <GymKitBar gymKit={gymKit} setGymKit={setGymKit} totalShown={libKitCount} totalAll={kitTotalAll} />
     {/* ═══ HOME VIEW ═══ */
-    libBrowseMode === "home" && <div>{/* Your Exercises — hero carousel */
+    libBrowseMode === "home" && <div>{/* Resume chip — active filters survive a
+      non-destructive "← Browse Library", so make them visible and one tap from
+      the results they'd show. */
+      hasResumeState && <button type={"button"} className={"lib-resume-chip"} onClick={() => setLibBrowseMode("filtered")}>
+        <span aria-hidden="true">{resumeIcon}</span>
+        <span className={"lib-resume-chip-label"}>{`${resumeSummary} — View ${libFiltered.length} result${libFiltered.length !== 1 ? "s" : ""} →`}</span>
+        <span role={"button"} tabIndex={0} aria-label={"Clear filters and search"} className={"lib-resume-chip-x"} onClick={e => { e.stopPropagation(); clearAll(); }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); clearAll(); } }}>{"✕"}</span>
+      </button>}{/* Your Exercises — hero carousel */
       yourExercises.length > 0 && <div className={"lib-home-section"} style={{
         marginBottom: S.s4
       }}><div className={"lib-section-hdr"}><span className={"lib-hdr-icon"}>{"⚔️"}</span>{"Your Exercises"}</div><div className={"lib-hscroll-wrap"}><div className={"lib-hscroll"} onScroll={handleHScroll}>{yourExercises.map(({ ex, days }) => {
@@ -325,18 +443,19 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
                     fontWeight: 600
                   }}>{(ex.baseXP || 0) + " XP"}</span></div></button>;
             })}</div></div></div>)}</div>}{/* ═══ FILTERED VIEW ═══ */
-    libBrowseMode === "filtered" && <div> {
+    libBrowseMode === "filtered" && <div className={"lib-filtered-view"}> {
         /* Back to browse */
       }
       <div style={{
         marginBottom: S.s10
-      }}><button onClick={() => clearAll()} style={{
+      }}><button onClick={() => setLibBrowseMode("home")} style={{
           background: "transparent",
           border: "none",
           color: "#b4ac9e",
           fontSize: FS.fs78,
           cursor: "pointer",
-          padding: "4px 0",
+          padding: "8px 0",
+          minHeight: 44,
           display: "flex",
           alignItems: "center",
           gap: S.s4
@@ -354,7 +473,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         libOpenDrop && <div aria-hidden={"true"} onClick={() => setLibOpenDrop(null)} style={{
           position: "fixed",
           inset: 0,
-          zIndex: 19
+          zIndex: Z.scrim
         }} />}
         <FilterDropdown
           id="type"
@@ -463,54 +582,35 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       null}  {
         /* Exercise list (paginated) */
       }
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: S.s6
-      }}>{libFiltered.length === 0 && (_exReady
-          ? <div className={"empty"} style={{ padding: "24px 0" }}>{"No exercises match your filters."}</div>
-          // Nothing matched *yet* only because the catalog is still arriving —
-          // an empty-state here would be a lie, so show the shape of the rows.
-          : <div aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <div key={"skel" + i} className={"lib-skel-row"}>
-              <div className={"lib-skel-orb"} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className={"lib-skel-line"} style={{ width: `${68 - i * 5}%`, marginBottom: S.s6 }} />
-                <div className={"lib-skel-line"} style={{ width: `${44 - i * 3}%`, height: 7 }} />
-              </div>
-            </div>)}</div>
-        )}{libFiltered.slice(0, libVisibleCount).map(ex => (
-          <ExerciseRow
-            key={ex.id}
-            ex={ex}
-            rowRef={revealRef}
-            className={"scroll-reveal"}
-            selected={isInCart(ex.id)}
-            selectable={libSelectMode}
-            showEquipment
-            showPB={!!(profile.exercisePBs || {})[ex.id]}
-            isFav={(profile.favoriteExercises || []).includes(ex.id)}
-            onToggleFav={libSelectMode ? undefined : id => setProfile(p => ({
-              ...p,
-              favoriteExercises: (p.favoriteExercises || []).includes(id)
-                ? (p.favoriteExercises || []).filter(i => i !== id)
-                : [...(p.favoriteExercises || []), id]
-            }))}
-            onActivate={() => (libSelectMode ? toggleSel(ex.id) : setLibDetailEx(ex))}
-          />
-        ))}{/* Load More / count info */
-        libFiltered.length > libVisibleCount && <button onClick={() => setLibVisibleCount(c => c + 60)} style={{
-          alignSelf: "center",
-          margin: "12px auto",
-          padding: "8px 24px",
-          borderRadius: R.lg,
-          border: "1px solid rgba(180,172,158,.12)",
-          background: "rgba(45,42,36,.3)",
-          color: "#b4ac9e",
-          fontSize: FS.fs75,
-          fontWeight: 600,
-          cursor: "pointer",
-          letterSpacing: ".02em"
-        }}>{`Load More (${Math.min(libVisibleCount, libFiltered.length)} of ${libFiltered.length})`}</button>}</div></div>}{
+      <div className={"lib-vlist-wrap"}>{libFiltered.length === 0
+        ? (_exReady
+            ? <div className={"empty"} style={{ padding: "24px 0" }}>{"No exercises match your filters."}</div>
+            // Nothing matched *yet* only because the catalog is still arriving —
+            // an empty-state here would be a lie, so show the shape of the rows.
+            : <div aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <div key={"skel" + i} className={"lib-skel-row"}>
+                <div className={"lib-skel-orb"} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className={"lib-skel-line"} style={{ width: `${68 - i * 5}%`, marginBottom: S.s6 }} />
+                  <div className={"lib-skel-line"} style={{ width: `${44 - i * 3}%`, height: 7 }} />
+                </div>
+              </div>)}</div>)
+        : <List
+            listRef={listRef}
+            rowCount={libFiltered.length}
+            rowHeight={LIB_ROW_H}
+            rowComponent={LibExRow}
+            rowProps={{
+              exercises: libFiltered,
+              cartSet, favSet, pbSet,
+              selectable: libSelectMode,
+              onOpen: setLibDetailEx,
+              onToggleCart: toggleSel,
+              onToggleFav: toggleFav,
+            }}
+            overscanCount={6}
+            onScroll={saveListScroll}
+            style={{ height: "100%", width: "100%", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          />}</div></div>}{
     /* ── end filtered view ──
        The exercise detail bottom sheet used to render here. It now lives at
        the App root as a portal (features/exercises/ExerciseDetailSheet.jsx)

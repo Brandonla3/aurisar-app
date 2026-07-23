@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { List } from 'react-window';
 import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
 import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FALLBACK, CLASS_SVG_PATHS, QUESTS, WORKOUT_TEMPLATES, PLAN_TEMPLATES, CHECKIN_REWARDS, KEYWORD_CLASS_MAP, PARTICLES, STORAGE_KEY, EMPTY_PROFILE, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, MUSCLE_COLORS, MUSCLE_META, TYPE_COLORS, UI_COLORS, MAP_REGIONS } from './data/constants';
@@ -9,7 +8,7 @@ import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './u
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, hrRange, scaleWeight, scaleDur } from './utils/xp';
-import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec } from './utils/time';
+import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec, daysUntil } from './utils/time';
 import { formatXP } from './utils/format';
 import { FS, R, S } from './utils/tokens';
 import { sb } from './utils/supabase';
@@ -33,8 +32,7 @@ import CharacterTab from './features/character/CharacterTab';
 import XpBarFlash from './features/profile/XpBarFlash';
 import { useAvatarConfig } from './features/avatar/useAvatarConfig.js';
 import MapOverlay from './features/character/MapOverlay';
-import WorkoutsTab from './features/workouts/WorkoutsTab';
-import WorkoutExercisePicker from './features/workouts/WorkoutExercisePicker';
+import WorkoutsTabContainer from './features/workouts/WorkoutsTabContainer';
 import CompletionModal from './features/workouts/CompletionModal';
 import CalendarTab from './features/calendar/CalendarTab';
 import LeaderboardTab from './features/leaderboard/LeaderboardTab';
@@ -48,6 +46,10 @@ import StagingTray from './components/StagingTray';
 import { useExerciseCart, cartEntry } from './hooks/useExerciseCart';
 import { planEntry } from './features/exercises/planEntry';
 import QuickLogModal from './features/exercises/QuickLogModal';
+import ErrorBoundary from './components/ErrorBoundary';
+import TabIcon from './components/TabIcons';
+import Sheet from './components/ui/Sheet';
+import ConfirmSheet from './components/ui/ConfirmSheet';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -263,8 +265,6 @@ function App() {
     setSwwIcon,
     swwSelected,
     setSwwSelected,
-    wbExPickerOpen,
-    setWbExPickerOpen,
     addToPlanPicker,
     setAddToPlanPicker,
     addToWorkoutPicker,
@@ -527,25 +527,48 @@ function App() {
   const [exHHMM, setExHHMM] = useState(""); // HH:MM portion of duration
   const [exSec, setExSec] = useState(""); // 0-59 seconds portion
   const [quickRows, setQuickRows] = useState([]); // extra set rows [{sets,reps,weightLbs}]
+  // Where the quick-log sheet was opened from: null | {type:"detail", ex}.
+  // Drives its contextual "← Back" (only a detail-sheet origin gets one).
+  const [quickLogOrigin, setQuickLogOrigin] = useState(null);
+  // The one opener for the quick-log sheet. Resets the form (unless the
+  // caller is returning to fields the user already typed — preserve:true),
+  // records the origin, and never touches the active tab: the sheet is a
+  // root portal, so logging works from Library, Workouts and Plans alike.
+  const openQuickLog = useCallback((exId, { origin = null, preserve = false } = {}) => {
+    if (!preserve) {
+      setSets("");
+      setReps("");
+      setExWeight("");
+      setWeightPct(100);
+      setHrZone(null);
+      setDistanceVal("");
+      setExHHMM("");
+      setExSec("");
+      setQuickRows([]);
+    }
+    setQuickLogOrigin(origin);
+    setSelEx(exId);
+  }, []);
   const [exSubTab, setExSubTab] = useState("library"); // "library" | "myworkouts"
   const [favSelectMode, setFavSelectMode] = useState(false);
-  const [libSearch, setLibSearch] = useState("");
+  // Only the DEBOUNCED search value stays in App — it feeds useExerciseFilters,
+  // whose libFiltered output App also uses for the detail-sheet sibling list.
+  // The raw keystroke value lives inside ExerciseLibraryTab so typing no longer
+  // re-renders the whole shell once per character.
   const [libSearchDebounced, setLibSearchDebounced] = useState("");
   const debouncedSetLibSearch = React.useRef(debounce(v => setLibSearchDebounced(v), 200)).current;
   const [libTypeFilters, setLibTypeFilters] = useState(() => new Set());
   const [libMuscleFilters, setLibMuscleFilters] = useState(() => new Set());
   const [libEquipFilters, setLibEquipFilters] = useState(() => new Set());
-  const [libOpenDrop, setLibOpenDrop] = useState(null); // "type"|"muscle"|"equip"|null
   const [libDetailEx, setLibDetailEx] = useState(null);
   const [libSelectMode, setLibSelectMode] = useState(false);
+  const setGymKit = useCallback(v => setProfile(p => ({ ...p, gymKit: v })), []);
   // One shared, persisted basket replaces the three throwaway selection Sets
   // the library, favourites list and builder picker each used to keep.
   const {
     cartIds, cartSet, isInCart, addToCart, removeFromCart, toggleCart,
     clearCart, moveInCart, pruneMissing, cartOpen, setCartOpen,
   } = useExerciseCart();
-  const [libBrowseMode, setLibBrowseMode] = useState("home");
-  const [libVisibleCount, setLibVisibleCount] = useState(60);
   const [lbFilter, setLbFilter] = useState("overall_xp");
   const [lbScope, setLbScope] = useState("world"); // "world" | "friends"
   const [lbStateFilters, setLbStateFilters] = useState(["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"]);
@@ -601,23 +624,7 @@ function App() {
   const [bodyTypeLocked, setBodyTypeLocked] = useState(false);
   const plansContainerRef = useRef(null);
   const [plansPendingOpen, setPlansPendingOpen] = useState(null);
-  const [dragWbExIdx, setDragWbExIdx] = useState(null);
-  const [ssChecked, setSsChecked] = useState(() => new Set()); // indices checked for superset grouping
-  const [ssAccordion, setSsAccordion] = useState({}); // collapse state for superset accordion sections in workout builder
-  const [collapsedWbEx, setCollapsedWbEx] = useState({}); // {i: bool}
-  function toggleWbEx(i) {
-    setCollapsedWbEx(s => ({
-      ...s,
-      [i]: !s[i]
-    }));
-  }
-  // Multi-select Sets, matching the library tab's filter model.
-  const [pickerMuscle, setPickerMuscle] = useState(() => new Set());
-  const [pickerSearch, setPickerSearch] = useState("");
-  const [pickerTypeFilter, setPickerTypeFilter] = useState(() => new Set());
-  const [pickerEquipFilter, setPickerEquipFilter] = useState(() => new Set());
-  const [pickerOpenDrop, setPickerOpenDrop] = useState(null); // "muscle"|"type"|"equip"|null
-  const [pickerSelected, setPickerSelected] = useState([]); // [{exId, sets, reps, weightLbs, weightPct, durationMin, distanceMi, hrZone}]
+  // Workout-builder superset/collapse state moved to WorkoutsTabContainer.
   // Quests
   const [questCat, setQuestCat] = useState("All");
   // Calendar
@@ -632,40 +639,15 @@ function App() {
   // Exercise editor
   // Save-as-Plan wizard (from history)
   // Schedule picker (for existing plans or exercises)
-  // Workouts tab
-  const [workoutView, setWorkoutView] = useState("list"); // "list"|"detail"|"builder"|"templates"
-  const [activeWorkout, setActiveWorkout] = useState(null);
+  // Workouts tab — view/builder/picker state lives in WorkoutsTabContainer;
+  // only the live tracker (rendered at App root, feeds completion) stays.
   const [liveWorkout, setLiveWorkout] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
   });
   const [pendingLiveWorkout, setPendingLiveWorkout] = useState(null);
-  const [wbName, setWbName] = useState("");
-  const [wbIcon, setWbIcon] = useState("💪");
-  const [wbIconPickerOpen, setWbIconPickerOpen] = useState(false);
-  const [wbDesc, setWbDesc] = useState("");
-  const [wbExercises, setWbExercises] = useState([]); // [{exId,sets,reps,weightLbs,durationMin,...}]
-  // wbExCompleted removed — Mark Complete feature removed from builder UX
-  const [wbEditId, setWbEditId] = useState(null); // id of workout being edited
-  const [wbCopySource, setWbCopySource] = useState(null);
-  const [wbIsOneOff, setWbIsOneOff] = useState(false); // true when building a one-off workout
   const [pendingSoloRemoveId, setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
-  const [workoutSubTab, setWorkoutSubTab] = useState("reusable"); // "reusable"|"oneoff"
-  const [collapsedWo, setCollapsedWo] = useState(new Set());
-  const [expandedRecipeDesc, setExpandedRecipeDesc] = useState(new Set()); // which recipe descs are expanded
-  const [expandedRecipeEx, setExpandedRecipeEx] = useState(new Set()); // which recipe exercise lists are expanded
-  const [recipeFilter, setRecipeFilter] = useState(() => new Set(["Bodyweight"])); // multi-select category filter
-  const [recipeCatDrop, setRecipeCatDrop] = useState(false); // category dropdown open
-  // Workout-level optional stats (builder)
-  const [wbDuration, setWbDuration] = useState(""); // HH:MM string
-  const [wbDurSec, setWbDurSec] = useState(""); // 0-59 seconds
-  const [wbActiveCal, setWbActiveCal] = useState(""); // active calories
-  const [wbTotalCal, setWbTotalCal] = useState(""); // total calories
   const [bootStep, setBootStep] = useState(0);
-  // Workout label filter & builder
-  const [woLabelFilters, setWoLabelFilters] = useState(() => new Set());
-  const [woLabelDropOpen, setWoLabelDropOpen] = useState(false);
-  const [wbLabels, setWbLabels] = useState([]); // labels for workout being built/edited
-  const [newLabelInput, setNewLabelInput] = useState("");
+  const workoutsRef = useRef(null);
   // Workout completion modal
   // In-app confirm delete (replaces window.confirm which fails in sandbox)
   // Log tab sub-tabs
@@ -718,25 +700,17 @@ function App() {
   //   - Escape-key dismiss
   //   - Restore focus to the element that opened the modal
   // The hook stacks correctly when nested modals open (e.g. picker → config).
-  useModalLifecycle(!!exEditorOpen, () => setExEditorOpen(false));
+  // Modals that render through the Sheet/ConfirmSheet primitives register
+  // their own lifecycle inside the primitive (onClose wiring) — only the
+  // remaining hand-rolled portals keep an entry here.
   useModalLifecycle(savePlanWizard != null, () => setSavePlanWizard(null));
   useModalLifecycle(schedulePicker != null, () => setSchedulePicker(null));
   useModalLifecycle(saveWorkoutWizard != null, () => setSaveWorkoutWizard(null));
-  useModalLifecycle(!!wbExPickerOpen, () => closePicker());
-  useModalLifecycle(addToPlanPicker != null, () => setAddToPlanPicker(null));
   useModalLifecycle(!!retroCheckInModal, () => setRetroCheckInModal(false));
-  useModalLifecycle(statsPromptModal != null, () => setStatsPromptModal(null));
   useModalLifecycle(calExDetailModal != null, () => setCalExDetailModal(null));
   useModalLifecycle(retroEditModal != null, () => setRetroEditModal(null));
-  useModalLifecycle(addToWorkoutPicker != null, () => setAddToWorkoutPicker(null));
   useModalLifecycle(oneOffModal != null, () => setOneOffModal(null));
-  useModalLifecycle(completionModal != null, () => {
-    setCompletionModal(null);
-    setCompletionAction("today");
-    setScheduleWoDate("");
-  });
   useModalLifecycle(logEditModal != null, () => setLogEditModal(null));
-  useModalLifecycle(confirmDelete != null, () => setConfirmDelete(null));
   useModalLifecycle(shareModal != null, () => setShareModal(null));
   useModalLifecycle(!!feedbackOpen, () => setFeedbackOpen(false));
   useEffect(() => {
@@ -2825,12 +2799,6 @@ function App() {
     if (!_exReady || allExercises.length === 0) return;
     pruneMissing(id => !!allExById[id]);
   }, [_exReady, allExercises.length, allExById, pruneMissing]);
-  const wbTotalXP = useMemo(() => wbExercises.reduce((s, ex) => {
-    const extraCount = (ex.extraRows || []).length;
-    const b = calcExXP(ex.exId, ex.sets || 3, ex.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
-    const r = (ex.extraRows || []).reduce((rs, row) => rs + calcExXP(ex.exId, parseInt(row.sets) || parseInt(ex.sets) || 3, parseInt(row.reps) || parseInt(ex.reps) || 10, profile.chosenClass, allExById, null, null, null, extraCount), 0);
-    return s + (b + r);
-  }, 0), [wbExercises, profile.chosenClass, allExById]);
 
   // ── Exercise filter derivations — extracted to features/exercises ──
   // Memoized derivations the library tab consumes. The hook keeps the heavy
@@ -3605,329 +3573,7 @@ function App() {
   }
 
   // Workout builder helpers
-  function initWorkoutBuilder(base) {
-    setWbIconPickerOpen(false);
-    if (base) {
-      setWbName(base.name);
-      setWbIcon(base.icon);
-      setWbDesc(base.desc || "");
-      setWbExercises(base.exercises.map(e => ({
-        ...e
-      })));
-      setWbEditId(base.id);
-      const split = base.durationMin ? secToHHMMSplit(Number(base.durationMin)) : {
-        hhmm: "",
-        sec: ""
-      };
-      const hasSec = split.sec && split.sec !== 0 && split.sec !== "";
-      setWbDuration(hasSec ? `${split.hhmm}:${String(split.sec).padStart(2,"0")}` : (split.hhmm || ""));
-      setWbDurSec("");
-      setWbActiveCal(base.activeCal || "");
-      setWbTotalCal(base.totalCal || "");
-      setWbLabels(base.labels || []);
-    } else {
-      setWbName("");
-      setWbIcon("💪");
-      setWbDesc("");
-      setWbExercises([]);
-      setWbEditId(null);
-      setWbDuration("");
-      setWbDurSec("");
-      setWbActiveCal("");
-      setWbTotalCal("");
-      setWbLabels([]);
-    }
-    setWbIsOneOff(false);
-    setNewLabelInput("");
-    setWorkoutView("builder");
-  }
-  function saveBuiltWorkout() {
-    if (!wbName.trim()) {
-      showToast("Name your workout first!");
-      return;
-    }
-    if (wbExercises.length === 0) {
-      showToast("Add at least one exercise.");
-      return;
-    }
-    const w = {
-      id: wbEditId || uid(),
-      name: wbName.trim(),
-      icon: wbIcon,
-      desc: wbDesc.trim(),
-      exercises: wbExercises,
-      createdAt: new Date().toLocaleDateString(),
-      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
-      labels: wbLabels
-    };
-    if (wbEditId) {
-      setProfile(pr => ({
-        ...pr,
-        workouts: (pr.workouts || []).map(wo => wo.id === wbEditId ? w : wo)
-      }));
-      showToast("Workout updated! 💪");
-    } else {
-      setProfile(pr => ({
-        ...pr,
-        workouts: [w, ...(pr.workouts || [])]
-      }));
-      showToast("Workout created! 💪");
-    }
-    setWorkoutView("list");
-    setActiveWorkout(null);
-    setWbEditId(null);
-    setWbCopySource(null);
-    setWbDuration("");
-    setWbDurSec("");
-    setWbActiveCal("");
-    setWbTotalCal("");
-    setWbLabels([]);
-    setNewLabelInput("");
-  }
-  function saveAsNewWorkout() {
-    if (!wbName.trim()) {
-      showToast("Name your workout first!");
-      return;
-    }
-    if (wbExercises.length === 0) {
-      showToast("Add at least one exercise.");
-      return;
-    }
-    const w = {
-      id: uid(),
-      name: wbName.trim(),
-      icon: wbIcon,
-      desc: wbDesc.trim(),
-      exercises: wbExercises,
-      createdAt: new Date().toLocaleDateString(),
-      durationMin: combineHHMMSec(wbDuration, wbDurSec) || null,
-      activeCal: wbActiveCal || null,
-      totalCal: wbTotalCal || null,
-      labels: wbLabels
-    };
-    setProfile(pr => ({
-      ...pr,
-      workouts: [w, ...(pr.workouts || [])]
-    }));
-    showToast("Saved as new workout! 💪");
-    setWorkoutView("list");
-    setActiveWorkout(null);
-    setWbEditId(null);
-    setWbCopySource(null);
-    setWbDuration("");
-    setWbDurSec("");
-    setWbActiveCal("");
-    setWbTotalCal("");
-    setWbLabels([]);
-    setNewLabelInput("");
-  }
-  function copyWorkout(wo) {
-    setWbName("Copy of " + wo.name);
-    setWbIcon(wo.icon);
-    setWbDesc(wo.desc || "");
-    setWbExercises(wo.exercises.map(e => ({
-      ...e
-    })));
-    setWbEditId(null); // new id on save
-    setWbCopySource(wo.name);
-    setWbLabels(wo.labels || []);
-    setNewLabelInput("");
-    setWorkoutView("builder");
-  }
-  function deleteWorkout(id) {
-    const wo = (profile.workouts || []).find(w => w.id === id);
-    setConfirmDelete({
-      type: "workout",
-      id,
-      name: wo ? wo.name : "this workout",
-      icon: wo ? wo.icon : "💪"
-    });
-  }
-  function _doDeleteWorkout(id) {
-    const wo = (profile.workouts || []).find(w => w.id === id);
-    if (!wo) return;
-    const bin = [...(profile.deletedItems || []), {
-      id: uid(),
-      type: "workout",
-      item: wo,
-      deletedAt: new Date().toISOString()
-    }];
-    setProfile(p => ({
-      ...p,
-      workouts: (p.workouts || []).filter(w => w.id !== id),
-      deletedItems: bin
-    }));
-    setWorkoutView("list");
-    setActiveWorkout(null);
-    showToast("Workout moved to Deleted — recoverable for 7 days.");
-  }
-  function addExToWorkout(exId) {
-    const exd = allExById[exId] || {};
-    setWbExercises(ex => [...ex, {
-      exId,
-      sets: exd.defaultSets != null ? exd.defaultSets : 3,
-      reps: exd.defaultReps != null ? exd.defaultReps : 10,
-      weightLbs: exd.defaultWeightLbs || null,
-      durationMin: exd.defaultDurationMin || null,
-      weightPct: exd.defaultWeightPct || 100,
-      distanceMi: exd.defaultDistanceMi || null,
-      hrZone: exd.defaultHrZone || null
-    }]);
-    setWbExPickerOpen(false);
-  }
-  function closePicker() {
-    setWbExPickerOpen(false);
-    setPickerSearch("");
-    setPickerMuscle(new Set());
-    setPickerTypeFilter(new Set());
-    setPickerEquipFilter(new Set());
-    setPickerOpenDrop(null);
-    setPickerSelected([]);
-  }
-  function pickerToggleEx(exId) {
-    const exd = allExById[exId] || {};
-    setPickerSelected(prev => {
-      const exists = prev.find(e => e.exId === exId);
-      if (exists) return prev.filter(e => e.exId !== exId);
-      return [...prev, {
-        exId,
-        sets: "3",
-        reps: "10",
-        weightLbs: "",
-        weightPct: 100,
-        durationMin: "",
-        distanceMi: "",
-        hrZone: null
-      }];
-    });
-  }
-  function commitPickerToWorkout() {
-    if (pickerSelected.length === 0) return;
-    setWbExercises(ex => [...ex, ...pickerSelected.map(e => ({
-      ...e,
-      sets: e.sets || "",
-      reps: e.reps || "",
-      weightLbs: e.weightLbs || null,
-      durationMin: e.durationMin || null,
-      distanceMi: e.distanceMi || null
-    }))]);
-    closePicker();
-  }
-
-  /* ── Reorder a superset pair as a single unit ── */
-  function reorderSupersetPair(anchorIdx, partnerIdx, direction) {
-    setWbExercises(exs => {
-      const arr = [...exs];
-      const minI = Math.min(anchorIdx, partnerIdx);
-      const maxI = Math.max(anchorIdx, partnerIdx);
-      // We need to move both exercises. For simplicity, ensure they're adjacent first.
-      // If not adjacent, move partner next to anchor first.
-      if (maxI - minI !== 1) {
-        // Make them adjacent: move maxI to minI+1
-        const [moved] = arr.splice(maxI, 1);
-        arr.splice(minI + 1, 0, moved);
-        // Remap supersetWith
-        const idxMap = {};
-        const temp = exs.map((_, i) => i);
-        const [movedI] = temp.splice(maxI, 1);
-        temp.splice(minI + 1, 0, movedI);
-        temp.forEach((oldI, newI) => {
-          idxMap[oldI] = newI;
-        });
-        arr.forEach((e, ei) => {
-          if (e.supersetWith != null && idxMap[e.supersetWith] != null) arr[ei] = {
-            ...e,
-            supersetWith: idxMap[e.supersetWith]
-          };
-        });
-        return arr;
-      }
-      // Now move the pair up or down
-      if (direction === "up" && minI > 0) {
-        // Swap the pair with the element above
-        const above = arr[minI - 1];
-        arr[minI - 1] = arr[minI];
-        arr[minI] = arr[minI + 1];
-        arr[minI + 1] = above;
-        // Remap
-        arr.forEach((e, ei) => {
-          if (e.supersetWith === minI - 1) arr[ei] = {
-            ...e,
-            supersetWith: minI + 1
-          };else if (e.supersetWith === minI) arr[ei] = {
-            ...e,
-            supersetWith: minI - 1
-          };else if (e.supersetWith === minI + 1) arr[ei] = {
-            ...e,
-            supersetWith: minI
-          };
-        });
-      } else if (direction === "down" && maxI < arr.length - 1) {
-        const below = arr[maxI + 1];
-        arr[maxI + 1] = arr[maxI];
-        arr[maxI] = arr[minI];
-        arr[minI] = below;
-        arr.forEach((e, ei) => {
-          if (e.supersetWith === minI) arr[ei] = {
-            ...e,
-            supersetWith: minI + 1
-          };else if (e.supersetWith === minI + 1) arr[ei] = {
-            ...e,
-            supersetWith: minI + 2
-          };else if (e.supersetWith === maxI + 1) arr[ei] = {
-            ...e,
-            supersetWith: minI
-          };
-        });
-      }
-      return arr;
-    });
-  }
-  function removeWbEx(idx) {
-    setWbExercises(exs => {
-      const updated = exs.map((e, i) => {
-        if (i === idx) return null;
-        if (e.supersetWith === idx) return {
-          ...e,
-          supersetWith: null
-        };
-        if (e.supersetWith != null && e.supersetWith > idx) {
-          return {
-            ...e,
-            supersetWith: e.supersetWith - 1
-          };
-        }
-        return e;
-      }).filter(Boolean);
-      return updated;
-    });
-  }
-  function reorderWbEx(fromIdx, toIdx) {
-    if (fromIdx === toIdx) return;
-    setWbExercises(exs => {
-      const arr = [...exs];
-      const [moved] = arr.splice(fromIdx, 1);
-      arr.splice(toIdx, 0, moved);
-      const indexMap = {};
-      const temp = exs.map((_, i) => i);
-      const [movedIdx] = temp.splice(fromIdx, 1);
-      temp.splice(toIdx, 0, movedIdx);
-      temp.forEach((oldIdx, newIdx) => {
-        indexMap[oldIdx] = newIdx;
-      });
-      return arr.map(e => {
-        if (e.supersetWith != null && indexMap[e.supersetWith] != null) {
-          return {
-            ...e,
-            supersetWith: indexMap[e.supersetWith]
-          };
-        }
-        return e;
-      });
-    });
-  }
+  // Workout builder + picker functions moved to WorkoutsTabContainer.
   // Add a workout's exercises as a new day in a plan
   function addWorkoutToPlan(workout, planId) {
     const plan = profile.plans.find(p => p.id === planId);
@@ -4043,7 +3689,11 @@ function App() {
       onConfirm(wo);
       return;
     }
-    const _bsPrefs = profile.notificationPrefs || {};
+    // Read the live prefs via the ref, not the closed-over `profile`: this
+    // function is captured by the [] -memoized openCompletionFlow, so a stale
+    // closure would otherwise see the initial EMPTY_PROFILE prefs and ignore a
+    // user who later disabled the stats prompt.
+    const _bsPrefs = notifPrefsRef.current || {};
     if (_bsPrefs.reviewBattleStats === false) {
       onConfirm(wo);
       return;
@@ -4078,10 +3728,25 @@ function App() {
   // Workout completion handler is extracted into useWorkoutCompletion (finding
   // #3 in docs/performance-audit.md) — modal close happens before the heavy
   // setProfile re-render and the rest is wrapped in startTransition.
+  // The one completion entry point the Workouts container needs: stats
+  // prompt first (skippable via prefs), then the completion sheet primed
+  // for "today". Collapses what used to be four separate props.
+  const openCompletionFlow = useCallback(wo => {
+    openStatsPromptIfNeeded(wo, (woWithStats, _sr) => {
+      setCompletionModal({
+        workout: woWithStats,
+        fromStats: _sr
+      });
+      setCompletionDate(todayStr());
+      setCompletionAction("today");
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { confirmWorkoutComplete } = useWorkoutCompletion({
     profile, setProfile,
     allExById, applyAutoCheckIn, getMult,
-    showToast, setXpFlash, setWorkoutSubTab,
+    showToast, setXpFlash,
+    showWorkoutsSubTab: t => workoutsRef.current?.showSubTab(t),
     completionModal, setCompletionModal,
     completionDate, setCompletionDate,
     completionAction, setCompletionAction,
@@ -4285,7 +3950,7 @@ function App() {
         showToast(p.icon + " " + p.name + " scheduled for " + formatScheduledDate(spDate) + " \u2726");
       }
       setActiveTab("workouts");
-      setWorkoutSubTab("oneoff");
+      workoutsRef.current?.showSubTab("oneoff");
     }
     setSchedulePicker(null);
   }
@@ -4318,18 +3983,6 @@ function App() {
       });
     } catch (e) {
       return dateStr;
-    }
-  }
-  function daysUntil(dateStr) {
-    if (!dateStr) return null;
-    try {
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const then = new Date(dateStr + "T00:00:00");
-      const diff = Math.round((then - now) / 86400000);
-      return diff;
-    } catch (e) {
-      return null;
     }
   }
 
@@ -5332,22 +4985,26 @@ function App() {
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises", "mdi:dumbbell"], ["workouts", "Workouts", "mdi:weight-lifter"], ["calendar", "Calendar", "mdi:calendar-blank"], ["social", "Guild", "game-icons:tribal-pendant"]].map(([t, l, iconName]) => {
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"}><div className={"tabs"}>{[["workout", "Exercises"], ["workouts", "Workouts"], ["calendar", "Calendar"], ["social", "Guild"]].map(([t, l]) => {
             const isOn = activeTab === t;
-            const tabColor = isOn ? "#d4cec4" : "#8a8478";
-            const iconPath = iconName.replace(":", "/");
-            const iconSrc = `https://api.iconify.design/${iconPath}.svg?color=${encodeURIComponent(tabColor)}`;
             return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
               setActiveTab(t);
-              if (t === "workouts") setWorkoutView("list");
+              if (t === "workouts") workoutsRef.current?.showList();
               if (t === "social" && authUser) {
                 loadSocialData();
                 loadIncomingShares();
               }
-            })}><span className={"tab-icon"}><img src={iconSrc} alt={""} width={22} height={22} style={{
-                  display: "block"
-                }} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}<button key="world" className={`tab ${activeTab === "world" ? "on" : ""}`} title="Enter Aurisar World" onClick={() => guardAll(() => { setPrevTab(activeTab); setActiveTab("world"); })} style={{position:"relative"}}><span className={"tab-icon"}><img src={`https://api.iconify.design/mdi/earth.svg?color=${encodeURIComponent(activeTab === "world" ? "#d4cec4" : "#8a8478")}`} alt={""} width={22} height={22} style={{display:"block"}} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExById={allExById} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <div style={{position:"fixed",inset:0,zIndex:820,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setPendingLiveWorkout(null)}><div style={{width:"100%",maxWidth:520,background:"linear-gradient(160deg,rgba(22,22,16,.82),rgba(12,12,10,.78))",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",border:"1px solid rgba(180,172,158,.1)",borderRadius:"16px 16px 0 0",padding:"20px 16px calc(28px + env(safe-area-inset-bottom,0px))"}} onClick={e => e.stopPropagation()}><div style={{fontFamily:"'Cinzel',serif",fontSize:".88rem",color:"#d4cec4",marginBottom:8}}>{"Replace Active Workout?"}</div><div style={{fontSize:".75rem",color:"#8a8478",marginBottom:20,lineHeight:1.5}}>{`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}</div><div style={{display:"flex",gap:10}}><button className={"btn btn-ghost btn-sm"} style={{flex:1}} onClick={() => setPendingLiveWorkout(null)}>{"Keep Current"}</button><button className={"btn btn-gold"} style={{flex:2}} onClick={confirmReplaceLiveWorkout}>{`Discard & Track ${pendingLiveWorkout.icon}`}</button></div></div></div>}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
+            })}><span className={"tab-icon"}><TabIcon name={t} size={22} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
+          })}<button key="world" className={`tab ${activeTab === "world" ? "on" : ""}`} title="Enter Aurisar World" onClick={() => guardAll(() => { setPrevTab(activeTab); setActiveTab("world"); })} style={{position:"relative"}}><span className={"tab-icon"}><TabIcon name="world" size={22} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
+        open
+        icon={"⚡"}
+        title={"Replace Active Workout?"}
+        body={`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}
+        confirmLabel={`Discard & Track ${pendingLiveWorkout.icon}`}
+        cancelLabel={"Keep Current"}
+        onConfirm={confirmReplaceLiveWorkout}
+        onCancel={() => setPendingLiveWorkout(null)}
+      />}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -5363,7 +5020,7 @@ function App() {
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
             gymKit={profile.gymKit}
-            setGymKit={v => setProfile(p => ({ ...p, gymKit: v }))}
+            setGymKit={setGymKit}
             libKitCount={libKitCount}
             kitTotalAll={allExercises.length}
             _exReady={_exReady}
@@ -5376,8 +5033,6 @@ function App() {
             libDiscoverRows={libDiscoverRows}
             libMuscleOpts={libMuscleOpts}
             libEquipOpts={libEquipOpts}
-            libSearch={libSearch}
-            setLibSearch={setLibSearch}
             setLibSearchDebounced={setLibSearchDebounced}
             libTypeFilters={libTypeFilters}
             setLibTypeFilters={setLibTypeFilters}
@@ -5385,8 +5040,6 @@ function App() {
             setLibMuscleFilters={setLibMuscleFilters}
             libEquipFilters={libEquipFilters}
             setLibEquipFilters={setLibEquipFilters}
-            libOpenDrop={libOpenDrop}
-            setLibOpenDrop={setLibOpenDrop}
             debouncedSetLibSearch={debouncedSetLibSearch}
             setLibDetailEx={setLibDetailEx}
             libSelectMode={libSelectMode}
@@ -5394,10 +5047,6 @@ function App() {
             isInCart={isInCart}
             toggleCart={toggleCart}
             setLibSelectMode={setLibSelectMode}
-            libBrowseMode={libBrowseMode}
-            setLibBrowseMode={setLibBrowseMode}
-            libVisibleCount={libVisibleCount}
-            setLibVisibleCount={setLibVisibleCount}
             profile={profile}
             setProfile={setProfile}
             allExercises={allExercises}
@@ -5418,96 +5067,32 @@ function App() {
             />
           )}</>
 
-        /* ── WORKOUTS TAB ────────────────────── */}{activeTab === "workouts" && (
-          <WorkoutsTab
-            workoutView={workoutView}
-            setWorkoutView={setWorkoutView}
-            workoutSubTab={workoutSubTab}
-            setWorkoutSubTab={setWorkoutSubTab}
-            woLabelFilters={woLabelFilters}
-            setWoLabelFilters={setWoLabelFilters}
-            woLabelDropOpen={woLabelDropOpen}
-            setWoLabelDropOpen={setWoLabelDropOpen}
-            newLabelInput={newLabelInput}
-            setNewLabelInput={setNewLabelInput}
-            activeWorkout={activeWorkout}
-            setActiveWorkout={setActiveWorkout}
-            liveWorkout={liveWorkout}
-            startLiveWorkout={startLiveWorkout}
-            collapsedWo={collapsedWo}
-            setCollapsedWo={setCollapsedWo}
+        /* ── WORKOUTS TAB ────────────────────── */}{<div style={activeTab !== "workouts" ? { display: "none" } : undefined}>
+          {/* Keep-alive like PlansTabContainer: the container holds the
+              builder draft, so unmounting on tab switch would lose it. The
+              ref must also stay live for cross-tab entry points (StagingTray
+              forge, stats-prompt Back, completion sub-tab jumps). */}
+          <WorkoutsTabContainer
+            ref={workoutsRef}
             profile={profile}
             setProfile={setProfile}
-            recipeFilter={recipeFilter}
-            setRecipeFilter={setRecipeFilter}
-            recipeCatDrop={recipeCatDrop}
-            setRecipeCatDrop={setRecipeCatDrop}
-            expandedRecipeDesc={expandedRecipeDesc}
-            setExpandedRecipeDesc={setExpandedRecipeDesc}
-            expandedRecipeEx={expandedRecipeEx}
-            setExpandedRecipeEx={setExpandedRecipeEx}
-            wbName={wbName}
-            setWbName={setWbName}
-            wbIcon={wbIcon}
-            setWbIcon={setWbIcon}
-            wbDesc={wbDesc}
-            setWbDesc={setWbDesc}
-            wbExercises={wbExercises}
-            setWbExercises={setWbExercises}
-            wbEditId={wbEditId}
-            setWbEditId={setWbEditId}
-            wbIsOneOff={wbIsOneOff}
-            setWbIsOneOff={setWbIsOneOff}
-            wbLabels={wbLabels}
-            setWbLabels={setWbLabels}
-            wbDuration={wbDuration}
-            setWbDuration={setWbDuration}
-            wbDurSec={wbDurSec}
-            setWbDurSec={setWbDurSec}
-            wbActiveCal={wbActiveCal}
-            setWbActiveCal={setWbActiveCal}
-            wbTotalCal={wbTotalCal}
-            setWbTotalCal={setWbTotalCal}
-            wbCopySource={wbCopySource}
-            setWbCopySource={setWbCopySource}
-            wbIconPickerOpen={wbIconPickerOpen}
-            setWbIconPickerOpen={setWbIconPickerOpen}
-            wbExPickerOpen={wbExPickerOpen}
-            setWbExPickerOpen={setWbExPickerOpen}
-            wbTotalXP={wbTotalXP}
-            collapsedWbEx={collapsedWbEx}
-            setCollapsedWbEx={setCollapsedWbEx}
-            ssChecked={ssChecked}
-            setSsChecked={setSsChecked}
-            ssAccordion={ssAccordion}
-            setSsAccordion={setSsAccordion}
-            dragWbExIdx={dragWbExIdx}
-            setDragWbExIdx={setDragWbExIdx}
-            initWorkoutBuilder={initWorkoutBuilder}
-            copyWorkout={copyWorkout}
-            openStatsPromptIfNeeded={openStatsPromptIfNeeded}
-            setCompletionModal={setCompletionModal}
-            setCompletionDate={setCompletionDate}
-            setCompletionAction={setCompletionAction}
-            setConfirmDelete={setConfirmDelete}
-            setSelEx={setSelEx}
-            setPendingSoloRemoveId={setPendingSoloRemoveId}
-            quickLogSoloEx={quickLogSoloEx}
-            openScheduleEx={openScheduleEx}
-            setAddToWorkoutPicker={setAddToWorkoutPicker}
-            openExEditor={openExEditor}
-            setAddToPlanPicker={setAddToPlanPicker}
-            deleteWorkout={deleteWorkout}
-            reorderSupersetPair={reorderSupersetPair}
-            reorderWbEx={reorderWbEx}
-            saveBuiltWorkout={saveBuiltWorkout}
-            saveAsNewWorkout={saveAsNewWorkout}
-            daysUntil={daysUntil}
-            showToast={showToast}
+            allExercises={allExercises}
             allExById={allExById}
             clsColor={cls.color}
+            liveWorkout={liveWorkout}
+            startLiveWorkout={startLiveWorkout}
+            showToast={showToast}
+            setConfirmDelete={setConfirmDelete}
+            openCompletionFlow={openCompletionFlow}
+            quickLogSoloEx={quickLogSoloEx}
+            openQuickLog={openQuickLog}
+            setPendingSoloRemoveId={setPendingSoloRemoveId}
+            openScheduleEx={openScheduleEx}
+            openExEditor={openExEditor}
+            setAddToWorkoutPicker={setAddToWorkoutPicker}
+            setAddToPlanPicker={setAddToPlanPicker}
           />
-        )
+        </div>
 
         /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setLibDetailEx={setLibDetailEx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
 
@@ -5751,6 +5336,18 @@ function App() {
       }</div>
 
     /* ══ EXERCISE EDITOR MODAL ══════════════════ */}{exEditorOpen && exEditorDraft && (
+      <ErrorBoundary fallback={(error, reset) => (
+        <ConfirmSheet
+          open
+          icon={"⚠️"}
+          title={"Exercise editor hit an error"}
+          body={String(error?.message || error)}
+          confirmLabel={"Close"}
+          cancelLabel={"Try again"}
+          onConfirm={() => { reset(); setExEditorOpen(false); }}
+          onCancel={reset}
+        />
+      )}>
       <ExerciseEditorModal
         exEditorDraft={exEditorDraft}
         setExEditorDraft={setExEditorDraft}
@@ -5764,6 +5361,7 @@ function App() {
         deleteCustomEx={deleteCustomEx}
         newExDraft={newExDraft}
       />
+      </ErrorBoundary>
     )
 
     /* ══ STAGING TRAY ═══════════════════════════ */}{(
@@ -5780,13 +5378,7 @@ function App() {
         moveInCart={moveInCart}
         onForgeWorkout={() => {
           if (!stagedIds.length) return;
-          setWbExercises(stagedIds.map(id => cartEntry(id, allExById)));
-          setWbName("");
-          setWbIcon("💪");
-          setWbDesc("");
-          setWbEditId(null);
-          setWbIsOneOff(false);
-          setWorkoutView("builder");
+          workoutsRef.current?.openBuilderWithExercises(stagedIds.map(id => cartEntry(id, allExById)));
           setActiveTab("workouts");
           clearCart();
           setLibSelectMode(false);
@@ -5820,19 +5412,9 @@ function App() {
         siblings={activeTab === "workout" && exSubTab === "library" ? libFiltered : null}
         profile={profile}
         setProfile={setProfile}
-        setActiveTab={setActiveTab}
         setAddToWorkoutPicker={setAddToWorkoutPicker}
         openSavePlanWizard={openSavePlanWizard}
-        setSelEx={setSelEx}
-        setSets={setSets}
-        setReps={setReps}
-        setExWeight={setExWeight}
-        setWeightPct={setWeightPct}
-        setHrZone={setHrZone}
-        setDistanceVal={setDistanceVal}
-        setExHHMM={setExHHMM}
-        setExSec={setExSec}
-        setQuickRows={setQuickRows}
+        openQuickLog={openQuickLog}
         allExById={allExById}
         isInCart={isInCart}
         toggleCart={toggleCart}
@@ -6029,38 +5611,11 @@ function App() {
               flex: 1
             }} onClick={() => setSaveWorkoutWizard(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>, document.body)
+            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>, document.body)}
 
-    /* ══ WORKOUT EXERCISE PICKER ═════════════════ */}{wbExPickerOpen && (
-      <WorkoutExercisePicker
-        pickerSearch={pickerSearch}
-        setPickerSearch={setPickerSearch}
-        pickerMuscle={pickerMuscle}
-        setPickerMuscle={setPickerMuscle}
-        pickerTypeFilter={pickerTypeFilter}
-        setPickerTypeFilter={setPickerTypeFilter}
-        pickerEquipFilter={pickerEquipFilter}
-        setPickerEquipFilter={setPickerEquipFilter}
-        pickerOpenDrop={pickerOpenDrop}
-        setPickerOpenDrop={setPickerOpenDrop}
-        pickerSelected={pickerSelected}
-        allExercises={allExercises}
-        allExById={allExById}
-        closePicker={closePicker}
-        openExEditor={openExEditor}
-        pickerToggleEx={pickerToggleEx}
-        commitPickerToWorkout={commitPickerToWorkout}
-      />
-    )}
-    {/* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && createPortal(<div className={"atp-backdrop"} onClick={() => setAddToPlanPicker(null)}><div className={"atp-sheet"} onClick={e => e.stopPropagation()}><div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}><div style={{
-            fontFamily: "'Inter',sans-serif",
-            fontSize: FS.fs84,
-            color: "#d4cec4"
-          }}>{"📋 Add to Plan"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setAddToPlanPicker(null)}>{"✕"}</button></div><div style={{
+    {/* Workout exercise picker renders inside WorkoutsTabContainer now. */}
+
+    {/* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && <Sheet open onClose={() => setAddToPlanPicker(null)} layer={"modal"} title={"📋 Add to Plan"} ariaLabel={"Add workout to plan"}><div style={{ display: "flex", flexDirection: "column", gap: S.s12 }}><div style={{
           display: "flex",
           alignItems: "center",
           gap: S.s8,
@@ -6079,7 +5634,7 @@ function App() {
               color: "#8a8478"
             }}>{addToPlanPicker.workout.exercises.length}{" exercises will be added as a new day"}</div></div></div>{profile.plans.length === 0 ? <div className={"empty"} style={{
           padding: "14px 0"
-        }}>{"No plans yet. Create a plan first in the Plans tab."}</div> : profile.plans.map(pl => <div key={pl.id} className={"atp-plan-row"} onClick={() => addWorkoutToPlan(addToPlanPicker.workout, pl.id)}><span style={{
+        }}>{"No plans yet. Create a plan first in the Plans tab."}</div> : profile.plans.map(pl => <button type={"button"} key={pl.id} className={"atp-plan-row"} onClick={() => addWorkoutToPlan(addToPlanPicker.workout, pl.id)}><span style={{
             fontSize: "1.3rem"
           }}>{pl.icon}</span><div style={{
             flex: 1,
@@ -6094,9 +5649,10 @@ function App() {
             }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" · currently "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><span style={{
             fontSize: FS.md,
             color: "#b4ac9e"
-          }}>{"→"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
-          width: "100%"
-        }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></div>, document.body)
+          }}>{"→"}</span></button>)}<button className={"btn btn-ghost btn-sm"} style={{
+          width: "100%",
+          minHeight: 44
+        }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></Sheet>
 
     /* ══ RETRO CHECK-IN MODAL ════════════════════ */}{retroCheckInModal && createPortal(<div className={"cdel-backdrop"} onClick={() => setRetroCheckInModal(false)}><div className={"cdel-sheet"} style={{
         borderColor: "rgba(180,172,158,.08)",
@@ -6159,9 +5715,23 @@ function App() {
     /* ══ WORKOUT COMPLETION MODAL ════════════════ */
     /* ══ ONE-OFF NAMING MODAL ════════════════════ */
     /* ══ SINGLE EXERCISE QUICK-LOG MODAL ════════ */}{selEx && (
+      <ErrorBoundary fallback={(error, reset) => (
+        <ConfirmSheet
+          open
+          icon={"⚠️"}
+          title={"Quick Log hit an error"}
+          body={String(error?.message || error)}
+          confirmLabel={"Close"}
+          cancelLabel={"Try again"}
+          onConfirm={() => { reset(); setSelEx(null); }}
+          onCancel={reset}
+        />
+      )}>
       <QuickLogModal
         selEx={selEx}
         setSelEx={setSelEx}
+        quickLogOrigin={quickLogOrigin}
+        setQuickLogOrigin={setQuickLogOrigin}
         allExById={allExById}
         profile={profile}
         sets={sets} setSets={setSets}
@@ -6182,16 +5752,29 @@ function App() {
         setAddToWorkoutPicker={setAddToWorkoutPicker}
         openSavePlanWizard={openSavePlanWizard}
       />
+      </ErrorBoundary>
     )}
 
-    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)} style={{ alignItems: "center" }}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
-        borderRadius: R.r16,
-        padding: S.s0,
-        "--mg-color": cls.color,
-        background: "linear-gradient(160deg,#12120e,#0c0c0a)",
-        backdropFilter: "none",
-        WebkitBackdropFilter: "none",
-      }}><div className={"modal-body"}><div className={"stats-prompt-banner"} onClick={() => {
+    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && <Sheet
+      open
+      onClose={() => setStatsPromptModal(null)}
+      layer={"modal"}
+      placement={"center"}
+      style={{ "--mg-color": cls.color }}
+      ariaLabel={"Review battle stats"}
+      title={<span className={"stats-modal-title"}>{"📊 Review Battle Stats "}<span style={{ color: "#8a8478", fontWeight: "normal", fontSize: FS.lg }}>{"(Optional)"}</span></span>}
+      headerLeft={<button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={() => {
+        setStatsPromptModal(null);
+        if (statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId) {
+          // Return to the form the user was mid-way through —
+          // preserve their typed values rather than resetting.
+          openQuickLog(statsPromptModal.wo._soloExId, { preserve: true });
+        } else if (!statsPromptModal.wo.soloEx) {
+          workoutsRef.current?.showBuilder();
+          setActiveTab("workouts");
+        }
+      }}>{"← Back"}</button>}
+    ><div><div className={"stats-prompt-banner"} onClick={() => {
             setProfile(p => ({
               ...p,
               notificationPrefs: {
@@ -6213,33 +5796,7 @@ function App() {
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0
-            }} /><div className={"stats-prompt-banner-text"}>{"Want this reminder off? Check here. To re-enable, you can do so in "}<strong>{"Alerts settings"}</strong>{"."}</div></div><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: S.s10
-          }}><div><div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8
-              }}><button className={"btn btn-ghost btn-sm"} style={{
-                  padding: "4px 8px",
-                  fontSize: FS.fs75
-                }} onClick={() => {
-                  setStatsPromptModal(null);
-                  if (statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId) {
-                    setSelEx(statsPromptModal.wo._soloExId);
-                  } else if (!statsPromptModal.wo.soloEx) {
-                    setWorkoutView("builder");
-                    setActiveTab("workouts");
-                  }
-                }}>{"← Back"}</button><div className={"stats-modal-title"} style={{
-                  flex: 1
-                }}>{"📊 "}{"Review Battle Stats "}<span style={{
-                    color: "#8a8478",
-                    fontWeight: "normal",
-                    fontSize: FS.lg
-                  }}>{"(Optional)"}</span></div></div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setStatsPromptModal(null)}>{"✕"}</button></div><div className={"stats-modal-subtitle"} style={{
+            }} /><div className={"stats-prompt-banner-text"}>{"Want this reminder off? Check here. To re-enable, you can do so in "}<strong>{"Alerts settings"}</strong>{"."}</div></div><div className={"stats-modal-subtitle"} style={{
             marginBottom: S.s14
           }}>{statsPromptModal.wo.oneOff ? "Review your workout stats before completing. Fill in any missing values, or leave blank to skip." : (() => {
               const missing = [statsPromptModal.missingDur && "Duration", statsPromptModal.missingAct && "Active Cal", statsPromptModal.missingTot && "Total Cal"].filter(Boolean);
@@ -6303,7 +5860,7 @@ function App() {
               setStatsPromptModal(null);
               setSpMakeReusable(false);
               setSpDurSec("");
-            }}>{"✓ Save & Complete"}</button></div></div></div></div>, document.body)
+            }}>{"✓ Save & Complete"}</button></div></div></Sheet>
 
     /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */}{calExDetailModal && createPortal(<div className={"modal-backdrop"} onClick={() => setCalExDetailModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
@@ -6440,22 +5997,7 @@ function App() {
       />
     )
 
-    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && createPortal(<div className={"modal-backdrop"} onClick={() => setAddToWorkoutPicker(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
-        borderRadius: R.r16,
-        padding: S.s0,
-        maxHeight: "80vh",
-        overflowY: "auto"
-      }}><div className={"modal-body"}><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: S.s14
-          }}><div style={{
-              fontFamily: "'Inter',sans-serif",
-              fontSize: FS.fs92,
-              color: "#d4cec4",
-              fontWeight: 700
-            }}>{"➕ Add to Existing Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setAddToWorkoutPicker(null)}>{"✕"}</button></div><div style={{
+    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && <Sheet open onClose={() => setAddToWorkoutPicker(null)} layer={"modal"} title={"➕ Add to Existing Workout"} ariaLabel={"Add to existing workout"}><div><div style={{
             fontSize: FS.fs65,
             color: "#8a8478",
             marginBottom: S.s12
@@ -6468,10 +6010,14 @@ function App() {
               textTransform: "uppercase",
               letterSpacing: ".08em",
               marginBottom: S.s6
-            }}>{"💪 Re-Usable Workouts"}</div>{(profile.workouts || []).filter(w => !w.oneOff).map(wo => <div key={wo.id} style={{
+            }}>{"💪 Re-Usable Workouts"}</div>{(profile.workouts || []).filter(w => !w.oneOff).map(wo => <button type={"button"} key={wo.id} style={{
               display: "flex",
               alignItems: "center",
               gap: S.s10,
+              width: "100%",
+              minHeight: 44,
+              textAlign: "left",
+              fontFamily: "inherit",
               padding: "8px 12px",
               borderRadius: R.xl,
               border: "1px solid rgba(45,42,36,.2)",
@@ -6504,7 +6050,7 @@ function App() {
                 }}>{wo.exercises.length}{" exercises"}</div></div><span style={{
                 fontSize: FS.fs65,
                 color: "#b4ac9e"
-              }}>{"+ add →"}</span></div>)}</>
+              }}>{"+ add →"}</span></button>)}</>
           /* Scheduled One-Off Workouts */}{(() => {
             const today = todayStr();
             const grouped = {};
@@ -6535,10 +6081,14 @@ function App() {
                   exercises: [],
                   oneOff: true
                 };
-                return <div key={g.id} style={{
+                return <button type={"button"} key={g.id} style={{
                   display: "flex",
                   alignItems: "center",
                   gap: S.s10,
+                  width: "100%",
+                  minHeight: 44,
+                  textAlign: "left",
+                  fontFamily: "inherit",
                   padding: "8px 12px",
                   borderRadius: R.xl,
                   border: "1px solid rgba(230,126,34,.15)",
@@ -6575,9 +6125,9 @@ function App() {
                     }}>{"📅 "}{formatScheduledDate(g.date)}</div></div><span style={{
                     fontSize: FS.fs65,
                     color: "#e67e22"
-                  }}>{"+ add →"}</span></div>;
+                  }}>{"+ add →"}</span></button>;
               })}</>;
-          })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></div></div>, document.body)}{oneOffModal && createPortal(<div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+          })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></Sheet>}{oneOffModal && createPortal(<div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -6670,7 +6220,7 @@ function App() {
         confirmDelete={confirmDelete}
         setConfirmDelete={setConfirmDelete}
         plansContainerRef={plansContainerRef}
-        _doDeleteWorkout={_doDeleteWorkout}
+        _doDeleteWorkout={id => workoutsRef.current?.doDeleteWorkout(id)}
         _doDeleteCustomEx={_doDeleteCustomEx}
         _doDeleteLogEntry={_doDeleteLogEntry}
         _doResetChar={_doResetChar}

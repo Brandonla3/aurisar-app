@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
-import { createPortal } from 'react-dom';
 import { S, R, FS } from '../../utils/tokens';
+import Sheet from '../../components/ui/Sheet';
+import { MUSCLE_OPTS, muscleLabel } from './exerciseFilterOptions';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, weightLabel, distLabel, pctToSlider, sliderToPct } from '../../utils/units';
 import { getMuscleColor, hrRange } from '../../utils/xp';
 import { HR_ZONES } from '../../data/constants';
@@ -34,19 +35,19 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
   newExDraft,
 }) {
   if (!exEditorDraft) return null;
-  try {
-    const ed = exEditorDraft;
-    const setEd = patch => setExEditorDraft(d => ({ ...d, ...patch }));
-    const isCardioED = ed.category === "cardio";
-    const isFlexED = ed.category === "flexibility";
-    const hasWeightED = !isCardioED && !isFlexED;
-    const metric = isMetric(profile.units);
-    const wUnit = weightLabel(profile.units);
-    const dUnit = distLabel(profile.units);
-    const age = profile.age || 30;
-    return createPortal(<div className={"ex-editor-backdrop"} onClick={() => setExEditorOpen(false)}><div className={"ex-editor-sheet"} onClick={e => e.stopPropagation()} style={{
+  const ed = exEditorDraft;
+  const setEd = patch => setExEditorDraft(d => ({ ...d, ...patch }));
+  const isCardioED = ed.category === "cardio";
+  const isFlexED = ed.category === "flexibility";
+  const hasWeightED = !isCardioED && !isFlexED;
+  const metric = isMetric(profile.units);
+  const wUnit = weightLabel(profile.units);
+  const dUnit = distLabel(profile.units);
+  const age = profile.age || 30;
+  const title = exEditorMode === "edit" ? "✎ Edit Technique" : exEditorMode === "copy" ? "⎘ Copy Technique" : "⚔ Forge Technique";
+  return <Sheet open onClose={() => setExEditorOpen(false)} layer={"editor"} title={title} titleFont={"cinzel"} ariaLabel={title} className={"ex-editor-sheet"} style={{
         "--mg-color": getMuscleColor(ed.muscleGroup || "chest")
-      }}><div className={"ex-editor-hdr"}><div><div className={"ex-editor-title"}>{exEditorMode === "edit" ? "✎ Edit Technique" : exEditorMode === "copy" ? "⎘ Copy Technique" : "⚔ Forge Technique"}</div><div className={"ex-editor-subtitle"}>{exEditorMode === "edit" ? "Sharpen your custom technique" : "Forge a new technique for your grimoire"}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setExEditorOpen(false)}>{"✕"}</button></div><div className={"ex-editor-body"}>{exEditorMode !== "edit" && <div className={"field"}><label>{"Start from existing exercise (optional)"}</label><select className={"inp"} style={{
+      }}><div className={"ex-editor-body"}><div className={"ex-editor-subtitle"}>{exEditorMode === "edit" ? "Sharpen your custom technique" : "Forge a new technique for your grimoire"}</div>{exEditorMode !== "edit" && <div className={"field"}><label>{"Start from existing exercise (optional)"}</label><select className={"inp"} style={{
                 appearance: "auto",
                 cursor: "pointer"
               }} onChange={e => {
@@ -73,16 +74,16 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
 
             {
               /* Icon grid */
-            }<div style={{
+            }<div role={"group"} aria-label={"Choose an icon"} style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: S.s6,
+              gap: S.s4,
               marginBottom: S.s4
-            }}>{EX_ICON_LIST.map(ic => <div key={ic} onClick={() => setEd({
+            }}>{EX_ICON_LIST.map(ic => <button type={"button"} key={ic} aria-label={`Icon ${ic}`} aria-pressed={ed.icon === ic} onClick={() => setEd({
                 icon: ic
               })} style={{
-                width: 34,
-                height: 34,
+                width: 44,
+                height: 44,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -91,8 +92,9 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 borderRadius: R.r7,
                 border: `1px solid ${ed.icon === ic ? "rgba(180,172,158,.2)" : "rgba(45,42,36,.22)"}`,
                 background: ed.icon === ic ? "rgba(45,42,36,.25)" : "rgba(45,42,36,.12)",
-                transition: "all .15s"
-              }}>{ic}</div>)}</div>
+                transition: "all .15s",
+                padding: 0
+              }}>{ic}</button>)}</div>
 
             {
               /* Category */
@@ -114,13 +116,12 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 display: "flex",
                 gap: S.s4,
                 flexWrap: "wrap"
-              }}>{["chest", "back", "shoulder", "bicep", "tricep", "forearm", "legs", "glutes", "calves", "abs"].map(mg => <button key={mg} className={`btn btn-sm ${ed.muscleGroup === mg ? "btn-gold" : "btn-ghost"}`} style={{
-                  textTransform: "capitalize",
+              }}>{MUSCLE_OPTS.map(mg => <button key={mg} className={`btn btn-sm ${ed.muscleGroup === mg ? "btn-gold" : "btn-ghost"}`} style={{
                   fontSize: FS.fs54,
                   padding: "4px 8px"
                 }} onClick={() => setEd({
                   muscleGroup: mg
-                })}>{mg}</button>)}</div></div>
+                })}>{muscleLabel(mg)}</button>)}</div></div>
 
             {
               /* Base XP */
@@ -186,7 +187,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
               /* HR Zone — cardio only */}{isCardioED && <div className={"field"}><label>{"Default Heart Rate Zone "}{profile.age ? `(Age ${profile.age})` : ""}</label><div className={"hr-zone-row"}>{HR_ZONES.map(z => {
                     const range = hrRange(age, z);
                     const sel = (ed.defaultHrZone || null) === z.z;
-                    return <div key={z.z} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{
+                    return <button type={"button"} key={z.z} aria-pressed={sel} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{
                       "--zc": z.color,
                       borderColor: sel ? z.color : "rgba(45,42,36,.2)",
                       background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
@@ -196,7 +197,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                         color: sel ? z.color : "#8a8478"
                       }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
                         color: sel ? z.color : "#8a8478"
-                      }}>{range.lo}{"–"}{range.hi}</span></div>;
+                      }}>{range.lo}{"–"}{range.hi}</span></button>;
                   })}</div>{!profile.age && <div style={{
                   fontSize: FS.sm,
                   color: "#8a8478",
@@ -255,11 +256,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
               marginTop: S.s8,
               padding: "10px",
               fontSize: FS.fs78
-            }} onClick={() => deleteCustomEx(ed.id)}>{"🗑 Delete Exercise"}</button>}</div></div></div>, document.body);
-  } catch (e) {
-    console.error("Exercise editor render error:", e);
-    return null;
-  }
+            }} onClick={() => deleteCustomEx(ed.id)}>{"🗑 Delete Exercise"}</button>}</div></Sheet>;
 });
 
 export default ExerciseEditorModal;
