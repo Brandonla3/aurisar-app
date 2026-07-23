@@ -11,8 +11,26 @@
 -- SET search_path = public, auth (see 06-extend-friend-rpc.sql) and adds
 -- mark_channel_read() so the client can mark a channel read without
 -- refetching its message window.
+--
+-- The same empty-search_path breakage also hit update_channel_timestamp(),
+-- the AFTER INSERT trigger on public.messages: it UPDATEs `channels`
+-- unqualified, so with search_path='' every send_message() insert raised
+-- "relation channels does not exist" — i.e. sending was broken even once
+-- the RPCs themselves were fixed. It is repinned here too.
 
 BEGIN;
+
+-- ── update_channel_timestamp (messages INSERT trigger) ──────────────────────
+CREATE OR REPLACE FUNCTION public.update_channel_timestamp()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, auth
+AS $$
+BEGIN
+  UPDATE channels SET updated_at = NOW() WHERE id = NEW.channel_id;
+  RETURN NEW;
+END;
+$$;
 
 -- ── get_or_create_dm_channel ────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_or_create_dm_channel(p_other_user_id uuid)
