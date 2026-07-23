@@ -5626,7 +5626,7 @@ function App() {
           closeConversation={closeConversation}
           loadConversations={loadConversations}
           loadChannelMessages={loadChannelMessages}
-          goToGuild={() => guardAll(() => setActiveTab("guild"))}
+          goToGuild={() => guardAll(() => setActiveTab("social"))}
           authUser={authUser}
         />
 

@@ -223,7 +223,7 @@ const MessagesTab = memo(function MessagesTab({
           fontSize: FS.fs52,
           color: "#8a8478"
         }}>{otherCls ? otherCls.name : "Unknown"}{" · Lv."}{other.level || 1}{other.public_id ? " · #" + other.public_id : ""}</div>}</div></div>
-    <div ref={scrollRef} onScroll={onScroll} aria-label={"Message history"} style={{
+    <div ref={scrollRef} onScroll={onScroll} role="log" aria-live="polite" aria-label={"Message history"} style={{
       flex: 1,
       minHeight: 0,
       overflowY: "auto",

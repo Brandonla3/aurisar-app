@@ -4,6 +4,7 @@ import {
   normalizeIncomingRow,
   buildOptimisticMessage,
   mergeIncomingMessage,
+  mergeSnapshot,
   resolveOptimistic,
   failOptimistic,
   removeMessage,
@@ -41,6 +42,8 @@ export default function useMessages({ authUser, showToast, onOpenChat }) {
   const showToastRef = useRef(null);
   const handleIncomingRef = useRef(null);
   const listLoadedRef = useRef(false);
+  // Monotonic token so an out-of-order channel fetch can't overwrite a newer one.
+  const loadSeqRef = useRef(0);
 
   async function loadConversations() {
     if (!authUserRef.current) return;
@@ -66,19 +69,28 @@ export default function useMessages({ authUser, showToast, onOpenChat }) {
   }
 
   async function loadChannelMessages(channelId) {
+    // Token this request so a slow fetch for a channel the user has since left
+    // (or that resolves after a newer load) can't paint stale history — and so
+    // its error/loading writes are also ignored once superseded.
+    const seq = ++loadSeqRef.current;
     setMsgLoading(true);
     try {
       const { data, error } = await sb.rpc('get_channel_messages', {
         p_channel_id: channelId,
         p_limit: 50,
       });
+      if (seq !== loadSeqRef.current) return; // superseded by a newer load
       if (error) throw error;
-      setMsgMessages(data || []);
+      // Merge, don't replace: preserve optimistic sends and realtime rows that
+      // arrived during the fetch instead of clobbering them with the snapshot.
+      setMsgMessages(prev => mergeSnapshot(prev, data || []));
       setMsgChatError(null);
     } catch (e) {
+      if (seq !== loadSeqRef.current) return;
       setMsgChatError(e.message || "Could not load messages");
+    } finally {
+      if (seq === loadSeqRef.current) setMsgLoading(false);
     }
-    setMsgLoading(false);
   }
 
   /** Open an existing conversation from the list. */
@@ -120,15 +132,18 @@ export default function useMessages({ authUser, showToast, onOpenChat }) {
       if (chan) {
         setMsgActiveChannel(chan);
         setMsgView("chat");
+        // loadChannelMessages owns msgLoading from here — don't clear it early
+        // or the spinner vanishes before the message window arrives.
         loadChannelMessages(channelId);
       } else {
         setMsgView("list");
+        setMsgLoading(false);
       }
       if (onOpenChat) onOpenChat();
     } catch (e) {
       showToastRef.current("Could not open chat: " + (e.message || e));
+      setMsgLoading(false);
     }
-    setMsgLoading(false);
   }
 
   async function deliverMessage(channelId, content, tmpId) {

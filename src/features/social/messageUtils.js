@@ -60,10 +60,34 @@ export function mergeIncomingMessage(list, incoming) {
     // text must belong to a different (successful) send. Matching failed rows
     // here would silently erase the "tap to retry" bubble and, once its own
     // RPC resolved, produce two rows with the same server id.
-    const idx = next.findIndex(m => m.pending && m.content === incoming.content);
-    if (idx !== -1) next = [...next.slice(0, idx), ...next.slice(idx + 1)];
+    //
+    // Only strip when *exactly one* pending row matches the content. With two
+    // identical pending sends we can't tell which echo this is, so we leave
+    // both — dedupe-by-id above plus resolveOptimistic's already-delivered
+    // guard collapse the duplicate once each RPC returns.
+    const matches = [];
+    for (let i = 0; i < next.length; i++) {
+      if (next[i].pending && next[i].content === incoming.content) matches.push(i);
+    }
+    if (matches.length === 1) {
+      const idx = matches[0];
+      next = [...next.slice(0, idx), ...next.slice(idx + 1)];
+    }
   }
   return sortByCreatedAt([...next, incoming]);
+}
+
+/**
+ * Merge a freshly fetched message window with rows already in state — optimistic
+ * sends or realtime messages that arrived while the fetch was in flight — so a
+ * channel load never drops a message received mid-fetch. Deduped by id (server
+ * rows win on collision), sorted by created_at.
+ */
+export function mergeSnapshot(current, snapshot) {
+  const byId = new Map();
+  for (const m of current) byId.set(m.id, m);
+  for (const m of snapshot) byId.set(m.id, m);
+  return sortByCreatedAt([...byId.values()]);
 }
 
 /** Mark an optimistic row confirmed once send_message returns the real id. */
