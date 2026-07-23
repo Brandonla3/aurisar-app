@@ -8,6 +8,8 @@ import { normalizeHHMM, combineHHMMSec, daysUntil } from '../../utils/time';
 import { S, R, FS } from '../../utils/tokens';
 import SetsEditor from '../../components/ui/SetsEditor';
 import FilterDropdown from '../exercises/FilterDropdown';
+import IconButton from '../../components/ui/IconButton';
+import Sheet from '../../components/ui/Sheet';
 import { buildWorkoutObject } from './workoutModel';
 import { UI_COLORS, MUSCLE_COLORS, WORKOUT_TEMPLATES, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 
@@ -156,30 +158,13 @@ const WbExCard = React.memo(function WbExCard({
   const runPace = isRunningEx && distMiVal > 0 && durationMin > 0 ? durationMin / distMiVal : null;
   const runBoostPct = runPace ? runPace <= 8 ? 20 : 5 : 0;
   const mgColor = getMuscleColor(exD.muscleGroup);
-  return <><div className={"wb-ex-hdr"} onClick={() => toggleCollapse()}><div style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: S.s2,
-        flexShrink: 0
-      }}><button type={"button"} aria-label={`Move ${exD.name} up`} title={"Move up"} className={"btn btn-ghost btn-xs"} style={{
-          padding: "2px 6px",
-          fontSize: FS.fs65,
-          lineHeight: 1,
-          minWidth: 0,
-          opacity: i === 0 ? .3 : 1
-        }} disabled={i === 0} onClick={e => {
+  return <><div className={"wb-ex-hdr"} onClick={() => toggleCollapse()}><div className={"wb-reorder"}><IconButton label={`Move ${exD.name} up`} size={20} disabled={i === 0} onClick={e => {
           e.stopPropagation();
           reorder(i - 1);
-        }}>{"▲"}</button><button type={"button"} aria-label={`Move ${exD.name} down`} title={"Move down"} className={"btn btn-ghost btn-xs"} style={{
-          padding: "2px 6px",
-          fontSize: FS.fs65,
-          lineHeight: 1,
-          minWidth: 0,
-          opacity: i === exCount - 1 ? .3 : 1
-        }} disabled={i === exCount - 1} onClick={e => {
+        }}>{"▲"}</IconButton><IconButton label={`Move ${exD.name} down`} size={20} disabled={i === exCount - 1} onClick={e => {
           e.stopPropagation();
           reorder(i + 1);
-        }}>{"▼"}</button></div>{ex.supersetWith == null && exCount >= 2 && <div style={{
+        }}>{"▼"}</IconButton></div>{ex.supersetWith == null && exCount >= 2 && <div style={{
         display: "flex",
         alignItems: "center",
         gap: S.s4,
@@ -529,7 +514,7 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
         return (wo && wo.labels || []).some(l => woLabelFilters.has(l));
       }).sort((a, b) => a.date.localeCompare(b.date));
       const hasSoloExs = (profile.scheduledWorkouts || []).some(sw => !sw.sourceWorkoutId && sw.exId && sw.scheduledDate >= today);
-      if (scheduled.length === 0 && !hasSoloExs && woLabelFilters.size === 0) return <div className={"empty"}>{"No upcoming one-off workouts."}<br />{"Select exercises and tap ⚡ One-Off Workout to schedule one."}</div>;
+      if (scheduled.length === 0 && !hasSoloExs && woLabelFilters.size === 0) return <div className={"empty"} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: S.s12 }}><div>{"No upcoming one-off workouts."}<br />{"Stage exercises from the Library, or build one now."}</div><button className={"btn btn-gold-solid btn-sm"} onClick={() => { initWorkoutBuilder(null); setWbIsOneOff(true); }}>{"＋ Build One-Off"}</button></div>;
       if (scheduled.length === 0 && !hasSoloExs && woLabelFilters.size > 0) return <div className={"empty"}>{"No one-off workouts match the selected labels."}</div>;
       if (scheduled.length === 0) return null;
       return scheduled.map(g => {
@@ -643,11 +628,21 @@ openCompletionFlow({ ...wo, oneOff: true });
                 }}>{"✎"}</button><button className={"btn btn-ghost btn-sm"} style={{
                   color: UI_COLORS.danger
                 }} onClick={() => {
-                  setProfile(p => ({
-                    ...p,
-                    scheduledWorkouts: (p.scheduledWorkouts || []).filter(s => s.id !== sw.id)
-                  }));
-                  showToast("Scheduled exercise removed.");
+                  // Confirm before removing, matching workout deletion — the
+                  // ✕ used to delete instantly with only a toast.
+                  setConfirmDelete({
+                    title: "Remove Scheduled Exercise?",
+                    body: `Remove ${ex.name} from your schedule?`,
+                    icon: "🗑",
+                    confirmLabel: "🗑 Remove",
+                    onConfirm: () => {
+                      setProfile(p => ({
+                        ...p,
+                        scheduledWorkouts: (p.scheduledWorkouts || []).filter(s => s.id !== sw.id)
+                      }));
+                      showToast("Scheduled exercise removed.");
+                    }
+                  });
                 }}>{"✕"}</button></div></div><div style={{
               display: "flex",
               gap: S.s6,
@@ -1022,7 +1017,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
     }}><div className={"builder-nav-title"}>{wbIsOneOff ? wbEditId ? "✎ Edit One-Off" : "⚡ New One-Off Workout" : wbEditId ? "✎ Edit Workout" : wbCopySource ? "⎘ Copy Workout" : "⚔ New Workout"}</div>{wbCopySource && <div className={"builder-nav-sub"}>{"Forging from: "}{wbCopySource}</div>}</div></div>
   {
     /* Combined Identity + Labels + Session Stats panel */
-  }<div className={"wb-section"}><div className={"field"}><label>{"Name "}<span className={"req-star"}>{"*"}</span></label><div className={"wb-identity-row"}><div className={"wb-icon-btn"} title={"Change icon"} onClick={() => setWbIconPickerOpen(v => !v)}>{wbIcon}<span className={"wb-icon-btn-caret"}>{"▾"}</span></div><input className={"inp"} value={wbName} onChange={e => setWbName(e.target.value)} placeholder={"e.g. Morning Push Day…"} /></div></div>{wbIconPickerOpen && <div className={"wb-icon-picker"}>{["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾","🏅","🥇","⛹️","🤼","🧗","🤾","🎿","🏄","⛷️","🚣","🏹","🏇","🌿","🫀","🦴","💨","🌊","🏔️","🌄","🐉","🦅","🔱","☀️","🌙","🌪️","💫","🎖️","⚒️","🧱","🥋"].map(ic => <div key={ic} className={`icon-opt ${wbIcon === ic ? "sel" : ""}`} onClick={() => { setWbIcon(ic); setWbIconPickerOpen(false); }}>{ic}</div>)}</div>}<div className={"field"} style={{marginTop: S.s8}}><label>{"Description "}<span style={{color:"#8a8478",fontWeight:"normal",textTransform:"none"}}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div><div className={"wb-section-divider"} /><div className={"wb-sub-hdr"}><span className={"wb-sub-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{color:"#8a8478",fontWeight:"normal",letterSpacing:".05em",marginLeft:S.s6,textTransform:"none"}}>{"(optional)"}</span></div><div style={{display:"flex",gap:S.s6,flexWrap:"wrap",alignItems:"center"}}>{(profile.workoutLabels || []).map(l => <span key={l} className={"wo-label-chip" + (wbLabels.includes(l) ? " sel" : "")} onClick={() => setWbLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}>{l}</span>)}<span style={{display:"inline-flex",alignItems:"center",gap:S.s4}}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onKeyDown={e => {
+  }<div className={"wb-section"}><div className={"field"}><label>{"Name "}<span className={"req-star"}>{"*"}</span></label><div className={"wb-identity-row"}><div className={"wb-icon-btn"} title={"Change icon"} onClick={() => setWbIconPickerOpen(v => !v)}>{wbIcon}<span className={"wb-icon-btn-caret"}>{"▾"}</span></div><input className={"inp"} value={wbName} onChange={e => setWbName(e.target.value)} placeholder={"e.g. Morning Push Day…"} /></div></div>{<Sheet open={wbIconPickerOpen} onClose={() => setWbIconPickerOpen(false)} layer={"modal"} placement={"center"} maxWidth={360} title={"Choose an icon"} ariaLabel={"Choose a workout icon"}><div className={"wb-icon-picker"} role={"group"} aria-label={"Workout icons"}>{["💪","🏋️","🔥","⚔️","🏃","🚴","🧘","⚡","🎯","🛡️","🏆","🌟","💥","🗡️","🥊","🤸","🏊","🎽","🦵","🦾","🏅","🥇","⛹️","🤼","🧗","🤾","🎿","🏄","⛷️","🚣","🏹","🏇","🌿","🫀","🦴","💨","🌊","🏔️","🌄","🐉","🦅","🔱","☀️","🌙","🌪️","💫","🎖️","⚒️","🧱","🥋"].map(ic => <button type={"button"} key={ic} aria-label={`Icon ${ic}`} aria-pressed={wbIcon === ic} className={`icon-opt ${wbIcon === ic ? "sel" : ""}`} onClick={() => { setWbIcon(ic); setWbIconPickerOpen(false); }}>{ic}</button>)}</div></Sheet>}<div className={"field"} style={{marginTop: S.s8}}><label>{"Description "}<span style={{color:"#8a8478",fontWeight:"normal",textTransform:"none"}}>{"(optional)"}</span></label><input className={"inp"} value={wbDesc} onChange={e => setWbDesc(e.target.value)} placeholder={"e.g. Upper body strength focus…"} /></div><div className={"wb-section-divider"} /><div className={"wb-sub-hdr"}><span className={"wb-sub-hdr-icon"}>{"❖"}</span>{"Labels"}<span style={{color:"#8a8478",fontWeight:"normal",letterSpacing:".05em",marginLeft:S.s6,textTransform:"none"}}>{"(optional)"}</span></div><div style={{display:"flex",gap:S.s6,flexWrap:"wrap",alignItems:"center"}}>{(profile.workoutLabels || []).map(l => <span key={l} className={"wo-label-chip" + (wbLabels.includes(l) ? " sel" : "")} onClick={() => setWbLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}>{l}</span>)}<span style={{display:"inline-flex",alignItems:"center",gap:S.s4}}><input className={"wo-label-new-inp"} value={newLabelInput} onChange={e => setNewLabelInput(e.target.value)} onKeyDown={e => {
           if (e.key === "Enter" && newLabelInput.trim()) {
             const lbl = newLabelInput.trim();
             if (!(profile.workoutLabels || []).some(x => x.toLowerCase() === lbl.toLowerCase())) {
@@ -1147,7 +1142,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
               supersetWith: null
             } : x))}>{"✕ Ungroup"}</button></div>{renderSsAccordionSection(ex, i, exD, "A", i + "_a")}{renderSsAccordionSection(partnerEx, partnerIdx, partnerExD, "B", i + "_b")}</div>;
       }
-      return <>{i === minSsChecked && ssChecked.size > 0 && <div className={"ss-action-bar"}><span className={"ss-action-text"}>{ssChecked.size + " exercise" + (ssChecked.size !== 1 ? "s" : "") + " selected"}</span>{ssChecked.size === 2 && <button className={"ss-action-btn"} onClick={() => {
+      return <>{i === minSsChecked && ssChecked.size > 0 && <div className={"ss-action-bar"}><span className={"ss-action-text"}>{ssChecked.size === 1 ? "Select 1 more to superset" : "🔗 2 selected — ready to group"}</span>{ssChecked.size === 2 && <button className={"ss-action-btn"} onClick={() => {
             const [a, b] = [...ssChecked];
             setWbExercises(exs => exs.map((x, xi) => xi === a ? {
               ...x,
@@ -1176,24 +1171,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
           setDragWbExIdx(null);
         }} onDragEnd={() => setDragWbExIdx(null)}><WbExCard ex={ex} i={i} exD={exD} collapsed={!!collapsedWbEx[i]} profile={profile} allExById={allExById} metric={metric} setWbExercises={setWbExercises} setCollapsedWbEx={setCollapsedWbEx} setSsChecked={setSsChecked} ssChecked={ssChecked} exCount={wbExercises.length} openExEditor={openExEditor} /></div></>;
     });
-  })()}<div style={{ height: 80 }} /><div style={{
-    position: "fixed",
-    bottom: "calc(var(--bottom-nav-h) + 10px)",
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "calc(100% - 32px)",
-    maxWidth: 488,
-    zIndex: 90,
-    display: "flex",
-    gap: S.s8,
-    padding: "10px 14px",
-    background: "rgba(14,13,10,.95)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    borderRadius: 14,
-    border: "1px solid rgba(180,172,158,.12)",
-    boxShadow: "0 -4px 24px rgba(0,0,0,.45)",
-  }}>{wbIsOneOff ? wbEditId ?
+  })()}<div className={"wb-footer"}>{wbIsOneOff ? wbEditId ?
   // Editing an existing scheduled one-off — save changes in place
   <button className={"btn btn-gold"} style={{
     flex: 1
@@ -1257,13 +1235,12 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
     openCompletionFlow(wo);
     setWorkoutView("list");
   }}>{"Next: Log or Schedule →"}</button> : wbEditId ? <>
-  <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button>
+  <button className={"btn btn-gold-solid"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Update Workout"}</button>
   <button className={"btn btn-ghost"} style={{ flex: 1 }} onClick={saveAsNewWorkout}>{"📋 Save As New"}</button>
   </> : <>
-  <button className={"btn btn-gold"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Save Workout"}</button>
-  <button className={"btn btn-gold"} style={{
-    flex: 1,
-    background: "linear-gradient(135deg,#8B7425,#A89030)"
+  <button className={"btn btn-gold-solid"} style={{ flex: 1 }} onClick={saveBuiltWorkout}>{"💾 Save Workout"}</button>
+  <button className={"btn btn-glass-yellow"} style={{
+    flex: 1
   }} onClick={() => {
     if (!wbName.trim()) {
       showToast("Name your workout first!");

@@ -284,7 +284,6 @@
     .builder-ex-input{width:58px;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.06);border-radius:5px;padding:4px 6px;color:#d4cec4;font-family:'Inter',sans-serif;font-size:.82rem;text-align:center;outline:none}
     .builder-ex-input:focus{border-color:rgba(180,172,158,.12)}
     .icon-row{display:flex;gap:7px;flex-wrap:wrap}
-    .icon-opt{font-size:1.2rem;width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.05);transition:all .2s}
     .icon-opt:hover{background:rgba(45,42,36,.28)}
     .icon-opt.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.25)}
     .tpl-card{background:linear-gradient(145deg,rgba(36,34,28,.88),rgba(26,24,20,.82));border:1px solid rgba(180,172,158,.05);border-radius:12px;padding:13px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
@@ -1285,7 +1284,7 @@
     .bday-tab:hover .bday-tab-del{opacity:1}
 
     /* ── Icon picker ── */
-    .icon-opt{font-size:1.2rem;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.05);transition:all .2s}
+    .icon-opt{font-size:1.2rem;width:44px;height:44px;padding:0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.05);transition:all .2s;font-family:inherit}
     .icon-opt:hover{background:rgba(45,42,36,.22);border-color:rgba(180,172,158,.06);transform:scale(1.08)}
     .icon-opt.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.28);box-shadow:0 0 8px rgba(180,172,158,.08)}
 
@@ -1392,7 +1391,17 @@
     .wb-icon-btn{width:42px;height:42px;border-radius:9px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.35rem;flex-shrink:0;transition:background .2s,border-color .2s;position:relative}
     .wb-icon-btn:hover{background:rgba(45,42,36,.4);border-color:rgba(180,172,158,.2)}
     .wb-icon-btn-caret{position:absolute;bottom:2px;right:3px;font-size:.42rem;color:rgba(180,172,158,.55);line-height:1}
-    .wb-icon-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;padding:10px;background:rgba(14,14,12,.55);border-radius:9px;border:1px solid rgba(180,172,158,.07)}
+    .wb-icon-picker{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+
+    /* Builder save/complete bar — sticky in normal flow instead of a fixed
+       overlay with a spacer hack, so it never covers the last exercise. */
+    .wb-footer{position:sticky;bottom:0;z-index:var(--z-sticky);display:flex;gap:8px;margin:14px -12px 0;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(14,13,10,.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid rgba(180,172,158,.12)}
+    .wb-footer .btn{min-height:44px}
+
+    /* Reorder ▲/▼ column — IconButtons whose 44px hit boxes must not overlap,
+       so the visual chips are small but the column has room for two of them. */
+    .wb-reorder{display:flex;flex-direction:column;flex-shrink:0;margin:-4px 0}
+    .wb-reorder .icon-btn{height:36px}
     .wb-dur-hint{font-size:.6rem;color:#8a8478;margin-top:3px;font-style:italic;text-align:center}
 
     /* ── Plan Wizard Full-Screen Overlay ── */
