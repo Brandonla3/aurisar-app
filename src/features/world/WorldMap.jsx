@@ -75,6 +75,14 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
   const bakedRef = useRef(null);
   const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 });
   const dragRef = useRef(null);
+  const closeBtnRef = useRef(null);
+
+  // Dialog focus management: focus Close on open, restore focus on close.
+  useEffect(() => {
+    const prev = document.activeElement;
+    closeBtnRef.current?.focus?.();
+    return () => { if (prev instanceof HTMLElement) prev.focus?.(); };
+  }, []);
 
   useEffect(() => {
     if (!mapData) return;
@@ -290,6 +298,9 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="World Map"
       style={{
         position: 'absolute', inset: 0, zIndex: 95,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -332,7 +343,7 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
         <button style={ghostBtn} onClick={() => zoomBy(1.3)} aria-label="Zoom in">＋</button>
         <button style={ghostBtn} onClick={() => zoomBy(1 / 1.3)} aria-label="Zoom out">－</button>
         <button style={ghostBtn} onClick={reset}>Reset</button>
-        <button style={ghostBtn} onClick={onClose}>Close</button>
+        <button ref={closeBtnRef} style={ghostBtn} onClick={onClose}>Close</button>
       </div>
 
       <p style={{ color: '#64748b', fontSize: 11, marginTop: 8 }}>
