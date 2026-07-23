@@ -47,6 +47,8 @@ export const DEFAULT_PLAYABLE_RADIUS_M = 520;
  * @returns {{minX:number, minZ:number, maxX:number, maxZ:number}}
  */
 export function mapBounds(radius = DEFAULT_PLAYABLE_RADIUS_M) {
-  const r = radius ?? DEFAULT_PLAYABLE_RADIUS_M;
+  // Guard a malformed config: a non-positive or non-finite radius would make
+  // ctx.arc() throw (negative) or divide-by-zero → NaN coords in the map bake.
+  const r = Number.isFinite(radius) && radius > 0 ? radius : DEFAULT_PLAYABLE_RADIUS_M;
   return { minX: -r, minZ: -r, maxX: r, maxZ: r };
 }
