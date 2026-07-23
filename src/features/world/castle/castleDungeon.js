@@ -3,10 +3,14 @@
  * Used by client reconciliation tests; mirrored in spacetimedb/src/dungeon/helpers.ts.
  */
 
+import { PX_PER_M, WORLD_ORIGIN_PX } from '../worldSpace.js';
 import { INTERIOR_ANCHOR, ENTRY, LOCAL_BOUNDS } from './castlePlan.js';
 
-export const STDB_CENTER = 1600;
-export const PX_PER_M = 32;
+// Coordinate contract sourced from the single client source of truth
+// (worldSpace) so this module and the server dungeon helper never drift.
+// STDB_CENTER is worldSpace.WORLD_ORIGIN_PX under this module's historical name.
+export { PX_PER_M };
+export const STDB_CENTER = WORLD_ORIGIN_PX;
 export const DUNGEON_MAX_PLAYERS = 5;
 export const DUNGEON_GATE_RANGE_M = 6;
 export const DUNGEON_EXIT_RANGE_M = 4;

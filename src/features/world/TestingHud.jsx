@@ -5,16 +5,15 @@
  * imperatively (no React re-renders) so it's cheap to leave on permanently.
  *
  * Minimap: top-right circular canvas showing the actual baked terrain (biome
- * colors) centered on the player, with the 8x8 tile grid, POI markers, live
- * mobs (red dots), the player (triangle), and the world bounds. A compass
- * strip sits directly on top of the circle showing the cardinal letters that
- * scroll based on camera-forward yaw; +/- and the mouse wheel zoom the view.
+ * colors) centered on the player, with POI markers, live mobs (red dots), the
+ * player (triangle), and the playable-disc edge. A compass strip sits directly
+ * on top of the circle showing the cardinal letters that scroll based on
+ * camera-forward yaw; +/- and the mouse wheel zoom the view.
  */
 
 import { useEffect, useRef } from 'react';
-import { streamingParams } from './streaming/index.js';
-import worldBuildConfig from './config/world_build_config.json';
 import { buildWorldMapCanvas, drawMapMarkers, locationLabelAt } from './mapRender.js';
+import { mapBounds, DEFAULT_PLAYABLE_RADIUS_M } from './worldSpace.js';
 
 // Minimap config
 const MAP_SIZE_PX = 160;
@@ -22,8 +21,6 @@ const DEFAULT_VIEW_RADIUS_M = 320; // shows ~640m on each axis around the player
 const MIN_VIEW_RADIUS = 80;
 const MAX_VIEW_RADIUS = 520;
 const BAKE_SIZE = 512;             // terrain bake resolution
-
-const PARAMS = streamingParams(worldBuildConfig);
 
 // Cardinal-only compass labels positioned at 0/90/180/270 deg clockwise from +Z (south).
 const COMPASS_POINTS = [
@@ -55,10 +52,9 @@ export default function TestingHud({ sceneRef, visible = true, mapData = null })
 
     // Bake the terrain once (disc bounds), reused across visibility toggles.
     if (mapData && !bakedRef.current) {
-      const r = mapData.config?.radius ?? 520;
       bakedRef.current = buildWorldMapCanvas(mapData.worldgen, {
         size: BAKE_SIZE,
-        bounds: { minX: -r, minZ: -r, maxX: r, maxZ: r },
+        bounds: mapBounds(mapData.config?.radius),
       });
     }
 
@@ -250,67 +246,23 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData }) {
     ctx.fillRect(0, 0, w, w);
   }
 
-  // Tile grid
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-  ctx.lineWidth = 1;
-  for (let row = 0; row <= PARAMS.rows; row++) {
-    const wz = PARAMS.minZ + row * PARAMS.tileSize;
-    const my = toMapY(wz);
-    if (my < -2 || my > w + 2) continue;
-    ctx.beginPath();
-    ctx.moveTo(0, my);
-    ctx.lineTo(w, my);
-    ctx.stroke();
-  }
-  for (let col = 0; col <= PARAMS.cols; col++) {
-    const wx = PARAMS.minX + col * PARAMS.tileSize;
-    const mx = toMapX(wx);
-    if (mx < -2 || mx > w + 2) continue;
-    ctx.beginPath();
-    ctx.moveTo(mx, 0);
-    ctx.lineTo(mx, w);
-    ctx.stroke();
-  }
-
   // POI markers (caves / ruins / dungeon entrances), no labels at minimap scale.
   if (mapData) {
     drawMapMarkers(ctx, mapData, (x, z) => ({ px: toMapX(x), py: toMapY(z) }),
       { labels: false, w, h: w });
   }
 
-  // World bounds — bold yellow on visible borders + thin off-screen indicators.
-  const boundsX0 = toMapX(PARAMS.minX);
-  const boundsZ0 = toMapY(PARAMS.minZ);
-  const boundsX1 = toMapX(PARAMS.maxX);
-  const boundsZ1 = toMapY(PARAMS.maxZ);
-
-  ctx.strokeStyle = 'rgba(255, 220, 80, 0.85)';
-  ctx.lineWidth = 2.5;
+  // World edge — the playable disc boundary, centred on the world origin (not
+  // the streaming-grid box, which over-covers the world and never lined up).
+  // As the player nears the rim the curve slides into view; the CSS circular
+  // clip hides any overshoot.
+  const discR = (mapData?.config?.radius ?? DEFAULT_PLAYABLE_RADIUS_M) * scale;
+  const ex = toMapX(0), ez = toMapY(0);
+  ctx.strokeStyle = 'rgba(255, 220, 80, 0.55)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  if (boundsX0 >= 0 && boundsX0 <= w) {
-    ctx.moveTo(boundsX0, Math.max(0, boundsZ0));
-    ctx.lineTo(boundsX0, Math.min(w, boundsZ1));
-  }
-  if (boundsX1 >= 0 && boundsX1 <= w) {
-    ctx.moveTo(boundsX1, Math.max(0, boundsZ0));
-    ctx.lineTo(boundsX1, Math.min(w, boundsZ1));
-  }
-  if (boundsZ0 >= 0 && boundsZ0 <= w) {
-    ctx.moveTo(Math.max(0, boundsX0), boundsZ0);
-    ctx.lineTo(Math.min(w, boundsX1), boundsZ0);
-  }
-  if (boundsZ1 >= 0 && boundsZ1 <= w) {
-    ctx.moveTo(Math.max(0, boundsX0), boundsZ1);
-    ctx.lineTo(Math.min(w, boundsX1), boundsZ1);
-  }
+  ctx.arc(ex, ez, discR, 0, Math.PI * 2);
   ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255, 220, 80, 0.30)';
-  const indicatorPx = 3;
-  if (boundsX0 < 0) ctx.fillRect(0, 0, indicatorPx, w);
-  if (boundsX1 > w) ctx.fillRect(w - indicatorPx, 0, indicatorPx, w);
-  if (boundsZ0 < 0) ctx.fillRect(0, 0, w, indicatorPx);
-  if (boundsZ1 > w) ctx.fillRect(0, w - indicatorPx, w, indicatorPx);
 
   // Mobs — red dots, faded if dead
   for (const m of mobs) {

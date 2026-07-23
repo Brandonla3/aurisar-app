@@ -4,7 +4,7 @@
     "version": 1,
     "source": "public/reference/ashwood.html (three.js r128 single-file prototype)",
     "units": "1 unit = 1 meter = 32 SpacetimeDB px; world origin = Babylon (0,0) = STDB (1600,1600)",
-    "notes": "Engine-portable declarative geography. Consumed by src/features/world/worldgen/ and, later, by the Blender/Unreal export pipeline."
+    "notes": "DEV/TEST world only — NOT the live map. The live world is zone1_world.json (see src/features/world/content/zones/manifest.ts). Kept as a regression fixture and Blender/Unreal export sample; target it explicitly with --config, e.g. node scripts/verify_worldgen.mjs --config src/features/world/config/ashwood_world.json"
   },
   "seed": 20240611,
   "radius": 520,
