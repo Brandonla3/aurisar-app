@@ -45,7 +45,7 @@ import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
 import { sameInteriorFloor } from '../castle/castleNavSurface.js';
-import { MOBS as MOB_DEFS } from '../content/index';
+import { MOBS as MOB_DEFS, ALL_WAYPOINTS, ALL_NPCS } from '../content/index';
 import { toWorld, toStdb } from '../worldSpace.js';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -2656,15 +2656,30 @@ export class BabylonWorldScene {
   // don't re-run. worldgen is built synchronously in the constructor.
   getMapData() {
     return (this._mapData ??= {
-      worldgen: this._worldgen,
-      config:   this._worldgen.config,
-      sites:    this._worldgen.sites,
+      worldgen:  this._worldgen,
+      config:    this._worldgen.config,
+      sites:     this._worldgen.sites,
+      waypoints: ALL_WAYPOINTS,   // static POIs (incl. the Castle Ashwood gate)
+      npcs:      ALL_NPCS,        // static NPC anchors
     });
   }
 
   // Chest manifest (world units) for optional map plotting.
   getChests() {
     return this._worldgen?.sites?.chests ?? [];
+  }
+
+  // Live remote players in this instance, for the maps. Mirrors getMobs(): a
+  // fresh array of world-unit positions + display name each call. Positions are
+  // the lerped render positions (see _lerpRemote), so they track smoothly.
+  getRemotes() {
+    const out = [];
+    this._remotePlayers.forEach((rp, key) => {
+      const p = rp?.root?.position;
+      if (!p) return;
+      out.push({ key, x: p.x, z: p.z, name: rp._username, moving: !!rp.isMoving });
+    });
+    return out;
   }
 
   // Current named location for the minimap / map header readout. Combines the
