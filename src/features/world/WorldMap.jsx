@@ -13,26 +13,12 @@
 
 import React, { useEffect, useRef } from 'react';
 import { buildWorldMapCanvas, drawMapMarkers } from './mapRender.js';
+import { mapBounds } from './worldSpace.js';
 import { FONT, ghostBtn } from './ui/panelTheme.js';
 
 const BAKE_SIZE = 640;     // terrain bake resolution (drawImage scales it up)
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 6;
-
-// Combined bounds so the disc AND the eastern dungeons fit, kept square+centred
-// so the round world isn't distorted.
-function combinedBounds(config) {
-  const radius = config.radius ?? 520;
-  let maxX = radius;
-  const interiors = config.interiors ?? {};
-  for (const k of Object.keys(interiors)) maxX = Math.max(maxX, interiors[k].cx ?? 0);
-  maxX += 120; // padding past the furthest dungeon
-  let minX = -radius, minZ = -radius, maxZ = radius;
-  const cx = (minX + maxX) / 2;
-  const cz = (minZ + maxZ) / 2;
-  const half = Math.max(maxX - minX, maxZ - minZ) / 2;
-  return { minX: cx - half, maxX: cx + half, minZ: cz - half, maxZ: cz + half };
-}
 
 export default function WorldMap({ mapData, sceneRef, onClose }) {
   const canvasRef = useRef(null);
@@ -46,7 +32,11 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const bounds = combinedBounds(mapData.config);
+    // Frame the map to the playable disc (the round world), NOT the far-off
+    // teleport-only dungeon interiors — those become off-map markers in a later
+    // batch. This keeps the player centred on the actual world instead of
+    // squished into one half beside a large void.
+    const bounds = mapBounds(mapData.config?.radius);
     const baked = buildWorldMapCanvas(mapData.worldgen, { size: BAKE_SIZE, bounds });
     bakedRef.current = baked;
 
