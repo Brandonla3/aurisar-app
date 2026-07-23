@@ -237,10 +237,9 @@ const GuildTab = memo(function GuildTab({
               }}><div className={"friend-name"}>{f.playerName || "Unnamed Warrior"}</div><div style={{
                   display: "flex",
                   gap: S.s4
-                }}><button className={"btn btn-ghost btn-xs"} style={{
+                }}><button className={"btn btn-xs guild-chat-btn"} style={{
                     fontSize: FS.fs55,
-                    color: UI_COLORS.info,
-                    padding: "2px 6px"
+                    padding: "2px 8px"
                   }} onClick={() => openDmWithUser(f.id)}>{"💬 Chat"}</button><button className={"btn btn-ghost btn-xs"} style={{
                     fontSize: FS.fs55,
                     color: "#b4ac9e",

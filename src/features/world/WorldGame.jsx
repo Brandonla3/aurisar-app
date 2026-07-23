@@ -34,6 +34,8 @@ import {
   QUEST_STATE, useQuestRows, myQuestsFrom, buildNpcMarkers, parseCounts,
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
+import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen } from './chatUtils.js';
+import { PROXIMITY_RADIUS }   from './game/constants.js';
 // Bundled UMD package — avoids the CSP script-src violation from loading
 // jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
 if (typeof window !== 'undefined' && !window.BABYLON) {
@@ -117,6 +119,11 @@ const S = {
   },
   chatRow: { marginBottom: 2 },
   chatSender: { color: '#7dd3fc', fontWeight: 600 },
+  chatGlobalTag: { color: '#fbbf24', fontWeight: 600, marginRight: 4, fontSize: 10 },
+  chatUnseenDot: {
+    position: 'absolute', top: 4, right: 6, width: 8, height: 8,
+    borderRadius: '50%', background: '#ef4444', border: '1.5px solid rgba(0,0,0,0.6)',
+  },
   chatInput: { display: 'flex', gap: 6, width: IS_TOUCH ? 240 : 340 },
   input: {
     flex: 1, background: 'rgba(15,23,42,0.9)',
@@ -204,6 +211,17 @@ export default function WorldGame({ playerInfo, onExit }) {
   const [chatOpen,     setChatOpen]     = useState(false);
   const [chatInput,    setChatInput]    = useState('');
   const [chatMessages, setChatMessages] = useState([]);
+  // Small dot on the mobile chat button when messages arrive while closed.
+  const [chatUnseen,   setChatUnseen]   = useState(false);
+  // Refs for the stable onChatMessage callback: my identity/position (for
+  // proximity filtering), whether the chat UI is open, and the join cutoff
+  // (SpacetimeDB replays existing rows as inserts on connect — don't dump
+  // the whole table history into the log).
+  const myIdentityHexRef = useRef(null);
+  const myPosRef         = useRef(null);
+  const chatOpenRef      = useRef(false);
+  const joinCutoffRef    = useRef(null);
+  const lastChatSentRef  = useRef(0);
   // Visual joystick state: null = idle, object = active
   const [joyVis, setJoyVis] = useState(null); // { baseX, baseY, thumbX, thumbY }
   // Slice 5c: local player liveness from the SpacetimeDB player row.
@@ -271,6 +289,11 @@ export default function WorldGame({ playerInfo, onExit }) {
   // ── SpacetimeDB callbacks ─────────────────────────────────────────────────
   const onPlayerUpdate = useCallback((row) => {
     sceneRef.current?.applyPlayerUpdate(row);
+    // Track our own server-space position for chat proximity filtering.
+    const myHex = myIdentityHexRef.current;
+    if (myHex && idHex(row.identity) === myHex) {
+      myPosRef.current = { x: row.x, y: row.y };
+    }
   }, []);
 
   const onPlayerDelete = useCallback((row) => {
@@ -278,7 +301,11 @@ export default function WorldGame({ playerInfo, onExit }) {
   }, []);
 
   const onChatMessage = useCallback((row) => {
-    setChatMessages(prev => [...prev, row].slice(-60));
+    if (joinCutoffRef.current == null) joinCutoffRef.current = joinCutoffMs(Date.now());
+    if (row?.sentAt != null && row.sentAt < joinCutoffRef.current) return; // pre-join history
+    if (!isChatVisible(row, myPosRef.current, PROXIMITY_RADIUS)) return;
+    setChatMessages(prev => insertChatMessage(prev, row));
+    if (shouldFlagUnseen(row, myIdentityHexRef.current, chatOpenRef.current)) setChatUnseen(true);
   }, []);
 
   const onMobUpsert = useCallback((row) => {
@@ -322,6 +349,24 @@ export default function WorldGame({ playerInfo, onExit }) {
     onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
     onEquippedUpsert, onEquippedDelete,
   });
+
+  // Keep the identity hex ref current for onPlayerUpdate's self-check.
+  useEffect(() => {
+    myIdentityHexRef.current = idHex(identity);
+  }, [identity]);
+
+  // Reset the replay cutoff whenever the world (re)connects. useSpacetimeWorld
+  // tears down and rebuilds the connection when fitness XP changes, and on
+  // reconnect SpacetimeDB replays the whole chat_message table as inserts —
+  // without this, a long session's reconnect would repopulate the log with old
+  // messages (and evict current ones via the 60-row cap).
+  const prevConnectedRef = useRef(false);
+  useEffect(() => {
+    if (connected && !prevConnectedRef.current) {
+      joinCutoffRef.current = joinCutoffMs(Date.now());
+    }
+    prevConnectedRef.current = connected;
+  }, [connected]);
 
   const onChestOpen = useCallback((chest) => {
     if (!connected) return;
@@ -492,6 +537,8 @@ export default function WorldGame({ playerInfo, onExit }) {
   // ── Chat open/close ───────────────────────────────────────────────────────
   const openChat = useCallback(() => {
     setChatOpen(true);
+    setChatUnseen(false);
+    chatOpenRef.current = true;
     sceneRef.current?.setChatOpen(true);
     setTimeout(() => inputRef.current?.focus(), 30);
   }, []);
@@ -499,6 +546,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const closeChat = useCallback(() => {
     setChatOpen(false);
     setChatInput('');
+    chatOpenRef.current = false;
     sceneRef.current?.setChatOpen(false);
     // Drop the on-screen keyboard focus so mobile browsers don't eat the
     // next tap as a "dismiss keyboard" gesture instead of a game input.
@@ -587,12 +635,32 @@ export default function WorldGame({ playerInfo, onExit }) {
 
   const submitChat = useCallback(() => {
     const text = chatInput.trim();
-    if (text && connected) {
-      const msgType = text.startsWith('/w ') ? 'world' : 'proximity';
-      sendChat(text.replace(/^\/w /, ''), msgType);
+    if (!text) { closeChat(); return; }
+    if (!connected) {
+      showToast('Not connected to the world yet — message not sent');
+      return; // keep the input (and its text) so they can retry
     }
+    // Mirror the server's 1 msg/sec rate limit client-side — the server drops
+    // silently, so give feedback here instead of eating the message.
+    const now = Date.now();
+    if (now - lastChatSentRef.current < 1000) {
+      showToast('Slow down — one message per second');
+      return;
+    }
+    // '/g' or '/global' send globally ('/w' kept as a legacy alias); default is
+    // nearby-only. Match the command with or without trailing text, then strip it.
+    const globalCmd = /^\/(g|global|w)\b\s*/i;
+    const isGlobal = globalCmd.test(text);
+    const body = text.replace(globalCmd, '');
+    if (!body) { closeChat(); return; } // command with no message — just dismiss
+    const sent = sendChat(body, isGlobal ? 'world' : 'proximity');
+    if (sent === false) {
+      showToast('Not connected to the world yet — message not sent');
+      return;
+    }
+    lastChatSentRef.current = now;
     closeChat();
-  }, [chatInput, connected, sendChat, closeChat]);
+  }, [chatInput, connected, sendChat, closeChat, showToast]);
 
   // Keyboard: Enter opens chat, Escape closes it (without exiting world)
   useEffect(() => {
@@ -840,12 +908,19 @@ export default function WorldGame({ playerInfo, onExit }) {
         </div>
       )}
 
-      {/* Chat message log — floats above the bottom bar whenever there's history */}
-      {chatMessages.length > 0 && (
+      {/* Chat message log — floats above the bottom bar whenever there's
+          history (or the input is open, so the empty state has a home) */}
+      {(chatMessages.length > 0 || chatOpen) && (
         <div style={S.chatLogWrap}>
           <div style={S.chatLog}>
-            {chatMessages.map((msg, i) => (
-              <div key={i} style={S.chatRow}>
+            {chatMessages.length === 0 && (
+              <div style={{ ...S.chatRow, color: '#64748b', fontStyle: 'italic' }}>
+                Nothing said nearby yet — say hello!
+              </div>
+            )}
+            {chatMessages.map((msg) => (
+              <div key={String(msg.id)} style={S.chatRow}>
+                {msg.msgType === 'world' && <span style={S.chatGlobalTag}>[Global]</span>}
                 <span style={S.chatSender}>[{msg.senderName}]</span>{' '}
                 <span>{msg.text}</span>
               </div>
@@ -864,7 +939,8 @@ export default function WorldGame({ playerInfo, onExit }) {
               ref={inputRef}
               style={S.input}
               value={chatInput}
-              placeholder="Type a message… (Enter to send, Esc to cancel)"
+              aria-label="World chat message"
+              placeholder="Message nearby players… (/g for global, Esc to cancel)"
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter')  { e.preventDefault(); submitChat(); }
@@ -877,9 +953,10 @@ export default function WorldGame({ playerInfo, onExit }) {
         ) : (
           <>
             {IS_TOUCH && (
-              <button style={actionBtnStyle} onClick={openChat} aria-label="Open chat">
+              <button style={{ ...actionBtnStyle, position: 'relative' }} onClick={openChat} aria-label="Open chat">
                 <span style={{ fontSize: 22 }}>💬</span>
                 <span style={actionBtnLabelStyle}>Chat</span>
+                {chatUnseen && <span style={S.chatUnseenDot} />}
               </button>
             )}
             <ActionButtons
