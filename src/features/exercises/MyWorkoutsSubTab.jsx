@@ -90,8 +90,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               return (
                 <div
                   key={exId}
+                  className={"stretch-row"}
                   style={{
-                    position: "relative",
                     background: isSel ? "rgba(45,42,36,.3)" : "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
                     border: "1px solid " + (isSel ? "rgba(180,172,158,.2)" : "rgba(180,172,158,.05)"),
                     borderRadius: R.r10,
@@ -248,8 +248,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               return (
                 <div
                   key={ex.id}
+                  className={"stretch-row"}
                   style={{
-                    position: "relative",
                     background: "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
                     border: "1px solid rgba(180,172,158,.05)",
                     borderRadius: R.r10,

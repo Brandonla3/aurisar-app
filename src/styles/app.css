@@ -722,8 +722,17 @@
     .picker-ex-main:focus-visible::after{
       outline:2px solid var(--cls-color,#c49428);outline-offset:-2px;border-radius:10px
     }
-    /* Secondary actions sit above the overlay so they stay clickable. */
-    .picker-ex-fav{position:relative;z-index:1}
+    /* Every other control in a stretched row must sit above the overlay, or
+       the overlay eats the click and the row's primary action fires instead.
+       Stated once for all such rows rather than per control: a rule that has
+       to be remembered for each new button is a rule that gets forgotten —
+       which is exactly how the favourite star and the custom-exercise
+       edit/delete controls became unclickable. */
+    .stretch-row{position:relative}
+    .stretch-row button:not(.picker-ex-main),
+    .stretch-row a,
+    .stretch-row input,
+    .stretch-row select{position:relative;z-index:1}
     .picker-ex-row:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--mg-color) 26%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.32),0 0 12px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
     .picker-ex-row:active{transform:scale(.985);transition:transform var(--dur-instant) var(--ease-standard)}
     .picker-ex-row.sel{
