@@ -1,9 +1,25 @@
 import React, { memo } from 'react';
-import { createPortal } from 'react-dom';
 import { todayStr } from '../../utils/helpers';
 import { calcWorkoutXP, getMuscleColor } from '../../utils/xp';
 import { formatXP } from '../../utils/format';
 import { S, FS } from '../../utils/tokens';
+import Sheet from '../../components/ui/Sheet';
+
+// The selected-state checkmark circle each option row shows. One definition
+// instead of the three verbatim copies this file used to carry.
+function RadioCheck({ on }) {
+  return (
+    <div aria-hidden={"true"} style={{
+      marginLeft: "auto", width: 18, height: 18,
+      border: "1.5px solid rgba(180,172,158,.08)", borderRadius: "50%",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: FS.md,
+      background: on ? "rgba(180,172,158,.25)" : "transparent",
+      color: on ? "#1a1200" : "transparent",
+      flexShrink: 0
+    }}>{"✓"}</div>
+  );
+}
 
 /**
  * Workout completion modal — extracted from the inline IIFE in App.jsx as part
@@ -50,27 +66,28 @@ const CompletionModal = memo(function CompletionModal({
     setScheduleWoDate("");
   }
 
-  return createPortal(
-    <div className={"completion-backdrop"} onClick={e => {
-      if (e.target !== e.currentTarget) return;
-      dismiss();
-    }}>
-      <div className={"completion-sheet sheet-slide-up"} role={"dialog"} aria-modal={"true"} aria-label={"Workout completion"} style={{ "--mg-color": accentColor }}>
-
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: S.s8 }}>
-          {completionModal.fromStats && (
-            <button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75 }} onClick={() => {
-              const prev = completionModal.fromStats;
-              setCompletionModal(null);
-              setCompletionAction("today");
-              setScheduleWoDate("");
-              setStatsPromptModal(prev);
-            }}>{"← Back"}</button>
-          )}
-          <div className={"completion-wo-name"} style={{ fontSize: FS.fs90, flex: 1 }}>{"⚔ Complete Deed"}</div>
-          <button className={"btn btn-ghost btn-sm"} onClick={dismiss}>{"✕"}</button>
-        </div>
+  return (
+    <Sheet
+      open
+      onClose={dismiss}
+      layer={"modal"}
+      placement={"center"}
+      maxWidth={380}
+      title={"⚔ Complete Deed"}
+      titleFont={"cinzel"}
+      ariaLabel={"Workout completion"}
+      style={{ "--mg-color": accentColor }}
+      headerLeft={completionModal.fromStats ? (
+        <button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={() => {
+          const prev = completionModal.fromStats;
+          setCompletionModal(null);
+          setCompletionAction("today");
+          setScheduleWoDate("");
+          setStatsPromptModal(prev);
+        }}>{"← Back"}</button>
+      ) : null}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: S.s14 }}>
 
         {/* Workout card */}
         <div className={"completion-wo-card"} style={{ "--mg-color": woMgColor }}>
@@ -82,10 +99,10 @@ const CompletionModal = memo(function CompletionModal({
         </div>
 
         {/* Options */}
-        <div style={{ display: "flex", flexDirection: "column", gap: S.s8 }}>
+        <div role={"radiogroup"} aria-label={"When was this workout done?"} style={{ display: "flex", flexDirection: "column", gap: S.s8 }}>
 
           {/* Option 1 — Completed today */}
-          <div className={`completion-option ${completionAction === "today" ? "sel" : ""}`} onClick={() => {
+          <button type={"button"} role={"radio"} aria-checked={completionAction === "today"} className={`completion-option ${completionAction === "today" ? "sel" : ""}`} onClick={() => {
             setCompletionAction("today");
             setCompletionDate(todayStr());
           }}>
@@ -94,11 +111,11 @@ const CompletionModal = memo(function CompletionModal({
               <div className={"completion-option-title"}>{"Completed Today"}</div>
               <div className={"completion-option-sub"}>{new Date().toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}</div>
             </div>
-            <div style={{ marginLeft: "auto", width: 18, height: 18, border: "1.5px solid rgba(180,172,158,.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: FS.md, background: completionAction === "today" ? "rgba(180,172,158,.25)" : "transparent", color: completionAction === "today" ? "#1a1200" : "transparent", flexShrink: 0 }}>{"✓"}</div>
-          </div>
+            <RadioCheck on={completionAction === "today"} />
+          </button>
 
           {/* Option 2 — Completed on a past day */}
-          <div className={`completion-option ${inPickMode ? "sel" : ""}`} onClick={() => {
+          <button type={"button"} role={"radio"} aria-checked={inPickMode} className={`completion-option ${inPickMode ? "sel" : ""}`} onClick={() => {
             setCompletionAction("past");
             setCompletionDate("");
           }}>
@@ -107,8 +124,8 @@ const CompletionModal = memo(function CompletionModal({
               <div className={"completion-option-title"}>{"Choose Completion Day"}</div>
               <div className={"completion-option-sub"}>{inPickMode && pickerValue ? new Date(pickerValue + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Log for a past date"}</div>
             </div>
-            <div style={{ marginLeft: "auto", width: 18, height: 18, border: "1.5px solid rgba(180,172,158,.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: FS.md, background: inPickMode && pickerValue ? "rgba(180,172,158,.25)" : "transparent", color: inPickMode && pickerValue ? "#1a1200" : "transparent", flexShrink: 0 }}>{"✓"}</div>
-          </div>
+            <RadioCheck on={inPickMode && pickerValue} />
+          </button>
           {inPickMode && (
             <div style={{ paddingLeft: 8 }}>
               <input className={"inp"} type={"date"} max={todayStr()} value={pickerValue} onChange={e => setCompletionDate(e.target.value)} style={{ marginTop: S.s2 }} autoFocus={true} />
@@ -121,7 +138,7 @@ const CompletionModal = memo(function CompletionModal({
           )}
 
           {/* Option 3 — Schedule for a future date */}
-          <div className={`completion-option ${inScheduleMode ? "sel" : ""}`} onClick={() => {
+          <button type={"button"} role={"radio"} aria-checked={inScheduleMode} className={`completion-option ${inScheduleMode ? "sel" : ""}`} onClick={() => {
             setCompletionAction("schedule");
             setScheduleWoDate("");
           }}>
@@ -130,8 +147,8 @@ const CompletionModal = memo(function CompletionModal({
               <div className={"completion-option-title"}>{"Schedule for Later"}</div>
               <div className={"completion-option-sub"}>{inScheduleMode && scheduleWoDate ? new Date(scheduleWoDate + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Add to calendar for a future date"}</div>
             </div>
-            <div style={{ marginLeft: "auto", width: 18, height: 18, border: "1.5px solid rgba(180,172,158,.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: FS.md, background: inScheduleMode && scheduleWoDate ? "rgba(180,172,158,.25)" : "transparent", color: inScheduleMode && scheduleWoDate ? "#1a1200" : "transparent", flexShrink: 0 }}>{"✓"}</div>
-          </div>
+            <RadioCheck on={inScheduleMode && scheduleWoDate} />
+          </button>
           {inScheduleMode && (
             <div style={{ paddingLeft: 8 }}>
               <input className={"inp"} type={"date"} min={(() => {
@@ -184,8 +201,7 @@ const CompletionModal = memo(function CompletionModal({
         </div>
 
       </div>
-    </div>,
-    document.body
+    </Sheet>
   );
 });
 

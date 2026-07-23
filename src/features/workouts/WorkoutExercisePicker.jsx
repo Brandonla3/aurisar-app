@@ -1,10 +1,10 @@
 import React, { memo, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
-import { S, R, FS } from '../../utils/tokens';
+import { S, FS } from '../../utils/tokens';
+import Sheet from '../../components/ui/Sheet';
 import ExerciseRow from '../exercises/ExerciseRow';
 import FilterDropdown from '../exercises/FilterDropdown';
 import { matchesAll, facetCounts as countFacet, NO_FACET, muscleKeys, typeKeys, equipKeys } from '../exercises/matchesFacets';
@@ -79,31 +79,28 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [allExercises, q, pickerMuscle, pickerTypeFilter, pickerEquipFilter]);
 
-  return createPortal(
-    <div className={"ex-picker-backdrop"} onClick={e => {
-      e.stopPropagation();
-      closePicker();
-    }}>
-      <div className={"ex-picker-sheet"} onClick={e => e.stopPropagation()} style={{ maxHeight: "85vh" }}>
-        {/* ── Header ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: S.s10 }}>
-          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: FS.lg, fontWeight: 600, color: "#8a8478" }}>
-            {"Add to Workout"}
-            {pickerSelected.length > 0 && (
-              <span style={{ color: "#b4ac9e", marginLeft: S.s6 }}>{pickerSelected.length + " selected"}</span>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: S.s6 }}>
-            {pickerSelected.length > 0 && (
-              <button className={"btn btn-gold btn-xs"} onClick={commitPickerToWorkout}>{"＋ Add " + pickerSelected.length}</button>
-            )}
-            <button className={"btn btn-ghost btn-xs"} onClick={() => { closePicker(); openExEditor("create", null); }}>{"✦ New Custom"}</button>
-            <button className={"btn btn-ghost btn-sm"} onClick={closePicker}>{"✕"}</button>
-          </div>
+  return (
+    // onClose is closePicker — the FULL teardown (search, facets, selection),
+    // never a bare setter; see rowInvariants.test.js.
+    <Sheet
+      open
+      onClose={closePicker}
+      layer={"picker"}
+      tall
+      scroll={"none"}
+      title={pickerSelected.length > 0 ? `Add to Workout · ${pickerSelected.length} selected` : "Add to Workout"}
+      ariaLabel={"Add exercises to workout"}
+      headerRight={
+        <div style={{ display: "flex", gap: S.s6, flexShrink: 0 }}>
+          {pickerSelected.length > 0 && (
+            <button className={"btn btn-gold btn-xs"} onClick={commitPickerToWorkout}>{"＋ Add " + pickerSelected.length}</button>
+          )}
+          <button className={"btn btn-ghost btn-xs"} onClick={() => { closePicker(); openExEditor("create", null); }}>{"✦ New Custom"}</button>
         </div>
-
+      }
+    >
         {/* ── Search bar ── */}
-        <div style={{ marginBottom: S.s8 }}>
+        <div style={{ marginBottom: S.s8, flexShrink: 0 }}>
           <input
             className={"inp"}
             style={{ width: "100%", padding: "8px 12px", fontSize: FS.fs82 }}
@@ -120,7 +117,7 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
             duplicating what the library tab already had in an accessible
             form. They are the shared FilterDropdown now, which also brings
             multi-select and faceted counts in line with the library. */}
-        <div style={{ position: "relative", marginBottom: S.s10 }}>
+        <div style={{ position: "relative", marginBottom: S.s10, flexShrink: 0 }}>
           {pickerOpenDrop && <div aria-hidden={"true"} onClick={closeDrops} style={{ position: "fixed", inset: 0, zIndex: 19 }} />}
           <div style={{ display: "flex", gap: S.s8 }}>
             <FilterDropdown
@@ -178,22 +175,24 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
           const selIds = new Set(pickerSelected.map(e => e.exId));
           return (
             <>
-              <div style={{ fontSize: FS.fs62, color: "#8a8478", marginBottom: S.s6, textAlign: "right" }}>
+              <div style={{ fontSize: FS.fs62, color: "#8a8478", marginBottom: S.s6, textAlign: "right", flexShrink: 0 }}>
                 {filtered.length + " match" + (filtered.length !== 1 ? "es" : "")}
               </div>
-              <List
-                rowCount={filtered.length}
-                rowHeight={60}
-                rowComponent={WbExPickerRow}
-                rowProps={{ exercises: filtered, selIds, onToggle: pickerToggleEx }}
-                style={{ height: 'min(60vh, 480px)', width: '100%' }}
-              />
+              {/* The virtualized list is the sheet's ONLY scroller (the
+                  Sheet body is scroll="none") — no more scroll-in-scroll. */}
+              <div style={{ flex: "1 1 auto", minHeight: 120 }}>
+                <List
+                  rowCount={filtered.length}
+                  rowHeight={60}
+                  rowComponent={WbExPickerRow}
+                  rowProps={{ exercises: filtered, selIds, onToggle: pickerToggleEx }}
+                  style={{ height: '100%', width: '100%' }}
+                />
+              </div>
             </>
           );
         })()}
-      </div>
-    </div>,
-    document.body
+    </Sheet>
   );
 });
 

@@ -48,6 +48,7 @@ import { useExerciseCart, cartEntry } from './hooks/useExerciseCart';
 import { planEntry } from './features/exercises/planEntry';
 import QuickLogModal from './features/exercises/QuickLogModal';
 import ErrorBoundary from './components/ErrorBoundary';
+import Sheet from './components/ui/Sheet';
 import ConfirmSheet from './components/ui/ConfirmSheet';
 
 // ── Debounce utility ──
@@ -752,25 +753,17 @@ function App() {
   //   - Escape-key dismiss
   //   - Restore focus to the element that opened the modal
   // The hook stacks correctly when nested modals open (e.g. picker → config).
-  useModalLifecycle(!!exEditorOpen, () => setExEditorOpen(false));
+  // Modals that render through the Sheet/ConfirmSheet primitives register
+  // their own lifecycle inside the primitive (onClose wiring) — only the
+  // remaining hand-rolled portals keep an entry here.
   useModalLifecycle(savePlanWizard != null, () => setSavePlanWizard(null));
   useModalLifecycle(schedulePicker != null, () => setSchedulePicker(null));
   useModalLifecycle(saveWorkoutWizard != null, () => setSaveWorkoutWizard(null));
-  useModalLifecycle(!!wbExPickerOpen, () => closePicker());
-  useModalLifecycle(addToPlanPicker != null, () => setAddToPlanPicker(null));
   useModalLifecycle(!!retroCheckInModal, () => setRetroCheckInModal(false));
-  useModalLifecycle(statsPromptModal != null, () => setStatsPromptModal(null));
   useModalLifecycle(calExDetailModal != null, () => setCalExDetailModal(null));
   useModalLifecycle(retroEditModal != null, () => setRetroEditModal(null));
-  useModalLifecycle(addToWorkoutPicker != null, () => setAddToWorkoutPicker(null));
   useModalLifecycle(oneOffModal != null, () => setOneOffModal(null));
-  useModalLifecycle(completionModal != null, () => {
-    setCompletionModal(null);
-    setCompletionAction("today");
-    setScheduleWoDate("");
-  });
   useModalLifecycle(logEditModal != null, () => setLogEditModal(null));
-  useModalLifecycle(confirmDelete != null, () => setConfirmDelete(null));
   useModalLifecycle(shareModal != null, () => setShareModal(null));
   useModalLifecycle(!!feedbackOpen, () => setFeedbackOpen(false));
   useEffect(() => {
@@ -6182,15 +6175,7 @@ function App() {
         commitPickerToWorkout={commitPickerToWorkout}
       />
     )}
-    {/* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && createPortal(<div className={"atp-backdrop"} onClick={() => setAddToPlanPicker(null)}><div className={"atp-sheet"} onClick={e => e.stopPropagation()}><div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}><div style={{
-            fontFamily: "'Inter',sans-serif",
-            fontSize: FS.fs84,
-            color: "#d4cec4"
-          }}>{"📋 Add to Plan"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setAddToPlanPicker(null)}>{"✕"}</button></div><div style={{
+    {/* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && <Sheet open onClose={() => setAddToPlanPicker(null)} layer={"modal"} title={"📋 Add to Plan"} ariaLabel={"Add workout to plan"}><div style={{ display: "flex", flexDirection: "column", gap: S.s12 }}><div style={{
           display: "flex",
           alignItems: "center",
           gap: S.s8,
@@ -6209,7 +6194,7 @@ function App() {
               color: "#8a8478"
             }}>{addToPlanPicker.workout.exercises.length}{" exercises will be added as a new day"}</div></div></div>{profile.plans.length === 0 ? <div className={"empty"} style={{
           padding: "14px 0"
-        }}>{"No plans yet. Create a plan first in the Plans tab."}</div> : profile.plans.map(pl => <div key={pl.id} className={"atp-plan-row"} onClick={() => addWorkoutToPlan(addToPlanPicker.workout, pl.id)}><span style={{
+        }}>{"No plans yet. Create a plan first in the Plans tab."}</div> : profile.plans.map(pl => <button type={"button"} key={pl.id} className={"atp-plan-row"} onClick={() => addWorkoutToPlan(addToPlanPicker.workout, pl.id)}><span style={{
             fontSize: "1.3rem"
           }}>{pl.icon}</span><div style={{
             flex: 1,
@@ -6224,9 +6209,10 @@ function App() {
             }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" · currently "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><span style={{
             fontSize: FS.md,
             color: "#b4ac9e"
-          }}>{"→"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
-          width: "100%"
-        }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></div>, document.body)
+          }}>{"→"}</span></button>)}<button className={"btn btn-ghost btn-sm"} style={{
+          width: "100%",
+          minHeight: 44
+        }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></Sheet>
 
     /* ══ RETRO CHECK-IN MODAL ════════════════════ */}{retroCheckInModal && createPortal(<div className={"cdel-backdrop"} onClick={() => setRetroCheckInModal(false)}><div className={"cdel-sheet"} style={{
         borderColor: "rgba(180,172,158,.08)",
@@ -6329,14 +6315,26 @@ function App() {
       </ErrorBoundary>
     )}
 
-    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && createPortal(<div className={"modal-backdrop"} onClick={() => setStatsPromptModal(null)} style={{ alignItems: "center" }}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
-        borderRadius: R.r16,
-        padding: S.s0,
-        "--mg-color": cls.color,
-        background: "linear-gradient(160deg,#12120e,#0c0c0a)",
-        backdropFilter: "none",
-        WebkitBackdropFilter: "none",
-      }}><div className={"modal-body"}><div className={"stats-prompt-banner"} onClick={() => {
+    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && <Sheet
+      open
+      onClose={() => setStatsPromptModal(null)}
+      layer={"modal"}
+      placement={"center"}
+      style={{ "--mg-color": cls.color }}
+      ariaLabel={"Review battle stats"}
+      title={<span className={"stats-modal-title"}>{"📊 Review Battle Stats "}<span style={{ color: "#8a8478", fontWeight: "normal", fontSize: FS.lg }}>{"(Optional)"}</span></span>}
+      headerLeft={<button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={() => {
+        setStatsPromptModal(null);
+        if (statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId) {
+          // Return to the form the user was mid-way through —
+          // preserve their typed values rather than resetting.
+          openQuickLog(statsPromptModal.wo._soloExId, { preserve: true });
+        } else if (!statsPromptModal.wo.soloEx) {
+          setWorkoutView("builder");
+          setActiveTab("workouts");
+        }
+      }}>{"← Back"}</button>}
+    ><div><div className={"stats-prompt-banner"} onClick={() => {
             setProfile(p => ({
               ...p,
               notificationPrefs: {
@@ -6358,35 +6356,7 @@ function App() {
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0
-            }} /><div className={"stats-prompt-banner-text"}>{"Want this reminder off? Check here. To re-enable, you can do so in "}<strong>{"Alerts settings"}</strong>{"."}</div></div><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: S.s10
-          }}><div><div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: S.s8
-              }}><button className={"btn btn-ghost btn-sm"} style={{
-                  padding: "4px 8px",
-                  fontSize: FS.fs75
-                }} onClick={() => {
-                  setStatsPromptModal(null);
-                  if (statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId) {
-                    // Return to the form the user was mid-way through —
-                    // preserve their typed values rather than resetting.
-                    openQuickLog(statsPromptModal.wo._soloExId, { preserve: true });
-                  } else if (!statsPromptModal.wo.soloEx) {
-                    setWorkoutView("builder");
-                    setActiveTab("workouts");
-                  }
-                }}>{"← Back"}</button><div className={"stats-modal-title"} style={{
-                  flex: 1
-                }}>{"📊 "}{"Review Battle Stats "}<span style={{
-                    color: "#8a8478",
-                    fontWeight: "normal",
-                    fontSize: FS.lg
-                  }}>{"(Optional)"}</span></div></div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setStatsPromptModal(null)}>{"✕"}</button></div><div className={"stats-modal-subtitle"} style={{
+            }} /><div className={"stats-prompt-banner-text"}>{"Want this reminder off? Check here. To re-enable, you can do so in "}<strong>{"Alerts settings"}</strong>{"."}</div></div><div className={"stats-modal-subtitle"} style={{
             marginBottom: S.s14
           }}>{statsPromptModal.wo.oneOff ? "Review your workout stats before completing. Fill in any missing values, or leave blank to skip." : (() => {
               const missing = [statsPromptModal.missingDur && "Duration", statsPromptModal.missingAct && "Active Cal", statsPromptModal.missingTot && "Total Cal"].filter(Boolean);
@@ -6450,7 +6420,7 @@ function App() {
               setStatsPromptModal(null);
               setSpMakeReusable(false);
               setSpDurSec("");
-            }}>{"✓ Save & Complete"}</button></div></div></div></div>, document.body)
+            }}>{"✓ Save & Complete"}</button></div></div></Sheet>
 
     /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */}{calExDetailModal && createPortal(<div className={"modal-backdrop"} onClick={() => setCalExDetailModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
@@ -6587,22 +6557,7 @@ function App() {
       />
     )
 
-    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && createPortal(<div className={"modal-backdrop"} onClick={() => setAddToWorkoutPicker(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
-        borderRadius: R.r16,
-        padding: S.s0,
-        maxHeight: "80vh",
-        overflowY: "auto"
-      }}><div className={"modal-body"}><div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: S.s14
-          }}><div style={{
-              fontFamily: "'Inter',sans-serif",
-              fontSize: FS.fs92,
-              color: "#d4cec4",
-              fontWeight: 700
-            }}>{"➕ Add to Existing Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setAddToWorkoutPicker(null)}>{"✕"}</button></div><div style={{
+    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && <Sheet open onClose={() => setAddToWorkoutPicker(null)} layer={"modal"} title={"➕ Add to Existing Workout"} ariaLabel={"Add to existing workout"}><div><div style={{
             fontSize: FS.fs65,
             color: "#8a8478",
             marginBottom: S.s12
@@ -6615,10 +6570,14 @@ function App() {
               textTransform: "uppercase",
               letterSpacing: ".08em",
               marginBottom: S.s6
-            }}>{"💪 Re-Usable Workouts"}</div>{(profile.workouts || []).filter(w => !w.oneOff).map(wo => <div key={wo.id} style={{
+            }}>{"💪 Re-Usable Workouts"}</div>{(profile.workouts || []).filter(w => !w.oneOff).map(wo => <button type={"button"} key={wo.id} style={{
               display: "flex",
               alignItems: "center",
               gap: S.s10,
+              width: "100%",
+              minHeight: 44,
+              textAlign: "left",
+              fontFamily: "inherit",
               padding: "8px 12px",
               borderRadius: R.xl,
               border: "1px solid rgba(45,42,36,.2)",
@@ -6651,7 +6610,7 @@ function App() {
                 }}>{wo.exercises.length}{" exercises"}</div></div><span style={{
                 fontSize: FS.fs65,
                 color: "#b4ac9e"
-              }}>{"+ add →"}</span></div>)}</>
+              }}>{"+ add →"}</span></button>)}</>
           /* Scheduled One-Off Workouts */}{(() => {
             const today = todayStr();
             const grouped = {};
@@ -6682,10 +6641,14 @@ function App() {
                   exercises: [],
                   oneOff: true
                 };
-                return <div key={g.id} style={{
+                return <button type={"button"} key={g.id} style={{
                   display: "flex",
                   alignItems: "center",
                   gap: S.s10,
+                  width: "100%",
+                  minHeight: 44,
+                  textAlign: "left",
+                  fontFamily: "inherit",
                   padding: "8px 12px",
                   borderRadius: R.xl,
                   border: "1px solid rgba(230,126,34,.15)",
@@ -6722,9 +6685,9 @@ function App() {
                     }}>{"📅 "}{formatScheduledDate(g.date)}</div></div><span style={{
                     fontSize: FS.fs65,
                     color: "#e67e22"
-                  }}>{"+ add →"}</span></div>;
+                  }}>{"+ add →"}</span></button>;
               })}</>;
-          })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></div></div>, document.body)}{oneOffModal && createPortal(<div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+          })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></Sheet>}{oneOffModal && createPortal(<div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{

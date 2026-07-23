@@ -1083,7 +1083,7 @@
     /* Add-to-plan picker */
     .atp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:84;display:flex;align-items:center;justify-content:center;padding:20px}
     .atp-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
-    .atp-plan-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .18s}
+    .atp-plan-row{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;font-family:inherit;color:inherit;padding:9px 12px;border-radius:9px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .18s}
     .atp-plan-row:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.18)}
     /* Workout completion modal */
     .completion-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:86;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -1091,7 +1091,6 @@
     .completion-wo-icon{font-size:1.8rem}
     .completion-wo-name{font-family:'Inter',sans-serif;font-size:.82rem;color:#d4cec4}
     .completion-wo-sub{font-size:.65rem;color:#8a8478;margin-top:2px}
-    .completion-option{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:11px;border:1.5px solid rgba(180,172,158,.06);background:rgba(45,42,36,.12);cursor:pointer;transition:all .2s}
     .completion-option:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.18)}
     .completion-option.sel{border-color:rgba(180,172,158,.3);background:rgba(45,42,36,.25);box-shadow:0 0 0 1px rgba(180,172,158,.2)}
     .completion-option-icon{font-size:1.4rem;flex-shrink:0}
@@ -1315,7 +1314,9 @@
     .completion-wo-icon{font-size:1.9rem}
     .completion-wo-name{font-family:'Cinzel',serif;font-size:.84rem;color:#d4cec4;letter-spacing:.04em;font-weight:600}
     .completion-wo-sub{font-size:.62rem;color:#8a8478;margin-top:3px;font-family:'Inter',sans-serif;letter-spacing:.02em}
-    .completion-option{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:11px;border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 36%,transparent);background:rgba(28,26,22,.88);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+    /* Real <button>s since the radio-group conversion — inherit the app
+       typography and fill the row like the old divs did. */
+    .completion-option{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font-family:inherit;color:inherit;padding:13px 16px;border-radius:11px;border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 36%,transparent);background:rgba(28,26,22,.88);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
     .completion-option::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,color-mix(in srgb,var(--mg-color) 8%,transparent),transparent);opacity:0;transition:opacity .2s}
     .completion-option:hover{border-color:color-mix(in srgb,var(--mg-color) 24%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.32),0 0 12px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
     .completion-option:hover::before{opacity:1}

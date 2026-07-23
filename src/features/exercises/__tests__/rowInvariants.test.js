@@ -74,13 +74,16 @@ describe('stretched-row overlay safeguard', () => {
 describe('picker dismissal runs the full teardown', () => {
   const app = read('src/App.jsx');
 
-  it('wires the builder picker Escape to closePicker, not a bare setter', () => {
+  it('wires the builder picker dismissal to closePicker, not a bare setter', () => {
     // useModalLifecycle(!!wbExPickerOpen, () => setWbExPickerOpen(false)) left
     // the search, filter Sets and selection populated, so reopening restored
-    // the previous session's state.
-    const line = app.split(/\r?\n/).find(l => l.includes('useModalLifecycle(!!wbExPickerOpen'));
-    expect(line, 'builder picker modal lifecycle not found').toBeTruthy();
-    expect(line).toMatch(/closePicker\(\)/);
+    // the previous session's state. Escape/backdrop/X now flow through the
+    // Sheet primitive's onClose — that prop must be the full closePicker
+    // teardown. (The App-level lifecycle registration moved into Sheet when
+    // the picker adopted it.)
+    const picker = read('src/features/workouts/WorkoutExercisePicker.jsx');
+    expect(picker, 'picker must dismiss via closePicker').toMatch(/onClose=\{closePicker\}/);
+    expect(app.includes('useModalLifecycle(!!wbExPickerOpen'), 'stale App-level picker lifecycle should be gone').toBe(false);
   });
 
   it('clears every picker facet in closePicker', () => {
