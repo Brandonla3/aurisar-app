@@ -1105,12 +1105,10 @@
     .inp[type="number"]{-moz-appearance:textfield}
     .wb-ex-lbl{font-size:.58rem;color:#8a8478}
     /* Add-to-plan picker */
-    .atp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:84;display:flex;align-items:center;justify-content:center;padding:20px}
-    .atp-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:16px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+    /* .atp-backdrop/.atp-sheet removed — add-to-plan now renders via Sheet. */
     .atp-plan-row{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;font-family:inherit;color:inherit;padding:9px 12px;border-radius:9px;border:1px solid rgba(180,172,158,.05);background:rgba(45,42,36,.12);cursor:pointer;transition:all .18s}
     .atp-plan-row:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.18)}
-    /* Workout completion modal */
-    .completion-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:86;display:flex;align-items:center;justify-content:center;padding:20px}
+    /* Workout completion modal (renders via Sheet; .completion-backdrop removed) */
     .completion-wo-card{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:10px;background:rgba(45,42,36,.18);border:1px solid rgba(180,172,158,.06)}
     .completion-wo-icon{font-size:1.8rem}
     .completion-wo-name{font-family:'Inter',sans-serif;font-size:.82rem;color:#d4cec4}
