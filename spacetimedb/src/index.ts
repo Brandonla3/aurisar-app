@@ -7,7 +7,9 @@
  * Deploy:  spacetime publish --server mainnet aurisar-world
  * Regen:   spacetime generate --lang typescript --out-dir ../src/features/world/module_bindings
  *
- * Coordinate system (must stay in sync with the client):
+ * Coordinate system — the client's single source of truth is
+ * src/features/world/worldSpace.js (PX_PER_M, WORLD_ORIGIN_PX, toWorld/toStdb);
+ * these MUST stay in sync with it:
  *   STDB px → world units:   (px - 1600) / 32     (client toWorld)
  *   world units → STDB px:   units * 32 + 1600    (client toStdb)
  *   Spawn at STDB (1600, 1600) = world origin.
@@ -107,7 +109,7 @@ import {
 
 // World bounds in STDB px. Derived from world_build_config — see header.
 const WORLD_HALF_PX = 32000;        // 1000 world units * 32 px/unit
-const WORLD_CENTER_PX = 1600;       // legacy origin offset (matches client STDB_CENTER)
+const WORLD_CENTER_PX = 1600;       // legacy origin offset; mirrors client worldSpace.js WORLD_ORIGIN_PX
 const PLAYER_HALF_PX = 32;          // 1 world unit player half-width
 const WORLD_MIN_PX = WORLD_CENTER_PX - WORLD_HALF_PX + PLAYER_HALF_PX; // -30368
 const WORLD_MAX_PX = WORLD_CENTER_PX + WORLD_HALF_PX - PLAYER_HALF_PX; // 33568
