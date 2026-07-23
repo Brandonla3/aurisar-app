@@ -1,6 +1,5 @@
-import React, { memo, useState } from 'react';
-import AvatarCreator from '../avatar/AvatarCreator.jsx';
-import CharacterTurntable from '../avatar/CharacterTurntable.jsx';
+import React, { memo, useState, Suspense } from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { UI_COLORS } from '../../data/constants';
 import { calcCharStats } from '../../utils/xp';
 import { ClassIcon } from '../../components/ClassIcon';
@@ -16,6 +15,18 @@ import { S, R, FS } from '../../utils/tokens';
  * Wrapped in React.memo so unrelated App re-renders don't drag this tab
  * into a re-render when none of its props changed.
  */
+
+// Both of these pull in babylonjs (the turntable directly, the creator via
+// AvatarPreview). Lazy-loading them keeps the ~engine off the eager bundle
+// graph — the Character tab is statically imported, so a static import here
+// would drag Babylon onto first paint for every user, world or not.
+const AvatarCreator = lazyWithRetry(() => import('../avatar/AvatarCreator.jsx'));
+const CharacterTurntable = lazyWithRetry(() => import('../avatar/CharacterTurntable.jsx'));
+const Avatar3DFallback = (
+  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a8478', fontSize: '.75rem', letterSpacing: '.14em', textTransform: 'uppercase' }} role="status" aria-live="polite">
+    {'Loading…'}
+  </div>
+);
 
 // ── Module-level constants (hoisted from the IIFE) ──
 const STAT_META = {
@@ -124,7 +135,9 @@ const CharacterTab = memo(function CharacterTab({
               user has a saved config. */}
           {avatarConfig ? (
             <div style={{ height: 280, marginBottom: S.s14 }}>
-              <CharacterTurntable config={avatarConfig} />
+              <Suspense fallback={Avatar3DFallback}>
+                <CharacterTurntable config={avatarConfig} />
+              </Suspense>
             </div>
           ) : (
             <div style={{ fontSize: "2.6rem", margin: `20px 0 ${S.s14}px` }}>{"⚔️"}</div>
@@ -154,16 +167,18 @@ const CharacterTab = memo(function CharacterTab({
           </button>
         </div>
         {creatorOpen && (
-          <AvatarCreator
-            initialConfig={avatarConfig}
-            saving={savingAvatar}
-            onSave={async (cfg) => {
-              const ok = await onSaveAvatar?.(cfg);
-              if (ok !== false) setCreatorOpen(false);
-              return ok; // forward result so AvatarCreator can surface save errors
-            }}
-            onCancel={() => setCreatorOpen(false)}
-          />
+          <Suspense fallback={null}>
+            <AvatarCreator
+              initialConfig={avatarConfig}
+              saving={savingAvatar}
+              onSave={async (cfg) => {
+                const ok = await onSaveAvatar?.(cfg);
+                if (ok !== false) setCreatorOpen(false);
+                return ok; // forward result so AvatarCreator can surface save errors
+              }}
+              onCancel={() => setCreatorOpen(false)}
+            />
+          </Suspense>
         )}
       </div>
       /* ══ STATS SUB-TAB ════════════════════════════ */}{charSubTab === "stats" && <div><div className={"char-section"}>{rune("Character Stats")}<div style={{

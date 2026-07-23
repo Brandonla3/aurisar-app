@@ -20,6 +20,7 @@ export default defineConfig({
         // React.lazy at the call sites, these chunks only load on demand.
         manualChunks(id) {
           if (id.includes('node_modules/three/')) return 'three';
+          if (id.includes('node_modules/babylonjs')) return 'babylon';
           if (id.includes('node_modules/recharts/')) return 'recharts';
           if (id.includes('node_modules/@supabase/')) return 'supabase';
           // Static exercise + class data is ~1.7MB pre-gzip. Keeping it in
