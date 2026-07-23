@@ -390,6 +390,17 @@
     /* LIBRARY HOME — sticky translucent search bar (iOS material) */
     .lib-sticky-search{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
 
+    /* Virtualised filtered list: the .scroll-area is locked into a non-scrolling
+       flex column so react-window's List is the ONLY scroller (no scroll-in-
+       scroll). Applied only while the filtered view is mounted (toggled from the
+       tab via useLayoutEffect). Home mode gets none of these rules and keeps
+       normal window scroll. */
+    .scroll-area.lib-list-locked{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0;-webkit-mask-image:none;mask-image:none;overscroll-behavior:contain}
+    .lib-tab-root--filtered{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+    .lib-filtered-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+    .lib-vlist-wrap{flex:1 1 auto;min-height:0}
+    .lib-vlist-wrap > [role="list"]{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
     /* LIBRARY HOME SCROLL */
     .lib-hscroll-wrap{position:relative;overflow:hidden}
     .lib-hscroll-wrap::before,.lib-hscroll-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:28px;z-index:2;pointer-events:none;transition:opacity .25s}
@@ -550,6 +561,7 @@
     }
     /* Resume chip — surfaced on the home view when filters are still active,
        so a non-destructive back leaves the filtered results visibly reachable. */
+    .lib-resume-chip-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .lib-resume-chip{
       display:flex;align-items:center;gap:8px;width:100%;min-height:44px;
       margin-bottom:10px;padding:8px 12px;border-radius:9px;cursor:pointer;
