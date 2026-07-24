@@ -335,6 +335,11 @@ export function buildPropTemplates(scene, opts = {}) {
     const fernMat = createGrassMaterial(scene, { maxH: fernGeo.maxH, name: 'ash_fernGrass' });
     T.tuft = meshFromCluster('tpl_tuft', tuftGeo, tuftMat);
     T.fern = meshFromCluster('tpl_fern', fernGeo, fernMat);
+    // Mark grass understory so its per-tile instanced clones opt into shadow
+    // receiving below — same StandardMaterial as the main field, so shadows
+    // land consistently across the field/understory boundary.
+    T.tuft.metadata = { ...(T.tuft.metadata || {}), grass: true };
+    T.fern.metadata = { ...(T.fern.metadata || {}), grass: true };
   } else {
     T.tuft = BABYLON.MeshBuilder.CreateCylinder('tpl_tuft', { diameterTop: 0, diameterBottom: 0.8, height: 1.05, tessellation: 5 }, scene);
     T.tuft.bakeTransformIntoVertices(BABYLON.Matrix.Translation(0, 0.52, 0));
@@ -471,6 +476,9 @@ class Acc {
     mesh.makeGeometryUnique();
     mesh.setEnabled(true);
     mesh.isPickable = false;
+    // Grass understory receives shadows too, so the effect doesn't stop at the
+    // field/understory boundary (the StandardMaterial grass samples them).
+    if (template.metadata?.grass) mesh.receiveShadows = true;
     mesh.thinInstanceSetBuffer('matrix', new Float32Array(this.mats), 16, true);
     let cols = this.cols;
     if (cols.length && template.metadata?.texturedCard) {
