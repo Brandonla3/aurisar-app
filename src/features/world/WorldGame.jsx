@@ -29,6 +29,7 @@ import DialoguePanel          from './hud/DialoguePanel.jsx';
 import QuestLogPanel          from './hud/QuestLogPanel.jsx';
 import QuestTracker           from './hud/QuestTracker.jsx';
 import { ITEMS }              from './content/index';
+import { aggregateFitnessPerks } from '../../utils/gearPerks';
 import { rollChestLoot }      from './content/formulas/chestLoot';
 import { RECIPES_BY_ID, canCookRecipe } from './content/formulas/cooking';
 import { NPCS, QUESTS, WAYPOINTS } from './content/index';
@@ -205,7 +206,7 @@ const S = {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function WorldGame({ playerInfo, onExit }) {
+export default function WorldGame({ playerInfo, onExit, onEquipPerksChange }) {
   const canvasRef  = useRef(null);
   const sceneRef   = useRef(null);
   const logEndRef  = useRef(null);
@@ -398,6 +399,20 @@ export default function WorldGame({ playerInfo, onExit }) {
     () => equippedFor(identity),
     [equippedFor, identity],
   );
+
+  // Batch C2: mirror the local player's aggregated equipped-gear fitnessPerks
+  // up to the fitness profile (via App), which persists them so workout XP is
+  // boosted even while the world tab is closed. Only fires on an actual change.
+  const lastPerksRef = React.useRef(null);
+  useEffect(() => {
+    if (!onEquipPerksChange) return;
+    const items = Object.values(equipped).map((id) => ITEMS[id]).filter((it) => it?.fitnessPerks);
+    const perks = aggregateFitnessPerks(items);
+    const json = JSON.stringify(perks);
+    if (json === lastPerksRef.current) return;
+    lastPerksRef.current = json;
+    onEquipPerksChange(perks);
+  }, [equipped, onEquipPerksChange]);
   const inv = React.useMemo(() => ({
     counts: serverCounts,
     copper,

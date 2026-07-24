@@ -3752,6 +3752,18 @@ function App() {
     completionAction, setCompletionAction,
     setScheduleWoDate,
   });
+
+  // Batch C2: the world mirrors the player's aggregated equipped-gear
+  // fitnessPerks up here; persist onto the profile (Supabase + localStorage via
+  // storage.js) so workout XP stays boosted even when the world tab is closed.
+  // useWorkoutCompletion reads profile.equipPerks at logging time. Only writes
+  // on an actual change to avoid a persist churn loop.
+  const handleEquipPerksChange = React.useCallback((perks) => {
+    setProfile(p => {
+      if (JSON.stringify(p.equipPerks ?? null) === JSON.stringify(perks ?? null)) return p;
+      return { ...p, equipPerks: perks };
+    });
+  }, [setProfile]);
   function scheduleWorkoutForDate() {
     const wo = _optionalChain([completionModal, 'optionalAccess', _64 => _64.workout]);
     if (!wo || !scheduleWoDate) return;
@@ -6254,6 +6266,7 @@ function App() {
           avatarConfig={avatarConfig}
           fitnessXp={profile?.xp ?? 0}
           fitnessXpBaseline={0}
+          onEquipPerksChange={handleEquipPerksChange}
         />
       </React.Suspense>
     )
