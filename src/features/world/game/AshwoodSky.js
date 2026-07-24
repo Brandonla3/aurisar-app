@@ -23,7 +23,8 @@
 
 /* global BABYLON */
 
-import { aerialFogWeight, applyAerialFog } from './aerialPerspective.js';
+import { aerialFogWeight, applyAerialFog, sunVisibilityFromWet } from './aerialPerspective.js';
+import { createAtmosphereState } from './atmosphereState.js';
 
 const VERT = `
 precision highp float;
@@ -249,6 +250,15 @@ export class AshwoodSky {
     // so a fast orbit can't pump the global fog colour between warm/cool ends.
     this._aerialW = 0;
 
+    // Shared atmosphere contract (atmosphereState.js): the single source of truth
+    // for sunDir / fog / visibility that grass + water read instead of each
+    // recomputing -key.direction. Holds LIVE references to this._sunDir (already
+    // a unit vector: the LM normalises key.direction) and scene.fogColor, so they
+    // track every frame; scalars are refreshed in _update. Attached to
+    // scene.metadata.ashwood lazily there — that object is (re)built by
+    // BabylonWorldScene AFTER this constructor runs.
+    this._atmosphere = createAtmosphereState(this._sunDir, scene.fogColor);
+
     this._observer = scene.onBeforeRenderObservable.add(() => this._update());
   }
 
@@ -362,6 +372,28 @@ export class AshwoodSky {
     // scene.fogColor each frame) all inherit it consistently — no per-shader edits.
     applyAerialFog(this.scene.fogColor, fr, fg, fb, this._aerialW);
     this.scene.fogDensity = FOG_DENSITY_NIGHT + (FOG_DENSITY_DAY - FOG_DENSITY_NIGHT) * dayF;
+
+    // Publish/refresh the shared atmosphere contract (atmosphereState.js). Lazy
+    // attach — scene.metadata.ashwood is built by BabylonWorldScene after this
+    // constructor, and exists by the first render frame. sunDir + fogColor are
+    // live references (already current from the writes above); refresh scalars.
+    const ashwood = this.scene.metadata?.ashwood;
+    if (ashwood) {
+      if (ashwood.atmosphere !== this._atmosphere) ashwood.atmosphere = this._atmosphere;
+      const a = this._atmosphere;
+      // Re-point fogColor each publish: LightingManager._blendProfiles REASSIGNS
+      // scene.fogColor to a freshly-allocated Color3 during zone transitions, so
+      // a once-captured reference would orphan after the first dungeon trip.
+      // sunDir stays a live ref (a scratch Vector3 mutated in place, never
+      // replaced). Re-pointing is a reference write, not a per-frame copy.
+      a.fogColor = this.scene.fogColor;
+      a.sunVisibility = sunVisibilityFromWet(wet);
+      a.fogDensity = this.scene.fogDensity;
+      a.dayFactor = dayF;
+      a.duskFactor = dusk;
+      a.night = night;
+      a.facingWeight = this._aerialW;
+    }
   }
 
   dispose() {

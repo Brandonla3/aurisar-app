@@ -26,16 +26,26 @@
  */
 export function aerialFogWeight(facing, dayF, dusk, wet) {
   const f = Number.isFinite(facing) ? facing : 0;
-  const w = Number.isFinite(wet) ? Math.max(0, Math.min(1, wet)) : 0;
-  // Overcast obscures the sun, so the directional cue diffuses toward neutral
-  // (0.15 residual keeps a whisper of warmth in light rain, near-nothing in a
-  // downpour). This is the same `wet` signal the biome-fog blend already reads.
-  const sunVis = 1 - 0.85 * w;
+  // Overcast obscures the sun, so the directional cue diffuses toward neutral.
+  const sunVis = sunVisibilityFromWet(wet);
   // Dominant warm lobe toward the sun; the away side is attenuated so a camera
   // orbit doesn't swing the world between two saturated extremes.
   const lobe = f > 0 ? f : f * 0.35;
   // Golden-hour dominant; ~0 at high noon (dusk→0) and at night (both →0).
   return lobe * (0.05 * dayF + 0.22 * dusk) * sunVis;
+}
+
+/**
+ * How visible the sun is through the weather, 1 (clear) → 0.15 (downpour). The
+ * 0.15 residual keeps a whisper of directional warmth in light rain and
+ * near-nothing in a full overcast. Shared by aerialFogWeight and published on
+ * the AtmosphereState so the fog tint and any readout agree on one definition.
+ * @param {number} wet 0 (clear) … 1 (overcast / rain)
+ * @returns {number} 0.15 … 1
+ */
+export function sunVisibilityFromWet(wet) {
+  const w = Number.isFinite(wet) ? Math.max(0, Math.min(1, wet)) : 0;
+  return 1 - 0.85 * w;
 }
 
 /**

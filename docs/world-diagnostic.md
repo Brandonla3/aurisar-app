@@ -136,7 +136,7 @@ sun/sky disagreement.
   night shooting-star streak) still bloom. Rain is a non-emissive `LinesMesh`, so it never
   glowed and needs no exclusion.
 
-**Pass 2 (this PR — implemented, visual acceptance pending):**
+**Pass 2 (merged in #273 — visual acceptance pending):**
 
 - **Sun-directional aerial perspective** (`threejs-atmosphere-aerial-perspective`, analytic
   tier). The overworld haze was direction-agnostic while the sky dome already warms toward
@@ -155,19 +155,28 @@ sun/sky disagreement.
   helper with unit coverage (toward-sun warmer, away bounded, night = baseline exactly,
   wet attenuates, degenerate vectors finite, channels in `[0,1]`).
 
+**Pass 3 (this PR — implemented):** the atmosphere infrastructure the #273 review asked for.
+
+- **Shared `AtmosphereState` contract** (`atmosphereState.js`). The sky dome, global fog,
+  grass, and water each derived the sun direction independently (`sun = -key.direction`, three
+  copies) — the drift the review flagged. `AshwoodSky._update` is now the sole writer of a
+  single state bag at `scene.metadata.ashwood.atmosphere` (sun direction computed once as a
+  unit ground→sun vector, plus sun visibility, fog colour/density, day/dusk/night, and the
+  eased aerial facing weight); the grass, water, and volumetric-cloud binds read
+  `atmosphere.sunDir` instead of recomputing it, falling back to the key light before the first
+  overworld frame. `sunDir` is a live reference (a scratch mutated in place); `fogColor` is
+  re-pointed each publish, since `LightingManager._blendProfiles` reassigns `scene.fogColor` to
+  a new `Color3` on zone transitions and a captured reference would otherwise orphan. The shared
+  `sunVisibilityFromWet` now backs both the fog tint and the state. Covered by
+  `atmosphereState.test.js`.
+- **Dev-only Atmosphere-QA overlay** on `devWorldViewer.js` (`?qa=1`, opt-in so it never
+  enters the headless screenshot harness). Freeze/scrub the time of day, force weather
+  wetness against the random cycle, toggle volumetric clouds, and read out sun elevation, sun
+  visibility, aerial facing weight, fog RGB/density, and tier straight from the AtmosphereState
+  — turning the acceptance matrix into reproducible states instead of subjective screenshots.
+
 **Deferred to a later pass** — real, but not bounded enough to ship blind:
 
-- **Shared `AtmosphereState` contract.** The sky shader, global fog, water, and grass each
-  read sun direction / fog colour / density through their own path today. A single source of
-  truth (sun direction, sun-scatter colour, cloud/sun visibility, fog colour, density) they
-  all consume would stop independently-tuned coefficients drifting apart — the right home for
-  the aerial-perspective magic numbers once they settle on-device. Larger than a visual pass;
-  its own refactor.
-- **Dev-only Atmosphere-QA overlay** on `devWorldViewer.js`: freeze/set time, force
-  dry/rain, toggle volumetric clouds, and read out sun elevation, cloud/sun visibility,
-  facing weight, fog RGB/density, and tier — turning the acceptance matrix into reproducible
-  states instead of subjective screenshots. Tooling, tracked with the `threejs-visual-validation`
-  harness in Batch 3's remit.
 - **Grass shadow-receiving.** Grass is a hand-written `ShaderMaterial` (`grassBlades.js`), and
   the world runs **two** shadow systems — a `CascadedShadowGenerator` (4 cascades) on high and
   a blur-ESM `ShadowGenerator` on low/mobile. Making a custom shader sample either means
@@ -341,10 +350,10 @@ a GPU budget.
   `Ashwood*` systems (grass, clouds, sky, water, shadows, color) with a single tone-map owner,
   in bounded passes, each visually accepted on the deploy preview before it's closed out.
   *Implemented:* Pass 1 — lake Beer-Lambert depth absorption + selective mobile bloom (merged
-  #272); Pass 2 — sun-directional aerial perspective. *Next:* record the visual-acceptance
-  matrix per pass; a shared `AtmosphereState` contract + dev Atmosphere-QA overlay; grass
-  shadow-receiving; high-tier CSM `autoCalcDepthBounds`; re-validate the deferred Batch 2 perf
-  items on-device. See §1 "Batch 3 status".
+  #272); Pass 2 — sun-directional aerial perspective (merged #273); Pass 3 — shared
+  `AtmosphereState` contract + dev Atmosphere-QA overlay. *Next:* record the visual-acceptance
+  matrix per pass; grass shadow-receiving; high-tier CSM `autoCalcDepthBounds`; re-validate the
+  deferred Batch 2 perf items on-device. See §1 "Batch 3 status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.
