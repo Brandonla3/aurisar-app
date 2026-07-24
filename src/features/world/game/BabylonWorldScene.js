@@ -433,8 +433,9 @@ class LightingManager {
     if (this._noPipeline) {
       // ImageProcessingPostProcess: attaches directly to the camera using only
       // standard 8-bit RGBA render targets (always supported on mobile WebGL2).
-      // Inherits scene.imageProcessingConfiguration — gives us ACES tone-mapping,
-      // exposure, and contrast without requiring any special GPU extensions.
+      // Inherits scene.imageProcessingConfiguration — gives us the same KHR PBR
+      // Neutral tone-mapping, exposure, and contrast as the desktop pipeline,
+      // without requiring any special GPU extensions.
       try {
         this._imagePP = new BABYLON.ImageProcessingPostProcess(
           'imgPP', 1.0, this.camera,
@@ -495,6 +496,16 @@ class LightingManager {
       } catch (_) { /* try next tier */ }
     }
     return null;
+  }
+
+  // Mobile/low tier only: the fallback GlowLayer (_setupPipelines) has no
+  // threshold, so it blooms EVERY emissive material — including UI-ish flat
+  // draws never meant to look like light sources (mob HP-bar fill, NPC
+  // billboard markers). Desktop's threshold-bloom pipeline doesn't have this
+  // problem. No-op on desktop (_glowLayer is null); callers can call this
+  // right after creating the mesh regardless of tier.
+  excludeFromGlow(mesh) {
+    this._glowLayer?.addExcludedMesh(mesh);
   }
 
   _loadEnvSafe(url) {
@@ -1079,6 +1090,7 @@ export class BabylonWorldScene {
       this.playerInfo?.avatarConfig ?? null,
       this.scene,
       AssetLibrary,
+      { excludeFromGlow: (mesh) => this._lm?.excludeFromGlow(mesh) },
     );
     this._local.root.position.set(0, this._worldgen.surfaceY(0, 0), 0);
     // Flush remote updates that arrived while we were loading.
@@ -1092,7 +1104,9 @@ export class BabylonWorldScene {
     // P1: content-defined hub NPCs. Not load-critical — quest UI degrades
     // to the quest log if a model fails. Markers set by React may have
     // arrived before init finished; re-apply them.
-    this._npcs = new NpcSystem(this.scene, this._worldgen, AssetLibrary);
+    this._npcs = new NpcSystem(this.scene, this._worldgen, AssetLibrary, {
+      excludeFromGlow: (mesh) => this._lm?.excludeFromGlow(mesh),
+    });
     this._npcs.init()
       .then(() => {
         if (this._pendingNpcMarkers) this._npcs?.setMarkers(this._pendingNpcMarkers);
@@ -2033,6 +2047,7 @@ export class BabylonWorldScene {
     hpBg.parent = hpBar;
     hpBg.material = this._hpBarMats.bg;
     hpBg.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    this._lm?.excludeFromGlow(hpBg);
 
     const hpFill = BABYLON.MeshBuilder.CreatePlane(`mob_hpfill_${row.mobId}`, {
       width: 1.0, height: 0.10,
@@ -2041,6 +2056,9 @@ export class BabylonWorldScene {
     hpFill.material = this._hpBarMats.fill;
     hpFill.position.z = -0.001; // sit just in front of background
     hpFill.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    // Bright red emissive fill — the mobile GlowLayer has no bloom threshold,
+    // so without this it reads as a glowing light source on every mob.
+    this._lm?.excludeFromGlow(hpFill);
 
     return { hpBar, hpFill };
   }
@@ -2511,6 +2529,7 @@ export class BabylonWorldScene {
       // base-body GLB (no default clothing).
       const rp = await CharacterAvatar.create(
         row.identity, row.username, parsedConfig, this.scene, AssetLibrary,
+        { excludeFromGlow: (mesh) => this._lm?.excludeFromGlow(mesh) },
       );
       if (this._remotePlayers.has(key)) {
         rp.dispose(); // another update already spawned this player

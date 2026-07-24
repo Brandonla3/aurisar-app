@@ -74,8 +74,12 @@ export class AshwoodTileProvider {
       lakeWater = water;
       streamWater = water;
     } else {
-      water = buildWaterMaterial(scene, {});
-      streamWater = buildWaterMaterial(scene, { name: 'ashwood_streamwater', alpha: 0.58 });
+      // Ponds get a gentler absorbK than the lake default (3.0): their vShore
+      // saturates at the analytic bowl's own ~0.45 m-scale centre, a much
+      // shallower real depth than the lake's ~1.2 m — without this, a pond's
+      // centre would read just as dark/"deep" as the big lake's.
+      water = buildWaterMaterial(scene, { absorbK: 1.2 });
+      streamWater = buildWaterMaterial(scene, { name: 'ashwood_streamwater', alpha: 0.58, depthBody: 0 });
       // Lake material adds a planar reflection at its surface level — but the
       // MirrorTexture is a second render of the whole scene, so it's gated to
       // the high tier. Low/mobile lakes keep the waves + fresnel sky blend.
@@ -562,6 +566,21 @@ uniform float t;
 uniform vec3 sunDir; uniform vec3 sunCol;
 uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyCol;
 uniform float night; uniform float alphaV;
+// 1 = depth-driven Beer-Lambert body colour (lake/ponds, where vShore is a
+// real per-vertex depth proxy from _applyShore); 0 = legacy wave-slope tint
+// (streams, where vShore is instead an artificial ripple-placement value —
+// see _streamRibbon — with no depth meaning, so the absorption curve must not
+// read it as one).
+uniform float bodyDepthMix;
+// Absorption strength at vShore's own saturation point (depthT=1). vShore is
+// normalized independently per water body — the lake by a 1.2 m divisor,
+// ponds by an unrelated ~0.45 m bowl-depth divisor — so "fully saturated"
+// does NOT mean the same absolute depth across bodies. Rather than read that
+// as true metre-depth (would need a new attribute), each body gets its own
+// calibrated absorption scale: the lake's real depth earns a strong, dark
+// centre; a pond's much shallower analytic bowl gets a gentler one so it
+// doesn't read as implausibly lake-deep at its own saturation point.
+uniform float bodyAbsorbK;
 uniform vec3 cameraPosition;
 uniform vec3 vFogColor; uniform float fogDensity;
 vec2 nm(vec2 uv){ return texture2D(uN, uv).rg * 2.0 - 1.0; }
@@ -575,7 +594,19 @@ void main() {
   vec3 n = normalize(vN + vec3(detail.x, 0.0, detail.z) * 0.5);
   vec3 V = normalize(cameraPosition - vWp);
   float fres = pow(1.0 - max(dot(V, n), 0.0), 3.0);
-  vec3 col = mix(deep, shallow, clamp(0.4 + 0.35 * (n.x + n.z), 0.0, 1.0));
+  // Beer-Lambert body colour driven by the baked vShore depth proxy (0 deep
+  // -> 1 at the shore/bank; see _applyShore) instead of wave slope, so the
+  // water actually darkens with real depth toward the lake/pond centre rather
+  // than just shimmering one flat tint. This is a VERTICAL-DEPTH absorption
+  // (terrain-height-derived), not a reconstructed view-path/scene-thickness
+  // estimate. Gated by bodyDepthMix (0 on streams, where vShore isn't a depth
+  // signal — see the uniform declaration above). col is the transmitted
+  // colour; the Fresnel mix below then blends it toward the sky/mirror
+  // reflection, keeping transmitted -> reflected energy order intact.
+  float depthT = 1.0 - clamp(vShore, 0.0, 1.0);
+  vec3 colDepth = mix(shallow, deep, 1.0 - exp(-depthT * bodyAbsorbK));
+  vec3 colSlope = mix(deep, shallow, clamp(0.4 + 0.35 * (n.x + n.z), 0.0, 1.0));
+  vec3 col = mix(colSlope, colDepth, bodyDepthMix);
   vec3 skyRefl = skyCol;
 #ifdef REFLECT
   // Planar reflection: project the fragment to screen space, nudge by the
@@ -629,7 +660,8 @@ function buildWaterMaterial(scene, opts = {}) {
     attributes: ['position', 'shore'],
     uniforms: ['world', 'viewProjection', 'cameraPosition',
                't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
-               'night', 'alphaV', 'vFogColor', 'fogDensity'],
+               'night', 'alphaV', 'vFogColor', 'fogDensity',
+               'bodyDepthMix', 'bodyAbsorbK'],
     samplers: reflect ? ['uN', 'uReflection'] : ['uN'],
     defines: reflect ? ['#define REFLECT'] : [],
     needAlphaBlending: true,
@@ -660,6 +692,15 @@ function buildWaterMaterial(scene, opts = {}) {
   mat.setColor3('shallow', BABYLON.Color3.FromHexString('#29646a'));
   mat.setColor3('skyCol',  BABYLON.Color3.FromHexString('#9db8c8'));
   mat.setFloat('alphaV', opts.alpha ?? 0.84);
+  // Default ON (lake/ponds: vShore is real depth). Streams pass depthBody:0 —
+  // their shore attribute is a ripple-placement value, not depth (see the
+  // shader-side comment on the bodyDepthMix uniform).
+  mat.setFloat('bodyDepthMix', opts.depthBody ?? 1);
+  // Default matches the lake's calibration (its vShore saturates at a real
+  // ~1.2 m depth, deep water). Ponds pass a lower absorbK — see the
+  // shader-side comment on the bodyAbsorbK uniform for why the same [0,1]
+  // proxy isn't comparable across water bodies.
+  mat.setFloat('bodyAbsorbK', opts.absorbK ?? 3.0);
   mat.setFloat('night', 0);
   mat.setFloat('t', 0);
 
