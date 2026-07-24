@@ -47,7 +47,7 @@
     },
     "goblin": {
       "file": "goblin.glb",
-      "bytes": 47844,
+      "bytes": 47924,
       "tris": 2912,
       "bones": 12,
       "clips": [
@@ -114,7 +114,7 @@
     },
     "tribal": {
       "file": "tribal.glb",
-      "bytes": 94376,
+      "bytes": 95396,
       "tris": 5252,
       "bones": 38,
       "clips": [

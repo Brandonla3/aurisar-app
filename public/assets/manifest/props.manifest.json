@@ -6,7 +6,7 @@
   "assets": {
     "anvil": {
       "file": "anvil.glb",
-      "bytes": 144408,
+      "bytes": 144484,
       "tris": 750,
       "bones": 0,
       "clips": [],
@@ -15,7 +15,7 @@
     },
     "barrel": {
       "file": "barrel.glb",
-      "bytes": 317148,
+      "bytes": 317256,
       "tris": 824,
       "bones": 0,
       "clips": [],
@@ -24,7 +24,7 @@
     },
     "bell_tower": {
       "file": "bell_tower.glb",
-      "bytes": 135708,
+      "bytes": 135736,
       "tris": 11799,
       "bones": 0,
       "clips": [],
@@ -33,7 +33,7 @@
     },
     "blacksmith": {
       "file": "blacksmith.glb",
-      "bytes": 97384,
+      "bytes": 97444,
       "tris": 7659,
       "bones": 0,
       "clips": [],
@@ -51,7 +51,7 @@
     },
     "cart": {
       "file": "cart.glb",
-      "bytes": 30508,
+      "bytes": 30972,
       "tris": 2659,
       "bones": 0,
       "clips": [],
@@ -69,7 +69,7 @@
     },
     "column": {
       "file": "column.glb",
-      "bytes": 5316,
+      "bytes": 5324,
       "tris": 122,
       "bones": 0,
       "clips": [],
@@ -78,7 +78,7 @@
     },
     "crate_wooden": {
       "file": "crate_wooden.glb",
-      "bytes": 318076,
+      "bytes": 318100,
       "tris": 1576,
       "bones": 0,
       "clips": [],
@@ -87,7 +87,7 @@
     },
     "dock_platform": {
       "file": "dock_platform.glb",
-      "bytes": 9424,
+      "bytes": 18272,
       "tris": 324,
       "bones": 0,
       "clips": [],
@@ -105,7 +105,7 @@
     },
     "fence": {
       "file": "fence.glb",
-      "bytes": 4288,
+      "bytes": 4836,
       "tris": 208,
       "bones": 0,
       "clips": [],
@@ -132,7 +132,7 @@
     },
     "house_3": {
       "file": "house_3.glb",
-      "bytes": 43680,
+      "bytes": 43696,
       "tris": 3024,
       "bones": 0,
       "clips": [],
@@ -177,7 +177,7 @@
     },
     "mushroom_red": {
       "file": "mushroom_red.glb",
-      "bytes": 3556,
+      "bytes": 3736,
       "tris": 48,
       "bones": 0,
       "clips": [],
@@ -186,7 +186,7 @@
     },
     "mushroom_tan": {
       "file": "mushroom_tan.glb",
-      "bytes": 3548,
+      "bytes": 3652,
       "tris": 48,
       "bones": 0,
       "clips": [],
@@ -204,7 +204,7 @@
     },
     "rock_large_d": {
       "file": "rock_large_d.glb",
-      "bytes": 4900,
+      "bytes": 4996,
       "tris": 80,
       "bones": 0,
       "clips": [],
@@ -213,7 +213,7 @@
     },
     "rock_large_f": {
       "file": "rock_large_f.glb",
-      "bytes": 4836,
+      "bytes": 4916,
       "tris": 73,
       "bones": 0,
       "clips": [],
@@ -222,7 +222,7 @@
     },
     "rock_tall_a": {
       "file": "rock_tall_a.glb",
-      "bytes": 5584,
+      "bytes": 5724,
       "tris": 136,
       "bones": 0,
       "clips": [],
@@ -231,7 +231,7 @@
     },
     "rock_tall_h": {
       "file": "rock_tall_h.glb",
-      "bytes": 4908,
+      "bytes": 4952,
       "tris": 78,
       "bones": 0,
       "clips": [],
@@ -240,7 +240,7 @@
     },
     "rowboat": {
       "file": "rowboat.glb",
-      "bytes": 8248,
+      "bytes": 16968,
       "tris": 168,
       "bones": 0,
       "clips": [],
@@ -258,7 +258,7 @@
     },
     "statue_head": {
       "file": "statue_head.glb",
-      "bytes": 6124,
+      "bytes": 6128,
       "tris": 196,
       "bones": 0,
       "clips": [],
@@ -267,7 +267,7 @@
     },
     "tent_open": {
       "file": "tent_open.glb",
-      "bytes": 5200,
+      "bytes": 5204,
       "tris": 232,
       "bones": 0,
       "clips": [],
@@ -276,7 +276,7 @@
     },
     "tent_small": {
       "file": "tent_small.glb",
-      "bytes": 5760,
+      "bytes": 5932,
       "tris": 224,
       "bones": 0,
       "clips": [],
@@ -285,7 +285,7 @@
     },
     "timber_pillar": {
       "file": "timber_pillar.glb",
-      "bytes": 5644,
+      "bytes": 14376,
       "tris": 44,
       "bones": 0,
       "clips": [],
@@ -303,7 +303,7 @@
     },
     "well": {
       "file": "well.glb",
-      "bytes": 27672,
+      "bytes": 27788,
       "tris": 1870,
       "bones": 0,
       "clips": [],
