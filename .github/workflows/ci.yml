@@ -45,6 +45,11 @@ jobs:
       - name: Vendored meshopt decoder fresh
         run: npm run vendor:meshopt:check
 
+      # Synthesized SFX WAVs are generated (scripts/build_audio_sfx.mjs) and
+      # committed — fail if the committed bytes drift from the generator.
+      - name: Audio SFX fresh
+        run: npm run check:audio
+
       # Determinism gate: the worldgen GOLDEN snapshot (realized plateau
       # heights + site counts + a site-position digest) must match. Any PR
       # that reshuffles the seed-manifest draw order (docs/world-design-plan.md,

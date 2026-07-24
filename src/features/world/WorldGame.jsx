@@ -249,7 +249,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const {
     onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
     onEquippedUpsert, onEquippedDelete,
-    countsFor, copperFor, openedChestIdsFor, equippedFor,
+    countsFor, copperFor, openedChestIdsFor, equippedFor, equippedRows,
   } = useServerInventory();
 
   const inventoryImport = React.useMemo(
@@ -374,6 +374,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const onChestOpen = useCallback((chest) => {
     if (!connected) return;
     openChest(chest.id);
+    sceneRef.current?.playSound('loot');
     const rolled = rollChestLoot(chest.seed);
     if (rolled.length) {
       const txt = rolled.map((r) => {
@@ -484,6 +485,38 @@ export default function WorldGame({ playerInfo, onExit }) {
     if (!sceneReady) return;
     sceneRef.current?.setOpenedChests(openedChestIds);
   }, [openedChestIds, sceneReady]);
+
+  // Batch C: reconcile the playerEquipped table (all players) onto their
+  // avatars. Diff the desired "owner|slot → itemId" set against what we last
+  // applied and call the scene's equip bridge on the changes only. A
+  // scene-instance guard re-applies everything after a scene remount.
+  const appliedEquipRef = useRef(new Map());
+  const equipSceneRef = useRef(null);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!sceneReady || !scene) return;
+    if (equipSceneRef.current !== scene) { equipSceneRef.current = scene; appliedEquipRef.current = new Map(); }
+    const applied = appliedEquipRef.current; // mutated in place (retry-safe)
+    const desired = new Map();
+    for (const row of equippedRows.values()) {
+      desired.set(`${idHex(row.owner)}|${row.slot}`, row.itemId);
+    }
+    for (const [key, itemId] of desired) {
+      if (applied.get(key) === itemId) continue; // unchanged, already applied
+      const sep = key.indexOf('|');
+      const ok = scene.applyEquip(key.slice(0, sep), key.slice(sep + 1), itemId);
+      // Latch only on success — an unresolved itemId stays un-applied so it
+      // retries on the next snapshot instead of being silently stuck.
+      if (ok) applied.set(key, itemId);
+    }
+    for (const key of [...applied.keys()]) {
+      if (!desired.has(key)) {
+        const sep = key.indexOf('|');
+        scene.removeEquip(key.slice(0, sep), key.slice(sep + 1)); // also prunes _equipState
+        applied.delete(key);
+      }
+    }
+  }, [equippedRows, sceneReady]);
 
   // Slice 5c — local-player HP / death overlay state, driven by BabylonWorldScene
   // when our own row arrives via the player table subscription.
@@ -760,8 +793,8 @@ export default function WorldGame({ playerInfo, onExit }) {
           playerName={playerInfo?.username}
           className={className}
           playerLevel={worldLevel}
-          onAcceptQuest={(qid) => { acceptQuest(qid); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
-          onTurnInQuest={(qid) => { turnInQuest(qid); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
+          onAcceptQuest={(qid) => { acceptQuest(qid); sceneRef.current?.playSound('ui'); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
+          onTurnInQuest={(qid) => { turnInQuest(qid); sceneRef.current?.playSound('loot'); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
           onBuyFromVendor={buyFromVendor}
           onSellToVendor={sellToVendor}
           onToast={showToast}

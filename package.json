@@ -21,6 +21,8 @@
     "emit:assets": "node scripts/assets_pipeline.mjs --emit",
     "vendor:meshopt": "node scripts/vendor_meshopt_decoder.mjs",
     "vendor:meshopt:check": "node scripts/vendor_meshopt_decoder.mjs --check",
+    "build:audio": "node scripts/build_audio_sfx.mjs",
+    "check:audio": "node scripts/build_audio_sfx.mjs --check",
     "build:terrain-assets": "node scripts/build_terrain_assets.mjs",
     "check:terrain-assets": "node scripts/build_terrain_assets.mjs --check",
     "sync:terrain-assets": "node scripts/sync_terrain_assets.mjs",

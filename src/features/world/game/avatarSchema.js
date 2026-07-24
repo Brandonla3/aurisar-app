@@ -14,12 +14,30 @@ export const DEFAULT_AVATAR = {
   species:  { earMorph: 0, hornMesh: null, tailMesh: null },
   hair:     { style: 'hair_short', color: '#2C1B0A' },
   clothing: { top: 'top_tunic', bottom: 'bottom_trousers', shoes: 'shoes_boots' },
-  gear:     { helmet: null, chest: null, weapon: null, gauntlets: null, legs: null },
+  gear:     { helmet: null, chest: null, weapon: null, gauntlets: null, legs: null, boots: null },
 };
 
 /** Asset keys for each clothing/gear slot. */
 export const CLOTHING_SLOTS = ['top', 'bottom', 'shoes'];
-export const GEAR_SLOTS     = ['helmet', 'chest', 'weapon', 'gauntlets', 'legs'];
+export const GEAR_SLOTS     = ['helmet', 'chest', 'weapon', 'gauntlets', 'legs', 'boots'];
+
+/**
+ * Content EquipSlot (server `playerEquipped.slot`) → avatar GEAR_SLOT. The two
+ * vocabularies differ: content is combat-authoritative (mainHand/offHand/
+ * head/hands/feet/trinket), the avatar is visual. Slots with no avatar target
+ * yet (offHand, trinket) map to null and simply don't render — Batch H adds
+ * off-hand + trinket FX. Weapons are the only slot visualized in Batch C.
+ */
+export const EQUIP_TO_GEAR = {
+  mainHand: 'weapon',
+  head:     'helmet',
+  chest:    'chest',
+  hands:    'gauntlets',
+  legs:     'legs',
+  feet:     'boots',
+  offHand:  null,
+  trinket:  null,
+};
 
 /**
  * Legacy → fantasy clothing key migration. Configs persisted before the

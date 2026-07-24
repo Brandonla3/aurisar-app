@@ -1,7 +1,11 @@
 # Aurisar World — Design & Content Improvement Program (Zones, Layout, Assets, Characters)
 
 **Status:** approved 2026-07-24. Batch A landed with the PR that added this doc; each
-subsequent batch records its landing PR here, world-diagnostic style.
+subsequent batch records its landing PR here, world-diagnostic style. Landed: Batch A
+(#275), Batch B (#277). Batch C is split into **C1** (visible gear + combat feel + audio —
+world-only, this PR) and **C2** (the fitness-XP perk bridge + template unlocks — touches the
+fitness core, follows separately) to keep the high-risk XP-path change isolated and
+reviewable.
 
 ## Context
 

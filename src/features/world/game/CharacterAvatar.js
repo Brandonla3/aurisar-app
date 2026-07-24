@@ -29,6 +29,15 @@ import {
   PLAYER_CLIPS, PLAYER_LOCOMOTION,
 } from './avatarSchema.js';
 import { AnimationController } from './AnimationController.js';
+import { resolveGearVisual, buildProceduralWeapon } from './gearVisuals.js';
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+// Procedural weapon rest orientation in the RightHand bone's local space
+// (grip-at-origin weapon rotated to lie along the hand), and the fallback
+// attack-swing duration when the rig has no skeletal attack clip.
+const WEAPON_REST_ROT_X = Math.PI / 2;
+const SWING_MS = 350;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -400,6 +409,10 @@ export class CharacterAvatar {
     } else {
       this._animateGLB(dt);
     }
+    // Weapon swing runs on BOTH paths — the box fallback (GLB failed to load)
+    // still equips a procedural weapon (parented to the hip) and must show the
+    // attack chop.
+    this._updateWeaponSwing(dt);
   }
 
   /** Planar speed of the root since last frame, teleport-aware. */
@@ -484,10 +497,29 @@ export class CharacterAvatar {
     this._animCtl.update(dt);
   }
 
-  /** Play a one-shot clip if the rig has it (attack lands in Batch C for
-   *  base bodies; the Gilded Sentinel already carries SwordSlash). */
+  /**
+   * Play a one-shot. Skeletal clip wins when the rig has it (the Gilded
+   * Sentinel's SwordSlash). Base bodies ship no attack clip yet, so an
+   * 'attack' with an equipped weapon falls back to a procedural weapon chop
+   * — self-contained combat feedback until a retargeted clip lands. Returns
+   * true if anything played.
+   */
   playOneShot(key) {
-    return this._animCtl?.playOneShot(key) ?? false;
+    if (this._animCtl?.playOneShot(key)) return true;
+    if (key === 'attack' && this._weaponMesh) { this._swingMs = SWING_MS; return true; }
+    return false;
+  }
+
+  // Procedural weapon chop: arc the equipped weapon around its grip over
+  // SWING_MS, layered on the static hand pose. Placeholder for a real
+  // retargeted attack clip; no effect when no weapon is equipped.
+  _updateWeaponSwing(dt) {
+    if (!(this._swingMs > 0) || !this._weaponMesh) return;
+    this._swingMs = Math.max(0, this._swingMs - dt);
+    const t = 1 - this._swingMs / SWING_MS;          // 0→1 over the swing
+    const arc = Math.sin(t * Math.PI) * 1.3;          // up-and-down chop
+    this._weaponMesh.rotation.x = WEAPON_REST_ROT_X - arc;
+    if (this._swingMs === 0) this._weaponMesh.rotation.x = WEAPON_REST_ROT_X;
   }
 
   // ── Morph controls ─────────────────────────────────────────────────────────
@@ -710,8 +742,6 @@ export class CharacterAvatar {
     // The piece KEEPS its own skeleton (vertex bone-indices reference its own
     // joint list — see _bindInstanceToRig), so the old dispose-duplicate-
     // skeletons step is gone; _disposeSlot tears the piece down whole.
-    // TODO(weapons): when rigid weapon assets land, detect meshes without skin
-    // weights and fall back to attachToBone(rightHand) for those.
     inst.rootNodes.forEach(n => { n.parent = this.root; });
     this._bindInstanceToRig(inst);
     // Gear ships through the same blank-material pipeline as clothing — tint
@@ -721,6 +751,67 @@ export class CharacterAvatar {
     this._slots[`gear_${slot}`] = { nodes: inst.rootNodes, animGroups: inst.animationGroups };
   }
 
+  // ── Equipped items (server-driven; itemId → gearVisuals) ────────────────────
+
+  /**
+   * Show/replace an equipped item on an avatar GEAR_SLOT from its ItemDef.
+   * Weapons render as a procedural mesh socketed to the RightHand bone (Batch
+   * C); armor pieces (Phase B) delegate to the skinned GLB loader above and
+   * no-op until a fitted asset exists. Pass a null item to clear the slot.
+   */
+  async setGearItem(gearSlot, item, assetLibrary) {
+    this._disposeSlot(`gear_${gearSlot}`);
+    this._config.gear[gearSlot] = item?.id ?? null;
+    if (!item) return;
+
+    const visual = resolveGearVisual(item, (k) => !!assetLibrary?.getContainer?.(k));
+    if (!visual) return;
+
+    if (visual.kind === 'weapon' || visual.kind === 'weaponModel') {
+      // Procedural placeholder OR a real rigid weapon GLB — both socket to the
+      // RightHand bone (rigid, NOT skinned). A weapon model drops in here with
+      // no call-site change; only the mesh source differs.
+      let mesh;
+      if (visual.kind === 'weaponModel') {
+        const container = assetLibrary?.getContainer?.(visual.modelKey);
+        if (!container) { await this.setGear(gearSlot, item.id, assetLibrary); return; }
+        const inst = container.instantiateModelsToScene(n => `${this._id}_weapon_${item.id}_${n}`, false);
+        mesh = new BABYLON.TransformNode(`${this._id}_weapon_${item.id}`, this._scene);
+        inst.rootNodes.forEach(n => { n.parent = mesh; });
+      } else {
+        mesh = buildProceduralWeapon(BABYLON, this._scene, visual, item.id);
+      }
+      if (!mesh) return;
+      mesh.name = `${this._id}_weapon_${item.id}`;
+      const handBone = findBone(this._skeleton, BONES.rightHand);
+      const refMesh = this._bodyMeshes[0] ?? null;
+      if (handBone && refMesh) {
+        mesh.attachToBone(handBone, refMesh);
+        // Seat the grip in the palm: authored grip-at-origin, length along +Y;
+        // rotate to lie along the hand (WEAPON_REST_ROT_X — the swing's rest
+        // pose) and nudge to the grip. Coarse; on-device is the acceptance gate.
+        mesh.position.set(0, 0.04, 0);
+        mesh.rotation.set(WEAPON_REST_ROT_X, 0, 0);
+      } else {
+        mesh.parent = this.root; // fallback: no rig (box avatar) — float at hip
+        mesh.position.set(0.4, 1.0, 0.1);
+      }
+      this._slots[`gear_${gearSlot}`] = { nodes: [mesh], animGroups: [], material: mesh.material };
+      if (gearSlot === 'weapon') this._weaponMesh = mesh; // drives the attack swing
+      return;
+    }
+
+    // armor → skinned GLB (Phase B — none shipped yet → no-op).
+    await this.setGear(gearSlot, item.id, assetLibrary);
+  }
+
+  /** Clear an equipped GEAR_SLOT (server unequip). _disposeSlot drops the
+   *  weapon-swing target and the exclusive material. */
+  removeGear(gearSlot) {
+    this._disposeSlot(`gear_${gearSlot}`);
+    this._config.gear[gearSlot] = null;
+  }
+
   // ── Slot disposal ──────────────────────────────────────────────────────────
 
   _disposeSlot(key) {
@@ -728,7 +819,14 @@ export class CharacterAvatar {
     if (!slot) return;
     slot.animGroups?.forEach(ag => { ag.stop(); ag.dispose(); });
     slot.nodes?.forEach(n => n.dispose(false, false));
+    // Procedural weapons own an exclusive StandardMaterial (unlike the shared
+    // clothing/skin materials) — dispose it, or repeated gear swaps leak.
+    slot.material?.dispose();
     delete this._slots[key];
+    // Any weapon-slot teardown (early-return, swap, unequip) must drop the
+    // swing target so _updateWeaponSwing / playOneShot never touch a disposed
+    // mesh.
+    if (key === 'gear_weapon') { this._weaponMesh = null; this._swingMs = 0; }
   }
 
   // ── Label ──────────────────────────────────────────────────────────────────

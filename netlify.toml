@@ -91,6 +91,10 @@
   for = "/assets/terrain/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/audio/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # The vendored meshopt decoder is also stable-named and dependency-versioned.
 [[headers]]
