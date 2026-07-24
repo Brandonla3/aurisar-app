@@ -19,12 +19,55 @@ import { CharacterAvatar } from '../game/CharacterAvatar.js';
 const MARKER_COLORS = { '!': '#f0d060', '?': '#f0d060' };
 
 // Deterministic per-NPC appearance so hub characters look distinct without
-// authored configs. Story pass can replace this with per-NPC avatarConfig
-// (or glbKey models) later.
+// authored configs. NPC_APPEARANCES below overrides this for the named hub
+// cast; the hash keeps covering any NPC added without an authored look.
 const HAIR_STYLES = ['hair_short', 'hair_long', 'hair_bun', 'hair_wavy'];
 const TOPS    = ['top_tunic', 'top_gambeson', 'top_cloth_shirt', 'top_leather_vest'];
 const BOTTOMS = ['bottom_trousers', 'bottom_breeches'];
 const TONES   = ['#C68642', '#8D5524', '#E0AC69', '#F1C27D'];
+
+// Authored looks for the quest-critical hub cast (design-plan Batch A):
+// each NPC reads as their occupation at a glance instead of a hash roll.
+// Partial avatarConfigs — CharacterAvatar merges defaults. marshal_halwin
+// keeps the gilded_sentinel model override and is deliberately absent.
+const NPC_APPEARANCES = {
+  trader_pell: {       // portly, prosperous provisioner
+    body: { gender: 'male', weight: 0.75, height: 0.45 },
+    skin: { tone: '#E0AC69' },
+    hair: { style: 'hair_short', color: '#5a3b1e' },
+    clothing: { top: 'top_leather_vest', bottom: 'bottom_breeches', shoes: 'shoes_boots' },
+  },
+  apothecary_yarrow: { // slight, tidy herbalist
+    body: { gender: 'female', weight: 0.3, age: 0.45 },
+    skin: { tone: '#F1C27D' },
+    hair: { style: 'hair_bun', color: '#8a8f6a' },
+    clothing: { top: 'top_cloth_shirt', bottom: 'bottom_cloth_skirt', shoes: 'shoes_sandals' },
+  },
+  brother_edran: {     // aging priest in a plain robe
+    body: { gender: 'male', age: 0.85, weight: 0.4 },
+    skin: { tone: '#C68642' },
+    hair: { style: 'hair_short', color: '#b9b9b9' },
+    clothing: { top: 'top_robe', bottom: 'bottom_trousers', shoes: 'shoes_sandals' },
+  },
+  smith_dorn: {        // broad-shouldered armorer
+    body: { gender: 'male', muscle: 0.9, shoulderWidth: 0.8 },
+    skin: { tone: '#8D5524' },
+    hair: { style: 'hair_short', color: '#1c1c1c' },
+    clothing: { top: 'top_gambeson', bottom: 'bottom_leather_pants', shoes: 'shoes_boots' },
+  },
+  fisher_maelis: {     // weathered old salt, grey braids
+    body: { gender: 'female', age: 0.7 },
+    skin: { tone: '#C68642' },
+    hair: { style: 'hair_braids', color: '#d8d8d8' },
+    clothing: { top: 'top_tunic', bottom: 'bottom_trousers', shoes: 'shoes_leather_wraps' },
+  },
+  foreman_bram: {      // stocky mine foreman
+    body: { gender: 'male', muscle: 0.7, weight: 0.6 },
+    skin: { tone: '#8D5524' },
+    hair: { style: 'hair_wavy', color: '#3a2a18' },
+    clothing: { top: 'top_leather_vest', bottom: 'bottom_leather_pants', shoes: 'shoes_boots' },
+  },
+};
 
 function hashId(id) {
   let h = 0;
@@ -44,6 +87,8 @@ const NPC_MODEL_OVERRIDES = {
 function npcAvatarConfig(npc) {
   const model = NPC_MODEL_OVERRIDES[npc.id];
   if (model) return { version: 1, model };
+  const authored = NPC_APPEARANCES[npc.id];
+  if (authored) return { version: 1, ...authored };
   const h = hashId(npc.id);
   // Unsigned shifts throughout: h is a full uint32, and `h >> n` reads it as
   // SIGNED — ids hashing ≥ 2^31 (trader_pell, foreman_bram) produced negative
