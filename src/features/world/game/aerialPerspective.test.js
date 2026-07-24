@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aerialFogWeight, applyAerialFog } from './aerialPerspective.js';
+import { aerialFogWeight, applyAerialFog, sunVisibilityFromWet } from './aerialPerspective.js';
 
 // A representative mid-warm golden-hour base fog colour for the apply tests.
 const BASE = { r: 0.45, g: 0.42, b: 0.40 };
@@ -50,6 +50,20 @@ describe('aerialFogWeight', () => {
 
   it('treats a non-finite wetness as clear weather rather than poisoning the result', () => {
     expect(Number.isFinite(aerialFogWeight(1, 0.4, 1, NaN))).toBe(true);
+  });
+});
+
+describe('sunVisibilityFromWet', () => {
+  it('is 1 in clear weather and falls to a 0.15 floor in a downpour', () => {
+    expect(sunVisibilityFromWet(0)).toBe(1);
+    expect(sunVisibilityFromWet(1)).toBeCloseTo(0.15, 5);
+    expect(sunVisibilityFromWet(0.5)).toBeCloseTo(0.575, 5);
+  });
+
+  it('clamps out-of-range / non-finite wetness to the valid range', () => {
+    expect(sunVisibilityFromWet(-1)).toBe(1);
+    expect(sunVisibilityFromWet(2)).toBeCloseTo(0.15, 5);
+    expect(sunVisibilityFromWet(NaN)).toBe(1);
   });
 });
 
