@@ -85,12 +85,14 @@ export function buildBladeClusterVertexData(o = {}) {
 // observer. NOT constructed at module scope: this module can be evaluated (via
 // the static import chain) before window.BABYLON is assigned.
 
-const _clocks = new WeakMap(); // scene -> { time, windX, windZ, obs }
+const _clocks = new WeakMap(); // scene -> { time, windX, windZ, obs, refs }
 
-function _ensureClock(scene) {
+// Get-or-create the shared clock (no refcount change) — called every frame in
+// bindForSubMesh.
+function _getClock(scene) {
   let c = _clocks.get(scene);
   if (!c) {
-    c = { time: 0, windX: 0.8, windZ: 0.6, obs: null };
+    c = { time: 0, windX: 0.8, windZ: 0.6, obs: null, refs: 0 };
     c.obs = scene.onBeforeRenderObservable.add(() => {
       c.time += scene.getEngine().getDeltaTime() / 1000;
       const ang = 0.7 + Math.sin(c.time * 0.04) * 0.25;
@@ -100,6 +102,22 @@ function _ensureClock(scene) {
     _clocks.set(scene, c);
   }
   return c;
+}
+
+// Acquire a reference (one per grass material) and return a release fn that
+// removes the shared per-frame observer once the LAST grass material on the
+// scene disposes — so a disposed material doesn't leave the clock callback
+// ticking on a scene that outlives it.
+function _acquireClock(scene) {
+  const c = _getClock(scene);
+  c.refs++;
+  return () => {
+    c.refs--;
+    if (c.refs <= 0 && _clocks.get(scene) === c) {
+      scene.onBeforeRenderObservable.remove(c.obs);
+      _clocks.delete(scene);
+    }
+  };
 }
 
 // ── material plugin ───────────────────────────────────────────────────────────
@@ -154,7 +172,7 @@ function _grassWindPluginClass() {
 
     bindForSubMesh(uniformBuffer, scene) {
       if (!this._isEnabled) return;
-      const c = _ensureClock(scene);
+      const c = _getClock(scene);
       const md = scene.metadata?.ashwood;
       const wind = Math.max(0.2, Math.min(3, md?.weather?.windStrength ?? 1));
       uniformBuffer.updateFloat('grassTime', c.time);
@@ -218,6 +236,16 @@ function _grassWindPluginClass() {
               diffuseColor *= mix(0.55, 1.18, pow(clamp(vGrassBladeT, 0.0, 1.0), 1.1));
             #endif
           `,
+          // Force opaque OUTPUT alpha. needAlphaBlending:false only keeps the
+          // material out of the transparent queue — the StandardMaterial
+          // INSTANCESCOLOR path still does `alpha *= vColor.a`, which would leak
+          // the per-blade wind seed (instanceColor.a) into the fragment's output
+          // alpha and confuse prepass / render-target / compositing consumers.
+          CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+            #ifdef GRASSWIND
+              color.a = 1.0;
+            #endif
+          `,
         };
       }
       return null;
@@ -254,6 +282,8 @@ export function createGrassMaterial(scene, opts = {}) {
   // eslint-disable-next-line no-new -- the plugin registers on the material in its ctor
   new Plugin(mat, maxH);
 
-  _ensureClock(scene);
+  // Acquire a reference on the shared wind clock and release it on dispose, so
+  // the per-frame observer is torn down when the last grass material goes away.
+  mat.onDisposeObservable.add(_acquireClock(scene));
   return mat;
 }
