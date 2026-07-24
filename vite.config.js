@@ -14,13 +14,17 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 400,
     rollupOptions: {
+      // world-viewer.html (the standalone dev/QA renderer — `?qa=1` atmosphere
+      // overlay, `?hud=assets` download ledger, the meshopt-decode acceptance
+      // path) is a build input on Netlify deploy previews / branch builds and
+      // locally, giving rendering PRs a real-GPU review surface, but kept OUT of
+      // production. On non-prod it MUST be emitted or the SPA catch-all shadows
+      // /world-viewer.html with index.html.
+      //
       // Production keeps Vite's DEFAULT single index.html entry (no `input`
-      // override) so its chunk graph is unchanged. Only non-production builds
-      // (Netlify deploy-preview / branch, and local) add the standalone
-      // world-viewer.html so rendering PRs have a real-GPU review surface. Naming
-      // an explicit production entry perturbed rolldown's splitting — it broke the
-      // babylon decoders out into their own chunk that reads the ambient BABYLON
-      // global before it is set — so production must stay on the default.
+      // override): naming an explicit production entry perturbed rolldown's chunk
+      // splitting — it broke the babylon decoders out into their own chunk that
+      // reads the ambient BABYLON global before it is set — so prod stays default.
       // CONTEXT is set by Netlify ('production' | 'deploy-preview' | 'branch-deploy').
       ...(process.env.CONTEXT === 'production'
         ? {}

@@ -17,6 +17,11 @@ import 'babylonjs-loaders';
 import { createCharacterAssetCache } from '../world/game/AssetLibrary.js';
 import { CharacterAvatar } from '../world/game/CharacterAvatar.js';
 import { mergeConfig }     from '../world/game/avatarSchema.js';
+import { configureBabylonDecoders } from '../world/game/babylonDecoders.js';
+
+// window.BABYLON is set by ../../babylonGlobal.js (imported first). Repoint the
+// meshopt decoder at our same-origin vendored build before any GLB loads.
+configureBabylonDecoders(BABYLON);
 
 export default function CharacterTurntable({ config, style }) {
   const canvasRef = useRef(null);

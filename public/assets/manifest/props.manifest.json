@@ -1,0 +1,314 @@
+{
+  "_generated": "scripts/assets_pipeline.mjs — do not edit by hand",
+  "category": "props",
+  "base": "/assets/props/",
+  "budgetClass": "kit_static",
+  "assets": {
+    "anvil": {
+      "file": "anvil.glb",
+      "bytes": 144484,
+      "tris": 750,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 1024
+    },
+    "barrel": {
+      "file": "barrel.glb",
+      "bytes": 317256,
+      "tris": 824,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 1024
+    },
+    "bell_tower": {
+      "file": "bell_tower.glb",
+      "bytes": 135736,
+      "tris": 11799,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "blacksmith": {
+      "file": "blacksmith.glb",
+      "bytes": 97444,
+      "tris": 7659,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "bonfire": {
+      "file": "bonfire.glb",
+      "bytes": 13284,
+      "tris": 602,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "cart": {
+      "file": "cart.glb",
+      "bytes": 30972,
+      "tris": 2659,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "column_broken": {
+      "file": "column_broken.glb",
+      "bytes": 4104,
+      "tris": 108,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "column": {
+      "file": "column.glb",
+      "bytes": 5324,
+      "tris": 122,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "crate_wooden": {
+      "file": "crate_wooden.glb",
+      "bytes": 318100,
+      "tris": 1576,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 1024
+    },
+    "dock_platform": {
+      "file": "dock_platform.glb",
+      "bytes": 18272,
+      "tris": 324,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 512
+    },
+    "farmcrate_apple": {
+      "file": "farmcrate_apple.glb",
+      "bytes": 595664,
+      "tris": 4028,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 1024
+    },
+    "fence": {
+      "file": "fence.glb",
+      "bytes": 4836,
+      "tris": 208,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "house_1": {
+      "file": "house_1.glb",
+      "bytes": 81624,
+      "tris": 5758,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "house_2": {
+      "file": "house_2.glb",
+      "bytes": 98796,
+      "tris": 7162,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "house_3": {
+      "file": "house_3.glb",
+      "bytes": 43696,
+      "tris": 3024,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "inn": {
+      "file": "inn.glb",
+      "bytes": 92748,
+      "tris": 7756,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "lantern_wall": {
+      "file": "lantern_wall.glb",
+      "bytes": 178132,
+      "tris": 2822,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 1024
+    },
+    "market_stand_1": {
+      "file": "market_stand_1.glb",
+      "bytes": 22340,
+      "tris": 1548,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "market_stand_2": {
+      "file": "market_stand_2.glb",
+      "bytes": 16464,
+      "tris": 1132,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "mushroom_red": {
+      "file": "mushroom_red.glb",
+      "bytes": 3736,
+      "tris": 48,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "mushroom_tan": {
+      "file": "mushroom_tan.glb",
+      "bytes": 3652,
+      "tris": 48,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "ore_rocks": {
+      "file": "ore_rocks.glb",
+      "bytes": 3356,
+      "tris": 84,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "rock_large_d": {
+      "file": "rock_large_d.glb",
+      "bytes": 4996,
+      "tris": 80,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "rock_large_f": {
+      "file": "rock_large_f.glb",
+      "bytes": 4916,
+      "tris": 73,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "rock_tall_a": {
+      "file": "rock_tall_a.glb",
+      "bytes": 5724,
+      "tris": 136,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "rock_tall_h": {
+      "file": "rock_tall_h.glb",
+      "bytes": 4952,
+      "tris": 78,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "rowboat": {
+      "file": "rowboat.glb",
+      "bytes": 16968,
+      "tris": 168,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 512
+    },
+    "statue_block": {
+      "file": "statue_block.glb",
+      "bytes": 4300,
+      "tris": 140,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "statue_head": {
+      "file": "statue_head.glb",
+      "bytes": 6128,
+      "tris": 196,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "tent_open": {
+      "file": "tent_open.glb",
+      "bytes": 5204,
+      "tris": 232,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "tent_small": {
+      "file": "tent_small.glb",
+      "bytes": 5932,
+      "tris": 224,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "timber_pillar": {
+      "file": "timber_pillar.glb",
+      "bytes": 14376,
+      "tris": 44,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 512
+    },
+    "weapon_stand": {
+      "file": "weapon_stand.glb",
+      "bytes": 323980,
+      "tris": 2084,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 1024
+    },
+    "well": {
+      "file": "well.glb",
+      "bytes": 27788,
+      "tris": 1870,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    }
+  }
+}

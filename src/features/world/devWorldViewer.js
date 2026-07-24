@@ -18,6 +18,17 @@ import BABYLON from '../../babylonGlobal.js';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { sunElevationDeg } from './game/atmosphereState.js';
+import { configureBabylonDecoders } from './game/babylonDecoders.js';
+import charactersManifest from '../../../public/assets/manifest/characters.manifest.json';
+import modelsManifest from '../../../public/assets/manifest/models.manifest.json';
+import mobsManifest from '../../../public/assets/manifest/mobs.manifest.json';
+import propsManifest from '../../../public/assets/manifest/props.manifest.json';
+
+const ASSET_MANIFESTS = [charactersManifest, modelsManifest, mobsManifest, propsManifest];
+
+// window.BABYLON is set by ../../babylonGlobal.js (imported first). Repoint the
+// meshopt decoder at our same-origin vendored build before any GLB loads.
+configureBabylonDecoders(BABYLON);
 
 const canvas = document.getElementById('world-canvas');
 const hud = document.getElementById('hud');
@@ -238,3 +249,49 @@ function mountAtmosphereQA(worldScene) {
 
 // Expose the cleanup so the overlay can be torn down from the console in dev.
 if (params.has('qa')) window.__atmoQACleanup = mountAtmosphereQA(scene);
+
+// ?hud=assets — Asset-budget overlay (Batch B). Reads the generated manifests
+// (scripts/assets_pipeline.mjs) for the on-disk download ledger per category,
+// alongside live scene stats (draw calls, active/total meshes, textures), so
+// the acceptance-matrix "download ≈9MB / draw calls within budget" checks are
+// visible on the deploy preview instead of guessed. Opt-in; off by default.
+function mountAssetHud(worldScene) {
+  if (document.getElementById('asset-hud')) return () => {};
+  const ledger = ASSET_MANIFESTS.map((m) => {
+    const bytes = Object.values(m.assets).reduce((a, x) => a + (x.bytes || 0), 0);
+    return { cat: m.category, n: Object.keys(m.assets).length, kb: Math.round(bytes / 1024) };
+  });
+  const totalKb = ledger.reduce((a, x) => a + x.kb, 0);
+
+  const panel = document.createElement('div');
+  panel.id = 'asset-hud';
+  panel.style.cssText =
+    'position:fixed;bottom:8px;right:8px;z-index:10;font:11px/1.6 ui-monospace,monospace;' +
+    'color:#dfe;background:rgba(10,14,20,0.82);padding:8px 10px;border-radius:6px;min-width:210px';
+  const out = document.createElement('pre');
+  out.style.cssText = 'margin:0;white-space:pre';
+  panel.appendChild(out);
+  document.body.appendChild(panel);
+
+  const bScene = worldScene.scene;
+  // Official instrumentation surface for draw calls (vs reaching into engine
+  // internals). Captured on the scene; disposed with the overlay.
+  const instr = new BABYLON.SceneInstrumentation(bScene);
+  instr.captureFrameTime = true;
+  const timer = setInterval(() => {
+    const draws = instr.drawCallsCounter?.current ?? '—';
+    out.textContent =
+      `— download ledger —\n` +
+      ledger.map((l) => `${l.cat.padEnd(11)} ${String(l.n).padStart(3)}  ${String(l.kb).padStart(5)}KB`).join('\n') +
+      `\n${'total'.padEnd(11)}      ${String(totalKb).padStart(5)}KB\n` +
+      `— live —\n` +
+      `draw calls  ${draws}\n` +
+      `meshes      ${bScene.getActiveMeshes().length}/${bScene.meshes.length}\n` +
+      `textures    ${bScene.textures.length}\n` +
+      `materials   ${bScene.materials.length}\n` +
+      `tier        ${bScene.metadata?.ashwood?.qualityTier ?? '—'}`;
+  }, 300);
+  return () => { clearInterval(timer); instr.dispose(); panel.remove(); };
+}
+
+if (params.get('hud') === 'assets') window.__assetHudCleanup = mountAssetHud(scene);

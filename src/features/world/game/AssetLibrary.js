@@ -15,74 +15,32 @@
 
 /* global BABYLON */
 
-export const CHARACTER_ASSET_BASE = '/assets/characters/';
+import charactersManifest from '../../../../public/assets/manifest/characters.manifest.json';
+import modelsManifest from '../../../../public/assets/manifest/models.manifest.json';
+
+export const CHARACTER_ASSET_BASE = charactersManifest.base; // '/assets/characters/'
 const BASE = CHARACTER_ASSET_BASE;
 
-// Keys → relative paths under BASE.
-// Hair keys must match `HAIR_STYLES` keys in src/features/avatar/panels/HairPanel.jsx.
-// `hair_shaved` intentionally has no entry — selecting it should render no mesh.
-// Missing files load silently (see _load below); a Blender-authored .glb can land
-// later with no other code change. See public/assets/characters/README.md for the
-// export contract.
-// Exported as the single source of truth — AvatarPreview's PreviewAssets
-// imports this same object instead of keeping its own copy.
-export const MANIFEST = {
-  // Base bodies — neutral default + gendered variants. Selected via
-  // CharacterAvatar._resolveBaseBody based on config.body.gender.
-  base_body:            'base_body.glb',
-  base_body_male:       'base_body_male.glb',
-  base_body_female:     'base_body_female.glb',
-
-  // Hair (8 styles + 'hair_shaved' renders as nothing — intentionally absent)
-  'hair/hair_short':    'hair/hair_short.glb',
-  'hair/hair_long':     'hair/hair_long.glb',
-  'hair/hair_braids':   'hair/hair_braids.glb',
-  'hair/hair_ponytail': 'hair/hair_ponytail.glb',
-  'hair/hair_bun':      'hair/hair_bun.glb',
-  'hair/hair_wavy':     'hair/hair_wavy.glb',
-  'hair/hair_afro':     'hair/hair_afro.glb',
-  'hair/hair_mohawk':   'hair/hair_mohawk.glb',
-
-  // Clothing — fantasy RPG only (no modern items).
-  'clothing/top_tunic':           'clothing/top_tunic.glb',
-  'clothing/top_robe':            'clothing/top_robe.glb',
-  'clothing/top_cloth_shirt':     'clothing/top_cloth_shirt.glb',
-  'clothing/top_gambeson':        'clothing/top_gambeson.glb',
-  'clothing/top_leather_vest':    'clothing/top_leather_vest.glb',
-  'clothing/top_chainmail':       'clothing/top_chainmail.glb',
-  'clothing/bottom_trousers':     'clothing/bottom_trousers.glb',
-  'clothing/bottom_kilt':         'clothing/bottom_kilt.glb',
-  'clothing/bottom_leather_pants':'clothing/bottom_leather_pants.glb',
-  'clothing/bottom_breeches':     'clothing/bottom_breeches.glb',
-  'clothing/bottom_cloth_skirt':  'clothing/bottom_cloth_skirt.glb',
-  'clothing/bottom_leggings':     'clothing/bottom_leggings.glb',
-  'clothing/shoes_boots':         'clothing/shoes_boots.glb',
-  'clothing/shoes_sandals':       'clothing/shoes_sandals.glb',
-  'clothing/shoes_greaves':       'clothing/shoes_greaves.glb',
-  'clothing/shoes_leather_wraps': 'clothing/shoes_leather_wraps.glb',
-
-  // Species — horns (head-attached) and tails (hip-attached).
-  'species/horns_small':    'species/horns_small.glb',
-  'species/horns_large':    'species/horns_large.glb',
-  'species/horns_curved':   'species/horns_curved.glb',
-  'species/tail_short':     'species/tail_short.glb',
-  'species/tail_long':      'species/tail_long.glb',
-  'species/tail_fluffy':    'species/tail_fluffy.glb',
-
-  // Gear — auto-skinned via scripts/blender/04_import_armor.py. Each piece
-  // ships skin weights bound to the shared MPFB rig so it deforms with the
-  // body. Add new entries here as `gear/<key>: 'gear/<key>.glb'` once a piece
-  // has been fit + processed + visually verified.
-};
+// Key → relative path under BASE, read from the generated manifest
+// (scripts/assets_pipeline.mjs). Keys are `base_body`, `hair/<style>`,
+// `clothing/<item>`, `species/<piece>`, and — once fit + processed — `gear/<key>`.
+// Hair keys match `HAIR_STYLES` in src/features/avatar/panels/HairPanel.jsx;
+// `hair_shaved` intentionally has no asset (renders no mesh). Missing files
+// load silently (see _load); the manifest is the single source of truth,
+// shared with AvatarPreview's PreviewAssets. See public/assets/characters/README.md.
+export const MANIFEST = Object.fromEntries(
+  Object.entries(charactersManifest.assets).map(([key, a]) => [key, a.file]),
+);
 
 // Standalone, self-contained character models — a full rigged+animated mesh in
 // a single GLB, NOT part of the modular MPFB system (no shape keys, own
 // skeleton). Used for authored hero/NPC appearances via `avatarConfig.model`.
-// Built by scripts/build_gilded_sentinel.mjs. CharacterAvatar takes a distinct
-// build path for these (no morphs, no modular hair/clothing/gear pieces).
-export const MODEL_MANIFEST = {
-  gilded_sentinel: 'gilded_sentinel.glb',
-};
+// Built by scripts/build_gilded_sentinel.mjs; keyed by asset key in the
+// generated models manifest. CharacterAvatar takes a distinct build path for
+// these (no morphs, no modular hair/clothing/gear pieces).
+export const MODEL_MANIFEST = Object.fromEntries(
+  Object.entries(modelsManifest.assets).map(([key, a]) => [key, a.file]),
+);
 
 const _containers = new Map();
 let   _scene      = null;

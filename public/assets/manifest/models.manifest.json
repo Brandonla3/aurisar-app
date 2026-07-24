@@ -1,0 +1,24 @@
+{
+  "_generated": "scripts/assets_pipeline.mjs — do not edit by hand",
+  "category": "models",
+  "base": "/assets/characters/",
+  "budgetClass": "character_model",
+  "assets": {
+    "gilded_sentinel": {
+      "file": "gilded_sentinel.glb",
+      "bytes": 226476,
+      "tris": 12564,
+      "bones": 24,
+      "clips": [
+        "Idle",
+        "RestPose",
+        "Run",
+        "Run2",
+        "SwordSlash",
+        "Walk"
+      ],
+      "morphs": [],
+      "texMaxPx": 0
+    }
+  }
+}

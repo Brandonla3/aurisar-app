@@ -14,6 +14,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import BABYLON from '../../babylonGlobal.js';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
+import { configureBabylonDecoders } from './game/babylonDecoders.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 import TestingHud             from './TestingHud.jsx';
 import {
@@ -37,9 +38,12 @@ import {
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
 import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen, PROXIMITY_RADIUS } from './chatUtils.js';
-// window.BABYLON is established by ../../babylonGlobal.js (imported above) — a
-// bundled UMD package that also avoids the CSP script-src violation from loading
-// jsdelivr at runtime, and keeps BabylonWorldScene's window.BABYLON references live.
+// window.BABYLON is established by ../../babylonGlobal.js (imported above), which
+// also avoids the CSP script-src violation from loading jsdelivr at runtime and
+// keeps BabylonWorldScene's window.BABYLON references live. Repoint the meshopt
+// decoder at our same-origin vendored build before any GLB loads (our assets are
+// EXT_meshopt_compression-encoded).
+configureBabylonDecoders(BABYLON);
 
 const IS_TOUCH = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;

@@ -1,0 +1,143 @@
+{
+  "_generated": "scripts/assets_pipeline.mjs — do not edit by hand",
+  "category": "mobs",
+  "base": "/assets/mobs/",
+  "budgetClass": "creature_rigged",
+  "assets": {
+    "bull": {
+      "file": "bull.glb",
+      "bytes": 249944,
+      "tris": 2418,
+      "bones": 42,
+      "clips": [
+        "Attack_Headbutt",
+        "Attack_Kick",
+        "Death",
+        "Eating",
+        "Gallop",
+        "Gallop_Jump",
+        "Idle",
+        "Idle_2",
+        "Idle_Headlow",
+        "Idle_HitReact_Left",
+        "Idle_HitReact_Right",
+        "Jump_toIdle",
+        "Walk"
+      ],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "glubevolved": {
+      "file": "glubevolved.glb",
+      "bytes": 67132,
+      "tris": 4452,
+      "bones": 13,
+      "clips": [
+        "Death",
+        "Fast_Flying",
+        "Flying_Idle",
+        "Headbutt",
+        "HitReact",
+        "No",
+        "Punch",
+        "Yes"
+      ],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "goblin": {
+      "file": "goblin.glb",
+      "bytes": 47924,
+      "tris": 2912,
+      "bones": 12,
+      "clips": [
+        "Attack",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "Run",
+        "Walk"
+      ],
+      "morphs": [],
+      "texMaxPx": 32
+    },
+    "orcenemy": {
+      "file": "orcenemy.glb",
+      "bytes": 45384,
+      "tris": 2296,
+      "bones": 4,
+      "clips": [
+        "Bite_Front",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "skeleton_minion": {
+      "file": "skeleton_minion.glb",
+      "bytes": 575540,
+      "tris": 5288,
+      "bones": 369,
+      "clips": [
+        "1H_Melee_Attack_Slice_Diagonal",
+        "Death_A",
+        "Hit_A",
+        "Idle",
+        "Running_A",
+        "Walking_A"
+      ],
+      "morphs": [],
+      "texMaxPx": 512
+    },
+    "spider": {
+      "file": "spider.glb",
+      "bytes": 130436,
+      "tris": 2712,
+      "bones": 39,
+      "clips": [
+        "Spider_Attack",
+        "Spider_Death",
+        "Spider_Idle",
+        "Spider_Jump",
+        "Spider_Walk"
+      ],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "tribal": {
+      "file": "tribal.glb",
+      "bytes": 95396,
+      "tris": 5252,
+      "bones": 38,
+      "clips": [
+        "Death",
+        "Fast_Flying",
+        "Flying_Idle",
+        "Headbutt",
+        "HitReact",
+        "No",
+        "Punch",
+        "Yes"
+      ],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "wolf": {
+      "file": "wolf.glb",
+      "bytes": 6880,
+      "tris": 180,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    }
+  }
+}
