@@ -42,8 +42,58 @@
     # VITE_SPACETIMEDB_URI; defaulted in src/features/world/useSpacetimeWorld.js).
     Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
 
-# Cache the immutable Vite-hashed bundle aggressively.
+# Cache the immutable Vite-hashed bundle aggressively. Vite fingerprints its
+# JS/CSS output (e.g. /assets/index-BDUvV1ml.js), so the URL changes whenever
+# the content does — safe to cache forever.
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Public runtime ASSETS live in /assets subdirectories with STABLE filenames
+# (base_body.glb, skeleton_minion.glb, the generated manifests, the meshopt
+# decoder). Those are NOT fingerprinted — the pipeline can rewrite them in
+# place — so `immutable` above would let clients serve stale bytes for a year
+# and defeat future asset corrections at the same URL. Netlify applies header
+# rules in order with later rules overriding, so these revalidate: cache, but
+# check freshness (ETag → 304 when unchanged) before use.
+#   NOTE: this fixes propagation from here on. A client that already cached a
+#   file under the old immutable policy keeps it until expiry; the current
+#   optimization is visually-lossless (meshopt geometry only, no texture
+#   re-encode), so a stale cache means a larger download, not a wrong render.
+#   Content-hashed asset URLs (via the manifest) are the follow-up if guaranteed
+#   immediate propagation is ever required.
+[[headers]]
+  for = "/assets/characters/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/mobs/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/props/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/manifest/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/tiles/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/castle/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/assets/terrain/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# The vendored meshopt decoder is also stable-named and dependency-versioned.
+[[headers]]
+  for = "/babylon/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

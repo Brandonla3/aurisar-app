@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
+
+const r = (p) => fileURLToPath(new URL(p, import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -14,6 +17,14 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 400,
     rollupOptions: {
+      // Emit the dev world viewer as a real build entry so /world-viewer.html
+      // is served on deploy previews (the SPA catch-all otherwise shadows it
+      // with index.html). It's the acceptance surface for the meshopt decode
+      // path + ?hud=assets ledger. `main` must be listed too or Vite drops it.
+      input: {
+        main: r('./index.html'),
+        'world-viewer': r('./world-viewer.html'),
+      },
       output: {
         // Split heavy libraries into their own chunks so the main bundle
         // doesn't pay for recharts on first paint. Combined with React.lazy at
