@@ -320,6 +320,37 @@ export class AshwoodSky {
       const k = 0.25 + 0.75 * dayF;
       fr *= k; fg *= k; fb *= k;
     }
+
+    // Sun-directional aerial perspective (analytic in-scattering). The haze
+    // between the camera and distant surfaces forward-scatters sunlight, so it
+    // glows warm when the camera faces toward the sun and cools when facing
+    // away. This shares this._sunDir — the exact sun direction the sky dome
+    // already warms toward (the golden-hour horizon band in FRAG) — so sky and
+    // ground haze now agree instead of the haze being direction-agnostic
+    // (threejs-atmosphere-aerial-perspective: sky and terrain haze must NOT use
+    // different sun directions). Analytic tier: this is the whole scattering
+    // model a small ground world needs — no LUT. Strongest at golden hour (a
+    // low sun means a long haze path); self-fades at night (dusk & dayF → 0).
+    // Applied AFTER the night dimming k above: this is in-scattered sunlight, so
+    // it stays bright at golden hour rather than being pulled toward night. It
+    // lands on the single scene.fogColor below, so terrain/props (Babylon fog)
+    // and water/grass (vFogColor uniform, copied from scene.fogColor each frame)
+    // all pick it up consistently — no per-shader edits.
+    const cam = this.lm.camera ?? this.scene.activeCamera;
+    if (cam && cam.target) {
+      const fx = cam.target.x - cam.position.x;   // camera-forward, horizontal
+      const fz = cam.target.z - cam.position.z;
+      const sx = this._sunDir.x, sz = this._sunDir.z;   // toward the sun, horizontal
+      const fl = Math.hypot(fx, fz) || 1;
+      const sl = Math.hypot(sx, sz) || 1;
+      const facing = (fx * sx + fz * sz) / (fl * sl);   // -1 away … +1 toward sun
+      const w = facing * (0.05 * dayF + 0.22 * dusk);   // tune the 0.22 on-device
+      // Warm toward the sun (+R,+G,−B); the mirror cools the away-facing haze.
+      fr = Math.max(0, fr + w * 0.85);
+      fg = Math.max(0, fg + w * 0.42);
+      fb = Math.max(0, fb - w * 0.75);
+    }
+
     this.scene.fogColor.copyFromFloats(fr, fg, fb);
     this.scene.fogDensity = FOG_DENSITY_NIGHT + (FOG_DENSITY_DAY - FOG_DENSITY_NIGHT) * dayF;
   }
