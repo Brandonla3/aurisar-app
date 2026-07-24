@@ -409,6 +409,10 @@ export class CharacterAvatar {
     } else {
       this._animateGLB(dt);
     }
+    // Weapon swing runs on BOTH paths — the box fallback (GLB failed to load)
+    // still equips a procedural weapon (parented to the hip) and must show the
+    // attack chop.
+    this._updateWeaponSwing(dt);
   }
 
   /** Planar speed of the root since last frame, teleport-aware. */
@@ -491,7 +495,6 @@ export class CharacterAvatar {
     if (!this._animCtl) return;
     this._animCtl.setLocomotionSpeed(this._measureSpeed(dt));
     this._animCtl.update(dt);
-    this._updateWeaponSwing(dt);
   }
 
   /**

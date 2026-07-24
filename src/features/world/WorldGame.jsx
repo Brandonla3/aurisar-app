@@ -374,6 +374,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const onChestOpen = useCallback((chest) => {
     if (!connected) return;
     openChest(chest.id);
+    sceneRef.current?.playSound('loot');
     const rolled = rollChestLoot(chest.seed);
     if (rolled.length) {
       const txt = rolled.map((r) => {
@@ -790,8 +791,8 @@ export default function WorldGame({ playerInfo, onExit }) {
           playerName={playerInfo?.username}
           className={className}
           playerLevel={worldLevel}
-          onAcceptQuest={(qid) => { acceptQuest(qid); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
-          onTurnInQuest={(qid) => { turnInQuest(qid); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
+          onAcceptQuest={(qid) => { acceptQuest(qid); sceneRef.current?.playSound('ui'); showToast(`Quest accepted: ${QUESTS[qid]?.name ?? qid}`); }}
+          onTurnInQuest={(qid) => { turnInQuest(qid); sceneRef.current?.playSound('loot'); showToast(`Quest complete: ${QUESTS[qid]?.name ?? qid}`); }}
           onBuyFromVendor={buyFromVendor}
           onSellToVendor={sellToVendor}
           onToast={showToast}
