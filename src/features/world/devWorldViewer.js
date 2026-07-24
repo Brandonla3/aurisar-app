@@ -248,20 +248,24 @@ function mountAssetHud(worldScene) {
   document.body.appendChild(panel);
 
   const bScene = worldScene.scene;
+  // Official instrumentation surface for draw calls (vs reaching into engine
+  // internals). Captured on the scene; disposed with the overlay.
+  const instr = new BABYLON.SceneInstrumentation(bScene);
+  instr.captureFrameTime = true;
   const timer = setInterval(() => {
-    const inst = bScene.getEngine()?._drawCalls?.current;
+    const draws = instr.drawCallsCounter?.current ?? '—';
     out.textContent =
       `— download ledger —\n` +
       ledger.map((l) => `${l.cat.padEnd(11)} ${String(l.n).padStart(3)}  ${String(l.kb).padStart(5)}KB`).join('\n') +
       `\n${'total'.padEnd(11)}      ${String(totalKb).padStart(5)}KB\n` +
       `— live —\n` +
-      `draw calls  ${bScene.getEngine().drawCalls ?? inst ?? '—'}\n` +
+      `draw calls  ${draws}\n` +
       `meshes      ${bScene.getActiveMeshes().length}/${bScene.meshes.length}\n` +
       `textures    ${bScene.textures.length}\n` +
       `materials   ${bScene.materials.length}\n` +
       `tier        ${bScene.metadata?.ashwood?.qualityTier ?? '—'}`;
   }, 300);
-  return () => { clearInterval(timer); panel.remove(); };
+  return () => { clearInterval(timer); instr.dispose(); panel.remove(); };
 }
 
 if (params.get('hud') === 'assets') window.__assetHudCleanup = mountAssetHud(scene);

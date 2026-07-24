@@ -23,9 +23,17 @@ let _done = false;
 export function configureBabylonDecoders(B = (typeof window !== 'undefined' ? window.BABYLON : undefined)) {
   if (_done) return;
   const babylon = B ?? (typeof BABYLON !== 'undefined' ? BABYLON : undefined);
-  const cfg = babylon?.MeshoptCompression?.Configuration;
+  if (!babylon) return; // called before the UMD global exists — caller retries
+  const cfg = babylon.MeshoptCompression?.Configuration;
   if (cfg?.decoder) {
     cfg.decoder.url = '/babylon/meshopt_decoder.js';
     _done = true;
+  } else {
+    // Babylon is present but the meshopt config isn't where we expect it — the
+    // decoder would then default to the Babylon CDN, which our CSP blocks, and
+    // every meshopt GLB would silently fail. Make that loud instead of a
+    // baffling "all models missing" report.
+    console.warn('[babylonDecoders] MeshoptCompression.Configuration.decoder not found — ' +
+      'meshopt GLBs may fail to load (Babylon version change?). Expected same-origin /babylon/meshopt_decoder.js.');
   }
 }

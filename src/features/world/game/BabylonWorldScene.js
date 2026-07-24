@@ -1937,9 +1937,11 @@ export class BabylonWorldScene {
     // row must never be invisible — its AI can still attack and quests
     // need it killable. (Codex P1 on #219.)
     // Resolve the shared asset key from the content graph (several mob types
-    // map to one GLB, e.g. forest_wolf + old_greyjaw → 'wolf'); legacy rows
-    // without a MobDef fall through to primitives.
-    const glbKey = MOB_DEFS[row.mobType]?.glbKey ?? null;
+    // map to one GLB, e.g. forest_wolf + old_greyjaw → 'wolf'). A legacy row
+    // whose mobType predates the content graph (e.g. 'wolf' during a deploy
+    // window) falls back to using the mobType directly as an asset key so it
+    // still gets its GLB; anything unresolved uses the primitive composite.
+    const glbKey = MOB_DEFS[row.mobType]?.glbKey ?? row.mobType;
     const hasGlb = glbKey != null && MobAssetLibrary.hasContainer(glbKey);
 
     const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);

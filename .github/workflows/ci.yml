@@ -40,6 +40,11 @@ jobs:
       - name: Asset manifests + budgets
         run: npm run check:assets
 
+      # The self-hosted meshopt decoder must match the installed meshoptimizer
+      # (a dep bump without re-vendoring ships a mismatched decoder).
+      - name: Vendored meshopt decoder fresh
+        run: npm run vendor:meshopt:check
+
       # Determinism gate: the worldgen GOLDEN snapshot (realized plateau
       # heights + site counts + a site-position digest) must match. Any PR
       # that reshuffles the seed-manifest draw order (docs/world-design-plan.md,

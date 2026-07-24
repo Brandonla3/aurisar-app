@@ -14,7 +14,29 @@ import modelsManifest from '../../../../public/assets/manifest/models.manifest.j
 import mobsManifest from '../../../../public/assets/manifest/mobs.manifest.json';
 import propsManifest from '../../../../public/assets/manifest/props.manifest.json';
 import { MANIFEST, MODEL_MANIFEST } from './AssetLibrary.js';
+import { DEFAULT_AVATAR, CLOTHING_SLOTS } from './avatarSchema.js';
 import { MOBS } from '../content/index';
+import { ZONE1_PROPS } from '../content/zones/zone1/props';
+
+// NpcSystem's NPC_MODEL_OVERRIDES targets, asserted directly rather than
+// imported — NpcSystem pulls in CharacterAvatar, which touches the BABYLON
+// global at module eval (absent in the node test env). Keep in sync with
+// NpcSystem.NPC_MODEL_OVERRIDES.
+const NPC_MODEL_TARGETS = ['gilded_sentinel'];
+
+// The prop kinds PropsSystem._placeAll instantiates by literal key. A file
+// removed from the pack + a re-run would pass the generic "every entry points
+// to a file" check while silently dropping a placement — this is the explicit
+// consumer contract that catches it.
+const REQUIRED_PROP_KEYS = [
+  'house_1', 'house_2', 'house_3', 'inn', 'bell_tower', 'blacksmith',
+  'market_stand_1', 'market_stand_2', 'well', 'fence', 'bonfire',
+  'dock_platform', 'rowboat', 'tent_open', 'tent_small', 'crate_wooden',
+  'barrel', 'anvil', 'weapon_stand', 'farmcrate_apple',
+  'rock_tall_a', 'rock_tall_h', 'rock_large_d', 'rock_large_f', 'ore_rocks',
+  'mushroom_red', 'mushroom_tan', 'column', 'column_broken',
+  'statue_head', 'statue_block', 'timber_pillar',
+];
 
 const PUBLIC = fileURLToPath(new URL('../../../../public', import.meta.url));
 const ALL = [charactersManifest, modelsManifest, mobsManifest, propsManifest];
@@ -58,5 +80,38 @@ describe('content ↔ mob asset resolution (glbKey)', () => {
         `mob ${mob.mobType}: glbKey '${mob.glbKey}' not in mobs.manifest.json`,
       ).toBeDefined();
     }
+  });
+});
+
+describe('consumer-required keys (a removed asset must fail CI, not silently drop)', () => {
+  it('the default avatar loadout resolves in the character manifest', () => {
+    // Base body (all three), plus the default hair + clothing the schema ships.
+    for (const key of ['base_body', 'base_body_male', 'base_body_female']) {
+      expect(MANIFEST[key], `character key ${key}`).toBeDefined();
+    }
+    expect(MANIFEST[`hair/${DEFAULT_AVATAR.hair.style}`], 'default hair').toBeDefined();
+    for (const slot of CLOTHING_SLOTS) {
+      const key = `clothing/${DEFAULT_AVATAR.clothing[slot]}`;
+      expect(MANIFEST[key], `default clothing ${slot} (${key})`).toBeDefined();
+    }
+  });
+
+  it('every NPC model override resolves in the models manifest', () => {
+    for (const key of NPC_MODEL_TARGETS) {
+      expect(MODEL_MANIFEST[key], `NPC model override ${key}`).toBeDefined();
+    }
+  });
+
+  it('every prop kind PropsSystem places resolves in the props manifest', () => {
+    for (const key of REQUIRED_PROP_KEYS) {
+      expect(propsManifest.assets[key], `required prop ${key}`).toBeDefined();
+    }
+  });
+
+  it('REQUIRED_PROP_KEYS stays in sync with authored ZONE1_PROPS coverage', () => {
+    // A cheap guard that the settlement content still has props to place —
+    // if the layout is emptied this fires before the world silently goes bare.
+    expect(ZONE1_PROPS.buildings.length).toBeGreaterThan(0);
+    expect(REQUIRED_PROP_KEYS.length).toBeGreaterThan(20);
   });
 });

@@ -80,7 +80,7 @@ function hashId(id) {
 // the procedurally-varied modular body. Kept out of the shared content package
 // (src/.../content) so it stays a pure rendering concern and doesn't churn the
 // SpacetimeDB content mirror.
-const NPC_MODEL_OVERRIDES = {
+export const NPC_MODEL_OVERRIDES = {
   marshal_halwin: 'gilded_sentinel',
 };
 

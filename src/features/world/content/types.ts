@@ -211,8 +211,10 @@ export interface NpcDef {
   /** Zone-local meters. */
   pos: { x: number; z: number };
   facingRad: number;
-  /** Asset key under public/assets/creatures/ (humanoids share the pool);
-   *  absent → tinted base-body avatar. */
+  /** Reserved: a standalone-model asset key for an authored NPC appearance.
+   *  Not consumed yet — NpcSystem renders NPCs from a hashed/authored
+   *  avatarConfig (+ NPC_MODEL_OVERRIDES for the Gilded Sentinel). Absent →
+   *  tinted modular base-body avatar. */
   glbKey?: string;
   questIds: string[];
   /** $N = player name, $C = class display name. */

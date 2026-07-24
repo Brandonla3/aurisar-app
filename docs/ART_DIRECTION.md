@@ -35,6 +35,20 @@ not photoreal.
 | Metal | `#7a7d84` | low saturation, roughness ≥ 0.6 |
 | Water deep | `#1c3a3a` | Beer-Lambert deep tint |
 
+## What CI proves — and what it does not
+
+`check:assets` and the pipeline's structural backstop verify the **shape** of
+every asset: per-skin joint counts, animation clip names + channel/sampler
+counts, morph-target names + counts, mesh/primitive/material counts. A write is
+refused if any of those drift. That is a fail-safe against a transform silently
+dropping a rig, clip, or morph — **not** a proof of pixel identity. It does not
+compare vertex payloads, joint order/inverse-bind matrices, UVs, or image bytes.
+"Visually identical" is an **on-device** check on the deploy preview
+(`world-viewer.html?hud=assets`), never something green CI establishes. Build and
+test success prove the code path and structural integrity; they do not prove the
+art. Treat meshopt + `KHR_mesh_quantization` as **visually lossless**, not
+float-preserving.
+
 ## 2. Cohesion treatment (applied at intake, not runtime)
 
 New CC0 kit pieces and the MPFB humans must read as one world. This is done
@@ -73,17 +87,27 @@ state, first-interactive **≤ 8 MB** on mobile (lazy loading lands in Batch F).
 
 `scripts/assets_pipeline.mjs` (`npm run assets:pipeline`) per runtime GLB:
 
-1. read (all glTF extensions) → capture structural signature (skin joints,
-   clip names, morph-target names, mesh count);
-2. `prune → dedup → weld → resample`; optional per-asset clip curation
+1. skip if already `EXT_meshopt_compression`-encoded (idempotent — optimization
+   runs once, when a fresh GLB is dropped in; `--force` re-runs from source);
+2. read (all glTF extensions) → capture the structural signature;
+3. `prune → dedup → weld → resample`; optional per-asset clip curation
    (`keepClips` in `config/asset-packs.json`) for CC0 packs shipping dozens of
    unused clips (e.g. `skeleton_minion` 31 → 6);
-3. textures: downsize > cap and convert PNG/JPEG → WebP via `sharp` (already-
-   small WebP left alone — never inflate);
-4. `meshopt` geometry encode (`EXT_meshopt_compression`, lossless);
+4. `meshopt` geometry encode (`EXT_meshopt_compression`) — **textures are not
+   re-encoded** (see below);
 5. **re-parse and abort the file if the signature drifted** — a rig/clip/morph
    is never silently lost to compression;
-6. **write only if smaller** than the original.
+6. **write only if it saves ≥ 1 KB** — no sub-KB binary churn on re-runs.
+
+**Texture policy.** The pipeline does not lossy-recompress textures. Lossy WebP
+on a normal / ORM / packed-data map introduces lighting noise, shifted
+roughness, or seams, and no shipped asset needs it (nothing exceeds the 1024
+cap; character/model packs carry no textures). The `treatment` field
+(`config/asset-packs.json`, validated — unknown values fail) governs the texture
+policy per class: rigged characters/creatures never touch textures;
+`kit_static` may **losslessly** downsize a future over-cap color texture. Until
+then an over-cap texture is a budget failure surfaced by `check:assets`, not a
+silent lossy resize.
 
 Then it emits `public/assets/manifest/<category>.manifest.json` (key → file,
 bytes, tris, bones, clips, morphs, texMaxPx) and refreshes the generated block
@@ -92,9 +116,24 @@ of `public/assets/ATTRIBUTION.md`.
 - **meshopt, not Draco**: smaller decoder, better ratio here. Decoder is
   self-hosted (`scripts/vendor_meshopt_decoder.mjs` →
   `public/babylon/meshopt_decoder.js`, registered by `babylonDecoders.js`) — the
-  Babylon CDN default is blocked by our `script-src 'self'` CSP anyway.
+  Babylon CDN default is blocked by our `script-src 'self'` CSP anyway. The
+  vendored file pins the `meshoptimizer` version in its header;
+  `npm run vendor:meshopt:check` (CI) fails if a dep bump left it stale.
 - **KTX2 deferred** until the texture payload warrants a transcoder (world-design
   plan, Batch B).
+
+### Caching
+
+Runtime GLBs and manifests keep **stable filenames** and can be rewritten in
+place, so `netlify.toml` serves the mutable public-asset paths
+(`/assets/{characters,mobs,props,manifest,tiles,castle,terrain}`, `/babylon`)
+with `max-age=0, must-revalidate` (ETag → 304) rather than the 1-year
+`immutable` used for Vite's content-hashed bundles. This guarantees a future
+asset correction propagates. A client that cached a file under the *old*
+immutable policy keeps it until expiry; because optimization is visually
+lossless, that degrades to a larger download, not a wrong render.
+Content-hashed asset URLs (via the manifest) are the follow-up if guaranteed
+immediate propagation is ever required.
 
 ### Manifests are the source of truth
 
