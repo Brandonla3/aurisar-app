@@ -26,7 +26,9 @@ const BASE = '/assets/mobs/';
 // Zone-1 roster → CC0 stand-in models under public/assets/mobs/ (see
 // public/assets/ATTRIBUTION.md). Several types share a file; missing
 // files fall back to family-shaped primitives.
-const MANIFEST = {
+// Exported for the mobClips truthfulness test (MOB_CLIPS must only name
+// clips that actually exist inside the mapped GLB).
+export const MANIFEST = {
   forest_wolf:    'wolf.glb',
   old_greyjaw:    'wolf.glb',
   wild_boar:      'bull.glb',
@@ -50,9 +52,11 @@ async function _load(key, path, scene) {
     const file  = parts >= 0 ? path.slice(parts + 1) : path;
     const c = await BABYLON.SceneLoader.LoadAssetContainerAsync(dir, file, scene);
     _containers.set(key, c);
-  } catch {
-    // Asset not yet present — skip silently. _spawnMob will use the
-    // primitive fallback for this mobType.
+  } catch (err) {
+    // Non-fatal — _spawnMob falls back to the primitive composite for this
+    // mobType. Warn so a bad export during an asset swap is debuggable
+    // instead of silently shipping shape-primitive mobs.
+    console.warn(`[MobAssetLibrary] ${key} (${path}) failed to load; using primitive fallback:`, err?.message ?? err);
   }
 }
 

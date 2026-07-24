@@ -24,7 +24,11 @@
 
 /* global BABYLON */
 
-import { mergeConfig, MORPH_KEYS, BONES, CLOTHING_SLOTS, GEAR_SLOTS } from './avatarSchema.js';
+import {
+  mergeConfig, MORPH_KEYS, BONES, CLOTHING_SLOTS, GEAR_SLOTS,
+  PLAYER_CLIPS, PLAYER_LOCOMOTION,
+} from './avatarSchema.js';
+import { AnimationController } from './AnimationController.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,8 +125,7 @@ export class CharacterAvatar {
     this._nodes      = [];
     this._skeleton   = null;
     this._animGroups = null;
-    this._idleAnim   = null;
-    this._walkAnim   = null;
+    this._animCtl    = null;   // AnimationController (GLB paths only)
     this._morphMgr   = null;
     this._bodyMeshes = [];   // main skinned meshes (share skeleton with clothing)
     this._slots      = {};   // slot key → { nodes, meshes }
@@ -131,6 +134,15 @@ export class CharacterAvatar {
     this._useFallback   = false;
     this._fallbackLimbs = null;
     this._animTime      = 0;
+
+    // Displacement-derived locomotion speed (m/s). Measuring the root's
+    // actual planar movement each frame drives idle/walk/run identically
+    // for the local player, remote players and NPCs — no caller has to
+    // report anything beyond moving the root. isMoving stays as the box-
+    // fallback driver and a scene-side movement flag.
+    this._lastX = null;
+    this._lastZ = null;
+    this._speedMps = 0;
 
     // Local-only terrain blocker. BabylonWorldScene still owns input and moves
     // root.position; CharacterAvatar.update() runs immediately afterward, so
@@ -212,17 +224,11 @@ export class CharacterAvatar {
     this._morphMgr = this._bodyMeshes.find(m => m.morphTargetManager)
       ?.morphTargetManager ?? null;
 
-    // Animations
+    // Animations — semantic clip map + speed-driven blending.
     this._animGroups = inst.animationGroups;
-    this._idleAnim   = this._animGroups.find(ag => /idle/i.test(ag.name)) ?? null;
-    this._walkAnim   = this._animGroups.find(ag => /walk/i.test(ag.name)) ?? null;
-    this._animGroups.forEach(ag => ag.stop());
-    if (this._idleAnim) {
-      this._idleAnim.loopAnimation = true;
-      this._idleAnim.weight = 1;
-      this._idleAnim.play(true);
-    }
-    if (this._walkAnim) { this._walkAnim.weight = 0; }
+    this._animCtl = new AnimationController(
+      this._animGroups, PLAYER_CLIPS, PLAYER_LOCOMOTION,
+    );
 
     // Apply morph targets and materials from stored config
     this._applyAllMorphs();
@@ -276,18 +282,12 @@ export class CharacterAvatar {
       n.getChildMeshes ? n.getChildMeshes(false) : []
     );
 
-    // Animations — reuse the same idle/walk resolver + cross-fade as the
-    // modular path. build_gilded_sentinel.mjs names the clips Idle/Walk/...
+    // Animations — same controller + clip map as the modular path.
+    // build_gilded_sentinel.mjs names the clips Idle/Walk/Run/SwordSlash.
     this._animGroups = inst.animationGroups;
-    this._idleAnim   = this._animGroups.find(ag => /idle/i.test(ag.name)) ?? null;
-    this._walkAnim   = this._animGroups.find(ag => /walk/i.test(ag.name)) ?? null;
-    this._animGroups.forEach(ag => ag.stop());
-    if (this._idleAnim) {
-      this._idleAnim.loopAnimation = true;
-      this._idleAnim.weight = 1;
-      this._idleAnim.play(true);
-    }
-    if (this._walkAnim) { this._walkAnim.weight = 0; }
+    this._animCtl = new AnimationController(
+      this._animGroups, PLAYER_CLIPS, PLAYER_LOCOMOTION,
+    );
 
     this._applyModelMaterial();
   }
@@ -398,8 +398,28 @@ export class CharacterAvatar {
     if (this._useFallback) {
       this._animateBox(dt);
     } else {
-      this._animateGLB();
+      this._animateGLB(dt);
     }
+  }
+
+  /** Planar speed of the root since last frame, teleport-aware. */
+  _measureSpeed(dt) {
+    const p = this.root?.position;
+    if (!p) return 0;
+    if (this._lastX === null) {
+      this._lastX = p.x; this._lastZ = p.z;
+      return 0;
+    }
+    const dx = p.x - this._lastX;
+    const dz = p.z - this._lastZ;
+    this._lastX = p.x; this._lastZ = p.z;
+    const dist = Math.hypot(dx, dz);
+    // A >5 m step in one frame is a teleport (door/fast-travel/respawn),
+    // not locomotion — read it as standing still.
+    const raw = (dt > 0 && dist < 5) ? dist / (dt / 1000) : 0;
+    // Light smoothing so lerp jitter doesn't flicker walk↔idle.
+    this._speedMps += (raw - this._speedMps) * Math.min(1, dt / 100);
+    return this._speedMps;
   }
 
   _resolveTerrainMobility() {
@@ -458,31 +478,16 @@ export class CharacterAvatar {
     }
   }
 
-  _animateGLB() {
-    const BLEND = 0.08;
-    if (this.isMoving) {
-      if (this._walkAnim && !this._walkAnim.isPlaying) {
-        this._walkAnim.weight = 0;
-        this._walkAnim.loopAnimation = true;
-        this._walkAnim.play(true);
-      }
-      if (this._walkAnim) this._walkAnim.weight = Math.min(1, (this._walkAnim.weight ?? 0) + BLEND);
-      if (this._idleAnim) {
-        this._idleAnim.weight = Math.max(0, (this._idleAnim.weight ?? 1) - BLEND);
-        if (this._idleAnim.weight <= 0 && this._idleAnim.isPlaying) this._idleAnim.stop();
-      }
-    } else {
-      if (this._idleAnim && !this._idleAnim.isPlaying) {
-        this._idleAnim.weight = 0;
-        this._idleAnim.loopAnimation = true;
-        this._idleAnim.play(true);
-      }
-      if (this._idleAnim) this._idleAnim.weight = Math.min(1, (this._idleAnim.weight ?? 0) + BLEND);
-      if (this._walkAnim) {
-        this._walkAnim.weight = Math.max(0, (this._walkAnim.weight ?? 1) - BLEND);
-        if (this._walkAnim.weight <= 0 && this._walkAnim.isPlaying) this._walkAnim.stop();
-      }
-    }
+  _animateGLB(dt) {
+    if (!this._animCtl) return;
+    this._animCtl.setLocomotionSpeed(this._measureSpeed(dt));
+    this._animCtl.update(dt);
+  }
+
+  /** Play a one-shot clip if the rig has it (attack lands in Batch C for
+   *  base bodies; the Gilded Sentinel already carries SwordSlash). */
+  playOneShot(key) {
+    return this._animCtl?.playOneShot(key) ?? false;
   }
 
   // ── Morph controls ─────────────────────────────────────────────────────────
@@ -787,6 +792,7 @@ export class CharacterAvatar {
 
   dispose() {
     Object.keys(this._slots).forEach(k => this._disposeSlot(k));
+    this._animCtl?.dispose();
     this._animGroups?.forEach(ag => { ag.stop(); ag.dispose(); });
     this._modelMaterial?.dispose();
     this._nodes.forEach(n => n.dispose(false, false));

@@ -21,7 +21,7 @@ export const NPCS: NpcDef[] = [
     title: 'Town Marshal',
     pos: { x: 4, z: 6 },
     facingRad: Math.PI,
-    questIds: ['q_wolves', 'q_greyjaw', 'q_bandits', 'q_ringleader'],
+    questIds: ['q_first_blood', 'q_wolves', 'q_greyjaw', 'q_bandits', 'q_ringleader'],
     greeting: 'Keep your blade close, $C. This valley is not what it was.',
   },
   {

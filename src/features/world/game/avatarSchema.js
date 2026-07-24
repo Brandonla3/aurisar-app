@@ -84,6 +84,31 @@ export const MORPH_KEYS = {
   earMorph:      'EarElf',
 };
 
+/**
+ * Semantic clip map for player-family rigs (base bodies + standalone
+ * models), consumed by AnimationController.resolveClips. The base bodies
+ * ship Idle/Walk/Run/Jump (public/assets/characters/README.md); the
+ * Gilded Sentinel adds SwordSlash. Jump stays unmapped on purpose — no
+ * jump mechanic exists (design-plan cut list).
+ */
+export const PLAYER_CLIPS = {
+  idle:   /idle/i,
+  walk:   /walk/i,
+  run:    /run/i,
+  attack: /swordslash|attack/i,  // absent on base bodies until Batch C
+  hit:    /hit/i,
+  death:  /death/i,
+};
+
+/** Locomotion tuning for the player-family rigs: the scene moves avatars
+ *  at ~12 m/s at full input, which reads as a run; partial joystick
+ *  deflection and remote lerp tails land in the walk band. */
+export const PLAYER_LOCOMOTION = {
+  runThresholdMps: 5.0,
+  walkRefMps: 1.8,
+  runRefMps: 6.5,
+};
+
 /** Bone names (post-rename from mixamorig: prefix strip). */
 export const BONES = {
   head:      'Head',

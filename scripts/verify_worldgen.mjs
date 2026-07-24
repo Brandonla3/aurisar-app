@@ -81,13 +81,30 @@ const GOLDEN = {
   20260612: { // zone1_world (live)
     plateaus: [0, 0, 0, 0, 10.303, 22.5805, 45.902, 49.3826, 71.4533, 65.0962, 94.1685, 116.1395, 113.8915],
     sites: { trees: 359, rocks: 291, bushes: 141, details: 806, ruins: 6, caves: 5, chests: 25, ponds: 3 },
+    sitesDigest: 1609540378,
   },
   20240611: { // ashwood_world (dev)
     plateaus: [10.172, 7, 12, 22.6312, 22, 56, 52, 56, 89.0006, 97.9134],
     sites: { trees: 309, rocks: 219, bushes: 141, details: 675, ruins: 11, caves: 8, chests: 25, ponds: 3 },
+    sitesDigest: 107254303,
   },
 };
 const golden = GOLDEN[config.seed];
+
+// FNV-1a over every realized site position (0.1 m resolution). Counts alone
+// can survive a reshuffle (rejection sampling can land on the same totals);
+// the digest pins the POSITIONS, which is what "no stray reshuffle" means.
+function sitesDigest(sites) {
+  let h = 0x811c9dc5;
+  const mix = (n) => { h ^= n & 0xffffffff; h = Math.imul(h, 0x01000193) >>> 0; };
+  for (const k of ['trees', 'rocks', 'bushes', 'details', 'ruins', 'caves', 'chests', 'ponds']) {
+    for (const site of sites[k] ?? []) {
+      mix(Math.round(site.x * 10));
+      mix(Math.round(site.z * 10));
+    }
+  }
+  return h >>> 0;
+}
 
 const wg = createWorldgen(config);
 const wg2 = createWorldgen(config);
@@ -204,6 +221,12 @@ console.log(
 if (golden) {
   for (const k of ['trees', 'rocks', 'bushes', 'details', 'ruins', 'caves', 'chests', 'ponds'])
     check(`golden ${k} count = ${golden.sites[k]}`, s[k].length === golden.sites[k], `got ${s[k].length}`);
+  const digest = sitesDigest(s);
+  if (golden.sitesDigest == null) {
+    console.log(`  --  no sites digest recorded for seed ${config.seed} — record sitesDigest: ${digest}`);
+  } else {
+    check(`golden sites digest = ${golden.sitesDigest}`, digest === golden.sitesDigest, `got ${digest}`);
+  }
 } else {
   check('tree count plausible', s.trees.length > 100 && s.trees.length < config.scatter.treeCount);
   check('ruin count exact', s.ruins.length === config.scatter.ruinCount);
