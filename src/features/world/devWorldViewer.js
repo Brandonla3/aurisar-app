@@ -15,6 +15,7 @@
 import BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
+import { sunElevationDeg } from './game/atmosphereState.js';
 
 if (typeof window !== 'undefined' && !window.BABYLON) {
   window.BABYLON = BABYLON;
@@ -112,3 +113,99 @@ if (params.has('nav')) {
     scene._castle.showNavDebug(true, Number.isFinite(navLevel) ? navLevel : 1);
   }, 400);
 }
+
+// ?qa=1 — Atmosphere-QA overlay. Reproducible atmosphere states for the Batch 3
+// visual-acceptance matrix: freeze/scrub the time of day, force weather wetness,
+// toggle volumetric clouds, and read out the shared AtmosphereState (sun
+// elevation, sun visibility, aerial facing weight, fog RGB/density, tier).
+// Opt-in so it never appears in the default/headless screenshot harness.
+function mountAtmosphereQA(worldScene) {
+  const bScene = worldScene.scene;
+  const panel = document.createElement('div');
+  panel.id = 'atmo-qa';
+  panel.style.cssText =
+    'position:fixed;top:8px;right:8px;z-index:10;font:11px/1.6 ui-monospace,monospace;' +
+    'color:#dfe;background:rgba(10,14,20,0.82);padding:8px 10px;border-radius:6px;min-width:230px';
+
+  const title = document.createElement('div');
+  title.textContent = 'Atmosphere QA';
+  title.style.cssText = 'font-weight:700;margin-bottom:6px;letter-spacing:0.04em';
+  panel.appendChild(title);
+
+  const row = (labelText, control) => {
+    const r = document.createElement('label');
+    r.style.cssText = 'display:flex;align-items:center;gap:8px;margin:3px 0;justify-content:space-between';
+    const s = document.createElement('span'); s.textContent = labelText; s.style.opacity = '0.85';
+    r.append(s, control); panel.appendChild(r); return r;
+  };
+  const slider = (min, max, step) => {
+    const el = document.createElement('input');
+    Object.assign(el, { type: 'range', min: String(min), max: String(max), step: String(step) });
+    el.style.flex = '1'; return el;
+  };
+  const check = () => { const el = document.createElement('input'); el.type = 'checkbox'; return el; };
+
+  // Time of day (scrubbing implies freeze, so the chosen light holds).
+  const timeSlider = slider(0, 24, 0.25); timeSlider.value = String(worldScene.getTimeOfDay());
+  const freezeBox = check();
+  row('time (h)', timeSlider);
+  row('freeze time', freezeBox);
+  timeSlider.oninput = () => { freezeBox.checked = true; worldScene.setTimeOfDay(+timeSlider.value, true); };
+  freezeBox.onchange = () => {
+    if (freezeBox.checked) worldScene.setTimeOfDay(+timeSlider.value, true);
+    else worldScene.setDayNightFrozen(false);
+  };
+
+  // Weather wetness (force pins it against the random wet/dry cycle).
+  const wetSlider = slider(0, 1, 0.05);
+  const forceWetBox = check();
+  row('wet', wetSlider);
+  row('force wet', forceWetBox);
+  let forcedWet = null;
+  const applyWet = () => { forcedWet = +wetSlider.value; forceWetBox.checked = true; };
+  wetSlider.oninput = applyWet;
+  forceWetBox.onchange = () => {
+    if (forceWetBox.checked) { applyWet(); return; }
+    forcedWet = null;
+    const w = bScene.metadata?.ashwood?.weather;
+    if (w) w.weatherTimer = 0; // let the cycle re-roll immediately
+  };
+
+  // Volumetric clouds (high tier only; a no-op elsewhere).
+  const volBox = check();
+  volBox.checked = !!bScene.metadata?.ashwood?.volumetricClouds;
+  row('volumetric clouds', volBox);
+  volBox.onchange = () => worldScene.setVolumetricClouds?.(volBox.checked);
+
+  const out = document.createElement('pre');
+  out.style.cssText = 'margin:6px 0 0;white-space:pre';
+  panel.appendChild(out);
+  document.body.appendChild(panel);
+
+  const f2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : '—');
+  setInterval(() => {
+    const md = bScene.metadata?.ashwood;
+    const atmo = md?.atmosphere;
+    const weather = md?.weather;
+    if (forcedWet != null && weather) {
+      weather.wet = forcedWet; weather.wetTarget = forcedWet; weather.weatherTimer = 1e9;
+    } else if (weather && !forceWetBox.checked) {
+      wetSlider.value = String(weather.wet);
+    }
+    if (!freezeBox.checked) timeSlider.value = String(worldScene.getTimeOfDay());
+    const fc = atmo?.fogColor;
+    const rgb = fc
+      ? `${Math.round(fc.r * 255)},${Math.round(fc.g * 255)},${Math.round(fc.b * 255)}`
+      : '—';
+    out.textContent =
+      `time    ${f2(worldScene.getTimeOfDay())} h\n` +
+      `sun el  ${f2(sunElevationDeg(atmo?.sunDir))}°\n` +
+      `sun vis ${f2(atmo?.sunVisibility)}\n` +
+      `facing  ${f2(atmo?.facingWeight)}\n` +
+      `fog rgb ${rgb}\n` +
+      `fog den ${atmo ? f2(atmo.fogDensity) : '—'}\n` +
+      `tier    ${md?.qualityTier ?? '—'}`;
+  }, 200);
+}
+
+if (params.has('qa')) mountAtmosphereQA(scene);
