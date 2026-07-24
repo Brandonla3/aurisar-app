@@ -102,14 +102,24 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   work is the pragmatic substitute; true tree LOD wants the deferred streaming re-tile /
   billboard-impostor work (§7).
 
-### Batch 3 status (implemented)
+### Batch 3 status
 
-Visual quality via the `threejs-*` technique skills. Shipped in bounded passes, each
-validated on the Netlify deploy preview (no GPU here to eyeball renders), so every change
-replaces a hack or omission with the technique the skill prescribes — verifiable by the
-technique, not by taste.
+Visual quality via the `threejs-*` technique skills, in bounded passes. There is no GPU
+here to eyeball renders, so each change replaces a hack or omission with the technique the
+skill prescribes — verifiable by the technique, not by taste. **Build/test success proves
+the code path, not the art result.** A pass is *implemented* when it merges green and
+*visually accepted* only once the acceptance matrix below has been run on the deploy preview
+and its result recorded here — those are tracked separately on purpose (the historical
+regressions in this subsystem have been subtle visual drifts, not build breaks).
 
-**Pass 1 (delivered):**
+**Visual acceptance matrix** (run on the deploy preview, per pass, before marking accepted):
+morning / noon / golden hour / night × dry-clear / full wet-overcast × camera facing the sun,
+side-on, away, and a full orbit × terrain-props / water / grass in the same frame × high / low
+/ mobile tiers (volumetric-cloud toggle where available). Acceptance rejects: hue pumping
+during camera movement, over-bright orange rain haze, water/grass seams, fog banding, and
+sun/sky disagreement.
+
+**Pass 1 (merged in #272 — visual acceptance pending):**
 
 - **Lake body colour — Beer-Lambert depth absorption** (`threejs-water-optics`). The lake
   mixed its deep→shallow colour by *wave slope*, so it read as one flat teal. It now absorbs
@@ -126,7 +136,7 @@ technique, not by taste.
   night shooting-star streak) still bloom. Rain is a non-emissive `LinesMesh`, so it never
   glowed and needs no exclusion.
 
-**Pass 2 (delivered — this PR):**
+**Pass 2 (this PR — implemented, visual acceptance pending):**
 
 - **Sun-directional aerial perspective** (`threejs-atmosphere-aerial-perspective`, analytic
   tier). The overworld haze was direction-agnostic while the sky dome already warms toward
@@ -136,9 +146,28 @@ technique, not by taste.
   facing away, sharing the sky's sun direction. Strongest at golden hour, gone at night.
   Every fog consumer — terrain/props (Babylon fog), water/grass (`vFogColor`) — inherits it
   from that one write, so it is world-wide and mutually consistent with no per-shader edits.
+  Because `scene.fogColor` is one *global* colour, three guards keep it reading as aerial
+  perspective rather than a camera-following filter: the weight is **weather-gated**
+  (`sunVisibility` from `weather.wet` — an overcast sky that hides the sun makes the haze
+  neutral, not amber), **asymmetric** (dominant warm toward-sun lobe, gentle cool away side),
+  and **temporally eased** (the tint lags the camera ~0.5s, so a fast orbit can't pump the
+  world between the two ends). The scattering maths lives in a pure `aerialPerspective.js`
+  helper with unit coverage (toward-sun warmer, away bounded, night = baseline exactly,
+  wet attenuates, degenerate vectors finite, channels in `[0,1]`).
 
 **Deferred to a later pass** — real, but not bounded enough to ship blind:
 
+- **Shared `AtmosphereState` contract.** The sky shader, global fog, water, and grass each
+  read sun direction / fog colour / density through their own path today. A single source of
+  truth (sun direction, sun-scatter colour, cloud/sun visibility, fog colour, density) they
+  all consume would stop independently-tuned coefficients drifting apart — the right home for
+  the aerial-perspective magic numbers once they settle on-device. Larger than a visual pass;
+  its own refactor.
+- **Dev-only Atmosphere-QA overlay** on `devWorldViewer.js`: freeze/set time, force
+  dry/rain, toggle volumetric clouds, and read out sun elevation, cloud/sun visibility,
+  facing weight, fog RGB/density, and tier — turning the acceptance matrix into reproducible
+  states instead of subjective screenshots. Tooling, tracked with the `threejs-visual-validation`
+  harness in Batch 3's remit.
 - **Grass shadow-receiving.** Grass is a hand-written `ShaderMaterial` (`grassBlades.js`), and
   the world runs **two** shadow systems — a `CascadedShadowGenerator` (4 cascades) on high and
   a blur-ESM `ShadowGenerator` on low/mobile. Making a custom shader sample either means
@@ -310,10 +339,12 @@ a GPU budget.
   `babylonjs-engine`.
 - **Batch 3 — Visual quality via skills.** Apply the `threejs-*` techniques to the
   `Ashwood*` systems (grass, clouds, sky, water, shadows, color) with a single tone-map owner,
-  in bounded passes validated on the deploy preview. *Delivered:* Pass 1 — lake Beer-Lambert
-  depth absorption + selective mobile bloom; Pass 2 — sun-directional aerial perspective.
-  *Next:* grass shadow-receiving, high-tier CSM `autoCalcDepthBounds`, re-validate the deferred
-  Batch 2 perf items on-device. See §1 "Batch 3 status".
+  in bounded passes, each visually accepted on the deploy preview before it's closed out.
+  *Implemented:* Pass 1 — lake Beer-Lambert depth absorption + selective mobile bloom (merged
+  #272); Pass 2 — sun-directional aerial perspective. *Next:* record the visual-acceptance
+  matrix per pass; a shared `AtmosphereState` contract + dev Atmosphere-QA overlay; grass
+  shadow-receiving; high-tier CSM `autoCalcDepthBounds`; re-validate the deferred Batch 2 perf
+  items on-device. See §1 "Batch 3 status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.
