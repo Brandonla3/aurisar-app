@@ -1,0 +1,326 @@
+{
+  "_generated": "scripts/assets_pipeline.mjs — do not edit by hand",
+  "category": "characters",
+  "base": "/assets/characters/",
+  "budgetClass": "character_rigged",
+  "assets": {
+    "base_body_female": {
+      "file": "base_body_female.glb",
+      "bytes": 303280,
+      "tris": 10500,
+      "bones": 65,
+      "clips": [
+        "Idle",
+        "Jump",
+        "Run",
+        "Walk"
+      ],
+      "morphs": [
+        "EarElf"
+      ],
+      "texMaxPx": 0
+    },
+    "base_body_male": {
+      "file": "base_body_male.glb",
+      "bytes": 301980,
+      "tris": 10500,
+      "bones": 65,
+      "clips": [
+        "Idle",
+        "Jump",
+        "Run",
+        "Walk"
+      ],
+      "morphs": [
+        "EarElf"
+      ],
+      "texMaxPx": 0
+    },
+    "base_body": {
+      "file": "base_body.glb",
+      "bytes": 301980,
+      "tris": 10500,
+      "bones": 65,
+      "clips": [
+        "Idle",
+        "Jump",
+        "Run",
+        "Walk"
+      ],
+      "morphs": [
+        "EarElf"
+      ],
+      "texMaxPx": 0
+    },
+    "clothing/bottom_breeches": {
+      "file": "clothing/bottom_breeches.glb",
+      "bytes": 25432,
+      "tris": 1075,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/bottom_cloth_skirt": {
+      "file": "clothing/bottom_cloth_skirt.glb",
+      "bytes": 27744,
+      "tris": 1498,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/bottom_kilt": {
+      "file": "clothing/bottom_kilt.glb",
+      "bytes": 24136,
+      "tris": 927,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/bottom_leather_pants": {
+      "file": "clothing/bottom_leather_pants.glb",
+      "bytes": 28456,
+      "tris": 1637,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/bottom_leggings": {
+      "file": "clothing/bottom_leggings.glb",
+      "bytes": 28448,
+      "tris": 1637,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/bottom_trousers": {
+      "file": "clothing/bottom_trousers.glb",
+      "bytes": 28448,
+      "tris": 1637,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/shoes_boots": {
+      "file": "clothing/shoes_boots.glb",
+      "bytes": 28208,
+      "tris": 1372,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/shoes_greaves": {
+      "file": "clothing/shoes_greaves.glb",
+      "bytes": 29508,
+      "tris": 1619,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/shoes_leather_wraps": {
+      "file": "clothing/shoes_leather_wraps.glb",
+      "bytes": 26536,
+      "tris": 1054,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/shoes_sandals": {
+      "file": "clothing/shoes_sandals.glb",
+      "bytes": 23948,
+      "tris": 715,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/top_chainmail": {
+      "file": "clothing/top_chainmail.glb",
+      "bytes": 36508,
+      "tris": 2284,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/top_cloth_shirt": {
+      "file": "clothing/top_cloth_shirt.glb",
+      "bytes": 35168,
+      "tris": 2108,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/top_gambeson": {
+      "file": "clothing/top_gambeson.glb",
+      "bytes": 35960,
+      "tris": 2215,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/top_leather_vest": {
+      "file": "clothing/top_leather_vest.glb",
+      "bytes": 25956,
+      "tris": 954,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/top_robe": {
+      "file": "clothing/top_robe.glb",
+      "bytes": 41580,
+      "tris": 3166,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "clothing/top_tunic": {
+      "file": "clothing/top_tunic.glb",
+      "bytes": 35952,
+      "tris": 2215,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_afro": {
+      "file": "hair/hair_afro.glb",
+      "bytes": 27388,
+      "tris": 396,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_braids": {
+      "file": "hair/hair_braids.glb",
+      "bytes": 25232,
+      "tris": 468,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_bun": {
+      "file": "hair/hair_bun.glb",
+      "bytes": 27160,
+      "tris": 472,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_long": {
+      "file": "hair/hair_long.glb",
+      "bytes": 22748,
+      "tris": 260,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_mohawk": {
+      "file": "hair/hair_mohawk.glb",
+      "bytes": 23108,
+      "tris": 328,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_ponytail": {
+      "file": "hair/hair_ponytail.glb",
+      "bytes": 23548,
+      "tris": 344,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_short": {
+      "file": "hair/hair_short.glb",
+      "bytes": 21716,
+      "tris": 220,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "hair/hair_wavy": {
+      "file": "hair/hair_wavy.glb",
+      "bytes": 22948,
+      "tris": 260,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "species/horns_curved": {
+      "file": "species/horns_curved.glb",
+      "bytes": 8216,
+      "tris": 1024,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "species/horns_large": {
+      "file": "species/horns_large.glb",
+      "bytes": 3892,
+      "tris": 72,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "species/horns_small": {
+      "file": "species/horns_small.glb",
+      "bytes": 3888,
+      "tris": 72,
+      "bones": 0,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "species/tail_fluffy": {
+      "file": "species/tail_fluffy.glb",
+      "bytes": 23056,
+      "tris": 312,
+      "bones": 66,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "species/tail_long": {
+      "file": "species/tail_long.glb",
+      "bytes": 20580,
+      "tris": 216,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    },
+    "species/tail_short": {
+      "file": "species/tail_short.glb",
+      "bytes": 19424,
+      "tris": 108,
+      "bones": 65,
+      "clips": [],
+      "morphs": [],
+      "texMaxPx": 0
+    }
+  }
+}
