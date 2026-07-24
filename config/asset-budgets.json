@@ -1,0 +1,9 @@
+{
+  "_comment": "Per-class runtime-asset budgets, enforced by scripts/assets_pipeline.mjs --check (CI: check:assets). Caps are set ~1.25-1.4x the post-optimization size of the current worst asset in each class: tight enough to catch future bloat, loose enough that a legitimate new piece fits. Bytes are the on-disk .glb; tris is total triangles; texMaxPx is the largest allowed texture edge.",
+  "classes": {
+    "character_rigged": { "bytes": 380000, "tris": 16000, "texMaxPx": 1024 },
+    "character_model":  { "bytes": 520000, "tris": 40000, "texMaxPx": 1024 },
+    "creature_rigged":  { "bytes": 820000, "tris": 20000, "texMaxPx": 1024 },
+    "kit_static":       { "bytes": 620000, "tris": 12000, "texMaxPx": 1024 }
+  }
+}
