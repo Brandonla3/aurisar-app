@@ -175,7 +175,7 @@ sun/sky disagreement.
   visibility, aerial facing weight, fog RGB/density, and tier straight from the AtmosphereState
   — turning the acceptance matrix into reproducible states instead of subjective screenshots.
 
-**Pass 4 (this PR — implemented, visual acceptance pending):** grass shadows + cascade sharpness.
+**Pass 4 (this PR — implemented, visual acceptance pending):** grass shadow-receiving.
 
 - **Grass shadow-receiving** (`grassBlades.js`, `threejs-shadow-systems`). The grass was a
   hand-written `ShaderMaterial`, so `receiveShadows` did nothing for it — it couldn't sample the
@@ -186,15 +186,28 @@ sun/sky disagreement.
   (vertex, `CUSTOM_VERTEX_UPDATE_WORLDPOS`) and the root→tip darkening (fragment), while
   StandardMaterial owns lighting, **shadow receiving** (both generators, correct-by-construction),
   and built-in fog. The per-blade tint rides the thin-instance color buffer; its alpha is a wind
-  seed, not opacity, so the material forces opaque via `needAlphaBlending`. `AshwoodGrass`'s field
-  mesh sets `receiveShadows = true` (the understory keeps the new material; its shadow-receiving
-  is a trivial follow-up). This is a **lighting-model change** (StandardMaterial vs the old custom
-  wrapped diffuse), so it needs on-device visual acceptance and may take a tuning round — the
-  JS/plugin layer is verified headless (NullEngine), but GLSL/appearance can only be seen on a GPU.
-- **High-tier CSM `autoCalcDepthBounds`** — fits the cascade split range to the actual near/far
-  depth the camera sees each frame instead of the full `[near, shadowMaxZ]` span, concentrating
-  texels where geometry is for sharper contact shadows. Kept alongside `stabilizeCascades` (the
-  snapping stays; only the depth range tightens).
+  seed, not opacity, so the material forces opaque via `needAlphaBlending` **and** pins the
+  fragment output alpha to 1 in a late hook (so the seed can't leak into prepass/compositing
+  alpha). Both the player-following field (`AshwoodGrass`) and the per-tile tuft/fern understory
+  (`ashwoodPropMeshes`) set `receiveShadows = true`, so shadows don't stop at the field/understory
+  boundary. A shared per-scene wind clock is ref-counted and torn down when the last grass
+  material disposes. Covered by `grassBlades.test.js` (a headless NullEngine suite: plugin
+  registration, opaque-alpha contract, thin-instance render, clock disposal). This is a
+  **lighting-model change** (StandardMaterial vs the old custom wrapped diffuse), so it needs
+  on-device visual acceptance and may take a tuning round — the JS/plugin layer is verified
+  headless, but GLSL/appearance can only be seen on a GPU.
+- **Deploy-preview review surface.** `world-viewer.html` (the standalone renderer + `?qa=1`
+  atmosphere overlay) is now a Vite build input on Netlify **deploy-preview / branch** builds
+  (gated on `CONTEXT`), so rendering PRs have a real-GPU review surface, while it stays excluded
+  from production.
+
+**Deferred to a later pass** — real, but not bounded enough to ship blind:
+
+- **High-tier CSM `autoCalcDepthBounds`** — fits the cascade split range to the camera's actual
+  near/far depth for sharper contact shadows, but it activates a per-frame camera-depth reducer
+  (recurring GPU work on the heaviest tier) and can pump cascade resolution as large props enter
+  and leave view. Needs on-device **frame-time** measurement (on/off, at a fixed pose + orbit +
+  tile churn) against a p95 threshold before it ships — not a blind enable.
 
 ---
 
@@ -361,9 +374,9 @@ a GPU budget.
   *Implemented:* Pass 1 — lake Beer-Lambert depth absorption + selective mobile bloom (merged
   #272); Pass 2 — sun-directional aerial perspective (merged #273); Pass 3 — shared
   `AtmosphereState` contract + dev Atmosphere-QA overlay (merged #274); Pass 4 — grass
-  shadow-receiving (StandardMaterial + plugin) + high-tier CSM `autoCalcDepthBounds`. *Next:*
-  record the visual-acceptance matrix per pass; understory grass shadow-receiving; re-validate the
-  deferred Batch 2 perf items on-device. See §1 "Batch 3 status".
+  shadow-receiving, field + understory (StandardMaterial + plugin). *Next:*
+  record the visual-acceptance matrix per pass; high-tier CSM `autoCalcDepthBounds` (frame-time
+  measured); re-validate the deferred Batch 2 perf items on-device. See §1 "Batch 3 status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.
