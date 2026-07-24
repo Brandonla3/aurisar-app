@@ -26,24 +26,15 @@ export const RARITY = {
   epic:     { tint: [0.72, 0.46, 0.92], emissive: 0.30 },
 };
 
-/** Class → starter clothing tint (cheap layer-1 identity, 11 classes). Wired
- *  into avatar clothing in a later class-identity pass; exported + tested now
- *  so the table stays in sync with the class roster. */
-export const CLASS_TINTS = {
-  warrior:   '#7a3b2e', gladiator: '#8a2f2f', warden:  '#3f5a34',
-  phantom:   '#2e2f3a', tempest:   '#356b7a', warlord: '#5a2f5a',
-  druid:     '#4a5a2a', oracle:    '#6a5a2f', titan:   '#4a4a52',
-  striker:   '#7a5a2a', alchemist: '#2f6a4a',
-};
-
 /**
- * Weapon itemId → procedural shape + grip offset in the RightHand bone's
- * local space. `shape` selects a builder below; the emoji icon in the item
- * def is the design hint. Unlisted weapons fall back to 'sword'.
+ * Weapon itemId → procedural shape. `shape` selects a builder below; the emoji
+ * icon in the item def is the design hint. Unlisted weapons fall back to
+ * 'sword'. (Class-tinted starter clothing lands with its first consumer in the
+ * later class-identity pass — out of scope here.)
  */
 const WEAPON_SHAPE = {
   worn_shortsword: 'sword', wolfsbane_blade: 'sword', arming_sword: 'sword',
-  marshals_blade: 'sword', militia_vest: null, // (non-weapon, guard)
+  marshals_blade: 'sword',
   carving_knife: 'knife', bronzework_mace: 'mace',
   hunting_bow: 'bow', gnarled_staff: 'staff', hickory_shortstaff: 'staff',
 };

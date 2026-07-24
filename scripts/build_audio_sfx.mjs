@@ -94,6 +94,19 @@ function ui() {
 
 const SOUNDS = { swing, hit, loot, ui };
 
+// Compare two WAVs by PCM samples within a small tolerance rather than exact
+// bytes: the generator uses Math.sin/exp/pow, whose last-bit results can shift
+// across V8/Node majors, which would flip an exact-byte gate to "stale" for
+// contributors on a different Node than CI. ±2 LSB (of 16-bit) is inaudible
+// and well below any real regression.
+function wavsEquivalent(a, b, tol = 2) {
+  if (a.length !== b.length || a.length < 44) return a.equals(b);
+  for (let i = 44; i < a.length; i += 2) {
+    if (Math.abs(a.readInt16LE(i) - b.readInt16LE(i)) > tol) return false;
+  }
+  return true;
+}
+
 async function main() {
   let stale = 0;
   await mkdir(OUT, { recursive: true });
@@ -102,7 +115,7 @@ async function main() {
     const path = join(OUT, `${name}.wav`);
     if (CHECK) {
       const cur = existsSync(path) ? await readFile(path) : Buffer.alloc(0);
-      if (!cur.equals(bytes)) { console.error(`✗ ${name}.wav stale — run \`npm run build:audio\``); stale++; }
+      if (!wavsEquivalent(cur, bytes)) { console.error(`✗ ${name}.wav stale — run \`npm run build:audio\``); stale++; }
     } else {
       await writeFile(path, bytes);
       console.log(`  ${name}.wav (${(bytes.length / 1024).toFixed(1)} KB)`);

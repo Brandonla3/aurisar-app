@@ -767,19 +767,31 @@ export class CharacterAvatar {
     const visual = resolveGearVisual(item, (k) => !!assetLibrary?.getContainer?.(k));
     if (!visual) return;
 
-    if (visual.kind === 'weapon') {
-      const mesh = buildProceduralWeapon(BABYLON, this._scene, visual, item.id);
+    if (visual.kind === 'weapon' || visual.kind === 'weaponModel') {
+      // Procedural placeholder OR a real rigid weapon GLB — both socket to the
+      // RightHand bone (rigid, NOT skinned). A weapon model drops in here with
+      // no call-site change; only the mesh source differs.
+      let mesh;
+      if (visual.kind === 'weaponModel') {
+        const container = assetLibrary?.getContainer?.(visual.modelKey);
+        if (!container) { await this.setGear(gearSlot, item.id, assetLibrary); return; }
+        const inst = container.instantiateModelsToScene(n => `${this._id}_weapon_${item.id}_${n}`, false);
+        mesh = new BABYLON.TransformNode(`${this._id}_weapon_${item.id}`, this._scene);
+        inst.rootNodes.forEach(n => { n.parent = mesh; });
+      } else {
+        mesh = buildProceduralWeapon(BABYLON, this._scene, visual, item.id);
+      }
       if (!mesh) return;
       mesh.name = `${this._id}_weapon_${item.id}`;
       const handBone = findBone(this._skeleton, BONES.rightHand);
       const refMesh = this._bodyMeshes[0] ?? null;
       if (handBone && refMesh) {
         mesh.attachToBone(handBone, refMesh);
-        // Seat the grip in the palm: the weapon is authored grip-at-origin,
-        // length along +Y; rotate it to lie along the hand and nudge to the
-        // grip. Tuned coarsely — on-device is the acceptance gate.
+        // Seat the grip in the palm: authored grip-at-origin, length along +Y;
+        // rotate to lie along the hand (WEAPON_REST_ROT_X — the swing's rest
+        // pose) and nudge to the grip. Coarse; on-device is the acceptance gate.
         mesh.position.set(0, 0.04, 0);
-        mesh.rotation.set(Math.PI / 2, 0, 0);
+        mesh.rotation.set(WEAPON_REST_ROT_X, 0, 0);
       } else {
         mesh.parent = this.root; // fallback: no rig (box avatar) — float at hip
         mesh.position.set(0.4, 1.0, 0.1);
@@ -789,7 +801,7 @@ export class CharacterAvatar {
       return;
     }
 
-    // weaponModel / armor → skinned or rigid GLB (none shipped yet → no-op).
+    // armor → skinned GLB (Phase B — none shipped yet → no-op).
     await this.setGear(gearSlot, item.id, assetLibrary);
   }
 

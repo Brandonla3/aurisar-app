@@ -2587,7 +2587,14 @@ export class BabylonWorldScene {
 
   // Store as canonical hex so subsequent comparisons against row.identity
   // (which is a fresh Identity instance each callback) actually match.
-  setMyIdentity(id) { this._myIdentity = idKey(id); }
+  setMyIdentity(id) {
+    this._myIdentity = idKey(id);
+    // Identity can resolve AFTER the first equipped-rows snapshot and/or the
+    // local avatar finishes building; both race independently. Replaying here
+    // (in addition to the local-avatar-ready call) guarantees the local
+    // player's own already-equipped gear renders regardless of ordering.
+    this._replayEquips(this._myIdentity);
+  }
 
   /** Sync server-authoritative opened chest indices (survives reload via SpacetimeDB). */
   setOpenedChests(ids) {
@@ -2796,17 +2803,21 @@ export class BabylonWorldScene {
     return this._remotePlayers.get(identityKey) ?? null;
   }
 
+  /** Returns true when the equip was handled (recorded / no-op-by-design),
+   *  false only when the itemId can't be resolved — so the caller doesn't
+   *  latch an unresolved item as "applied" and never retry it. */
   applyEquip(identityKey, equipSlot, itemId) {
     const gearSlot = EQUIP_TO_GEAR[equipSlot];
-    if (!gearSlot) return; // offHand / trinket: no avatar slot yet
+    if (!gearSlot) return true; // offHand / trinket: intentionally no visual — done
     const item = ITEMS[itemId];
-    if (!item) return;
+    if (!item) return false;    // unknown / removed content — don't latch; retry later
     // Record durably first (so a later respawn re-applies it), then show it if
     // the avatar exists. The state IS the queue — no separate pending map.
     const slots = this._equipState.get(identityKey) ?? {};
     slots[gearSlot] = itemId;
     this._equipState.set(identityKey, slots);
     this._avatarFor(identityKey)?.setGearItem(gearSlot, item, AssetLibrary);
+    return true;
   }
 
   removeEquip(identityKey, equipSlot) {

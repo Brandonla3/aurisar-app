@@ -496,24 +496,26 @@ export default function WorldGame({ playerInfo, onExit }) {
     const scene = sceneRef.current;
     if (!sceneReady || !scene) return;
     if (equipSceneRef.current !== scene) { equipSceneRef.current = scene; appliedEquipRef.current = new Map(); }
-    const applied = appliedEquipRef.current;
+    const applied = appliedEquipRef.current; // mutated in place (retry-safe)
     const desired = new Map();
     for (const row of equippedRows.values()) {
       desired.set(`${idHex(row.owner)}|${row.slot}`, row.itemId);
     }
     for (const [key, itemId] of desired) {
-      if (applied.get(key) !== itemId) {
-        const sep = key.indexOf('|');
-        scene.applyEquip(key.slice(0, sep), key.slice(sep + 1), itemId);
-      }
+      if (applied.get(key) === itemId) continue; // unchanged, already applied
+      const sep = key.indexOf('|');
+      const ok = scene.applyEquip(key.slice(0, sep), key.slice(sep + 1), itemId);
+      // Latch only on success — an unresolved itemId stays un-applied so it
+      // retries on the next snapshot instead of being silently stuck.
+      if (ok) applied.set(key, itemId);
     }
-    for (const key of applied.keys()) {
+    for (const key of [...applied.keys()]) {
       if (!desired.has(key)) {
         const sep = key.indexOf('|');
-        scene.removeEquip(key.slice(0, sep), key.slice(sep + 1));
+        scene.removeEquip(key.slice(0, sep), key.slice(sep + 1)); // also prunes _equipState
+        applied.delete(key);
       }
     }
-    appliedEquipRef.current = desired;
   }, [equippedRows, sceneReady]);
 
   // Slice 5c — local-player HP / death overlay state, driven by BabylonWorldScene
