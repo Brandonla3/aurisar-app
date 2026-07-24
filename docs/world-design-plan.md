@@ -54,8 +54,10 @@ findings, all folded in below). All file references verified against the repo.
 - **Systems**: quests/chests/loot/vendors/dungeon-instancing/combat all work
   server-authoritatively. Stubbed: `fitnessPerks` unread, `gameStats` unread (flat
   `MELEE_DAMAGE=25`), quest `templateUnlockIds` advertised in UI but never granted, no
-  rare/epic items. **A brand-new user has zero available quests** (lowest gate is
-  `minLevel: 2`; worldLevel derives purely from fitness XP). **Zero audio exists.**
+  rare/epic items. **A brand-new user's first-session shape was wrong** — the only
+  ungated quest was an 8-kill loop 55–70 m out, and worldLevel derives purely from
+  fitness XP so every `minLevel: 2+` quest stays locked until real workouts land
+  (fixed in Batch A by `q_first_blood`). **Zero audio exists.**
   SpacetimeDB subscriptions are unfiltered `SELECT *` and movement syncs at 20 Hz —
   O(N²) row fan-out at scale.
 
@@ -97,11 +99,13 @@ new `game/MobAnimator.js`, `game/avatarSchema.js`, `game/MobAssetLibrary.js`,
 `systems/NpcSystem.js`, `content/zones/zone1/{quests,mobs}.ts`, `.github/workflows/ci.yml`.
 
 - **Groundwork (critique fixes):** add `verify:worldgen` GOLDEN check to `ci.yml` (it
-  exists but *nothing runs it*); establish the named 2–3 real-device benchmark matrix
+  existed but *nothing ran it*; extended with a site-position digest so count-preserving
+  reshuffles fail too); establish the named 2–3 real-device benchmark matrix
   (mid-tier Android + iPhone; fixed hub/castle-approach/Gallows capture stations) rerun in
-  every batch's acceptance; **first-5-minutes fix** — add one L1 pest-loop quest near the
-  south road + spawn→notice-board breadcrumb (pure content-graph; acceptance: account
-  creation → first quest turn-in ≤5 min).
+  every batch's acceptance; **first-5-minutes fix** — landed as `q_first_blood`, an
+  additive L1 3-wolf quest at the nearest (north-road) camp; both it and `q_wolves` are
+  offered by Marshal Halwin at L1 by design. The notice-board breadcrumb prop stays in
+  Batch E. Acceptance: account creation → first quest turn-in ≤5 min.
 - New `AnimationController.js`: clip-manifest resolution (replaces the idle/walk regex
   pair), frame-rate-independent exponential blending (τ≈120 ms), one-shots with
   time-tagged events. Consumers: CharacterAvatar, MobAnimator, NpcSystem.

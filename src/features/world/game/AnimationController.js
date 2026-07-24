@@ -118,8 +118,10 @@ export class AnimationController {
     ag.speedRatio = 1;
     const obs = ag.onAnimationGroupEndObservable?.add?.(() => {
       ag.onAnimationGroupEndObservable?.remove?.(obs);
+      if (this._oneShotObs === obs) this._oneShotObs = null;
       if (this._oneShot === ag) this._oneShot = null;
     });
+    this._oneShotObs = obs ?? null;
     ag.play(false);
     return true;
   }
@@ -144,11 +146,14 @@ export class AnimationController {
     ag.speedRatio = 1;
     const obs = ag.onAnimationGroupEndObservable?.add?.(() => {
       ag.onAnimationGroupEndObservable?.remove?.(obs);
+      if (this._deathObs === obs) this._deathObs = null;
       // Freeze on the last frame — a stopped group would snap the pose.
       ag.play(false);
       ag.goToFrame?.(ag.to);
       ag.pause?.();
     });
+    this._deathObs = obs ?? null;
+    this._deathGroup = ag;
     ag.play(false);
     const fps = 60; // glTF groups carry frame units at 60 fps
     const frames = (ag.to ?? 0) - (ag.from ?? 0);
@@ -213,6 +218,12 @@ export class AnimationController {
 
   _stopOneShot() {
     if (!this._oneShot) return;
+    // An interrupted one-shot never reaches its end observer — remove it
+    // here so no closure stays pinned to the group.
+    if (this._oneShotObs) {
+      this._oneShot.onAnimationGroupEndObservable?.remove?.(this._oneShotObs);
+      this._oneShotObs = null;
+    }
     this._oneShot.stop();
     this._oneShot.weight = 0;
     this._oneShot = null;
@@ -220,8 +231,12 @@ export class AnimationController {
 
   dispose() {
     this._stopOneShot();
+    if (this._deathObs) {
+      this._deathGroup?.onAnimationGroupEndObservable?.remove?.(this._deathObs);
+      this._deathObs = null;
+    }
     // Groups are owned by whoever instantiated the container; stopping is
-    // enough here (CharacterAvatar/scene dispose the groups themselves).
+    // enough here (CharacterAvatar and the mob entry dispose the groups).
     for (const ag of Object.values(this.clips)) ag.stop?.();
     this.clips = {};
   }

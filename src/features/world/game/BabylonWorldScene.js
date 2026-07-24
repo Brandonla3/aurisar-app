@@ -1771,10 +1771,11 @@ export class BabylonWorldScene {
     const p = this._local?.root?.position;
     if (!p) return;
     if (!this._mobUpdateCtx) {
-      this._mobUpdateCtx = { playerX: 0, playerZ: 0, groundYFor: (x, z, y) => this._groundYFor(x, z, y) };
+      this._mobUpdateCtx = { playerX: 0, playerY: 0, playerZ: 0, groundYFor: (x, z, y) => this._groundYFor(x, z, y) };
     }
     const ctx = this._mobUpdateCtx;
     ctx.playerX = p.x;
+    ctx.playerY = p.y;
     ctx.playerZ = p.z;
 
     const ANIM_RADIUS_SQ = 45 * 45;
@@ -1840,21 +1841,22 @@ export class BabylonWorldScene {
 
     // Position is server-authoritative but no longer snapped here — the
     // animator eases toward it each frame (and derives facing/locomotion
-    // from the resulting motion). See MobAnimator.update.
-    m.animator.setTarget(toWorld(row.x), toWorld(row.y));
+    // from the resulting motion). See MobAnimator.update. The raw server
+    // position is kept for combat range checks (the smoothed root lags it).
+    const wx = toWorld(row.x);
+    const wz = toWorld(row.y);
+    m.animator.setTarget(wx, wz);
+    m.authX = wx;
+    m.authZ = wz;
 
+    // Death is signalled ONLY by the server deleting the row (→ _removeMob).
+    // Row state is 'alive' | 'returning' — 'returning' is the live leash-home
+    // transition and must never be read as death (spacetimedb/src/index.ts:319).
     m.maxHp = row.maxHp;
-    const dead = row.state !== 'alive' || row.hp <= 0;
-    if (dead && !m.dead) {
-      // Edge path: a dead-state row before the server delete arrives.
-      // Play the death here; the eventual _removeMob defers its dispose.
-      this._beginMobDeath(m);
-    } else if (!dead) {
-      if (row.hp < m.lastHp) m.animator.onHit();
-      // Target ratio only — _updateMobs eases the fill toward it so damage
-      // drains instead of snapping (design-plan Batch A combat feel).
-      m.hpTarget = Math.max(0, Math.min(1, row.hp / Math.max(1, row.maxHp)));
-    }
+    if (row.hp < m.lastHp) m.animator.onHit();
+    // Target ratio only — _updateMobs eases the fill toward it so damage
+    // drains instead of snapping (design-plan Batch A combat feel).
+    m.hpTarget = Math.max(0, Math.min(1, row.hp / Math.max(1, row.maxHp)));
     m.lastHp = row.hp;
   }
 
@@ -1866,6 +1868,33 @@ export class BabylonWorldScene {
     m.deathMs = m.animator.playDeath();
   }
 
+  /** Full teardown of one mob entry, including the scene-level
+   *  AnimationGroups its GLB instantiate created (root.dispose does NOT
+   *  free those — leaving them leaks a group set per respawn). */
+  _disposeMobEntry(m) {
+    if (m._disposed) return;
+    m._disposed = true;
+    m.animator.dispose();
+    m.animGroups?.forEach(ag => { ag.stop(); ag.dispose(); });
+    // Dispose meshes but NOT materials/textures (2nd arg false): mob
+    // materials are shared/cached (per-type primitives via _stdMat, the
+    // two HP-bar materials, and GLB container materials instantiated with
+    // cloneMaterials: false), so a single despawn must not tear them out
+    // from under other mobs. engine.dispose() frees them at teardown.
+    m.root.dispose(false, false);
+  }
+
+  /** Instantly dispose any detached death play-outs (instance-scope changes
+   *  and teardown — a corpse must not linger across those boundaries). */
+  _clearDyingMobs() {
+    this._dyingMobs.forEach((m) => {
+      clearTimeout(m._deathTimer);
+      this._deathTimers.delete(m._deathTimer);
+      this._disposeMobEntry(m);
+    });
+    this._dyingMobs.clear();
+  }
+
   /**
    * The server DELETES the mob row on kill (client sees onDelete), so this
    * is the kill flow: play the death clip/fall on the detached entry, then
@@ -1874,34 +1903,32 @@ export class BabylonWorldScene {
    */
   _removeMob(mobId, { instant = false } = {}) {
     const m = this._mobs.get(mobId);
-    if (!m) return;
+    if (!m) {
+      // A delete can race ahead of the initial MobAssetLibrary flush —
+      // purge any queued upsert so the mob can't spawn as a client-only
+      // ghost when the queue drains.
+      if (this._pendingMobUpdates.length) {
+        this._pendingMobUpdates = this._pendingMobUpdates.filter(r => r.mobId !== mobId);
+      }
+      return;
+    }
     // Detach immediately — gameplay (targeting, minimap, quest prompts)
     // must not see a mob that is only still around to die on camera.
     this._mobs.delete(mobId);
 
-    const disposeEntry = () => {
-      m.animator.dispose();
-      // Dispose meshes but NOT materials/textures (2nd arg false): mob
-      // materials are shared/cached (per-type primitives via _stdMat, the
-      // two HP-bar materials, and GLB container materials instantiated with
-      // cloneMaterials: false), so a single despawn must not tear them out
-      // from under other mobs. engine.dispose() frees them at teardown.
-      m.root.dispose(false, false);
-    };
-
-    if (instant) { disposeEntry(); return; }
+    if (instant) { this._disposeMobEntry(m); return; }
 
     this._beginMobDeath(m);
     // The detached entry keeps animating through _updateMobs via this list
     // until its timer expires (fallback deaths need per-frame updates).
     this._dyingMobs.add(m);
     const waitMs = (m.deathMs || 900) + 300; // hold a beat on the corpse
-    const timer = setTimeout(() => {
-      this._deathTimers.delete(timer);
+    m._deathTimer = setTimeout(() => {
+      this._deathTimers.delete(m._deathTimer);
       this._dyingMobs.delete(m);
-      disposeEntry();
+      this._disposeMobEntry(m);
     }, waitMs);
-    this._deathTimers.add(timer);
+    this._deathTimers.add(m._deathTimer);
   }
 
   _spawnMob(row) {
@@ -1935,7 +1962,8 @@ export class BabylonWorldScene {
 
     const def = MOB_DEFS[row.mobType];
     const entry = {
-      root, visual, hpBar, hpFill,
+      root, visual, hpBar, hpFill, animGroups,
+      authX: root.position.x, authZ: root.position.z,
       maxHp: row.maxHp, lastHp: row.hp, dead: false, hpTarget: 1,
     };
     entry.animator = new MobAnimator(entry, {
@@ -2203,8 +2231,11 @@ export class BabylonWorldScene {
     let bestSq = maxRange * maxRange;
     this._mobs.forEach((m, mobId) => {
       if (m.dead) return;
-      const dx = m.root.position.x - p.x;
-      const dz = m.root.position.z - p.z;
+      // Range-check against the raw SERVER position, not the smoothed root —
+      // the eased visual lags the row and would let swings fire that the
+      // server then rejects.
+      const dx = m.authX - p.x;
+      const dz = m.authZ - p.z;
       const dsq = dx * dx + dz * dz;
       if (dsq >= bestSq) return;
       if (inInterior && !sameInteriorFloor(m.root.position.y, p.y)) return;
@@ -2627,8 +2658,10 @@ export class BabylonWorldScene {
       this._castle.applyServerExteriorState(wx, gy, wz, -Math.PI / 2);
       this._lastPos = { x: wx, z: wz };
     } else if (instChanged) {
-      // Instance scope changed — drop mobs and remotes from other instances.
+      // Instance scope changed — drop mobs and remotes from other instances,
+      // including any detached corpses still playing their death out.
       for (const [mobId] of this._mobs) this._removeMob(mobId, { instant: true });
+      this._clearDyingMobs();
       for (const [remoteKey] of this._remotePlayers) this._removeRemote(remoteKey);
     }
   }
@@ -3096,10 +3129,9 @@ export class BabylonWorldScene {
     this._touchCleanup?.();
     [...this._remotePlayers.keys()].forEach(id => this._removeRemote(id));
     [...this._mobs.keys()].forEach(id => this._removeMob(id, { instant: true }));
+    this._clearDyingMobs();
     this._deathTimers.forEach(t => clearTimeout(t));
     this._deathTimers.clear();
-    this._dyingMobs.forEach(m => { m.animator.dispose(); m.root.dispose(false, false); });
-    this._dyingMobs.clear();
     [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
     this._npcs?.dispose();
     this._npcs = null;

@@ -34,8 +34,9 @@ jobs:
       - name: World chest manifest up to date
         run: npm run emit:world-chests:check
 
-      # Determinism gate: the worldgen GOLDEN snapshot must match. Any PR that
-      # reshuffles the seed-manifest draw order (see docs/world-design-plan.md,
+      # Determinism gate: the worldgen GOLDEN snapshot (realized plateau
+      # heights + site counts + a site-position digest) must match. Any PR
+      # that reshuffles the seed-manifest draw order (docs/world-design-plan.md,
       # pillar "One reshuffle, then frozen ground") fails here instead of
       # silently moving every ruin/cave/chest in the live world.
       - name: Worldgen determinism (GOLDEN)

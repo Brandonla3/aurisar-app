@@ -214,7 +214,10 @@ export class MobAnimator {
     if (this._attackCdMs <= 0 && this._speedMps < 0.4) {
       const ax = ctx.playerX - p.x;
       const az = ctx.playerZ - p.z;
-      if (ax * ax + az * az < MELEE_RANGE_SQ) {
+      // Y gate: castle floors stack ~10 m apart — a mob one floor away can
+      // be near in XZ, and swinging through the ceiling reads as a bug.
+      const sameFloor = ctx.playerY === undefined || Math.abs(ctx.playerY - p.y) < 2.5;
+      if (sameFloor && ax * ax + az * az < MELEE_RANGE_SQ) {
         this._attackCdMs = this._attackIntervalMs;
         if (this._ctl?.has('attack')) {
           this._ctl.playOneShot('attack');
