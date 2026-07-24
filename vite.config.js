@@ -1,8 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { fileURLToPath } from 'node:url'
-
-const r = (p) => fileURLToPath(new URL(p, import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -17,14 +14,17 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 400,
     rollupOptions: {
-      // Emit the dev world viewer as a real build entry so /world-viewer.html
-      // is served on deploy previews (the SPA catch-all otherwise shadows it
-      // with index.html). It's the acceptance surface for the meshopt decode
-      // path + ?hud=assets ledger. `main` must be listed too or Vite drops it.
-      input: {
-        main: r('./index.html'),
-        'world-viewer': r('./world-viewer.html'),
-      },
+      // world-viewer.html (the standalone dev/QA renderer + `?qa=1` atmosphere
+      // overlay + `?hud=assets` download ledger) is a build input on Netlify
+      // deploy previews and branch builds — the real-GPU review surface for
+      // rendering PRs and the meshopt-decode acceptance path — but kept OUT of
+      // production. CONTEXT is set by Netlify ('production' | 'deploy-preview' |
+      // 'branch-deploy'); unset locally, where including it lets `vite build`
+      // verify the viewer entry compiles. (The SPA catch-all otherwise shadows
+      // /world-viewer.html with index.html when it isn't emitted.)
+      input: process.env.CONTEXT === 'production'
+        ? { main: 'index.html' }
+        : { main: 'index.html', worldViewer: 'world-viewer.html' },
       output: {
         // Split heavy libraries into their own chunks so the main bundle
         // doesn't pay for recharts on first paint. Combined with React.lazy at
