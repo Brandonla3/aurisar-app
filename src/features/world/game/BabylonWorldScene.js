@@ -1512,11 +1512,19 @@ export class BabylonWorldScene {
         csm.lambda                   = 0.8;   // logarithmic split (near detail)
         csm.stabilizeCascades        = true;
         csm.shadowMaxZ               = 80;
-        // NOTE: autoCalcDepthBounds (tighter cascade fit → sharper contact
-        // shadows) is deferred — it activates a per-frame camera-depth reducer,
-        // which is recurring GPU work on the heaviest tier (2048 CSM ×4 + SSAO2
-        // + post) that must be frame-time-measured on a real device before it
-        // ships, and can pump cascade resolution as large props enter/leave view.
+        // Fit the cascade split range to the camera's actual near/far depth each
+        // update instead of the full [near, shadowMaxZ] span, so texels
+        // concentrate where geometry is — sharper contact shadows under the
+        // third-person character. This is capability-gated (high tier only, the
+        // devices that already run the 2048 CSM + SSAO2 stack) and works with
+        // stabilizeCascades (the anti-swim snapping stays; only the depth range
+        // tightens). It activates a camera-depth reducer, so refresh it every 4th
+        // frame rather than every frame to keep the reducer cheap (the range
+        // drifts slowly; a smooth chase cam doesn't need per-frame refits). The
+        // dev viewer's ?qa=1 overlay exposes a runtime toggle + GPU frame-time
+        // readout so the on/off cost can be measured on a real device.
+        csm.autoCalcDepthBounds          = true;
+        csm.autoCalcDepthBoundsRefreshRate = 4;
         csm.cascadeBlendPercentage   = 0.1;
         csm.depthClamp               = true;
         csm.usePercentageCloserFiltering = true;

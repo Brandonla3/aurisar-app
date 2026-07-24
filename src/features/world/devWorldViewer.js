@@ -114,11 +114,13 @@ if (params.has('nav')) {
   }, 400);
 }
 
-// ?qa=1 — Atmosphere-QA overlay. Reproducible atmosphere states for the Batch 3
+// ?qa=1 — Atmosphere-QA overlay. Reproducible states for the Batch 3
 // visual-acceptance matrix: freeze/scrub the time of day, force weather wetness,
-// toggle volumetric clouds, and read out the shared AtmosphereState (sun
-// elevation, sun visibility, aerial facing weight, fog RGB/density, tier).
-// Opt-in so it never appears in the default/headless screenshot harness.
+// toggle volumetric clouds + the high-tier shadow autoCalcDepthBounds, and read
+// out the shared AtmosphereState (sun elevation, sun visibility, aerial facing
+// weight, fog RGB/density, tier) plus FPS and real GPU frame time — so the
+// shadow toggle's cost can be measured on/off. Opt-in so it never appears in the
+// default/headless screenshot harness.
 function mountAtmosphereQA(worldScene) {
   // Idempotent: a second call (viewer remount / double-invoke in dev) must not
   // stack a second panel + polling interval. Bail if one is already mounted.
@@ -180,6 +182,27 @@ function mountAtmosphereQA(worldScene) {
   row('volumetric clouds', volBox);
   volBox.onchange = () => worldScene.setVolumetricClouds?.(volBox.checked);
 
+  // Shadow cascade depth-bounds fit (high-tier CSM only). Toggle to measure the
+  // on/off cost against the GPU frame-time readout below — the acceptance check
+  // the #276 review asked for before this ships enabled.
+  const shadowGen = worldScene._shadowGen;
+  const csm = shadowGen && 'autoCalcDepthBounds' in shadowGen ? shadowGen : null;
+  const acdbBox = check();
+  acdbBox.checked = !!csm?.autoCalcDepthBounds;
+  acdbBox.disabled = !csm;
+  row('autoCalcDepthBounds', acdbBox);
+  acdbBox.onchange = () => { if (csm) csm.autoCalcDepthBounds = acdbBox.checked; };
+
+  // GPU frame-time instrumentation (needs EXT_disjoint_timer_query; present on
+  // most desktop browsers). Real GPU ms, not just FPS — so the shadow toggle's
+  // cost is measurable rather than inferred.
+  const instr = new BABYLON.EngineInstrumentation(worldScene.engine);
+  instr.captureGPUFrameTime = true;
+  const gpuMs = () => {
+    const ns = instr.gpuFrameTimeCounter?.lastSecAverage ?? 0;
+    return ns > 0 ? (ns / 1e6).toFixed(2) : '—';
+  };
+
   const out = document.createElement('pre');
   out.style.cssText = 'margin:6px 0 0;white-space:pre';
   panel.appendChild(out);
@@ -207,10 +230,12 @@ function mountAtmosphereQA(worldScene) {
       `facing  ${f2(atmo?.facingWeight)}\n` +
       `fog rgb ${rgb}\n` +
       `fog den ${atmo ? f2(atmo.fogDensity) : '—'}\n` +
-      `tier    ${md?.qualityTier ?? '—'}`;
+      `tier    ${md?.qualityTier ?? '—'}\n` +
+      `fps     ${worldScene.engine.getFps().toFixed(0)}\n` +
+      `gpu     ${gpuMs()} ms`;
   }, 200);
 
-  return () => { clearInterval(timer); panel.remove(); };
+  return () => { clearInterval(timer); instr.dispose(); panel.remove(); };
 }
 
 // Expose the cleanup so the overlay can be torn down from the console in dev.
