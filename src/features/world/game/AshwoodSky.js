@@ -23,6 +23,8 @@
 
 /* global BABYLON */
 
+import { aerialFogWeight, applyAerialFog } from './aerialPerspective.js';
+
 const VERT = `
 precision highp float;
 attribute vec3 position;
@@ -243,6 +245,9 @@ export class AshwoodSky {
     // closes as rain builds and breaks up after.
     this._cloudTime = 0;
     this._cloudCover = 0.38;
+    // Eased directional aerial-perspective weight (see _update). Lags the camera
+    // so a fast orbit can't pump the global fog colour between warm/cool ends.
+    this._aerialW = 0;
 
     this._observer = scene.onBeforeRenderObservable.add(() => this._update());
   }
@@ -308,9 +313,9 @@ export class AshwoodSky {
     // horizon color instead of being pulled toward the biome's ground tint,
     // while rain/overcast leans harder into it for atmosphere.
     const p = this.getPlayerPos?.();
+    const wet = this.scene.metadata?.ashwood?.weather?.wet ?? 0;
     let fr = this._bot.r, fg = this._bot.g, fb = this._bot.b;
     if (p) {
-      const wet = this.scene.metadata?.ashwood?.weather?.wet ?? 0;
       const blend = BIOME_FOG_BLEND_CLEAR + (BIOME_FOG_BLEND_WET - BIOME_FOG_BLEND_CLEAR) * wet;
       this.wg.biomeFogAt(p.x, p.z, this._biome);
       fr += (this._biome.r - fr) * blend;
@@ -326,16 +331,14 @@ export class AshwoodSky {
     // glows warm when the camera faces toward the sun and cools when facing
     // away. This shares this._sunDir — the exact sun direction the sky dome
     // already warms toward (the golden-hour horizon band in FRAG) — so sky and
-    // ground haze now agree instead of the haze being direction-agnostic
+    // ground haze agree instead of the haze being direction-agnostic
     // (threejs-atmosphere-aerial-perspective: sky and terrain haze must NOT use
-    // different sun directions). Analytic tier: this is the whole scattering
-    // model a small ground world needs — no LUT. Strongest at golden hour (a
-    // low sun means a long haze path); self-fades at night (dusk & dayF → 0).
-    // Applied AFTER the night dimming k above: this is in-scattered sunlight, so
-    // it stays bright at golden hour rather than being pulled toward night. It
-    // lands on the single scene.fogColor below, so terrain/props (Babylon fog)
-    // and water/grass (vFogColor uniform, copied from scene.fogColor each frame)
-    // all pick it up consistently — no per-shader edits.
+    // different sun directions). Analytic tier: the whole scattering model a
+    // small ground world needs — no LUT. The weight (aerialFogWeight) is
+    // golden-hour-dominant, gated by weather so an overcast sky that hides the
+    // sun makes the haze neutral rather than amber, and asymmetric so the
+    // toward-sun warm lobe dominates the gentle away-side cool. See the helper.
+    let wTarget = 0;
     const cam = this.lm.camera ?? this.scene.activeCamera;
     if (cam && cam.target) {
       const fx = cam.target.x - cam.position.x;   // camera-forward, horizontal
@@ -344,16 +347,20 @@ export class AshwoodSky {
       const fl = Math.hypot(fx, fz) || 1;
       const sl = Math.hypot(sx, sz) || 1;
       const facing = (fx * sx + fz * sz) / (fl * sl);   // -1 away … +1 toward sun
-      const w = facing * (0.05 * dayF + 0.22 * dusk);   // tune the 0.22 on-device
-      // Warm toward the sun (+R,+G,−B); the mirror cools the away-facing haze.
-      // Clamp to [0,1]: at peak dusk + facing the sun the warm term can push a
-      // channel past 1, and super-unity fog reads slightly blown under EXP2.
-      fr = Math.min(1, Math.max(0, fr + w * 0.85));
-      fg = Math.min(1, Math.max(0, fg + w * 0.42));
-      fb = Math.min(1, Math.max(0, fb - w * 0.75));
+      wTarget = aerialFogWeight(facing, dayF, dusk, wet);
     }
-
-    this.scene.fogColor.copyFromFloats(fr, fg, fb);
+    // Ease the weight over time. scene.fogColor is one GLOBAL colour (not a
+    // per-pixel model), so an un-eased term would let a fast 180° orbit swing
+    // the whole distant world between the warm and cool ends at once — reading
+    // as a camera-following filter rather than aerial perspective. Easing makes
+    // the haze lag the camera (~0.5s); the min() caps a long-frame spike so it
+    // never overshoots. Applied AFTER the night dimming k above: in-scattered
+    // sunlight should stay bright at golden hour, not be pulled toward night.
+    this._aerialW += (wTarget - this._aerialW) * Math.min(1, dt * 2.0);
+    // Final overworld fog write (clamped [0,1], straight into scene.fogColor):
+    // terrain/props (Babylon fog) and water/grass (vFogColor, copied from
+    // scene.fogColor each frame) all inherit it consistently — no per-shader edits.
+    applyAerialFog(this.scene.fogColor, fr, fg, fb, this._aerialW);
     this.scene.fogDensity = FOG_DENSITY_NIGHT + (FOG_DENSITY_DAY - FOG_DENSITY_NIGHT) * dayF;
   }
 
