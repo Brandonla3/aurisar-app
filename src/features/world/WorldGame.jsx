@@ -9,7 +9,9 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import BABYLON from 'babylonjs';
+// Sets window.BABYLON before babylonjs-loaders (and its decoder chunks) evaluate
+// — MUST stay the first Babylon-related import. See src/babylonGlobal.js.
+import BABYLON from '../../babylonGlobal.js';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
@@ -35,11 +37,9 @@ import {
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
 import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen, PROXIMITY_RADIUS } from './chatUtils.js';
-// Bundled UMD package — avoids the CSP script-src violation from loading
-// jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
-if (typeof window !== 'undefined' && !window.BABYLON) {
-  window.BABYLON = BABYLON;
-}
+// window.BABYLON is established by ../../babylonGlobal.js (imported above) — a
+// bundled UMD package that also avoids the CSP script-src violation from loading
+// jsdelivr at runtime, and keeps BabylonWorldScene's window.BABYLON references live.
 
 const IS_TOUCH = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;

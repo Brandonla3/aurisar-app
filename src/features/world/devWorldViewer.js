@@ -12,14 +12,12 @@
  * dev (it is not a build input).
  */
 
-import BABYLON from 'babylonjs';
+// Sets window.BABYLON before babylonjs-loaders (and its decoder chunks) evaluate
+// — MUST stay the first Babylon-related import. See src/babylonGlobal.js.
+import BABYLON from '../../babylonGlobal.js';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { sunElevationDeg } from './game/atmosphereState.js';
-
-if (typeof window !== 'undefined' && !window.BABYLON) {
-  window.BABYLON = BABYLON;
-}
 
 const canvas = document.getElementById('world-canvas');
 const hud = document.getElementById('hud');

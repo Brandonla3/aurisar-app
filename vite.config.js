@@ -14,15 +14,17 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 400,
     rollupOptions: {
-      // world-viewer.html (the standalone dev/QA renderer + `?qa=1` atmosphere
-      // overlay) is added as a build input on Netlify deploy previews and branch
-      // builds, so rendering PRs have a real-GPU review surface, but kept OUT of
-      // production. CONTEXT is set by Netlify ('production' | 'deploy-preview' |
-      // 'branch-deploy'); unset locally, where including it lets `vite build`
-      // verify the viewer entry compiles.
-      input: process.env.CONTEXT === 'production'
-        ? { main: 'index.html' }
-        : { main: 'index.html', worldViewer: 'world-viewer.html' },
+      // Production keeps Vite's DEFAULT single index.html entry (no `input`
+      // override) so its chunk graph is unchanged. Only non-production builds
+      // (Netlify deploy-preview / branch, and local) add the standalone
+      // world-viewer.html so rendering PRs have a real-GPU review surface. Naming
+      // an explicit production entry perturbed rolldown's splitting — it broke the
+      // babylon decoders out into their own chunk that reads the ambient BABYLON
+      // global before it is set — so production must stay on the default.
+      // CONTEXT is set by Netlify ('production' | 'deploy-preview' | 'branch-deploy').
+      ...(process.env.CONTEXT === 'production'
+        ? {}
+        : { input: { main: 'index.html', worldViewer: 'world-viewer.html' } }),
       output: {
         // Split heavy libraries into their own chunks so the main bundle
         // doesn't pay for recharts on first paint. Combined with React.lazy at
