@@ -249,7 +249,7 @@ export default function WorldGame({ playerInfo, onExit }) {
   const {
     onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
     onEquippedUpsert, onEquippedDelete,
-    countsFor, copperFor, openedChestIdsFor, equippedFor,
+    countsFor, copperFor, openedChestIdsFor, equippedFor, equippedRows,
   } = useServerInventory();
 
   const inventoryImport = React.useMemo(
@@ -484,6 +484,36 @@ export default function WorldGame({ playerInfo, onExit }) {
     if (!sceneReady) return;
     sceneRef.current?.setOpenedChests(openedChestIds);
   }, [openedChestIds, sceneReady]);
+
+  // Batch C: reconcile the playerEquipped table (all players) onto their
+  // avatars. Diff the desired "owner|slot → itemId" set against what we last
+  // applied and call the scene's equip bridge on the changes only. A
+  // scene-instance guard re-applies everything after a scene remount.
+  const appliedEquipRef = useRef(new Map());
+  const equipSceneRef = useRef(null);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!sceneReady || !scene) return;
+    if (equipSceneRef.current !== scene) { equipSceneRef.current = scene; appliedEquipRef.current = new Map(); }
+    const applied = appliedEquipRef.current;
+    const desired = new Map();
+    for (const row of equippedRows.values()) {
+      desired.set(`${idHex(row.owner)}|${row.slot}`, row.itemId);
+    }
+    for (const [key, itemId] of desired) {
+      if (applied.get(key) !== itemId) {
+        const sep = key.indexOf('|');
+        scene.applyEquip(key.slice(0, sep), key.slice(sep + 1), itemId);
+      }
+    }
+    for (const key of applied.keys()) {
+      if (!desired.has(key)) {
+        const sep = key.indexOf('|');
+        scene.removeEquip(key.slice(0, sep), key.slice(sep + 1));
+      }
+    }
+    appliedEquipRef.current = desired;
+  }, [equippedRows, sceneReady]);
 
   // Slice 5c — local-player HP / death overlay state, driven by BabylonWorldScene
   // when our own row arrives via the player table subscription.

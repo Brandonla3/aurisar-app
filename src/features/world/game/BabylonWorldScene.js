@@ -17,6 +17,7 @@
 import { AssetLibrary }    from './AssetLibrary.js';
 import { MobAssetLibrary } from './MobAssetLibrary.js';
 import { MobAnimator }     from './MobAnimator.js';
+import { AudioSystem }     from './AudioSystem.js';
 import { CharacterAvatar } from './CharacterAvatar.js';
 import { AshwoodSky }        from './AshwoodSky.js';
 import { AshwoodGrass }      from './AshwoodGrass.js';
@@ -47,7 +48,8 @@ import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
 import { sameInteriorFloor } from '../castle/castleNavSurface.js';
-import { MOBS as MOB_DEFS, ALL_WAYPOINTS, ALL_NPCS } from '../content/index';
+import { MOBS as MOB_DEFS, ALL_WAYPOINTS, ALL_NPCS, ITEMS } from '../content/index';
+import { EQUIP_TO_GEAR } from './avatarSchema.js';
 import { toWorld, toStdb } from '../worldSpace.js';
 
 // The authored flat tiles (T_03_03) predate the Ashwood heightfield and
@@ -819,6 +821,17 @@ function saveGfxPrefs(prefs) {
   catch { /* quota / private mode */ }
 }
 
+// Persisted audio mute pref (Batch C). Default unmuted.
+const AUDIO_PREFS_KEY = 'aurisar.world.audio.v1';
+function loadAudioMuted() {
+  try { return JSON.parse(localStorage.getItem(AUDIO_PREFS_KEY))?.muted === true; }
+  catch { return false; }
+}
+function saveAudioMuted(muted) {
+  try { localStorage.setItem(AUDIO_PREFS_KEY, JSON.stringify({ muted: !!muted })); }
+  catch { /* quota / private mode */ }
+}
+
 // ── Adaptive graphics safe-mode ──────────────────────────────────────────────
 // Desktop picks its effect tier from WebGL2 *feature* detection, which every
 // desktop GPU passes — so a weak/integrated/software GPU gets the same maximal
@@ -890,6 +903,9 @@ export class BabylonWorldScene {
     this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
+    // identityKey → { gearSlot → itemId } for equips that arrived before the
+    // avatar spawned; replayed by _replayEquips once it exists (Batch C).
+    this._pendingEquips     = new Map();
     this._spawning          = new Set(); // identity IDs currently being async-spawned
 
     // Slice 5c: local-player liveness. The server pushes hp / deadUntil
@@ -1052,6 +1068,9 @@ export class BabylonWorldScene {
     this._wildlife = new AshwoodWildlife(this.scene, this._worldgen, playerPos);
     this._weather = new AshwoodWeather(this.scene, this._lm, playerPos);
 
+    // SFX (Batch C). Non-critical: a missing audio engine degrades to silence.
+    this._audio = new AudioSystem(this.scene, { muted: loadAudioMuted() });
+
     this._bindKeys();
 
     // Render loop guards on _local until CharacterAvatar is ready. Wrapped so a
@@ -1097,6 +1116,7 @@ export class BabylonWorldScene {
       { excludeFromGlow: (mesh) => this._lm?.excludeFromGlow(mesh) },
     );
     this._local.root.position.set(0, this._worldgen.surfaceY(0, 0), 0);
+    if (this._myIdentity) this._replayEquips(this._myIdentity); // Batch C: show my gear
     // Flush remote updates that arrived while we were loading.
     // Mobs first — they can spawn independently of `_local` once
     // MobAssetLibrary is ready, and we want them visible ASAP.
@@ -1488,6 +1508,7 @@ export class BabylonWorldScene {
 
   // Called by WorldGame's React joystick overlay each frame
   setJoystick(dx, dy) {
+    if (dx || dy) this._audio?.unlock(); // touch input unlocks audio on mobile
     this._joyDx = dx;
     this._joyDy = dy;
   }
@@ -1724,6 +1745,7 @@ export class BabylonWorldScene {
 
   _bindKeys() {
     this._kd = (e) => {
+      this._audio?.unlock(); // first user gesture unlocks the audio context
       if (this._chatOpen || this._inputPaused) return;
       this._keys[e.code] = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
@@ -1858,7 +1880,12 @@ export class BabylonWorldScene {
     // Row state is 'alive' | 'returning' — 'returning' is the live leash-home
     // transition and must never be read as death (spacetimedb/src/index.ts:319).
     m.maxHp = row.maxHp;
-    if (row.hp < m.lastHp) m.animator.onHit();
+    if (row.hp < m.lastHp) {
+      m.animator.onHit();
+      // 'hit' SFX only for the mob the local player last swung at (avoids a
+      // cacophony when many mobs trade blows across the field).
+      if (row.mobId === this._pendingHitMobId) { this._audio?.play('hit'); this._pendingHitMobId = null; }
+    }
     // Target ratio only — _updateMobs eases the fill toward it so damage
     // drains instead of snapping (design-plan Batch A combat feel).
     m.hpTarget = Math.max(0, Math.min(1, row.hp / Math.max(1, row.maxHp)));
@@ -2230,6 +2257,10 @@ export class BabylonWorldScene {
       if (dx * dx + dz * dz > 1e-6) this._local.root.rotation.y = Math.atan2(dx, dz);
     }
     this._local.playOneShot?.('attack');
+    this._audio?.play('swing');
+    // Remember the target so the 'hit' SFX fires when its HP actually drops
+    // (server round-trip), not on the swing — matches the contact frame.
+    this._pendingHitMobId = target.mobId;
     this.callbacks.onCastAbility?.(target.mobId);
   }
 
@@ -2704,6 +2735,7 @@ export class BabylonWorldScene {
           rp._targetZ,
         );
         this._remotePlayers.set(key, rp);
+        this._replayEquips(key); // Batch C: show a remote's gear once spawned
       }
     } finally {
       this._spawning.delete(key);
@@ -2738,6 +2770,55 @@ export class BabylonWorldScene {
     // they pin to terrain as before.
     const cy = this._castle?.remoteSurfaceY(p.x, p.z, p.y);
     p.y = cy ?? this._worldgen.surfaceY(p.x, p.z);
+  }
+
+  // ── Equipment visuals (server playerEquipped → avatar) ─────────────────────
+  // WorldGame reconciles the playerEquipped table and calls these with the
+  // owner's identity hex, the content EquipSlot, and the itemId. We route to
+  // the local or the matching remote avatar and show/clear the piece. Equips
+  // for an avatar that hasn't spawned yet queue and replay on spawn.
+
+  /** The avatar for an identity hex, or null if it isn't spawned yet. */
+  _avatarFor(identityKey) {
+    if (identityKey && identityKey === this._myIdentity) return this._local;
+    return this._remotePlayers.get(identityKey) ?? null;
+  }
+
+  applyEquip(identityKey, equipSlot, itemId) {
+    const gearSlot = EQUIP_TO_GEAR[equipSlot];
+    if (!gearSlot) return; // offHand / trinket: no avatar slot yet
+    const item = ITEMS[itemId];
+    if (!item) return;
+    const avatar = this._avatarFor(identityKey);
+    if (!avatar) {
+      // Queue until the avatar exists (created async / remote not spawned).
+      const slots = this._pendingEquips.get(identityKey) ?? {};
+      slots[gearSlot] = itemId;
+      this._pendingEquips.set(identityKey, slots);
+      return;
+    }
+    avatar.setGearItem(gearSlot, item, AssetLibrary);
+  }
+
+  removeEquip(identityKey, equipSlot) {
+    const gearSlot = EQUIP_TO_GEAR[equipSlot];
+    if (!gearSlot) return;
+    const pend = this._pendingEquips.get(identityKey);
+    if (pend) delete pend[gearSlot];
+    this._avatarFor(identityKey)?.removeGear(gearSlot);
+  }
+
+  /** Apply any queued equips for an avatar that just spawned. */
+  _replayEquips(identityKey) {
+    const slots = this._pendingEquips.get(identityKey);
+    if (!slots) return;
+    this._pendingEquips.delete(identityKey);
+    const avatar = this._avatarFor(identityKey);
+    if (!avatar) return;
+    for (const [gearSlot, itemId] of Object.entries(slots)) {
+      const item = ITEMS[itemId];
+      if (item) avatar.setGearItem(gearSlot, item, AssetLibrary);
+    }
   }
 
   // ── Name label ─────────────────────────────────────────────────────────────
@@ -2790,6 +2871,16 @@ export class BabylonWorldScene {
     this._chatOpen = open;
     if (open) this._keys = {};
   }
+
+  // ── Audio (Batch C) ─────────────────────────────────────────────────────────
+
+  /** Play a one-shot SFX by name ('swing' | 'hit' | 'loot' | 'ui'). Public so
+   *  React (loot toasts, UI confirms) can trigger world audio. */
+  playSound(name) { this._audio?.play(name); }
+
+  /** Toggle + persist the world SFX mute pref. */
+  setAudioMuted(muted) { this._audio?.setMuted(muted); saveAudioMuted(muted); }
+  isAudioMuted() { return this._audio?.muted ?? false; }
 
   // ── Utilities ──────────────────────────────────────────────────────────────
 
@@ -3144,6 +3235,8 @@ export class BabylonWorldScene {
     this._deathTimers.forEach(t => clearTimeout(t));
     this._deathTimers.clear();
     [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
+    this._audio?.dispose();
+    this._audio = null;
     this._npcs?.dispose();
     this._npcs = null;
     this._props?.dispose();
