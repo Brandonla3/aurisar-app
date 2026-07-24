@@ -74,6 +74,10 @@ export class AshwoodGrass {
     this.mesh.material = this.material;
     this.mesh.isPickable = false;
     this.mesh.alwaysSelectAsActiveMesh = true; // it surrounds the camera; skip culling
+    // Receive the scene's shadows (CascadedShadowGenerator on high, blur-ESM on
+    // low/mobile) — the StandardMaterial grass material samples them for free, so
+    // trees/props cast onto the field instead of the grass reading flat-lit.
+    this.mesh.receiveShadows = true;
 
     const n = Math.ceil(this.RADIUS / this.CELL);
     // Blades per cell can exceed perCell (the density formula scales it up in
@@ -93,8 +97,9 @@ export class AshwoodGrass {
   _update() {
     const p = this.getPlayerPos?.();
     if (!p) return;
-    // Wind/light uniforms are driven by the shared pump in grassBlades.js; this
-    // observer only rebuilds the scatter when the player crosses a cell.
+    // Wind is driven by the shared clock + material plugin in grassBlades.js
+    // (lighting/shadows/fog come from the StandardMaterial); this observer only
+    // rebuilds the scatter when the player crosses a cell.
     if (Math.abs(p.x - this.lastX) + Math.abs(p.z - this.lastZ) > this.CELL) this._rebuild(p.x, p.z);
   }
 

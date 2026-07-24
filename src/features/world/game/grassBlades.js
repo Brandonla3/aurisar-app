@@ -12,8 +12,15 @@
  * angle is 0 at the base) while the tip rides a preserved-length arc, driven by
  * travelling gust fronts plus a per-blade chop and tip flutter.
  *
- * All materials created here register with a single per-scene uniform pump so
- * the field and understory sway with identical wind and light.
+ * The material is a StandardMaterial + a MaterialPlugin (GrassWindPlugin). The
+ * plugin injects the world-space wind (vertex) and the root→tip darkening
+ * (fragment); StandardMaterial owns lighting, SHADOW RECEIVING (mesh.receiveShadows),
+ * and built-in fog. This is the reason for the rewrite from a hand-written
+ * ShaderMaterial: a custom shader can't receive the scene's CascadedShadowGenerator
+ * / blur-ESM shadows without hand-rolling cascade sampling, whereas StandardMaterial
+ * gets both for free. The per-blade tint rides the thin-instance color buffer
+ * (Babylon's INSTANCESCOLOR path); alpha in that buffer is a wind seed, not
+ * opacity, so the material forces opaque via needAlphaBlending.
  */
 
 /* global BABYLON */
@@ -71,210 +78,212 @@ export function buildBladeClusterVertexData(o = {}) {
   return { positions, indices, normals, uvs, maxH: height };
 }
 
-// ── shaders ─────────────────────────────────────────────────────────────────
+// ── shared per-scene wind clock ───────────────────────────────────────────────
+// One clock per scene advances the wind time + a slowly-drifting coherent wind
+// direction (so gust fronts sweep the whole field the same way; weather only
+// supplies strength). The plugin reads it in bindForSubMesh — no per-material
+// observer. NOT constructed at module scope: this module can be evaluated (via
+// the static import chain) before window.BABYLON is assigned.
 
-const VERT = `
-precision highp float;
-attribute vec3 position;
-attribute vec3 normal;
-attribute vec2 uv;
-#include<instancesDeclaration>
-// Thin-instance color binds to the auto-declared 'instanceColor' (rgb = tint,
-// a = per-blade seed), NOT 'color'; declare it when the buffer isn't present.
-#ifndef INSTANCESCOLOR
-attribute vec4 instanceColor;
-#endif
-uniform mat4 viewProjection;
-uniform float uTime;
-uniform float uWind;
-uniform float uWindSpeed;
-uniform float uGustScale;
-uniform float uMaxH;
-uniform vec2 uWindDir;
-varying float vBladeT;
-varying float vWind;
-varying vec3 vTint;
-varying vec3 vN;
-varying vec3 vWp;
-void main() {
-  #include<instancesVertex>
-  vec4 wp = finalWorld * vec4(position, 1.0);
-  vec2 aOrigin = vec2(finalWorld[3].x, finalWorld[3].z);
-  float bladeT = clamp(position.y / uMaxH, 0.0, 1.0);
-  float seed = instanceColor.a;
+const _clocks = new WeakMap(); // scene -> { time, windX, windZ, obs, refs }
 
-  vec2 windDir = normalize(uWindDir);
-  vec2 sideDir = vec2(-windDir.y, windDir.x);
-  float along = dot(aOrigin, windDir);            // position along wind => fronts
-  float jitter = fract(sin(dot(aOrigin, vec2(12.9898, 78.233))) * 43758.5453);
-  float gust = pow(sin(along * uGustScale - uTime * uWindSpeed * 0.6 + jitter * 6.2831) * 0.5 + 0.5, 1.6);
-  float chop = sin(along * uGustScale * 2.7 - uTime * uWindSpeed * 1.3 + seed * 6.2831) * 0.5 + 0.5;
-  float ampVar = 0.65 + fract(seed * 7.0) * 0.7;
-  // Gentler bend so blades sway upright instead of folding flat to the ground
-  // (the old 1.45 cap let storm wind lay the whole field over).
-  float phi = clamp(uWind * (0.18 + gust * 0.5 + chop * 0.12) * ampVar * 0.55, 0.0, 0.8);
-
-  // Circular-arc rooted bend: root pinned (a = 0 at bladeT 0), tip rides an
-  // arc of preserved length so the blade folds instead of stretching.
-  float yScale = length(vec3(finalWorld[1].x, finalWorld[1].y, finalWorld[1].z));
-  float worldH = uMaxH * yScale;
-  float a = phi * pow(bladeT, 1.5);
-  float radius = worldH / max(phi, 1e-3);
-  float arc = radius * (1.0 - cos(a));                 // horizontal, along wind
-  float drop = radius * sin(a) - position.y * yScale;  // swap straight height for arc height
-  float flutter = sin(uTime * 10.0 + seed * 18.0 + along * 0.8) * 0.04 * smoothstep(0.55, 1.0, bladeT);
-
-  wp.x += windDir.x * arc + sideDir.x * flutter;
-  wp.z += windDir.y * arc + sideDir.y * flutter;
-  wp.y += drop;
-
-  vWp = wp.xyz;
-  vBladeT = bladeT;
-  vWind = clamp(gust * 0.75 + chop * 0.25, 0.0, 1.0);
-  vTint = instanceColor.rgb;
-  vN = normalize(mat3(finalWorld) * normal);
-  gl_Position = viewProjection * wp;
-}
-`;
-
-const FRAG = `
-precision highp float;
-varying float vBladeT;
-varying float vWind;
-varying vec3 vTint;
-varying vec3 vN;
-varying vec3 vWp;
-uniform float uLight;
-uniform float uBackStrength;   // 0 on low/mobile, >0 on high tier
-uniform float fogDensity;
-uniform float uDebugMode;      // 0 final, 1 height, 2 tint, 3 wind
-uniform vec3 uSunDir;
-uniform vec3 vFogColor;
-uniform vec3 cameraPosition;
-void main() {
-  vec3 N = normalize(vN);
-  vec3 L = normalize(uSunDir);
-  vec3 V = normalize(cameraPosition - vWp);
-
-  // Root→tip ramp: darker at the base (fake AO / ground contact), brighter and
-  // slightly warmer at the tip.
-  vec3 rootC = vTint * 0.5;
-  vec3 tipC = clamp(vTint * 1.3 + 0.05, 0.0, 1.6);
-  vec3 base = mix(rootC, tipC, pow(vBladeT, 1.1));
-
-  // Wrapped diffuse so blades never read fully unlit when facing away.
-  float wrap = clamp((dot(N, L) + 0.5) / 1.5, 0.0, 1.0);
-  float lambert = mix(0.55, 1.0, wrap);
-  // Translucency: thin tips glow when backlit (tier-gated, free no-op on low).
-  float back = pow(clamp(dot(-V, L), 0.0, 1.0), 2.0) * uBackStrength * pow(vBladeT, 1.5);
-
-  vec3 c = base * uLight * lambert + base * back;
-  float dist = length(cameraPosition - vWp);
-  float fog = exp(-pow(dist * fogDensity, 2.0));
-  c = mix(vFogColor, c, clamp(fog, 0.0, 1.0));
-
-  if (uDebugMode > 0.5) {
-    if (uDebugMode < 1.5) c = vec3(vBladeT);
-    else if (uDebugMode < 2.5) c = vTint;
-    else c = vec3(vWind, 1.0 - vWind, 0.25);
+// Get-or-create the shared clock (no refcount change) — called every frame in
+// bindForSubMesh.
+function _getClock(scene) {
+  let c = _clocks.get(scene);
+  if (!c) {
+    c = { time: 0, windX: 0.8, windZ: 0.6, obs: null, refs: 0 };
+    c.obs = scene.onBeforeRenderObservable.add(() => {
+      c.time += scene.getEngine().getDeltaTime() / 1000;
+      const ang = 0.7 + Math.sin(c.time * 0.04) * 0.25;
+      c.windX = Math.cos(ang);
+      c.windZ = Math.sin(ang);
+    });
+    _clocks.set(scene, c);
   }
-  gl_FragColor = vec4(c, 1.0);
-}
-`;
-
-// ── per-scene uniform pump ───────────────────────────────────────────────────
-
-const _pumps = new WeakMap(); // scene -> { mats:Set, time:number, obs }
-
-// Lazily-created shared scratch vectors. NOT constructed at module scope: this
-// module can be evaluated (via the static import chain) before window.BABYLON
-// is assigned, so any top-level `new BABYLON.*` would throw ReferenceError and
-// white-screen the world. Every BABYLON access here happens at runtime instead.
-function _ensureVecs() {
-  if (!_windDir) _windDir = new BABYLON.Vector2(0.8, 0.6);
-  if (!_sun) _sun = new BABYLON.Vector3(0, 1, 0);
+  return c;
 }
 
-function _tick(scene, e) {
-  _ensureVecs();
-  e.time += scene.getEngine().getDeltaTime() / 1000;
-  const md = scene.metadata?.ashwood;
-  const wind = Math.max(0.2, Math.min(3, md?.weather?.windStrength ?? 1));
-  const lm = md?.lm;
-  const back = md?.qualityTier === 'high' ? 0.25 : 0.0;
-  const light = 0.35 + 0.65 * (lm?.dayFactor ?? 1);
-  // A single coherent wind direction shared by every blade, drifting slowly so
-  // gust fronts sweep the whole field the same way (weather only gives strength).
-  const ang = 0.7 + Math.sin(e.time * 0.04) * 0.25;
-  _windDir.set(Math.cos(ang), Math.sin(ang));
-  // Prefer the shared atmosphere sunDir (AshwoodSky's single source of truth,
-  // already a unit ground→sun vector) so grass, water, and the sky agree on one
-  // sun direction; fall back to the key light before the first overworld frame.
-  const atmo = md?.atmosphere;
-  if (atmo?.sunDir) {
-    _sun.copyFrom(atmo.sunDir);
-  } else if (lm?.key) {
-    _sun.copyFrom(lm.key.direction).scaleInPlace(-1).normalize();
-  } else {
-    _sun.set(0, 1, 0);
-  }
-  const fog = scene.fogColor, fd = scene.fogDensity;
-  for (const m of e.mats) {
-    m.setFloat('uTime', e.time);
-    m.setFloat('uWind', wind);
-    m.setVector2('uWindDir', _windDir);
-    m.setFloat('uLight', light);
-    m.setFloat('uBackStrength', back);
-    m.setVector3('uSunDir', _sun);
-    m.setColor3('vFogColor', fog);
-    m.setFloat('fogDensity', fd);
-  }
+// Acquire a reference (one per grass material) and return a release fn that
+// removes the shared per-frame observer once the LAST grass material on the
+// scene disposes — so a disposed material doesn't leave the clock callback
+// ticking on a scene that outlives it.
+function _acquireClock(scene) {
+  const c = _getClock(scene);
+  c.refs++;
+  return () => {
+    c.refs--;
+    if (c.refs <= 0 && _clocks.get(scene) === c) {
+      scene.onBeforeRenderObservable.remove(c.obs);
+      _clocks.delete(scene);
+    }
+  };
 }
 
-let _windDir = null;
-let _sun = null;
+// ── material plugin ───────────────────────────────────────────────────────────
+// Lazily defined (needs BABYLON at runtime, not module-eval time) and cached.
 
-function _ensurePump(scene) {
-  let e = _pumps.get(scene);
-  if (!e) {
-    e = { mats: new Set(), time: 0, obs: null };
-    e.obs = scene.onBeforeRenderObservable.add(() => _tick(scene, e));
-    _pumps.set(scene, e);
-  }
-  return e;
-}
+let _GrassWindPlugin = null;
 
-/** Register a grass material so the shared pump drives its wind/light uniforms. */
-export function registerGrassMaterial(scene, mat) {
-  const e = _ensurePump(scene);
-  e.mats.add(mat);
-  mat.onDisposeObservable.add(() => e.mats.delete(mat));
+function _grassWindPluginClass() {
+  if (_GrassWindPlugin) return _GrassWindPlugin;
+
+  _GrassWindPlugin = class GrassWindPlugin extends BABYLON.MaterialPluginBase {
+    constructor(material, maxH) {
+      // name, priority (>100 so it runs after the base passes), defines
+      super(material, 'GrassWind', 200, { GRASSWIND: false });
+      this._maxH = maxH;
+      this._isEnabled = false;
+      this.isEnabled = true;
+    }
+
+    get isEnabled() { return this._isEnabled; }
+    set isEnabled(v) {
+      if (this._isEnabled === v) return;
+      this._isEnabled = v;
+      this.markAllDefinesAsDirty();
+      this._enable(v);
+    }
+
+    prepareDefines(defines) { defines.GRASSWIND = this._isEnabled; }
+
+    getClassName() { return 'GrassWindPlugin'; }
+
+    getUniforms() {
+      return {
+        ubo: [
+          { name: 'grassTime', size: 1, type: 'float' },
+          { name: 'grassWind', size: 1, type: 'float' },
+          { name: 'grassWindDir', size: 2, type: 'vec2' },
+          { name: 'grassWindSpeed', size: 1, type: 'float' },
+          { name: 'grassGustScale', size: 1, type: 'float' },
+          { name: 'grassMaxH', size: 1, type: 'float' },
+        ],
+        vertex: `#ifdef GRASSWIND
+          uniform float grassTime;
+          uniform float grassWind;
+          uniform vec2 grassWindDir;
+          uniform float grassWindSpeed;
+          uniform float grassGustScale;
+          uniform float grassMaxH;
+        #endif`,
+      };
+    }
+
+    bindForSubMesh(uniformBuffer, scene) {
+      if (!this._isEnabled) return;
+      const c = _getClock(scene);
+      const md = scene.metadata?.ashwood;
+      const wind = Math.max(0.2, Math.min(3, md?.weather?.windStrength ?? 1));
+      uniformBuffer.updateFloat('grassTime', c.time);
+      uniformBuffer.updateFloat('grassWind', wind);
+      uniformBuffer.updateFloat2('grassWindDir', c.windX, c.windZ);
+      uniformBuffer.updateFloat('grassWindSpeed', 1.0);
+      uniformBuffer.updateFloat('grassGustScale', 0.12);
+      uniformBuffer.updateFloat('grassMaxH', this._maxH);
+    }
+
+    getCustomCode(shaderType) {
+      if (shaderType === 'vertex') {
+        return {
+          CUSTOM_VERTEX_DEFINITIONS: 'varying float vGrassBladeT;',
+          // World-space wind: modify worldPos AFTER the instance transform so the
+          // gust fronts + sway direction stay in world space (an object-space
+          // displacement would be rotated by each blade's random Y rotation).
+          CUSTOM_VERTEX_UPDATE_WORLDPOS: `
+            #ifdef GRASSWIND
+            {
+              vec2 aOrigin = vec2(finalWorld[3].x, finalWorld[3].z);
+              float bladeT = clamp(positionUpdated.y / grassMaxH, 0.0, 1.0);
+              vGrassBladeT = bladeT;
+              #ifdef INSTANCESCOLOR
+                float seed = instanceColor.a;
+              #else
+                float seed = 0.5;
+              #endif
+              vec2 windDir = normalize(grassWindDir);
+              vec2 sideDir = vec2(-windDir.y, windDir.x);
+              float along = dot(aOrigin, windDir);
+              float jitter = fract(sin(dot(aOrigin, vec2(12.9898, 78.233))) * 43758.5453);
+              float gust = pow(sin(along * grassGustScale - grassTime * grassWindSpeed * 0.6 + jitter * 6.2831) * 0.5 + 0.5, 1.6);
+              float chop = sin(along * grassGustScale * 2.7 - grassTime * grassWindSpeed * 1.3 + seed * 6.2831) * 0.5 + 0.5;
+              float ampVar = 0.65 + fract(seed * 7.0) * 0.7;
+              float phi = clamp(grassWind * (0.18 + gust * 0.5 + chop * 0.12) * ampVar * 0.55, 0.0, 0.8);
+              float yScale = length(vec3(finalWorld[1].x, finalWorld[1].y, finalWorld[1].z));
+              float worldH = grassMaxH * yScale;
+              float a = phi * pow(bladeT, 1.5);
+              float radius = worldH / max(phi, 1e-3);
+              float arc = radius * (1.0 - cos(a));
+              float drop = radius * sin(a) - positionUpdated.y * yScale;
+              float flutter = sin(grassTime * 10.0 + seed * 18.0 + along * 0.8) * 0.04 * smoothstep(0.55, 1.0, bladeT);
+              worldPos.x += windDir.x * arc + sideDir.x * flutter;
+              worldPos.z += windDir.y * arc + sideDir.y * flutter;
+              worldPos.y += drop;
+            }
+            #endif
+          `,
+        };
+      }
+      if (shaderType === 'fragment') {
+        return {
+          CUSTOM_FRAGMENT_DEFINITIONS: 'varying float vGrassBladeT;',
+          // Root→tip ramp: darker at the base (fake AO / ground contact), brighter
+          // toward the tip. Multiplicative on the tinted diffuse (from the
+          // thin-instance color), so it composes regardless of where the base
+          // applies the vertex/instance color.
+          CUSTOM_FRAGMENT_UPDATE_DIFFUSE: `
+            #ifdef GRASSWIND
+              diffuseColor *= mix(0.55, 1.18, pow(clamp(vGrassBladeT, 0.0, 1.0), 1.1));
+            #endif
+          `,
+          // Force opaque OUTPUT alpha. needAlphaBlending:false only keeps the
+          // material out of the transparent queue — the StandardMaterial
+          // INSTANCESCOLOR path still does `alpha *= vColor.a`, which would leak
+          // the per-blade wind seed (instanceColor.a) into the fragment's output
+          // alpha and confuse prepass / render-target / compositing consumers.
+          CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+            #ifdef GRASSWIND
+              color.a = 1.0;
+            #endif
+          `,
+        };
+      }
+      return null;
+    }
+  };
+
+  return _GrassWindPlugin;
 }
 
 /**
- * Build a grass blade ShaderMaterial. maxH must match the geometry's height so
- * the wind bladeT normalizes correctly. Registers with the per-scene pump.
+ * Build a grass StandardMaterial with the wind/ramp plugin. maxH must match the
+ * geometry's height so the wind bladeT normalizes correctly. The mesh should set
+ * `receiveShadows = true` to pick up the scene's shadows; the per-blade tint
+ * rides the thin-instance color buffer.
  */
 export function createGrassMaterial(scene, opts = {}) {
   const maxH = opts.maxH ?? 0.5;
   const name = opts.name ?? 'grassBladeMat';
-  BABYLON.Effect.ShadersStore['grassBladeVertexShader'] = VERT;
-  BABYLON.Effect.ShadersStore['grassBladeFragmentShader'] = FRAG;
-  const mat = new BABYLON.ShaderMaterial(name, scene, 'grassBlade', {
-    // world0-3 MUST be declared for thin instancing or the instancesVertex
-    // include reads unbound attributes (blades stretch across the sky).
-    attributes: ['position', 'normal', 'uv', 'instanceColor', 'world0', 'world1', 'world2', 'world3'],
-    uniforms: ['viewProjection', 'world', 'cameraPosition',
-               'uTime', 'uWind', 'uWindDir', 'uWindSpeed', 'uGustScale', 'uMaxH',
-               'uLight', 'uSunDir', 'uBackStrength', 'vFogColor', 'fogDensity', 'uDebugMode'],
-  });
+
+  const mat = new BABYLON.StandardMaterial(name, scene);
+  // Tint comes from the per-instance color (INSTANCESCOLOR); diffuse stays white
+  // so it is not double-multiplied. Grass is matte (no specular highlight) and
+  // two-sided (thin blades seen from both faces).
+  mat.diffuseColor = new BABYLON.Color3(1, 1, 1);
+  mat.specularColor = new BABYLON.Color3(0, 0, 0);
   mat.backFaceCulling = false;
-  mat.setFloat('uMaxH', maxH);
-  mat.setFloat('uWindSpeed', 1.0);
-  mat.setFloat('uGustScale', 0.12);
-  mat.setFloat('uDebugMode', 0);
-  _ensureVecs();
-  mat.setVector2('uWindDir', _windDir);
-  registerGrassMaterial(scene, mat);
+  mat.twoSidedLighting = true;
+  // The thin-instance color's alpha channel is a per-blade wind seed, NOT
+  // opacity — force the material opaque so it is never read as transparency.
+  mat.needAlphaBlending = () => false;
+
+  // Attach the wind/ramp plugin (registers itself via the base constructor).
+  const Plugin = _grassWindPluginClass();
+  // eslint-disable-next-line no-new -- the plugin registers on the material in its ctor
+  new Plugin(mat, maxH);
+
+  // Acquire a reference on the shared wind clock and release it on dispose, so
+  // the per-frame observer is torn down when the last grass material goes away.
+  mat.onDisposeObservable.add(_acquireClock(scene));
   return mat;
 }

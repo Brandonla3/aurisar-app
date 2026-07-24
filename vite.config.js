@@ -14,6 +14,15 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 400,
     rollupOptions: {
+      // world-viewer.html (the standalone dev/QA renderer + `?qa=1` atmosphere
+      // overlay) is added as a build input on Netlify deploy previews and branch
+      // builds, so rendering PRs have a real-GPU review surface, but kept OUT of
+      // production. CONTEXT is set by Netlify ('production' | 'deploy-preview' |
+      // 'branch-deploy'); unset locally, where including it lets `vite build`
+      // verify the viewer entry compiles.
+      input: process.env.CONTEXT === 'production'
+        ? { main: 'index.html' }
+        : { main: 'index.html', worldViewer: 'world-viewer.html' },
       output: {
         // Split heavy libraries into their own chunks so the main bundle
         // doesn't pay for recharts on first paint. Combined with React.lazy at
