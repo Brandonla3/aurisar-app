@@ -14,17 +14,21 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 400,
     rollupOptions: {
-      // world-viewer.html (the standalone dev/QA renderer + `?qa=1` atmosphere
-      // overlay + `?hud=assets` download ledger) is a build input on Netlify
-      // deploy previews and branch builds — the real-GPU review surface for
-      // rendering PRs and the meshopt-decode acceptance path — but kept OUT of
-      // production. CONTEXT is set by Netlify ('production' | 'deploy-preview' |
-      // 'branch-deploy'); unset locally, where including it lets `vite build`
-      // verify the viewer entry compiles. (The SPA catch-all otherwise shadows
-      // /world-viewer.html with index.html when it isn't emitted.)
-      input: process.env.CONTEXT === 'production'
-        ? { main: 'index.html' }
-        : { main: 'index.html', worldViewer: 'world-viewer.html' },
+      // world-viewer.html (the standalone dev/QA renderer — `?qa=1` atmosphere
+      // overlay, `?hud=assets` download ledger, the meshopt-decode acceptance
+      // path) is a build input on Netlify deploy previews / branch builds and
+      // locally, giving rendering PRs a real-GPU review surface, but kept OUT of
+      // production. On non-prod it MUST be emitted or the SPA catch-all shadows
+      // /world-viewer.html with index.html.
+      //
+      // Production keeps Vite's DEFAULT single index.html entry (no `input`
+      // override): naming an explicit production entry perturbed rolldown's chunk
+      // splitting — it broke the babylon decoders out into their own chunk that
+      // reads the ambient BABYLON global before it is set — so prod stays default.
+      // CONTEXT is set by Netlify ('production' | 'deploy-preview' | 'branch-deploy').
+      ...(process.env.CONTEXT === 'production'
+        ? {}
+        : { input: { main: 'index.html', worldViewer: 'world-viewer.html' } }),
       output: {
         // Split heavy libraries into their own chunks so the main bundle
         // doesn't pay for recharts on first paint. Combined with React.lazy at

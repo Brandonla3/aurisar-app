@@ -7,14 +7,17 @@
  */
 
 import React, { useEffect, useRef, useCallback } from 'react';
-import BABYLON from 'babylonjs';
+// Sets window.BABYLON before babylonjs-loaders (and its decoder chunks) evaluate
+// — MUST stay the first Babylon-related import. See src/babylonGlobal.js.
+import BABYLON from '../../babylonGlobal.js';
 import 'babylonjs-loaders';
 import { createCharacterAssetCache } from '../world/game/AssetLibrary.js';
 import { CharacterAvatar } from '../world/game/CharacterAvatar.js';
 import { mergeConfig }     from '../world/game/avatarSchema.js';
 import { configureBabylonDecoders } from '../world/game/babylonDecoders.js';
 
-if (typeof window !== 'undefined' && !window.BABYLON) window.BABYLON = BABYLON;
+// window.BABYLON is set by ../../babylonGlobal.js (imported first). Repoint the
+// meshopt decoder at our same-origin vendored build before any GLB loads.
 configureBabylonDecoders(BABYLON);
 
 // Dedicated asset cache for the preview scene — the world's AssetLibrary

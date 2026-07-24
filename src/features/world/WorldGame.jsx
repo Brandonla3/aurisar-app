@@ -9,7 +9,9 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import BABYLON from 'babylonjs';
+// Sets window.BABYLON before babylonjs-loaders (and its decoder chunks) evaluate
+// — MUST stay the first Babylon-related import. See src/babylonGlobal.js.
+import BABYLON from '../../babylonGlobal.js';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
 import { configureBabylonDecoders } from './game/babylonDecoders.js';
@@ -36,13 +38,11 @@ import {
 } from './hooks/useQuests.js';
 import { CLASSES }            from '../../data/exercises.js';
 import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen, PROXIMITY_RADIUS } from './chatUtils.js';
-// Bundled UMD package — avoids the CSP script-src violation from loading
-// jsdelivr at runtime and keeps BabylonWorldScene's window.BABYLON references.
-if (typeof window !== 'undefined' && !window.BABYLON) {
-  window.BABYLON = BABYLON;
-}
-// Repoint the meshopt decoder at our same-origin vendored build before any
-// GLB loads (our assets are EXT_meshopt_compression-encoded).
+// window.BABYLON is established by ../../babylonGlobal.js (imported above), which
+// also avoids the CSP script-src violation from loading jsdelivr at runtime and
+// keeps BabylonWorldScene's window.BABYLON references live. Repoint the meshopt
+// decoder at our same-origin vendored build before any GLB loads (our assets are
+// EXT_meshopt_compression-encoded).
 configureBabylonDecoders(BABYLON);
 
 const IS_TOUCH = typeof window !== 'undefined' &&
