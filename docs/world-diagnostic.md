@@ -102,6 +102,50 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   work is the pragmatic substitute; true tree LOD wants the deferred streaming re-tile /
   billboard-impostor work (§7).
 
+### Batch 3 status (implemented)
+
+Visual quality via the `threejs-*` technique skills. Shipped in bounded passes, each
+validated on the Netlify deploy preview (no GPU here to eyeball renders), so every change
+replaces a hack or omission with the technique the skill prescribes — verifiable by the
+technique, not by taste.
+
+**Pass 1 (delivered):**
+
+- **Lake body colour — Beer-Lambert depth absorption** (`threejs-water-optics`). The lake
+  mixed its deep→shallow colour by *wave slope*, so it read as one flat teal. It now absorbs
+  the shallow tint toward the deep tint exponentially along the baked vertical-depth proxy
+  (`vShore`) — dark deep centre → bright shallow edge. Streams (no depth field) keep the
+  legacy slope look via a `bodyDepthMix` uniform; ponds use a gentler `bodyAbsorbK`.
+  (`ashwoodTileProvider.js`)
+- **Selective mobile bloom** (`threejs-bloom`). The mobile/low `GlowLayer` has no threshold,
+  so it bloomed *every* emissive — HP-bar fills, NPC/player nameplates, rain. A
+  `LightingManager.excludeFromGlow()` blocklist (no-op on desktop, where the layer is null)
+  excludes those three artefacts at their creation sites; intended emitters (portal, castle
+  windows, crystals, forge coal) still bloom.
+
+**Pass 2 (delivered — this PR):**
+
+- **Sun-directional aerial perspective** (`threejs-atmosphere-aerial-perspective`, analytic
+  tier). The overworld haze was direction-agnostic while the sky dome already warms toward
+  the sun — a soft version of the skill's "sky and terrain haze must not use different sun
+  directions" failure. An analytic in-scattering tint on the single `scene.fogColor` write
+  (`AshwoodSky._update`) now warms the haze when the camera faces the sun and cools it when
+  facing away, sharing the sky's sun direction. Strongest at golden hour, gone at night.
+  Every fog consumer — terrain/props (Babylon fog), water/grass (`vFogColor`) — inherits it
+  from that one write, so it is world-wide and mutually consistent with no per-shader edits.
+
+**Deferred to a later pass** — real, but not bounded enough to ship blind:
+
+- **Grass shadow-receiving.** Grass is a hand-written `ShaderMaterial` (`grassBlades.js`), and
+  the world runs **two** shadow systems — a `CascadedShadowGenerator` (4 cascades) on high and
+  a blur-ESM `ShadowGenerator` on low/mobile. Making a custom shader sample either means
+  manually replicating the cascade-selection/split binding a `StandardMaterial` gets for free,
+  which is fragile, Babylon-version-sensitive, and acne/swim-prone on dense, wind-displaced
+  blades. Needs on-device iteration, not a blind edit.
+- **High-tier `autoCalcDepthBounds`** (CSM cascade-sharpness nicety) — one line, but it adds a
+  per-frame depth pass and interacts with the tuned `stabilizeCascades` setup; measure on
+  device before enabling.
+
 ---
 
 ## 2. World layout — the coordinate problem
@@ -262,7 +306,11 @@ a GPU budget.
   the re-tile / impostor work). See §1 "Batch 2 status" for the rationale. Guided by
   `babylonjs-engine`.
 - **Batch 3 — Visual quality via skills.** Apply the `threejs-*` techniques to the
-  `Ashwood*` systems (grass, clouds, sky, water, shadows, color) with a single tone-map owner.
+  `Ashwood*` systems (grass, clouds, sky, water, shadows, color) with a single tone-map owner,
+  in bounded passes validated on the deploy preview. *Delivered:* Pass 1 — lake Beer-Lambert
+  depth absorption + selective mobile bloom; Pass 2 — sun-directional aerial perspective.
+  *Next:* grass shadow-receiving, high-tier CSM `autoCalcDepthBounds`, re-validate the deferred
+  Batch 2 perf items on-device. See §1 "Batch 3 status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.
