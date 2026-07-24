@@ -201,13 +201,21 @@ sun/sky disagreement.
   (gated on `CONTEXT`), so rendering PRs have a real-GPU review surface, while it stays excluded
   from production.
 
-**Deferred to a later pass** — real, but not bounded enough to ship blind:
+**Pass 5 (this PR — implemented, cost-measurement enabled):** high-tier CSM `autoCalcDepthBounds`.
 
-- **High-tier CSM `autoCalcDepthBounds`** — fits the cascade split range to the camera's actual
-  near/far depth for sharper contact shadows, but it activates a per-frame camera-depth reducer
-  (recurring GPU work on the heaviest tier) and can pump cascade resolution as large props enter
-  and leave view. Needs on-device **frame-time** measurement (on/off, at a fixed pose + orbit +
-  tile churn) against a p95 threshold before it ships — not a blind enable.
+- **`autoCalcDepthBounds`** on the high-tier `CascadedShadowGenerator` fits the cascade split
+  range to the camera's actual near/far depth instead of the full `[near, shadowMaxZ]` span, so
+  texels concentrate where geometry is → sharper contact shadows under the character. It is
+  **capability-gated** (high tier only — the devices already running the 2048 CSM + SSAO2 stack)
+  and works with `stabilizeCascades` (the anti-swim snapping stays; only the depth range
+  tightens). The #276 review's concern was the per-frame camera-depth reducer it activates, so
+  its cost is (a) reduced via `autoCalcDepthBoundsRefreshRate = 4` (refit every 4th frame — the
+  range drifts slowly, a smooth chase cam doesn't need per-frame refits), and (b) made
+  **measurable**: the `?qa=1` viewer overlay adds a runtime `autoCalcDepthBounds` toggle beside a
+  real **GPU frame-time** readout (`EngineInstrumentation`, not just FPS), so the on/off cost can
+  be checked against a threshold and the feature flipped off (or the refresh rate raised) in one
+  line if it doesn't pay for itself. Watch for near/far pumping as large props (the castle) enter
+  and leave view during the check.
 
 ---
 
@@ -374,9 +382,10 @@ a GPU budget.
   *Implemented:* Pass 1 — lake Beer-Lambert depth absorption + selective mobile bloom (merged
   #272); Pass 2 — sun-directional aerial perspective (merged #273); Pass 3 — shared
   `AtmosphereState` contract + dev Atmosphere-QA overlay (merged #274); Pass 4 — grass
-  shadow-receiving, field + understory (StandardMaterial + plugin). *Next:*
-  record the visual-acceptance matrix per pass; high-tier CSM `autoCalcDepthBounds` (frame-time
-  measured); re-validate the deferred Batch 2 perf items on-device. See §1 "Batch 3 status".
+  shadow-receiving, field + understory (StandardMaterial + plugin, merged #276); Pass 5 —
+  high-tier CSM `autoCalcDepthBounds` (capability-gated, refresh-throttled, `?qa=1` frame-time
+  measurement). *Next:* record the visual-acceptance matrix per pass; re-validate the deferred
+  Batch 2 perf items on-device. See §1 "Batch 3 status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.
