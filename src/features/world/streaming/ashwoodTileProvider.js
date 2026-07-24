@@ -718,9 +718,19 @@ function buildWaterMaterial(scene, opts = {}) {
     mat.setFloat('t', t);
     mat.setColor3('vFogColor', scene.fogColor);
     mat.setFloat('fogDensity', scene.fogDensity);
-    const lm = scene.metadata?.ashwood?.lm;
+    // Prefer the shared atmosphere contract (AshwoodSky's single source of truth
+    // for sun direction + day/dusk/night) so water, grass, and the sky agree;
+    // fall back to the key light before the first overworld frame.
+    const md = scene.metadata?.ashwood;
+    const atmo = md?.atmosphere;
+    const lm = md?.lm;
     let dayF = 1, dusk = 0;
-    if (lm?.key) {
+    if (atmo?.sunDir) {
+      mat.setVector3('sunDir', atmo.sunDir);
+      dayF = atmo.dayFactor ?? 1;
+      dusk = atmo.duskFactor ?? 0;
+      mat.setFloat('night', atmo.night ?? Math.max(0, Math.min(1, 1 - dayF * 1.5)));
+    } else if (lm?.key) {
       sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
       mat.setVector3('sunDir', sunDir);
       dayF = lm.dayFactor ?? 1;

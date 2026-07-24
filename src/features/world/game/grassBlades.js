@@ -207,7 +207,13 @@ function _tick(scene, e) {
   // gust fronts sweep the whole field the same way (weather only gives strength).
   const ang = 0.7 + Math.sin(e.time * 0.04) * 0.25;
   _windDir.set(Math.cos(ang), Math.sin(ang));
-  if (lm?.key) {
+  // Prefer the shared atmosphere sunDir (AshwoodSky's single source of truth,
+  // already a unit ground→sun vector) so grass, water, and the sky agree on one
+  // sun direction; fall back to the key light before the first overworld frame.
+  const atmo = md?.atmosphere;
+  if (atmo?.sunDir) {
+    _sun.copyFrom(atmo.sunDir);
+  } else if (lm?.key) {
     _sun.copyFrom(lm.key.direction).scaleInPlace(-1).normalize();
   } else {
     _sun.set(0, 1, 0);
