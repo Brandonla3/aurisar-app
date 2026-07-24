@@ -1508,6 +1508,12 @@ export class BabylonWorldScene {
         csm.lambda                   = 0.8;   // logarithmic split (near detail)
         csm.stabilizeCascades        = true;
         csm.shadowMaxZ               = 80;
+        // Fit the cascade split range to the actual near/far depth of what the
+        // camera sees each frame instead of the full [near, shadowMaxZ] span, so
+        // texels concentrate where geometry is — sharper contact shadows under
+        // the third-person character. Works with stabilizeCascades (the snapping
+        // stays; only the depth range tightens).
+        csm.autoCalcDepthBounds      = true;
         csm.cascadeBlendPercentage   = 0.1;
         csm.depthClamp               = true;
         csm.usePercentageCloserFiltering = true;
