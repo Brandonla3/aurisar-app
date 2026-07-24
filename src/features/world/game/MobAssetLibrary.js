@@ -26,7 +26,9 @@ const BASE = '/assets/mobs/';
 // Zone-1 roster → CC0 stand-in models under public/assets/mobs/ (see
 // public/assets/ATTRIBUTION.md). Several types share a file; missing
 // files fall back to family-shaped primitives.
-const MANIFEST = {
+// Exported for the mobClips truthfulness test (MOB_CLIPS must only name
+// clips that actually exist inside the mapped GLB).
+export const MANIFEST = {
   forest_wolf:    'wolf.glb',
   old_greyjaw:    'wolf.glb',
   wild_boar:      'bull.glb',
