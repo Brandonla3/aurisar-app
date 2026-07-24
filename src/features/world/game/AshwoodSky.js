@@ -346,9 +346,11 @@ export class AshwoodSky {
       const facing = (fx * sx + fz * sz) / (fl * sl);   // -1 away … +1 toward sun
       const w = facing * (0.05 * dayF + 0.22 * dusk);   // tune the 0.22 on-device
       // Warm toward the sun (+R,+G,−B); the mirror cools the away-facing haze.
-      fr = Math.max(0, fr + w * 0.85);
-      fg = Math.max(0, fg + w * 0.42);
-      fb = Math.max(0, fb - w * 0.75);
+      // Clamp to [0,1]: at peak dusk + facing the sun the warm term can push a
+      // channel past 1, and super-unity fog reads slightly blown under EXP2.
+      fr = Math.min(1, Math.max(0, fr + w * 0.85));
+      fg = Math.min(1, Math.max(0, fg + w * 0.42));
+      fb = Math.min(1, Math.max(0, fb - w * 0.75));
     }
 
     this.scene.fogColor.copyFromFloats(fr, fg, fb);

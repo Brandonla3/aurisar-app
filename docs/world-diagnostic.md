@@ -118,10 +118,13 @@ technique, not by taste.
   legacy slope look via a `bodyDepthMix` uniform; ponds use a gentler `bodyAbsorbK`.
   (`ashwoodTileProvider.js`)
 - **Selective mobile bloom** (`threejs-bloom`). The mobile/low `GlowLayer` has no threshold,
-  so it bloomed *every* emissive — HP-bar fills, NPC/player nameplates, rain. A
-  `LightingManager.excludeFromGlow()` blocklist (no-op on desktop, where the layer is null)
-  excludes those three artefacts at their creation sites; intended emitters (portal, castle
-  windows, crystals, forge coal) still bloom.
+  so it bloomed *every* emissive — the mob HP-bar fill, NPC quest markers, and character
+  nameplates all haloed like light sources. A `LightingManager.excludeFromGlow()` blocklist
+  (no-op on desktop, where the layer is null) excludes those artefacts at their creation sites
+  (HP-bar background + fill, NPC markers, and every `CharacterAvatar` nameplate — player,
+  remote, and NPC); intended emitters (portal, castle windows, crystals, forge coal, and the
+  night shooting-star streak) still bloom. Rain is a non-emissive `LinesMesh`, so it never
+  glowed and needs no exclusion.
 
 **Pass 2 (delivered — this PR):**
 
