@@ -15,8 +15,10 @@ import 'babylonjs-loaders';
 import { createCharacterAssetCache } from '../world/game/AssetLibrary.js';
 import { CharacterAvatar } from '../world/game/CharacterAvatar.js';
 import { mergeConfig }     from '../world/game/avatarSchema.js';
+import { configureBabylonDecoders } from '../world/game/babylonDecoders.js';
 
 if (typeof window !== 'undefined' && !window.BABYLON) window.BABYLON = BABYLON;
+configureBabylonDecoders(BABYLON);
 
 export default function CharacterTurntable({ config, style }) {
   const canvasRef = useRef(null);

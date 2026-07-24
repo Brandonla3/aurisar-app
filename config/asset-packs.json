@@ -1,0 +1,43 @@
+{
+  "_comment": "Declarative intake manifest for scripts/assets_pipeline.mjs. Each pack maps a directory of runtime GLBs to an optimization TREATMENT preset, a BUDGET class (config/asset-budgets.json), and a LICENSE record (emitted into public/assets/ATTRIBUTION.md's generated section). 'category' becomes the generated manifest filename (public/assets/manifest/<category>.manifest.json). keepClips (optional) prunes a rigged asset's animation set to just the named clips before compression — used where a CC0 pack ships dozens of clips the game never plays. See docs/ART_DIRECTION.md.",
+  "textureCap": 1024,
+  "packs": [
+    {
+      "category": "characters",
+      "dir": "public/assets/characters",
+      "treatment": "character_rigged",
+      "budgetClass": "character_rigged",
+      "recurse": true,
+      "exclude": ["gilded_sentinel.glb"],
+      "license": { "source": "MPFB / MakeHuman-derived base bodies + Blender-authored modular pieces", "author": "project (CC0 base) + Quaternius/Kenney kit pieces", "url": "public/assets/characters/README.md", "spdx": "CC0-1.0" }
+    },
+    {
+      "category": "models",
+      "dir": "public/assets/characters",
+      "treatment": "character_model",
+      "budgetClass": "character_model",
+      "recurse": false,
+      "include": ["gilded_sentinel.glb"],
+      "license": { "source": "Meshy AI generation, merged per-clip via scripts/build_gilded_sentinel.mjs", "author": "project", "url": "scripts/build_gilded_sentinel.mjs", "spdx": "CC0-1.0" }
+    },
+    {
+      "category": "mobs",
+      "dir": "public/assets/mobs",
+      "treatment": "creature_rigged",
+      "budgetClass": "creature_rigged",
+      "recurse": false,
+      "license": { "source": "Animated creatures (Quaternius) + KayKit skeletons", "author": "Quaternius, Kay Lousberg", "url": "https://quaternius.com / https://kaylousberg.com", "spdx": "CC0-1.0" },
+      "keepClips": {
+        "skeleton_minion.glb": ["Idle", "Walking_A", "Running_A", "1H_Melee_Attack_Slice_Diagonal", "Hit_A", "Death_A"]
+      }
+    },
+    {
+      "category": "props",
+      "dir": "public/assets/props",
+      "treatment": "kit_static",
+      "budgetClass": "kit_static",
+      "recurse": false,
+      "license": { "source": "Medieval Village / Fantasy Props / Nature / Pirate kits", "author": "Quaternius, Kenney", "url": "https://quaternius.com / https://kenney.nl", "spdx": "CC0-1.0" }
+    }
+  ]
+}

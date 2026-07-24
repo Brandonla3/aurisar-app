@@ -15,11 +15,13 @@ export default defineConfig({
     chunkSizeWarningLimit: 400,
     rollupOptions: {
       // world-viewer.html (the standalone dev/QA renderer + `?qa=1` atmosphere
-      // overlay) is added as a build input on Netlify deploy previews and branch
-      // builds, so rendering PRs have a real-GPU review surface, but kept OUT of
+      // overlay + `?hud=assets` download ledger) is a build input on Netlify
+      // deploy previews and branch builds — the real-GPU review surface for
+      // rendering PRs and the meshopt-decode acceptance path — but kept OUT of
       // production. CONTEXT is set by Netlify ('production' | 'deploy-preview' |
       // 'branch-deploy'); unset locally, where including it lets `vite build`
-      // verify the viewer entry compiles.
+      // verify the viewer entry compiles. (The SPA catch-all otherwise shadows
+      // /world-viewer.html with index.html when it isn't emitted.)
       input: process.env.CONTEXT === 'production'
         ? { main: 'index.html' }
         : { main: 'index.html', worldViewer: 'world-viewer.html' },

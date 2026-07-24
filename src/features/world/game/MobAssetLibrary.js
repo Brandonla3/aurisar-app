@@ -1,46 +1,28 @@
 /**
  * MobAssetLibrary — singleton GLB container cache for mobs.
  *
- * Mirrors `AssetLibrary.js` (characters) but loads from `/assets/mobs/`.
- * `BabylonWorldScene._spawnMob` consults `hasContainer(row.mobType)`; on a
- * hit it instantiates from the cached AssetContainer, on a miss it falls
- * back to the primitive composite already in `_spawnMob`. Missing GLB
- * files load silently so a new mob type can ship runtime-side before its
- * .glb has been authored.
- *
- * Usage:
- *   await MobAssetLibrary.init(scene);
- *   const container = MobAssetLibrary.getContainer('wolf');
- *   if (container) { const inst = container.instantiateModelsToScene(...); ... }
+ * The key→file table is no longer hand-maintained here: it is read from the
+ * generated `public/assets/manifest/mobs.manifest.json` (emitted by
+ * scripts/assets_pipeline.mjs), keyed by each mob GLB's asset key — the same
+ * string `MobDef.glbKey` carries in the content graph (wolf, bull, spider,
+ * glubevolved, goblin, tribal, skeleton_minion, orcenemy). The scene resolves
+ * a row's `mobType` → `MOBS[mobType].glbKey` → this cache; several mob types
+ * share one asset key (forest_wolf + old_greyjaw → wolf). Missing files load
+ * silently and `_spawnMob` falls back to family-shaped primitives.
  *
  * See public/assets/mobs/README.md for the export contract.
  */
 
 /* global BABYLON */
 
-const BASE = '/assets/mobs/';
+import mobsManifest from '../../../../public/assets/manifest/mobs.manifest.json';
 
-// Mob type (matches `mob.mob_type` in the SpacetimeDB module) → relative .glb
-// path. Keys must align with the `mobType` string the server emits; missing
-// files load silently and `_spawnMob` falls back to primitives.
-// Zone-1 roster → CC0 stand-in models under public/assets/mobs/ (see
-// public/assets/ATTRIBUTION.md). Several types share a file; missing
-// files fall back to family-shaped primitives.
-// Exported for the mobClips truthfulness test (MOB_CLIPS must only name
-// clips that actually exist inside the mapped GLB).
-export const MANIFEST = {
-  forest_wolf:    'wolf.glb',
-  old_greyjaw:    'wolf.glb',
-  wild_boar:      'bull.glb',
-  webwood_spider: 'spider.glb',
-  mudfin_murloc:  'glubevolved.glb',
-  tunnel_rat:     'goblin.glb',
-  vale_bandit:    'tribal.glb',
-  restless_bones: 'skeleton_minion.glb',
-  gorrak:         'orcenemy.glb',
-  // Legacy type (pre-zone-1 rows during the deploy window).
-  wolf:           'wolf.glb',
-};
+const BASE = mobsManifest.base; // '/assets/mobs/'
+
+// assetKey (== MobDef.glbKey) → file, straight from the generated manifest.
+const ASSETS = Object.fromEntries(
+  Object.entries(mobsManifest.assets).map(([key, a]) => [key, a.file]),
+);
 
 const _containers = new Map();
 let   _ready      = false;
@@ -54,7 +36,7 @@ async function _load(key, path, scene) {
     _containers.set(key, c);
   } catch (err) {
     // Non-fatal — _spawnMob falls back to the primitive composite for this
-    // mobType. Warn so a bad export during an asset swap is debuggable
+    // asset key. Warn so a bad export during an asset swap is debuggable
     // instead of silently shipping shape-primitive mobs.
     console.warn(`[MobAssetLibrary] ${key} (${path}) failed to load; using primitive fallback:`, err?.message ?? err);
   }
@@ -62,24 +44,24 @@ async function _load(key, path, scene) {
 
 export const MobAssetLibrary = {
   /**
-   * Load all known mob GLBs. Missing files are skipped — none are
-   * load-critical, since `_spawnMob` falls back to primitives. Call once
-   * during scene init, alongside `AssetLibrary.init`.
+   * Load every mob GLB named in the manifest. Missing files are skipped —
+   * none are load-critical, since `_spawnMob` falls back to primitives. Call
+   * once during scene init, alongside `AssetLibrary.init`.
    */
   async init(scene) {
     await Promise.all(
-      Object.entries(MANIFEST).map(([k, p]) => _load(k, p, scene))
+      Object.entries(ASSETS).map(([k, p]) => _load(k, p, scene))
     );
     _ready = true;
     console.log('[MobAssetLibrary] Ready. Loaded:', [..._containers.keys()].join(', ') || '(none)');
   },
 
-  /** Returns the AssetContainer for a mob type, or null if not loaded. */
+  /** Returns the AssetContainer for an asset key (== glbKey), or null. */
   getContainer(key) {
     return _containers.get(key) ?? null;
   },
 
-  /** Whether a GLB is loaded for a given mob type. */
+  /** Whether a GLB is loaded for a given asset key. */
   hasContainer(key) {
     return _containers.has(key);
   },

@@ -12,8 +12,10 @@ import 'babylonjs-loaders';
 import { createCharacterAssetCache } from '../world/game/AssetLibrary.js';
 import { CharacterAvatar } from '../world/game/CharacterAvatar.js';
 import { mergeConfig }     from '../world/game/avatarSchema.js';
+import { configureBabylonDecoders } from '../world/game/babylonDecoders.js';
 
 if (typeof window !== 'undefined' && !window.BABYLON) window.BABYLON = BABYLON;
+configureBabylonDecoders(BABYLON);
 
 // Dedicated asset cache for the preview scene — the world's AssetLibrary
 // containers belong to a different Babylon scene, so the preview loads its

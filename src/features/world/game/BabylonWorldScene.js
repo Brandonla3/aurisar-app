@@ -1941,7 +1941,13 @@ export class BabylonWorldScene {
     // (quadruped with a per-type palette, humanoid for bandits). A server
     // row must never be invisible — its AI can still attack and quests
     // need it killable. (Codex P1 on #219.)
-    const hasGlb = MobAssetLibrary.hasContainer(row.mobType);
+    // Resolve the shared asset key from the content graph (several mob types
+    // map to one GLB, e.g. forest_wolf + old_greyjaw → 'wolf'). A legacy row
+    // whose mobType predates the content graph (e.g. 'wolf' during a deploy
+    // window) falls back to using the mobType directly as an asset key so it
+    // still gets its GLB; anything unresolved uses the primitive composite.
+    const glbKey = MOB_DEFS[row.mobType]?.glbKey ?? row.mobType;
+    const hasGlb = glbKey != null && MobAssetLibrary.hasContainer(glbKey);
 
     const root = new BABYLON.TransformNode(`mob_${row.mobId}`, this.scene);
     // Spawn AT the server position — the animator's smoothing must never
@@ -1958,7 +1964,7 @@ export class BabylonWorldScene {
 
     let animGroups = null;
     if (hasGlb) {
-      animGroups = this._buildMobVisualFromGlb(row, visual);
+      animGroups = this._buildMobVisualFromGlb(glbKey, row, visual);
     } else {
       this._buildMobVisualPrimitive(row, visual);
     }
@@ -1985,8 +1991,8 @@ export class BabylonWorldScene {
   // pattern from CharacterAvatar._buildGLB — `cloneMaterials: false` is
   // intentional (shared materials across mob instances; revisit when we
   // need per-mob tinting like alpha-wolf darker etc.).
-  _buildMobVisualFromGlb(row, visual) {
-    const container = MobAssetLibrary.getContainer(row.mobType);
+  _buildMobVisualFromGlb(glbKey, row, visual) {
+    const container = MobAssetLibrary.getContainer(glbKey);
     const inst = container.instantiateModelsToScene(
       (name) => `mob_${row.mobId}_${name}`,
       false, // share materials

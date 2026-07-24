@@ -16,6 +16,11 @@
     "emit:castle:check": "node scripts/emit-castle-manifest.mjs --check",
     "emit:world-chests": "node scripts/emit_world_chests.mjs",
     "emit:world-chests:check": "node scripts/emit_world_chests.mjs --check",
+    "assets:pipeline": "node scripts/assets_pipeline.mjs",
+    "check:assets": "node scripts/assets_pipeline.mjs --check",
+    "emit:assets": "node scripts/assets_pipeline.mjs --emit",
+    "vendor:meshopt": "node scripts/vendor_meshopt_decoder.mjs",
+    "vendor:meshopt:check": "node scripts/vendor_meshopt_decoder.mjs --check",
     "build:terrain-assets": "node scripts/build_terrain_assets.mjs",
     "check:terrain-assets": "node scripts/build_terrain_assets.mjs --check",
     "sync:terrain-assets": "node scripts/sync_terrain_assets.mjs",
@@ -49,6 +54,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@gltf-transform/core": "^4.4.1",
+    "@gltf-transform/extensions": "^4.4.1",
+    "@gltf-transform/functions": "^4.4.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -61,6 +68,7 @@
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
     "jsdom": "^25.0.1",
+    "meshoptimizer": "^1.2.0",
     "sharp": "^0.35.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
