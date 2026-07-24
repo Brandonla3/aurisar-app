@@ -16,15 +16,19 @@
  * the mesh builders take the BABYLON namespace + scene as arguments.
  */
 
-/** Rarity → tint + emissive/particle budget (visual language, common→epic). */
+/** Rarity → tint + emissive strength (visual language, common→epic). The
+ *  emissive drives the existing glow/bloom layers directly (rare/epic read as
+ *  lit); no separate glow flag. Particle FX for epics land in Batch H. */
 export const RARITY = {
-  common:   { tint: [0.62, 0.62, 0.66], emissive: 0.0,  glow: false },
-  uncommon: { tint: [0.55, 0.72, 0.48], emissive: 0.05, glow: false },
-  rare:     { tint: [0.42, 0.60, 0.92], emissive: 0.18, glow: true },
-  epic:     { tint: [0.72, 0.46, 0.92], emissive: 0.30, glow: true },
+  common:   { tint: [0.62, 0.62, 0.66], emissive: 0.0 },
+  uncommon: { tint: [0.55, 0.72, 0.48], emissive: 0.05 },
+  rare:     { tint: [0.42, 0.60, 0.92], emissive: 0.18 },
+  epic:     { tint: [0.72, 0.46, 0.92], emissive: 0.30 },
 };
 
-/** Class → starter clothing tint (cheap layer-1 identity, 11 classes). */
+/** Class → starter clothing tint (cheap layer-1 identity, 11 classes). Wired
+ *  into avatar clothing in a later class-identity pass; exported + tested now
+ *  so the table stays in sync with the class roster. */
 export const CLASS_TINTS = {
   warrior:   '#7a3b2e', gladiator: '#8a2f2f', warden:  '#3f5a34',
   phantom:   '#2e2f3a', tempest:   '#356b7a', warlord: '#5a2f5a',

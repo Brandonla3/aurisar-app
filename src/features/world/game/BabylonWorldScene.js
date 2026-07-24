@@ -903,9 +903,13 @@ export class BabylonWorldScene {
     this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
     this._pendingMobUpdates = []; // mob rows queued while MobAssetLibrary is loading
-    // identityKey → { gearSlot → itemId } for equips that arrived before the
-    // avatar spawned; replayed by _replayEquips once it exists (Batch C).
-    this._pendingEquips     = new Map();
+    // DURABLE per-identity equip state: identityKey → { gearSlot → itemId }.
+    // WorldGame only sends equip DELTAS, so the scene must remember each
+    // avatar's gear itself and re-apply it on every (re)spawn — a remote that
+    // goes out of scope / disconnects and returns, or an instance transition,
+    // otherwise comes back bare. Written by applyEquip/removeEquip, replayed by
+    // _replayEquips on spawn (Batch C).
+    this._equipState        = new Map();
     this._spawning          = new Set(); // identity IDs currently being async-spawned
 
     // Slice 5c: local-player liveness. The server pushes hp / deadUntil
@@ -1436,6 +1440,7 @@ export class BabylonWorldScene {
     };
 
     const onDown = (e) => {
+      this._audio?.unlock(); // any canvas gesture (mouse-orbit / touch) unlocks audio
       const rect = canvas.getBoundingClientRect();
       // Left-half touches belong to the React joystick overlay; a 3rd+
       // right-half finger is ignored rather than hijacking the pinch.
@@ -1882,9 +1887,13 @@ export class BabylonWorldScene {
     m.maxHp = row.maxHp;
     if (row.hp < m.lastHp) {
       m.animator.onHit();
-      // 'hit' SFX only for the mob the local player last swung at (avoids a
-      // cacophony when many mobs trade blows across the field).
-      if (row.mobId === this._pendingHitMobId) { this._audio?.play('hit'); this._pendingHitMobId = null; }
+      // 'hit' SFX only for the mob the local player last swung at, and only
+      // within a short window after the swing (avoids a field-wide cacophony
+      // and a false hit on a miss).
+      if (row.mobId === this._pendingHitMobId && performance.now() - (this._pendingHitAt ?? 0) < 700) {
+        this._audio?.play('hit');
+        this._pendingHitMobId = null;
+      }
     }
     // Target ratio only — _updateMobs eases the fill toward it so damage
     // drains instead of snapping (design-plan Batch A combat feel).
@@ -2258,9 +2267,12 @@ export class BabylonWorldScene {
     }
     this._local.playOneShot?.('attack');
     this._audio?.play('swing');
-    // Remember the target so the 'hit' SFX fires when its HP actually drops
-    // (server round-trip), not on the swing — matches the contact frame.
+    // Remember the target + time so the 'hit' SFX fires when its HP actually
+    // drops (server round-trip), not on the swing. Bounded to a short window
+    // so a MISS doesn't fire a false hit when that mob is later damaged by
+    // someone else (optimistic hit-confirm, not exact contact-frame sync).
     this._pendingHitMobId = target.mobId;
+    this._pendingHitAt = now;
     this.callbacks.onCastAbility?.(target.mobId);
   }
 
@@ -2789,30 +2801,29 @@ export class BabylonWorldScene {
     if (!gearSlot) return; // offHand / trinket: no avatar slot yet
     const item = ITEMS[itemId];
     if (!item) return;
-    const avatar = this._avatarFor(identityKey);
-    if (!avatar) {
-      // Queue until the avatar exists (created async / remote not spawned).
-      const slots = this._pendingEquips.get(identityKey) ?? {};
-      slots[gearSlot] = itemId;
-      this._pendingEquips.set(identityKey, slots);
-      return;
-    }
-    avatar.setGearItem(gearSlot, item, AssetLibrary);
+    // Record durably first (so a later respawn re-applies it), then show it if
+    // the avatar exists. The state IS the queue — no separate pending map.
+    const slots = this._equipState.get(identityKey) ?? {};
+    slots[gearSlot] = itemId;
+    this._equipState.set(identityKey, slots);
+    this._avatarFor(identityKey)?.setGearItem(gearSlot, item, AssetLibrary);
   }
 
   removeEquip(identityKey, equipSlot) {
     const gearSlot = EQUIP_TO_GEAR[equipSlot];
     if (!gearSlot) return;
-    const pend = this._pendingEquips.get(identityKey);
-    if (pend) delete pend[gearSlot];
+    const slots = this._equipState.get(identityKey);
+    if (slots) {
+      delete slots[gearSlot];
+      if (!Object.keys(slots).length) this._equipState.delete(identityKey);
+    }
     this._avatarFor(identityKey)?.removeGear(gearSlot);
   }
 
-  /** Apply any queued equips for an avatar that just spawned. */
+  /** Re-apply an avatar's remembered gear when it (re)spawns. */
   _replayEquips(identityKey) {
-    const slots = this._pendingEquips.get(identityKey);
+    const slots = this._equipState.get(identityKey);
     if (!slots) return;
-    this._pendingEquips.delete(identityKey);
     const avatar = this._avatarFor(identityKey);
     if (!avatar) return;
     for (const [gearSlot, itemId] of Object.entries(slots)) {
@@ -3234,6 +3245,7 @@ export class BabylonWorldScene {
     this._clearDyingMobs();
     this._deathTimers.forEach(t => clearTimeout(t));
     this._deathTimers.clear();
+    this._equipState.clear();
     [...this._campfires.keys()].forEach(id => this._removeCampfire(id));
     this._audio?.dispose();
     this._audio = null;

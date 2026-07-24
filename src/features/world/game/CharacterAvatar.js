@@ -781,7 +781,7 @@ export class CharacterAvatar {
         mesh.parent = this.root; // fallback: no rig (box avatar) — float at hip
         mesh.position.set(0.4, 1.0, 0.1);
       }
-      this._slots[`gear_${gearSlot}`] = { nodes: [mesh], animGroups: [] };
+      this._slots[`gear_${gearSlot}`] = { nodes: [mesh], animGroups: [], material: mesh.material };
       if (gearSlot === 'weapon') this._weaponMesh = mesh; // drives the attack swing
       return;
     }
@@ -790,11 +790,11 @@ export class CharacterAvatar {
     await this.setGear(gearSlot, item.id, assetLibrary);
   }
 
-  /** Clear an equipped GEAR_SLOT (server unequip). */
+  /** Clear an equipped GEAR_SLOT (server unequip). _disposeSlot drops the
+   *  weapon-swing target and the exclusive material. */
   removeGear(gearSlot) {
     this._disposeSlot(`gear_${gearSlot}`);
     this._config.gear[gearSlot] = null;
-    if (gearSlot === 'weapon') { this._weaponMesh = null; this._swingMs = 0; }
   }
 
   // ── Slot disposal ──────────────────────────────────────────────────────────
@@ -804,7 +804,14 @@ export class CharacterAvatar {
     if (!slot) return;
     slot.animGroups?.forEach(ag => { ag.stop(); ag.dispose(); });
     slot.nodes?.forEach(n => n.dispose(false, false));
+    // Procedural weapons own an exclusive StandardMaterial (unlike the shared
+    // clothing/skin materials) — dispose it, or repeated gear swaps leak.
+    slot.material?.dispose();
     delete this._slots[key];
+    // Any weapon-slot teardown (early-return, swap, unequip) must drop the
+    // swing target so _updateWeaponSwing / playOneShot never touch a disposed
+    // mesh.
+    if (key === 'gear_weapon') { this._weaponMesh = null; this._swingMs = 0; }
   }
 
   // ── Label ──────────────────────────────────────────────────────────────────
