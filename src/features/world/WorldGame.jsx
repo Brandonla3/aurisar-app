@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 import { BabylonWorldScene } from './game/BabylonWorldScene.js';
+import { configureBabylonDecoders } from './game/babylonDecoders.js';
 import { useSpacetimeWorld }  from './useSpacetimeWorld.js';
 import TestingHud             from './TestingHud.jsx';
 import {
@@ -40,6 +41,9 @@ import { idHex, isChatVisible, insertChatMessage, joinCutoffMs, shouldFlagUnseen
 if (typeof window !== 'undefined' && !window.BABYLON) {
   window.BABYLON = BABYLON;
 }
+// Repoint the meshopt decoder at our same-origin vendored build before any
+// GLB loads (our assets are EXT_meshopt_compression-encoded).
+configureBabylonDecoders(BABYLON);
 
 const IS_TOUCH = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;

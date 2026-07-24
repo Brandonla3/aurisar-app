@@ -13,44 +13,14 @@
 /* global BABYLON */
 
 import { ZONE1_PROPS } from '../content/zones/zone1/props';
+import propsManifest from '../../../../public/assets/manifest/props.manifest.json';
 
-const BASE = '/assets/props/';
+const BASE = propsManifest.base; // '/assets/props/'
 
-const MANIFEST = {
-  house_1: 'house_1.glb',
-  house_2: 'house_2.glb',
-  house_3: 'house_3.glb',
-  inn: 'inn.glb',
-  bell_tower: 'bell_tower.glb',
-  blacksmith: 'blacksmith.glb',
-  market_stand_1: 'market_stand_1.glb',
-  market_stand_2: 'market_stand_2.glb',
-  well: 'well.glb',
-  fence: 'fence.glb',
-  bonfire: 'bonfire.glb',
-  dock_platform: 'dock_platform.glb',
-  rowboat: 'rowboat.glb',
-  tent_open: 'tent_open.glb',
-  tent_small: 'tent_small.glb',
-  crate_wooden: 'crate_wooden.glb',
-  barrel: 'barrel.glb',
-  anvil: 'anvil.glb',
-  weapon_stand: 'weapon_stand.glb',
-  farmcrate_apple: 'farmcrate_apple.glb',
-  rock_tall_a: 'rock_tall_a.glb',
-  rock_tall_h: 'rock_tall_h.glb',
-  rock_large_d: 'rock_large_d.glb',
-  rock_large_f: 'rock_large_f.glb',
-  ore_rocks: 'ore_rocks.glb',
-  mushroom_red: 'mushroom_red.glb',
-  mushroom_tan: 'mushroom_tan.glb',
-  column: 'column.glb',
-  column_broken: 'column_broken.glb',
-  statue_head: 'statue_head.glb',
-  statue_block: 'statue_block.glb',
-  timber_pillar: 'timber_pillar.glb',
-  cart: 'cart.glb',
-};
+// key → file, from the generated manifest (scripts/assets_pipeline.mjs).
+const MANIFEST = Object.fromEntries(
+  Object.entries(propsManifest.assets).map(([key, a]) => [key, a.file]),
+);
 
 // House heights from the reference layout (houseHeight table).
 const HOUSE_KINDS = ['house_1', 'house_2', 'blacksmith'];

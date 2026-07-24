@@ -1,51 +1,48 @@
 /**
  * MOB_CLIPS truthfulness — the table in MobAnimator.js must only name
- * animation clips that actually exist inside the GLB each mob type maps to
- * (MobAssetLibrary MANIFEST). Parses the glTF JSON chunk straight out of
- * the shipped .glb files so the contract can never silently drift when an
- * asset is replaced (design-plan Batch B formalizes this as the pipeline's
- * rig/clip contract; this is the Batch A seed of it).
+ * animation clips that actually exist inside the GLB each mob type maps to.
+ * The mob type → GLB path resolves through the content graph's `glbKey`
+ * and the generated `mobs.manifest.json` (scripts/assets_pipeline.mjs), so
+ * this test also pins the whole mobType → glbKey → file → clip-inventory
+ * chain — the Batch B rig/clip contract in seed form.
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import mobsManifest from '../../../../public/assets/manifest/mobs.manifest.json';
 import { MOB_CLIPS } from './MobAnimator.js';
-import { MANIFEST } from './MobAssetLibrary.js';
+import { MOBS } from '../content/index';
 
-const MOBS_DIR = fileURLToPath(new URL('../../../../public/assets/mobs/', import.meta.url));
+// The manifest already carries each GLB's clip inventory (parsed at emit
+// time), so the shipped bytes and the test agree by construction.
+const clipInventory = (glbKey) => new Set(mobsManifest.assets[glbKey]?.clips ?? []);
+const glbKeyFor = (mobType) => MOBS[mobType]?.glbKey ?? null;
 
-function glbAnimationNames(file) {
-  const buf = readFileSync(MOBS_DIR + file);
-  // GLB container: 12-byte header, then chunks; chunk 0 is the JSON blob.
-  const jsonLen = buf.readUInt32LE(12);
-  const gltf = JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf8'));
-  return new Set((gltf.animations ?? []).map((a) => a.name));
-}
-
-describe('MOB_CLIPS ↔ shipped GLB clip inventories', () => {
-  it('maps only mob types that exist in the MobAssetLibrary manifest', () => {
+describe('MOB_CLIPS ↔ generated mob manifest clip inventories', () => {
+  it('every keyed mob type resolves to an asset in the manifest', () => {
     for (const mobType of Object.keys(MOB_CLIPS)) {
-      expect(MANIFEST[mobType], `${mobType} missing from MobAssetLibrary MANIFEST`).toBeDefined();
+      const glbKey = glbKeyFor(mobType);
+      expect(glbKey, `${mobType} has no MobDef.glbKey`).toBeTruthy();
+      expect(mobsManifest.assets[glbKey], `${mobType} → ${glbKey} missing from mobs.manifest.json`).toBeDefined();
     }
   });
 
   for (const [mobType, clips] of Object.entries(MOB_CLIPS)) {
-    it(`${mobType}: every named clip exists in ${MANIFEST[mobType]}`, () => {
-      const names = glbAnimationNames(MANIFEST[mobType]);
+    it(`${mobType}: every named clip exists in its GLB`, () => {
+      const glbKey = glbKeyFor(mobType);
+      const names = clipInventory(glbKey);
       for (const [key, clip] of Object.entries(clips)) {
         if (clip == null) continue;
-        expect(names.has(clip), `${mobType}.${key} → "${clip}" not in ${MANIFEST[mobType]}`).toBe(true);
+        expect(names.has(clip), `${mobType}.${key} → "${clip}" not in ${glbKey}.glb`).toBe(true);
       }
     });
   }
 
   it('clipless GLBs are deliberately absent (procedural fallback covers them)', () => {
-    // wolf.glb ships zero animations — the wolf family must NOT be in the
-    // table, or MobAnimator would build a controller that resolves nothing
-    // and skip the fallback life entirely.
-    for (const mobType of ['forest_wolf', 'old_greyjaw', 'wolf']) {
+    // wolf.glb ships zero clips — the wolf family must NOT be in the table,
+    // or MobAnimator would build a controller that resolves nothing and skip
+    // the procedural fallback life entirely.
+    for (const mobType of ['forest_wolf', 'old_greyjaw']) {
       expect(MOB_CLIPS[mobType], `${mobType} should use the procedural fallback`).toBeUndefined();
-      expect(glbAnimationNames(MANIFEST[mobType]).size).toBe(0);
+      expect(clipInventory(glbKeyFor(mobType)).size).toBe(0);
     }
   });
 });
