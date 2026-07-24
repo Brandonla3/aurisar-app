@@ -29,18 +29,24 @@
  *   node scripts/assets_pipeline.mjs --emit     re-emit manifests only (no optimize)
  *
  * Design notes:
- * - meshopt is lossless for geometry and Babylon 9 decodes EXT_meshopt_compression
- *   (decoder self-hosted via src/features/world/game/babylonDecoders.js). Draco is
- *   rejected (larger decoder, worse ratio here); KTX2 is deferred until the texture
- *   payload warrants a transcoder (docs/world-design-plan.md, Batch B).
- * - Quantization rides inside meshopt() with morph/skin-safe defaults; the signature
- *   re-check is the backstop.
+ * - meshopt is VISUALLY lossless for geometry — it re-encodes vertex/index buffers
+ *   and applies KHR_mesh_quantization (fixed-point, morph/skin-safe at this scale,
+ *   NOT float-preserving). Babylon 9 decodes EXT_meshopt_compression via the
+ *   self-hosted decoder (src/features/world/game/babylonDecoders.js). Draco is
+ *   rejected (larger decoder, worse ratio here); KTX2 is deferred.
+ * - TEXTURES ARE NOT RE-ENCODED. An earlier lossy WebP/resize pass was removed: no
+ *   shipped texture exceeds the 1024 cap and the character/model packs carry none,
+ *   so it saved nothing while risking normal/ORM/packed-map fidelity. Downsizing an
+ *   over-cap texture is gated behind a treatment flag and, if ever hit, must be
+ *   lossless + slot-aware (a future need, not exercised today).
+ * - The structural-signature backstop is a fail-safe, not a proof of pixel identity:
+ *   it compares rig/mesh/material/animation/morph SHAPE, not vertex payloads. See
+ *   docs/ART_DIRECTION.md "what CI proves / doesn't prove".
  */
 import { NodeIO } from '@gltf-transform/core';
-import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { prune, dedup, weld, resample, meshopt } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
-import sharp from 'sharp';
 import { readFile, writeFile, stat, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, basename } from 'node:path';
@@ -60,19 +66,55 @@ let problems = 0;
 const fail = (msg) => { console.error(`  ✗ ${msg}`); problems++; };
 const ok = (msg) => console.log(`  ✓ ${msg}`);
 
+// Only write when the saving clears this floor — avoids 1-byte re-encode churn
+// on binary source files across pipeline re-runs.
+const MIN_SAVE_BYTES = 1024;
+
+// Treatment presets. All packs get the same lossless geometry path
+// (prune/dedup/weld/resample → meshopt); the treatment governs the TEXTURE
+// policy, which is the only place asset classes must differ (a normal map on a
+// rigged character must never be touched the way a static prop's albedo could).
+// `allowTextureDownsize` only permits a LOSSLESS resize of a texture that
+// exceeds the cap — never a lossy re-encode. No current asset triggers it.
+const TREATMENTS = {
+  character_rigged: { allowTextureDownsize: false },
+  character_model:  { allowTextureDownsize: false },
+  creature_rigged:  { allowTextureDownsize: false },
+  kit_static:       { allowTextureDownsize: true },
+};
+
 // ── glTF structural probes ──────────────────────────────────────────────────
 const io = new NodeIO()
   .registerExtensions(ALL_EXTENSIONS)
   .registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
 
+// A structural signature rich enough that weld/resample/quantize can't silently
+// change what the asset *is*. Compares rig shape (per-skin joint counts), mesh
+// makeup (per-mesh primitive + morph-target counts), material count, and
+// per-animation channel/sampler counts — not vertex payloads (see the header
+// note; pixel identity is an on-device check, not a CI one).
 function signature(doc) {
   const root = doc.getRoot();
-  const joints = root.listSkins().reduce((a, s) => a + s.listJoints().length, 0);
+  const skins = root.listSkins().map((s) => s.listJoints().length).sort((a, b) => a - b);
   const clips = root.listAnimations().map((a) => a.getName()).sort();
-  const morphs = [];
-  root.listMeshes().forEach((m) => { const tn = m.getExtras()?.targetNames; if (tn) morphs.push(...tn); });
-  return { joints, clips, morphs: morphs.sort(), meshes: root.listMeshes().length };
+  const anims = root.listAnimations()
+    .map((a) => `${a.getName()}:${a.listChannels().length}/${a.listSamplers().length}`).sort();
+  const morphNames = [];
+  const meshShape = root.listMeshes().map((m) => {
+    const tn = m.getExtras()?.targetNames; if (tn) morphNames.push(...tn);
+    const prims = m.listPrimitives();
+    const morphCounts = prims.map((p) => p.listTargets().length);
+    return `${prims.length}:[${morphCounts.join(',')}]`;
+  }).sort();
+  return {
+    skins, joints: skins.reduce((a, b) => a + b, 0),
+    clips, anims, meshes: root.listMeshes().length, meshShape,
+    materials: root.listMaterials().length,
+    morphs: morphNames.sort(),
+  };
 }
+
+const sigString = (s) => JSON.stringify(s);
 
 function triCount(doc) {
   let n = 0;
@@ -93,41 +135,41 @@ function maxTexEdge(doc) {
   return mx;
 }
 
-const sameSig = (a, b) =>
-  a.joints === b.joints && a.meshes === b.meshes &&
-  a.clips.join('|') === b.clips.join('|') && a.morphs.join('|') === b.morphs.join('|');
+const sameSig = (a, b) => sigString(a) === sigString(b);
 
-// ── texture downsize/recompress (only when it helps) ────────────────────────
-// Downsize any texture whose longest edge exceeds TEX_CAP, and convert
-// png/jpeg to webp. Already-small webp is left untouched so we never inflate.
-async function optimizeTextures(doc) {
+// Report any texture that exceeds the cap. Downsizing is deliberately NOT done
+// here: it would need to be lossless and slot-aware (never lossy-recompress a
+// normal/ORM/packed map), and no shipped asset triggers it. A future kit with
+// oversized color textures is the reason `allowTextureDownsize` exists; until
+// then an over-cap texture is a budget failure, surfaced by check:assets.
+function overCapTextures(doc) {
+  const over = [];
   for (const tex of doc.getRoot().listTextures()) {
-    const img = tex.getImage();
-    if (!img) continue;
-    const mime = tex.getMimeType();
-    const size = tex.getSize();
-    const tooBig = size && Math.max(size[0], size[1]) > TEX_CAP;
-    const reencode = mime === 'image/png' || mime === 'image/jpeg';
-    if (!tooBig && !reencode) continue;
-    let pipe = sharp(Buffer.from(img));
-    if (tooBig) {
-      const scale = TEX_CAP / Math.max(size[0], size[1]);
-      pipe = pipe.resize(Math.round(size[0] * scale), Math.round(size[1] * scale), {
-        fit: 'fill', kernel: sharp.kernel.lanczos3,
-      });
-    }
-    const out = await pipe.webp({ quality: 88, effort: 5 }).toBuffer();
-    // Never enlarge a single texture.
-    if (out.length < img.byteLength || tooBig) {
-      tex.setImage(out).setMimeType('image/webp');
-    }
+    const s = tex.getSize();
+    if (s && Math.max(s[0], s[1]) > TEX_CAP) over.push(Math.max(s[0], s[1]));
   }
+  return over;
 }
 
 // ── per-file optimization ───────────────────────────────────────────────────
 async function optimizeFile(absPath, pack) {
   const original = await readFile(absPath);
   const doc = await io.read(absPath);
+
+  // Idempotency + reproducibility: a file already carrying
+  // EXT_meshopt_compression has been through the pipeline. Re-running
+  // prune/weld/resample/meshopt on its own output COMPOUNDS (weld can merge
+  // post-quantization vertices, meshopt re-encodes) — a slow drift away from
+  // the source. Skip it so `assets:pipeline` is a no-op on optimized assets;
+  // optimization happens once, when a fresh (uncompressed) GLB is dropped in.
+  // `--force` re-optimizes anyway (e.g. after a pipeline change, from source).
+  const alreadyOptimized = doc.getRoot().listExtensionsUsed()
+    .some((e) => e.extensionName === 'EXT_meshopt_compression');
+  if (alreadyOptimized && !process.argv.includes('--force')) {
+    console.log(`  · ${basename(absPath).padEnd(26)} already optimized (skip; --force to redo)`);
+    return { wrote: false };
+  }
+
   const sig0 = signature(doc);
 
   // Optional clip curation (drop CC0-pack clips the game never plays).
@@ -139,8 +181,13 @@ async function optimizeFile(absPath, pack) {
     }
   }
 
+  const over = overCapTextures(doc);
+  if (over.length && !TREATMENTS[pack.treatment]?.allowTextureDownsize) {
+    // Surface (don't silently mutate) — check:assets budget will also flag it.
+    console.warn(`  ! ${basename(absPath)}: texture ${Math.max(...over)}px > ${TEX_CAP} cap (no lossy downsize; fix the source)`);
+  }
+
   await doc.transform(prune(), dedup(), weld(), resample());
-  await optimizeTextures(doc);
   await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'high' }));
 
   const out = Buffer.from(await io.writeBinary(doc));
@@ -149,15 +196,17 @@ async function optimizeFile(absPath, pack) {
   const check = await io.readBinary(out);
   const sig1 = signature(check);
   const expected = keep
-    ? { ...sig0, clips: [...keep].sort() }
+    ? { ...sig0, clips: [...keep].sort(),
+        anims: sig0.anims.filter((a) => keep.includes(a.split(':')[0])).sort() }
     : sig0;
   if (!sameSig(expected, sig1)) {
     fail(`${relative(ROOT, absPath)}: structural signature changed — refusing to write.\n` +
-      `      before ${JSON.stringify(expected)}\n      after  ${JSON.stringify(sig1)}`);
+      `      before ${sigString(expected)}\n      after  ${sigString(sig1)}`);
     return { wrote: false, bytes: original.length };
   }
 
-  const smaller = out.length < original.length;
+  const saved = original.length - out.length;
+  const smaller = saved >= MIN_SAVE_BYTES; // ignore sub-KB churn
   if (smaller && MODE === 'optimize') await writeFile(absPath, out);
   const finalBytes = smaller ? out.length : original.length;
   const pct = ((finalBytes / original.length) * 100).toFixed(0);
@@ -254,6 +303,15 @@ async function main() {
   await MeshoptEncoder.ready;
   await MeshoptDecoder.ready;
   console.log(`[assets_pipeline] mode=${MODE}\n`);
+
+  // Reject an unknown treatment up front — the field drives real behavior now,
+  // so a typo must fail loudly rather than silently fall through.
+  for (const pack of packsCfg.packs) {
+    if (!TREATMENTS[pack.treatment]) {
+      fail(`pack ${pack.category}: unknown treatment '${pack.treatment}' (known: ${Object.keys(TREATMENTS).join(', ')})`);
+    }
+  }
+  if (problems) { console.error(`\n${problems} problem(s).`); process.exit(1); }
 
   if (MODE === 'optimize') {
     for (const pack of packsCfg.packs) {
