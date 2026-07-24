@@ -20,8 +20,13 @@
  *   sunDir        BABYLON.Vector3  normalized ground→sun (the shaders' light L);
  *                                  a LIVE reference to the sky's own scratch, so
  *                                  it is always the current frame's value.
- *   fogColor      BABYLON.Color3   === scene.fogColor (LIVE ref; the final
- *                                  aerial-perspective-tinted value).
+ *   fogColor      BABYLON.Color3   === scene.fogColor, the final
+ *                                  aerial-perspective-tinted value. The writer
+ *                                  RE-POINTS this each publish because
+ *                                  LightingManager._blendProfiles reassigns
+ *                                  scene.fogColor to a new Color3 on zone
+ *                                  transitions — a captured reference would
+ *                                  otherwise orphan after the first dungeon trip.
  *   sunVisibility number 0..1      1 clear → 0.15 overcast (cloud hides the sun;
  *                                  see sunVisibilityFromWet).
  *   fogDensity    number           === scene.fogDensity.
@@ -34,10 +39,10 @@
 
 /**
  * Build the atmosphere-state bag. `sunDirRef` and `fogColorRef` are stored by
- * REFERENCE (the sky's own scratch Vector3 and scene.fogColor), so the writer
- * mutates them in place each frame and readers always see the live value with
- * no copy. Scalars are seeded to a benign clear-day default for the frames
- * before the first write.
+ * REFERENCE (the sky's own scratch Vector3 and scene.fogColor), so readers see
+ * the live value with no copy — sunDir is mutated in place each frame, and
+ * fogColor is re-pointed each publish (see the fogColor note above). Scalars are
+ * seeded to a benign clear-day default for the frames before the first write.
  * @param {BABYLON.Vector3} sunDirRef
  * @param {BABYLON.Color3}  fogColorRef
  */

@@ -162,10 +162,13 @@ sun/sky disagreement.
   copies) — the drift the review flagged. `AshwoodSky._update` is now the sole writer of a
   single state bag at `scene.metadata.ashwood.atmosphere` (sun direction computed once as a
   unit ground→sun vector, plus sun visibility, fog colour/density, day/dusk/night, and the
-  eased aerial facing weight); the grass and water binds read `atmosphere.sunDir` instead of
-  recomputing it, falling back to the key light before the first overworld frame. `sunDir` and
-  `fogColor` are held by live reference (no per-frame copy); the shared `sunVisibilityFromWet`
-  now backs both the fog tint and the state. Covered by `atmosphereState.test.js`.
+  eased aerial facing weight); the grass, water, and volumetric-cloud binds read
+  `atmosphere.sunDir` instead of recomputing it, falling back to the key light before the first
+  overworld frame. `sunDir` is a live reference (a scratch mutated in place); `fogColor` is
+  re-pointed each publish, since `LightingManager._blendProfiles` reassigns `scene.fogColor` to
+  a new `Color3` on zone transitions and a captured reference would otherwise orphan. The shared
+  `sunVisibilityFromWet` now backs both the fog tint and the state. Covered by
+  `atmosphereState.test.js`.
 - **Dev-only Atmosphere-QA overlay** on `devWorldViewer.js` (`?qa=1`, opt-in so it never
   enters the headless screenshot harness). Freeze/scrub the time of day, force weather
   wetness against the random cycle, toggle volumetric clouds, and read out sun elevation, sun

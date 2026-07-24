@@ -731,7 +731,7 @@ function buildWaterMaterial(scene, opts = {}) {
       dusk = atmo.duskFactor ?? 0;
       mat.setFloat('night', atmo.night ?? Math.max(0, Math.min(1, 1 - dayF * 1.5)));
     } else if (lm?.key) {
-      sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
+      sunDir.copyFrom(lm.key.direction).scaleInPlace(-1).normalize();
       mat.setVector3('sunDir', sunDir);
       dayF = lm.dayFactor ?? 1;
       dusk = lm.duskFactor ?? 0;

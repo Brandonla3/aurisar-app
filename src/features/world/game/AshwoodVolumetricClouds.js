@@ -171,7 +171,13 @@ export class AshwoodVolumetricClouds {
     const dayF = lm?.dayFactor ?? 1;
     const dusk = lm?.duskFactor ?? 0;
     const night = Math.max(0, Math.min(1, 1 - dayF * 1.5));
-    if (lm?.key) {
+    // Prefer the shared atmosphere sunDir (AshwoodSky's single source of truth)
+    // so the cloud layer agrees with the sky, fog, grass, and water on one sun
+    // direction; fall back to the key light before the first overworld frame.
+    const atmo = this.scene.metadata?.ashwood?.atmosphere;
+    if (atmo?.sunDir) {
+      this._sunDir.copyFrom(atmo.sunDir);
+    } else if (lm?.key) {
       this._sunDir.copyFrom(lm.key.direction).scaleInPlace(-1);
     }
 

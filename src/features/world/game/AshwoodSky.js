@@ -381,6 +381,12 @@ export class AshwoodSky {
     if (ashwood) {
       if (ashwood.atmosphere !== this._atmosphere) ashwood.atmosphere = this._atmosphere;
       const a = this._atmosphere;
+      // Re-point fogColor each publish: LightingManager._blendProfiles REASSIGNS
+      // scene.fogColor to a freshly-allocated Color3 during zone transitions, so
+      // a once-captured reference would orphan after the first dungeon trip.
+      // sunDir stays a live ref (a scratch Vector3 mutated in place, never
+      // replaced). Re-pointing is a reference write, not a per-frame copy.
+      a.fogColor = this.scene.fogColor;
       a.sunVisibility = sunVisibilityFromWet(wet);
       a.fogDensity = this.scene.fogDensity;
       a.dayFactor = dayF;
