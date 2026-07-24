@@ -120,6 +120,9 @@ if (params.has('nav')) {
 // elevation, sun visibility, aerial facing weight, fog RGB/density, tier).
 // Opt-in so it never appears in the default/headless screenshot harness.
 function mountAtmosphereQA(worldScene) {
+  // Idempotent: a second call (viewer remount / double-invoke in dev) must not
+  // stack a second panel + polling interval. Bail if one is already mounted.
+  if (document.getElementById('atmo-qa')) return () => {};
   const bScene = worldScene.scene;
   const panel = document.createElement('div');
   panel.id = 'atmo-qa';
@@ -183,7 +186,7 @@ function mountAtmosphereQA(worldScene) {
   document.body.appendChild(panel);
 
   const f2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : '—');
-  setInterval(() => {
+  const timer = setInterval(() => {
     const md = bScene.metadata?.ashwood;
     const atmo = md?.atmosphere;
     const weather = md?.weather;
@@ -206,6 +209,9 @@ function mountAtmosphereQA(worldScene) {
       `fog den ${atmo ? f2(atmo.fogDensity) : '—'}\n` +
       `tier    ${md?.qualityTier ?? '—'}`;
   }, 200);
+
+  return () => { clearInterval(timer); panel.remove(); };
 }
 
-if (params.has('qa')) mountAtmosphereQA(scene);
+// Expose the cleanup so the overlay can be torn down from the console in dev.
+if (params.has('qa')) window.__atmoQACleanup = mountAtmosphereQA(scene);
