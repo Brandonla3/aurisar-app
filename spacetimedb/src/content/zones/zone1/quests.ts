@@ -7,8 +7,8 @@
  * design's starter zone (see public/assets/ATTRIBUTION.md). All text is
  * placeholder copy the story pass rewrites.
  *
- * Kill objectives: q_wolves, q_bandits → q_ringleader · q_murlocs ·
- * q_mine · q_bones
+ * Kill objectives: q_first_blood · q_wolves, q_bandits → q_ringleader ·
+ * q_murlocs · q_mine · q_bones
  * Collect objectives (P4 phase 2): q_greyjaw, q_boars, q_spiders, q_supplies
  * Edran chain (P4 phase 5): q_whispers → q_names_of_the_dead →
  * q_silence_the_call → q_rite
@@ -20,6 +20,23 @@
 import type { QuestDef } from '../../types';
 
 export const QUESTS: QuestDef[] = [
+  {
+    // First-session quest (docs/world-design-plan.md, Batch A): no level
+    // gate, no prereq, 3 kills at the nearest camp — a fresh account gets
+    // a directed win inside its first 10–20-minute burst. Deliberately
+    // additive: q_wolves keeps its own shape and both credit wolf kills.
+    id: 'q_first_blood',
+    zoneId: 1,
+    name: 'First Blood',
+    giverNpcId: 'marshal_halwin',
+    turnInNpcId: 'marshal_halwin',
+    text: "New to the valley, $N? Then learn its first rule: the wolves are not afraid of you yet. There is a wolf run just up the north road — put down 3 Forest Wolves and come straight back. Quick work, close to home.",
+    completionText: 'Quick and clean. You will do fine here. Now, about those wolves at the door…',
+    objectives: [
+      { type: 'kill', mobType: 'forest_wolf', count: 3, label: 'Forest Wolf slain' },
+    ],
+    reward: { copper: 40, itemIds: ['tough_jerky'], gameXp: 100 },
+  },
   {
     id: 'q_wolves',
     zoneId: 1,
