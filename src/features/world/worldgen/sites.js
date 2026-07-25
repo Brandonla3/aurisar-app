@@ -21,6 +21,36 @@
 
 import { randIn } from './rng.js';
 
+/**
+ * Stable, position-derived chest id (u32).
+ *
+ * Chest ids used to be array indices assigned after the exclusion post-filter.
+ * That meant ANY edit which re-indexed the manifest — adding an exclusion
+ * zone, nudging a scatter count — silently remapped every player's persisted
+ * `playerChestOpened` history onto different chests, with no error anywhere.
+ *
+ * Deriving the id from the chest's own realized position and seed makes it
+ * invariant under re-indexing: a chest that does not move keeps its id
+ * forever, and a chest that moves is genuinely a different chest. Positions
+ * are quantized to 0.1 m so float noise across engines can never shift a key.
+ *
+ * Determinism class: CONFIG-SAFE — this is a pure hash of values already
+ * drawn, so it consumes no RNG and cannot shift the stream.
+ */
+export function chestKey(x, z, seed) {
+  let h = 0x811c9dc5;
+  const mix = (v) => {
+    for (let i = 0; i < 4; i++) {
+      h ^= (v >>> (i * 8)) & 255;
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+  };
+  mix(Math.round(x * 10) | 0);
+  mix(Math.round(z * 10) | 0);
+  mix(seed | 0);
+  return h >>> 0;
+}
+
 export function generateSites(config, rng, wg) {
   const R = config.radius;
   const S = config.scatter;
@@ -106,7 +136,10 @@ export function generateSites(config, rng, wg) {
   const chests = [];
   for (let i = 0; i < S.chestCount; i++) {
     const p = scatter(10);
-    chests.push({ x: p.x, z: p.z, seed: siteSeed() });
+    // siteSeed() must be drawn exactly once, in this position, to keep the
+    // draw order — chestKey is a pure hash of values already drawn.
+    const seed = siteSeed();
+    chests.push({ id: chestKey(p.x, p.z, seed), x: p.x, z: p.z, seed });
   }
 
   // ── ponds: prefer the Mire, never on the mountain ──

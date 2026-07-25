@@ -12,6 +12,7 @@
  * placeholders for the story pass.
  */
 import type { ZoneDef } from '../types';
+import { LANDMARKS as L } from './zone1/landmarks.generated';
 
 export const ZONES: ZoneDef[] = [
   {
@@ -26,8 +27,12 @@ export const ZONES: ZoneDef[] = [
     // k·3000 m offsets in P5, when per-zone bounds + travel land.
     originOffsetM: { x: 0, z: 0 },
     worldConfig: 'zone1_world.json',
-    spawnPos: { x: 0, z: 0 },
-    graveyardPos: { x: -12, z: -14 },
+    // NOTE: neither of these is read by anything yet — the server hardcodes
+    // the spawn at STDB (1600,1600) and respawn snaps to the origin. They are
+    // still pointed at the landmarks so that when the graveyard build-out
+    // wires them up, they cannot already have drifted.
+    spawnPos: { x: L.hub.x, z: L.hub.z },
+    graveyardPos: { x: L.graveyard.x, z: L.graveyard.z },
     gates: [
       // Zone 2 begins past z=180; the pass placement follows the reference
       // northern ridge road.

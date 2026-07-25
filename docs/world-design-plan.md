@@ -2,10 +2,42 @@
 
 **Status:** approved 2026-07-24. Batch A landed with the PR that added this doc; each
 subsequent batch records its landing PR here, world-diagnostic style. Landed: Batch A
-(#275), Batch B (#277), Batch C1 (#279 — visible gear + combat feel + audio). Batch C was
-split to isolate the fitness-XP path; **C2** (this PR) wires the `fitnessPerks` → workout-XP
-bridge. Quest template-unlocks stay deferred: no quest defines `templateUnlockIds` today, so
-the grant is moot until that content + fitness-side gating exist.
+(#275), Batch B (#277), Batch C1 (#279 — visible gear + combat feel + audio), C2 (#280 —
+`fitnessPerks` → workout-XP bridge). Batch C was split to isolate the fitness-XP path.
+Quest template-unlocks stay deferred: no quest defines `templateUnlockIds` today, so the
+grant is moot until that content + fitness-side gating exist.
+
+**Batch D landed as two commits in one PR**, sequenced so the disruptive half is a single
+reviewable cut:
+
+- **D1 — coordinate truth, and nothing moves.** The landmarks emitter, the consumer
+  migration, the position-derived chest-key *mechanism*, and the spatial validators that
+  were entirely absent. Deliberately golden-neutral: it passed `verify:worldgen` on the
+  pre-existing digest, so it provably reshuffled nothing. Two POI labels reconcile on
+  purpose (Stillmere → the lake bowl, Oakrest → the hub plateau centre).
+- **D2 — the one reshuffle.** Authored `biomeAnchors`, all three road corridors, the hub
+  plateau r26→34, `meta.version` 3→4, GOLDEN regenerated once, chest ids cut over, and the
+  danger↔spawn rule with the Gloomweb retune that makes it pass. The chest-key cutover
+  rides this same commit deliberately: positions move here anyway, so players see **one**
+  "chests restocked" event rather than two.
+
+**Player-visible consequence of D2, stated once:** every world chest is restocked. Chest
+ids changed from array indices to position-derived keys, so pre-existing
+`playerChestOpened` rows no longer name any real chest. They are pruned lazily per player
+(`pruneStaleChestRows`) rather than in a big-bang delete.
+
+Decisions taken in D2 worth recording:
+- **Gloomweb danger 0.7 → 0.6** rather than bumping `webwood_spider` L3 → L4. Gloomweb
+  sits 60 m from spawn and hosts an early quest target, so the second-highest danger of
+  five was mis-authored for where it actually is. Retuning `danger` touches no mob stats,
+  so first-session pacing is unchanged — and it tightens the Gallows Rise deltas that
+  share the biome. Chosen by the author over the mob-level alternative.
+- **Anchors draw zero RNG.** Biome layout is now permanently CONFIG-SAFE: an anchor can
+  move, or a new one be added, without reshuffling stages 2–3. This was the whole reason
+  to replace `biomeRing`, whose *length* was a stage-1 draw count.
+- **Ponds 3 → 6.** `sites.js` prefers biome index 3 for ponds and rejects any that land on
+  the mountain. Under the old shuffled ring that biome often fell on the massif, so half
+  the configured ponds were silently discarded. All 6 now realize.
 
 ## Context
 
@@ -190,6 +222,22 @@ unaffected; quest turn-in grants its advertised training plan; wolves are animat
 Files: `config/zone1_world.json` (v3→4), `worldgen/biomes.js`, `worldgen/forest.js`,
 new `scripts/emit_zone1_landmarks.mjs`, generated `content/zones/zone1/landmarks.generated.ts`,
 `scripts/emit_world_chests.mjs`, `content/zones/zone1/*.ts`, `validateContent()`, `ci.yml`.
+
+**Landed as D1 + D2 — see Status.** Realized outcome:
+- Both acceptance rules verified against the real worldgen: every biome anchor owns its own
+  cell (so each named biome contains its namesake POI), and all 12 camps satisfy
+  `|mobLevel − (1+danger×6)| ≤ 2`. Biome share across the ±180 m band is
+  Greywood 25.6% · Gloomweb 24.7% · Meadow 19.1% · Highlands 17.9% · Mourner's Rise 12.7%,
+  with a CI floor at 5% so no biome can be squeezed out.
+- GOLDEN gained `forestDigest` and `biomeDigest`. `sitesDigest` covered only the overworld
+  manifest, so stage-3 forest output was unprotected — and the north-pass road *is* a
+  `forest.js` corridor, so a road tweak silently moving ~2 100 Wildwood instances would
+  have sailed through the old gate.
+- The dev `ashwood_world.json` keeps the legacy `biomeRing` path and its **unchanged**
+  `sitesDigest` (107254303) — that is the proof the legacy path is byte-identical.
+- Still open for Batch E: `spawnPos` / `graveyardPos` in `zones/manifest.ts` have **no
+  consumers** (the server hardcodes spawn at STDB (1600,1600) and respawn snaps to the
+  origin). The graveyard build-out has to wire them up, not just place props.
 
 - **Everything reshuffle-class lands here, once**: authored `biomeAnchors` (12 anchors —
   named biomes verifiably contain namesake POIs), **all road corridors** (castle road,

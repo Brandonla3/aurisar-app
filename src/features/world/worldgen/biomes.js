@@ -2,10 +2,23 @@
  * biomes — Voronoi-seeded biome regions with inverse-distance-weighted
  * color/fog blending. Ported from the prototype (lines ~2100-2132).
  *
- * The seed placement mirrors the prototype's buildBiomeSeeds() RNG draw
- * order exactly, so with the canon seed the macro biome layout (where the
- * Meadow/Old-growth/Highlands/Mire/Ashlands fall) is IDENTICAL to the
- * reference world the prototype generates.
+ * Two seed-placement modes, selected by the config:
+ *
+ *   1. `biomeAnchors` (authored — zone1, since meta.version 4). Every seed is
+ *      hand-placed so a named biome provably contains its namesake POI. This
+ *      path draws ZERO random numbers, which makes it CONFIG-SAFE: moving an
+ *      anchor, or adding one, never shifts the RNG stream and therefore never
+ *      reshuffles the site manifest (stage 2) or the forest (stage 3). Biome
+ *      layout is free to edit forever after.
+ *
+ *   2. `biomeRing` (legacy — the dev ashwood_world.json). A Fisher-Yates
+ *      shuffle of the ring multiset plus jittered polar placement, mirroring
+ *      the prototype's buildBiomeSeeds() draw order exactly (3 + 2N draws).
+ *      Kept so the dev world keeps reproducing its canon layout and GOLDEN.
+ *
+ * Determinism class: RESHUFFLE to switch a world between the two modes (it
+ * changes the stage-1 draw count); CONFIG-SAFE to edit anchors within mode 1.
+ * See src/features/world/worldgen/DETERMINISM.md.
  *
  * Pure math. Colors are plain {r,g,b} mutable objects (engine-free).
  */
@@ -22,10 +35,12 @@ function hexToRgb(hex) {
 }
 
 /**
- * @param {object}   config  ashwood_world.json
- * @param {function} rng     seeded generator — consumed in the prototype's
- *                           exact draw order; call this FIRST on a fresh
- *                           mulberry32(seed) to reproduce the canon layout.
+ * @param {object}   config  zone1_world.json / ashwood_world.json
+ * @param {function} rng     seeded generator. Only consumed on the legacy
+ *                           `biomeRing` path, where the draw order mirrors the
+ *                           prototype's buildBiomeSeeds() exactly — call this
+ *                           FIRST on a fresh mulberry32(seed) to reproduce the
+ *                           canon layout. The `biomeAnchors` path draws zero.
  */
 export function createBiomes(config, rng) {
   const BIOMES = config.biomes.map((b) => ({
@@ -33,19 +48,32 @@ export function createBiomes(config, rng) {
     fogRgb: hexToRgb(b.fog),
   }));
 
-  // ── seed placement (exact mirror of prototype buildBiomeSeeds) ──
-  const seeds = [{ x: 0, z: 0, b: 0 }]; // gentle meadow around the spawn
-  const ring = config.biomeRing.slice();
-  for (let i = ring.length - 1; i > 0; i--) {
-    const j = (rng() * (i + 1)) | 0;
-    const t = ring[i]; ring[i] = ring[j]; ring[j] = t;
-  }
-  const R = config.radius;
-  const base = rng() * 6.28;
-  for (let i = 0; i < ring.length; i++) {
-    const a = base + (i / ring.length) * 6.28 + randIn(rng, -0.25, 0.25);
-    const rr = R * randIn(rng, 0.42, 0.92);
-    seeds.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, b: ring[i] });
+  // ── seed placement ──
+  const seeds = [];
+  if (Array.isArray(config.biomeAnchors) && config.biomeAnchors.length) {
+    // Authored anchors. Fully declarative and RNG-free — the anchor list is
+    // the whole seed set (including the hub), so there is exactly one place
+    // that decides where a biome lives.
+    for (const a of config.biomeAnchors) seeds.push({ x: a.x, z: a.z, b: a.b });
+  } else if (!Array.isArray(config.biomeRing) || !config.biomeRing.length) {
+    // Neither mode configured. Failing loudly beats silently generating a
+    // single-biome world that would look "almost right" and desync nothing.
+    throw new Error('worldgen/biomes: config needs biomeAnchors or biomeRing');
+  } else {
+    // Legacy ring shuffle (exact mirror of prototype buildBiomeSeeds).
+    seeds.push({ x: 0, z: 0, b: 0 }); // gentle meadow around the spawn
+    const ring = config.biomeRing.slice();
+    for (let i = ring.length - 1; i > 0; i--) {
+      const j = (rng() * (i + 1)) | 0;
+      const t = ring[i]; ring[i] = ring[j]; ring[j] = t;
+    }
+    const R = config.radius;
+    const base = rng() * 6.28;
+    for (let i = 0; i < ring.length; i++) {
+      const a = base + (i / ring.length) * 6.28 + randIn(rng, -0.25, 0.25);
+      const rr = R * randIn(rng, 0.42, 0.92);
+      seeds.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, b: ring[i] });
+    }
   }
 
   function biomeIdxAt(x, z) {

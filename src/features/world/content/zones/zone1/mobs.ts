@@ -11,6 +11,7 @@
  *  - Loot tables ship now but only roll once P4's server inventory lands.
  */
 import type { MobDef, SpawnDef } from '../../types';
+import { LANDMARKS as L } from './landmarks.generated';
 
 export const MOBS: MobDef[] = [
   {
@@ -206,26 +207,32 @@ export const MOBS: MobDef[] = [
 ];
 
 // Camp positions follow the reference zone-1 layout (coordinate frame
-// carried over 1:1 — relative layout is identical). Comments use the
-// zone's POI names (see waypoints.ts).
+// carried over 1:1 — relative layout is identical).
+//
+// Each camp is expressed as an offset from the LANDMARK it belongs to rather
+// than as a bare literal, so the POI→camp link is real code instead of a
+// comment: move a POI and its camps travel with it. The realized coordinates
+// are unchanged from the hand-placed originals.
+const at = (l: { x: number; z: number }, dx: number, dz: number) => ({ x: l.x + dx, z: l.z + dz });
+
 export const SPAWNS: SpawnDef[] = [
   // Greywood Run (north)
-  { netId: 'z1_wolves_a',   mobType: 'forest_wolf',    zoneId: 1, pos: { x: -15, z: 55 },  count: 7, radiusM: 22 },
-  { netId: 'z1_wolves_b',   mobType: 'forest_wolf',    zoneId: 1, pos: { x: 20, z: 70 },   count: 6, radiusM: 20 },
-  { netId: 'z1_greyjaw',    mobType: 'old_greyjaw',    zoneId: 1, pos: { x: 0, z: 95 },    count: 1, radiusM: 8 },
+  { netId: 'z1_wolves_a',   mobType: 'forest_wolf',    zoneId: 1, pos: at(L.greywood_run, -13, -15), count: 7, radiusM: 22 },
+  { netId: 'z1_wolves_b',   mobType: 'forest_wolf',    zoneId: 1, pos: at(L.greywood_run, 22, 0),    count: 6, radiusM: 20 },
+  { netId: 'z1_greyjaw',    mobType: 'old_greyjaw',    zoneId: 1, pos: at(L.greywood_run, 2, 25),    count: 1, radiusM: 8 },
   // Tuskfield (east)
-  { netId: 'z1_boars_a',    mobType: 'wild_boar',      zoneId: 1, pos: { x: 55, z: 12 },   count: 6, radiusM: 22 },
-  { netId: 'z1_boars_b',    mobType: 'wild_boar',      zoneId: 1, pos: { x: 80, z: -15 },  count: 5, radiusM: 18 },
+  { netId: 'z1_boars_a',    mobType: 'wild_boar',      zoneId: 1, pos: at(L.tuskfield, -10, 12),     count: 6, radiusM: 22 },
+  { netId: 'z1_boars_b',    mobType: 'wild_boar',      zoneId: 1, pos: at(L.tuskfield, 15, -15),     count: 5, radiusM: 18 },
   // Gloomweb (west)
-  { netId: 'z1_spiders',    mobType: 'webwood_spider', zoneId: 1, pos: { x: -60, z: 5 },   count: 7, radiusM: 22 },
+  { netId: 'z1_spiders',    mobType: 'webwood_spider', zoneId: 1, pos: at(L.gloomweb, 0, 1),         count: 7, radiusM: 22 },
   // Stillmere shore (northwest)
-  { netId: 'z1_murlocs',    mobType: 'mudfin_murloc',  zoneId: 1, pos: { x: -75, z: 57 },  count: 8, radiusM: 14 },
+  { netId: 'z1_murlocs',    mobType: 'mudfin_murloc',  zoneId: 1, pos: at(L.stillmere, 17, -31),     count: 8, radiusM: 14 },
   // Rustvein Dig (southwest)
-  { netId: 'z1_kobolds',    mobType: 'tunnel_rat',     zoneId: 1, pos: { x: -82, z: -62 }, count: 9, radiusM: 20 },
+  { netId: 'z1_kobolds',    mobType: 'tunnel_rat',     zoneId: 1, pos: at(L.rustvein_dig, 2, 2),     count: 9, radiusM: 20 },
   // Gallows Rise (southeast)
-  { netId: 'z1_bandits_a',  mobType: 'vale_bandit',    zoneId: 1, pos: { x: 65, z: -65 },  count: 7, radiusM: 24 },
-  { netId: 'z1_bandits_b',  mobType: 'vale_bandit',    zoneId: 1, pos: { x: 90, z: -90 },  count: 5, radiusM: 16 },
-  { netId: 'z1_gorrak',     mobType: 'gorrak',         zoneId: 1, pos: { x: 92, z: -92 },  count: 1, radiusM: 2 },
+  { netId: 'z1_bandits_a',  mobType: 'vale_bandit',    zoneId: 1, pos: at(L.gallows_rise, -11, 11),  count: 7, radiusM: 24 },
+  { netId: 'z1_bandits_b',  mobType: 'vale_bandit',    zoneId: 1, pos: at(L.gallows_rise, 14, -14),  count: 5, radiusM: 16 },
+  { netId: 'z1_gorrak',     mobType: 'gorrak',         zoneId: 1, pos: at(L.gallows_rise, 16, -16),  count: 1, radiusM: 2 },
   // Mourner's Rest (northeast)
-  { netId: 'z1_undead',     mobType: 'restless_bones', zoneId: 1, pos: { x: 80, z: 78 },   count: 8, radiusM: 18 },
+  { netId: 'z1_undead',     mobType: 'restless_bones', zoneId: 1, pos: at(L.mourners_rest, 0, -2),   count: 8, radiusM: 18 },
 ];

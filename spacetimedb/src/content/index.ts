@@ -31,12 +31,17 @@ import { NPCS as ZONE1_NPCS } from './zones/zone1/npcs';
 import { QUESTS as ZONE1_QUESTS } from './zones/zone1/quests';
 import { WAYPOINTS as ZONE1_WAYPOINTS } from './zones/zone1/waypoints';
 import { DUNGEONS } from './dungeons/index';
+import { LANDMARKS, ALL_LANDMARKS } from './zones/zone1/landmarks.generated';
 
 export * from './types';
 export { ABILITIES, ALL_ABILITIES, CLASS_IDS, CLASS_KITS } from './classes/index';
 export { ALL_ITEMS, ITEMS, getItemDef } from './items/index';
 export { ZONES, ZONES_BY_ID, getZone } from './zones/manifest';
 export { DUNGEONS } from './dungeons/index';
+export {
+  LANDMARKS, ALL_LANDMARKS, landmarkPos,
+} from './zones/zone1/landmarks.generated';
+export type { LandmarkDef, LandmarkId } from './zones/zone1/landmarks.generated';
 
 // ── Flat collections (zone files merge here as zones ship) ───────────
 // The raw ALL_* arrays keep authoring mistakes visible: the keyed maps

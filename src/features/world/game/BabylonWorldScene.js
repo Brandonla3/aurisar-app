@@ -48,7 +48,7 @@ import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
 import { sameInteriorFloor } from '../castle/castleNavSurface.js';
-import { MOBS as MOB_DEFS, ALL_WAYPOINTS, ALL_NPCS, ITEMS } from '../content/index';
+import { MOBS as MOB_DEFS, ALL_WAYPOINTS, ALL_NPCS, ITEMS, LANDMARKS } from '../content/index';
 import { EQUIP_TO_GEAR } from './avatarSchema.js';
 import { toWorld, toStdb } from '../worldSpace.js';
 
@@ -853,7 +853,10 @@ function saveSafeLevel(level) {
 }
 
 // ── Dungeon entrance constants ───────────────────────────────────────────────
-const DUNGEON_ENTRANCE      = Object.freeze({ x: 0, z: -37 });
+// The portal position is a shared landmark (map label, future crypt interior,
+// the road that reaches it), so it is authored once in zone1_world.json
+// `anchors` and read here from the generated module rather than repeated.
+const DUNGEON_ENTRANCE      = Object.freeze({ x: LANDMARKS.hollow_crypt.x, z: LANDMARKS.hollow_crypt.z });
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
@@ -898,7 +901,7 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
-    this._openedChests  = new Set(); // chest indices already looted this session
+    this._openedChests  = new Set(); // position-derived chest ids already looted
     this._inputPaused   = false;     // true while a full-screen panel owns the screen
     this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
@@ -1663,14 +1666,16 @@ export class BabylonWorldScene {
     this._lastChestScanAt = now;
 
     const { x, z } = this._local.root.position;
-    for (let i = 0; i < chests.length; i++) {
-      if (this._openedChests.has(i)) continue;
-      const c = chests[i];
+    for (const c of chests) {
+      // c.id is the position-derived key from worldgen (chestKey), matching
+      // what the server persists — never the array index, which shifts under
+      // any manifest edit.
+      if (this._openedChests.has(c.id)) continue;
       const dx = x - c.x;
       const dz = z - c.z;
       if (dx * dx + dz * dz < CHEST_OPEN_DIST_SQ) {
-        this._openedChests.add(i);
-        this.callbacks.onChestOpen?.({ id: i, seed: c.seed });
+        this._openedChests.add(c.id);
+        this.callbacks.onChestOpen?.({ id: c.id, seed: c.seed });
       }
     }
   }
@@ -3009,7 +3014,7 @@ export class BabylonWorldScene {
   getUnopenedChests() {
     const chests = this._worldgen?.sites?.chests;
     if (!chests) return [];
-    return chests.filter((_, i) => !this._openedChests.has(i));
+    return chests.filter((c) => !this._openedChests.has(c.id));
   }
 
   // Pause gameplay key input (movement/attack) while a full-screen panel (the
