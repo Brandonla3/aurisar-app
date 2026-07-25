@@ -29,7 +29,7 @@ import DialoguePanel          from './hud/DialoguePanel.jsx';
 import QuestLogPanel          from './hud/QuestLogPanel.jsx';
 import QuestTracker           from './hud/QuestTracker.jsx';
 import { ITEMS }              from './content/index';
-import { aggregateFitnessPerks } from '../../utils/gearPerks';
+import { aggregateFitnessPerks, hasAnyPerks } from '../../utils/gearPerks';
 import { rollChestLoot }      from './content/formulas/chestLoot';
 import { RECIPES_BY_ID, canCookRecipe } from './content/formulas/cooking';
 import { NPCS, QUESTS, WAYPOINTS } from './content/index';
@@ -404,15 +404,24 @@ export default function WorldGame({ playerInfo, onExit, onEquipPerksChange }) {
   // up to the fitness profile (via App), which persists them so workout XP is
   // boosted even while the world tab is closed. Only fires on an actual change.
   const lastPerksRef = React.useRef(null);
+  const equipLoadedRef = React.useRef(false);
   useEffect(() => {
-    if (!onEquipPerksChange) return;
+    if (!onEquipPerksChange || !connected) return;
     const items = Object.values(equipped).map((id) => ITEMS[id]).filter((it) => it?.fitnessPerks);
     const perks = aggregateFitnessPerks(items);
+    const empty = !hasAnyPerks(perks);
+    // Mount/reconnect race: `equipped` is {} until the player_equipped
+    // subscription replays. NEVER persist an empty table (which would wipe a
+    // real boost in profile.equipPerks) until we've seen a non-empty snapshot
+    // this session. A genuine no-gear player just leaves profile.equipPerks
+    // untouched → no boost, which is correct.
+    if (empty && !equipLoadedRef.current) return;
+    if (!empty) equipLoadedRef.current = true;
     const json = JSON.stringify(perks);
     if (json === lastPerksRef.current) return;
     lastPerksRef.current = json;
     onEquipPerksChange(perks);
-  }, [equipped, onEquipPerksChange]);
+  }, [equipped, connected, onEquipPerksChange]);
   const inv = React.useMemo(() => ({
     counts: serverCounts,
     copper,

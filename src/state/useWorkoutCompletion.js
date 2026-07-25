@@ -103,8 +103,10 @@ export function useWorkoutCompletion({
             icon: exData.icon,
             xp,
             // Gear XP factor for this row (>1 = boosted); omitted when no perks
-            // so it doesn't bloat the persisted log. Lets history show "gear +X%".
-            perkMult: perkMult !== 1 ? perkMult : undefined,
+            // so it doesn't bloat the persisted log. Lets history show "gear +X%"
+            // and lets a future server-side recompute verify/strip the boost
+            // from baseXp without reconstructing it.
+            ...(perkMult !== 1 ? { perkMult, baseXp } : {}),
             mult: getMult(exData),
             sets: parseInt(row.sets) || 3,
             reps: parseInt(row.reps) || 10,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  aggregateFitnessPerks, perkMultiplier, hasAnyPerks, PERK_CAP,
+  aggregateFitnessPerks, perkMultiplier, hasAnyPerks, applyPerk, PERK_CAP,
 } from './gearPerks.js';
 
 const cloak = { fitnessPerks: { categories: { cardio: 1.03 } } };
@@ -65,5 +65,36 @@ describe('perkMultiplier', () => {
     ]);
     expect(perkMultiplier(p, { category: 'strength', muscleGroup: 'chest' })).toBe(PERK_CAP);
     expect(PERK_CAP).toBe(1.35);
+  });
+
+  it('respects an explicit cap override', () => {
+    const p = aggregateFitnessPerks([{ fitnessPerks: { categories: { strength: 1.3 } } }]);
+    expect(perkMultiplier(p, { category: 'strength' }, 1.1)).toBe(1.1);
+  });
+
+  it('never reduces XP — a sub-1 factor is rejected at aggregation (floor 1)', () => {
+    const p = aggregateFitnessPerks([{ fitnessPerks: { categories: { strength: 0.85 } } }]);
+    expect(hasAnyPerks(p)).toBe(false);
+    expect(perkMultiplier(p, { category: 'strength' })).toBe(1);
+  });
+});
+
+describe('hasAnyPerks', () => {
+  it('is true when any bucket has an entry, false otherwise', () => {
+    expect(hasAnyPerks(aggregateFitnessPerks([{ fitnessPerks: { categories: { cardio: 1.03 } } }]))).toBe(true);
+    expect(hasAnyPerks({ exercises: {}, muscleGroups: {}, categories: {} })).toBe(false);
+    expect(hasAnyPerks(null)).toBe(false);
+  });
+});
+
+describe('applyPerk', () => {
+  const p = aggregateFitnessPerks([{ fitnessPerks: { categories: { strength: 1.03 } } }]);
+  it('multiplies + rounds when a perk matches', () => {
+    expect(applyPerk(100, p, { category: 'strength' })).toBe(103);
+    expect(applyPerk(101, p, { category: 'strength' })).toBe(104); // 104.03 → 104
+  });
+  it('returns the base XP unchanged when no perk matches', () => {
+    expect(applyPerk(100, p, { category: 'cardio' })).toBe(100);
+    expect(applyPerk(100, null, { category: 'strength' })).toBe(100);
   });
 });

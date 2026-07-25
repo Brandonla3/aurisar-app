@@ -40,7 +40,9 @@ export function aggregateFitnessPerks(items) {
       const src = perks[bucket];
       if (!src) continue;
       for (const [key, mult] of Object.entries(src)) {
-        if (typeof mult !== 'number' || !Number.isFinite(mult) || mult <= 0) continue;
+        // Gear only ever BOOSTS: reject non-finite, ≤0, and sub-1 factors so a
+        // data-entry typo (0.85 vs 1.085) can never reduce honest workout XP.
+        if (typeof mult !== 'number' || !Number.isFinite(mult) || mult < 1) continue;
         out[bucket][key] = (out[bucket][key] ?? 1) * mult;
       }
     }
@@ -69,6 +71,21 @@ export function perkMultiplier(perks, ex, cap = PERK_CAP) {
   if (ex.exId && perks.exercises)          f *= perks.exercises[ex.exId] ?? 1;
   if (ex.muscleGroup && perks.muscleGroups) f *= perks.muscleGroups[ex.muscleGroup] ?? 1;
   if (ex.category && perks.categories)      f *= perks.categories[ex.category] ?? 1;
-  if (!(f > 1)) return f > 0 ? Math.min(f, cap) : 1; // no boost / degenerate → pass through
+  // Clamp to [1, cap]: gear boosts, never reduces (floor 1), and never
+  // dominates (ceiling PERK_CAP). Degenerate/NaN → 1.
+  if (!Number.isFinite(f) || f < 1) return 1;
   return Math.min(f, cap);
+}
+
+/**
+ * Award-time helper: the honest base XP multiplied by the gear factor for one
+ * exercise, rounded. The single seam every XP-granting log path should use so
+ * the boost is consistent (completion flow, quick-log, plan-day, edits).
+ * @param {number} baseXp result of calcExXP (no perk)
+ * @param {object} perks  aggregated perk table (profile.equipPerks)
+ * @param {{exId?:string, category?:string, muscleGroup?:string}} ex
+ */
+export function applyPerk(baseXp, perks, ex) {
+  const m = perkMultiplier(perks, ex);
+  return m !== 1 ? Math.round(baseXp * m) : baseXp;
 }

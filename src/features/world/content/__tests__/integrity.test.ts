@@ -85,6 +85,14 @@ describe('fitness reward references', () => {
       for (const cat of Object.keys(perks.categories ?? {})) {
         expect(categories.has(cat), `item ${item.id}: unknown category ${cat}`).toBe(true);
       }
+      // Perk values must be boosts in a sane range: ≥1 (gear never reduces XP)
+      // and ≤ the per-item cap (no single item should approach the 1.35 total).
+      for (const bucket of ['exercises', 'muscleGroups', 'categories'] as const) {
+        for (const [k, v] of Object.entries(perks[bucket] ?? {})) {
+          expect(v, `item ${item.id}: perk ${bucket}.${k} = ${v} must be ≥ 1`).toBeGreaterThanOrEqual(1);
+          expect(v, `item ${item.id}: perk ${bucket}.${k} = ${v} unreasonably large`).toBeLessThanOrEqual(1.35);
+        }
+      }
     }
   });
 });
