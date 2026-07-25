@@ -2,10 +2,24 @@
 
 **Status:** approved 2026-07-24. Batch A landed with the PR that added this doc; each
 subsequent batch records its landing PR here, world-diagnostic style. Landed: Batch A
-(#275), Batch B (#277), Batch C1 (#279 — visible gear + combat feel + audio). Batch C was
-split to isolate the fitness-XP path; **C2** (this PR) wires the `fitnessPerks` → workout-XP
-bridge. Quest template-unlocks stay deferred: no quest defines `templateUnlockIds` today, so
-the grant is moot until that content + fitness-side gating exist.
+(#275), Batch B (#277), Batch C1 (#279 — visible gear + combat feel + audio), C2 (#280 —
+`fitnessPerks` → workout-XP bridge). Batch C was split to isolate the fitness-XP path.
+Quest template-unlocks stay deferred: no quest defines `templateUnlockIds` today, so the
+grant is moot until that content + fitness-side gating exist.
+
+**Batch D is split into D1 and D2** so exactly one PR is disruptive:
+
+- **D1 (this PR) — coordinate truth, and nothing moves.** The landmarks emitter, the
+  consumer migration, the position-derived chest-key *mechanism*, and the spatial
+  validators that were entirely absent. Deliberately golden-neutral: `verify:worldgen`
+  passes with the pre-existing digest, so this PR provably reshuffles nothing and needs no
+  player-facing migration. Two POI labels are reconciled on purpose (below).
+- **D2 (next) — the one reshuffle.** Authored `biomeAnchors`, all road corridors, the
+  hub-plateau/exclusion resize, `meta.version` 3→4, GOLDEN regenerated once, chest ids
+  cut over to the new keys with the single announced "chests restocked" reset, and the
+  danger↔spawn rule plus the camp retune that makes it pass. Splitting this way keeps the
+  chest-id change and the position reshuffle in the *same* commit, so players see one
+  chest reset rather than two.
 
 ## Context
 
@@ -190,6 +204,19 @@ unaffected; quest turn-in grants its advertised training plan; wolves are animat
 Files: `config/zone1_world.json` (v3→4), `worldgen/biomes.js`, `worldgen/forest.js`,
 new `scripts/emit_zone1_landmarks.mjs`, generated `content/zones/zone1/landmarks.generated.ts`,
 `scripts/emit_world_chests.mjs`, `content/zones/zone1/*.ts`, `validateContent()`, `ci.yml`.
+
+**Split D1 / D2 — see Status.** D1 (landed) carries everything that moves nothing:
+the emitter + consumer migration, `chestKey()`, `worldgen/DETERMINISM.md`, and the spatial
+tests. D2 carries every reshuffle-class edit in one cut. Findings from D1 worth carrying
+into D2:
+- Anchored biome seeds draw **zero** RNG (the ring path drew `3 + 2N`), so after D2's cut
+  biome layout becomes permanently CONFIG-SAFE — anchors can move without a reshuffle.
+- `sitesDigest` does **not** cover stage-3 forest output, `biomeSeeds`, or per-site seeds.
+  D2 adds road corridors as `forest.js` paths, which stage-3 changes would slip past the
+  gate today — extend the digest in the same commit.
+- `spawnPos` / `graveyardPos` in `zones/manifest.ts` have **no consumers**: the server
+  hardcodes spawn at STDB (1600,1600) and respawn snaps to the origin. E's graveyard
+  build-out has to wire them up, not just place props.
 
 - **Everything reshuffle-class lands here, once**: authored `biomeAnchors` (12 anchors —
   named biomes verifiably contain namesake POIs), **all road corridors** (castle road,

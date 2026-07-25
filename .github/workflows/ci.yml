@@ -34,6 +34,13 @@ jobs:
       - name: World chest manifest up to date
         run: npm run emit:world-chests:check
 
+      # Shared world positions are authored once (zone1_world.json `anchors`,
+      # or derived from the lake/plateaus/castlePlan truth that already owns
+      # them). This step also cross-checks the remaining hand-copies — the
+      # castle keep-out and interior anchor — against castlePlan.js.
+      - name: Zone 1 landmarks up to date
+        run: npm run emit:landmarks:check
+
       # Asset manifests fresh + every runtime GLB within its per-class budget
       # (config/asset-budgets.json), files present, ATTRIBUTION block current.
       # See docs/ART_DIRECTION.md and scripts/assets_pipeline.mjs.
