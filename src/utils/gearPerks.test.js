@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  aggregateFitnessPerks, perkMultiplier, hasAnyPerks, applyPerk, PERK_CAP,
+  aggregateFitnessPerks, perkMultiplier, hasAnyPerks, perkAward, applyStoredPerk, PERK_CAP,
 } from './gearPerks.js';
 
 const cloak = { fitnessPerks: { categories: { cardio: 1.03 } } };
@@ -87,14 +87,36 @@ describe('hasAnyPerks', () => {
   });
 });
 
-describe('applyPerk', () => {
+describe('perkAward', () => {
   const p = aggregateFitnessPerks([{ fitnessPerks: { categories: { strength: 1.03 } } }]);
-  it('multiplies + rounds when a perk matches', () => {
-    expect(applyPerk(100, p, { category: 'strength' })).toBe(103);
-    expect(applyPerk(101, p, { category: 'strength' })).toBe(104); // 104.03 → 104
+  it('multiplies + rounds and records perkMult/baseXp when a perk matches', () => {
+    expect(perkAward(100, p, { category: 'strength' })).toEqual({ xp: 103, perkMult: 1.03, baseXp: 100 });
+    expect(perkAward(101, p, { category: 'strength' }).xp).toBe(104); // 104.03 → 104
   });
-  it('returns the base XP unchanged when no perk matches', () => {
-    expect(applyPerk(100, p, { category: 'cardio' })).toBe(100);
-    expect(applyPerk(100, null, { category: 'strength' })).toBe(100);
+  it('returns xp unchanged, perkMult 1 and no baseXp when no perk matches', () => {
+    expect(perkAward(100, p, { category: 'cardio' })).toEqual({ xp: 100, perkMult: 1 });
+    expect(perkAward(100, null, { category: 'strength' })).toEqual({ xp: 100, perkMult: 1 });
+    expect(perkAward(100, p, { category: 'cardio' })).not.toHaveProperty('baseXp');
+  });
+  it('preserves the invariant xp === round(baseXp × perkMult)', () => {
+    const a = perkAward(137, aggregateFitnessPerks([{ fitnessPerks: { muscleGroups: { chest: 1.07 } } }]), { muscleGroup: 'chest' });
+    expect(a.xp).toBe(Math.round(a.baseXp * a.perkMult));
+  });
+});
+
+describe('applyStoredPerk', () => {
+  it('re-applies a stored multiplier to a recomputed base (rounded)', () => {
+    expect(applyStoredPerk(100, 1.03)).toBe(103);
+    expect(applyStoredPerk(101, 1.03)).toBe(104); // 104.03 → 104
+  });
+  it('is a no-op for missing / ≤1 / non-finite stored factors', () => {
+    expect(applyStoredPerk(100, undefined)).toBe(100);
+    expect(applyStoredPerk(100, 1)).toBe(100);
+    expect(applyStoredPerk(100, 0.9)).toBe(100);
+    expect(applyStoredPerk(100, NaN)).toBe(100);
+    expect(applyStoredPerk(100, 'x')).toBe(100);
+  });
+  it('clamps a stored factor above the cap', () => {
+    expect(applyStoredPerk(100, 2)).toBe(Math.round(100 * PERK_CAP));
   });
 });

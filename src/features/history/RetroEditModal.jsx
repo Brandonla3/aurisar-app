@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { createPortal } from 'react-dom';
 import { uid } from '../../utils/helpers';
 import { calcExXP } from '../../utils/xp';
+import { applyStoredPerk } from '../../utils/gearPerks';
 import { S, FS, R } from '../../utils/tokens';
 
 /**
@@ -96,8 +97,12 @@ const RetroEditModal = memo(function RetroEditModal({
               const newEntries = rem.entries.map((e, i) => {
                 const updated = retroEditModal.entries[i];
                 if (!updated) return null;
-                const xp = calcExXP(updated.exId, parseInt(updated.sets) || 3, parseInt(updated.reps) || 10, profile.chosenClass, allExById);
-                return { ...e, ...updated, xp, sets: parseInt(updated.sets) || e.sets, reps: parseInt(updated.reps) || e.reps };
+                const base = calcExXP(updated.exId, parseInt(updated.sets) || 3, parseInt(updated.reps) || 10, profile.chosenClass, allExById);
+                // Preserve the entry's stored gear boost; refresh baseXp so the
+                // xp ≈ round(baseXp × perkMult) invariant survives the edit.
+                const boosted = typeof e.perkMult === "number" && e.perkMult > 1;
+                const xp = applyStoredPerk(base, e.perkMult);
+                return { ...e, ...updated, xp, ...(boosted ? { baseXp: base } : {}), sets: parseInt(updated.sets) || e.sets, reps: parseInt(updated.reps) || e.reps };
               }).filter(Boolean);
               const updatedLog = profile.log.map(le => {
                 const matchIdx = rem.entries.findIndex(re => re._idx === le._idx || (re.exId === le.exId && re.dateKey === le.dateKey && (re.sourceGroupId === le.sourceGroupId || re.sourcePlanId === le.sourcePlanId)));

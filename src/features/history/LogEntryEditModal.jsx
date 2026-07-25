@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { S, R, FS } from '../../utils/tokens';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, weightLabel, distLabel } from '../../utils/units';
 import { calcExXP } from '../../utils/xp';
+import { applyStoredPerk } from '../../utils/gearPerks';
 import { HR_ZONES, UI_COLORS } from '../../data/constants';
 
 /**
@@ -50,7 +51,9 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
     const effectiveW = parseFloat(entry.weightLbs) || 0;
     const distMi = entry.distanceMi || null;
     const isC = ex.category === "cardio";
-    return calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi, effectiveW || null, isC ? entry.hrZone || null : null);
+    const base = calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi, effectiveW || null, isC ? entry.hrZone || null : null);
+    // Preview must match saveLogEdit: preserve the entry's stored gear boost.
+    return applyStoredPerk(base, entry.perkMult);
   }
 
   const previewXP = calcEntryXP(d);

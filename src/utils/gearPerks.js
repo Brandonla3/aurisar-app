@@ -78,14 +78,39 @@ export function perkMultiplier(perks, ex, cap = PERK_CAP) {
 }
 
 /**
- * Award-time helper: the honest base XP multiplied by the gear factor for one
- * exercise, rounded. The single seam every XP-granting log path should use so
- * the boost is consistent (completion flow, quick-log, plan-day, edits).
- * @param {number} baseXp result of calcExXP (no perk)
- * @param {object} perks  aggregated perk table (profile.equipPerks)
+ * The single award-time seam every XP-granting log path routes through, so the
+ * gear boost is applied and recorded identically everywhere (completion flow,
+ * quick-log, solo-log, plan-day). Given the honest pre-gear XP for one exercise
+ * — class/travel/region bonuses already folded in — returns the fields to
+ * persist on the log entry:
+ *   { xp, perkMult, baseXp? }
+ * When no perk applies, xp === preGearXp, perkMult === 1, and baseXp is omitted
+ * so a non-boosted entry stays byte-identical to before this feature. When a
+ * perk applies, baseXp carries the pre-gear figure so a later server recompute
+ * can verify/strip the boost (invariant: xp === round(baseXp × perkMult)).
+ * @param {number} preGearXp honest XP before the gear factor
+ * @param {object} perks aggregated perk table (profile.equipPerks)
  * @param {{exId?:string, category?:string, muscleGroup?:string}} ex
+ * @returns {{xp:number, perkMult:number, baseXp?:number}}
  */
-export function applyPerk(baseXp, perks, ex) {
+export function perkAward(preGearXp, perks, ex) {
   const m = perkMultiplier(perks, ex);
-  return m !== 1 ? Math.round(baseXp * m) : baseXp;
+  if (m === 1) return { xp: preGearXp, perkMult: 1 };
+  return { xp: Math.round(preGearXp * m), perkMult: m, baseXp: preGearXp };
+}
+
+/**
+ * Edit-time recompute: re-apply the multiplier that was STORED on a log entry
+ * when it was first logged, to a freshly-recomputed base XP. Editing an
+ * entry's sets/reps must preserve the gear boost that was active that day —
+ * not silently strip it (a surprise XP drop) nor re-read today's loadout
+ * (which would rewrite history). Clamped to the same cap; a missing/≤1 stored
+ * factor is a no-op, so non-perk entries are untouched.
+ * @param {number} baseXp freshly-recomputed calcExXP for the edited entry
+ * @param {number|undefined} storedPerkMult entry.perkMult from when it was logged
+ */
+export function applyStoredPerk(baseXp, storedPerkMult) {
+  const pm = storedPerkMult;
+  if (typeof pm !== 'number' || !Number.isFinite(pm) || pm <= 1) return baseXp;
+  return Math.round(baseXp * Math.min(pm, PERK_CAP));
 }
