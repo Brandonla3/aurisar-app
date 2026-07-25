@@ -40,7 +40,14 @@
     # DbConnection.builder().build() and every subscription silently fails.
     # wss://maincloud.spacetimedb.com is the live STDB endpoint (set via
     # VITE_SPACETIMEDB_URI; defaulted in src/features/world/useSpacetimeWorld.js).
-    Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
+    # `worker-src 'self' blob:` is required by Babylon's glTF decoders: meshopt
+    # (and KTX2/Draco) decode EXT_meshopt_compression GLBs in a Worker built
+    # from a Blob URL (MeshoptDecoder.useWorkers). Without it worker-src falls
+    # back to script-src, the blob worker is refused, the decode promise never
+    # settles, and every meshopt GLB (all characters + mobs since the #277
+    # re-encode) hangs forever — the avatar never spawns and WASD movement is
+    # silently dead while the camera still works.
+    Content-Security-Policy   = "default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://maincloud.spacetimedb.com https://api.resend.com https://api.pwnedpasswords.com https://challenges.cloudflare.com https://api.prod.whoop.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; manifest-src 'self'"
 
 # Cache the immutable Vite-hashed bundle aggressively. Vite fingerprints its
 # JS/CSS output (e.g. /assets/index-BDUvV1ml.js), so the URL changes whenever

@@ -943,7 +943,14 @@ export class BabylonWorldScene {
       window.matchMedia('(pointer: coarse)').matches;
 
     this._initSync();
-    this._initCharactersAsync();
+    // A character-init failure must be LOUD: if this rejects (or hangs — e.g.
+    // the meshopt decode worker refused by CSP), _local never exists, the
+    // render loop's `if (this._local)` guard silently skips _tick forever, and
+    // the world presents as "camera works but WASD does nothing" with an
+    // empty console.
+    this._initCharactersAsync().catch((err) => {
+      console.error('[Aurisar] Character init failed — local avatar will not spawn and movement is disabled:', err);
+    });
   }
 
   // ── Sync bootstrap (terrain, engine — no characters yet) ──────────────────
