@@ -102,10 +102,12 @@ describe('the live settlement', () => {
   });
 
   it('leaves the exact respawn point walkable', () => {
-    // The server respawns every death to world (0,0), and the well at (0,2)
-    // is 2.9 m deep — 0.20 m of clearance once the player radius is added.
-    // If this ever fails, players materialise inside the well and the
-    // walk-out escape becomes the only thing saving them.
+    // The server respawns every death to world (0,0). The well is the
+    // nearest solid to that point (position is authored in props.ts, not
+    // hardcoded here, so this can't go stale the way a written-out
+    // distance/clearance figure would). If this ever fails, players
+    // materialise inside a solid and the walk-out escape becomes the only
+    // thing saving them.
     expect(P.blocked(0, 0)).toBe(false);
   });
 
@@ -162,11 +164,11 @@ describe('rotation inverse (review H1 regression)', () => {
     expect(P.blocked(inside.x, inside.z)).toBe(true);
     expect(P.blocked(outside.x, outside.z)).toBe(false);
     // The MIRRORED bug blocked the reflection instead — assert a point the old
-    // code wrongly blocked (reflect local z) is open.
+    // code wrongly blocked (reflect local z) is open. (7x6 is non-square, so
+    // the mirrored point genuinely falls outside the correctly-rotated box —
+    // no distance guard needed; a prior version of this guard was inverted
+    // and silently skipped the assertion it existed to run.)
     const mirrored = localToWorld(20, 12, 0.4, 3.0, 2.5);
-    const dx = mirrored.x - 20, dz = mirrored.z - 12;
-    if (Math.hypot(dx, dz) > Math.hypot(3.5 + 0.35, 3 + 0.35)) {
-      expect(P.blocked(mirrored.x, mirrored.z)).toBe(false);
-    }
+    expect(P.blocked(mirrored.x, mirrored.z)).toBe(false);
   });
 });

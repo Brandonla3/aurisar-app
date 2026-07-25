@@ -134,7 +134,9 @@ for (let i = 0; i < CELLS; i++) {
       const mix = (v) => Math.max(0, Math.min(255, Math.round(((v * 255) * 0.62 + 40) * shade)));
       fill = `rgb(${mix(col.r)},${mix(col.g)},${mix(col.b)})`;
     }
-    add(`<rect x="${PX(wx - step / 2).toFixed(1)}" y="${PY(wz - step / 2).toFixed(1)}" width="${(M(step) + 1).toFixed(1)}" height="${(M(step) + 1).toFixed(1)}" fill="${fill}"/>`);
+    // PY decreases as world z increases (north is up), so the cell's top
+    // edge in pixel-space comes from its LARGER-z bound, not wz - step/2.
+    add(`<rect x="${PX(wx - step / 2).toFixed(1)}" y="${PY(wz + step / 2).toFixed(1)}" width="${(M(step) + 1).toFixed(1)}" height="${(M(step) + 1).toFixed(1)}" fill="${fill}"/>`);
   }
 }
 add(`</g>`);

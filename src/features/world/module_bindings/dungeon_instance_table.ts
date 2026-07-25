@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  instanceId: __t.u64().primaryKey().autoInc().name("instance_id"),
+  instanceId: __t.u64().primaryKey().name("instance_id"),
   dungeonId: __t.string().name("dungeon_id"),
   createdAt: __t.u64().name("created_at"),
 });
