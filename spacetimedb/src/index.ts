@@ -557,7 +557,9 @@ export const setPlayerInfo = spacetimedb.reducer(
         online: true,
         lastChatAt: 0n,
         lastAttackAt: 0n,
-        lastMoveAt: 0n,
+        // Seeded, not 0: the move guard measures from this, and a fresh row
+        // with no baseline would owe its first move an unbounded allowance.
+        lastMoveAt: ctx.timestamp.microsSinceUnixEpoch,
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
         deadUntil: 0n,
@@ -761,7 +763,10 @@ export const setAvatarConfig = spacetimedb.reducer(
 
 /**
  * Called on every movement tick from the client (~20 times/sec while moving).
- * Server validates position is within world bounds before updating.
+ * The server clamps the claimed position twice before storing it: to the world
+ * bounds, then to what max speed allows since the last accepted move
+ * (world/moveGuard.ts). Position is still client-authoritative — the guard
+ * bounds how fast it can lie, not whether it can.
  *
  * Slice 5c: dead players cannot move. Their `playerRespawnQueue` row will
  * teleport them to origin when the timer fires.
@@ -805,17 +810,17 @@ export const movePlayer = spacetimedb.reducer(
     // and every proximity gate in this module (chests, vendors, dungeon entry,
     // melee, cooking) trusts it — see world/moveGuard.ts. Applied above the
     // castle branch so nav validation runs against the position we will
-    // actually store, and skipped when lastMoveAt is 0 (a row that has not
-    // moved since the column was appended has no baseline to measure from).
-    let clampedX = boundedX;
-    let clampedY = boundedY;
-    if (existing.lastMoveAt > 0n) {
-      const guarded = clampMoveToMaxSpeed(
-        existing.x, existing.y, boundedX, boundedY, nowMicros - existing.lastMoveAt,
-      );
-      clampedX = guarded.x;
-      clampedY = guarded.y;
-    }
+    // actually store.
+    //
+    // A zero lastMoveAt means "no baseline", not "unguarded": it is spent as
+    // zero elapsed (the jitter grace and nothing more) rather than skipping
+    // the clamp, so the first move on a row cannot be a free teleport. Every
+    // spawn, connect and teleport path seeds lastMoveAt, so in practice this
+    // fallback only covers a row written before those paths existed.
+    const elapsedMicros = existing.lastMoveAt > 0n ? nowMicros - existing.lastMoveAt : 0n;
+    const { x: clampedX, y: clampedY } = clampMoveToMaxSpeed(
+      existing.x, existing.y, boundedX, boundedY, elapsedMicros,
+    );
 
     // Cheap no-op check BEFORE the castle-nav branch: identical inputs against
     // an already-validated row resolve to the identical row, so bail before
@@ -923,6 +928,10 @@ export const enterDungeon = spacetimedb.reducer(
       zoneId: detectZone(spawnPx.x, spawnPx.y),
       dungeonInstanceId: instanceId,
       floorYM: CASTLE_LEVELS[1].y,
+      // Teleports bypass the speed guard by writing the row directly, but they
+      // must still restart its clock: leaving a stale lastMoveAt here would
+      // hand the first step inside the interior a budget earned outdoors.
+      lastMoveAt: ctx.timestamp.microsSinceUnixEpoch,
     });
 
     if (created) seedDungeonInstanceMobs(ctx, instanceId, dungeonId);
@@ -962,6 +971,7 @@ export const leaveDungeon = spacetimedb.reducer(
       zoneId: detectZone(gatePx.x, gatePx.y),
       dungeonInstanceId: 0n,
       floorYM: 0,
+      lastMoveAt: ctx.timestamp.microsSinceUnixEpoch,
     });
 
     cleanupDungeonInstanceIfEmpty(ctx, leavingInstance);
@@ -1613,6 +1623,7 @@ export const respawnPlayer = spacetimedb.reducer(
       deadUntil: 0n,
       dungeonInstanceId: 0n,
       floorYM: 0,
+      lastMoveAt: ctx.timestamp.microsSinceUnixEpoch,
     });
 
     if (prevInstanceId > 0n) {
@@ -1632,7 +1643,15 @@ export const respawnPlayer = spacetimedb.reducer(
 export const clientConnected = spacetimedb.clientConnected((ctx) => {
   const existing = ctx.db.player.identity.find(ctx.sender);
   if (existing) {
-    ctx.db.player.identity.update({ ...existing, online: true });
+    // Restart the move guard's clock at connect. This is what gives rows
+    // predating lastMoveAt a real baseline — without it their first move
+    // after the migration would be measured against 0. It also means a
+    // reconnect tightens the next move's allowance rather than banking one.
+    ctx.db.player.identity.update({
+      ...existing,
+      online: true,
+      lastMoveAt: ctx.timestamp.microsSinceUnixEpoch,
+    });
   }
   // If no row exists, setPlayerInfo will create one.
   // Mob seeding is handled by the client invoking seedWorld() once on connect.

@@ -15,8 +15,8 @@ import {
   MOVE_JITTER_GRACE_M,
   MOVE_MAX_CREDIT_MICROS,
 } from '../../../../spacetimedb/src/world/moveGuard.ts';
+import { PX_PER_M } from '../worldSpace.js';
 
-const PX_PER_M = 32;
 const repoRoot = join(import.meta.dirname, '../../../..');
 
 /** The server's own move-rate floor — the shortest gap it will ever see. */
@@ -82,11 +82,60 @@ describe('clampMoveToMaxSpeed', () => {
 
   it('gives only the grace term when the clock does not advance', () => {
     // Same-instant replay or clock skew: no budget, but never a negative one.
+    // This is also how movePlayer spends a baseline-less row (lastMoveAt 0),
+    // so a first move can never be a free teleport.
     for (const elapsed of [0n, -5_000_000n]) {
       const r = clampMoveToMaxSpeed(0, 0, 999 * PX_PER_M, 0, elapsed);
       expect(r.clamped).toBe(true);
       expect(r.x / PX_PER_M).toBeCloseTo(MOVE_JITTER_GRACE_M, 6);
     }
+  });
+});
+
+describe('every path that writes a position seeds lastMoveAt', () => {
+  // The guard measures from player.lastMoveAt, so any path that writes a
+  // position without setting it hands the next move an allowance it did not
+  // earn — and a row still sitting at 0 would get an unbounded first move.
+  // Reducers need a live module to run, so this asserts the wiring in source.
+  const server = readFileSync(join(repoRoot, 'spacetimedb/src/index.ts'), 'utf8');
+
+  /** Body of the reducer/update starting at `anchor`, up to the closing `});`. */
+  const blockAfter = (anchor) => {
+    const at = server.indexOf(anchor);
+    expect(at, `anchor not found: ${anchor}`).toBeGreaterThan(-1);
+    return server.slice(at, server.indexOf('});', at));
+  };
+
+  it('movePlayer never skips the clamp on a zero baseline', () => {
+    const body = blockAfter('export const movePlayer');
+    // The clamp must be unconditional; the zero case is spent as zero elapsed.
+    expect(body).toContain('clampMoveToMaxSpeed(');
+    expect(body).toMatch(/existing\.lastMoveAt > 0n \? nowMicros - existing\.lastMoveAt : 0n/);
+    expect(body, 'clamp must not sit behind an if (lastMoveAt > 0) guard')
+      .not.toMatch(/if \(existing\.lastMoveAt > 0n\) \{\s*const guarded/);
+  });
+
+  it('spawn seeds it', () => {
+    expect(blockAfter('ctx.db.player.insert({'))
+      .toContain('lastMoveAt: ctx.timestamp.microsSinceUnixEpoch');
+  });
+
+  it('connect seeds it', () => {
+    expect(blockAfter('spacetimedb.clientConnected'))
+      .toContain('lastMoveAt: ctx.timestamp.microsSinceUnixEpoch');
+  });
+
+  it.each([
+    ['dungeon entry', 'const spawnPx ='],
+    ['dungeon exit', 'const leavingInstance ='],
+  ])('%s teleport seeds it', (_label, anchor) => {
+    expect(blockAfter(anchor))
+      .toContain('lastMoveAt: ctx.timestamp.microsSinceUnixEpoch');
+  });
+
+  it('respawn seeds it', () => {
+    expect(blockAfter('const prevInstanceId ='))
+      .toContain('lastMoveAt: ctx.timestamp.microsSinceUnixEpoch');
   });
 });
 
@@ -102,6 +151,19 @@ describe('the ceiling matches the client it is policing', () => {
     const m = scene.match(/const speed = ([\d.]+);/);
     expect(m, 'movement speed literal not found in _moveLocal').toBeTruthy();
     expect(Number(m[1]) * 1000).toBe(MAX_MOVE_SPEED_MPS);
+  });
+
+  it('moveGuard px/m matches the client scale it converts with', () => {
+    // moveGuard keeps its own PX_PER_M (the server module has no shared
+    // constants file — chest.ts does the same). worldSpace.test.js already
+    // pins the client/index.ts pair; this covers the third copy, so a scale
+    // change cannot leave the ceiling silently converting at the old rate.
+    const guard = readFileSync(
+      join(repoRoot, 'spacetimedb/src/world/moveGuard.ts'), 'utf8',
+    );
+    const m = guard.match(/const PX_PER_M = (\d+);/);
+    expect(m, 'PX_PER_M not found in moveGuard.ts').toBeTruthy();
+    expect(Number(m[1])).toBe(PX_PER_M);
   });
 
   it('a full-rate honest client is never clamped', () => {
