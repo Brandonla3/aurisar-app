@@ -18,6 +18,8 @@
     "emit:world-chests:check": "node scripts/emit_world_chests.mjs --check",
     "emit:landmarks": "node scripts/emit_zone1_landmarks.mjs",
     "emit:landmarks:check": "node scripts/emit_zone1_landmarks.mjs --check",
+    "plan": "node scripts/render_world_plan.mjs",
+    "plan:all": "node scripts/render_world_plan.mjs --view world && node scripts/render_world_plan.mjs --view zone && node scripts/render_world_plan.mjs --view hub",
     "assets:pipeline": "node scripts/assets_pipeline.mjs",
     "check:assets": "node scripts/assets_pipeline.mjs --check",
     "emit:assets": "node scripts/assets_pipeline.mjs --emit",
