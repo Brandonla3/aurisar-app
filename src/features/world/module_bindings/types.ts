@@ -40,6 +40,13 @@ export const ChatMessage = __t.object("ChatMessage", {
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;
 
+export const DungeonInstance = __t.object("DungeonInstance", {
+  instanceId: __t.u64(),
+  dungeonId: __t.string(),
+  createdAt: __t.u64(),
+});
+export type DungeonInstance = __Infer<typeof DungeonInstance>;
+
 export const Mob = __t.object("Mob", {
   mobId: __t.u64(),
   mobType: __t.string(),
@@ -55,6 +62,11 @@ export const Mob = __t.object("Mob", {
   leashRadiusPx: __t.f32(),
   respawnSec: __t.u32(),
   lastAttackAt: __t.u64(),
+  dungeonInstanceId: __t.u64(),
+  floorYm: __t.f32(),
+  spawnedAt: __t.u64(),
+  lastAoeAt: __t.u64(),
+  enraged: __t.bool(),
 });
 export type Mob = __Infer<typeof Mob>;
 
@@ -68,6 +80,7 @@ export const MobRespawnQueueRow = __t.object("MobRespawnQueueRow", {
   id: __t.u64(),
   scheduledAt: __t.scheduleAt(),
   spawnNetId: __t.string(),
+  dungeonInstanceId: __t.u64(),
 });
 export type MobRespawnQueueRow = __Infer<typeof MobRespawnQueueRow>;
 
@@ -88,8 +101,42 @@ export const Player = __t.object("Player", {
   hp: __t.i32(),
   maxHp: __t.i32(),
   deadUntil: __t.u64(),
+  dungeonInstanceId: __t.u64(),
+  floorYm: __t.f32(),
+  lastMoveAt: __t.u64(),
 });
 export type Player = __Infer<typeof Player>;
+
+export const PlayerChestOpened = __t.object("PlayerChestOpened", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  chestId: __t.u32(),
+});
+export type PlayerChestOpened = __Infer<typeof PlayerChestOpened>;
+
+export const PlayerEquipped = __t.object("PlayerEquipped", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  slot: __t.string(),
+  itemId: __t.string(),
+});
+export type PlayerEquipped = __Infer<typeof PlayerEquipped>;
+
+export const PlayerItemStack = __t.object("PlayerItemStack", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  itemId: __t.string(),
+  quantity: __t.u32(),
+});
+export type PlayerItemStack = __Infer<typeof PlayerItemStack>;
+
+export const PlayerProgress = __t.object("PlayerProgress", {
+  identity: __t.identity(),
+  fitnessXp: __t.u64(),
+  fitnessXpBaseline: __t.u64(),
+  worldLevel: __t.u32(),
+});
+export type PlayerProgress = __Infer<typeof PlayerProgress>;
 
 export const PlayerQuest = __t.object("PlayerQuest", {
   id: __t.u64(),
@@ -107,4 +154,11 @@ export const PlayerRespawnQueueRow = __t.object("PlayerRespawnQueueRow", {
   identity: __t.identity(),
 });
 export type PlayerRespawnQueueRow = __Infer<typeof PlayerRespawnQueueRow>;
+
+export const PlayerWallet = __t.object("PlayerWallet", {
+  identity: __t.identity(),
+  copper: __t.u64(),
+  imported: __t.bool(),
+});
+export type PlayerWallet = __Infer<typeof PlayerWallet>;
 
