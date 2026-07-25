@@ -16,6 +16,15 @@ import {
   MOVE_MAX_CREDIT_MICROS,
 } from '../../../../spacetimedb/src/world/moveGuard.ts';
 import { PX_PER_M } from '../worldSpace.js';
+import {
+  castleInteriorSurfaceAt,
+  castleInteriorResolveMove,
+} from '../../../../spacetimedb/src/castle/validate.ts';
+import {
+  CASTLE_NAV_META,
+  CASTLE_LEVELS,
+  CASTLE_STEP_UP,
+} from '../../../../spacetimedb/src/castle/navGrids.ts';
 
 const repoRoot = join(import.meta.dirname, '../../../..');
 
@@ -139,6 +148,49 @@ describe('every path that writes a position seeds lastMoveAt', () => {
   });
 });
 
+describe('a wall-crossing clamped step still resolves', () => {
+  // Clamping projects along the straight chord to the claim, so indoors it can
+  // land in a wall even when both endpoints are walkable. The reducer resolves
+  // a clamped step through the same wall-slide the client uses; this pins the
+  // property that makes it safe — from a walkable spot it ALWAYS yields a
+  // surface, so a clamped step can never strand the row on a rejection.
+  const walkable = (() => {
+    // Find a real interior floor cell from the nav meta rather than
+    // hard-coding a coordinate that a castle relayout would invalidate.
+    const { anchor, bounds } = CASTLE_NAV_META;
+    for (let xm = bounds.x0; xm <= bounds.x1; xm += 0.5) {
+      for (let zm = bounds.z0; zm <= bounds.z1; zm += 0.5) {
+        const wx = anchor.x + xm;
+        const wz = anchor.z + zm;
+        if (castleInteriorSurfaceAt(wx, wz, CASTLE_LEVELS[1].y)) return { wx, wz };
+      }
+    }
+    return null;
+  })();
+
+  it('found a walkable interior cell to test from', () => {
+    expect(walkable, 'no walkable interior cell — castle nav data missing?').toBeTruthy();
+  });
+
+  it('slides instead of returning nothing when the chord leaves the interior', () => {
+    // Aim far outside the interior footprint: the direct point is unwalkable,
+    // which before the fix meant the reducer returned and advanced nothing.
+    const r = castleInteriorResolveMove(
+      walkable.wx, walkable.wz, walkable.wx + 500, walkable.wz + 500,
+      CASTLE_LEVELS[1].y,
+    );
+    expect(r.surface, 'resolver must never leave a walkable step unresolved').toBeTruthy();
+  });
+
+  it('resolves to a point on the same floor', () => {
+    const r = castleInteriorResolveMove(
+      walkable.wx, walkable.wz, walkable.wx + 500, walkable.wz + 500,
+      CASTLE_LEVELS[1].y,
+    );
+    expect(Math.abs(r.floorYM - CASTLE_LEVELS[1].y)).toBeLessThanOrEqual(CASTLE_STEP_UP);
+  });
+});
+
 describe('a clamped step cannot wedge the row', () => {
   // Clamping projects along the straight chord to the claim, which indoors can
   // cross a wall even when both endpoints are walkable. Two safeguards keep a
@@ -148,28 +200,22 @@ describe('a clamped step cannot wedge the row', () => {
     join(repoRoot, 'src/features/world/game/BabylonWorldScene.js'), 'utf8',
   );
 
-  it('castle nav retries nearer points, and only for a clamped step', () => {
-    const m = server.match(/const CLAMPED_NAV_RETRY_FRACTIONS = \[([^\]]+)\]/);
-    expect(m, 'CLAMPED_NAV_RETRY_FRACTIONS not found').toBeTruthy();
-    const fractions = m[1].split(',').map((s) => Number(s.trim()));
-    // Nearest-to-the-claim first, so the furthest walkable point wins.
-    expect(fractions[0]).toBe(1);
-    expect(fractions).toEqual([...fractions].sort((a, b) => b - a));
-    expect(fractions.every((f) => f > 0 && f <= 1)).toBe(true);
-    // An unclamped claim must keep the strict single-point check, or ordinary
-    // moves into walls would start being partially accepted.
-    expect(server).toContain('guarded.clamped ? CLAMPED_NAV_RETRY_FRACTIONS : [1]');
+  it('a clamped indoor step goes through the wall-slide resolver', () => {
+    const body = server.slice(server.indexOf('export const movePlayer'));
+    expect(body).toContain('if (guarded.clamped) {');
+    expect(body).toContain('castleInteriorResolveMove(');
+    // An unclamped claim must keep the strict all-or-nothing check, or
+    // ordinary moves into walls would start being quietly slid instead.
+    expect(body).toMatch(/} else \{[\s\S]{0,400}castleInteriorSurfaceAt\([\s\S]{0,120}if \(!surface\) return;/);
   });
 
-  it('the client re-sends while the server row sits behind its claim', () => {
-    // Without this the send only fires on LOCAL change, so a player who stops
-    // right after a stall would strand the row — and every proximity check
-    // would read the stale position for as long as they stood still.
+  it('the client feeds the server offset into the send decision', () => {
+    // Behaviour is covered in moveSync.test.js; this pins the wiring, since a
+    // scene test cannot stage the network stall that reaches it.
     expect(scene).toMatch(/_serverPos\s*=\s*\{\s*x:\s*row\.x,\s*y:\s*row\.y\s*\}/);
-    expect(scene).toContain('|| reconciling');
-    expect(scene).toMatch(/_serverPosBehind\(toStdb\(x\), toStdb\(z\)\)/);
-    // Dead players are pinned server-side; retrying them would spin forever.
-    expect(scene).toMatch(/if \(this\._localHp <= 0\) return false;/);
+    expect(scene).toContain('shouldSendMove({');
+    expect(scene).toMatch(/serverOffsetPx:\s*this\._serverOffsetPx\(toStdb\(x\), toStdb\(z\)\)/);
+    expect(scene).toMatch(/alive:\s*this\._localHp > 0/);
   });
 });
 

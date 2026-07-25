@@ -847,29 +847,33 @@ export const movePlayer = spacetimedb.reducer(
       // surfaceAt refY (prevents spoofed jumps to upper floors / boss rooms).
       const refY = existing.floorYM > 0 ? existing.floorYM : CASTLE_LEVELS[1].y;
 
-      // A shortened step is projected along the straight chord to the claim,
-      // and indoors that chord can clip a wall even when both endpoints are
-      // walkable — so the guard could synthesise a nav-blocked point out of a
-      // legal move and wedge the row until the client's claim happened to
-      // line up. Walk back along the same chord and take the furthest point
-      // that resolves. Only when the guard actually shortened the step: an
-      // unclamped claim keeps the strict all-or-nothing check, so ordinary
-      // moves into walls are still refused outright.
-      let resolvedSurfaceY: number | null = null;
-      for (const f of guarded.clamped ? CLAMPED_NAV_RETRY_FRACTIONS : [1]) {
-        const tryX = existing.x + (clampedX - existing.x) * f;
-        const tryY = existing.y + (clampedY - existing.y) * f;
-        const surface = castleInteriorSurfaceAt(pxToWorldM(tryX), pxToWorldM(tryY), refY);
-        if (!surface) continue;
+      if (guarded.clamped) {
+        // A shortened step is projected along the straight chord to the claim,
+        // and indoors that chord can clip a wall even when both endpoints are
+        // walkable — so the guard could synthesise a nav-blocked point out of
+        // a legal move and wedge the row. Resolve it the same way the client
+        // resolves its own steps (wall-slide per axis, else stay put), which
+        // walks the corner the chord cut. castleInteriorResolveMove always
+        // returns a surface when the stored position has one, so a clamped
+        // step can no longer strand the row on a rejection.
+        const resolved = castleInteriorResolveMove(
+          pxToWorldM(existing.x), pxToWorldM(existing.y), worldXM, worldZM, refY,
+        );
+        if (!resolved.surface) return;
+        if (floorYM > 0 && Math.abs(floorYM - resolved.floorYM) > CASTLE_STEP_UP) return;
+        clampedX = worldMToPx(resolved.x);
+        clampedY = worldMToPx(resolved.z);
+        nextFloorYM = resolved.floorYM;
+      } else {
+        // Unclamped claims keep the strict all-or-nothing check: the client
+        // already wall-slides locally, so a blocked point here is spoofed or
+        // desynced and should be refused rather than quietly slid.
+        const surface = castleInteriorSurfaceAt(worldXM, worldZM, refY);
+        if (!surface) return;
         // Reject moves whose client-claimed floor is far from the resolved surface.
-        if (floorYM > 0 && Math.abs(floorYM - surface.y) > CASTLE_STEP_UP) continue;
-        clampedX = tryX;
-        clampedY = tryY;
-        resolvedSurfaceY = surface.y;
-        break;
+        if (floorYM > 0 && Math.abs(floorYM - surface.y) > CASTLE_STEP_UP) return;
+        nextFloorYM = surface.y;
       }
-      if (resolvedSurfaceY === null) return;
-      nextFloorYM = resolvedSurfaceY;
     } else if (existing.floorYM !== 0) {
       nextFloorYM = 0;
     }
@@ -1009,15 +1013,6 @@ const CHAT_COOLDOWN_MICROS = 1_000_000n; // 1 second
 // movePlayer accepts at most one write per 40 ms (25 Hz) per player — above
 // every legitimate client rate, below a frame-rate hammer. See movePlayer.
 const MOVE_MIN_INTERVAL_MICROS = 40_000n;
-
-/**
- * Fallback points tried along a speed-clamped step when the projected point
- * lands in castle geometry, nearest-to-the-claim first. Four samples keeps the
- * cost trivial on what is already a cold path (only a clamped indoor move
- * reaches it) while guaranteeing the row still advances whenever any prefix of
- * the chord is walkable.
- */
-const CLAMPED_NAV_RETRY_FRACTIONS = [1, 0.75, 0.5, 0.25];
 
 // chat_message was insert-only with no cap, TTL, or delete anywhere: every
 // client downloaded the module's entire chat history on connect — the single
