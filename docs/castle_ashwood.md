@@ -19,7 +19,7 @@ SpacetimeDB `movePlayer` validates interior moves with level-aware `surfaceAt` (
 - **`dungeonInstance`** table + `player.dungeonInstanceId` / `mob.dungeonInstanceId`
 - Instance mobs seed from `castleAshwood.generated.ts` on first member entry
 - Client syncs interior presentation from the player row
-- **`player.floorYM`** persisted for reconnect + server surfaceAt reference
+- **`player.floorYm`** persisted for reconnect + server surfaceAt reference
 - **Interior mob AI (phase 3)** — dungeon mobs use nav wall-slide; aggro/melee require same instance + floor
 - **minLevel gating (phase 4)** — private `playerProgress` + `syncProgress`; dungeon entry and quests enforce level
 - **Gorrak treasury quest** — `q_ringleader` kill scoped to `ca_boss` spawn in Castle Ashwood instance

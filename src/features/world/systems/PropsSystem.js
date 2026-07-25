@@ -14,6 +14,7 @@
 
 import { ZONE1_PROPS } from '../content/zones/zone1/props';
 import propsManifest from '../../../../public/assets/manifest/props.manifest.json';
+import { propRand as rand } from './propFootprints';
 
 const BASE = propsManifest.base; // '/assets/props/'
 
@@ -25,11 +26,6 @@ const MANIFEST = Object.fromEntries(
 // House heights from the reference layout (houseHeight table).
 const HOUSE_KINDS = ['house_1', 'house_2', 'blacksmith'];
 const HOUSE_HEIGHT = { house_1: 8.0, house_2: 7.6, inn: 7.6, blacksmith: 6.6 };
-
-function rand(x, z) {
-  const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
-  return h - Math.floor(h);
-}
 
 export class PropsSystem {
   constructor(scene, worldgen) {
