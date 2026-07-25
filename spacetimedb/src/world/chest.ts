@@ -29,10 +29,16 @@ export interface WorldChestDef {
 
 const WORLD_CHESTS: WorldChestDef[] = chestManifest.chests;
 
+// Keyed by the chest's position-derived id (worldgen chestKey), NOT by array
+// position. Ids used to be array indices, so any worldgen edit that re-indexed
+// the manifest silently repointed every persisted playerChestOpened row at a
+// different chest. A Map makes the lookup independent of ordering.
+const WORLD_CHESTS_BY_ID: Map<number, WorldChestDef> = new Map(
+  WORLD_CHESTS.map((c) => [c.id, c]),
+);
+
 export function getWorldChest(chestId: number): WorldChestDef | null {
-  const chest = WORLD_CHESTS[chestId];
-  if (!chest || chest.id !== chestId) return null;
-  return chest;
+  return WORLD_CHESTS_BY_ID.get(chestId) ?? null;
 }
 
 /** Zone-1 chest world meters → STDB px (origin offset is zero). */
@@ -83,6 +89,27 @@ export function grantChestLoot(
 }
 
 /**
+ * Drop this player's playerChestOpened rows that no longer name a real chest.
+ *
+ * One-time migration for the meta.version 3→4 reshuffle: chest ids used to be
+ * array indices (0…24) and are now position-derived keys, so every pre-existing
+ * row references an id the manifest no longer contains. Those rows can never
+ * match again — they are inert, but without this they would accumulate forever.
+ * Announced to players as "chests restocked".
+ *
+ * Self-healing rather than a big-bang delete: it only touches the acting
+ * player's rows and only ones that are provably stale, so it is safe to leave
+ * in place permanently (after the migration drains, it finds nothing).
+ */
+function pruneStaleChestRows(ctx: InventoryCtx, owner: unknown): void {
+  for (const row of ctx.db.playerChestOpened.iter()) {
+    if (!row.owner.isEqual(owner)) continue;
+    if (WORLD_CHESTS_BY_ID.has(row.chestId)) continue;
+    ctx.db.playerChestOpened.id.delete(row.id);
+  }
+}
+
+/**
  * Open a world chest when the player is in range. Returns rolled loot on
  * success, null when validation fails or the chest was already opened.
  */
@@ -94,6 +121,7 @@ export function openChestForPlayer(
 ): Array<{ itemId: string; qty: number }> | null {
   const chest = getWorldChest(chestId);
   if (!chest) return null;
+  pruneStaleChestRows(ctx, owner);
   if (!playerNearChest(player, chest)) return null;
   if (chestAlreadyOpened(ctx, owner, chestId)) return null;
 

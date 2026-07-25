@@ -136,7 +136,10 @@ export function generateSites(config, rng, wg) {
   const chests = [];
   for (let i = 0; i < S.chestCount; i++) {
     const p = scatter(10);
-    chests.push({ x: p.x, z: p.z, seed: siteSeed() });
+    // siteSeed() must be drawn exactly once, in this position, to keep the
+    // draw order — chestKey is a pure hash of values already drawn.
+    const seed = siteSeed();
+    chests.push({ id: chestKey(p.x, p.z, seed), x: p.x, z: p.z, seed });
   }
 
   // ── ponds: prefer the Mire, never on the mountain ──

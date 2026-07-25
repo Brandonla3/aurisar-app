@@ -24,6 +24,11 @@ export function buildForestLayout(config) {
   const paths = [
     [[FX - FR * 0.92, FZ + FR * 0.05], [FX - 70, FZ + 55], [FX - 5, FZ + 80], [FX + 65, FZ + 35], [FX + 40, FZ - 45], [FX - 25, FZ - 90]],
     [[FX + FR * 0.9, FZ - FR * 0.15], [FX + 55, FZ + 15], [FX - 15, FZ + 5], [FX - 80, FZ - 35]],
+    // North-pass road (Greywood Run → the zone-2 gate at (0,170)). The trails
+    // entry in zone1_world.json only paints packed dirt; without a matching
+    // forest corridor the road would run straight through dense Wildwood.
+    // Control points mirror that trail exactly — keep the two in step.
+    [[FX + 3, FZ - 32], [FX + 1, FZ - 6], [FX + 3, FZ + 24], [FX + 5, FZ + 60]],
   ];
   const clearings = [
     [FX, FZ, 20], [FX - 72, FZ + 52, 15], [FX + 62, FZ - 42, 17],

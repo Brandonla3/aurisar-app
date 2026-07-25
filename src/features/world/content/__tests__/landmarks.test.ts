@@ -18,9 +18,13 @@ import {
   ALL_LANDMARKS,
   ALL_WAYPOINTS,
   LANDMARKS,
+  MOBS,
   SPAWNS,
   landmarkPos,
 } from '../index';
+
+// eslint-disable-next-line -- JS module without types
+import { createWorldgen } from '../../worldgen/index.js';
 
 // eslint-disable-next-line -- JSON module, no types
 import zone1Config from '../../config/zone1_world.json';
@@ -138,5 +142,40 @@ describe('mob camps', () => {
       expect(nearest, `spawn ${s.netId} is ${nearest.toFixed(1)}m from any landmark`)
         .toBeLessThanOrEqual(40);
     }
+  });
+});
+
+describe('danger ↔ spawn coupling', () => {
+  // `biomes[].danger` was authored as a 0.15→1.0 gradient and then wired to
+  // nothing at all. This is its first consumer: a camp must sit in a biome
+  // whose danger roughly predicts its mob level, so the world reads honestly —
+  // a player walking into a "dangerous" biome meets dangerous things.
+  //
+  //   expectedLevel = 1 + danger * 6,  |mobLevel - expectedLevel| <= 2
+  //
+  // Fix a failure by MOVING THE CAMP (its landmark offset) or retuning that
+  // biome's danger — not by widening the tolerance.
+  const TOLERANCE = 2;
+  const wg = createWorldgen(zone1Config);
+
+  it('every camp\'s mob level matches its biome danger', () => {
+    for (const s of SPAWNS) {
+      const mob = MOBS[s.mobType];
+      expect(mob, `spawn ${s.netId}: unknown mobType ${s.mobType}`).toBeTruthy();
+      const biome = wg.biomeAt(s.pos.x, s.pos.z);
+      const expected = 1 + biome.danger * 6;
+      const delta = Math.abs(mob.level - expected);
+      expect(
+        delta,
+        `${s.netId} (${s.mobType} L${mob.level}) sits in ${biome.name} `
+        + `(danger ${biome.danger} → expected L${expected.toFixed(1)}), off by ${delta.toFixed(1)}`,
+      ).toBeLessThanOrEqual(TOLERANCE);
+    }
+  });
+
+  it('the danger gradient still spans a meaningful range', () => {
+    const dangers = zone1Config.biomes.map((b: { danger: number }) => b.danger);
+    expect(Math.min(...dangers)).toBeLessThanOrEqual(0.2);
+    expect(Math.max(...dangers)).toBeGreaterThanOrEqual(0.9);
   });
 });

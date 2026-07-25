@@ -78,26 +78,34 @@ function farthestFromPaths(cfg) {
 //    Regenerate the values below if the geometry legitimately changes:
 //      node -e '(await import("./src/features/world/worldgen/index.js")).createWorldgen(...)'
 const GOLDEN = {
-  20260612: { // zone1_world (live)
+  20260612: { // zone1_world (live) — regenerated once for the meta.version 3→4
+    // reshuffle (authored biomeAnchors + road corridors). See
+    // worldgen/DETERMINISM.md and docs/world-design-plan.md Batch D.
     plateaus: [0, 0, 0, 0, 10.303, 22.5805, 45.902, 49.3826, 71.4533, 65.0962, 94.1685, 116.1395, 113.8915],
-    sites: { trees: 359, rocks: 291, bushes: 141, details: 806, ruins: 6, caves: 5, chests: 25, ponds: 3 },
-    sitesDigest: 1609540378,
+    sites: { trees: 407, rocks: 325, bushes: 149, details: 794, ruins: 6, caves: 5, chests: 25, ponds: 6 },
+    sitesDigest: 2293337888,
+    forestDigest: 260965903,
+    biomeDigest: 4105125819,
   },
-  20240611: { // ashwood_world (dev)
+  20240611: { // ashwood_world (dev) — untouched by the reshuffle: it keeps the
+    // legacy biomeRing path, and its sitesDigest is unchanged, which is the
+    // proof that path is byte-identical.
     plateaus: [10.172, 7, 12, 22.6312, 22, 56, 52, 56, 89.0006, 97.9134],
     sites: { trees: 309, rocks: 219, bushes: 141, details: 675, ruins: 11, caves: 8, chests: 25, ponds: 3 },
     sitesDigest: 107254303,
+    forestDigest: 3110971851,
+    biomeDigest: 2348431874,
   },
 };
 const golden = GOLDEN[config.seed];
 
-// FNV-1a over every realized site position (0.1 m resolution). Counts alone
-// can survive a reshuffle (rejection sampling can land on the same totals);
-// the digest pins the POSITIONS, which is what "no stray reshuffle" means.
-function sitesDigest(sites) {
+// FNV-1a over realized positions (0.1 m resolution). Counts alone can survive
+// a reshuffle (rejection sampling can land on the same totals); the digest pins
+// the POSITIONS, which is what "no stray reshuffle" means.
+function digestOf(sites, keys) {
   let h = 0x811c9dc5;
   const mix = (n) => { h ^= n & 0xffffffff; h = Math.imul(h, 0x01000193) >>> 0; };
-  for (const k of ['trees', 'rocks', 'bushes', 'details', 'ruins', 'caves', 'chests', 'ponds']) {
+  for (const k of keys) {
     for (const site of sites[k] ?? []) {
       mix(Math.round(site.x * 10));
       mix(Math.round(site.z * 10));
@@ -105,6 +113,19 @@ function sitesDigest(sites) {
   }
   return h >>> 0;
 }
+
+const SITE_KEYS = ['trees', 'rocks', 'bushes', 'details', 'ruins', 'caves', 'chests', 'ponds'];
+// Stage 3 was NOT covered before. It matters now: the north-pass road is a
+// forest.js corridor, and forest path/clearing edits reject stage-3 draws, so a
+// road tweak that silently moved 2 100 Wildwood instances used to sail through.
+const FOREST_KEYS = ['forestTrees', 'forestBrush', 'forestLogs'];
+
+const sitesDigest = (sites) => digestOf(sites, SITE_KEYS);
+const forestDigest = (sites) => digestOf(sites, FOREST_KEYS);
+// Biome seeds are stage 1. Under authored anchors they are pure config, but
+// pinning them still catches an accidental anchor edit or a fallback to the
+// legacy ring path.
+const biomeDigest = (seeds) => digestOf({ s: seeds }, ['s']);
 
 const wg = createWorldgen(config);
 const wg2 = createWorldgen(config);
@@ -210,6 +231,42 @@ const col = { r: 0, g: 0, b: 0 };
 wg.biomeColorAt(123, -45, col);
 check('biomeColorAt in range', [col.r, col.g, col.b].every((v) => v > 0 && v <= 1));
 
+// ── biome anchors: every anchor must classify as its OWN biome ──
+// Anchors are placed on the POIs they name, so this is the "a named biome
+// provably contains its namesake POI" acceptance criterion — and it also
+// catches an anchor placed so close to a rival that the rival wins the cell.
+if (config.biomeAnchors?.length) {
+  let shadowed = 0;
+  for (const a of config.biomeAnchors) {
+    const got = wg.biomeIdxAt(a.x, a.z);
+    if (got !== a.b) {
+      shadowed++;
+      console.log(`  !!  anchor (${a.x},${a.z}) "${a.note ?? ''}" wants ${config.biomes[a.b].name}, got ${config.biomes[got].name}`);
+    }
+  }
+  check('every biome anchor owns its own cell', shadowed === 0, `${shadowed} shadowed`);
+
+  // Raster share over the playable band — a biome squeezed to near-zero means
+  // the layout reads as one fewer biome than it advertises.
+  const share = new Map();
+  let cells = 0;
+  for (let x = -180; x <= 180; x += 4) {
+    for (let z = -180; z <= 180; z += 4) {
+      if (Math.hypot(x, z) > 180) continue;
+      const b = wg.biomeIdxAt(x, z);
+      share.set(b, (share.get(b) ?? 0) + 1);
+      cells++;
+    }
+  }
+  const pct = [...share.entries()]
+    .sort((p, q) => q[1] - p[1])
+    .map(([b, c]) => `${config.biomes[b].name} ${(100 * c / cells).toFixed(1)}%`);
+  console.log(`      biome share (±180m): ${pct.join(' · ')}`);
+  const smallest = Math.min(...[...share.values()].map((c) => 100 * c / cells));
+  check('no biome squeezed out of the playable band', share.size === config.biomes.length && smallest >= 5,
+    `${share.size}/${config.biomes.length} present, smallest ${smallest.toFixed(1)}%`);
+}
+
 // ── sites: counts match the golden exactly, none in lake water, trees keep out
 //    of the Wildwood and the mountain (they dress themselves) ──
 const s = wg.sites;
@@ -221,11 +278,16 @@ console.log(
 if (golden) {
   for (const k of ['trees', 'rocks', 'bushes', 'details', 'ruins', 'caves', 'chests', 'ponds'])
     check(`golden ${k} count = ${golden.sites[k]}`, s[k].length === golden.sites[k], `got ${s[k].length}`);
-  const digest = sitesDigest(s);
-  if (golden.sitesDigest == null) {
-    console.log(`  --  no sites digest recorded for seed ${config.seed} — record sitesDigest: ${digest}`);
-  } else {
-    check(`golden sites digest = ${golden.sitesDigest}`, digest === golden.sitesDigest, `got ${digest}`);
+  for (const [label, got, want] of [
+    ['sites', sitesDigest(s), golden.sitesDigest],
+    ['forest', forestDigest(s), golden.forestDigest],
+    ['biome-seed', biomeDigest(wg.biomeSeeds), golden.biomeDigest],
+  ]) {
+    if (want == null) {
+      console.log(`  --  no ${label} digest for seed ${config.seed} — record ${label}Digest: ${got}`);
+    } else {
+      check(`golden ${label} digest = ${want}`, got === want, `got ${got}`);
+    }
   }
 } else {
   check('tree count plausible', s.trees.length > 100 && s.trees.length < config.scatter.treeCount);

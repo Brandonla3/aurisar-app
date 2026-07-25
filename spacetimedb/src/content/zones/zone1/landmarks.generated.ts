@@ -38,7 +38,7 @@ export const LANDMARKS = {
   greywood_run: { id: 'greywood_run', name: "Greywood Run", x: -2, z: 70 },
   // zone1_world.json anchors
   hollow_crypt: { id: 'hollow_crypt', name: "The Hollow Crypt", x: 0, z: -37 },
-  // zone1_world.json plateaus[0] (hub plateau, r26)
+  // zone1_world.json plateaus[0] (hub plateau, r34)
   hub: { id: 'hub', name: "Oakrest", x: 0, z: 0 },
   // zone1_world.json anchors
   lower_gate: { id: 'lower_gate', name: "Frostspire Lower Gate", x: -160, z: -150 },

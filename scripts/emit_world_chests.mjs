@@ -24,12 +24,28 @@ const zone1Config = JSON.parse(
 
 const { createWorldgen } = await import('../src/features/world/worldgen/index.js');
 const wg = createWorldgen(zone1Config);
-const chests = wg.sites.chests.map((c, index) => ({
-  id: index,
+
+// Ids are position-derived (worldgen/sites.js chestKey), NOT array indices.
+// The old `id: index` meant any manifest edit that re-indexed the array —
+// an added exclusion zone, a scatter tweak — silently remapped every player's
+// persisted playerChestOpened history onto different chests. See
+// worldgen/DETERMINISM.md § "Index-keyed data".
+const chests = wg.sites.chests.map((c) => ({
+  id: c.id,
   x: c.x,
   z: c.z,
   seed: c.seed,
 }));
+
+const ids = new Set(chests.map((c) => c.id));
+if (ids.size !== chests.length) {
+  console.error(`FATAL: chest id collision (${chests.length} chests, ${ids.size} distinct ids).`);
+  process.exit(1);
+}
+if (chests.some((c) => !Number.isInteger(c.id) || c.id < 0 || c.id > 0xffffffff)) {
+  console.error('FATAL: chest id outside u32 range (playerChestOpened.chestId is u32).');
+  process.exit(1);
+}
 
 const json = JSON.stringify({ version: 1, chests }, null, 2) + '\n';
 

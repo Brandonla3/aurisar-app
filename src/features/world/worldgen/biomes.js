@@ -55,6 +55,10 @@ export function createBiomes(config, rng) {
     // the whole seed set (including the hub), so there is exactly one place
     // that decides where a biome lives.
     for (const a of config.biomeAnchors) seeds.push({ x: a.x, z: a.z, b: a.b });
+  } else if (!Array.isArray(config.biomeRing) || !config.biomeRing.length) {
+    // Neither mode configured. Failing loudly beats silently generating a
+    // single-biome world that would look "almost right" and desync nothing.
+    throw new Error('worldgen/biomes: config needs biomeAnchors or biomeRing');
   } else {
     // Legacy ring shuffle (exact mirror of prototype buildBiomeSeeds).
     seeds.push({ x: 0, z: 0, b: 0 }); // gentle meadow around the spawn

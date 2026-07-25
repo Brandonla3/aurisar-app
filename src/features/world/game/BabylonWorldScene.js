@@ -901,7 +901,7 @@ export class BabylonWorldScene {
     this._chatOpen      = false;
     this._inDungeon     = false;
     this._local         = null;
-    this._openedChests  = new Set(); // chest indices already looted this session
+    this._openedChests  = new Set(); // position-derived chest ids already looted
     this._inputPaused   = false;     // true while a full-screen panel owns the screen
     this._lastChestScanAt = 0;       // throttle the proximity scan (~4 Hz)
     this._pendingUpdates    = []; // remote rows queued while _local is loading
@@ -1659,14 +1659,16 @@ export class BabylonWorldScene {
     this._lastChestScanAt = now;
 
     const { x, z } = this._local.root.position;
-    for (let i = 0; i < chests.length; i++) {
-      if (this._openedChests.has(i)) continue;
-      const c = chests[i];
+    for (const c of chests) {
+      // c.id is the position-derived key from worldgen (chestKey), matching
+      // what the server persists — never the array index, which shifts under
+      // any manifest edit.
+      if (this._openedChests.has(c.id)) continue;
       const dx = x - c.x;
       const dz = z - c.z;
       if (dx * dx + dz * dz < CHEST_OPEN_DIST_SQ) {
-        this._openedChests.add(i);
-        this.callbacks.onChestOpen?.({ id: i, seed: c.seed });
+        this._openedChests.add(c.id);
+        this.callbacks.onChestOpen?.({ id: c.id, seed: c.seed });
       }
     }
   }
@@ -3005,7 +3007,7 @@ export class BabylonWorldScene {
   getUnopenedChests() {
     const chests = this._worldgen?.sites?.chests;
     if (!chests) return [];
-    return chests.filter((_, i) => !this._openedChests.has(i));
+    return chests.filter((c) => !this._openedChests.has(c.id));
   }
 
   // Pause gameplay key input (movement/attack) while a full-screen panel (the
