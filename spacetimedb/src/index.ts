@@ -105,6 +105,7 @@ import {
   openChestForPlayer,
   playerNearLitCampfire,
 } from './world/chest.js';
+import { clampMoveToMaxSpeed } from './world/moveGuard.js';
 import {
   equipItemForPlayer,
   unequipSlotForPlayer,
@@ -796,8 +797,25 @@ export const movePlayer = spacetimedb.reducer(
 
     // World bounds: 64000x64000 px (2km x 2km world), with 32px player half-width buffer.
     // See header for derivation from world_build_config.tiling_streaming.
-    const clampedX = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
-    const clampedY = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
+    const boundedX = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
+    const boundedY = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
+
+    // Speed ceiling on the claimed position. Bounds-clamping alone let a
+    // modified client rewrite this row to anywhere in the disc between calls,
+    // and every proximity gate in this module (chests, vendors, dungeon entry,
+    // melee, cooking) trusts it — see world/moveGuard.ts. Applied above the
+    // castle branch so nav validation runs against the position we will
+    // actually store, and skipped when lastMoveAt is 0 (a row that has not
+    // moved since the column was appended has no baseline to measure from).
+    let clampedX = boundedX;
+    let clampedY = boundedY;
+    if (existing.lastMoveAt > 0n) {
+      const guarded = clampMoveToMaxSpeed(
+        existing.x, existing.y, boundedX, boundedY, nowMicros - existing.lastMoveAt,
+      );
+      clampedX = guarded.x;
+      clampedY = guarded.y;
+    }
 
     // Cheap no-op check BEFORE the castle-nav branch: identical inputs against
     // an already-validated row resolve to the identical row, so bail before

@@ -409,6 +409,13 @@ chest reset (1600 px origin untouched per world-diagnostic §7).
 - **Retarget quality**: 1-clip spike before committing the Quaternius set.
 - **Server fan-out**: E's filtered subscriptions + move-rate + bot load test precede H's
   second dungeon; STDB filtered-SQL support unverified → fallback is coarser scoping.
+- **Movement is client-authoritative**: the client tells the server where it is, and
+  every proximity gate (chests, vendors, dungeon entry, melee, cooking) trusts that row;
+  client-side collision is advisory only. Bounded post-E by a server speed ceiling
+  (`spacetimedb/src/world/moveGuard.ts`) that clamps a claim to what max speed allows
+  since the last accepted move — so a spoofed position costs travel time instead of
+  being free. Not eliminated: the jitter grace still allows roughly 2.5x walking pace,
+  and tightening that needs a carried credit bucket.
 - **Download ledger**: 14→~9 (B)→~10.9+audio (C)→~14.4 (E/F)→~15.9 (G)→~16.6 (H) ≈
   ≤18 MB vs 30 MB cap; CI-enforced from B.
 - **Schedule**: the two late L-rocks (Crypt, Frostspire) are severable — A–F each ship

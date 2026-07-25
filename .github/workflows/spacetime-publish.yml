@@ -131,8 +131,33 @@ jobs:
         # delegates to `spacetimedb-cli` (for version management). We
         # don't need version management in CI — one symlink does the
         # same job without 200 lines of shim.
+        #
+        # Version choice — the CLI must be >= the `spacetimedb` npm runtime
+        # the module is BUILT against (spacetimedb/package-lock.json), because
+        # publish/generate extract the schema by running the built module and
+        # parsing its module def. An older CLI against a newer runtime fails
+        # hard and unhelpfully:
+        #
+        #   Error: invalid bsatn module def
+        #   Caused by: unknown tag 0xd for sum type RawModuleDefV10Section
+        #
+        # (reproduced locally with CLI 2.2.0 against runtime 2.6.1). The
+        # reverse — newer CLI, older runtime — is fine. The old v2.2.0 pin
+        # here sat exactly on that edge: `spacetimedb` is declared as ^2.2.0,
+        # so any lockfile refresh inside the caret would have silently broken
+        # publishing. Pinning the CLI ahead of the runtime removes that.
+        #
+        # 2.7.x also matches what `npm run generate` uses (CLI 2.7 dropped
+        # --server/--database and reads local module source), so the schema CI
+        # publishes and the schema the committed bindings describe come from
+        # one toolchain. Verified before bumping: bindings generated at 2.2.0
+        # and at 2.7.0 are byte-identical apart from the version stamp, so
+        # this is not a migration — no column is renamed or retyped.
+        #
+        # NB: the v2.7.0 tag carries no release assets; v2.7.0-hotfix3 is the
+        # published 2.7.0 build. Check the asset exists before bumping again.
         env:
-          SPACETIMEDB_VERSION: v2.2.0  # match the version Aurisar's local CLI ships
+          SPACETIMEDB_VERSION: v2.7.0-hotfix3
         run: |
           mkdir -p "$HOME/.local/bin"
           curl -fsSL -o /tmp/spacetime.tar.gz \
