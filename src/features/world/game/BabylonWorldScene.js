@@ -25,6 +25,7 @@ import { AshwoodWildlife }   from './AshwoodWildlife.js';
 import { AshwoodWeather }    from './AshwoodWeather.js';
 import { AshwoodVolumetricClouds } from './AshwoodVolumetricClouds.js';
 import { FlickerLights }    from './flickerLights.js';
+import { shouldSendMove }   from './moveSync.js';
 import {
   TileLoader,
   GlbTileProvider,
@@ -863,15 +864,8 @@ const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
 // ── Movement replication pacing (Batch E) ───────────────────────────────────
-// Every accepted movePlayer is one row-delta fanned out to EVERY subscriber —
-// at 100 concurrent players the old 20 Hz was ~2,000 writes/s → ~200,000
-// deltas/s, the O(N²) the plan flags. 80 ms (12.5 Hz) with _lerpRemote's
-// position smoothing on the receiving side is visually indistinguishable and
-// costs 40% of the fan-out. The dead-band only gates STATIONARY resends
-// (walking covers ~1 m per interval at 12 m/s); isMoving flips always send.
-// The server enforces its own 40 ms floor on top (movePlayer lastMoveAt).
-const MOVE_SEND_INTERVAL_MS = 80;
-const MOVE_SEND_DEADBAND_M  = 0.1;
+// Move-send policy (rate, dead-band, and the guard-reconcile re-send) lives in
+// moveSync.js so it can be tested without standing up a scene.
 
 // ── Crowd gating (Batch E) ───────────────────────────────────────────────────
 // Sized for the ~50-100 concurrent target. Remote avatars beyond the animation
@@ -921,6 +915,7 @@ export class BabylonWorldScene {
     this._myIdentity    = null;
     this._keys          = {};
     this._lastPos       = { x: 0, z: 0 };
+    this._serverPos     = null;   // last position the server stored for us (px)
     this._lastMoving    = false;
     this._lastSentAt    = 0;
     this._chatOpen      = false;
@@ -2654,15 +2649,31 @@ export class BabylonWorldScene {
     this._lastCamWritten = write;
   }
 
+  /**
+   * How far the server's stored row sits from the position we last claimed —
+   * i.e. how much the server's move guard shortened our step. 0 when converged
+   * or not yet known. See moveSync.js for why this drives a re-send.
+   */
+  _serverOffsetPx(sentX, sentY) {
+    if (!this._serverPos) return 0;
+    return Math.max(Math.abs(this._serverPos.x - sentX),
+                    Math.abs(this._serverPos.y - sentY));
+  }
+
   _syncStdb() {
     const now = Date.now();
-    if (now - this._lastSentAt < MOVE_SEND_INTERVAL_MS) return;
-
     const { x, z } = this._local.root.position;
     const dx = x - this._lastPos.x;
     const dz = z - this._lastPos.z;
 
-    if (Math.sqrt(dx * dx + dz * dz) > MOVE_SEND_DEADBAND_M || this._local.isMoving !== this._lastMoving) {
+    if (shouldSendMove({
+      sinceLastSendMs: now - this._lastSentAt,
+      movedM:          Math.sqrt(dx * dx + dz * dz),
+      isMoving:        this._local.isMoving,
+      wasMoving:       this._lastMoving,
+      serverOffsetPx:  this._serverOffsetPx(toStdb(x), toStdb(z)),
+      alive:           this._localHp > 0,
+    })) {
       const floorYM = (this._castle?.isInside() || this._localDungeonInstanceId > 0n)
         ? this._local.root.position.y
         : 0;
@@ -2733,6 +2744,10 @@ export class BabylonWorldScene {
   _applyLocalPlayerUpdate(row) {
     this._localHp    = row.hp ?? this._localMaxHp;
     this._localMaxHp = row.maxHp ?? this._localMaxHp;
+    // Not applied to the avatar (still client-authoritative, see above) — kept
+    // only so _syncStdb can tell when the server's move guard left the row
+    // behind our claim and re-send until it converges.
+    this._serverPos  = { x: row.x, y: row.y };
 
     const now = (typeof BigInt === 'function' ? BigInt(Date.now()) * 1000n : 0n);
     const isDead = (row.hp ?? this._localMaxHp) <= 0 ||
