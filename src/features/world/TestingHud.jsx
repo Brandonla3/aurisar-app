@@ -26,11 +26,13 @@ const BAKE_SIZE = 512;             // terrain bake resolution
 // getPose().yaw is atan2(forward.x, forward.z), so yaw 0 faces +z — which is
 // NORTH (see worldSpace.js). This used to label yaw 0 'S', which is why the
 // wolf quests' "just up the north road" sent players the opposite way.
-const COMPASS_POINTS = [
+// Exported for orientation tests. yaw = atan2(fwd.x, fwd.z) increases
+// CLOCKWISE on a north-up map, so facing east (+x) is yaw +90.
+export const COMPASS_POINTS = [
   { label: 'N', yawDeg:    0 },
-  { label: 'W', yawDeg:   90 },
+  { label: 'E', yawDeg:   90 },
   { label: 'S', yawDeg:  180 },
-  { label: 'E', yawDeg:  -90 },
+  { label: 'W', yawDeg:  -90 },
 ];
 
 export default function TestingHud({ sceneRef, visible = true, mapData = null }) {
@@ -324,7 +326,7 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes =
   // Player — triangle at center, rotated to camera yaw
   ctx.save();
   ctx.translate(halfMap, halfMap);
-  ctx.rotate(-pose.yaw);
+  ctx.rotate(pose.yaw); // clockwise yaw on a north-up canvas — NOT negated
   ctx.fillStyle = 'rgba(120, 200, 255, 0.95)';
   ctx.strokeStyle = 'rgba(10, 20, 30, 0.9)';
   ctx.lineWidth = 1;

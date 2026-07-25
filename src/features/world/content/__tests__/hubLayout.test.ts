@@ -73,12 +73,21 @@ describe('Oakrest hub layout', () => {
   });
 
   it('no prop collider blocks a carriageway near the hub', () => {
-    for (const c of P.colliders) {
-      if (Math.hypot(c.x, c.z) > 45) continue;
-      const d = roadDist(c.x, c.z);
-      expect(d, `${c.label} at (${c.x.toFixed(1)},${c.z.toFixed(1)}) is ${d.toFixed(1)}m from a road centreline`)
-        .toBeGreaterThanOrEqual(HALF_W);
+    // Centre-distance alone let a 7x6 house pass while its corner stood in
+    // the road (review H5). Two checks: the centre must clear the road by the
+    // collider's REACH, and — exact and cheap — sample the carriageway itself
+    // with blocked(): no sampled road point may be solid.
+    let solid = 0;
+    const offenders: string[] = [];
+    for (const curve of wg.trailCurves) {
+      for (const [px, pz] of curve) {
+        if (Math.hypot(px, pz) > 45) continue;
+        for (const [ox, oz] of [[0, 0], [HALF_W - 0.1, 0], [-(HALF_W - 0.1), 0], [0, HALF_W - 0.1], [0, -(HALF_W - 0.1)]]) {
+          if (P.blocked(px + ox, pz + oz)) { solid++; offenders.push(`(${(px + ox).toFixed(1)},${(pz + oz).toFixed(1)})`); }
+        }
+      }
     }
+    expect(solid, `solid carriageway samples: ${offenders.slice(0, 6).join(' ')}`).toBe(0);
   });
 
   it('the respawn point stays open with margin', () => {

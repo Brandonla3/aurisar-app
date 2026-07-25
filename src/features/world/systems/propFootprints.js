@@ -48,12 +48,20 @@ export const PROP_FOOTPRINTS = {
   mud_hut:         { uniform: 5.5 },
   mud_hut_small:   { uniform: 1.2, local: [1.8, 1.2] },
   ruin_column:     { uniform: 1.6 },
-  timber_pillar:   { uniform: 1.1 },
+  timber_pillar:   { uniform: 1.0 },  // matches PropsSystem's literal exactly
   ore_rocks:       { uniform: 1.4, local: [2.4, 1.4] },
   dock_platform:   { uniform: 2.4, walkable: true },
   dock_hut:        { fit: [3.4, 3.0, 3.0], local: [2.8, 2.4] },
   rowboat:         { uniform: 2.6, walkable: true },
 };
+
+/** PropsSystem's deterministic per-position hash (frac(sin dot-noise)) —
+ *  reproduced here so colliders can match rand-scaled props exactly. Keep in
+ *  step with PropsSystem.rand. */
+export function propRand(x, z) {
+  const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+  return h - Math.floor(h);
+}
 
 /** Fence modules are laid every FENCE_MODULE_M along the segment. */
 export const FENCE_MODULE_M = 2.35;
@@ -117,7 +125,10 @@ export function buildPropColliders(props) {
     push(circOf(key, c.x, c.z, PROP_FOOTPRINTS[key].uniform), key);
   }
   for (const h of props.mudHuts ?? []) {
-    push(circOf('mud_hut', h.x, h.z, PROP_FOOTPRINTS.mud_hut.uniform), 'mud_hut');
+    // PropsSystem scales huts by 5.5 + rand(x,z)*1.5 with its deterministic
+    // hash; reproduce it so the collider matches the rendered hut, not the
+    // minimum one.
+    push(circOf('mud_hut', h.x, h.z, PROP_FOOTPRINTS.mud_hut.uniform + propRand(h.x, h.z) * 1.5), 'mud_hut');
     const s = PROP_FOOTPRINTS.mud_hut_small;
     push(circOf('mud_hut_small', h.x + s.local[0], h.z + s.local[1], s.uniform), 'mud_hut_small');
   }
@@ -125,7 +136,11 @@ export function buildPropColliders(props) {
     const cols = r.columns ?? 8;
     for (let i = 0; i < cols; i++) {
       const a = (i / cols) * Math.PI * 2;
-      push(circOf('ruin_column', r.x + Math.cos(a) * r.ringR, r.z + Math.sin(a) * r.ringR,
+      // PropsSystem places columns at (x + sin a * R, z + cos a * R) — match
+      // it exactly; the cos/sin transposition put every collider on a
+      // DISJOINT ring from the rendered pillars (all walk-through, with
+      // invisible walls elsewhere).
+      push(circOf('ruin_column', r.x + Math.sin(a) * r.ringR, r.z + Math.cos(a) * r.ringR,
         PROP_FOOTPRINTS.ruin_column.uniform), 'ruin_column');
     }
   }

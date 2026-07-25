@@ -21,8 +21,8 @@
  *
  *  • "Already inside can always walk out." A collider added under a standing
  *    player must never trap them. This matters more here than in the castle:
- *    the server respawns every death to exactly (0,0), and the well at (0,2)
- *    leaves only 0.20 m of clearance, so this escape is load-bearing on a
+ *    the server respawns every death to exactly (0,0), and the well beside the spawn
+ *    leaves well under a metre of clearance, so this escape is load-bearing on a
  *    routine path, not an edge case.
  *
  *  • Geometry comes from the shared table in propFootprints.js, so a prop and
@@ -34,8 +34,12 @@
 
 import { buildPropColliders } from './propFootprints.js';
 
-/** Matches castlePlan's PLAYER_R so the two systems feel identical. */
-export const PLAYER_R = 0.35;
+import { PLAYER_R as CASTLE_PLAYER_R } from '../castle/castlePlan.js';
+
+/** THE player radius — re-exported from castlePlan so the two collision
+ *  systems can never drift apart (a copied literal here passed its test
+ *  forever regardless of the castle's value). */
+export const PLAYER_R = CASTLE_PLAYER_R;
 
 /** Spatial hash cell size (m). Props cluster in settlements, so a coarse grid
  *  keeps the per-move candidate set at a handful without a build-time cost. */
@@ -61,8 +65,14 @@ export function createPropColliders(props) {
     } else {
       c._hw = c.w / 2 + PLAYER_R;
       c._hd = c.d / 2 + PLAYER_R;
-      c._cos = Math.cos(-(c.rot ?? 0));
-      c._sin = Math.sin(-(c.rot ?? 0));
+      // Inverse of localToWorld's left-handed rotation [[c,s],[-s,c]] is its
+      // transpose [[c,-s],[s,c]] — so cache cos/sin of +rot and apply the
+      // TRANSPOSED form in blocked(). The old code cached cos/sin of -rot and
+      // applied the forward form, which re-applies the rotation instead of
+      // inverting it: collision was MIRRORED on every non-cardinal building
+      // (caught by review; invisible at the pi/2 the original test used).
+      c._cos = Math.cos(c.rot ?? 0);
+      c._sin = Math.sin(c.rot ?? 0);
     }
     c._reach = c.kind === 'circle' ? c.r + PLAYER_R : Math.hypot(c._hw, c._hd);
   }
@@ -96,6 +106,7 @@ export function createPropColliders(props) {
         // Into the rect's local frame, then a plain AABB test.
         const lx = dx * c._cos - dz * c._sin;
         const lz = dx * c._sin + dz * c._cos;
+        // (transposed inverse: lx = c*dx - s*dz, lz = s*dx + c*dz)
         if (Math.abs(lx) < c._hw && Math.abs(lz) < c._hd) return true;
       }
     }

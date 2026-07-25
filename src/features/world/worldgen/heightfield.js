@@ -186,7 +186,11 @@ export function createHeightfield(config, zones) {
    * footprint reaches the lake's influence radius.
    */
   function lowlandShelf(x, z) {
-    if (zones.inMountain(x, z)) return null;
+    // Gate on the SAME boundary mtnH carves to (mountain.r), not on
+    // zones.inMountain (mountain.margin, 12 m wider) — gating on margin left
+    // an annulus where neither function shaped terrain, which put a ~5 m
+    // cliff and a sunken moat across the Rustvein Dig shelf footprint.
+    if (Math.hypot(x - M.x, z - M.z) < M.r) return null;
     const p = plateauInfo(x, z);
     return p.weight > 0 ? p : null;
   }

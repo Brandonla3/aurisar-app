@@ -147,3 +147,26 @@ describe('propFootprints geometry', () => {
     expect(PLAYER_R).toBe(0.35);
   });
 });
+
+describe('rotation inverse (review H1 regression)', () => {
+  // The original rotation test used pi/2, the one angle where a sign error in
+  // the inverse is invisible (symmetric extents). Pin a non-cardinal angle
+  // using localToWorld — the pinned-correct forward transform — as the oracle:
+  // a point just inside a local corner must be blocked; its mirror must not.
+  it('agrees with localToWorld at rot -0.4 (the real NE house)', () => {
+    const P = createPropColliders({
+      buildings: [{ kind: 'house', x: 20, z: 12, w: 7, d: 6, rot: -0.4 }],
+    });
+    const inside = localToWorld(20, 12, -0.4, 3.0, 2.5);   // inside 3.5 x 3 extents
+    const outside = localToWorld(20, 12, -0.4, 4.2, 3.7);  // past both + PLAYER_R
+    expect(P.blocked(inside.x, inside.z)).toBe(true);
+    expect(P.blocked(outside.x, outside.z)).toBe(false);
+    // The MIRRORED bug blocked the reflection instead — assert a point the old
+    // code wrongly blocked (reflect local z) is open.
+    const mirrored = localToWorld(20, 12, 0.4, 3.0, 2.5);
+    const dx = mirrored.x - 20, dz = mirrored.z - 12;
+    if (Math.hypot(dx, dz) > Math.hypot(3.5 + 0.35, 3 + 0.35)) {
+      expect(P.blocked(mirrored.x, mirrored.z)).toBe(false);
+    }
+  });
+});

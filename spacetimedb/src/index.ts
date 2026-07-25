@@ -799,6 +799,17 @@ export const movePlayer = spacetimedb.reducer(
     const clampedX = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
     const clampedY = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
 
+    // Cheap no-op check BEFORE the castle-nav branch: identical inputs against
+    // an already-validated row resolve to the identical row, so bail before
+    // paying pxToWorldM/isInCastleInterior/surfaceAt for a resend. (The full
+    // post-computation dead-band below still catches zoneId/floor no-ops.)
+    if (
+      existing.x === clampedX && existing.y === clampedY &&
+      existing.direction === direction % 4 && existing.isMoving === isMoving
+    ) {
+      return;
+    }
+
     // Castle Ashwood interior: reject moves into nav-blocked columns (walls,
     // furniture footprints baked into emitted nav bitmaps). Outside the
     // interior footprint this returns null and we fall through to normal px clamp.
@@ -997,7 +1008,12 @@ export const sendChat = spacetimedb.reducer(
     const rows = [...ctx.db.chatMessage.iter()];
     if (rows.length > CHAT_MAX_ROWS) {
       rows.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-      for (const old of rows.slice(0, rows.length - CHAT_MAX_ROWS)) {
+      // Bounded per call: delete-by-value is O(table) each, so an unbounded
+      // drain of a large pre-cap backlog could blow the reducer budget and
+      // abort the transaction INCLUDING the insert — chat would fail closed
+      // and retry the same doomed work forever. 50/call converges to the same
+      // steady state with no cliff.
+      for (const old of rows.slice(0, Math.min(rows.length - CHAT_MAX_ROWS, 50))) {
         ctx.db.chatMessage.delete(old);
       }
     }

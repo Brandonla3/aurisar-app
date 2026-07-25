@@ -153,7 +153,7 @@ export const QUESTS: QuestDef[] = [
     turnInNpcId: 'marshal_halwin',
     requiresQuestId: 'q_bandits',
     minLevel: 5,
-    text: 'Gorrak the Ruthless has barricaded himself in the treasury vault deep within Castle Ashwood. Enter through the gate on the east side, fight your way to the royal vault on the upper floors, and end him, $N.',
+    text: 'Gorrak the Ruthless has barricaded himself in the treasury vault deep within Castle Ashwood. Take the east road to the castle and enter by the front gate, fight your way to the royal vault on the upper floors, and end him, $N.',
     completionText: 'Gorrak is dead? Then the valley is free of his shadow. You have done the town a great service.',
     objectives: [
       {

@@ -217,7 +217,7 @@ export default function WorldMap({ mapData, sceneRef, onClose }) {
         const e = clampToEdge(p.px, p.py, size, size);
         ctx.save();
         ctx.translate(e.x, e.y);
-        ctx.rotate(e.clamped ? e.angle + Math.PI / 2 : -pose.yaw);
+        ctx.rotate(e.clamped ? e.angle + Math.PI / 2 : pose.yaw); // clockwise yaw, north-up
         ctx.fillStyle = 'rgba(120, 200, 255, 0.98)';
         ctx.strokeStyle = 'rgba(10, 20, 30, 0.95)';
         ctx.lineWidth = 1.5;

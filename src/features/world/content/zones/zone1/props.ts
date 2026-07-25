@@ -15,13 +15,13 @@ export interface RotPos extends SimplePos { rot: number }
 
 export const ZONE1_PROPS = {
   buildings: [
-    { kind: 'house',  x: 14,  z: 10,  w: 7, d: 6, rot: -0.4 },
-    { kind: 'house',  x: -15, z: 5,   w: 6, d: 5, rot: 0.5 },
+    { kind: 'house',  x: 20,  z: 12,  w: 7, d: 6, rot: -0.4 },
+    { kind: 'house',  x: -15, z: 2,   w: 6, d: 5, rot: 0.5 },
     { kind: 'inn',    x: 16,  z: -8,  w: 6, d: 7, rot: 2.4 },
     { kind: 'chapel', x: -10, z: -19, w: 5, d: 7, rot: 0.9 },
   ] as BuildingProp[],
 
-  wells: [{ x: 0, z: 3.6 }] as SimplePos[],
+  wells: [{ x: -2.6, z: 3.6 }] as SimplePos[],
 
   stalls: [
     { x: -12.5, z: 1.5, rot: Math.PI / 2 },

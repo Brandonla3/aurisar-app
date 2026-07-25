@@ -145,6 +145,7 @@ export class CharacterAvatar {
     // per-frame work stops. Mirrors MobAnimator.setSuspended.
     this._animSuspended = false;
     this._labelPlane    = null;
+    this._nameplateVisible = true;
 
     // Box fallback state
     this._useFallback   = false;
@@ -422,9 +423,20 @@ export class CharacterAvatar {
     const next = !!on;
     if (next === this._animSuspended) return;
     this._animSuspended = next;
-    if (next) this._animCtl?.suspend();
-    else this._animCtl?.resume();
+    if (next) {
+      this._animCtl?.suspend();
+    } else {
+      this._animCtl?.resume();
+      // Reset the displacement-speed measurement: the first post-resume frame
+      // otherwise divides the WHOLE gated drift by one dt (~0.6 m reads as
+      // ~36 m/s) and pins the run blend for a beat (review M12). _lastX=null
+      // is the measurer's own first-frame sentinel.
+      this._lastX = null;
+      this._lastZ = null;
+      this._speedMps = 0;
+    }
     if (this._labelPlane) this._labelPlane.setEnabled(!next);
+    this._nameplateVisible = !next;
   }
 
   /** True while crowd-gated. */
@@ -435,7 +447,10 @@ export class CharacterAvatar {
    * nameplate cap hides labels on avatars that are still animating.
    */
   setNameplateVisible(on) {
-    if (this._labelPlane) this._labelPlane.setEnabled(!!on && !this._animSuspended);
+    const next = !!on && !this._animSuspended;
+    if (next === this._nameplateVisible) return; // idempotent — called per-frame
+    this._nameplateVisible = next;
+    if (this._labelPlane) this._labelPlane.setEnabled(next);
   }
 
   update(dt) {

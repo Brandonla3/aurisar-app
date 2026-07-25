@@ -164,7 +164,7 @@ add(`<g id="props">`);
 for (const c of colliders) {
   if (c.kind === 'rect') {
     const w = M(c.w), d = M(c.d);
-    add(`<g transform="translate(${PX(c.x).toFixed(1)},${PY(c.z).toFixed(1)}) rotate(${(-c.rot * 180 / Math.PI).toFixed(2)})">`
+    add(`<g transform="translate(${PX(c.x).toFixed(1)},${PY(c.z).toFixed(1)}) rotate(${(c.rot * 180 / Math.PI).toFixed(2)})">`
       + `<rect x="${(-w / 2).toFixed(1)}" y="${(-d / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${d.toFixed(1)}" `
       + `fill="rgba(180,80,60,0.30)" stroke="#b4503c" stroke-width="1.5"/></g>`);
   } else {

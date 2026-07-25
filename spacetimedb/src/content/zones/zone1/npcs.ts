@@ -29,7 +29,7 @@ export const NPCS: NpcDef[] = [
     zoneId: 1,
     name: 'Trader Pell',
     title: 'Provisioner',
-    pos: { x: -13, z: -1 },
+    pos: { x: -12.6, z: -1.4 },
     facingRad: Math.PI / 2,
     questIds: ['q_supplies'],
     greeting: 'Fresh bread, clean water, fair prices. What can I get you?',
