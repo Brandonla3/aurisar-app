@@ -63,6 +63,14 @@ export function propRand(x, z) {
   return h - Math.floor(h);
 }
 
+/** The mine's nine boulders: [lx, lz, uniform] in the mine's local frame.
+ *  Replicated from PropsSystem's rocks table — keep in step. */
+export const MINE_ROCKS = [
+  [0, -3.0, 2.6], [-2.7, -2.0, 1.9], [2.7, -2.2, 2.0],
+  [-1.6, -1.0, 1.2], [1.8, -0.9, 1.1], [0.3, -4.2, 2.3],
+  [-1.4, -3.4, 1.8], [1.5, -3.2, 1.7], [0, -1.6, 1.4],
+];
+
 /** Fence modules are laid every FENCE_MODULE_M along the segment. */
 export const FENCE_MODULE_M = 2.35;
 
@@ -93,7 +101,9 @@ export function buildPropColliders(props) {
     out.push({ kind: 'rect', label: b.kind, x: b.x, z: b.z, rot: b.rot ?? 0, w: b.w, d: b.d });
   }
   for (const w of props.wells ?? []) {
-    push(rectOf('well', w.x, w.z, 0, PROP_FOOTPRINTS.well.fit), 'well');
+    // PropsSystem renders the (non-square) well at rand(x,z)*PI — the collider
+    // must spin with it or corners clip/block wrongly at non-cardinal angles.
+    push(rectOf('well', w.x, w.z, propRand(w.x, w.z) * Math.PI, PROP_FOOTPRINTS.well.fit), 'well');
   }
   for (const s of props.stalls ?? []) {
     const rot = s.rot ?? 0;
@@ -153,12 +163,25 @@ export function buildPropColliders(props) {
     const o = PROP_FOOTPRINTS.ore_rocks;
     const op = localToWorld(m.x, m.z, rot, o.local[0], o.local[1]);
     push(circOf('ore_rocks', op.x, op.z, o.uniform), 'ore_rocks');
+    // The nine mine boulders (kept in step with PropsSystem's rocks table):
+    // [lx, lz, uniform]. Solid-looking 1-2.6 m rocks players were walking
+    // through. Rotation is irrelevant for a circle.
+    for (const [lx, lz, u] of MINE_ROCKS) {
+      const rp = localToWorld(m.x, m.z, rot, lx, lz);
+      push(circOf('mine_rock', rp.x, rp.z, u), 'mine_rock');
+    }
   }
   for (const d of props.docks ?? []) {
     const rot = d.rot ?? 0;
     const h = PROP_FOOTPRINTS.dock_hut;
     const hp = localToWorld(d.x, d.z, rot, h.local[0], h.local[1]);
     out.push({ kind: 'rect', label: 'dock_hut', x: hp.x, z: hp.z, rot, w: h.fit[0], d: h.fit[2] });
+    // Dock clutter rendered solid: barrel at local (1.6,0.6) u0.9, crate at
+    // (0.7,1.4) u1.0 (PropsSystem's dock branch — keep in step).
+    const db = localToWorld(d.x, d.z, rot, 1.6, 0.6);
+    push(circOf('dock_barrel', db.x, db.z, 0.9), 'crate_barrel');
+    const dc = localToWorld(d.x, d.z, rot, 0.7, 1.4);
+    push(circOf('dock_crate', dc.x, dc.z, 1.0), 'crate');
   }
   return out;
 }
