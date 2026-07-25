@@ -860,6 +860,17 @@ const DUNGEON_ENTRANCE      = Object.freeze({ x: LANDMARKS.hollow_crypt.x, z: LA
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
+// ── Crowd gating (Batch E) ───────────────────────────────────────────────────
+// Sized for the ~50-100 concurrent target. Remote avatars beyond the animation
+// radius, or past the per-tier nearest-N cap, hold their pose (see
+// CharacterAvatar.setSuspended) while still tracking their server position.
+const REMOTE_ANIM_RADIUS_SQ = 45 * 45;   // matches the mob gate — one legible number
+// Nameplates are capped harder than animation: each is a DynamicTexture plus an
+// uncached material, drawn in an overlay rendering group with depth writes off,
+// so it is never occlusion-culled and costs a draw at any distance.
+const REMOTE_NAMEPLATE_CAP = 20;
+const REMOTE_NAMEPLATE_RADIUS_SQ = 35 * 35;
+
 // Chest pickup: walk within this radius of an unopened chest to loot it.
 const CHEST_OPEN_DIST_SQ = 2.5 * 2.5;
 const CHEST_SCAN_MS      = 250; // how often to scan (chest count is small)
@@ -882,6 +893,7 @@ export class BabylonWorldScene {
     this._dyingMobs     = new Set(); // detached entries playing their death out (see _removeMob)
     this._deathTimers   = new Set(); // pending deferred-dispose timeouts
     this._mobScratch    = [];        // reusable per-frame sort buffer (_updateMobs)
+    this._remoteScratch = [];        // reusable per-frame sort buffer (_updateRemotes)
     this._campfires     = new Map(); // campfireId(BigInt) -> { root, light, ps, ph }
     // Shared, cached mob materials. Mob palettes are per-type/family and never
     // mutated per-instance, so one StandardMaterial per name serves every mob of
@@ -1798,10 +1810,7 @@ export class BabylonWorldScene {
     this._trackCamera();
     this._syncStdb();
 
-    this._remotePlayers.forEach(rp => {
-      this._lerpRemote(rp, dt);
-      rp.update(dt);
-    });
+    this._updateRemotes(dt);
 
     // Mobs: smoothing, facing, skeletal/fallback life, HP drain, gating.
     this._updateMobs(dt);
@@ -1812,6 +1821,53 @@ export class BabylonWorldScene {
 
     // Mob HP-bar planes use BILLBOARDMODE_ALL, so they already face the camera
     // in world space every frame — the old per-frame parent lookAt was redundant.
+  }
+
+  // Per-frame remote-player presentation, distance-gated exactly like mobs.
+  //
+  // Remote MPFB avatars — not mobs — are the dominant skeletal cost at 50-100
+  // concurrent players: each one is a full rigged human with a blend tree, a
+  // terrain resolve and a weapon-swing tick. This loop used to be a flat
+  // forEach over every remote, so a crowded hub paid all of it every frame.
+  //
+  // Position lerp always runs (a gated avatar is still exactly where the server
+  // says it is); only animation freezes. Nameplates get a tighter nearest-N cap
+  // than animation because each one is its own DynamicTexture + material drawn
+  // in an overlay group that is never occlusion-culled.
+  _updateRemotes(dt) {
+    const p = this._local?.root?.position;
+    const list = this._remoteScratch;
+    list.length = 0;
+
+    // No local avatar yet (still loading): keep everyone lerping, ungated —
+    // there is no reference point to sort by.
+    if (!p) {
+      this._remotePlayers.forEach((rp) => {
+        this._lerpRemote(rp, dt);
+        rp.setSuspended?.(false);
+        rp.update(dt);
+      });
+      return;
+    }
+
+    this._remotePlayers.forEach((rp) => {
+      const rpos = rp?.root?.position;
+      rp._distSq = rpos ? (rpos.x - p.x) ** 2 + (rpos.z - p.z) ** 2 : Infinity;
+      list.push(rp);
+    });
+    list.sort((a, b) => a._distSq - b._distSq);
+
+    const animCap = this._qualityTier === 'mobile' ? 8
+                  : this._qualityTier === 'low'    ? 14 : 20;
+
+    for (let i = 0; i < list.length; i++) {
+      const rp = list[i];
+      // Lerp first: gating must never desync where a remote actually stands.
+      this._lerpRemote(rp, dt);
+      rp.setSuspended?.(i >= animCap || rp._distSq > REMOTE_ANIM_RADIUS_SQ);
+      rp.setNameplateVisible?.(i < REMOTE_NAMEPLATE_CAP && rp._distSq <= REMOTE_NAMEPLATE_RADIUS_SQ);
+      rp.update(dt);
+    }
   }
 
   // Per-frame mob presentation. Skeletal playback is the real CPU cost at
