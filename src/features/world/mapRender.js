@@ -41,8 +41,9 @@ export function buildWorldMapCanvas(worldgen, { size, bounds }) {
   const out = { r: 0, g: 0, b: 0 };
 
   for (let py = 0; py < size; py++) {
-    // canvas-y maps to world-z (north = top = minZ)
-    const wz = minZ + ((py + 0.5) / size) * spanZ;
+    // canvas-y maps to world-z, INVERTED: +z is north, and north is up.
+    // See worldSpace.js for why the convention is +z = north.
+    const wz = maxZ - ((py + 0.5) / size) * spanZ;
     for (let px = 0; px < size; px++) {
       const wx = minX + ((px + 0.5) / size) * spanX;
       const i = (py * size + px) * 4;
@@ -67,13 +68,16 @@ export function buildWorldMapCanvas(worldgen, { size, bounds }) {
   }
   ctx.putImageData(img, 0, 0);
 
+  // py is inverted: +z is north and north is up, so world maxZ maps to py 0.
+  // Anything that derives canvas corners from these must remember that a
+  // larger z gives a SMALLER py (see TestingHud's minimap crop).
   const worldToPx = (x, z) => ({
     px: ((x - minX) / spanX) * size,
-    py: ((z - minZ) / spanZ) * size,
+    py: ((maxZ - z) / spanZ) * size,
   });
   const pxToWorld = (px, py) => ({
     x: minX + (px / size) * spanX,
-    z: minZ + (py / size) * spanZ,
+    z: maxZ - (py / size) * spanZ,
   });
 
   return { canvas, bounds, size, worldToPx, pxToWorld };

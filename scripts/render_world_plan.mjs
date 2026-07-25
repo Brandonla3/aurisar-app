@@ -90,12 +90,11 @@ const zone1Props = readZone1Props();
 const colliders = buildPropColliders(zone1Props);
 
 // ── projection ──────────────────────────────────────────────────────────────
-// NOTE: +z is drawn DOWNWARD here, matching the current renderer convention
-// (north = -z = top). If/when the axis convention flips, flip only this pair
-// and the compass rose below — everything else is expressed through them.
+// +z is north and north is up, so z is drawn INVERTED — matching
+// mapRender.worldToPx. Everything else is expressed through this pair.
 const S = SIZE / (2 * R);
 const PX = (x) => (x - cx) * S + SIZE / 2;
-const PY = (z) => (z - cz) * S + SIZE / 2;
+const PY = (z) => SIZE / 2 - (z - cz) * S;
 const M = (m) => m * S; // meters → px
 
 const parts = [];
@@ -207,18 +206,14 @@ add(`<g transform="translate(24,${SIZE - 34})">`
   + `<rect x="-6" y="-20" width="${(M(barM) + 90).toFixed(0)}" height="34" fill="rgba(10,12,18,0.72)" rx="4"/>`
   + `<line x1="0" y1="0" x2="${M(barM).toFixed(1)}" y2="0" stroke="#fff" stroke-width="3"/>`
   + `<text x="${(M(barM) + 8).toFixed(1)}" y="4" fill="#fff" font-family="ui-monospace,monospace" font-size="13">${barM} m</text></g>`);
-// Compass. Up on this plan is -z. Which cardinal that IS depends on the axis
-// convention, and the repo currently disagrees with itself (worldSpace.js and
-// the in-game compass say -z = north; the content, quest prose and the zone-2
-// gate's own name say +z = north). Label the axis, which is unambiguous, and
-// note the compass reading rather than silently picking a side.
+// Compass. +z is north (worldSpace.js) and north is up, so this agrees with
+// both 2D maps and the in-game compass strip.
 add(`<g transform="translate(${SIZE - 58},64)">`
   + `<circle r="34" fill="rgba(10,12,18,0.75)"/>`
   + `<line x1="0" y1="22" x2="0" y2="-18" stroke="#fff" stroke-width="2"/>`
   + `<path d="M0,-24 l5,8 l-10,0 z" fill="#fff"/>`
-  + `<text x="0" y="-27" fill="#fff" font-family="ui-monospace,monospace" font-size="12" text-anchor="middle">-z</text>`
-  + `<text x="0" y="34" fill="#9aa" font-family="ui-monospace,monospace" font-size="10" text-anchor="middle">+z</text>`
-  + `<text x="0" y="50" fill="#ffd54a" font-family="ui-monospace,monospace" font-size="10" text-anchor="middle">compass: N</text></g>`);
+  + `<text x="0" y="-27" fill="#fff" font-family="ui-monospace,monospace" font-size="13" font-weight="700">N</text>`
+  + `<text x="0" y="34" fill="#9aa" font-family="ui-monospace,monospace" font-size="10" text-anchor="middle">+z</text></g>`);
 add(`<text x="16" y="26" fill="#fff" font-family="ui-monospace,monospace" font-size="15" font-weight="700">Aurisar — ${esc(NAME)}  ·  centre (${cx}, ${cz})  ·  r ${R} m</text>`);
 add(`</g>`);
 

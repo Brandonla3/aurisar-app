@@ -1717,7 +1717,7 @@ export class BabylonWorldScene {
   }
 
   // ── Dungeon entrance ───────────────────────────────────────────────────────
-  // Gate sits at the end of the north path (z = -37). Two stone pillars, a
+  // Gate sits at the end of the SOUTH road (z = -37; +z is north). Two pillars, a
   // lintel, and a faintly pulsing portal plane mark the trigger zone.
 
   _buildDungeonEntrance() {
@@ -3020,7 +3020,7 @@ export class BabylonWorldScene {
     if (!p) return null;
     // Camera-relative forward heading: where pressing W would move you,
     // projected onto the XZ plane. atan2(forward.x, forward.z) so 0 = +Z
-    // (south), increases clockwise.
+    // (north), increases clockwise. See worldSpace.js — +z is north.
     let yaw = 0;
     if (this._camera) {
       const fwdX = this._camTarget.x - this._camera.position.x;
