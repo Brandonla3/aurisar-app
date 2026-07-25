@@ -382,7 +382,10 @@ cover; a rare glows on its owner in the hub; no advertised-but-fake content rema
 ### Later phases (noted, per scope lock)
 Zone 2 behind the north pass; Frostspire Halls interior; economy/P2P trading; VAT crowds;
 tree impostors (stays in world-diagnostic Batch 4); KTX2 (gated on texture payload);
-server-side perk validation hardening; baked-tile parity.
+server-side perk validation hardening; baked-tile parity — note the committed
+`public/assets/tiles/T_03_03_*` predate the heightfield and are already disabled
+(`USE_GLB_TILES = false`); E1a's lowland shelves raise the hub and Rustvein inside that
+tile's bounds, so whoever re-enables baking must regenerate from `surfaceY`, not patch.
 
 ## Cut list (deliberate)
 Jump mechanic (no mechanic exists — clip stays baked); upper-body attack masking;
