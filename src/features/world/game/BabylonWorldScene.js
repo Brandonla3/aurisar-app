@@ -862,6 +862,17 @@ const DUNGEON_ENTRANCE      = Object.freeze({ x: LANDMARKS.hollow_crypt.x, z: LA
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
+// ── Movement replication pacing (Batch E) ───────────────────────────────────
+// Every accepted movePlayer is one row-delta fanned out to EVERY subscriber —
+// at 100 concurrent players the old 20 Hz was ~2,000 writes/s → ~200,000
+// deltas/s, the O(N²) the plan flags. 80 ms (12.5 Hz) with _lerpRemote's
+// position smoothing on the receiving side is visually indistinguishable and
+// costs 40% of the fan-out. The dead-band only gates STATIONARY resends
+// (walking covers ~1 m per interval at 12 m/s); isMoving flips always send.
+// The server enforces its own 40 ms floor on top (movePlayer lastMoveAt).
+const MOVE_SEND_INTERVAL_MS = 80;
+const MOVE_SEND_DEADBAND_M  = 0.1;
+
 // ── Crowd gating (Batch E) ───────────────────────────────────────────────────
 // Sized for the ~50-100 concurrent target. Remote avatars beyond the animation
 // radius, or past the per-tier nearest-N cap, hold their pose (see
@@ -2645,13 +2656,13 @@ export class BabylonWorldScene {
 
   _syncStdb() {
     const now = Date.now();
-    if (now - this._lastSentAt < 50) return;
+    if (now - this._lastSentAt < MOVE_SEND_INTERVAL_MS) return;
 
     const { x, z } = this._local.root.position;
     const dx = x - this._lastPos.x;
     const dz = z - this._lastPos.z;
 
-    if (Math.sqrt(dx * dx + dz * dz) > 0.04 || this._local.isMoving !== this._lastMoving) {
+    if (Math.sqrt(dx * dx + dz * dz) > MOVE_SEND_DEADBAND_M || this._local.isMoving !== this._lastMoving) {
       const floorYM = (this._castle?.isInside() || this._localDungeonInstanceId > 0n)
         ? this._local.root.position.y
         : 0;
