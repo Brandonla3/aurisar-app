@@ -873,6 +873,18 @@ const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggl
 const MOVE_SEND_INTERVAL_MS = 80;
 const MOVE_SEND_DEADBAND_M  = 0.1;
 
+// Reconcile cadence for the server's move guard (spacetimedb/src/world/
+// moveGuard.ts). The guard clamps an over-speed claim instead of rejecting it,
+// so the row can sit behind the avatar; without a re-send, a player who stops
+// right after a network stall would leave it there and every proximity check
+// would read the stale spot. Slower than the live rate on purpose — a longer
+// gap earns a proportionally bigger allowance, so convergence takes about the
+// same number of calls either way, and a wedged state cannot spam the module.
+// The dead-band is in server px (32 px/m): ~5 cm, well under the guard's own
+// 0.75 m jitter grace, so an accepted position never reads as "behind".
+const MOVE_RECONCILE_INTERVAL_MS = 500;
+const MOVE_RECONCILE_DEADBAND_PX = 1.5;
+
 // ── Crowd gating (Batch E) ───────────────────────────────────────────────────
 // Sized for the ~50-100 concurrent target. Remote avatars beyond the animation
 // radius, or past the per-tier nearest-N cap, hold their pose (see
@@ -921,6 +933,7 @@ export class BabylonWorldScene {
     this._myIdentity    = null;
     this._keys          = {};
     this._lastPos       = { x: 0, z: 0 };
+    this._serverPos     = null;   // last position the server stored for us (px)
     this._lastMoving    = false;
     this._lastSentAt    = 0;
     this._chatOpen      = false;
@@ -2654,6 +2667,26 @@ export class BabylonWorldScene {
     this._lastCamWritten = write;
   }
 
+  /**
+   * True when the server stored a position materially different from the one
+   * we last sent — i.e. the server's move guard shortened our step.
+   *
+   * The guard clamps rather than rejects, so a claim that outruns max speed
+   * still advances the row, just not all the way. Normally the next tick
+   * carries us the rest of the way, but the send below only fires on LOCAL
+   * change: a player who stops right after a network stall would send nothing
+   * further, leaving the row metres behind the avatar with every server-side
+   * proximity check (chests, vendors, NPCs) reading the stale spot. So while
+   * the row disagrees we keep re-sending the same claim until it catches up.
+   */
+  _serverPosBehind(sentX, sentY) {
+    if (!this._serverPos) return false;
+    // Dead players are pinned server-side on purpose — retrying would spin.
+    if (this._localHp <= 0) return false;
+    return Math.abs(this._serverPos.x - sentX) > MOVE_RECONCILE_DEADBAND_PX ||
+           Math.abs(this._serverPos.y - sentY) > MOVE_RECONCILE_DEADBAND_PX;
+  }
+
   _syncStdb() {
     const now = Date.now();
     if (now - this._lastSentAt < MOVE_SEND_INTERVAL_MS) return;
@@ -2662,7 +2695,14 @@ export class BabylonWorldScene {
     const dx = x - this._lastPos.x;
     const dz = z - this._lastPos.z;
 
-    if (Math.sqrt(dx * dx + dz * dz) > MOVE_SEND_DEADBAND_M || this._local.isMoving !== this._lastMoving) {
+    // Re-send at a slower cadence than live movement: a longer gap earns a
+    // bigger allowance from the guard, so convergence costs a handful of
+    // calls either way and this keeps a wedged state from spamming the module.
+    const reconciling =
+      now - this._lastSentAt >= MOVE_RECONCILE_INTERVAL_MS &&
+      this._serverPosBehind(toStdb(x), toStdb(z));
+
+    if (Math.sqrt(dx * dx + dz * dz) > MOVE_SEND_DEADBAND_M || this._local.isMoving !== this._lastMoving || reconciling) {
       const floorYM = (this._castle?.isInside() || this._localDungeonInstanceId > 0n)
         ? this._local.root.position.y
         : 0;
@@ -2733,6 +2773,10 @@ export class BabylonWorldScene {
   _applyLocalPlayerUpdate(row) {
     this._localHp    = row.hp ?? this._localMaxHp;
     this._localMaxHp = row.maxHp ?? this._localMaxHp;
+    // Not applied to the avatar (still client-authoritative, see above) — kept
+    // only so _syncStdb can tell when the server's move guard left the row
+    // behind our claim and re-send until it converges.
+    this._serverPos  = { x: row.x, y: row.y };
 
     const now = (typeof BigInt === 'function' ? BigInt(Date.now()) * 1000n : 0n);
     const isDead = (row.hp ?? this._localMaxHp) <= 0 ||

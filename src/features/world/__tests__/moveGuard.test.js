@@ -139,6 +139,40 @@ describe('every path that writes a position seeds lastMoveAt', () => {
   });
 });
 
+describe('a clamped step cannot wedge the row', () => {
+  // Clamping projects along the straight chord to the claim, which indoors can
+  // cross a wall even when both endpoints are walkable. Two safeguards keep a
+  // shortened step from leaving the row stranded behind the avatar.
+  const server = readFileSync(join(repoRoot, 'spacetimedb/src/index.ts'), 'utf8');
+  const scene = readFileSync(
+    join(repoRoot, 'src/features/world/game/BabylonWorldScene.js'), 'utf8',
+  );
+
+  it('castle nav retries nearer points, and only for a clamped step', () => {
+    const m = server.match(/const CLAMPED_NAV_RETRY_FRACTIONS = \[([^\]]+)\]/);
+    expect(m, 'CLAMPED_NAV_RETRY_FRACTIONS not found').toBeTruthy();
+    const fractions = m[1].split(',').map((s) => Number(s.trim()));
+    // Nearest-to-the-claim first, so the furthest walkable point wins.
+    expect(fractions[0]).toBe(1);
+    expect(fractions).toEqual([...fractions].sort((a, b) => b - a));
+    expect(fractions.every((f) => f > 0 && f <= 1)).toBe(true);
+    // An unclamped claim must keep the strict single-point check, or ordinary
+    // moves into walls would start being partially accepted.
+    expect(server).toContain('guarded.clamped ? CLAMPED_NAV_RETRY_FRACTIONS : [1]');
+  });
+
+  it('the client re-sends while the server row sits behind its claim', () => {
+    // Without this the send only fires on LOCAL change, so a player who stops
+    // right after a stall would strand the row — and every proximity check
+    // would read the stale position for as long as they stood still.
+    expect(scene).toMatch(/_serverPos\s*=\s*\{\s*x:\s*row\.x,\s*y:\s*row\.y\s*\}/);
+    expect(scene).toContain('|| reconciling');
+    expect(scene).toMatch(/_serverPosBehind\(toStdb\(x\), toStdb\(z\)\)/);
+    // Dead players are pinned server-side; retrying them would spin forever.
+    expect(scene).toMatch(/if \(this\._localHp <= 0\) return false;/);
+  });
+});
+
 describe('the ceiling matches the client it is policing', () => {
   it('MAX_MOVE_SPEED_MPS equals BabylonWorldScene._moveLocal speed', () => {
     // The client integrates `speed * dt` with dt in milliseconds, so the
