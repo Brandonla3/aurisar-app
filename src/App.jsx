@@ -8,6 +8,7 @@ import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './u
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, hrRange, scaleWeight, scaleDur } from './utils/xp';
+import { perkAward, applyStoredPerk } from './utils/gearPerks';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec, daysUntil } from './utils/time';
 import { formatXP } from './utils/format';
 import { FS, R, S } from './utils/tokens';
@@ -3198,7 +3199,13 @@ function App() {
     const myRegion = MAP_REGIONS[myRegionIdx];
     const regionBoost = myRegion && (myRegion.boost.muscle === "all" || myRegion.boost.muscle === ex.muscleGroup) ? 1.07 : 1;
     const travelMult = travelActive ? 1.1 : 1;
-    const finalEarned = Math.round(earned * travelMult * regionBoost);
+    const preGearEarned = Math.round(earned * travelMult * regionBoost);
+    // Equipped-gear XP perk (Batch C2): gear boosts real workout XP. Applied
+    // here at the logging seam, layered on top of the honest earned figure
+    // (class/travel/region already in), never inside calcExXP (also the
+    // estimator). No-op unless perk-bearing gear is equipped.
+    const _award = perkAward(preGearEarned, profile.equipPerks, { exId: ex.id, category: ex.category, muscleGroup: ex.muscleGroup });
+    const finalEarned = _award.xp;
     // Capture current state values before clearing UI
     const capturedPendingSoloRemoveId = pendingSoloRemoveId;
     const capturedHrZone = canHaveZone && hrZone || null;
@@ -3221,6 +3228,10 @@ function App() {
           exercise: ex.name,
           icon: ex.icon,
           xp: finalEarned,
+          // Gear XP factor for this row (>1 = boosted); omitted with no perks so
+          // it doesn't bloat the persisted log. baseXp is the pre-gear figure so a
+          // later server recompute can verify/strip without reconstructing it.
+          ...(_award.perkMult !== 1 ? { perkMult: _award.perkMult, baseXp: _award.baseXp } : {}),
           mult,
           reps: rv,
           sets: sv,
@@ -3359,7 +3370,10 @@ function App() {
     const myRegionIdx = getRegionIdx(xpToLevel(profile.xp));
     const myRegion = MAP_REGIONS[myRegionIdx];
     const regionBoost = myRegion && (myRegion.boost.muscle === "all" || myRegion.boost.muscle === ex.muscleGroup) ? 1.07 : 1;
-    const finalEarned = Math.round(earned * (travelActive ? 1.1 : 1) * regionBoost);
+    const preGearEarned = Math.round(earned * (travelActive ? 1.1 : 1) * regionBoost);
+    // Equipped-gear XP perk (Batch C2), layered on top; no-op without gear.
+    const _award = perkAward(preGearEarned, profile.equipPerks, { exId: ex.id, category: ex.category, muscleGroup: ex.muscleGroup });
+    const finalEarned = _award.xp;
     // Show stats popup, then log on confirm
     const synth = {
       name: ex.name,
@@ -3375,6 +3389,7 @@ function App() {
         exercise: ex.name,
         icon: ex.icon,
         xp: finalEarned,
+        ...(_award.perkMult !== 1 ? { perkMult: _award.perkMult, baseXp: _award.baseXp } : {}),
         mult,
         reps: rv,
         sets: sv,
@@ -3752,6 +3767,18 @@ function App() {
     completionAction, setCompletionAction,
     setScheduleWoDate,
   });
+
+  // Batch C2: the world mirrors the player's aggregated equipped-gear
+  // fitnessPerks up here; persist onto the profile (Supabase + localStorage via
+  // storage.js) so workout XP stays boosted even when the world tab is closed.
+  // useWorkoutCompletion reads profile.equipPerks at logging time. Only writes
+  // on an actual change to avoid a persist churn loop.
+  const handleEquipPerksChange = React.useCallback((perks) => {
+    setProfile(p => {
+      if (JSON.stringify(p.equipPerks ?? null) === JSON.stringify(perks ?? null)) return p;
+      return { ...p, equipPerks: perks };
+    });
+  }, [setProfile]);
   function scheduleWorkoutForDate() {
     const wo = _optionalChain([completionModal, 'optionalAccess', _64 => _64.workout]);
     if (!wo || !scheduleWoDate) return;
@@ -3778,15 +3805,25 @@ function App() {
     setScheduleWoDate("");
     showToast(`📅 ${wo.name} scheduled for ${formatScheduledDate(scheduleWoDate)}!`);
   }
-  function calcEntryXP(entry) {
+  // Pure recomputed base XP for an edited entry (no gear perk). null when the
+  // exercise can't be resolved so the caller can fall back to the stored xp.
+  function calcBaseEntryXP(entry) {
     const ex = allExById[entry.exId];
-    if (!ex) return entry.xp;
+    if (!ex) return null;
     const rv = parseInt(entry.reps) || 1,
       sv = parseInt(entry.sets) || 1;
     const effectiveW = parseFloat(entry.weightLbs) || 0;
     const distMi = entry.distanceMi || null;
     const isCardio = ex.category === "cardio";
     return calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi, effectiveW || null, isCardio ? entry.hrZone || null : null);
+  }
+  function calcEntryXP(entry) {
+    const base = calcBaseEntryXP(entry);
+    if (base == null) return entry.xp;
+    // Preserve the gear boost that was active when this entry was logged —
+    // re-apply the stored multiplier rather than stripping it or re-reading
+    // today's loadout. No-op for entries logged without perks.
+    return applyStoredPerk(base, entry.perkMult);
   }
   function openLogEdit(idx) {
     const entry = profile.log[idx];
@@ -3806,9 +3843,15 @@ function App() {
     const oldEntry = profile.log[idx];
     const newXP = calcEntryXP(logEditDraft);
     const xpDiff = newXP - oldEntry.xp;
+    // When the entry carries a gear boost, refresh baseXp to the newly
+    // recomputed pre-gear figure so the stored invariant xp ≈ round(baseXp ×
+    // perkMult) stays true after the edit.
+    const _pm = logEditDraft.perkMult;
+    const _boosted = typeof _pm === "number" && _pm > 1;
     const updatedEntry = {
       ...logEditDraft,
-      xp: newXP
+      xp: newXP,
+      ...(_boosted ? { baseXp: calcBaseEntryXP(logEditDraft) ?? logEditDraft.baseXp } : {})
     };
     const updatedLog = profile.log.map((e, i) => i === idx ? updatedEntry : e);
     // Recalculate running PB from the full updated log
@@ -6254,6 +6297,7 @@ function App() {
           avatarConfig={avatarConfig}
           fitnessXp={profile?.xp ?? 0}
           fitnessXpBaseline={0}
+          onEquipPerksChange={handleEquipPerksChange}
         />
       </React.Suspense>
     )

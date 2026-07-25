@@ -5,6 +5,7 @@ import { _optionalChain, uid, todayStr } from '../utils/helpers';
 import { daysUntil } from '../utils/time';
 import { isMetric, lbsToKg, kgToLbs, miToKm, weightLabel, pctToSlider, sliderToPct } from '../utils/units';
 import { calcPlanXP, calcDayXP, calcExXP, hrRange, checkQuestCompletion, calcExercisePBs, getMuscleColor } from '../utils/xp';
+import { perkAward } from '../utils/gearPerks';
 import { formatXP } from '../utils/format';
 import { S, FS, R } from '../utils/tokens';
 
@@ -185,15 +186,20 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
     let totalXP = 0;
     const entries = [];
     const clsKey = profile.chosenClass;
+    // Equipped-gear XP perk (Batch C2): completing a plan is a real workout log,
+    // so gear boosts its XP too. No-op unless perk-bearing gear is equipped.
+    const equipPerks = profile.equipPerks;
     plan.days.forEach(day => {
       day.exercises.forEach(ex => {
         const exData = allExById[ex.exId];
         if (!exData) return;
-        const earned = calcExXP(ex.exId, ex.sets, ex.reps, clsKey, allExById, null, ex.weightLbs || null, null);
-        totalXP += earned;
+        const preGearXp = calcExXP(ex.exId, ex.sets, ex.reps, clsKey, allExById, null, ex.weightLbs || null, null);
+        const award = perkAward(preGearXp, equipPerks, { exId: ex.exId, category: exData.category, muscleGroup: exData.muscleGroup });
+        totalXP += award.xp;
         const mult = clsKey ? CLASSES[clsKey]?.bonuses[exData.category] || 1 : 1;
         entries.push({
-          exercise: exData.name, icon: exData.icon, xp: earned, mult,
+          exercise: exData.name, icon: exData.icon, xp: award.xp, mult,
+          ...(award.perkMult !== 1 ? { perkMult: award.perkMult, baseXp: award.baseXp } : {}),
           reps: parseInt(ex.reps) || 1, sets: parseInt(ex.sets) || 1,
           weightLbs: ex.weightLbs || null, weightPct: 100,
           hrZone: null, distanceMi: null,

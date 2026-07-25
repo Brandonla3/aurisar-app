@@ -1125,6 +1125,11 @@ const EMPTY_PROFILE = {
   // Progression
   titles:[], achievements:{},
   xp:0, log:[], plans:[],
+  // Aggregated fitnessPerks from equipped world gear, mirrored up from the
+  // world overlay (Batch C2). null = no gear synced yet. Applied to workout XP
+  // at logging time (useWorkoutCompletion / gearPerks). Declared here so the
+  // [profile-audit] doesn't flag it on first save (cf. the `phone` field note).
+  equipPerks:null,
   customExercises:[],
   workouts:[],
   workoutLabels:[], // user-created labels for organizing workouts

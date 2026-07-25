@@ -1,6 +1,7 @@
 import { startTransition } from 'react';
 import { uid, todayStr } from '../utils/helpers';
 import { calcExXP, checkQuestCompletion } from '../utils/xp';
+import { perkAward } from '../utils/gearPerks';
 import { formatXP } from '../utils/format';
 import { QUESTS } from '../data/constants';
 
@@ -72,6 +73,12 @@ export function useWorkoutCompletion({
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       const batchId = uid();
 
+      // Equipped-gear XP perks (Batch C2). Applied ONLY here at logging time,
+      // never inside calcExXP (which is also the plan/preview estimator). The
+      // world mirrors the aggregated perks onto profile.equipPerks; each row's
+      // honest XP is routed through the shared perkAward seam (hard-capped).
+      const equipPerks = profile.equipPerks;
+
       const entries = wo.exercises.flatMap(ex => {
         const exData = allExById[ex.exId];
         if (!exData) return [];
@@ -84,12 +91,18 @@ export function useWorkoutCompletion({
         }, ...(ex.extraRows || [])];
         const extraCount = (ex.extraRows || []).length;
         return allRows.map(row => {
-          const xp = calcExXP(ex.exId, row.sets || 3, row.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
+          const preGearXp = calcExXP(ex.exId, row.sets || 3, row.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
+          const award = perkAward(preGearXp, equipPerks, { exId: ex.exId, category: exData.category, muscleGroup: exData.muscleGroup });
           return {
             exId: ex.exId,
             exercise: exData.name,
             icon: exData.icon,
-            xp,
+            xp: award.xp,
+            // Gear XP factor for this row (>1 = boosted); omitted when no perks
+            // so it doesn't bloat the persisted log. Lets history show "gear +X%"
+            // and lets a future server-side recompute verify/strip the boost
+            // from baseXp without reconstructing it.
+            ...(award.perkMult !== 1 ? { perkMult: award.perkMult, baseXp: award.baseXp } : {}),
             mult: getMult(exData),
             sets: parseInt(row.sets) || 3,
             reps: parseInt(row.reps) || 10,

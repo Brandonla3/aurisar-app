@@ -28,7 +28,7 @@ function toAvatarColor(aurisarClass) {
  * @param {string}   aurisarClass
  * @param {object}   avatarConfig
  */
-export default function WorldOverlay({ onClose, username, aurisarClass, avatarConfig = null, fitnessXp = 0, fitnessXpBaseline = 0 }) {
+export default function WorldOverlay({ onClose, username, aurisarClass, avatarConfig = null, fitnessXp = 0, fitnessXpBaseline = 0, onEquipPerksChange }) {
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -65,7 +65,7 @@ export default function WorldOverlay({ onClose, username, aurisarClass, avatarCo
       {/* Game fills the safe area; its HUD (WorldGame root is position:relative,
           width/height 100%) is inset with it. */}
       <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0 }}>
-        <WorldGame playerInfo={playerInfo} onExit={onClose} />
+        <WorldGame playerInfo={playerInfo} onExit={onClose} onEquipPerksChange={onEquipPerksChange} />
       </div>
     </div>
   );
