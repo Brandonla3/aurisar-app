@@ -44,6 +44,8 @@ import worldBuildConfig from '../config/world_build_config.json' with { type: 'j
 import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
 import { PropsSystem } from '../systems/PropsSystem.js';
+import { createPropColliders } from '../systems/propColliders.js';
+import { ZONE1_PROPS } from '../content/zones/zone1/props';
 import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
@@ -1167,6 +1169,11 @@ export class BabylonWorldScene {
     // loading; missing files skip silently.
     this._props = new PropsSystem(this.scene, this._worldgen);
     this._props.init().catch((err) => console.warn('[PropsSystem] init failed:', err));
+
+    // Prop collision is built from the SAME authored footprints PropsSystem
+    // scales its GLBs from, and is independent of the async GLB load — a slow
+    // asset fetch must not leave the settlement walk-through.
+    this._propColliders = createPropColliders(ZONE1_PROPS);
 
     // Castle Ashwood: exterior shell on the terrain + enterable interior
     // "instance" in the flat far-east interiors region. Built async,
@@ -2442,6 +2449,10 @@ export class BabylonWorldScene {
       }
       // the castle's exterior walls are solid — no walking into the shell
       this._castle?.resolveShellCollision(prevX, prevZ, pos);
+      // ...and so are settlement props. Client-only, like the shell: the
+      // server accepts overworld moves verbatim, so there is nothing to
+      // rubber-band against.
+      this._propColliders?.resolveMove(prevX, prevZ, pos);
       pos.y = this._worldgen.surfaceY(pos.x, pos.z);
     }
 
