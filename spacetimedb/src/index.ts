@@ -275,6 +275,8 @@ const spacetimedb = schema({
       deadUntil:    t.u64().default(0n),              // 0 = alive; otherwise micros-since-epoch when respawn fires
       dungeonInstanceId: t.u64().default(0n),        // 0 = overworld; else active dungeon instance
       floorYM:      t.f32().default(0),              // castle interior vertical meters (world Y)
+      // ── Batch E additions (appended; ADD COLUMN semantics) ──
+      lastMoveAt:   t.u64().default(0n),             // micros of last accepted movePlayer — server-side move-rate floor (movement was the one hot reducer with NO throttle; chat and attack both have one)
     }
   ),
 
@@ -554,6 +556,7 @@ export const setPlayerInfo = spacetimedb.reducer(
         online: true,
         lastChatAt: 0n,
         lastAttackAt: 0n,
+        lastMoveAt: 0n,
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
         deadUntil: 0n,
@@ -775,8 +778,19 @@ export const movePlayer = spacetimedb.reducer(
     const existing = ctx.db.player.identity.find(identity);
     if (!existing) return; // player hasn't called setPlayerInfo yet
 
+    const nowMicros = ctx.timestamp.microsSinceUnixEpoch;
+
     // Reject moves while dead — server pins the corpse until respawnPlayer fires.
-    if (existing.hp <= 0 || existing.deadUntil > ctx.timestamp.microsSinceUnixEpoch) {
+    if (existing.hp <= 0 || existing.deadUntil > nowMicros) {
+      return;
+    }
+
+    // Server-side move-rate floor. The client paces itself (~12 Hz), but this
+    // reducer had no throttle at all — the one hot path without one (chat and
+    // attack both have cooldowns), so a modified client could rewrite its row
+    // at frame rate and fan every write out to every subscriber. 40 ms (25 Hz)
+    // sits above any legitimate client rate, so honest traffic never drops.
+    if (existing.lastMoveAt > 0n && nowMicros - existing.lastMoveAt < MOVE_MIN_INTERVAL_MICROS) {
       return;
     }
 
@@ -784,6 +798,17 @@ export const movePlayer = spacetimedb.reducer(
     // See header for derivation from world_build_config.tiling_streaming.
     const clampedX = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, x));
     const clampedY = Math.max(WORLD_MIN_PX, Math.min(WORLD_MAX_PX, y));
+
+    // Cheap no-op check BEFORE the castle-nav branch: identical inputs against
+    // an already-validated row resolve to the identical row, so bail before
+    // paying pxToWorldM/isInCastleInterior/surfaceAt for a resend. (The full
+    // post-computation dead-band below still catches zoneId/floor no-ops.)
+    if (
+      existing.x === clampedX && existing.y === clampedY &&
+      existing.direction === direction % 4 && existing.isMoving === isMoving
+    ) {
+      return;
+    }
 
     // Castle Ashwood interior: reject moves into nav-blocked columns (walls,
     // furniture footprints baked into emitted nav bitmaps). Outside the
@@ -808,14 +833,27 @@ export const movePlayer = spacetimedb.reducer(
     // Zone detection based on position
     const zoneId = detectZone(clampedX, clampedY);
 
+    // No-op dead-band: a row update is broadcast to EVERY subscriber, so a
+    // call that changes nothing (client resend, isMoving heartbeat) must not
+    // become N deltas. lastMoveAt alone never justifies a write.
+    const dir = direction % 4;
+    if (
+      existing.x === clampedX && existing.y === clampedY &&
+      existing.direction === dir && existing.isMoving === isMoving &&
+      existing.zoneId === zoneId && existing.floorYM === nextFloorYM
+    ) {
+      return;
+    }
+
     ctx.db.player.identity.update({
       ...existing,
       x: clampedX,
       y: clampedY,
-      direction: direction % 4, // only 0-3 valid
+      direction: dir,
       isMoving,
       zoneId,
       floorYM: nextFloorYM,
+      lastMoveAt: nowMicros,
     });
   }
 );
@@ -919,6 +957,16 @@ export const leaveDungeon = spacetimedb.reducer(
  */
 const CHAT_COOLDOWN_MICROS = 1_000_000n; // 1 second
 
+// movePlayer accepts at most one write per 40 ms (25 Hz) per player — above
+// every legitimate client rate, below a frame-rate hammer. See movePlayer.
+const MOVE_MIN_INTERVAL_MICROS = 40_000n;
+
+// chat_message was insert-only with no cap, TTL, or delete anywhere: every
+// client downloaded the module's entire chat history on connect — the single
+// worst row-count offender at scale. Keep a rolling window; 200 lines is far
+// more scrollback than the chat panel shows.
+const CHAT_MAX_ROWS = 200;
+
 export const sendChat = spacetimedb.reducer(
   {
     text:    t.string(),
@@ -951,6 +999,24 @@ export const sendChat = spacetimedb.reducer(
       x: player.x,
       y: player.y,
     });
+
+    // Rolling window: drop everything beyond the newest CHAT_MAX_ROWS. The
+    // per-send cost is O(rows) over a table this same code keeps at ≤200 —
+    // except the very first send after this deploys, which drains the entire
+    // pre-cap backlog once. `id` is the send timestamp, so ordering by it is
+    // ordering by age; delete-by-row needs no key or schema change.
+    const rows = [...ctx.db.chatMessage.iter()];
+    if (rows.length > CHAT_MAX_ROWS) {
+      rows.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      // Bounded per call: delete-by-value is O(table) each, so an unbounded
+      // drain of a large pre-cap backlog could blow the reducer budget and
+      // abort the transaction INCLUDING the insert — chat would fail closed
+      // and retry the same doomed work forever. 50/call converges to the same
+      // steady state with no cliff.
+      for (const old of rows.slice(0, Math.min(rows.length - CHAT_MAX_ROWS, 50))) {
+        ctx.db.chatMessage.delete(old);
+      }
+    }
 
     ctx.db.player.identity.update({ ...player, lastChatAt: nowMicros });
   }

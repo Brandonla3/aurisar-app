@@ -30,3 +30,6 @@ assets-source/terrain/**
 # Runtime terrain maps are deterministic build products. CI publishes them as an
 # artifact and Vite/production builds regenerate them through predev/prebuild.
 public/assets/terrain/generated/**
+
+# Generated world plan vectors (regenerate with `npm run plan`); PNGs are kept.
+docs/world-plans/*.svg

@@ -275,18 +275,46 @@ export function useSpacetimeWorld(playerInfo, callbacks) {
             })
             .subscribe(['SELECT * FROM player_quest']);
 
-          // P4 inventory — separate subscription for module-version tolerance.
+          // P4 inventory — wallet, bag and loot history are PERSONAL: no other
+          // client ever reads them, yet `SELECT *` replicated every player's
+          // rows to everyone (~5,000+ rows at 100 CCU, and a data-exposure
+          // smell besides). Subscribe scoped to our own identity, and fall
+          // back to the old unfiltered queries if the deployed module rejects
+          // WHERE-filtered subscriptions — the SDK and this module's generated
+          // bindings support them, but the deployed server predates the SDK,
+          // so the fallback IS the compatibility probe (the warn below tells
+          // us which path the live server took).
+          const myHex = '0x' + connIdentity.toHexString().replace(/^0x/i, '');
           connection
             .subscriptionBuilder()
             .onError((ctx) => {
-              console.warn('[useSpacetimeWorld] inventory subscription failed (module not republished yet?):', ctx?.event);
+              console.warn('[useSpacetimeWorld] scoped inventory subscription rejected — falling back to unfiltered (deployed module predates WHERE support?):', ctx?.event);
+              connection
+                .subscriptionBuilder()
+                .onError((ctx2) => {
+                  console.warn('[useSpacetimeWorld] inventory subscription failed (module not republished yet?):', ctx2?.event);
+                })
+                .subscribe([
+                  'SELECT * FROM player_wallet',
+                  'SELECT * FROM player_item_stack',
+                  'SELECT * FROM player_chest_opened',
+                ]);
             })
             .subscribe([
-              'SELECT * FROM player_wallet',
-              'SELECT * FROM player_item_stack',
-              'SELECT * FROM player_chest_opened',
-              'SELECT * FROM player_equipped',
+              `SELECT * FROM player_wallet WHERE identity = ${myHex}`,
+              `SELECT * FROM player_item_stack WHERE owner = ${myHex}`,
+              `SELECT * FROM player_chest_opened WHERE owner = ${myHex}`,
             ]);
+
+          // player_equipped stays GLOBAL on purpose: gear visibility renders
+          // OTHER players' equipped weapons (Batch C1) from this table, so
+          // scoping it to self would strip everyone else's gear.
+          connection
+            .subscriptionBuilder()
+            .onError((ctx) => {
+              console.warn('[useSpacetimeWorld] equipment subscription failed (module not republished yet?):', ctx?.event);
+            })
+            .subscribe(['SELECT * FROM player_equipped']);
 
           // ── player table events ──
           connection.db.player.onInsert((_ctx, row) => {

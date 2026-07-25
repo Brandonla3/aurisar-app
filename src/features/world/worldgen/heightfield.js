@@ -166,9 +166,42 @@ export function createHeightfield(config, zones) {
     return h > 0 ? h : 0;
   }
 
+  /**
+   * Lowland shelves: apply authored plateaus that sit OUTSIDE the massif.
+   *
+   * `plateauInfo` used to be consumed only inside `mtnH`, which returns 0 past
+   * `mountain.r` — so every off-massif plateau entry was silently inert. Four of
+   * the thirteen authored zone-1 shelves were in that dead zone (the hub,
+   * Mourner's Rest, Rustvein Dig, Gallows Rise), each carrying a deliberate
+   * targetH that never did anything. Levelling a hub that a crowd stands on, and
+   * raising a POI for a sightline, both need shelves down here.
+   *
+   * Deliberately scoped to the off-massif case so mountain terrain is untouched:
+   * inside the massif `mtnH` still owns the blend, and its realized heights (the
+   * nine non-zero GOLDEN plateau values) are bit-identical.
+   *
+   * Determinism class: CONFIG-SAFE. The only path from terrain back into the RNG
+   * stream is `scatter()`'s `lakeWaterDepthAt` rejection, and that reads
+   * `lakeShape`/`groundHeight`, not this. Verified: no off-massif plateau
+   * footprint reaches the lake's influence radius.
+   */
+  function lowlandShelf(x, z) {
+    // Gate on the SAME boundary mtnH carves to (mountain.r), not on
+    // zones.inMountain (mountain.margin, 12 m wider) — gating on margin left
+    // an annulus where neither function shaped terrain, which put a ~5 m
+    // cliff and a sunken moat across the Rustvein Dig shelf footprint.
+    if (Math.hypot(x - M.x, z - M.z) < M.r) return null;
+    const p = plateauInfo(x, z);
+    return p.weight > 0 ? p : null;
+  }
+
   /** Final terrain height — THE placement function for everything. */
   function surfaceY(x, z) {
-    return groundHeight(x, z) + mtnH(x, z);
+    const base = groundHeight(x, z) + mtnH(x, z);
+    const shelf = lowlandShelf(x, z);
+    if (!shelf) return base;
+    const w = shelf.weight > 1 ? 1 : shelf.weight;
+    return base * (1 - w) + shelf.h * w;
   }
 
   function slopeAt(x, z, sample = 2.4) {

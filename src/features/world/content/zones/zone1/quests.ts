@@ -138,7 +138,7 @@ export const QUESTS: QuestDef[] = [
     giverNpcId: 'marshal_halwin',
     turnInNpcId: 'marshal_halwin',
     requiresQuestId: 'q_wolves',
-    text: 'A pack of cutthroats has made camp in the southwest hills. They have robbed three wagons this week. Drive them out — slay 10 Vale Bandits.',
+    text: 'A pack of cutthroats has made camp in the southeast hills. They have robbed three wagons this week. Drive them out — slay 10 Vale Bandits.',
     completionText: 'Ten fewer knives in the dark. Take this — you have earned it.',
     objectives: [
       { type: 'kill', mobType: 'vale_bandit', count: 10, label: 'Vale Bandit slain' },
@@ -153,7 +153,7 @@ export const QUESTS: QuestDef[] = [
     turnInNpcId: 'marshal_halwin',
     requiresQuestId: 'q_bandits',
     minLevel: 5,
-    text: 'Gorrak the Ruthless has barricaded himself in the treasury vault deep within Castle Ashwood. Enter through the gate to the southeast, fight your way to the royal vault on the upper floors, and end him, $N.',
+    text: 'Gorrak the Ruthless has barricaded himself in the treasury vault deep within Castle Ashwood. Take the east road to the castle and enter by the front gate, fight your way to the royal vault on the upper floors, and end him, $N.',
     completionText: 'Gorrak is dead? Then the valley is free of his shadow. You have done the town a great service.',
     objectives: [
       {
@@ -173,7 +173,7 @@ export const QUESTS: QuestDef[] = [
     giverNpcId: 'brother_edran',
     turnInNpcId: 'brother_edran',
     minLevel: 5,
-    text: 'The old ruin on the northwest hill was a chapel once, and its yard a resting place. Something has stirred the dead from their sleep. Grant them peace, $N — return 8 Restless Bones to the earth.',
+    text: 'The old ruin on the northeast hill was a chapel once, and its yard a resting place. Something has stirred the dead from their sleep. Grant them peace, $N — return 8 Restless Bones to the earth.',
     completionText: 'May they rest now, and may the Light forgive whatever woke them.',
     objectives: [
       { type: 'kill', mobType: 'restless_bones', count: 8, label: 'Restless Bones laid to rest' },
@@ -233,7 +233,7 @@ export const QUESTS: QuestDef[] = [
     turnInNpcId: 'brother_edran',
     requiresQuestId: 'q_silence_the_call',
     minLevel: 5,
-    text: 'Meet me at Mourner\'s Rest on the northwest hill. Stand within the old chapel stones while I speak the final prayer — then return, and I will bless your hands for the work ahead.',
+    text: 'Meet me at Mourner\'s Rest on the northeast hill. Stand within the old chapel stones while I speak the final prayer — then return, and I will bless your hands for the work ahead.',
     completionText: 'It is done. The hill is quiet again. Wear these — they are consecrated for a defender of the living.',
     objectives: [
       { type: 'find', targetId: 'poi_mourners_rest', label: "Pray at Mourner's Rest" },

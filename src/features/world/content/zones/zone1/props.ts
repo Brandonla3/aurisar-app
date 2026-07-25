@@ -15,27 +15,27 @@ export interface RotPos extends SimplePos { rot: number }
 
 export const ZONE1_PROPS = {
   buildings: [
-    { kind: 'house',  x: 10,  z: 12, w: 7, d: 6, rot: -0.4 },
-    { kind: 'house',  x: -10, z: 10, w: 6, d: 5, rot: 0.5 },
-    { kind: 'inn',    x: 12,  z: -6, w: 6, d: 7, rot: 2.4 },
-    { kind: 'chapel', x: -16, z: -8, w: 5, d: 7, rot: 0.9 },
+    { kind: 'house',  x: 20,  z: 12,  w: 7, d: 6, rot: -0.4 },
+    { kind: 'house',  x: -15, z: 2,   w: 6, d: 5, rot: 0.5 },
+    { kind: 'inn',    x: 16,  z: -8,  w: 6, d: 7, rot: 2.4 },
+    { kind: 'chapel', x: -10, z: -19, w: 5, d: 7, rot: 0.9 },
   ] as BuildingProp[],
 
-  wells: [{ x: 0, z: 2 }] as SimplePos[],
+  wells: [{ x: -2.6, z: 3.6 }] as SimplePos[],
 
   stalls: [
-    { x: -8.5, z: 3,    rot: Math.PI / 2 },
-    { x: 9.5,  z: 17.5, rot: -2.7, smithy: true }, // the smith's smithy
+    { x: -12.5, z: 1.5, rot: Math.PI / 2 },
+    { x: 5.5,  z: 18,   rot: -2.7, smithy: true }, // the smith's smithy
   ] as StallProp[],
 
   campfires: [
-    { x: 3, z: -4 }, { x: 65, z: -65 }, { x: 90, z: -90 },
+    { x: 2.5, z: -5 }, { x: 65, z: -65 }, { x: 90, z: -90 },
     { x: -80, z: -60 }, { x: -61, z: 56 },
   ] as SimplePos[],
 
   fences: [
-    { x1: 16,  z1: 16, x2: 22,  z2: 4 },
-    { x1: -16, z1: 14, x2: -20, z2: 2 },
+    { x1: -19, z1: -6, x2: -21, z2: -14 },
+    { x1: -24, z1: 4,  x2: -28, z2: -3 },
   ] as FenceLine[],
 
   tents: [

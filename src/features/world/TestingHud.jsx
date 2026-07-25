@@ -23,11 +23,16 @@ const MAX_VIEW_RADIUS = 520;
 const BAKE_SIZE = 512;             // terrain bake resolution
 
 // Cardinal-only compass labels positioned at 0/90/180/270 deg clockwise from +Z (south).
-const COMPASS_POINTS = [
-  { label: 'S', yawDeg:    0 },
-  { label: 'W', yawDeg:   90 },
-  { label: 'N', yawDeg:  180 },
-  { label: 'E', yawDeg:  -90 },
+// getPose().yaw is atan2(forward.x, forward.z), so yaw 0 faces +z — which is
+// NORTH (see worldSpace.js). This used to label yaw 0 'S', which is why the
+// wolf quests' "just up the north road" sent players the opposite way.
+// Exported for orientation tests. yaw = atan2(fwd.x, fwd.z) increases
+// CLOCKWISE on a north-up map, so facing east (+x) is yaw +90.
+export const COMPASS_POINTS = [
+  { label: 'N', yawDeg:    0 },
+  { label: 'E', yawDeg:   90 },
+  { label: 'S', yawDeg:  180 },
+  { label: 'W', yawDeg:  -90 },
 ];
 
 export default function TestingHud({ sceneRef, visible = true, mapData = null }) {
@@ -238,7 +243,8 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes =
   const scale = halfMap / viewRadius;
 
   const toMapX = (wx) => halfMap + (wx - pose.x) * scale;
-  const toMapY = (wz) => halfMap + (wz - pose.z) * scale;
+  // Inverted: +z is north and north is up. Must match mapRender's worldToPx.
+  const toMapY = (wz) => halfMap - (wz - pose.z) * scale;
 
   // ── Terrain ──
   // Void backdrop first (covers out-of-disc regions near the world edge).
@@ -249,8 +255,11 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes =
     // Source crop of the baked disc for the current player-centered window,
     // clamped to the baked canvas so edges don't smear.
     const B = baked.size;
-    const tl = baked.worldToPx(pose.x - viewRadius, pose.z - viewRadius);
-    const br = baked.worldToPx(pose.x + viewRadius, pose.z + viewRadius);
+    // Canvas top-left is (minX, MAXZ) because worldToPx inverts z — pairing
+    // (z - r) with the top corner here would make the vertical span negative
+    // and silently blank the crop.
+    const tl = baked.worldToPx(pose.x - viewRadius, pose.z + viewRadius);
+    const br = baked.worldToPx(pose.x + viewRadius, pose.z - viewRadius);
     const sxSpan = br.px - tl.px;
     const sySpan = br.py - tl.py;
     const cx0 = Math.max(0, tl.px), cy0 = Math.max(0, tl.py);
@@ -317,7 +326,7 @@ function _renderMinimap(ctx, pose, mobs, { baked, viewRadius, mapData, remotes =
   // Player — triangle at center, rotated to camera yaw
   ctx.save();
   ctx.translate(halfMap, halfMap);
-  ctx.rotate(-pose.yaw);
+  ctx.rotate(pose.yaw); // clockwise yaw on a north-up canvas — NOT negated
   ctx.fillStyle = 'rgba(120, 200, 255, 0.95)';
   ctx.strokeStyle = 'rgba(10, 20, 30, 0.9)';
   ctx.lineWidth = 1;

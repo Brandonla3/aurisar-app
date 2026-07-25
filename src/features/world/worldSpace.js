@@ -7,8 +7,17 @@
  * never drift apart across the scene, the World Map, and the minimap.
  *
  * World frame:
- *   • World space is meters, with the origin (0,0) at the spawn hub. +z is
- *     south, matching the worldgen + map convention (north = -z = top of map).
+ *   • World space is meters, with the origin (0,0) at the spawn hub.
+ *     **+z is NORTH**, +x is east; north is the top of the map.
+ *
+ *     This was inverted until Batch E. The renderer said +z = south while the
+ *     content said the opposite, and the content was both larger and
+ *     player-facing: the zone-2 gate is literally named `z1_north_pass` and
+ *     sits at z = +170, and the wolf quests point players "up the north road"
+ *     toward camps at z = +55…+95. Under the old convention a player following
+ *     the compass north walked ~125 m the wrong way, toward the crypt. The
+ *     compass, both 2D maps and the prose were reconciled onto +z = north
+ *     rather than renaming the gate and rewriting the quests.
  *   • The PLAYABLE world is a disc centered on the origin (radius from the live
  *     world config — zone1_world.json `radius`, ~520 m). The tile-streaming grid
  *     in world_build_config.json over-covers this disc; it is NOT the playable

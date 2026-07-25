@@ -16,7 +16,8 @@ reviewable cut:
   pre-existing digest, so it provably reshuffled nothing. Two POI labels reconcile on
   purpose (Stillmere → the lake bowl, Oakrest → the hub plateau centre).
 - **D2 — the one reshuffle.** Authored `biomeAnchors`, all three road corridors, the hub
-  plateau r26→34, `meta.version` 3→4, GOLDEN regenerated once, chest ids cut over, and the
+  plateau r26→34 (see the E1 correction below), `meta.version` 3→4, GOLDEN regenerated
+  once, chest ids cut over, and the
   danger↔spawn rule with the Gloomweb retune that makes it pass. The chest-key cutover
   rides this same commit deliberately: positions move here anyway, so players see **one**
   "chests restocked" event rather than two.
@@ -268,7 +269,30 @@ Files: `zone1_world.json` (plateaus/exclusions — now chest-safe), `content/zon
 
 - Road dressing (roads carved in D): signposts, 5 waystone shrines (find-quest targets,
   future fast-travel seam), Zone-2 tease gatehouse at the north pass.
-- Hub relayout for 25–40 concurrent occupants: plateau r26→34; zoned layout (≥12 m NPC
+**E1 correction to Batch D — off-massif plateaus were inert.** `plateauInfo` was consumed
+only inside `mtnH`, which returns 0 past `mountain.r`, so **every plateau outside the massif
+did nothing at all**. Four of the thirteen authored zone-1 shelves were in that dead zone —
+the hub, Mourner's Rest, Rustvein Dig and Gallows Rise — each carrying a deliberate
+`targetH` that never applied. Consequences:
+
+- **D2's "hub plateau r26→34" was a no-op.** It widened an entry that was not being read.
+  The claim in D2's commit and PR body that it saved Batch E a reshuffle was wrong; nothing
+  about the hub's terrain changed. Corrected here rather than left standing.
+- Every "vista plateau" item below (Tuskfield crest, Old Watchtower, Mourner's Rest h4→7,
+  the spawn→Frostspire corridor, the three world-edge ridges) was **unbuildable as written**
+  for the same reason.
+
+Fixed in E1 by applying plateaus in `surfaceY` for the off-massif case only (`lowlandShelf`),
+so `mtnH` still owns the blend inside the massif and its nine realized GOLDEN heights stay
+bit-identical. **CONFIG-SAFE, not RESHUFFLE** — the only path from terrain back into the RNG
+stream is `scatter()`'s `lakeWaterDepthAt` rejection, and no off-massif plateau footprint
+reaches the lake's 48 m influence radius (nearest: 127 m). Verified: all three digests
+unchanged. Realized effect — the hub is now dead level at 1.500 m out to r34 where it
+previously rolled from −0.20 m at the centre to 1.46 m at r20, which is what a hub hosting
+25–40 players needed; the other three shelves rise 2.8–3.6 m to their authored targets.
+
+- Hub relayout for 25–40 concurrent occupants: plateau r26→34 (now actually load-bearing);
+  zoned layout (≥12 m NPC
   spacing, 6 m road throats): arrivals plaza + notice board S, quest court NE, market
   lane W, chapel precinct SW, smithy N. **Graveyard build-out** at (−12,−14) — legible
   die→respawn→re-quest flow.
@@ -358,7 +382,10 @@ cover; a rare glows on its owner in the hub; no advertised-but-fake content rema
 ### Later phases (noted, per scope lock)
 Zone 2 behind the north pass; Frostspire Halls interior; economy/P2P trading; VAT crowds;
 tree impostors (stays in world-diagnostic Batch 4); KTX2 (gated on texture payload);
-server-side perk validation hardening; baked-tile parity.
+server-side perk validation hardening; baked-tile parity — note the committed
+`public/assets/tiles/T_03_03_*` predate the heightfield and are already disabled
+(`USE_GLB_TILES = false`); E1a's lowland shelves raise the hub and Rustvein inside that
+tile's bounds, so whoever re-enables baking must regenerate from `surfaceY`, not patch.
 
 ## Cut list (deliberate)
 Jump mechanic (no mechanic exists — clip stays baked); upper-body attack masking;

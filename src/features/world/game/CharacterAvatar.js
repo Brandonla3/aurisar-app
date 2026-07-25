@@ -139,6 +139,14 @@ export class CharacterAvatar {
     this._bodyMeshes = [];   // main skinned meshes (share skeleton with clothing)
     this._slots      = {};   // slot key → { nodes, meshes }
 
+    // Crowd gating (Batch E). A remote avatar far away or beyond the animating
+    // cap freezes its skeleton and hides its nameplate; the root still moves,
+    // so a gated avatar is exactly WHERE the server says — only the expensive
+    // per-frame work stops. Mirrors MobAnimator.setSuspended.
+    this._animSuspended = false;
+    this._labelPlane    = null;
+    this._nameplateVisible = true;
+
     // Box fallback state
     this._useFallback   = false;
     this._fallbackLimbs = null;
@@ -402,7 +410,53 @@ export class CharacterAvatar {
 
   // ── Per-frame update ───────────────────────────────────────────────────────
 
+  /**
+   * Distance/count gating for crowds (Batch E). Freezes skeletal evaluation at
+   * the current pose and hides the nameplate. Idempotent.
+   *
+   * The root keeps being moved by the caller's position lerp, so a suspended
+   * avatar is still exactly where the server says it is — only the per-frame
+   * blend-tree work, the terrain resolve and the nameplate draw stop. Mirrors
+   * MobAnimator.setSuspended, which the mob path has used since Batch A.
+   */
+  setSuspended(on) {
+    const next = !!on;
+    if (next === this._animSuspended) return;
+    this._animSuspended = next;
+    if (next) {
+      this._animCtl?.suspend();
+    } else {
+      this._animCtl?.resume();
+      // Reset the displacement-speed measurement: the first post-resume frame
+      // otherwise divides the WHOLE gated drift by one dt (~0.6 m reads as
+      // ~36 m/s) and pins the run blend for a beat (review M12). _lastX=null
+      // is the measurer's own first-frame sentinel.
+      this._lastX = null;
+      this._lastZ = null;
+      this._speedMps = 0;
+    }
+    if (this._labelPlane) this._labelPlane.setEnabled(!next);
+    this._nameplateVisible = !next;
+  }
+
+  /** True while crowd-gated. */
+  get suspended() { return this._animSuspended; }
+
+  /**
+   * Nameplate visibility, independent of animation gating — the nearest-N
+   * nameplate cap hides labels on avatars that are still animating.
+   */
+  setNameplateVisible(on) {
+    const next = !!on && !this._animSuspended;
+    if (next === this._nameplateVisible) return; // idempotent — called per-frame
+    this._nameplateVisible = next;
+    if (this._labelPlane) this._labelPlane.setEnabled(next);
+  }
+
   update(dt) {
+    // Gated: hold the current pose. Cheapest possible early-out — this is the
+    // per-frame cost that dominates at 50-100 concurrent players.
+    if (this._animSuspended) return;
     this._resolveTerrainMobility();
     if (this._useFallback) {
       this._animateBox(dt);
@@ -874,6 +928,10 @@ export class CharacterAvatar {
       plane.billboardMode   = BABYLON.Mesh.BILLBOARDMODE_ALL;
       plane.renderingGroupId = 1;
       plane.parent          = this.root;
+      // Kept so the crowd nameplate cap can toggle it — the plane draws in an
+      // overlay group with depth writes off, so it is never occlusion-culled and
+      // would otherwise cost a draw per player at any distance.
+      this._labelPlane      = plane;
       // Nameplate is emissive-driven text on a flat plane, not a light source —
       // exclude it from the mobile GlowLayer (see LightingManager.excludeFromGlow).
       excludeFromGlow?.(plane);

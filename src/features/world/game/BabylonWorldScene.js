@@ -44,6 +44,8 @@ import worldBuildConfig from '../config/world_build_config.json' with { type: 'j
 import zone1WorldConfig from '../config/zone1_world.json' with { type: 'json' };
 import { NpcSystem } from '../systems/NpcSystem.js';
 import { PropsSystem } from '../systems/PropsSystem.js';
+import { createPropColliders } from '../systems/propColliders.js';
+import { ZONE1_PROPS } from '../content/zones/zone1/props';
 import { CastleSystem } from '../castle/CastleSystem.js';
 import { ENTRY as CASTLE_ENTRY, LEVELS as CASTLE_LEVELS } from '../castle/castlePlan.js';
 import { isInCastleInteriorFootprint } from '../castle/castleDungeon.js';
@@ -860,6 +862,28 @@ const DUNGEON_ENTRANCE      = Object.freeze({ x: LANDMARKS.hollow_crypt.x, z: LA
 const DUNGEON_ENTER_DIST_SQ = 3.5 * 3.5;
 const DUNGEON_EXIT_DIST_SQ  = 5.5 * 5.5; // hysteresis band prevents rapid toggling
 
+// ── Movement replication pacing (Batch E) ───────────────────────────────────
+// Every accepted movePlayer is one row-delta fanned out to EVERY subscriber —
+// at 100 concurrent players the old 20 Hz was ~2,000 writes/s → ~200,000
+// deltas/s, the O(N²) the plan flags. 80 ms (12.5 Hz) with _lerpRemote's
+// position smoothing on the receiving side is visually indistinguishable and
+// costs 40% of the fan-out. The dead-band only gates STATIONARY resends
+// (walking covers ~1 m per interval at 12 m/s); isMoving flips always send.
+// The server enforces its own 40 ms floor on top (movePlayer lastMoveAt).
+const MOVE_SEND_INTERVAL_MS = 80;
+const MOVE_SEND_DEADBAND_M  = 0.1;
+
+// ── Crowd gating (Batch E) ───────────────────────────────────────────────────
+// Sized for the ~50-100 concurrent target. Remote avatars beyond the animation
+// radius, or past the per-tier nearest-N cap, hold their pose (see
+// CharacterAvatar.setSuspended) while still tracking their server position.
+const REMOTE_ANIM_RADIUS_SQ = 45 * 45;   // matches the mob gate — one legible number
+// Nameplates are capped harder than animation: each is a DynamicTexture plus an
+// uncached material, drawn in an overlay rendering group with depth writes off,
+// so it is never occlusion-culled and costs a draw at any distance.
+const REMOTE_NAMEPLATE_CAP = 20;
+const REMOTE_NAMEPLATE_RADIUS_SQ = 35 * 35;
+
 // Chest pickup: walk within this radius of an unopened chest to loot it.
 const CHEST_OPEN_DIST_SQ = 2.5 * 2.5;
 const CHEST_SCAN_MS      = 250; // how often to scan (chest count is small)
@@ -882,6 +906,7 @@ export class BabylonWorldScene {
     this._dyingMobs     = new Set(); // detached entries playing their death out (see _removeMob)
     this._deathTimers   = new Set(); // pending deferred-dispose timeouts
     this._mobScratch    = [];        // reusable per-frame sort buffer (_updateMobs)
+    this._remoteScratch = [];        // reusable per-frame sort buffer (_updateRemotes)
     this._campfires     = new Map(); // campfireId(BigInt) -> { root, light, ps, ph }
     // Shared, cached mob materials. Mob palettes are per-type/family and never
     // mutated per-instance, so one StandardMaterial per name serves every mob of
@@ -1155,6 +1180,11 @@ export class BabylonWorldScene {
     // loading; missing files skip silently.
     this._props = new PropsSystem(this.scene, this._worldgen);
     this._props.init().catch((err) => console.warn('[PropsSystem] init failed:', err));
+
+    // Prop collision is built from the SAME authored footprints PropsSystem
+    // scales its GLBs from, and is independent of the async GLB load — a slow
+    // asset fetch must not leave the settlement walk-through.
+    this._propColliders = createPropColliders(ZONE1_PROPS);
 
     // Castle Ashwood: exterior shell on the terrain + enterable interior
     // "instance" in the flat far-east interiors region. Built async,
@@ -1705,7 +1735,7 @@ export class BabylonWorldScene {
   }
 
   // ── Dungeon entrance ───────────────────────────────────────────────────────
-  // Gate sits at the end of the north path (z = -37). Two stone pillars, a
+  // Gate sits at the end of the SOUTH road (z = -37; +z is north). Two pillars, a
   // lintel, and a faintly pulsing portal plane mark the trigger zone.
 
   _buildDungeonEntrance() {
@@ -1798,10 +1828,7 @@ export class BabylonWorldScene {
     this._trackCamera();
     this._syncStdb();
 
-    this._remotePlayers.forEach(rp => {
-      this._lerpRemote(rp, dt);
-      rp.update(dt);
-    });
+    this._updateRemotes(dt);
 
     // Mobs: smoothing, facing, skeletal/fallback life, HP drain, gating.
     this._updateMobs(dt);
@@ -1812,6 +1839,53 @@ export class BabylonWorldScene {
 
     // Mob HP-bar planes use BILLBOARDMODE_ALL, so they already face the camera
     // in world space every frame — the old per-frame parent lookAt was redundant.
+  }
+
+  // Per-frame remote-player presentation, distance-gated exactly like mobs.
+  //
+  // Remote MPFB avatars — not mobs — are the dominant skeletal cost at 50-100
+  // concurrent players: each one is a full rigged human with a blend tree, a
+  // terrain resolve and a weapon-swing tick. This loop used to be a flat
+  // forEach over every remote, so a crowded hub paid all of it every frame.
+  //
+  // Position lerp always runs (a gated avatar is still exactly where the server
+  // says it is); only animation freezes. Nameplates get a tighter nearest-N cap
+  // than animation because each one is its own DynamicTexture + material drawn
+  // in an overlay group that is never occlusion-culled.
+  _updateRemotes(dt) {
+    const p = this._local?.root?.position;
+    const list = this._remoteScratch;
+    list.length = 0;
+
+    // No local avatar yet (still loading): keep everyone lerping, ungated —
+    // there is no reference point to sort by.
+    if (!p) {
+      this._remotePlayers.forEach((rp) => {
+        this._lerpRemote(rp, dt);
+        rp.setSuspended?.(false);
+        rp.update(dt);
+      });
+      return;
+    }
+
+    this._remotePlayers.forEach((rp) => {
+      const rpos = rp?.root?.position;
+      rp._distSq = rpos ? (rpos.x - p.x) ** 2 + (rpos.z - p.z) ** 2 : Infinity;
+      list.push(rp);
+    });
+    list.sort((a, b) => a._distSq - b._distSq);
+
+    const animCap = this._qualityTier === 'mobile' ? 8
+                  : this._qualityTier === 'low'    ? 14 : 20;
+
+    for (let i = 0; i < list.length; i++) {
+      const rp = list[i];
+      // Lerp first: gating must never desync where a remote actually stands.
+      this._lerpRemote(rp, dt);
+      rp.setSuspended?.(i >= animCap || rp._distSq > REMOTE_ANIM_RADIUS_SQ);
+      rp.setNameplateVisible?.(i < REMOTE_NAMEPLATE_CAP && rp._distSq <= REMOTE_NAMEPLATE_RADIUS_SQ);
+      rp.update(dt);
+    }
   }
 
   // Per-frame mob presentation. Skeletal playback is the real CPU cost at
@@ -2386,6 +2460,10 @@ export class BabylonWorldScene {
       }
       // the castle's exterior walls are solid — no walking into the shell
       this._castle?.resolveShellCollision(prevX, prevZ, pos);
+      // ...and so are settlement props. Client-only, like the shell: the
+      // server accepts overworld moves verbatim, so there is nothing to
+      // rubber-band against.
+      this._propColliders?.resolveMove(prevX, prevZ, pos);
       pos.y = this._worldgen.surfaceY(pos.x, pos.z);
     }
 
@@ -2578,13 +2656,13 @@ export class BabylonWorldScene {
 
   _syncStdb() {
     const now = Date.now();
-    if (now - this._lastSentAt < 50) return;
+    if (now - this._lastSentAt < MOVE_SEND_INTERVAL_MS) return;
 
     const { x, z } = this._local.root.position;
     const dx = x - this._lastPos.x;
     const dz = z - this._lastPos.z;
 
-    if (Math.sqrt(dx * dx + dz * dz) > 0.04 || this._local.isMoving !== this._lastMoving) {
+    if (Math.sqrt(dx * dx + dz * dz) > MOVE_SEND_DEADBAND_M || this._local.isMoving !== this._lastMoving) {
       const floorYM = (this._castle?.isInside() || this._localDungeonInstanceId > 0n)
         ? this._local.root.position.y
         : 0;
@@ -2964,7 +3042,7 @@ export class BabylonWorldScene {
     if (!p) return null;
     // Camera-relative forward heading: where pressing W would move you,
     // projected onto the XZ plane. atan2(forward.x, forward.z) so 0 = +Z
-    // (south), increases clockwise.
+    // (north), increases clockwise. See worldSpace.js — +z is north.
     let yaw = 0;
     if (this._camera) {
       const fwdX = this._camTarget.x - this._camera.position.x;
