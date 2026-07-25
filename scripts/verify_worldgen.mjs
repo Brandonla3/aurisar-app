@@ -153,7 +153,15 @@ if (!M || !Array.isArray(config.plateaus) || config.plateaus.length === 0) {
   config.plateaus.forEach(([cx, cz, , , target], idx) => {
     const y = wg.mtnH(cx, cz);
     if (Math.hypot(cx - M.x, cz - M.z) >= M.r) {
-      console.log(`  --  plateau (${cx},${cz}) off-massif — not carved (mtnH=${y.toFixed(2)})`);
+      // Off-massif shelves are carved by surfaceY (heightfield lowlandShelf),
+      // not by mtnH. They used to be silently inert; assert they now hit their
+      // authored target so a dead entry can never creep back in.
+      const sy = wg.surfaceY(cx, cz);
+      check(
+        `lowland shelf (${cx},${cz}) levels to ${target}`,
+        Math.abs(sy - target) < 0.25,
+        `surfaceY=${sy.toFixed(3)} vs target ${target}`,
+      );
       return;
     }
     if (golden) {
