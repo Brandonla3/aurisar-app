@@ -285,5 +285,20 @@ export function createGrassMaterial(scene, opts = {}) {
   // Acquire a reference on the shared wind clock and release it on dispose, so
   // the per-frame observer is torn down when the last grass material goes away.
   mat.onDisposeObservable.add(_acquireClock(scene));
+
+  // Grass is the one material family with no texture at all — every visual
+  // cue (tint, root->tip ramp, wind) is vertex color or shader math, so unlike
+  // bark/leaf-card there is nothing async left to complete after this point.
+  // This version's Material.isReady() has a frozen fast path that trusts the
+  // first successful check forever after (skipping any later dirty flag), so
+  // freezing a material with a texture still in flight can permanently miss
+  // it — irrelevant here, but see the matching note in ashwoodPropMeshes.js
+  // for the materials that DO have to worry about that. The wind plugin's
+  // uniforms (grassTime/grassWindDir/...) stay correct under freeze because
+  // they are scene-global, not per-mesh: even if Babylon caches this shared
+  // material's bind and only calls bindForSubMesh once per frame instead of
+  // once per consuming mesh, every consumer wants the identical value that
+  // frame regardless of which mesh triggered it.
+  mat.freeze();
   return mat;
 }
