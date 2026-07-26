@@ -83,7 +83,11 @@ export class AshwoodTileProvider {
       // Lake material adds a planar reflection at its surface level — but the
       // MirrorTexture is a second render of the whole scene, so it's gated to
       // the high tier. Low/mobile lakes keep the waves + fresnel sky blend.
-      const reflect = (scene.metadata?.ashwood?.qualityTier ?? 'high') === 'high';
+      // The player can also opt out entirely (Menu → Graphics), which skips the
+      // allocation here; how often an existing mirror refreshes is a separate,
+      // distance-based decision owned by the scene's frame-budget governor.
+      const reflect = (scene.metadata?.ashwood?.qualityTier ?? 'high') === 'high'
+        && scene.metadata?.ashwood?.reflections !== false;
       lakeWater = buildWaterMaterial(scene, { reflect, level: this.wg.config.lake.level });
     }
 
@@ -561,6 +565,13 @@ varying float vShore;
 uniform sampler2D uN;
 #ifdef REFLECT
 uniform sampler2D uReflection;
+// Reflection strength, 1 = full planar mirror, 0 = exactly the non-reflective
+// look the low/mobile tier renders. Lets reflections be switched off without a
+// reload: the REFLECT define is compile-time, and simply holding the mirror
+// texture would leave a stale image smeared across the surface as the camera
+// moves. Driven by the scene (Menu -> Graphics, and the frame-budget governor's
+// first shed step) via scene.metadata.ashwood.setWaterReflectAmt.
+uniform float reflectAmt;
 #endif
 uniform float t;
 uniform vec3 sunDir; uniform vec3 sunCol;
@@ -614,7 +625,7 @@ void main() {
   vec2 ruv = (vClip.xy / vClip.w) * 0.5 + 0.5;
   ruv += n.xz * 0.04;
   vec3 mir = texture2D(uReflection, clamp(ruv, 0.001, 0.999)).rgb;
-  skyRefl = mix(skyCol, mir, 0.85 * (1.0 - night));
+  skyRefl = mix(skyCol, mir, 0.85 * (1.0 - night) * reflectAmt);
 #endif
   col = mix(col, skyRefl, clamp(fres, 0.0, 1.0) * 0.75);
   vec3 R = reflect(-normalize(sunDir), n);
@@ -661,7 +672,7 @@ function buildWaterMaterial(scene, opts = {}) {
     uniforms: ['world', 'viewProjection', 'cameraPosition',
                't', 'sunDir', 'sunCol', 'deep', 'shallow', 'skyCol',
                'night', 'alphaV', 'vFogColor', 'fogDensity',
-               'bodyDepthMix', 'bodyAbsorbK'],
+               'bodyDepthMix', 'bodyAbsorbK', 'reflectAmt'],
     samplers: reflect ? ['uN', 'uReflection'] : ['uN'],
     defines: reflect ? ['#define REFLECT'] : [],
     needAlphaBlending: true,
@@ -682,10 +693,16 @@ function buildWaterMaterial(scene, opts = {}) {
     mirror.renderList = null;
     mirror.level = 1.0;
     mat.setTexture('uReflection', mirror);
+    mat.setFloat('reflectAmt', 1);
     if (!scene.customRenderTargets.includes(mirror)) scene.customRenderTargets.push(mirror);
     scene.metadata = scene.metadata || {};
     scene.metadata.ashwood = scene.metadata.ashwood || {};
+    // Two seams the scene's frame-budget governor drives: `waterMirror` to
+    // throttle *how often* the reflection re-renders (distance gating), and
+    // `setWaterReflectAmt` to fade it out entirely (explicit off), which the
+    // refresh rate alone cannot do without leaving a stale image behind.
     scene.metadata.ashwood.waterMirror = mirror;
+    scene.metadata.ashwood.setWaterReflectAmt = (v) => mat.setFloat('reflectAmt', v);
   }
 
   mat.setColor3('deep',    BABYLON.Color3.FromHexString('#0b2128'));

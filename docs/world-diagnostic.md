@@ -87,6 +87,10 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   re-renders the whole scene each frame even when the player is far from the lake) is
   worthwhile but risks the reflection popping while the lake is still visible — a
   threshold to tune live.
+  > **Superseded — this entry undersold the finding.** "The core ask is met" was wrong:
+  > tier-gating bounds *which devices* pay, not *when*, and the distance skip filed here as a
+  > nice-to-have was the whole cost. The mirror re-rendered the entire scene every frame at
+  > any distance **and inside interiors that contain no water**. Fixed in Batch 2b below.
 - **P4 — freeze:** `material.freeze()` skips per-submesh CPU readiness checks but does
   **not** reduce a material's per-fragment cost, so it would not cut the heavy terrain
   splat shader — which is already tier-scaled (oct 6/4/3; triplanar/voronoi high-only,
@@ -101,6 +105,71 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   per blade at a tier radius (13–24 m), tighter than the config's 45/80 m. The P1 leaf
   work is the pragmatic substitute; true tree LOD wants the deferred streaming re-tile /
   billboard-impostor work (§7).
+
+### Batch 2b status — the desktop/mobile inversion
+
+Filed from a player report: **"I can barely run the game on my desktop. It runs fine on my
+phone."** That reads as a paradox and isn't one. The tier resolver (`BabylonWorldScene.js`
+`_resolveQualityTier`) sends every touch device to `mobile` and every desktop whose GPU
+string doesn't match a short blacklist to `high`, and the gap between those two renderers is
+roughly 5–15× of per-frame work:
+
+| Per frame | `mobile` | `high` |
+|---|---|---|
+| Full scene geometry passes | 2 (shadow map + main) | **6** (4 CSM cascades + water mirror + main) |
+| Full-screen post passes | GlowLayer | HDR pipeline + SSAO2 + blur + grain |
+| Terrain shader | 3 octaves | 6 octaves + triplanar + detail normals |
+| Render resolution | device DPR, small canvas | up to **1.5× DPR** on a desktop monitor |
+
+That gap is intended. What was missing is that nothing bounded it — four defects let a weak
+desktop start on the maximal stack and stay there:
+
+- **The lake mirror rendered every frame, everywhere, forever.** P3 above was recorded as
+  "already tier-gated", and it is — but it was *ungated within the tier*, which is the part
+  that costs. The `MirrorTexture` is pushed into `scene.customRenderTargets`
+  (`ashwoodTileProvider.js`) with `renderList = null` and no `refreshRate`; Babylon renders
+  that array unconditionally each frame without checking whether the mesh sampling it is
+  visible, on screen, or loaded. Nothing ever read `metadata.ashwood.waterMirror` back. So
+  the high tier paid a **second full scene render** standing on the far side of the map, and
+  inside Castle Ashwood where there is no water. Now distance-gated with hysteresis and held
+  outright in interiors (`game/waterMirrorGate.js`, pure + unit-tested; driven by the scene's
+  frame-budget governor). Note the invariant: `refreshRate`'s setter calls
+  `resetRefreshCounter()`, whose "render at least once" rule forces a render on the next
+  frame — so the rate must only ever be written **on change**, or the gate renders every
+  frame anyway.
+- **The engine never asked for the discrete GPU.** `_createEngine` passed no
+  `powerPreference`, so WebGL's `'default'` applies — which on any switchable-graphics
+  machine hands out the **integrated** GPU. Worse, it is self-concealing: the renderer string
+  then reports the iGPU, so the tier sniff is reasoning about the wrong device. Now
+  `'high-performance'` on desktop (not mobile — one GPU there, and it is a battery request),
+  and deliberately not on the fallback retry path.
+- **The GPU blacklist has a hole.** `/intel.*\b(uhd|hd)\s*graphics/` misses AMD Vega/680M
+  iGPUs, keeps Iris Xe on `high` by choice, and — the common case — reads `unknown` when the
+  browser **masks** the renderer string, falling through to the heaviest stack. Unfixable by
+  extending the regex; addressed instead by giving the player an override (below).
+- **Slowness never triggered a downgrade.** The safe-mode ladder only fires on WebGL
+  *context loss*, and its one framerate check is `fps < 1` — "the GPU has stopped". A machine
+  holding 12 fps is stable by that definition. `game/perfWatchdog.js` adds the missing signal
+  (pure state machine, unit-tested): sustained sub-25 fps for 8 s, with a load grace period
+  and backgrounded-tab suppression, both because a false positive silently downgrades someone
+  who was fine. It sheds **in-session and without a reload** — reflections + SSAO + clouds,
+  then render resolution — because the context-loss ladder reloads only since a lost context
+  already took the world away, while a low framerate has not. It persists `safeLevel` so the
+  next load starts lighter (where the tier is chosen at construction and can drop what cannot
+  be torn down live), and suppresses the stability decay, which exists to walk back *one-off*
+  stalls and this is not one.
+
+Plus the thing that made all four invisible: **there were no graphics settings.** Menu →
+Graphics now exposes quality (Auto/High/Balanced/Low, reloads — the tier decides what gets
+*built*), a live water-reflections toggle, the existing volumetric-clouds toggle, and a
+tier/GPU readout so a bad guess is legible rather than inferred. A preference replaces the
+GPU sniff but deliberately does **not** outrank `safeLevel`: letting it would let a player pin
+themselves to a configuration that cannot boot. `resetGraphicsQuality()` is the escape hatch.
+
+**Still open:** the DPR cap itself (1.5 on desktop) is untuned — it is a real cost on a 1440p
+or 4K monitor with three-plus full-screen passes, but lowering it blind trades sharpness for
+frames on machines that may not need the trade. It wants the measured `?qa=1` GPU frame-time
+readout on a real monitor, not a blind edit.
 
 ### Batch 3 status
 
@@ -386,6 +455,10 @@ a GPU budget.
   high-tier CSM `autoCalcDepthBounds` (capability-gated, refresh-throttled, `?qa=1` frame-time
   measurement). *Next:* record the visual-acceptance matrix per pass; re-validate the deferred
   Batch 2 perf items on-device. See §1 "Batch 3 status".
+- **Batch 2b — The desktop/mobile inversion.** ✅ Filed from a player report: *"I can
+  barely run the game on my desktop. It runs fine on my phone."* Not a paradox — the two
+  devices run different renderers, and the desktop one had no floor under it. See §1
+  "Batch 2b status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.
