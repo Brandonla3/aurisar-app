@@ -26,6 +26,8 @@ import { AshwoodWeather }    from './AshwoodWeather.js';
 import { AshwoodVolumetricClouds } from './AshwoodVolumetricClouds.js';
 import { FlickerLights }    from './flickerLights.js';
 import { shouldSendMove }   from './moveSync.js';
+import { resolveMirrorRefreshRate, MIRROR_OFF } from './waterMirrorGate.js';
+import { createPerfState, samplePerf }          from './perfWatchdog.js';
 import {
   TileLoader,
   GlbTileProvider,
@@ -847,12 +849,51 @@ function saveAudioMuted(muted) {
 //   0 = full (GPU-detected)     1 = force ≤ low  (no SSAO2, classic shadows)
 //   2 = force mobile path       3 = + lower resolution + no shadows
 const MAX_SAFE_LEVEL = 3;
+
+// How often the frame-budget governor runs. Both of its jobs change slowly — a
+// player crosses the mirror gate's hysteresis band in seconds, and the framerate
+// watchdog needs 8 s of evidence — so this is a throttle, not a tick rate.
+const GOVERNOR_INTERVAL_MS = 500;
+const nowMs = () => (typeof performance !== 'undefined' && performance.now
+  ? performance.now() : Date.now());
+
 function loadSafeLevel() {
   const v = Number(loadGfxPrefs().safeLevel);
   return Number.isFinite(v) ? Math.max(0, Math.min(MAX_SAFE_LEVEL, Math.round(v))) : 0;
 }
 function saveSafeLevel(level) {
   saveGfxPrefs({ ...loadGfxPrefs(), safeLevel: Math.max(0, Math.min(MAX_SAFE_LEVEL, level)) });
+}
+
+// ── User-chosen quality preference ───────────────────────────────────────────
+// The GPU sniff in _resolveQualityTier is a heuristic over a renderer string
+// that browsers increasingly mask (a masked string reads 'unknown' and falls
+// through to the maximal stack). When it guesses wrong there was no way for a
+// player to say so — the world shipped with no graphics control at all. This is
+// that override, persisted alongside the rest of the graphics prefs.
+//
+// It deliberately does NOT defeat the safe-mode ladder: safeLevel is a record of
+// this machine actually losing its WebGL context, and letting a preference
+// outrank it would let a player pin themselves to a configuration that cannot
+// boot. resetGraphicsQuality() is the escape hatch that clears it.
+const QUALITY_PREFS = Object.freeze(['auto', 'high', 'balanced', 'low']);
+const PREF_TO_TIER  = Object.freeze({ high: 'high', balanced: 'low', low: 'mobile' });
+function loadQualityPref() {
+  const v = loadGfxPrefs().qualityPref;
+  return QUALITY_PREFS.includes(v) ? v : 'auto';
+}
+function saveQualityPref(pref) {
+  const v = QUALITY_PREFS.includes(pref) ? pref : 'auto';
+  saveGfxPrefs({ ...loadGfxPrefs(), qualityPref: v });
+}
+
+// ── Reflection opt-out ───────────────────────────────────────────────────────
+// The lake mirror is the single most expensive high-tier effect (a whole extra
+// scene render). Distance-gating it (waterMirrorGate.js) removes the waste;
+// this lets a player who is still short on frames turn it off outright.
+function loadReflectionsPref() { return loadGfxPrefs().reflections !== false; }
+function saveReflectionsPref(on) {
+  saveGfxPrefs({ ...loadGfxPrefs(), reflections: !!on });
 }
 
 // ── Dungeon entrance constants ───────────────────────────────────────────────
@@ -982,7 +1023,24 @@ export class BabylonWorldScene {
   _createEngine() {
     const make = (antialias, opts) => new BABYLON.Engine(this.canvas, antialias, opts);
     try {
-      return make(true, { stencil: true, adaptToDeviceRatio: true });
+      return make(true, {
+        stencil: true,
+        adaptToDeviceRatio: true,
+        // Ask for the discrete GPU. WebGL's default `powerPreference` is
+        // 'default', which on any switchable-graphics machine — a laptop with
+        // Optimus/AMD switchable, or a desktop whose display is plugged into the
+        // motherboard rather than the card — hands out the INTEGRATED GPU. That
+        // is the single most common cause of "my desktop with a real graphics
+        // card runs this worse than my phone", and it is invisible: the renderer
+        // string then reports the iGPU, so even _resolveQualityTier's sniff is
+        // reasoning about the wrong device.
+        //
+        // Desktop only: phones have one GPU, so the hint buys nothing there and
+        // 'high-performance' is a battery-drain request on the tier that already
+        // performs fine. Omitted from the fallback path below on purpose — if a
+        // context request is being refused, asking for more is not the retry.
+        ...(this._isMobile ? {} : { powerPreference: 'high-performance' }),
+      });
     } catch (primaryErr) {
       if (typeof console !== 'undefined') {
         console.warn('[Aurisar] WebGL engine creation failed; retrying with minimal options.', primaryErr);
@@ -1075,6 +1133,11 @@ export class BabylonWorldScene {
         worldgen: this._worldgen,
         castShadow: (mesh) => this._castShadow(mesh),
         qualityTier: this._qualityTier,
+        // Read by the tile provider when it builds the lake material. Turning
+        // reflections off in the menu should skip ALLOCATING the MirrorTexture
+        // on the next load, not just stop refreshing it — the governor's
+        // distance gate handles the live case.
+        reflections: loadReflectionsPref(),
       },
     };
 
@@ -1124,6 +1187,9 @@ export class BabylonWorldScene {
 
     this._onResize = () => this.engine.resize();
     window.addEventListener('resize', this._onResize);
+
+    // Distance-gates the lake reflection and watches the frame budget.
+    this._setupPerfGovernor();
 
     // After a crash-free run, relax the safe level by one so a machine that was
     // downgraded by a transient stall drifts back toward full quality on its
@@ -1246,6 +1312,15 @@ export class BabylonWorldScene {
     if (this.options.qualityTier) return this.options.qualityTier;
     if (this._isMobile) return 'mobile';
 
+    // An explicit player choice replaces the GPU sniff entirely (the sniff is
+    // what it is overriding), but still runs through the safe-mode step-down
+    // below — see the QUALITY_PREFS comment for why that ordering matters.
+    const pref = loadQualityPref();
+    if (pref !== 'auto') {
+      this._gpuRenderer = this._detectGpuRenderer();
+      return this._applySafeStepDown(PREF_TO_TIER[pref]);
+    }
+
     const caps = this.engine?.getCaps?.() ?? null;
     const canHeavy = !!caps &&
       (caps.textureHalfFloatRender || caps.textureFloatRender) &&
@@ -1271,11 +1346,17 @@ export class BabylonWorldScene {
     if (!canHeavy || isWeakIntegrated) tier = 'low';
     if (isSoftware) tier = 'mobile';
 
-    // Apply persisted safe-mode downgrades from prior unrecovered context
-    // losses, stepping DOWN from whatever the GPU-detected base tier is: level 1
-    // drops one tier, level ≥2 pins to the mobile render path (which also sheds
-    // the heavy DefaultRenderingPipeline — see LightingManager._setupPipelines).
-    // Level 3 additionally cuts shadows + resolution (_setupShadows / _initSync).
+    return this._applySafeStepDown(tier);
+  }
+
+  // Apply persisted safe-mode downgrades from prior unrecovered context losses,
+  // stepping DOWN from whatever base tier was chosen (GPU-detected or
+  // player-preferred): level 1 drops one tier, level ≥2 pins to the mobile
+  // render path (which also sheds the heavy DefaultRenderingPipeline — see
+  // LightingManager._setupPipelines). Level 3 additionally cuts shadows +
+  // resolution (_setupShadows / _initSync).
+  _applySafeStepDown(baseTier) {
+    let tier = baseTier;
     const safe = this._safeLevel ?? 0;
     if (safe > 0) {
       const order = ['high', 'low', 'mobile'];
@@ -1284,8 +1365,10 @@ export class BabylonWorldScene {
     }
 
     if (typeof console !== 'undefined') {
+      const pref = loadQualityPref();
       console.info(
-        `[Aurisar] GPU: ${renderer ?? 'unknown'} — quality tier: ${tier}` +
+        `[Aurisar] GPU: ${this._gpuRenderer ?? 'unknown'} — quality tier: ${tier}` +
+        (pref !== 'auto' ? ` (quality preference: ${pref})` : '') +
         (safe ? ` (graphics safe level ${safe})` : '')
       );
     }
@@ -1397,6 +1480,10 @@ export class BabylonWorldScene {
     this._decayTimer = setTimeout(() => {
       this._decayTimer = null;
       if (this._disposed || this._ctxLossCount > 0) return;
+      // A sustained-framerate downgrade fired this session. That is not the
+      // "one-off stall" this decay exists to walk back — relaxing it would put
+      // the player straight back on the stack they could not run.
+      if (this._perfDowngraded) return;
       saveSafeLevel((this._safeLevel ?? 0) - 1);
       if (typeof console !== 'undefined') {
         console.info('[Aurisar] Stable run — graphics safe level will relax on next load.');
@@ -1407,8 +1494,185 @@ export class BabylonWorldScene {
   /** Menu hook: clear all safe-mode downgrades and reload at full quality. */
   resetGraphicsQuality() {
     saveSafeLevel(0);
+    saveQualityPref('auto');
+    saveReflectionsPref(true);
     try { sessionStorage.removeItem('aurisar.world.gfx.downgraded'); } catch { /* ignore */ }
     if (typeof window !== 'undefined') window.location?.reload?.();
+  }
+
+  // ── Frame-budget governor ──────────────────────────────────────────────────
+  //
+  // One throttled observer owning both per-frame cost controls that depend on
+  // where the player is and how the frame budget is actually holding up. It runs
+  // on its own observer rather than inside _tick because _tick is gated on
+  // `this._local` — i.e. it does not run during load, which is exactly when the
+  // budget is tightest and when an ungated lake mirror is pure waste.
+  _setupPerfGovernor() {
+    this._perfState      = createPerfState(nowMs());
+    this._mirrorRate     = null;   // last value WRITTEN to the mirror (see _updateWaterMirror)
+    this._perfDowngraded = false;
+    this._lastGovernorAt = 0;
+    // Goes through the setter so the shader term and the mirror agree from the
+    // first frame, not just after the first menu interaction.
+    this._setReflectionsActive(loadReflectionsPref());
+
+    this._governorObs = this.scene.onBeforeRenderObservable.add(() => {
+      const now = nowMs();
+      if (now - this._lastGovernorAt < GOVERNOR_INTERVAL_MS) return;
+      this._lastGovernorAt = now;
+      this._updateWaterMirror();
+      this._samplePerformance(now);
+    });
+  }
+
+  // Gate the lake's planar reflection on whether it can actually be seen.
+  // Policy (and the reasoning for the ranges) lives in waterMirrorGate.js.
+  _updateWaterMirror() {
+    const mirror = this.scene.metadata?.ashwood?.waterMirror;
+    if (!mirror) return; // low/mobile tier, or reflective water not built
+
+    let rate = MIRROR_OFF;
+    if (this._reflectionsOn) {
+      const p    = this._local?.root?.position;
+      const lake = this._worldgen?.config?.lake;
+      rate = resolveMirrorRefreshRate({
+        distance: (p && lake) ? Math.hypot(p.x - lake.x, p.z - lake.z) : NaN,
+        waterRadius: lake?.waterR ?? 0,
+        // The castle interior and dungeon instances live in their own flat
+        // coordinate region, so a raw distance to the lake means nothing there.
+        indoors: !!this._castle?.isInside() || this._localDungeonInstanceId > 0n,
+        wasOff: this._mirrorRate === MIRROR_OFF,
+      });
+    }
+
+    // Only write on CHANGE. RenderTargetTexture's refreshRate setter calls
+    // resetRefreshCounter(), whose "render at least once" rule forces a render
+    // on the next frame — so re-assigning the same value every pass would make
+    // the mirror render every pass regardless of the rate we asked for.
+    if (rate !== this._mirrorRate) {
+      this._mirrorRate = rate;
+      mirror.refreshRate = rate;
+    }
+  }
+
+  _samplePerformance(now) {
+    if (this.options.autoRecoverGraphics === false) return;
+    const { state, shed } = samplePerf(this._perfState, {
+      fps: this.engine?.getFps?.() ?? NaN,
+      nowMs: now,
+      hidden: typeof document !== 'undefined' && document.visibilityState === 'hidden',
+    });
+    this._perfState = state;
+    if (shed) this._shedGraphicsStep(state.steps);
+  }
+
+  // Shed one step of per-frame cost, in-session and without a reload.
+  //
+  // The context-loss ladder reloads because a lost context has already taken the
+  // world away. Sustained-low-framerate has not: yanking a player out of a fight
+  // to rebuild the scene is a worse outcome than the framerate they had. So the
+  // live steps are limited to things that can be torn down safely mid-session,
+  // and the persisted safeLevel carries the verdict into the NEXT load, where
+  // the tier is chosen at construction time and can drop the things that cannot
+  // be removed live (cascaded shadows, the HDR pipeline).
+  _shedGraphicsStep(step) {
+    const fps = Math.round(this.engine?.getFps?.() ?? 0);
+    let what;
+
+    if (step === 1) {
+      // The three largest high-tier costs that are safe to drop live.
+      this._setReflectionsActive(false);
+      this._disposeSsao();
+      if (this._volClouds) this.setVolumetricClouds(false);
+      what = 'reflections, ambient occlusion and volumetric clouds';
+    } else if (step === 2) {
+      this._raiseHardwareScaling(1);        // stop rendering above CSS resolution
+      what = 'render resolution (native)';
+    } else {
+      this._raiseHardwareScaling(1 / 0.75); // render below CSS resolution, browser upscales
+      what = 'render resolution (75%)';
+    }
+
+    // First step also records the verdict for next load, and cancels the
+    // stability decay — that timer exists to walk back a downgrade caused by a
+    // one-off stall, and this was not one off, it was eight sustained seconds.
+    if (!this._perfDowngraded) {
+      this._perfDowngraded = true;
+      const next = Math.min(MAX_SAFE_LEVEL, (this._safeLevel ?? 0) + 1);
+      saveSafeLevel(next);
+      try { sessionStorage.setItem('aurisar.world.gfx.downgraded', String(next)); }
+      catch { /* quota / private mode */ }
+    }
+
+    if (typeof console !== 'undefined') {
+      console.info(`[Aurisar] ${fps} fps sustained — reduced ${what}. Adjust under Menu → Graphics.`);
+    }
+  }
+
+  // Explicit on/off, as opposed to the governor's distance throttle.
+  //
+  // Holding the mirror is enough when the lake is too far to read, but not when
+  // the player is standing on the shore and turns reflections off — the frozen
+  // texture would smear across the surface as the camera moves. So an explicit
+  // off also fades the shader's reflection term to zero, landing the water on
+  // exactly the fresnel-sky look the low/mobile tier renders. That is why this
+  // does not need a reload even though `#define REFLECT` is compile-time.
+  _setReflectionsActive(on) {
+    this._reflectionsOn = !!on;
+    this.scene?.metadata?.ashwood?.setWaterReflectAmt?.(this._reflectionsOn ? 1 : 0);
+    this._updateWaterMirror();
+  }
+
+  _disposeSsao() {
+    if (!this._ssao) return;
+    try { this._ssao.dispose(); }
+    catch (err) {
+      if (typeof console !== 'undefined') console.warn('[Aurisar] SSAO teardown failed:', err);
+    }
+    this._ssao = null;
+  }
+
+  // Hardware scaling is inverse: LEVEL 1 = CSS resolution, <1 = supersampled,
+  // >1 = upscaled. Only ever raise it here — a shed must not accidentally
+  // increase the pixel count on a machine already rendering below native.
+  _raiseHardwareScaling(level) {
+    const cur = this.engine?.getHardwareScalingLevel?.() ?? 1;
+    if (level > cur) this.engine.setHardwareScalingLevel(level);
+  }
+
+  // ── Graphics settings (game menu) ──────────────────────────────────────────
+
+  /** Everything the menu needs to render the Graphics section. */
+  getGraphicsInfo() {
+    return {
+      tier: this._qualityTier,
+      gpu: this._gpuRenderer ?? null,
+      pref: loadQualityPref(),
+      safeLevel: this._safeLevel ?? 0,
+      // Mobile is already the lightest path; there is nothing below it to pick.
+      canChooseTier: !this._isMobile,
+      reflectionsSupported: !!this.scene?.metadata?.ashwood?.waterMirror,
+      reflections: !!this._reflectionsOn,
+      autoReduced: !!this._perfDowngraded,
+    };
+  }
+
+  getQualityPreference() { return loadQualityPref(); }
+
+  /**
+   * Persist a quality preference and reload. The tier decides which effects are
+   * *constructed* (HDR pipeline, cascaded shadows, reflective water), so it can
+   * only take effect on a fresh scene — unlike the live toggles above.
+   */
+  setQualityPreference(pref) {
+    saveQualityPref(pref);
+    if (typeof window !== 'undefined') window.location?.reload?.();
+  }
+
+  getReflections() { return !!this._reflectionsOn; }
+  setReflections(on) {
+    saveReflectionsPref(on);
+    this._setReflectionsActive(on);
   }
 
   _setupCamera() {
@@ -3359,6 +3623,10 @@ export class BabylonWorldScene {
     if (this._recoveryTimer)     { clearTimeout(this._recoveryTimer);     this._recoveryTimer = null; }
     if (this._restoreCheckTimer) { clearTimeout(this._restoreCheckTimer); this._restoreCheckTimer = null; }
     if (this._decayTimer)        { clearTimeout(this._decayTimer);        this._decayTimer = null; }
+    if (this._governorObs) {
+      this.scene?.onBeforeRenderObservable?.remove(this._governorObs);
+      this._governorObs = null;
+    }
 
     window.removeEventListener('keydown', this._kd);
     window.removeEventListener('keyup',   this._ku);
