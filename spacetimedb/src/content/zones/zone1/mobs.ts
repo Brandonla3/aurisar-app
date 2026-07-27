@@ -233,6 +233,7 @@ export const MOBS: MobDef[] = [
     respawnSec: 240,
     glbKey: 'tribal',
     lootTable: [
+      { itemId: 'serahs_dagger', chance: 1, min: 1, max: 1 },
       { itemId: 'bandit_bandana', chance: 1, min: 1, max: 1 },
       { itemId: 'linen_scrap', chance: 0.5, min: 1, max: 1 },
     ],
@@ -255,6 +256,7 @@ export const MOBS: MobDef[] = [
     respawnSec: 240,
     glbKey: 'wolf',
     lootTable: [
+      { itemId: 'rutfangs_hide', chance: 1, min: 1, max: 1 },
       { itemId: 'wolf_fang', chance: 1, min: 1, max: 2 },
     ],
     copperMin: 100,
@@ -276,6 +278,7 @@ export const MOBS: MobDef[] = [
     respawnSec: 240,
     glbKey: 'spider',
     lootTable: [
+      { itemId: 'chitter_queens_crown', chance: 1, min: 1, max: 1 },
       { itemId: 'webwood_silk', chance: 1, min: 2, max: 3 },
       { itemId: 'spider_leg', chance: 0.6, min: 1, max: 1 },
     ],
@@ -304,7 +307,10 @@ export const SPAWNS: SpawnDef[] = [
   { netId: 'z1_boars_b',    mobType: 'wild_boar',      zoneId: 1, pos: at(L.tuskfield, 15, -15),     count: 5, radiusM: 18 },
   // Gloomweb (west)
   { netId: 'z1_spiders',    mobType: 'webwood_spider', zoneId: 1, pos: at(L.gloomweb, 0, 1),         count: 7, radiusM: 22 },
-  { netId: 'z1_chitter_q',  mobType: 'chitter_queen',  zoneId: 1, pos: at(L.gloomweb, 18, 12),        count: 1, radiusM: 3 },
+  // Offset nudged past the spider pack's own radius (22m) with real margin —
+  // she sat 21.1m from z1_spiders' center at the old (18,12) offset, inside
+  // the pack's own footprint.
+  { netId: 'z1_chitter_q',  mobType: 'chitter_queen',  zoneId: 1, pos: at(L.gloomweb, 28, 16),        count: 1, radiusM: 3 },
   // Stillmere shore (northwest)
   { netId: 'z1_murlocs',    mobType: 'mudfin_murloc',  zoneId: 1, pos: at(L.stillmere, 17, -31),     count: 8, radiusM: 14 },
   // Rustvein Dig (southwest)

@@ -118,7 +118,7 @@ describe('mob camps', () => {
     z1_boars_a: { x: 55, z: 12 },
     z1_boars_b: { x: 80, z: -15 },
     z1_spiders: { x: -60, z: 5 },
-    z1_chitter_q: { x: -42, z: 16 },
+    z1_chitter_q: { x: -32, z: 20 },
     z1_murlocs: { x: -75, z: 57 },
     z1_kobolds: { x: -82, z: -62 },
     z1_bandits_a: { x: 65, z: -65 },

@@ -3,9 +3,9 @@
  * design's starter zone (see public/assets/ATTRIBUTION.md). All text is
  * placeholder copy the story pass rewrites.
  *
- * Kill objectives: q_first_blood · q_wolves, q_bandits → q_ringleader ·
- * q_bandits → q_serahs_trail (curve fix: Serah replaces the accidental
- * overworld Gorrak duplicate) · q_murlocs · q_mine · q_bones
+ * Kill objectives: q_first_blood · q_wolves, q_bandits → q_ringleader,
+ * q_serahs_trail (curve fix: Serah replaces the accidental overworld Gorrak
+ * duplicate) · q_murlocs · q_mine · q_bones
  * Collect objectives (P4 phase 2): q_greyjaw, q_boars, q_spiders, q_supplies
  * Edran chain (P4 phase 5): q_whispers → q_names_of_the_dead →
  * q_silence_the_call → q_rite

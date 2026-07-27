@@ -41,4 +41,9 @@ export const ZONE1_ITEMS: ItemDef[] = [
   // ── Quest rewards (active questline) ───────────────────────────────
   { id: 'marshals_blade', name: "Marshal's Blade", icon: '⚔️', type: 'weapon', stack: 1, quality: 'uncommon', slot: 'mainHand', gameStats: { weaponDmgMin: 5, weaponDmgMax: 9, weaponSpeedSec: 2.5, STR: 1 }, minLevel: 3 },
   { id: 'militia_vest',   name: 'Militia Vest',   icon: '🦺', type: 'armor', stack: 1, quality: 'uncommon', slot: 'chest', gameStats: { armor: 16, CON: 1 }, minLevel: 5 },
+
+  // ── Rare trophies (guaranteed drops, curve fix) ─────────────────────
+  { id: 'serahs_dagger',        name: "Serah's Dagger",        icon: '🗡️', type: 'weapon', stack: 1, quality: 'uncommon', slot: 'mainHand', gameStats: { weaponDmgMin: 7, weaponDmgMax: 11, weaponSpeedSec: 1.8, DEX: 1 }, fitnessPerks: { muscleGroups: { forearm: 1.04 } }, minLevel: 5 },
+  { id: 'rutfangs_hide',        name: "Rutfang's Hide",        icon: '🐾', type: 'armor',  stack: 1, quality: 'uncommon', slot: 'chest',    gameStats: { armor: 17, CON: 1 }, fitnessPerks: { muscleGroups: { legs: 1.04 } }, minLevel: 5 },
+  { id: 'chitter_queens_crown', name: "Chitter-Queen's Crown", icon: '🕸️', type: 'armor',  stack: 1, quality: 'uncommon', slot: 'head',     gameStats: { armor: 6, INT: 1 }, fitnessPerks: { categories: { endurance: 1.03 } }, minLevel: 6 },
 ];
