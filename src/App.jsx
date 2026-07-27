@@ -78,7 +78,10 @@ const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(
   default: m.LandingPage
 })));
 const AdminPage = lazyWithRetry(() => import('./components/AdminPage'));
-const WorldOverlay = lazyWithRetry(() => import('./features/world/WorldOverlay.jsx'));
+// The World tab lands on the hub, not the scene. WorldHub owns entry, the
+// graphics settings (reachable with no engine running) and the error boundary
+// around the 3D world; it lazy-loads WorldOverlay itself when the player enters.
+const WorldHub = lazyWithRetry(() => import('./features/world/WorldHub.jsx'));
 import PlansTabContainer from './components/PlansTabContainer';
 import LiveWorkoutBanner from './components/LiveWorkoutBanner';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
@@ -4933,14 +4936,11 @@ function App() {
         position: "fixed",
         inset: 0,
         zIndex: 900
-      }} />}{navMenuOpen && <div className={"nav-menu-panel"}>{[{
-          icon: "⚔️",
-          label: "Character",
-          action: () => guardAll(() => {
-            setActiveTab("character");
-            setNavMenuOpen(false);
-          })
-        }, {
+      }} />}{navMenuOpen && <div className={"nav-menu-panel"}>{[
+        // Character moved to the World hub (World tab → Character). The
+        // activeTab === "character" render below stays put so setActiveTab
+        // callers elsewhere keep working.
+        {
           icon: "📜",
           label: "Plans",
           action: () => guardAll(() => {
@@ -6288,16 +6288,65 @@ function App() {
       />
     )
 
-    /* ══ WORLD OVERLAY ══════════════════════════ */}{activeTab === "world" && (
+    /* ══ WORLD HUB ══════════════════════════════ */}{activeTab === "world" && (
       <React.Suspense fallback={<div style={{position:"fixed",top:0,right:0,bottom:0,left:0,zIndex:9999,background:"#000"}} />}>
-        <WorldOverlay
+        <WorldHub
           onClose={() => setActiveTab(prevTab || "workout")}
-          username={profile?.username}
-          aurisarClass={profile?.class_type}
-          avatarConfig={avatarConfig}
-          fitnessXp={profile?.xp ?? 0}
-          fitnessXpBaseline={0}
-          onEquipPerksChange={handleEquipPerksChange}
+          worldProps={{
+            username: profile?.username,
+            aurisarClass: profile?.class_type,
+            avatarConfig,
+            fitnessXp: profile?.xp ?? 0,
+            fitnessXpBaseline: 0,
+            onEquipPerksChange: handleEquipPerksChange,
+          }}
+          /* Character and Guild are rendered HERE, not imported by the hub —
+             every prop below is App-owned state, so keeping the wiring at the
+             state's home leaves WorldHub a presentational shell. */
+          characterSlot={
+            <CharacterTab
+              profile={profile}
+              cls={cls}
+              level={level}
+              clsKey={clsKey}
+              myPublicId={myPublicId}
+              charSubTab={charSubTab}
+              setCharSubTab={setCharSubTab}
+              avatarConfig={avatarConfig}
+              onSaveAvatar={saveAvatarConfig}
+              savingAvatar={savingAvatar}
+            />
+          }
+          guildSlot={
+            <GuildTab
+              socialMsg={socialMsg}
+              friendSearch={friendSearch}
+              setFriendSearch={setFriendSearch}
+              friendSearchResult={friendSearchResult}
+              setFriendSearchResult={setFriendSearchResult}
+              setSocialMsg={setSocialMsg}
+              searchFriendByEmail={searchFriendByEmail}
+              friendSearchLoading={friendSearchLoading}
+              sendFriendRequest={sendFriendRequest}
+              rescindFriendRequest={rescindFriendRequest}
+              friendRequests={friendRequests}
+              acceptFriendRequest={acceptFriendRequest}
+              rejectFriendRequest={rejectFriendRequest}
+              incomingShares={incomingShares}
+              acceptShare={acceptShare}
+              declineShare={declineShare}
+              outgoingRequests={outgoingRequests}
+              friends={friends}
+              removeFriend={removeFriend}
+              friendRecentEvents={friendRecentEvents}
+              authUser={authUser}
+              socialLoading={socialLoading}
+              loadSocialData={loadSocialData}
+              loadIncomingShares={loadIncomingShares}
+              openDmWithUser={openDmWithUser}
+              setShareModal={setShareModal}
+            />
+          }
         />
       </React.Suspense>
     )

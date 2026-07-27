@@ -20,6 +20,7 @@
 
 import { hash2, computeGroundSplat } from '../worldgen/index.js';
 import { buildBladeClusterVertexData, createGrassMaterial } from './grassBlades.js';
+import { foliageForScene } from './graphicsSettings.js';
 
 // Tier-scaled geometry, ring, and per-cell blade count. perCell is the density
 // multiplier — the lever that turns a sparse card field into real grass.
@@ -46,8 +47,11 @@ export class AshwoodGrass {
     this.lastX = 1e9;
     this.lastZ = 1e9;
 
-    const tier = scene.metadata?.ashwood?.qualityTier;
-    const cfg = TIERS[tier] ?? TIERS.high;
+    // Keyed off the player's "Grass & foliage" setting, whose per-tier defaults
+    // map back to exactly these three rows (graphicsSettings.FOLIAGE_LEVELS) —
+    // so leaving it alone reproduces the tier's density, and turning it down
+    // works on any tier.
+    const cfg = TIERS[foliageForScene(scene).grass] ?? TIERS.high;
     this.CELL = cfg.cell;
     this.RADIUS = cfg.radius;
     this.PER_CELL = cfg.perCell;

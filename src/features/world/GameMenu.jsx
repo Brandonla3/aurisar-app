@@ -8,6 +8,8 @@ import React, { useState, useEffect } from 'react';
 import WorldModal from './ui/WorldModal.jsx';
 import { HOTKEYS } from './game/hotkeys.js';
 import { FONT, ghostBtn } from './ui/panelTheme.js';
+import GraphicsSettingsPanel from './ui/GraphicsSettingsPanel.jsx';
+import { worldGraphicsStyles } from './ui/graphicsPanelStyles.js';
 
 function Toggle({ label, on, onClick }) {
   return (
@@ -96,130 +98,31 @@ function TimeOfDayControl({ sceneRef }) {
   );
 }
 
-// Volumetric clouds (Phase 6) — high graphics tier only; the scene hides the
-// toggle entirely on devices that don't run the high-tier stack. State lives
-// in BabylonWorldScene (persisted to localStorage), the menu just mirrors it.
-function VolumetricCloudsToggle({ sceneRef }) {
-  // Ref reads happen in the effect (not during render) — mirrors the live
-  // scene state when the menu opens.
-  const [state, setState] = useState({ supported: false, on: false });
-  useEffect(() => {
-    const s = sceneRef?.current;
-    setState({
-      supported: s?.supportsVolumetricClouds?.() ?? false,
-      on: s?.getVolumetricClouds?.() ?? false,
-    });
-  }, [sceneRef]);
-  if (!state.supported) return null;
-  return (
-    <Toggle
-      label="Volumetric clouds"
-      on={state.on}
-      onClick={() => {
-        const next = !state.on;
-        setState((p) => ({ ...p, on: next }));
-        sceneRef?.current?.setVolumetricClouds?.(next);
-      }}
-    />
-  );
-}
-
-const QUALITY_OPTIONS = [
-  { id: 'auto',     label: 'Auto',     hint: 'Detect from your GPU' },
-  { id: 'high',     label: 'High',     hint: 'Reflections, ambient occlusion, cascaded shadows' },
-  { id: 'balanced', label: 'Balanced', hint: 'Simpler shadows and water, no ambient occlusion' },
-  { id: 'low',      label: 'Low',      hint: 'The mobile render path' },
-];
-
 /**
  * Graphics section.
  *
  * The world picks its effect tier by sniffing the GPU's renderer string, which
  * browsers increasingly mask — and a masked string falls through to the heaviest
- * stack. Until now there was no way for a player on the wrong side of that guess
- * to say so. Tier changes reload (the tier decides what gets *built*); the
- * reflection toggle is live.
+ * stack. This is where a player on the wrong side of that guess says so.
+ *
+ * The controls themselves live in GraphicsSettingsPanel, shared verbatim with
+ * the pre-world hub: same options, same store, only the skin differs. That
+ * matters because the hub is the copy a player can still reach when the world
+ * itself won't run.
  */
 function GraphicsSettings({ sceneRef }) {
-  const [info, setInfo] = useState(null);
-
-  useEffect(() => {
-    setInfo(sceneRef?.current?.getGraphicsInfo?.() ?? null);
-  }, [sceneRef]);
-
-  if (!info) return null;
-
-  const label = { fontSize: 11, color: '#94a3b8', fontFamily: FONT, margin: '0 0 6px' };
+  // Ref read happens in an effect, not during render — and re-runs when the
+  // menu opens so the panel reflects anything the governor shed meanwhile.
+  const [scene, setScene] = useState(null);
+  useEffect(() => { setScene(sceneRef?.current ?? null); }, [sceneRef]);
+  if (!scene) return null;
 
   return (
     <>
       <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#94a3b8', fontFamily: FONT, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         Graphics
       </h3>
-
-      {info.autoReduced && (
-        <p style={{ ...label, color: '#fbbf77' }}>
-          Quality was reduced automatically — the framerate stayed low for several
-          seconds. Reset below to try the full stack again.
-        </p>
-      )}
-
-      {info.canChooseTier && (
-        <div style={{ marginBottom: 10 }}>
-          <p style={label}>Quality · changing this reloads the world</p>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {QUALITY_OPTIONS.map((o) => {
-              const active = info.pref === o.id;
-              return (
-                <button
-                  key={o.id}
-                  title={o.hint}
-                  onClick={() => { if (!active) sceneRef?.current?.setQualityPreference?.(o.id); }}
-                  style={{
-                    ...ghostBtn, padding: '4px 10px', fontSize: 12,
-                    color: active ? '#0b1220' : '#cbd5e1',
-                    background: active ? '#c49428' : ghostBtn.background,
-                    border: active ? '1px solid #c49428' : ghostBtn.border,
-                    fontWeight: active ? 700 : 600,
-                  }}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-        {info.reflectionsSupported && (
-          <Toggle
-            label="Water reflections"
-            on={info.reflections}
-            onClick={() => {
-              const next = !info.reflections;
-              setInfo((p) => ({ ...p, reflections: next }));
-              sceneRef?.current?.setReflections?.(next);
-            }}
-          />
-        )}
-        <VolumetricCloudsToggle sceneRef={sceneRef} />
-      </div>
-
-      <p style={{ ...label, fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5 }}>
-        Rendering at <span style={{ color: '#7dd3fc' }}>{info.tier}</span>
-        {info.safeLevel > 0 && <> · safe level {info.safeLevel}</>}
-        {info.gpu && <><br />{info.gpu}</>}
-      </p>
-
-      {(info.safeLevel > 0 || info.pref !== 'auto' || info.autoReduced) && (
-        <button
-          style={{ ...ghostBtn, padding: '4px 10px', fontSize: 12, marginBottom: 18 }}
-          onClick={() => sceneRef?.current?.resetGraphicsQuality?.()}
-        >
-          ↺ Reset graphics quality
-        </button>
-      )}
+      <GraphicsSettingsPanel scene={scene} styles={worldGraphicsStyles} />
     </>
   );
 }
@@ -251,7 +154,7 @@ export default function GameMenu({ onClose, onOpenMap, onOpenInventory, onOpenCo
             cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          Exit World
+          Leave World
         </button>
       </div>
 

@@ -20,6 +20,7 @@
 import { mulberry32, hash2 } from '../worldgen/index.js';
 import { parseTileId } from './tileMath.js';
 import { buildBladeClusterVertexData, createGrassMaterial } from '../game/grassBlades.js';
+import { foliageForScene } from '../game/graphicsSettings.js';
 
 const rand = (rng, a, b) => a + rng() * (b - a);
 
@@ -577,8 +578,14 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // itself needed to get lighter, not just react faster once it's struggling.
   // This is a real, visible density cut on those two tiers specifically
   // (fewer overlapping cards per canopy); high/desktop is untouched.
-  const tier = scene.metadata?.ashwood?.qualityTier ?? 'high';
-  const leafScale = tier === 'mobile' ? 0.45 : tier === 'low' ? 0.6 : 1;
+  //
+  // Now driven by the player's "Grass & foliage" setting rather than the tier
+  // directly (graphicsSettings.FOLIAGE_LEVELS), whose per-tier defaults are
+  // exactly the scales above — so a player who leaves it alone gets the tuning
+  // described here, and one who turns it down gets it on a tier that would
+  // otherwise have rendered full density.
+  const foliage = foliageForScene(scene);
+  const leafScale = foliage.leafScale;
 
   // Ground-detail density (fern/tuft/flower understory): the same lever,
   // extended to a spot the tier scaling never reached before — every biome
@@ -587,7 +594,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // consumed below for pick/scale/tint) means which details survive is still
   // fully deterministic per seed, but never perturbs the RNG sequence a
   // surviving detail's own look is drawn from.
-  const detailScale = tier === 'mobile' ? 0.55 : tier === 'low' ? 0.7 : 1;
+  const detailScale = foliage.detailScale;
 
   // ── overworld trees (prototype spawnTree) ──
   for (const t of s.trees) {

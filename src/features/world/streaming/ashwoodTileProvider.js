@@ -60,9 +60,11 @@ export class AshwoodTileProvider {
       // Splat-blended PBR terrain: fully procedural grass/dirt/rock/sand/field,
       // blended per-fragment by the per-vertex terrainSplat weights baked in
       // _buildGround plus in-shader slope. Keeps all PBR lighting/shadows/fog.
-      ground = createTerrainMaterial(scene, {
-        tier: scene.metadata?.ashwood?.qualityTier,
-      });
+      // No `tier` override: createTerrainMaterial resolves the shader row from
+      // the player's "Terrain detail" setting, falling back to the scene's tier.
+      // Passing the tier here would win over that setting and make the control
+      // dead on every streamed tile — which is the whole production path.
+      ground = createTerrainMaterial(scene);
     }
 
     let water, lakeWater, streamWater;
