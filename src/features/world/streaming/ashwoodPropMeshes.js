@@ -810,8 +810,9 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
     if (templates.leafCard) {
       // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
-      // (Performance is explicitly out of scope this round; thin instances keep
-      // this one draw call per tile regardless of card count.)
+      // Thin instances keep this one draw call per tile regardless of card
+      // count; `leafScale` (tier-scaled, see above) is the actual fill-rate
+      // lever on top of that.
       const cards = Math.round(Math.min(220, (90 + cr * 16) | 0) * leafScale);
       const ccy = cby + ch * 0.2;           // canopy (ellipsoid) center height
       for (let c = 0; c < cards; c++) {

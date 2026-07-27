@@ -77,6 +77,18 @@ describe('buildPropTemplates — freeze contract', () => {
     expect(T.fern.material.isFrozen).toBe(true);
     scene.dispose();
   });
+
+  it('never freezes leafCardMat — the highest-risk exclusion, live mode only', () => {
+    // T.leafCard only exists when !opts.bake (bake mode has no leaf art at
+    // all). This is the one material where freezing early would be worst:
+    // its texture and .alpha both flip asynchronously in the image-decode
+    // pipeline's onload/onerror, well after construction.
+    const scene = newScene('high');
+    const T = buildPropTemplates(scene, { bake: false });
+    expect(T.leafCard).toBeTruthy();
+    expect(T.leafCard.material.isFrozen).toBe(false);
+    scene.dispose();
+  });
 });
 
 // ── buildTileProps: tier-scaled ground-detail density ───────────────────────
@@ -157,6 +169,40 @@ describe('buildTileProps — tier-scaled understory density', () => {
     buildTileProps(TILE_META, scene, wg, templates, container, inBoundsTile, null, { lights: false });
     expect(tuftCount(container)).toBe(0);
     scene.dispose();
+  });
+});
+
+function leafCardCount(container) {
+  const mesh = container.meshes.find((m) => m.name === `tile_${TILE_META.id}_leafcards`);
+  return mesh ? mesh.thinInstanceCount : 0;
+}
+
+describe('buildTileProps — tier-scaled leafScale (the main fill-rate lever)', () => {
+  it('scales the broadleaf canopy card count exactly the way leafScale intends', () => {
+    // One broadleaf tree, same seed reused across all three tier runs — each
+    // buildTileProps call re-seeds mulberry32(t.seed) from scratch, so the
+    // pre-scale card count ("150 + (rng()*60|0)") is bit-for-bit identical
+    // every time. Capturing it from the high-tier run (leafScale 1, so no
+    // rounding to undo) lets every other tier's count be predicted exactly,
+    // rather than just asserting "fewer than high".
+    const wg = makeWg({ biomeGrass: -1 }); // no understory noise in this count
+    wg.sites.trees = [{ x: 0, z: 0, seed: 4242, kind: 'broadleaf' }];
+
+    const counts = {};
+    for (const tier of ['high', 'low', 'mobile']) {
+      const scene = newScene(tier);
+      const templates = buildPropTemplates(scene, { bake: false });
+      const container = new BABYLON.AssetContainer(scene);
+      buildTileProps(TILE_META, scene, wg, templates, container, inBoundsTile, null, { lights: false });
+      counts[tier] = leafCardCount(container);
+      scene.dispose();
+    }
+
+    const preScale = counts.high; // leafScale 1 on high — exact, no rounding loss
+    expect(counts.low).toBe(Math.round(preScale * 0.6));
+    expect(counts.mobile).toBe(Math.round(preScale * 0.45));
+    expect(counts.mobile).toBeLessThan(counts.low);
+    expect(counts.low).toBeLessThan(counts.high);
   });
 });
 

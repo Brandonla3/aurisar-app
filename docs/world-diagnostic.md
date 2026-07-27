@@ -60,8 +60,9 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
 - **P1 — leaf-card fill.** Canopy quads are now single-sided: the material already
   draws both faces (`backFaceCulling=false` + `twoSidedLighting`), so the `DOUBLESIDE`
   geometry was doubling vertices *and* overdraw for no visual gain — ~halved on every
-  tier. Plus a tier-scaled card budget (mobile 0.6×, low 0.8×, high unchanged), so
-  mobile leaf fill drops ~⅔ overall. (`ashwoodPropMeshes.js`)
+  tier. Plus a tier-scaled card budget (mobile 0.6×, low 0.8×, high unchanged — tightened
+  again in Batch 2c to 0.45×/0.6×), so mobile leaf fill drops ~⅔ overall.
+  (`ashwoodPropMeshes.js`)
 - **P5 — mob material churn.** `_stdMat` caches per type/family; the two HP-bar
   materials are shared; `_removeMob` no longer disposes the shared materials; the
   redundant per-frame HP-bar `lookAt` is gone (the planes already billboard).
