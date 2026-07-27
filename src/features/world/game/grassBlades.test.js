@@ -30,6 +30,56 @@ function grassPlugin(mat) {
 }
 
 describe('createGrassMaterial', () => {
+  it('is frozen — no texture is ever assigned to a grass material, so this is unconditionally safe', () => {
+    const scene = newScene();
+    const mat = createGrassMaterial(scene, { maxH: 0.5, name: 'g' });
+    expect(mat.isFrozen).toBe(true);
+    scene.dispose();
+  });
+
+  it('keeps pushing the wind-clock uniforms every frame even though the material is frozen', async () => {
+    // The risk freeze() carries in general is that a shared material's bind
+    // gets skipped for meshes after the first each frame — but the plugin's
+    // bindForSubMesh runs on whatever bind DOES happen, and its uniforms are
+    // scene-global (the shared wind clock, weather), not per-mesh, so there is
+    // nothing for that skip to make stale. Pin that the hook still actually
+    // fires across frames, so wind can never visually freeze in place.
+    const scene = newScene();
+    // newScene() doesn't set an active camera — harmless for the other tests
+    // here (they only assert "doesn't throw" or inspect plugin state), but
+    // scene.render() silently no-ops without one, which would make this
+    // test's whole premise vacuous.
+    scene.activeCamera = scene.cameras[0];
+    const geo = buildBladeClusterVertexData({ planes: 2, segments: 3, height: 0.5 });
+    const mat = createGrassMaterial(scene, { maxH: geo.maxH, name: 'g' });
+    const mesh = new BABYLON.Mesh('grass', scene);
+    const vd = new BABYLON.VertexData();
+    vd.positions = geo.positions; vd.indices = geo.indices; vd.normals = geo.normals; vd.uvs = geo.uvs;
+    vd.applyToMesh(mesh);
+    mesh.material = mat;
+    mesh.thinInstanceSetBuffer('matrix', new Float32Array(BABYLON.Matrix.IdentityReadOnly.m), 16, false);
+    mesh.thinInstanceCount = 1;
+    mesh.thinInstanceRefreshBoundingInfo();
+    mesh.alwaysSelectAsActiveMesh = true; // skip frustum culling — not what's under test here
+
+    const plugin = grassPlugin(mat);
+    let calls = 0;
+    const orig = plugin.bindForSubMesh.bind(plugin);
+    plugin.bindForSubMesh = (...args) => { calls += 1; return orig(...args); };
+
+    expect(mat.isFrozen).toBe(true);
+    // Shader "compilation" under NullEngine still resolves asynchronously —
+    // the mesh isn't actually ready (and nothing binds) on the very first
+    // synchronous render() call, so yield between frames the same way a real
+    // render loop would across real frames.
+    for (let f = 0; f < 5; f++) {
+      scene.render();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    expect(calls).toBeGreaterThan(0);
+    scene.dispose();
+  });
+
   it('is a StandardMaterial carrying the GrassWind plugin, rendered opaque', () => {
     const scene = newScene();
     const mat = createGrassMaterial(scene, { maxH: 0.5, name: 'g' });

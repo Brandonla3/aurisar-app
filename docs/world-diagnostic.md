@@ -60,8 +60,9 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
 - **P1 — leaf-card fill.** Canopy quads are now single-sided: the material already
   draws both faces (`backFaceCulling=false` + `twoSidedLighting`), so the `DOUBLESIDE`
   geometry was doubling vertices *and* overdraw for no visual gain — ~halved on every
-  tier. Plus a tier-scaled card budget (mobile 0.6×, low 0.8×, high unchanged), so
-  mobile leaf fill drops ~⅔ overall. (`ashwoodPropMeshes.js`)
+  tier. Plus a tier-scaled card budget (mobile 0.6×, low 0.8×, high unchanged — tightened
+  again in Batch 2c to 0.45×/0.6×), so mobile leaf fill drops ~⅔ overall.
+  (`ashwoodPropMeshes.js`)
 - **P5 — mob material churn.** `_stdMat` caches per type/family; the two HP-bar
   materials are shared; `_removeMob` no longer disposes the shared materials; the
   redundant per-frame HP-bar `lookAt` is gone (the planes already billboard).
@@ -98,6 +99,12 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   (e.g. dungeon torches added after a freeze failing to relight the floor).
   `scene.freezeActiveMeshes()` is unsafe here — a chase camera + tile streaming
   constantly change the active-mesh set.
+  > **Narrowed, not superseded — this entry was right to reject "blind."** The terrain
+  > shader and `freezeActiveMeshes()` calls stand as written. But "blind" isn't the only
+  > option: every grass material and every prop material that never receives a texture
+  > (confirmed material-by-material, not assumed) freezes safely with zero recompile-timing
+  > risk. Done in Batch 2c below, with the exact same "dungeon torches" failure mode named
+  > here as the reason the textured foliage materials are deliberately excluded.
 - **P2 — per-instance tree LOD is not expressible** on the current thin-instance foliage
   (one mesh per prop-type per tile; `addLODLevel` keys off the whole mesh, not per
   instance), and the config's 60/180/450 m thresholds barely trigger inside the
@@ -105,6 +112,9 @@ tier (`BabylonWorldScene.js:1490-1501`); terrain is `CreateGround` at 96 subdivi
   per blade at a tier radius (13–24 m), tighter than the config's 45/80 m. The P1 leaf
   work is the pragmatic substitute; true tree LOD wants the deferred streaming re-tile /
   billboard-impostor work (§7).
+  > Still accurate — per-instance LOD remains out of reach without the re-tile. Batch 2c
+  > pushes further on the P1 substitute instead (tighter `leafScale`, plus closing a gap
+  > this analysis didn't cover: ground-detail density had no tier scaling at all).
 
 ### Batch 2b status — the desktop/mobile inversion
 
@@ -170,6 +180,48 @@ themselves to a configuration that cannot boot. `resetGraphicsQuality()` is the 
 or 4K monitor with three-plus full-screen passes, but lowering it blind trades sharpness for
 frames on machines that may not need the trade. It wants the measured `?qa=1` GPU frame-time
 readout on a real monitor, not a blind edit.
+
+### Batch 2c status — closing out P1 and P4
+
+Follow-up from the reporter's own hardware (`Intel(R) UHD Graphics (0x9A60)` — the tier
+sniff correctly placed it on `low`, and it still ran 11-16 fps sustained even after the
+governor's automatic shedding kicked in), plus a direct ask to go after leaf/grass cost
+specifically since they were named as the dominant lag source independent of any one
+machine. Two real levers, both previously deferred:
+
+- **P4 — material freeze, scoped to what's actually safe.** The prior entry rejected
+  `material.freeze()` broadly (it doesn't touch the terrain shader's per-fragment cost) and
+  `scene.freezeActiveMeshes()` outright (chase camera + streaming). Narrower ask this time:
+  every grass material (`grassBlades.js createGrassMaterial` — the AshwoodGrass field AND
+  the tuft/fern understory share this one helper) plus the flat-color prop materials that
+  never receive a texture in `ashwoodPropMeshes.js` (`leaf`, `rockM`, `wood`, `green`,
+  `fLeafM`, `stone`, `boulderM`, the stalagmite/crystal/mushroom/cave-void materials).
+  Deliberately NOT frozen: `bark`, `fTrunkM`, `pine`, `bushM`, and — the highest-value
+  target — `leafCardMat`. All five assign a texture asynchronously
+  (`applyOptionalTexture` / the leaf-card image-decode pipeline), and this Babylon version's
+  `Material.isReady()` has a frozen fast path (confirmed by reading the shipped source, not
+  guessed) that trusts the FIRST successful ready-check forever after, ignoring any later
+  dirty flag — freezing before that async texture settles risks it never taking effect,
+  the exact class of bug this doc already recorded once on the terrain material. The two
+  scene-global per-frame uniform plugins (`GrassWindPlugin`, `LeafSwayPlugin`) are safe
+  under freeze regardless, by construction: their values (wind clock, weather) are identical
+  for every mesh sharing a frozen material in a given frame, so a cached/skipped rebind can't
+  go stale. Covered by `grassBlades.test.js` (frozen + still pushes wind uniforms across
+  real NullEngine render frames) and the new `ashwoodPropMeshes.test.js` (exact frozen/
+  not-frozen material set).
+- **P1 — leaf-card budget pushed further, plus a gap the tier scaling never reached.**
+  `leafScale` (mobile/low canopy card count) tightened from 0.6/0.8 to 0.45/0.6 — a real,
+  visible density cut on those two tiers specifically; high/desktop unchanged. Separately:
+  ground-detail density (fern/tuft/flower understory) had **no tier scaling at all** before
+  this — every biome detail rendered at full count on every device. Two sources, both now
+  tier-scaled the same way leaf cards are: the sparse `s.details` manifest list (a `hash2`
+  skip roll independent of the detail's own `mulberry32(d.seed)` stream, so which details
+  survive is deterministic per seed without perturbing a surviving detail's own
+  pick/scale/tint) and the denser per-tile procedural 260-candidate scatter (a straight
+  loop-bound cut, since that `rng` is scoped to its own block). Covered by
+  `ashwoodPropMeshes.test.js`, which pins both mechanisms against the real per-tier counts
+  (`mobile: 0.55`, `low: 0.7`, `high: 1`) — not just the constants, the actual realized
+  thin-instance counts out of `buildTileProps`.
 
 ### Batch 3 status
 
@@ -459,6 +511,11 @@ a GPU budget.
   barely run the game on my desktop. It runs fine on my phone."* Not a paradox — the two
   devices run different renderers, and the desktop one had no floor under it. See §1
   "Batch 2b status".
+- **Batch 2c — Closing out P1 and P4.** ✅ Follow-up from the reporter's own hardware plus
+  a direct ask to go after leaf/grass cost specifically. Freeze every material that's
+  actually safe to freeze (grass, flat-color props — not the textured foliage the P4 entry
+  already flagged as risky); tighten `leafScale` further on low/mobile; tier-scale
+  ground-detail density, which had no scaling at all before. See §1 "Batch 2c status".
 - **Batch 4 — Deferred / higher-risk.** Server `1600`-origin normalization (live data
   migration) + the `detectZone` 3200 px fossil; streaming re-tile; delete `ashwood_world.json`;
   wire the `danger` gradient to spawns; build Zone 2/3.

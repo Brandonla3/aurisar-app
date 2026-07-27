@@ -157,12 +157,37 @@ export function buildPropTemplates(scene, opts = {}) {
   // canopy + undergrowth foliage sways in the wind
   for (const m of [leaf, pine, bushM, fLeafM]) new LeafSwayPlugin(m);
 
+  // Freeze the materials that NEVER receive a texture, in bake mode or live:
+  // leaf/rockM/wood/green/fLeafM only ever get a flat diffuseColor (+ the sway
+  // plugin's scene-global uniforms above, unaffected by freeze — see the
+  // freeze() note beside leafCardMat below for why that matters and why the
+  // textured siblings — bark, fTrunkM, pine, bushM, leafCardMat — are
+  // deliberately NOT in this list).
+  for (const m of [leaf, rockM, wood, green, fLeafM]) m.freeze();
+
   // Bark surface texture (tileable). The leaf art is a cutout *card*, not a
   // tiling texture, so it is NOT applied to the solid blob/cone canopies — it
   // drives the alpha-cutout leaf quads built below. Skipped in bake mode (the
   // GLB contract is plain geometry + vertex colors); each load is fallback-safe.
   let leafCardMat = null;
   if (!opts.bake) {
+    // NOTE on freezing: none of bark / fTrunkM / pine / bushM / leafCardMat are
+    // frozen (unlike leaf/rockM/wood/green/fLeafM above), and that is not an
+    // oversight. This Babylon version's Material.isReady() has a fast path —
+    // frozen + the submesh's effect was already found ready once → skip
+    // re-evaluating forever after, regardless of any later dirty flag. That is
+    // fine for a material whose configuration never changes post-construction,
+    // but every material below gets a texture assigned via applyOptionalTexture
+    // or (for leafCardMat) an async image-decode pipeline, and the SAME helper's
+    // error path can later clear that texture back out on a load failure. If
+    // freeze() ran before the texture settled, the material could cache
+    // "ready" against an incomplete definition and silently never pick up the
+    // texture (or the fallback) once it actually arrives — the exact class of
+    // regression world-diagnostic.md's P4 entry already recorded once, on the
+    // terrain material. leaf-card is the highest-value target for this (the
+    // map's dominant fill-rate cost — see the leafScale comment below), so
+    // skipping it here is a deliberate trade for correctness, not an oversight.
+    //
     // Bark: albedo + normal. Trunks are tall + thin, so the bark repeats
     // vertically. (Normals are .jpg to match the supplied texture pack.)
     applyOptionalTexture(bark, 'diffuseTexture', `${TEX_BASE}/bark_albedo.jpg`, scene, { uScale: 1, vScale: 3 });
@@ -398,12 +423,19 @@ export function buildPropTemplates(scene, opts = {}) {
   T.boulder = displacedIcoSphere('tpl_boulder', scene, { base: 0.78, amp: 0.34, seed: 23 });
   T.boulder.material = boulderM;
 
+  // stone/boulder: flat colour, never textured — safe to freeze once both
+  // templates above are assigned (see the note beside leafCardMat).
+  stone.freeze();
+  boulderM.freeze();
+
   // stalagmite cone, unit radius/height, center origin
   T.stalag = BABYLON.MeshBuilder.CreateCylinder('tpl_stalag', {
     diameterTop: 0, diameterBottom: 2, height: 1, tessellation: 6,
   }, scene);
   T.stalag.convertToFlatShadedMesh();
-  T.stalag.material = mat('ash_stalag', '#5a5a60');
+  const stalagM = mat('ash_stalag', '#5a5a60');
+  T.stalag.material = stalagM;
+  stalagM.freeze();
 
   // eerie cave crystal — emissive teal cone
   {
@@ -416,6 +448,7 @@ export function buildPropTemplates(scene, opts = {}) {
     }, scene);
     T.crystal.convertToFlatShadedMesh();
     T.crystal.material = crysM;
+    crysM.freeze(); // flat + emissive only, no texture, ever
   }
 
   // glowing mushroom — stem + cap merged under one soft-emissive material
@@ -430,6 +463,7 @@ export function buildPropTemplates(scene, opts = {}) {
     cap.position.y = 0.3;
     T.shroom = mergeKeep('tpl_shroom', [stem, cap]);
     T.shroom.material = shroomM;
+    shroomM.freeze(); // flat + emissive only, no texture, ever
   }
 
   // cave void dome — inward-facing near-black hemisphere; the open mouth of
@@ -442,6 +476,7 @@ export function buildPropTemplates(scene, opts = {}) {
     voidM.specularColor = new BABYLON.Color3(0, 0, 0);
     voidM.disableLighting = true;
     voidM.fogEnabled = false;
+    voidM.freeze(); // flat, no texture, ever
     T.caveDome = BABYLON.MeshBuilder.CreateSphere('tpl_cavedome', {
       diameter: 2, segments: 8, slice: 0.52,
       sideOrientation: BABYLON.Mesh.BACKSIDE,
@@ -535,8 +570,24 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   // high/desktop is unchanged. Canopies keep generous card overlap, so the
   // crown still reads as full. Combined with the single-sided leaf-card
   // geometry this roughly thirds the mobile leaf fill cost.
+  //
+  // Pushed further (was mobile 0.6 / low 0.8) after a report of the low tier
+  // still running well under 25 fps on a real weak-iGPU desktop even after
+  // the Batch 2b frame-budget governor's automatic shedding — i.e. the tier
+  // itself needed to get lighter, not just react faster once it's struggling.
+  // This is a real, visible density cut on those two tiers specifically
+  // (fewer overlapping cards per canopy); high/desktop is untouched.
   const tier = scene.metadata?.ashwood?.qualityTier ?? 'high';
-  const leafScale = tier === 'mobile' ? 0.6 : tier === 'low' ? 0.8 : 1;
+  const leafScale = tier === 'mobile' ? 0.45 : tier === 'low' ? 0.6 : 1;
+
+  // Ground-detail density (fern/tuft/flower understory): the same lever,
+  // extended to a spot the tier scaling never reached before — every biome
+  // detail rendered on every tier at full count. A skip roll drawn from an
+  // independent hash2 salt (not the detail's own mulberry32(d.seed) stream
+  // consumed below for pick/scale/tint) means which details survive is still
+  // fully deterministic per seed, but never perturbs the RNG sequence a
+  // surviving detail's own look is drawn from.
+  const detailScale = tier === 'mobile' ? 0.55 : tier === 'low' ? 0.7 : 1;
 
   // ── overworld trees (prototype spawnTree) ──
   for (const t of s.trees) {
@@ -620,6 +671,7 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
   for (const d of s.details) {
     if (!inBounds(d.x, d.z)) continue;
     if (onBeach(d.x, d.z)) continue;
+    if (detailScale < 1 && hash2(d.seed, 91.7) >= detailScale) continue;
     const rng = mulberry32(d.seed);
     const gy = surfaceY(d.x, d.z);
     const pick = rng();
@@ -758,8 +810,9 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     const hue = t.arch === 0 ? 0.28 + rng() * 0.03 : t.arch === 1 ? 0.30 + rng() * 0.03 : 0.26 + rng() * 0.04;
     if (templates.leafCard) {
       // Pure leaf cards, scaled by canopy radius — no geometric spheres at all.
-      // (Performance is explicitly out of scope this round; thin instances keep
-      // this one draw call per tile regardless of card count.)
+      // Thin instances keep this one draw call per tile regardless of card
+      // count; `leafScale` (tier-scaled, see above) is the actual fill-rate
+      // lever on top of that.
       const cards = Math.round(Math.min(220, (90 + cr * 16) | 0) * leafScale);
       const ccy = cby + ch * 0.2;           // canopy (ellipsoid) center height
       for (let c = 0; c < cards; c++) {
@@ -818,7 +871,14 @@ export function buildTileProps(meta, scene, wg, templates, container, inBounds, 
     const tileSeed = ((col * 73856093) ^ (row * 19349663)) >>> 0;
     const rng = mulberry32((wg.config.seed ^ tileSeed) >>> 0);
     const R2 = wg.config.radius * wg.config.radius;
-    for (let i = 0; i < 260; i++) {
+    // This dense per-tile scatter (up to 260 candidates × up to 9 active
+    // tiles) is a bigger source of understory tuft count than the sparse
+    // s.details list above, so it gets the same detailScale — as a loop-bound
+    // cut rather than a per-candidate skip roll, since this rng is scoped to
+    // this block alone (nothing downstream reuses it), so fewer iterations
+    // changes nothing about determinism beyond "this tier draws fewer".
+    const understoryCount = Math.round(260 * detailScale);
+    for (let i = 0; i < understoryCount; i++) {
       const x = meta.min.x + rng() * (meta.max.x - meta.min.x);
       const z = meta.min.z + rng() * (meta.max.z - meta.min.z);
       if (x * x + z * z > R2 * 0.94) continue;
