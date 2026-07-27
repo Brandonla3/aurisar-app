@@ -515,7 +515,13 @@ export function probeDevice() {
     let gl = null;
     try {
       const canvas = document.createElement('canvas');
-      gl = canvas.getContext('webgl2');
+      // Ask for the SAME GPU the engine will. BabylonWorldScene._createEngine
+      // requests powerPreference 'high-performance' on desktop; without it here,
+      // a switchable-graphics laptop hands the probe its INTEGRATED GPU, so the
+      // hub would sniff an iGPU renderer string, predict a lower tier and pin a
+      // lower ceiling than the world actually runs on. Mobile has one GPU, so
+      // the hint buys nothing and is omitted there — matching _createEngine.
+      gl = canvas.getContext('webgl2', { powerPreference: 'high-performance' });
       if (gl) {
         const dbg = gl.getExtension('WEBGL_debug_renderer_info');
         if (dbg) gpuRenderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) ?? null;
