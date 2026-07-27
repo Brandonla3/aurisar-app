@@ -25,6 +25,7 @@
 
 import { aerialFogWeight, applyAerialFog, sunVisibilityFromWet } from './aerialPerspective.js';
 import { createAtmosphereState } from './atmosphereState.js';
+import { writeFogDensity } from './graphicsSettings.js';
 
 const VERT = `
 precision highp float;
@@ -371,7 +372,10 @@ export class AshwoodSky {
     // terrain/props (Babylon fog) and water/grass (vFogColor, copied from
     // scene.fogColor each frame) all inherit it consistently — no per-shader edits.
     applyAerialFog(this.scene.fogColor, fr, fg, fb, this._aerialW);
-    this.scene.fogDensity = FOG_DENSITY_NIGHT + (FOG_DENSITY_DAY - FOG_DENSITY_NIGHT) * dayF;
+    // Through writeFogDensity so the player's "Distance fog" setting scales this
+    // per-frame write. A one-shot write from the settings panel would otherwise
+    // be clobbered on the very next frame by this line.
+    writeFogDensity(this.scene, FOG_DENSITY_NIGHT + (FOG_DENSITY_DAY - FOG_DENSITY_NIGHT) * dayF);
 
     // Publish/refresh the shared atmosphere contract (atmosphereState.js). Lazy
     // attach — scene.metadata.ashwood is built by BabylonWorldScene after this

@@ -28,6 +28,27 @@ import { FlickerLights }    from './flickerLights.js';
 import { shouldSendMove }   from './moveSync.js';
 import { resolveMirrorRefreshRate, MIRROR_OFF } from './waterMirrorGate.js';
 import { createPerfState, samplePerf }          from './perfWatchdog.js';
+// Graphics preference store + effect resolver. Deliberately engine-free so the
+// pre-world hub can render the same settings panel with no scene alive — see
+// the module header for why that matters.
+import {
+  MAX_SAFE_LEVEL,
+  PREF_TO_TIER,
+  applySafeStepDown,
+  clearSettingOverrides,
+  loadQualityPref,
+  loadSafeLevel,
+  loadSettingOverrides,
+  markBootStarted,
+  markBootSucceeded,
+  resetGraphicsPrefs,
+  resolveGraphicsSettings,
+  saveQualityPref,
+  saveSafeLevel,
+  saveSettingOverride,
+  tierFromProbe,
+  writeFogDensity,
+} from './graphicsSettings.js';
 import {
   TileLoader,
   GlbTileProvider,
@@ -122,6 +143,13 @@ class LightingManager {
 
     this._isMobile = options.isMobile ?? false;
     this._qualityTier = options.qualityTier ?? (this._isMobile ? 'mobile' : 'high');
+    // Post-processing level, resolved from the tier and the player's override
+    // (graphicsSettings.js). 'full' = HDR pipeline + grain + vignette, 'basic' =
+    // the same pipeline without the cinematic polish, 'minimal' = skip the
+    // pipeline entirely and use the ImageProcessing + GlowLayer fallback.
+    this._postFx = options.postFx ??
+      (this._isMobile || this._qualityTier === 'mobile' ? 'minimal'
+        : this._qualityTier === 'high' ? 'full' : 'basic');
 
     this.options = {
       dayLengthSec:  options.dayLengthSec  ?? 900,
@@ -419,8 +447,9 @@ class LightingManager {
     // in construction (no exception) but produce a black render at frame time
     // due to missing half-float / float render-target extensions. Skip it on
     // mobile — and on a desktop dropped to the 'mobile' tier by graphics
-    // safe-mode — and go straight to the lightweight fallback path.
-    if (!this._isMobile && this._qualityTier !== 'mobile') {
+    // safe-mode, or by a player choosing Minimal — and go straight to the
+    // lightweight fallback path.
+    if (!this._isMobile && this._postFx !== 'minimal') {
       // High bloom threshold + low weight so daylight scene surfaces don't
       // trigger bloom — only intentional emissives (portal, magic accents)
       // pass the threshold. The earlier 0.88 threshold was lifted from a
@@ -489,10 +518,10 @@ class LightingManager {
         p.bloomScale     = opts.bloomScale;
         p.sharpenEnabled = false;         // sharpen was a marginal-quality, full-cost pass
 
-        // High tier only: subtle cinematic polish. Grain breaks up flat-color
+        // Full post-FX only: subtle cinematic polish. Grain breaks up flat-color
         // banding in the sky/fog; a gentle vignette focuses the eye on the
-        // third-person character. Both are cheap and skipped on 'low'/'mobile'.
-        if (this._qualityTier === 'high') {
+        // third-person character. Both are cheap and skipped on 'basic'.
+        if (this._postFx === 'full') {
           p.grainEnabled     = true;
           p.grain.intensity  = 6;
           p.grain.animated   = true;
@@ -603,7 +632,7 @@ class LightingManager {
     this.scene.imageProcessingConfiguration.exposure = lerp(0.92, 0.82, dayFactor);
     this.scene.imageProcessingConfiguration.contrast = lerp(1.03, 1.10, sunset);
 
-    this.scene.fogDensity = lerp(0.0022, 0.0016, dayFactor);
+    writeFogDensity(this.scene, lerp(0.0022, 0.0016, dayFactor));
     lerpColor3Into(this.scene.fogColor, this._nightFog, this._dayFog, dayFactor);
 
     // Dynamic ambient: raise at night to keep geometry readable when the key
@@ -638,7 +667,7 @@ class LightingManager {
     this.scene.imageProcessingConfiguration.contrast = 1.12;
     this.fillDungeon.intensity = mood?.fill ?? 0.12;
 
-    this.scene.fogDensity = mood?.fogDensity ?? 0.018;
+    writeFogDensity(this.scene, mood?.fogDensity ?? 0.018);
     if (mood?.fogColor) {
       this.scene.fogColor.copyFromFloats(mood.fogColor[0], mood.fogColor[1], mood.fogColor[2]);
     } else {
@@ -715,6 +744,11 @@ class LightingManager {
 
     this.scene.imageProcessingConfiguration.exposure = lerp(fromState.exposure, toState.exposure, t);
     this.scene.imageProcessingConfiguration.contrast = lerp(fromState.contrast, toState.contrast, t);
+    // Deliberately NOT routed through writeFogDensity: both endpoints were
+    // captured after _updateOverworld / _updateDungeon already scaled them, and
+    // the scale is constant across the blend, so lerp(a·s, b·s) === s·lerp(a, b)
+    // already. Scaling again here would square it. The fog MODE is likewise
+    // already correct from those same writes.
     this.scene.fogDensity          = lerp(fromState.fogDensity, toState.fogDensity, t);
     this.scene.fogColor            = lerpColor3(fromState.fogColor, toState.fogColor, t);
     this.scene.environmentIntensity = lerp(fromState.envIntensity, toState.envIntensity, t);
@@ -813,19 +847,6 @@ class LightingManager {
   _disposePipeline(pipe) { if (pipe) pipe.dispose(); }
 }
 
-// Persisted graphics prefs (currently just the Phase 6 volumetric-clouds
-// opt-in). Read at scene init and written by setVolumetricClouds, so the
-// choice sticks across sessions and the dev viewer alike.
-const GFX_PREFS_KEY = 'aurisar.world.gfx.v1';
-function loadGfxPrefs() {
-  try { return JSON.parse(localStorage.getItem(GFX_PREFS_KEY)) ?? {}; }
-  catch { return {}; }
-}
-function saveGfxPrefs(prefs) {
-  try { localStorage.setItem(GFX_PREFS_KEY, JSON.stringify(prefs)); }
-  catch { /* quota / private mode */ }
-}
-
 // Persisted audio mute pref (Batch C). Default unmuted.
 const AUDIO_PREFS_KEY = 'aurisar.world.audio.v1';
 function loadAudioMuted() {
@@ -848,7 +869,10 @@ function saveAudioMuted(muted) {
 // quality.
 //   0 = full (GPU-detected)     1 = force ≤ low  (no SSAO2, classic shadows)
 //   2 = force mobile path       3 = + lower resolution + no shadows
-const MAX_SAFE_LEVEL = 3;
+//
+// MAX_SAFE_LEVEL, the ladder accessors, the quality preset and the per-setting
+// overrides all live in graphicsSettings.js — the pre-world hub reads and writes
+// the same store without an engine, so there can only be one copy of them.
 
 // How often the frame-budget governor runs. Both of its jobs change slowly — a
 // player crosses the mirror gate's hysteresis band in seconds, and the framerate
@@ -856,45 +880,6 @@ const MAX_SAFE_LEVEL = 3;
 const GOVERNOR_INTERVAL_MS = 500;
 const nowMs = () => (typeof performance !== 'undefined' && performance.now
   ? performance.now() : Date.now());
-
-function loadSafeLevel() {
-  const v = Number(loadGfxPrefs().safeLevel);
-  return Number.isFinite(v) ? Math.max(0, Math.min(MAX_SAFE_LEVEL, Math.round(v))) : 0;
-}
-function saveSafeLevel(level) {
-  saveGfxPrefs({ ...loadGfxPrefs(), safeLevel: Math.max(0, Math.min(MAX_SAFE_LEVEL, level)) });
-}
-
-// ── User-chosen quality preference ───────────────────────────────────────────
-// The GPU sniff in _resolveQualityTier is a heuristic over a renderer string
-// that browsers increasingly mask (a masked string reads 'unknown' and falls
-// through to the maximal stack). When it guesses wrong there was no way for a
-// player to say so — the world shipped with no graphics control at all. This is
-// that override, persisted alongside the rest of the graphics prefs.
-//
-// It deliberately does NOT defeat the safe-mode ladder: safeLevel is a record of
-// this machine actually losing its WebGL context, and letting a preference
-// outrank it would let a player pin themselves to a configuration that cannot
-// boot. resetGraphicsQuality() is the escape hatch that clears it.
-const QUALITY_PREFS = Object.freeze(['auto', 'high', 'balanced', 'low']);
-const PREF_TO_TIER  = Object.freeze({ high: 'high', balanced: 'low', low: 'mobile' });
-function loadQualityPref() {
-  const v = loadGfxPrefs().qualityPref;
-  return QUALITY_PREFS.includes(v) ? v : 'auto';
-}
-function saveQualityPref(pref) {
-  const v = QUALITY_PREFS.includes(pref) ? pref : 'auto';
-  saveGfxPrefs({ ...loadGfxPrefs(), qualityPref: v });
-}
-
-// ── Reflection opt-out ───────────────────────────────────────────────────────
-// The lake mirror is the single most expensive high-tier effect (a whole extra
-// scene render). Distance-gating it (waterMirrorGate.js) removes the waste;
-// this lets a player who is still short on frames turn it off outright.
-function loadReflectionsPref() { return loadGfxPrefs().reflections !== false; }
-function saveReflectionsPref(on) {
-  saveGfxPrefs({ ...loadGfxPrefs(), reflections: !!on });
-}
 
 // ── Dungeon entrance constants ───────────────────────────────────────────────
 // The portal position is a shared landmark (map label, future crypt interior,
@@ -1058,6 +1043,12 @@ export class BabylonWorldScene {
   }
 
   _initSync() {
+    // Raise the boot sentinel before anything touches the GPU. It is lowered on
+    // the first rendered frame (_setupRenderLoop); if it is still raised the
+    // next time the hub opens, this attempt never reached a frame — a GPU hang,
+    // an OOM, or a throw — and the hub offers a lighter configuration.
+    markBootStarted();
+
     this.engine = this._createEngine();
 
     // Persisted safe-mode level from prior context losses (see loadSafeLevel).
@@ -1073,22 +1064,6 @@ export class BabylonWorldScene {
     this.engine.onContextLostObservable.add(() => this._handleContextLost());
     this.engine.onContextRestoredObservable.add(() => this._handleContextRestored());
 
-    // Desktop only: cap effective DPR. Uncapped, a 4K / Retina display renders
-    // at native device-pixel-ratio (often 2× or higher), quadrupling per-frame
-    // pixel work and tipping the HDR pipeline + shadow blur passes into
-    // mid-teen fps on integrated GPUs. Mobile is left at the device DPR — it
-    // already performs fine and capping there is a visible quality regression
-    // (Codex P2 on #193). Deep safe levels tighten the cap further so a
-    // struggling GPU pushes fewer pixels per frame.
-    if (!this._isMobile) {
-      const safeCap = this._safeLevel >= 3 ? 0.75 : this._safeLevel >= 2 ? 1.0 : 1.5;
-      const dpr = Math.min(
-        (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
-        safeCap
-      );
-      this.engine.setHardwareScalingLevel(1 / dpr);
-    }
-
     // Quality tier: single source of truth for how expensive an effect stack a
     // device gets. 'mobile' → no HDR pipeline (GlowLayer fallback), classic
     // shadow map, no SSAO. 'low' → desktop lacking float/MRT render targets:
@@ -1096,6 +1071,37 @@ export class BabylonWorldScene {
     // desktop with the render-target support SSAO2 + cascaded shadows need.
     // Overridable via options.qualityTier for QA/forcing a tier.
     this._qualityTier = this._resolveQualityTier();
+
+    // Effective per-feature settings = tier defaults + the player's overrides,
+    // clamped so an override can only ever REDUCE cost (graphicsSettings.js).
+    // Everything downstream reads this rather than re-deriving from the tier
+    // string, so "Menu → Graphics → Shadows: Off" is honoured by exactly the
+    // code that would otherwise have inferred shadows from the tier.
+    this._gfx = resolveGraphicsSettings(
+      this._qualityTier, loadSettingOverrides(), this._safeLevel
+    );
+
+    // Desktop only: cap effective DPR. Uncapped, a 4K / Retina display renders
+    // at native device-pixel-ratio (often 2× or higher), quadrupling per-frame
+    // pixel work and tipping the HDR pipeline + shadow blur passes into
+    // mid-teen fps on integrated GPUs. Mobile is left at the device DPR — it
+    // already performs fine and capping there is a visible quality regression
+    // (Codex P2 on #193). Deep safe levels tighten the cap further so a
+    // struggling GPU pushes fewer pixels per frame.
+    //
+    // The player's render-scale setting multiplies on top: it can push the
+    // pixel count DOWN below the safe cap but never back up above it.
+    if (!this._isMobile) {
+      const safeCap = this._safeLevel >= 3 ? 0.75 : this._safeLevel >= 2 ? 1.0 : 1.5;
+      const dpr = Math.min(
+        (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+        safeCap
+      );
+      this._baseHardwareScaling = 1 / dpr;
+    } else {
+      this._baseHardwareScaling = this.engine.getHardwareScalingLevel();
+    }
+    this._applyRenderScale();
 
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.07, 0.10, 0.18, 1);
@@ -1117,6 +1123,7 @@ export class BabylonWorldScene {
     this._lm = new LightingManager(this.scene, this._camera, this.engine, {
       isMobile: this._isMobile,
       qualityTier: this._qualityTier,
+      postFx: this._gfx.postFx,
       startTimeOfDay: this.options.startTimeOfDay ?? realHour,
       dayLengthSec:   this.options.dayLengthSec   ?? 86400,
     });
@@ -1133,11 +1140,15 @@ export class BabylonWorldScene {
         worldgen: this._worldgen,
         castShadow: (mesh) => this._castShadow(mesh),
         qualityTier: this._qualityTier,
+        // Effective per-feature settings. Tile providers, the terrain material,
+        // the grass field and the fog writers all read this seam rather than
+        // branching on qualityTier, so one resolve decides the whole frame.
+        gfx: this._gfx,
         // Read by the tile provider when it builds the lake material. Turning
         // reflections off in the menu should skip ALLOCATING the MirrorTexture
         // on the next load, not just stop refreshing it — the governor's
         // distance gate handles the live case.
-        reflections: loadReflectionsPref(),
+        reflections: this._gfx.reflections === 'on',
       },
     };
 
@@ -1149,9 +1160,9 @@ export class BabylonWorldScene {
     // setVolumetricClouds(). Created after the metadata seam exists (its
     // observer reads lm/weather from there).
     this._volClouds = null;
-    if (this._qualityTier === 'high' && loadGfxPrefs().volumetricClouds) {
-      this.setVolumetricClouds(true);
-    }
+    // The apply half directly: the resolved setting IS the stored preference, so
+    // routing through the public setter would only rewrite what it just read.
+    if (this._gfx.volumetricClouds === 'on') this._setVolumetricCloudsActive(true);
 
     this._setupTileStreaming();
     this._buildDungeonEntrance();
@@ -1177,6 +1188,10 @@ export class BabylonWorldScene {
       try {
         if (this._local) this._tick();
         this.scene.render();
+        // Lower the boot sentinel: this load reached a frame, so the hub should
+        // not warn about it next time. Cheap flag check keeps it off the hot
+        // path after the first frame.
+        if (!this._bootConfirmed) { this._bootConfirmed = true; markBootSucceeded(); }
       } catch (err) {
         if (!this._renderErrLogged) {
           this._renderErrLogged = true;
@@ -1312,41 +1327,26 @@ export class BabylonWorldScene {
     if (this.options.qualityTier) return this.options.qualityTier;
     if (this._isMobile) return 'mobile';
 
+    this._gpuRenderer = this._detectGpuRenderer();
+
     // An explicit player choice replaces the GPU sniff entirely (the sniff is
     // what it is overriding), but still runs through the safe-mode step-down
-    // below — see the QUALITY_PREFS comment for why that ordering matters.
+    // below — see the graphicsSettings header for why that ordering matters.
     const pref = loadQualityPref();
-    if (pref !== 'auto') {
-      this._gpuRenderer = this._detectGpuRenderer();
-      return this._applySafeStepDown(PREF_TO_TIER[pref]);
-    }
+    if (pref !== 'auto') return this._applySafeStepDown(PREF_TO_TIER[pref]);
 
+    // The sniff itself lives in graphicsSettings.tierFromProbe so the pre-world
+    // hub can predict this tier from a throwaway context and the two can never
+    // disagree about what the player is walking into. Caps come from the live
+    // engine here; the hub reads the equivalent extensions directly.
     const caps = this.engine?.getCaps?.() ?? null;
     const canHeavy = !!caps &&
       (caps.textureHalfFloatRender || caps.textureFloatRender) &&
       !!caps.drawBuffersExtension;
 
-    // WebGL2 feature checks alone can't tell an RTX card from an Intel iGPU or a
-    // software rasterizer — they all report the same caps. Sniff the actual
-    // renderer string so known-slow GPUs never start on the maximal stack. When
-    // the browser masks the string this is a no-op and the context-loss
-    // watchdog below is the fallback safety net.
-    const renderer = this._detectGpuRenderer();
-    this._gpuRenderer = renderer;
-    const r = (renderer ?? '').toLowerCase();
-    const isSoftware = /swiftshader|llvmpipe|softpipe|basic render|microsoft basic|software|paravirtual/.test(r);
-    // Shared-memory Intel integrated graphics (the UHD/HD line) can't sustain
-    // SSAO2 + cascaded shadows + the heavy terrain shader together — this is the
-    // classic "works on my discrete card, dies on the office desktop" GPU. Start
-    // it one tier down. Iris Xe / Arc and discrete GPUs don't match and keep
-    // 'high'; the watchdog still catches anything 'low' can't handle.
-    const isWeakIntegrated = /intel.*\b(uhd|hd)\s*graphics/.test(r);
-
-    let tier = 'high';
-    if (!canHeavy || isWeakIntegrated) tier = 'low';
-    if (isSoftware) tier = 'mobile';
-
-    return this._applySafeStepDown(tier);
+    return this._applySafeStepDown(
+      tierFromProbe({ isMobile: false, gpuRenderer: this._gpuRenderer, canHeavy })
+    );
   }
 
   // Apply persisted safe-mode downgrades from prior unrecovered context losses,
@@ -1356,13 +1356,8 @@ export class BabylonWorldScene {
   // LightingManager._setupPipelines). Level 3 additionally cuts shadows +
   // resolution (_setupShadows / _initSync).
   _applySafeStepDown(baseTier) {
-    let tier = baseTier;
     const safe = this._safeLevel ?? 0;
-    if (safe > 0) {
-      const order = ['high', 'low', 'mobile'];
-      const idx = Math.min(order.length - 1, Math.max(0, order.indexOf(tier)) + Math.min(safe, 2));
-      tier = order[idx];
-    }
+    const tier = applySafeStepDown(baseTier, safe);
 
     if (typeof console !== 'undefined') {
       const pref = loadQualityPref();
@@ -1453,12 +1448,14 @@ export class BabylonWorldScene {
 
     const next = Math.min(MAX_SAFE_LEVEL, (this._safeLevel ?? 0) + 1);
     saveSafeLevel(next);
-    // Breadcrumb the app can read post-reload to toast "graphics reduced".
-    try { sessionStorage.setItem('aurisar.world.gfx.downgraded', String(next)); } catch { /* ignore */ }
     if (typeof console !== 'undefined') {
       console.warn(`[Aurisar] Reducing graphics to safe level ${next} and reloading to recover.`);
     }
-    this.callbacks?.onGraphicsDowngrade?.(next);
+    // The persisted safeLevel is the durable record — the hub and the menu both
+    // read it after the reload. This callback is only for telling whoever is on
+    // screen right now. (There used to be a sessionStorage breadcrumb here too,
+    // written at three sites and read at none; saveSafeLevel already covers it.)
+    this.callbacks?.onGraphicsDowngrade?.({ safeLevel: next, reloading: true });
 
     // Reload rebuilds the whole stack at the lower tier through the existing,
     // tested init path — far more reliable than tearing down SSAO2 / CSM / the
@@ -1491,12 +1488,15 @@ export class BabylonWorldScene {
     }, 120000);
   }
 
-  /** Menu hook: clear all safe-mode downgrades and reload at full quality. */
+  /**
+   * Menu hook: clear the safe-mode ladder, the preset AND every per-feature
+   * override, then reload at full quality. This is the single escape hatch from
+   * any configuration a player (or the governor) has painted themselves into,
+   * so it must clear all three layers — leaving overrides behind would make
+   * "Reset graphics quality" quietly not reset the graphics quality.
+   */
   resetGraphicsQuality() {
-    saveSafeLevel(0);
-    saveQualityPref('auto');
-    saveReflectionsPref(true);
-    try { sessionStorage.removeItem('aurisar.world.gfx.downgraded'); } catch { /* ignore */ }
+    resetGraphicsPrefs();
     if (typeof window !== 'undefined') window.location?.reload?.();
   }
 
@@ -1514,7 +1514,7 @@ export class BabylonWorldScene {
     this._lastGovernorAt = 0;
     // Goes through the setter so the shader term and the mirror agree from the
     // first frame, not just after the first menu interaction.
-    this._setReflectionsActive(loadReflectionsPref());
+    this._setReflectionsActive(this._gfx.reflections === 'on');
 
     this._governorObs = this.scene.onBeforeRenderObservable.add(() => {
       const now = nowMs();
@@ -1575,21 +1575,24 @@ export class BabylonWorldScene {
   // and the persisted safeLevel carries the verdict into the NEXT load, where
   // the tier is chosen at construction time and can drop the things that cannot
   // be removed live (cascaded shadows, the HDR pipeline).
+  // Every shed goes through setGraphicsSetting rather than poking the effects
+  // directly, so the panels show what actually happened. Before, the governor
+  // could turn reflections off underneath a menu that still read "On".
   _shedGraphicsStep(step) {
     const fps = Math.round(this.engine?.getFps?.() ?? 0);
     let what;
 
     if (step === 1) {
       // The three largest high-tier costs that are safe to drop live.
-      this._setReflectionsActive(false);
-      this._disposeSsao();
-      if (this._volClouds) this.setVolumetricClouds(false);
+      this.setGraphicsSetting('reflections', 'off');
+      this.setGraphicsSetting('ambientOcclusion', 'off');
+      this.setGraphicsSetting('volumetricClouds', 'off');
       what = 'reflections, ambient occlusion and volumetric clouds';
     } else if (step === 2) {
-      this._raiseHardwareScaling(1);        // stop rendering above CSS resolution
+      this.setGraphicsSetting('renderScale', 'full');  // stop rendering above CSS resolution
       what = 'render resolution (native)';
     } else {
-      this._raiseHardwareScaling(1 / 0.75); // render below CSS resolution, browser upscales
+      this.setGraphicsSetting('renderScale', 'threeQuarter');
       what = 'render resolution (75%)';
     }
 
@@ -1600,13 +1603,14 @@ export class BabylonWorldScene {
       this._perfDowngraded = true;
       const next = Math.min(MAX_SAFE_LEVEL, (this._safeLevel ?? 0) + 1);
       saveSafeLevel(next);
-      try { sessionStorage.setItem('aurisar.world.gfx.downgraded', String(next)); }
-      catch { /* quota / private mode */ }
     }
 
     if (typeof console !== 'undefined') {
       console.info(`[Aurisar] ${fps} fps sustained — reduced ${what}. Adjust under Menu → Graphics.`);
     }
+    // The menu's autoReduced banner covers a player who opens it later; this
+    // tells anyone already on screen, now, why the world just changed.
+    this.callbacks.onGraphicsDowngrade?.({ step, fps, what });
   }
 
   // Explicit on/off, as opposed to the governor's distance throttle.
@@ -1640,9 +1644,24 @@ export class BabylonWorldScene {
     if (level > cur) this.engine.setHardwareScalingLevel(level);
   }
 
-  // ── Graphics settings (game menu) ──────────────────────────────────────────
+  /**
+   * Apply the player's render-scale choice on top of the DPR / safe-level cap.
+   *
+   * The cap (_baseHardwareScaling) is a floor on the scaling LEVEL, and level is
+   * inverse to resolution — so multiplying by 1/factor can only ever push the
+   * pixel count down. A player cannot use this to render above what their safe
+   * level allows, which is the same invariant _raiseHardwareScaling enforces for
+   * the governor.
+   */
+  _applyRenderScale() {
+    const base = this._baseHardwareScaling ?? 1;
+    const factor = this._gfx?.renderScaleFactor ?? 1;
+    this.engine?.setHardwareScalingLevel?.(base / factor);
+  }
 
-  /** Everything the menu needs to render the Graphics section. */
+  // ── Graphics settings (game menu + pre-world hub) ──────────────────────────
+
+  /** Everything a settings panel needs to render the Graphics section. */
   getGraphicsInfo() {
     return {
       tier: this._qualityTier,
@@ -1651,6 +1670,13 @@ export class BabylonWorldScene {
       safeLevel: this._safeLevel ?? 0,
       // Mobile is already the lightest path; there is nothing below it to pick.
       canChooseTier: !this._isMobile,
+      // Per-feature state: current effective values, what this device is allowed
+      // to reach, and whether the player has moved off the preset.
+      settings: { ...this._gfx },
+      ceilings: this._gfx.ceilings,
+      isCustom: this._gfx.isCustom,
+      // Kept for the older menu shape — the mirror only exists on the tier that
+      // allocated it, so "supported" is not the same as "allowed".
       reflectionsSupported: !!this.scene?.metadata?.ashwood?.waterMirror,
       reflections: !!this._reflectionsOn,
       autoReduced: !!this._perfDowngraded,
@@ -1662,18 +1688,75 @@ export class BabylonWorldScene {
   /**
    * Persist a quality preference and reload. The tier decides which effects are
    * *constructed* (HDR pipeline, cascaded shadows, reflective water), so it can
-   * only take effect on a fresh scene — unlike the live toggles above.
+   * only take effect on a fresh scene — unlike the live settings below.
    */
   setQualityPreference(pref) {
     saveQualityPref(pref);
     if (typeof window !== 'undefined') window.location?.reload?.();
   }
 
-  getReflections() { return !!this._reflectionsOn; }
-  setReflections(on) {
-    saveReflectionsPref(on);
-    this._setReflectionsActive(on);
+  /**
+   * Set one per-feature graphics setting.
+   *
+   * Always persists. Whether it also takes effect NOW depends on the setting's
+   * scope: the live ones are torn down / rebuilt in place, the reload-scoped
+   * ones were baked into the scene at construction and wait for the next load
+   * (the panel stages those behind a single Apply button so three changes cost
+   * one reload, not three).
+   *
+   * The value is re-resolved through resolveGraphicsSettings rather than stored
+   * raw, so a request the tier cannot honour is clamped here exactly as it would
+   * be on the next load — the panel never shows an effect the player isn't
+   * actually getting.
+   *
+   * @returns {string} the value that actually took effect, after clamping
+   */
+  setGraphicsSetting(id, value) {
+    saveSettingOverride(id, value);
+    const prev = this._gfx;
+    this._gfx = resolveGraphicsSettings(
+      this._qualityTier, loadSettingOverrides(), this._safeLevel
+    );
+    // Re-point the metadata seam: tile providers and the fog writers read this
+    // object every frame, and it is frozen, so it has to be replaced wholesale.
+    if (this.scene?.metadata?.ashwood) this.scene.metadata.ashwood.gfx = this._gfx;
+
+    const applied = this._gfx[id];
+    if (applied !== prev[id]) {
+      switch (id) {
+        case 'reflections':
+          this._setReflectionsActive(applied === 'on');
+          break;
+        case 'ambientOcclusion':
+          this._setupSSAO();   // idempotent both ways — builds or disposes
+          break;
+        case 'volumetricClouds':
+          this._setVolumetricCloudsActive(applied === 'on');
+          break;
+        case 'renderScale':
+          this._applyRenderScale();
+          break;
+        case 'fog':
+          // Nothing to do: AshwoodSky rewrites fogDensity through
+          // writeFogDensity every frame and will pick the new scale up on the
+          // next one. Only the mode needs a nudge for the zero case.
+          writeFogDensity(this.scene, this.scene?.fogDensity ?? 0);
+          break;
+        default:
+          break;   // reload-scoped — nothing can change without a fresh scene
+      }
+    }
+    return applied;
   }
+
+  /** Clear every per-feature override (keeps the preset and the safe ladder). */
+  clearGraphicsSettings() {
+    clearSettingOverrides();
+    if (typeof window !== 'undefined') window.location?.reload?.();
+  }
+
+  getReflections() { return !!this._reflectionsOn; }
+  setReflections(on) { this.setGraphicsSetting('reflections', on ? 'on' : 'off'); }
 
   _setupCamera() {
     const cam = new BABYLON.ArcRotateCamera(
@@ -1820,9 +1903,11 @@ export class BabylonWorldScene {
   // ── Shadows ────────────────────────────────────────────────────────────────
 
   _setupShadows() {
-    // Deepest safe level: no shadow pass at all. The shadow map + blur is a
-    // large per-frame GPU cost, and level 3 is the "just keep rendering" tier.
-    if ((this._safeLevel ?? 0) >= 3) { this._shadowGen = null; return; }
+    // The shadow map + blur is a large per-frame GPU cost. Two things can switch
+    // it off: the deepest safe level (the "just keep rendering" tier, folded into
+    // the ceiling by ceilingsForTier) and the player choosing Off outright.
+    const want = this._gfx?.shadows ?? 'cascaded';
+    if (want === 'off') { this._shadowGen = null; return; }
 
     // High tier: cascaded shadow maps. Multiple cascades pack resolution near
     // the third-person character where it reads, and hold up across the
@@ -1830,7 +1915,7 @@ export class BabylonWorldScene {
     // critical setting for this camera — it kills the shadow "swimming" that
     // an ArcRotateCamera orbit would otherwise cause. shadowMaxZ is capped to
     // the fog horizon so cascades don't waste texels on invisible distance.
-    if (this._qualityTier === 'high') {
+    if (want === 'cascaded') {
       try {
         const csm = new BABYLON.CascadedShadowGenerator(2048, this._lm.key);
         csm.numCascades              = 4;
@@ -1862,8 +1947,10 @@ export class BabylonWorldScene {
     }
 
     // Low / mobile (or CSM construction failure): classic single shadow map.
-    // Start at 1024 — 4× cheaper shadow pass vs 2048 with minimal visual difference.
-    for (const size of [1024, 512]) {
+    // Start at 1024 — 4× cheaper shadow pass vs 2048 with minimal visual
+    // difference. 'simpleLow' skips straight to 512; the 512 entry is also the
+    // fallback when 1024 fails to allocate.
+    for (const size of (want === 'simpleLow' ? [512] : [1024, 512])) {
       try {
         const sg = new BABYLON.ShadowGenerator(size, this._lm.key);
         sg.useBlurExponentialShadowMap = true;
@@ -1887,11 +1974,17 @@ export class BabylonWorldScene {
 
   _setupSSAO() {
     // High tier only. SSAO2 needs the float/MRT render targets that the mobile
-    // path can't rely on, so it is skipped on 'low' and 'mobile'. The previous
-    // disable was a blanket perf cut; the retune below halves the AO buffer
-    // (ssaoRatio 0.5), drops to 8 samples, and caps maxZ at the fog horizon so
-    // distant tiles pay no AO cost — the combination that made it affordable.
-    if (this._qualityTier !== 'high') { this._ssao = null; return; }
+    // path can't rely on, so it is skipped on 'low' and 'mobile' — the ceiling
+    // in graphicsSettings pins ambientOcclusion to 'off' there, which is also
+    // what an explicit player Off produces. The retune below halves the AO
+    // buffer (ssaoRatio 0.5), drops to 8 samples, and caps maxZ at the fog
+    // horizon so distant tiles pay no AO cost — the combination that made it
+    // affordable at all.
+    //
+    // Idempotent, because this is also the live rebuild path when the player
+    // toggles AO back on mid-session.
+    if (this._gfx?.ambientOcclusion !== 'on') { this._disposeSsao(); return; }
+    if (this._ssao) return;
 
     try {
       const ssao = new BABYLON.SSAO2RenderingPipeline(
@@ -3458,8 +3551,14 @@ export class BabylonWorldScene {
   supportsVolumetricClouds() { return this._qualityTier === 'high'; }
   getVolumetricClouds() { return !!this._volClouds; }
 
+  /** Public toggle — persists through the settings store, then applies. */
   setVolumetricClouds(on) {
-    saveGfxPrefs({ ...loadGfxPrefs(), volumetricClouds: !!on });
+    this.setGraphicsSetting('volumetricClouds', on ? 'on' : 'off');
+  }
+
+  // The apply half, split out so setGraphicsSetting can call it without
+  // recursing back through the persistence layer it just wrote.
+  _setVolumetricCloudsActive(on) {
     if (on && !this._volClouds && this._qualityTier === 'high') {
       this._volClouds = new AshwoodVolumetricClouds(this.scene);
     } else if (!on && this._volClouds) {

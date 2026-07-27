@@ -1,5 +1,7 @@
 /* global BABYLON */
 
+import { TERRAIN_DETAIL_TO_TIER } from './graphicsSettings.js';
+
 /**
  * Cinematic splat-blended PBR terrain.
  *
@@ -304,7 +306,14 @@ float terrVoronoi(vec2 p, out vec2 cell){
  *   wetness?:number, scale?:number}} opts
  */
 export function createTerrainMaterial(scene, opts = {}) {
-  const tier = opts.tier ?? scene.metadata?.ashwood?.qualityTier ?? 'high';
+  // The player's "Terrain detail" setting picks the row; its per-tier defaults
+  // are the tier's own row, so this is a no-op until someone changes it.
+  // opts.tier still wins for callers that name a row explicitly (dev viewer).
+  const detail = scene.metadata?.ashwood?.gfx?.terrainDetail;
+  const tier = opts.tier
+    ?? TERRAIN_DETAIL_TO_TIER[detail]
+    ?? scene.metadata?.ashwood?.qualityTier
+    ?? 'high';
   const tierCfg = TERRAIN_TIERS[tier] ?? TERRAIN_TIERS.high;
   const presetName = Object.prototype.hasOwnProperty.call(PRESET_DEFAULTS, opts.preset)
     ? opts.preset : 'overworld';
