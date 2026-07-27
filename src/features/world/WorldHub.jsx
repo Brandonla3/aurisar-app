@@ -8,10 +8,11 @@
  * world to open the in-game menu, and a throw in the scene constructor took
  * down the whole app.
  *
- * So the hub sits in front of it. Nothing here touches WebGL: the settings
- * panel reads the same localStorage store the scene does (graphicsSettings.js)
- * and predicts the tier from a throwaway probe. Only pressing Enter constructs
- * a scene.
+ * So the hub sits in front of it. No Babylon engine, canvas or module is
+ * created here: the settings panel reads the same localStorage store the scene
+ * does (graphicsSettings.js) and predicts the tier from a probe that opens a
+ * bare WebGL2 context, reads the renderer string, and immediately drops it.
+ * Only pressing Enter loads the world module and constructs a scene.
  *
  * Character and Guild are passed in as rendered nodes rather than imported,
  * because both are driven by state that lives in App.jsx. That keeps the wiring
@@ -20,11 +21,15 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ErrorBoundary from '../../components/ErrorBoundary.jsx';
-import WorldOverlay from './WorldOverlay.jsx';
 import GraphicsSettingsPanel from './ui/GraphicsSettingsPanel.jsx';
 import { hubGraphicsStyles } from './ui/graphicsPanelStyles.js';
 import { applySafeModePreset, didLastBootFail, markBootSucceeded } from './game/graphicsSettings.js';
 import { C, FS, R, S } from '../../utils/tokens.js';
+
+// Lazy so that opening the World tab does not pay Babylon's module parse cost.
+// A static import would pull the whole engine in just to render a menu — which
+// is exactly the weight the hub exists to let players avoid.
+const WorldOverlay = React.lazy(() => import('./WorldOverlay.jsx'));
 
 const FONT = 'Inter, system-ui, sans-serif';
 
@@ -151,7 +156,9 @@ export default function WorldHub({ onClose, characterSlot = null, guildSlot = nu
           />
         )}
       >
-        <WorldOverlay {...worldProps} onClose={() => { setBootFailed(false); setView('hub'); }} />
+        <React.Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000' }} />}>
+          <WorldOverlay {...worldProps} onClose={() => { setBootFailed(false); setView('hub'); }} />
+        </React.Suspense>
       </ErrorBoundary>
     );
   }

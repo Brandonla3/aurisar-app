@@ -152,6 +152,12 @@ export const SETTING_DEFS = Object.freeze([
     label: 'Water reflections',
     hint: 'Renders the scene a second time into the lake surface — the single most expensive effect.',
     scope: 'live',
+    // Turning reflections OFF is genuinely live (fade the shader term, park the
+    // mirror). Turning them back ON is not: the MirrorTexture and the water
+    // shader's `#define REFLECT` are both decided when the lake material is
+    // built, so if this scene booted without them there is nothing to fade in.
+    // Without this the control would report On while the lake stayed flat.
+    isLive: (value, state) => value !== 'on' || !!state?.reflectionsSupported,
     options: [
       { id: 'on',  label: 'On' },
       { id: 'off', label: 'Off' },
@@ -194,6 +200,20 @@ export const SETTING_DEFS = Object.freeze([
 const DEF_BY_ID = Object.freeze(Object.fromEntries(SETTING_DEFS.map((d) => [d.id, d])));
 
 export function getSettingDef(id) { return DEF_BY_ID[id] ?? null; }
+
+/**
+ * Whether changing `def` to `value` can take effect without rebuilding the
+ * scene, given the current scene state.
+ *
+ * Most settings are statically one or the other, but a few depend on what the
+ * running scene actually allocated — see `reflections`. Both panels route
+ * through this so a control can never claim to be live when it isn't.
+ */
+export function scopeFor(def, value, state) {
+  if (def.scope !== 'live') return 'reload';
+  if (typeof def.isLive === 'function' && !def.isLive(value, state)) return 'reload';
+  return 'live';
+}
 
 /** Ordered option ids for a setting, heaviest first. */
 function optionIds(id) { return DEF_BY_ID[id].options.map((o) => o.id); }
@@ -266,6 +286,11 @@ function clampToCeiling(id, value, ceiling) {
  * Also migrates the two standalone booleans this store replaced, so players who
  * had already turned reflections off (or clouds on) keep that choice.
  */
+// The standalone booleans this store replaced. loadSettingOverrides still reads
+// them so an upgrading player keeps their choices, which means clear/reset have
+// to actively delete them — otherwise every read resurrects the override.
+const LEGACY_PREF_KEYS = Object.freeze(['reflections', 'volumetricClouds']);
+
 export function loadSettingOverrides() {
   const prefs = loadGfxPrefs();
   const raw = prefs.settings;
@@ -298,9 +323,18 @@ export function saveSettingOverride(id, value) {
   patchGfxPrefs({ settings });
 }
 
-/** Drop every override, returning the player to pure tier defaults. */
+/**
+ * Drop every override, returning the player to pure tier defaults.
+ *
+ * Must also delete the legacy booleans. loadSettingOverrides re-synthesizes an
+ * override from them on every read, so wiping `settings` alone left Reset
+ * lying to anyone upgrading from a build that used those keys: the reflections
+ * and clouds choices would silently come straight back.
+ */
 export function clearSettingOverrides() {
-  patchGfxPrefs({ settings: {} });
+  const prefs = loadGfxPrefs();
+  for (const key of LEGACY_PREF_KEYS) delete prefs[key];
+  saveGfxPrefs({ ...prefs, settings: {} });
 }
 
 // ── Resolution ───────────────────────────────────────────────────────────────
@@ -329,8 +363,10 @@ export function resolveGraphicsSettings(tier, overrides = {}, safeLevel = 0) {
     const requested = overrides[def.id] ?? defaults[def.id];
     const value = clampToCeiling(def.id, requested, ceilings[def.id]);
     settings[def.id] = value;
-    // "Custom" reflects what the player asked for, not what survived clamping —
-    // a request the hardware refused should not read as a bespoke setup.
+    // "Custom" tracks the player's stored INTENT, not the clamped result. A
+    // request the hardware refused still reads as custom — it is a choice they
+    // made and will get back on a machine that can honour it, so hiding it
+    // would make Reset look like a no-op.
     if (overrides[def.id] !== undefined && overrides[def.id] !== defaults[def.id]) {
       isCustom = true;
     }
@@ -534,7 +570,13 @@ export function applySafeModePreset() {
   saveSettingOverride('volumetricClouds', 'off');
 }
 
-/** Full escape hatch: clear the preset, every override, and the safe ladder. */
+/**
+ * Full escape hatch: clear the preset, every override, the legacy booleans and
+ * the safe ladder. Deliberately rebuilt from a bare object rather than spread
+ * over the old one — this is the one call that must leave nothing behind, and a
+ * spread silently preserves any key a future version adds.
+ */
 export function resetGraphicsPrefs() {
-  saveGfxPrefs({ ...loadGfxPrefs(), qualityPref: 'auto', safeLevel: 0, settings: {} });
+  const { bootPending } = loadGfxPrefs();
+  saveGfxPrefs({ qualityPref: 'auto', safeLevel: 0, settings: {}, bootPending: !!bootPending });
 }

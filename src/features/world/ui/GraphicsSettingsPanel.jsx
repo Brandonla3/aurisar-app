@@ -27,6 +27,7 @@ import {
   resolveGraphicsSettings,
   saveQualityPref,
   saveSettingOverride,
+  scopeFor,
 } from '../game/graphicsSettings.js';
 
 const PRESET_LABELS = {
@@ -52,6 +53,9 @@ function readState(scene) {
       pref: info.pref,
       settings: info.settings,
       ceilings: info.ceilings,
+      // Whether a MirrorTexture was actually allocated this run — decides
+      // whether "Water reflections: On" is live or needs a rebuild.
+      reflectionsSupported: info.reflectionsSupported,
       live: true,
     };
   }
@@ -68,21 +72,27 @@ function readState(scene) {
     pref,
     settings,
     ceilings: settings.ceilings,
+    // Nothing is running, so nothing was allocated; every change waits for boot.
+    reflectionsSupported: false,
     live: false,
   };
 }
 
 /** One row: a label and a strip of mutually exclusive option buttons. */
-function SettingRow({ def, value, ceiling, staged, styles, onPick }) {
+function SettingRow({ def, value, ceiling, staged, styles, state, onPick }) {
   const optionIds = def.options.map((o) => o.id);
   const ceilingIdx = optionIds.indexOf(ceiling);
   const shown = staged ?? value;
+  // Scope can depend on the value AND on what the running scene allocated
+  // (reflections can be switched off live but not back on without a rebuild),
+  // so the tag reflects the option currently shown, not the setting as a whole.
+  const needsReload = scopeFor(def, shown, state) === 'reload';
 
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={styles.rowLabel}>
         {def.label}
-        {def.scope === 'reload' && <span style={styles.reloadTag}> · needs reload</span>}
+        {needsReload && <span style={styles.reloadTag}> · needs reload</span>}
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {def.options.map((o, i) => {
@@ -132,20 +142,20 @@ export default function GraphicsSettingsPanel({ scene = null, styles, onReloadRe
   const refresh = useCallback(() => setState(readState(scene)), [scene]);
 
   const pick = useCallback((def, value) => {
-    if (def.scope === 'live' && scene?.setGraphicsSetting) {
-      scene.setGraphicsSetting(def.id, value);
-      refresh();
-      return;
-    }
-    if (def.scope === 'live') {
-      // No scene yet (hub): "live" and "reload" are the same thing — nothing is
-      // running to apply it to, and the world will read it on boot.
+    // No scene yet (hub): "live" and "reload" are the same thing — nothing is
+    // running to apply it to, and the world reads it on boot.
+    if (!scene?.setGraphicsSetting) {
       saveSettingOverride(def.id, value);
       refresh();
       return;
     }
+    if (scopeFor(def, value, state) === 'live') {
+      scene.setGraphicsSetting(def.id, value);
+      refresh();
+      return;
+    }
     setStaged((p) => ({ ...p, [def.id]: value }));
-  }, [scene, refresh]);
+  }, [scene, refresh, state]);
 
   const applyStaged = useCallback(() => {
     for (const [id, value] of Object.entries(staged)) saveSettingOverride(id, value);
@@ -155,13 +165,18 @@ export default function GraphicsSettingsPanel({ scene = null, styles, onReloadRe
   }, [staged, onReloadRequest]);
 
   const pickPreset = useCallback((pref) => {
+    // Commit anything staged first. A preset click reloads, and dropping the
+    // player's staged edits on the floor at that moment is silent data loss —
+    // they staged Shadows Off, clicked Balanced, and only Balanced survived.
+    for (const [id, value] of Object.entries(staged)) saveSettingOverride(id, value);
+    setStaged({});
     saveQualityPref(pref);
     // The preset changes the TIER, which decides what gets constructed — so it
     // can only take effect on a fresh scene, exactly like a staged setting.
     if (onReloadRequest) { onReloadRequest(); return; }
     if (scene?.setQualityPreference) { scene.setQualityPreference(pref); return; }
     if (typeof window !== 'undefined') window.location?.reload?.();
-  }, [scene, onReloadRequest]);
+  }, [scene, onReloadRequest, staged]);
 
   const hasStaged = Object.keys(staged).length > 0;
   const presets = useMemo(() => QUALITY_PREFS.map((id) => ({ id, ...PRESET_LABELS[id] })), []);
@@ -215,6 +230,7 @@ export default function GraphicsSettingsPanel({ scene = null, styles, onReloadRe
           ceiling={state.ceilings[def.id]}
           staged={staged[def.id]}
           styles={styles}
+          state={state}
           onPick={pick}
         />
       ))}

@@ -299,6 +299,27 @@ float terrVoronoi(vec2 p, out vec2 cell){
 }
 
 /**
+ * Which TERRAIN_TIERS row a material should use.
+ *
+ * Exported and BABYLON-free so it can be tested the way production calls it —
+ * the streaming tile provider used to pass `opts.tier` unconditionally, which
+ * silently outranked the player's "Terrain detail" setting on every streamed
+ * tile and made the control dead in the real world while unit tests of
+ * createTerrainMaterial still looked fine.
+ *
+ * Precedence: an explicit opts.tier (dev viewer / QA naming a row outright) >
+ * the player's setting > the scene's tier > high.
+ */
+export function resolveTerrainTierKey(scene, opts = {}) {
+  const detail = scene?.metadata?.ashwood?.gfx?.terrainDetail;
+  const key = opts.tier
+    ?? TERRAIN_DETAIL_TO_TIER[detail]
+    ?? scene?.metadata?.ashwood?.qualityTier
+    ?? 'high';
+  return TERRAIN_TIERS[key] ? key : 'high';
+}
+
+/**
  * Create a cinematic terrain material.
  *
  * @param {BABYLON.Scene} scene
@@ -306,15 +327,8 @@ float terrVoronoi(vec2 p, out vec2 cell){
  *   wetness?:number, scale?:number}} opts
  */
 export function createTerrainMaterial(scene, opts = {}) {
-  // The player's "Terrain detail" setting picks the row; its per-tier defaults
-  // are the tier's own row, so this is a no-op until someone changes it.
-  // opts.tier still wins for callers that name a row explicitly (dev viewer).
-  const detail = scene.metadata?.ashwood?.gfx?.terrainDetail;
-  const tier = opts.tier
-    ?? TERRAIN_DETAIL_TO_TIER[detail]
-    ?? scene.metadata?.ashwood?.qualityTier
-    ?? 'high';
-  const tierCfg = TERRAIN_TIERS[tier] ?? TERRAIN_TIERS.high;
+  const tier = resolveTerrainTierKey(scene, opts);
+  const tierCfg = TERRAIN_TIERS[tier];
   const presetName = Object.prototype.hasOwnProperty.call(PRESET_DEFAULTS, opts.preset)
     ? opts.preset : 'overworld';
   const presetCfg = {

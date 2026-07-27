@@ -1589,7 +1589,14 @@ export class BabylonWorldScene {
       this.setGraphicsSetting('volumetricClouds', 'off');
       what = 'reflections, ambient occlusion and volumetric clouds';
     } else if (step === 2) {
-      this.setGraphicsSetting('renderScale', 'full');  // stop rendering above CSS resolution
+      // Stop SUPERSAMPLING — the desktop DPR cap starts the engine at scaling
+      // level 1/1.5 ≈ 0.67, i.e. rendering above CSS resolution. This raises the
+      // baseline to 1.
+      //
+      // This rung must NOT go through renderScale: 'full' is that setting's
+      // default, so setting it would resolve to base/1 === base and shed
+      // nothing at all on exactly the supersampled desktops the rung exists for.
+      this._raiseBaseHardwareScaling(1);
       what = 'render resolution (native)';
     } else {
       this.setGraphicsSetting('renderScale', 'threeQuarter');
@@ -1659,6 +1666,22 @@ export class BabylonWorldScene {
     this.engine?.setHardwareScalingLevel?.(base / factor);
   }
 
+  /**
+   * Raise the BASELINE scaling level (drop supersampling), not just the current
+   * one. The governor's step-2 shed uses this.
+   *
+   * It has to move the baseline rather than call setHardwareScalingLevel
+   * directly: _applyRenderScale recomputes from `base` on every later
+   * renderScale change, so a shed written only to the engine would be silently
+   * undone the next time the player touched the resolution control.
+   */
+  _raiseBaseHardwareScaling(level) {
+    const base = this._baseHardwareScaling ?? 1;
+    if (level <= base) return;
+    this._baseHardwareScaling = level;
+    this._applyRenderScale();
+  }
+
   // ── Graphics settings (game menu + pre-world hub) ──────────────────────────
 
   /** Everything a settings panel needs to render the Graphics section. */
@@ -1719,7 +1742,14 @@ export class BabylonWorldScene {
     );
     // Re-point the metadata seam: tile providers and the fog writers read this
     // object every frame, and it is frozen, so it has to be replaced wholesale.
-    if (this.scene?.metadata?.ashwood) this.scene.metadata.ashwood.gfx = this._gfx;
+    if (this.scene?.metadata?.ashwood) {
+      this.scene.metadata.ashwood.gfx = this._gfx;
+      // The tile provider reads this flag when it builds a lake material to
+      // decide whether to allocate a MirrorTexture at all. Leaving it stale
+      // meant a tile streaming in after the player turned reflections off would
+      // still allocate the mirror — the exact cost they had just declined.
+      this.scene.metadata.ashwood.reflections = this._gfx.reflections === 'on';
+    }
 
     const applied = this._gfx[id];
     if (applied !== prev[id]) {

@@ -20,6 +20,7 @@ import {
   resolveGraphicsSettings,
   resolveTier,
   saveSettingOverride,
+  scopeFor,
   tierFromProbe,
   writeFogDensity,
 } from './graphicsSettings.js';
@@ -98,12 +99,18 @@ describe('ceiling clamping', () => {
     expect(ceilingsForTier('high', MAX_SAFE_LEVEL).shadows).toBe('off');
   });
 
-  it('does not mark a clamped-away request as custom', () => {
-    // The player asked for cascaded shadows on mobile; the hardware refused.
-    // That is not a bespoke configuration, so the preset should still read clean.
+  it('does not mark an override equal to the tier default as custom', () => {
     const r = resolveGraphicsSettings('mobile', { shadows: 'simple' }, 0);
     expect(r.shadows).toBe('simple');
     expect(r.isCustom).toBe(false);
+  });
+
+  it('still reads as custom when the request was clamped away', () => {
+    // isCustom tracks stored INTENT, not the clamped result: the player will get
+    // this back on a machine that can honour it, so Reset must stay offered.
+    const r = resolveGraphicsSettings('mobile', { shadows: 'cascaded' }, 0);
+    expect(r.shadows).toBe('simple');   // clamped
+    expect(r.isCustom).toBe(true);      // but the choice is still theirs
   });
 
   it('exposes derived scalars under names that cannot shadow the option ids', () => {
@@ -172,6 +179,32 @@ describe('override persistence', () => {
     clearSettingOverrides();
     expect(loadSettingOverrides()).toEqual({});
   });
+
+  // Regression: clearing only `settings` left the legacy booleans in place, and
+  // loadSettingOverrides re-synthesizes an override from them on EVERY read — so
+  // Reset silently handed the old choices straight back to anyone upgrading.
+  it('clearing also drops the legacy booleans so they cannot resurrect', () => {
+    write({ reflections: false, volumetricClouds: true, settings: {} });
+    expect(loadSettingOverrides()).toEqual({ reflections: 'off', volumetricClouds: 'on' });
+    clearSettingOverrides();
+    expect(loadSettingOverrides()).toEqual({});
+    expect(read().reflections).toBeUndefined();
+    expect(read().volumetricClouds).toBeUndefined();
+  });
+
+  it('reset drops legacy booleans too', () => {
+    write({ reflections: false, volumetricClouds: true, qualityPref: 'low', safeLevel: 2 });
+    resetGraphicsPrefs();
+    expect(loadSettingOverrides()).toEqual({});
+    expect(loadQualityPref()).toBe('auto');
+    expect(loadSafeLevel()).toBe(0);
+  });
+
+  it('reset preserves the boot sentinel — it describes the last run, not a pref', () => {
+    markBootStarted();
+    resetGraphicsPrefs();
+    expect(didLastBootFail()).toBe(true);
+  });
 });
 
 describe('foliageForScene', () => {
@@ -198,6 +231,33 @@ describe('foliageForScene', () => {
   it('falls back to full for a scene with no metadata at all', () => {
     expect(foliageForScene(null).leafScale).toBe(1);
     expect(foliageForScene({}).leafScale).toBe(1);
+  });
+});
+
+describe('scopeFor', () => {
+  const def = (id) => SETTING_DEFS.find((d) => d.id === id);
+
+  it('reports reload-scoped settings as reload regardless of state', () => {
+    expect(scopeFor(def('shadows'), 'off', { reflectionsSupported: true })).toBe('reload');
+  });
+
+  it('reports plainly live settings as live', () => {
+    expect(scopeFor(def('fog'), 'off', {})).toBe('live');
+    expect(scopeFor(def('renderScale'), 'half', {})).toBe('live');
+  });
+
+  // Regression: reflections were declared 'live', but the MirrorTexture and the
+  // water shader's `#define REFLECT` are decided when the lake material is
+  // built. Turning them ON in a scene that booted without them did nothing while
+  // the control happily reported On.
+  it('treats turning reflections ON as reload when no mirror was allocated', () => {
+    expect(scopeFor(def('reflections'), 'on', { reflectionsSupported: false })).toBe('reload');
+    expect(scopeFor(def('reflections'), 'on', { reflectionsSupported: true })).toBe('live');
+  });
+
+  it('keeps turning reflections OFF live either way — the fade always works', () => {
+    expect(scopeFor(def('reflections'), 'off', { reflectionsSupported: false })).toBe('live');
+    expect(scopeFor(def('reflections'), 'off', { reflectionsSupported: true })).toBe('live');
   });
 });
 

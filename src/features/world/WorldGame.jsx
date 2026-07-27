@@ -90,6 +90,13 @@ const S = {
     fontFamily: 'Inter, system-ui, sans-serif', border: '1px solid #334155',
     pointerEvents: 'none',
   },
+  gfxNotice: {
+    position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+    background: 'rgba(46,32,16,.92)', color: '#f0d060', fontSize: 12,
+    padding: '6px 16px', borderRadius: 20, zIndex: 11, maxWidth: '80vw',
+    fontFamily: 'Inter, system-ui, sans-serif', border: '1px solid rgba(196,148,40,.5)',
+    pointerEvents: 'none', textAlign: 'center',
+  },
   onlineCount: {
     // Cleared left of the circular minimap (top-right, ~168px wide incl. offset).
     position: 'absolute', top: 12, right: 178,
@@ -246,6 +253,9 @@ export default function WorldGame({ playerInfo, onExit, onEquipPerksChange }) {
   // scene (NPC markers) re-run — the quest-marker effect otherwise fires
   // before sceneRef is set and never again while disconnected.
   const [sceneReady, setSceneReady] = useState(false);
+  // Transient banner text when the scene sheds graphics cost on its own.
+  const [gfxNotice, setGfxNotice] = useState(null);
+  const gfxNoticeTimer = useRef(null);
 
   const {
     onStackUpsert, onStackDelete, onWalletUpsert, onChestOpenedInsert,
@@ -548,6 +558,23 @@ export default function WorldGame({ playerInfo, onExit, onEquipPerksChange }) {
     setLocalHp(state);
   }, []);
 
+  // The scene reduces its own graphics when the framerate stays low for several
+  // seconds, or when a lost WebGL context forces a reload at a safer level.
+  // Both used to happen silently: the world simply looked different and nothing
+  // said why. (There was a sessionStorage breadcrumb for this, written at three
+  // sites and read at none.) Menu → Graphics keeps the persistent record; this
+  // is the in-the-moment explanation.
+  const handleGraphicsDowngrade = useCallback((info) => {
+    const msg = info?.reloading
+      ? 'Graphics reduced to recover from a display driver error — reloading…'
+      : `Graphics reduced to hold the framerate (${info?.what ?? 'some effects'}). Adjust under Menu → Graphics.`;
+    setGfxNotice(msg);
+    if (gfxNoticeTimer.current) clearTimeout(gfxNoticeTimer.current);
+    gfxNoticeTimer.current = setTimeout(() => setGfxNotice(null), 9000);
+  }, []);
+
+  useEffect(() => () => { if (gfxNoticeTimer.current) clearTimeout(gfxNoticeTimer.current); }, []);
+
   // ── Babylon scene mount / unmount ─────────────────────────────────────────
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -558,7 +585,8 @@ export default function WorldGame({ playerInfo, onExit, onEquipPerksChange }) {
       { onMove: movePlayer, onCastAbility: castAbility, onBuildCampfire: buildCampfire,
         onLocalPlayerUpdate, onChestOpen: (...args) => onChestOpenRef.current?.(...args),
         onNearbyNpc, onNearbyDoor,
-        onEnterDungeon: enterDungeon, onLeaveDungeon: leaveDungeon }
+        onEnterDungeon: enterDungeon, onLeaveDungeon: leaveDungeon,
+        onGraphicsDowngrade: handleGraphicsDowngrade }
     );
     sceneRef.current = scene;
     setMapData(scene.getMapData());
@@ -937,6 +965,14 @@ export default function WorldGame({ playerInfo, onExit, onEquipPerksChange }) {
       {/* Connection badge */}
       {!connected && (
         <div style={S.statusBadge}>Connecting to Aurisar World…</div>
+      )}
+
+      {/* Graphics auto-reduction notice. The scene sheds cost on its own when
+          the framerate stays low; without this the world visibly changes with
+          no explanation. Transient — the Menu → Graphics banner is the
+          persistent record. */}
+      {gfxNotice && (
+        <div style={S.gfxNotice} role="status">{gfxNotice}</div>
       )}
 
       {/* Online count */}
