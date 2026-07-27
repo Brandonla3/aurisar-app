@@ -114,14 +114,18 @@ describe('mob camps', () => {
     z1_wolves_a: { x: -15, z: 55 },
     z1_wolves_b: { x: 20, z: 70 },
     z1_greyjaw: { x: 0, z: 95 },
+    z1_rutfang: { x: -34, z: 78 },
     z1_boars_a: { x: 55, z: 12 },
     z1_boars_b: { x: 80, z: -15 },
     z1_spiders: { x: -60, z: 5 },
+    z1_chitter_q: { x: -32, z: 20 },
     z1_murlocs: { x: -75, z: 57 },
     z1_kobolds: { x: -82, z: -62 },
     z1_bandits_a: { x: 65, z: -65 },
     z1_bandits_b: { x: 90, z: -90 },
-    z1_gorrak: { x: 92, z: -92 },
+    // Was z1_gorrak/gorrak — an accidental overworld duplicate of the castle's
+    // own Gorrak. Same position, a distinct rare (curve fix, Batch F).
+    z1_serah: { x: 92, z: -92 },
     z1_undead: { x: 80, z: 78 },
   };
 
