@@ -187,6 +187,11 @@ export const MOBS: MobDef[] = [
     copperMax: 30,
   },
   {
+    // Castle Ashwood's treasury boss (ca_boss, castlePlan.js:266) — q_ringleader's
+    // target. Kept here even though the overworld SPAWNS entry below no longer
+    // references this mobType: castlePlan.js still spawns 'gorrak' by name for
+    // the dungeon instance, so removing this MobDef would break the boss fight,
+    // not just the (now-fixed) accidental overworld duplicate.
     mobType: 'gorrak',
     name: 'Gorrak the Ruthless',
     family: 'humanoid',
@@ -208,6 +213,75 @@ export const MOBS: MobDef[] = [
     copperMin: 250,
     copperMax: 250,
   },
+  {
+    // Replaces the accidental overworld duplicate of the castle's own Gorrak
+    // (was SPAWNS 'z1_gorrak' at this exact position) — same bandit turf at
+    // Gallows Rise, a distinct field rare rather than a second copy of the
+    // dungeon boss. glbKey deliberately reuses vale_bandit's 'tribal', not
+    // gorrak's 'orcenemy', so she reads as a different silhouette on sight.
+    mobType: 'serah_the_knife',
+    name: 'Serah the Knife',
+    family: 'humanoid',
+    level: 5,
+    maxHp: 220,
+    dmgMin: 16,
+    dmgMax: 20,
+    attackSpeedSec: 1.8,
+    moveSpeedMps: 4.0,
+    aggroRadiusM: 12,
+    leashRadiusM: 40,
+    respawnSec: 240,
+    glbKey: 'tribal',
+    lootTable: [
+      { itemId: 'bandit_bandana', chance: 1, min: 1, max: 1 },
+      { itemId: 'linen_scrap', chance: 0.5, min: 1, max: 1 },
+    ],
+    copperMin: 100,
+    copperMax: 100,
+  },
+  {
+    // Rare: an alpha beyond Old Greyjaw in the same Greywood wolf territory.
+    mobType: 'rutfang',
+    name: 'Rutfang',
+    family: 'beast',
+    level: 5,
+    maxHp: 230,
+    dmgMin: 15,
+    dmgMax: 19,
+    attackSpeedSec: 1.9,
+    moveSpeedMps: 4.6,
+    aggroRadiusM: 12,
+    leashRadiusM: 40,
+    respawnSec: 240,
+    glbKey: 'wolf',
+    lootTable: [
+      { itemId: 'wolf_fang', chance: 1, min: 1, max: 2 },
+    ],
+    copperMin: 100,
+    copperMax: 100,
+  },
+  {
+    // Rare: a brood-mother above the regular Gloomweb lurkers.
+    mobType: 'chitter_queen',
+    name: 'Chitter-Queen',
+    family: 'spider',
+    level: 6,
+    maxHp: 280,
+    dmgMin: 17,
+    dmgMax: 21,
+    attackSpeedSec: 1.7,
+    moveSpeedMps: 4.5,
+    aggroRadiusM: 13,
+    leashRadiusM: 40,
+    respawnSec: 240,
+    glbKey: 'spider',
+    lootTable: [
+      { itemId: 'webwood_silk', chance: 1, min: 2, max: 3 },
+      { itemId: 'spider_leg', chance: 0.6, min: 1, max: 1 },
+    ],
+    copperMin: 100,
+    copperMax: 100,
+  },
 ];
 
 // Camp positions follow the reference zone-1 layout (coordinate frame
@@ -224,11 +298,13 @@ export const SPAWNS: SpawnDef[] = [
   { netId: 'z1_wolves_a',   mobType: 'forest_wolf',    zoneId: 1, pos: at(L.greywood_run, -13, -15), count: 7, radiusM: 22 },
   { netId: 'z1_wolves_b',   mobType: 'forest_wolf',    zoneId: 1, pos: at(L.greywood_run, 22, 0),    count: 6, radiusM: 20 },
   { netId: 'z1_greyjaw',    mobType: 'old_greyjaw',    zoneId: 1, pos: at(L.greywood_run, 2, 25),    count: 1, radiusM: 8 },
+  { netId: 'z1_rutfang',    mobType: 'rutfang',        zoneId: 1, pos: at(L.greywood_run, -32, 8),   count: 1, radiusM: 3 },
   // Tuskfield (east)
   { netId: 'z1_boars_a',    mobType: 'wild_boar',      zoneId: 1, pos: at(L.tuskfield, -10, 12),     count: 6, radiusM: 22 },
   { netId: 'z1_boars_b',    mobType: 'wild_boar',      zoneId: 1, pos: at(L.tuskfield, 15, -15),     count: 5, radiusM: 18 },
   // Gloomweb (west)
   { netId: 'z1_spiders',    mobType: 'webwood_spider', zoneId: 1, pos: at(L.gloomweb, 0, 1),         count: 7, radiusM: 22 },
+  { netId: 'z1_chitter_q',  mobType: 'chitter_queen',  zoneId: 1, pos: at(L.gloomweb, 18, 12),        count: 1, radiusM: 3 },
   // Stillmere shore (northwest)
   { netId: 'z1_murlocs',    mobType: 'mudfin_murloc',  zoneId: 1, pos: at(L.stillmere, 17, -31),     count: 8, radiusM: 14 },
   // Rustvein Dig (southwest)
@@ -236,7 +312,11 @@ export const SPAWNS: SpawnDef[] = [
   // Gallows Rise (southeast)
   { netId: 'z1_bandits_a',  mobType: 'vale_bandit',    zoneId: 1, pos: at(L.gallows_rise, -11, 11),  count: 7, radiusM: 24 },
   { netId: 'z1_bandits_b',  mobType: 'vale_bandit',    zoneId: 1, pos: at(L.gallows_rise, 14, -14),  count: 5, radiusM: 16 },
-  { netId: 'z1_gorrak',     mobType: 'gorrak',         zoneId: 1, pos: at(L.gallows_rise, 16, -16),  count: 1, radiusM: 2 },
+  // Was 'z1_gorrak'/'gorrak' — an accidental overworld duplicate of the castle's
+  // own Gorrak (ca_boss, castlePlan.js:266). Same position, a distinct rare
+  // instead: q_ringleader (which only counts spawnNetIdPrefix 'ca_boss') is
+  // unaffected by this change.
+  { netId: 'z1_serah',      mobType: 'serah_the_knife', zoneId: 1, pos: at(L.gallows_rise, 16, -16), count: 1, radiusM: 2 },
   // Mourner's Rest (northeast)
   { netId: 'z1_undead',     mobType: 'restless_bones', zoneId: 1, pos: at(L.mourners_rest, 0, -2),   count: 8, radiusM: 18 },
 ];

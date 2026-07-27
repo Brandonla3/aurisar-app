@@ -8,7 +8,8 @@
  * placeholder copy the story pass rewrites.
  *
  * Kill objectives: q_first_blood · q_wolves, q_bandits → q_ringleader ·
- * q_murlocs · q_mine · q_bones
+ * q_bandits → q_serahs_trail (curve fix: Serah replaces the accidental
+ * overworld Gorrak duplicate) · q_murlocs · q_mine · q_bones
  * Collect objectives (P4 phase 2): q_greyjaw, q_boars, q_spiders, q_supplies
  * Edran chain (P4 phase 5): q_whispers → q_names_of_the_dead →
  * q_silence_the_call → q_rite
@@ -169,6 +170,31 @@ export const QUESTS: QuestDef[] = [
       },
     ],
     reward: { copper: 500, itemIds: ['militia_vest'], gameXp: 800 },
+  },
+  {
+    // Curve fix: the castle-gate rumor breadcrumb explaining why the vale's
+    // own Gorrak fight moved to Castle Ashwood (q_ringleader) — Serah is the
+    // lieutenant left running the vale bandit camp in his absence, a distinct
+    // field rare, wholly additive alongside q_ringleader (does not touch it).
+    id: 'q_serahs_trail',
+    zoneId: 1,
+    name: "Serah's Trail",
+    giverNpcId: 'marshal_halwin',
+    turnInNpcId: 'marshal_halwin',
+    requiresQuestId: 'q_bandits',
+    minLevel: 5,
+    text: "Word from the castle gate says Gorrak fled to the old vault rather than face the militia in the open — but he left a lieutenant behind to hold the vale. Serah the Knife has taken what is left of his crew at Gallows Rise. End her, and the southeast hills are ours again.",
+    completionText: "Serah's blade will not threaten the vale again. Whatever Gorrak is doing holed up in that castle, at least our own roads are clear.",
+    objectives: [
+      {
+        type: 'kill',
+        mobType: 'serah_the_knife',
+        count: 1,
+        label: 'Serah the Knife slain',
+        spawnNetIdPrefix: 'z1_serah',
+      },
+    ],
+    reward: { copper: 220, gameXp: 600 },
   },
   {
     id: 'q_bones',
