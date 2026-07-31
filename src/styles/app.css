@@ -240,25 +240,43 @@
          btn-danger      destructive
        Sizes: btn-sm / btn-xs (both get a 44px touch extension on coarse
        pointers, below). For bare glyph actions use .icon-btn instead. */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font-ui);font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
-    .btn-gold-solid{background:linear-gradient(135deg,#8B7425,#A89030);color:#d4cec4;border:1px solid rgba(196,160,68,.35);box-shadow:0 2px 14px rgba(140,116,37,.28);text-shadow:0 1px 2px rgba(0,0,0,.35)}
-    .btn-gold-solid:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(140,116,37,.4)}
-    .btn-gold{background:linear-gradient(135deg,rgba(45,42,36,.5),rgba(45,42,36,.35));color:#d4cec4;box-shadow:none;border:1px solid rgba(180,172,158,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-    .btn-gold:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,0,0,.4)}
-    .btn-ghost{background:linear-gradient(135deg,rgba(45,42,36,.25),rgba(32,30,26,.15));color:#8a8478;border:1px solid rgba(180,172,158,.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-    .btn-ghost:hover{border-color:rgba(180,172,158,.07);color:#b4ac9e}
+    /* Cold Forge button ladder. Same rungs as before — the names are load-
+       bearing across ~40 files — but gold is retired in favour of the
+       surface ladder, and the single near-white commit action is the only
+       thing allowed to be bright.
+
+       Rung meanings are unchanged:
+         btn-gold-solid  the one primary commit of a screen (now near-white)
+         btn-gold        default action
+         btn-glass-yellow  highlighted alternative (now --signal)
+         btn-ghost       secondary / dismiss
+         btn-danger      destructive
+
+       Every backdrop-filter here is gone. These buttons sit on opaque cards,
+       so the blur had nothing behind it to blur; it only ever bought a
+       compositor layer per button. */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:var(--rad-chip);border:none;cursor:pointer;font-family:var(--font-ui);font-size:.72rem;font-weight:700;letter-spacing:-.005em;transition:background-color var(--dur-base) var(--ease-standard),color var(--dur-base) var(--ease-standard),border-color var(--dur-base) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);text-transform:none;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+    .btn:active{transform:scale(.97)}
+    .btn-gold-solid{background:var(--cast);color:var(--cast-ink);border:none;box-shadow:var(--elev-2);text-shadow:none}
+    .btn-gold-solid:hover{filter:brightness(1.04)}
+    .btn-gold{background-color:var(--sf-2);background-image:var(--specular);color:var(--tx-hi);box-shadow:var(--elev-1);border:1px solid var(--hair-2)}
+    .btn-gold:hover{background-color:var(--sf-3)}
+    .btn-ghost{background-color:var(--sf-1);color:var(--tx-mid);border:1px solid var(--hair-1)}
+    .btn-ghost:hover{border-color:var(--hair-2);color:var(--tx-hi)}
     .btn-cls{background:linear-gradient(135deg,var(--cls-color),color-mix(in srgb,var(--cls-color) 65%,black));color:#fff;box-shadow:0 4px 18px color-mix(in srgb,var(--cls-color) 35%,transparent)}
     .btn-cls:hover{transform:translateY(-2px);box-shadow:0 7px 28px color-mix(in srgb,var(--cls-color) 55%,transparent)}
-    .btn-glass{background:linear-gradient(135deg,rgba(45,42,36,.4),rgba(32,30,26,.25));color:#d4cec4;border:1px solid rgba(180,172,158,.06);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 rgba(180,172,158,.03),0 2px 12px rgba(0,0,0,.3);text-shadow:0 1px 2px rgba(0,0,0,.4)}
-    .btn-glass:hover{background:rgba(45,42,36,.3);border-color:rgba(180,172,158,.1);box-shadow:inset 0 1px 0 rgba(180,172,158,.05),0 4px 18px rgba(0,0,0,.45);transform:translateY(-1px)}
-    .btn-glass-yellow{background:rgba(255,232,124,.18);color:#FFE87C;border:1px solid rgba(255,232,124,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 rgba(255,232,124,.28),0 2px 14px rgba(255,232,124,.18);text-shadow:0 1px 3px rgba(0,0,0,.5)}
-    .btn-glass-yellow:hover{background:rgba(255,232,124,.24);border-color:rgba(255,232,124,.65);box-shadow:inset 0 1px 0 rgba(255,232,124,.38),0 4px 20px rgba(255,232,124,.28);transform:translateY(-1px)}
-    .btn-danger{background:rgba(180,30,30,.1);color:#e74c3c;border:1px solid rgba(180,30,30,.25)}
-    .btn-danger:hover{background:rgba(180,30,30,.22)}
-    .btn-green{background:rgba(46,204,113,.12);color:#2ecc71;border:1px solid rgba(46,204,113,.28)}
+    .btn-glass{background-color:var(--sf-2);background-image:var(--specular);color:var(--tx-hi);border:1px solid var(--hair-2);box-shadow:var(--elev-1)}
+    .btn-glass:hover{background-color:var(--sf-3)}
+    .btn-glass-yellow{background:var(--signal-dim);color:var(--signal);border:1px solid color-mix(in srgb,var(--signal) 40%,transparent);box-shadow:none;text-shadow:none}
+    .btn-glass-yellow:hover{background:color-mix(in srgb,var(--signal) 30%,transparent);border-color:color-mix(in srgb,var(--signal) 55%,transparent)}
+    /* Status colours stay chromatic on purpose. In a monochrome system a
+       neutral destructive action is indistinguishable from a safe one. */
+    .btn-danger{background:rgba(180,30,30,.12);color:#f0736a;border:1px solid rgba(180,30,30,.3)}
+    .btn-danger:hover{background:rgba(180,30,30,.24)}
+    .btn-green{background:rgba(46,204,113,.12);color:#4ade80;border:1px solid rgba(46,204,113,.3)}
     .btn-green:hover{background:rgba(46,204,113,.22)}
-    .btn:disabled{opacity:.3;cursor:not-allowed;transform:none!important}
-    .btn-sm{padding:7px 13px;font-size:.66rem}
+    .btn:disabled{opacity:.32;cursor:not-allowed;transform:none!important}
+    .btn-sm{padding:8px 14px;font-size:.68rem}
     .btn-xs{padding:5px 10px;font-size:.6rem}
 
     /* Touch-only hit-area extension. Visual size of small buttons is kept
@@ -539,7 +557,11 @@
     .hist-date-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid rgba(180,172,158,.04)}
     .hist-date-lbl{font-family:var(--font-ui);font-size:.58rem;color:#8a8478;letter-spacing:.1em}
     /* LOG SUB-TABS */
-    .log-subtab-bar{display:flex;gap:0;border:none;border-radius:10px;overflow:visible;margin-bottom:14px;flex-shrink:0;background:rgba(45,42,36,.55);padding:3px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 rgba(0,0,0,.18)}
+    /* Segmented control — the same pill language as the bottom rail, so
+       "which mode am I in" and "which tab am I on" answer the same way.
+       backdrop-filter dropped: it sits on an opaque field, so the blur had
+       nothing to blur and only cost a compositor layer. */
+    .log-subtab-bar{display:flex;gap:3px;border:1px solid var(--hair-1);border-radius:var(--rad-chip);overflow:visible;margin-bottom:14px;flex-shrink:0;background:var(--sf-1);padding:4px;box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
     .friend-card{background:rgba(45,42,36,.12);border:1px solid rgba(180,172,158,.06);border-radius:12px;padding:13px 14px;margin-bottom:10px}
     .friend-card-top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
     .friend-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:rgba(45,42,36,.18);border:1.5px solid rgba(180,172,158,.06);flex-shrink:0}
@@ -547,9 +569,9 @@
     .friend-meta{font-size:.65rem;color:#8a8478;margin-top:2px}
     .friend-recent{background:rgba(45,42,36,.12);border-radius:8px;padding:8px 10px;font-size:.68rem;color:#8a8478;margin-top:6px;border:1px solid rgba(180,172,158,.05)}
     .req-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(45,42,36,.14);border:1px solid rgba(180,172,158,.06);border-radius:10px;margin-bottom:8px}
-    .log-subtab-btn{flex:1;padding:7px 12px;text-align:center;font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.06em;cursor:pointer;transition:all .22s ease;color:#8a8478;background:transparent;border:none;border-radius:8px;text-transform:uppercase;-webkit-tap-highlight-color:transparent}
+    .log-subtab-btn{flex:1;padding:9px 12px;text-align:center;font-family:var(--font-ui);font-size:.72rem;font-weight:600;letter-spacing:-.005em;cursor:pointer;transition:color var(--dur-base) var(--ease-standard),background-color var(--dur-base) var(--ease-standard);color:var(--tx-mid);background:transparent;border:none;border-radius:var(--rad-chip);text-transform:none;-webkit-tap-highlight-color:transparent}
     .log-subtab-btn:last-child{border-right:none}
-    .log-subtab-btn.on{background:rgba(180,172,158,.16);color:#d4cec4;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.2)}
+    .log-subtab-btn.on{background:var(--sf-3);color:var(--tx-hi);box-shadow:var(--elev-1)}
     /* SOURCE BADGE on log entries */
     .log-source-badge{display:inline-flex;align-items:center;gap:3px;font-size:.56rem;padding:1px 6px;border-radius:4px;margin-left:5px;font-family:var(--font-ui);letter-spacing:.02em;vertical-align:middle}
     .log-source-badge.plan{background:rgba(45,42,36,.2);color:#b4ac9e;border:1px solid rgba(180,172,158,.06)}
@@ -1257,16 +1279,9 @@
     .upcoming-section{margin-bottom:12px}
     .upcoming-card{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid rgba(180,172,158,.06);background:rgba(45,42,36,.14);margin-bottom:7px;cursor:pointer}
     .upcoming-card:hover{border-color:rgba(180,172,158,.08);background:rgba(45,42,36,.2)}
-    /* WORKOUTS TAB — base style (overridden by Forge card block below) */
-    .workout-card:hover{border-color:rgba(180,172,158,.1)}
-    .workout-card-top{display:flex;align-items:center;gap:11px}
-    .workout-icon{font-size:1.6rem;flex-shrink:0}
-    .workout-name{font-family:var(--font-ui);font-size:.82rem;color:#d4cec4;margin-bottom:3px}
-    .workout-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .workout-tag{font-size:.58rem;padding:2px 7px;border-radius:8px;background:rgba(45,42,36,.2);border:1px solid rgba(180,172,158,.06);color:#b4ac9e;font-family:var(--font-ui);letter-spacing:.03em}
-    .workout-desc{font-size:.7rem;color:#8a8478;margin-top:6px;font-style:italic}
-    .workout-ex-pill-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
-    .workout-ex-pill{font-size:.6rem;padding:2px 7px;border-radius:8px;background:rgba(45,42,36,.15);border:1px solid rgba(180,172,158,.05);color:#8a8478}
+    /* The .workout-card family was declared here and again in the "Workout
+       cards" block below, with the later copy winning on every property.
+       The early copy is gone; the cards are defined in one place. */
     .workout-detail-ex{--mg-color:#B0A090;position:relative;display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:8px;background:color-mix(in srgb,var(--mg-color) 7%,rgba(30,28,24,.9));border:1px solid color-mix(in srgb,var(--mg-color) 14%,transparent);border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);margin-bottom:6px;box-shadow:0 1px 6px rgba(0,0,0,.18);transition:all .18s}
     .workout-detail-ex:hover{border-color:color-mix(in srgb,var(--mg-color) 22%,transparent);box-shadow:0 3px 10px rgba(0,0,0,.22)}
     .workout-detail-ex-orb{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 24%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 9%,rgba(25,23,18,.62)));box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 8px color-mix(in srgb,var(--mg-color) 9%,transparent),inset 0 0 6px rgba(0,0,0,.3)}
@@ -1630,13 +1645,17 @@
        All tabs: shared RPG system + tab-specific styles
        ══════════════════════════════════════════════════ */
 
-    /* ── Shared ornate section header ── */
+    /* ── Shared section header ────────────────────────────────────────────
+       Was a centred serif title flanked by two hairline rules. Centred
+       headers with decorative rules cost a whole row of vertical space to
+       say one word, and on a 390px screen that row is expensive. The title
+       now sits left, at reading weight, and the rules are gone — the .3
+       alpha on the old title was also the single least legible text in the
+       app. */
     .rpg-sec-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:0}
-    .rpg-sec-header-center .rpg-sec-title{text-align:center}
-    .rpg-sec-line{flex:1;height:1px}
-    .rpg-sec-line-l{background:linear-gradient(90deg,transparent,rgba(180,172,158,.06))}
-    .rpg-sec-line-r{background:linear-gradient(270deg,transparent,rgba(180,172,158,.06))}
-    .rpg-sec-title{font-family:'Cinzel',serif;font-size:.62rem;color:rgba(180,172,158,.4);letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+    .rpg-sec-header-center .rpg-sec-title{text-align:left}
+    .rpg-sec-line{display:none}
+    .rpg-sec-title{font-family:var(--font-ui);font-size:.78rem;font-weight:700;color:var(--tx-hi);letter-spacing:-.01em;text-transform:none;white-space:nowrap;flex-shrink:0}
 
     /* ── Tab bar (bottom nav — the only definition) ──────────────────────
        The rail is the visible object; .hud-nav-panel above only positions it.
@@ -1667,26 +1686,43 @@
     .tab.on .tab-icon{color:var(--signal);transform:translateY(-1px)}
     .tab:active .tab-icon{transform:scale(.88)}
 
-    /* ── Workout cards (Forge tab) — themed via --mg-color ── */
+    /* ── Workout cards (Arsenal) ──────────────────────────────────────────
+       One dominant element and one demoted micro-line. The old card gave the
+       name, an exercise-count chip, an XP chip and a label chip near-
+       identical weight, which is exactly why four workouts read as one grey
+       wall — nothing was allowed to win the glance.
+
+       The face comes from surfaceFor() (src/utils/surfaceFor.js), so every
+       workout is physically distinguishable before you read a word, and
+       --wear polishes it as you complete it. The muscle colour survives only
+       as the 2px left edge: the library's colour wayfinding is intact, but
+       hue no longer fills anything and so no longer competes with content. */
     .workout-card{
       --mg-color:#B0A090;
-      position:relative;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;
-      background:rgba(26,24,20,.92);
-      border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.06));
-      border-left:3px solid color-mix(in srgb,var(--mg-color) 38%,transparent);
-      transition:all var(--dur-slow) var(--ease-standard);-webkit-tap-highlight-color:transparent
+      position:relative;border-radius:var(--rad-card);padding:13px 14px;margin-bottom:10px;cursor:pointer;
+      background-color:var(--sf-1);
+      border:1px solid var(--hair-1);
+      box-shadow:var(--elev-2);overflow:hidden;isolation:isolate;
+      transition:border-color var(--dur-base) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);
+      -webkit-tap-highlight-color:transparent
     }
-    .workout-card:hover{border-color:color-mix(in srgb,var(--mg-color) 22%,rgba(180,172,158,.08));background:rgba(30,28,24,.95)}
-    .workout-card:active{transform:scale(.985);transition:transform .1s ease}
-    .workout-card-top{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+    .workout-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;z-index:2;
+      background:color-mix(in srgb,var(--mg-color) 60%,var(--sf-3))}
+    .workout-card:hover{border-color:var(--hair-2)}
+    .workout-card:active{transform:scale(.985);transition:transform var(--dur-instant) var(--ease-standard)}
+    .workout-card-top{display:flex;align-items:center;gap:12px;margin-bottom:0;position:relative;z-index:1}
+    /* A recessed well rather than a tinted square — the emoji reads as an
+       object set into the panel, which is what sells the material. */
     .workout-icon{
-      font-size:1.3rem;width:38px;height:38px;border-radius:8px;flex-shrink:0;
+      font-size:1.35rem;width:44px;height:44px;border-radius:12px;flex-shrink:0;
       display:flex;align-items:center;justify-content:center;
-      background:color-mix(in srgb,var(--mg-color) 16%,rgba(45,42,36,.5));
-      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
+      background:var(--sf-3);border:1px solid var(--hair-1);
+      box-shadow:inset 0 2px 5px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.05);
     }
-    .workout-name{font-family:'Cinzel',serif;font-size:.82rem;color:#d4cec4;line-height:1.2;margin-bottom:3px;letter-spacing:.02em}
-    .workout-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .workout-name{font-family:var(--font-ui);font-size:.95rem;font-weight:700;color:var(--tx-hi);line-height:1.25;margin-bottom:4px;letter-spacing:-.015em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .workout-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-family:var(--font-ui);font-size:.7rem;font-weight:500;color:var(--tx-mid);letter-spacing:-.005em}
+    .wo-micro-sep{color:var(--tx-lo)}
+    .wo-micro-xp{color:var(--signal);font-weight:700;font-variant-numeric:tabular-nums}
     .workout-tag{font-size:.58rem;color:color-mix(in srgb,var(--mg-color) 75%,#b4ac9e);background:color-mix(in srgb,var(--mg-color) 9%,rgba(45,42,36,.22));border:1px solid color-mix(in srgb,var(--mg-color) 14%,rgba(180,172,158,.05));border-radius:6px;padding:2px 7px;letter-spacing:.02em;font-family:var(--font-ui)}
     .workout-desc{font-size:.72rem;color:#8a8478;font-style:italic;margin-bottom:8px;line-height:1.45}
     .workout-ex-pill-row{display:flex;gap:4px;flex-wrap:wrap}
@@ -1706,7 +1742,11 @@
     .wo-divider{height:1px;margin:18px 0;background:linear-gradient(90deg,transparent,rgba(180,172,158,.1) 20%,rgba(180,172,158,.14) 50%,rgba(180,172,158,.1) 80%,transparent)}
 
     /* ── Workouts/Recipes sticky filter bar (iOS material) ── */
-    .wo-sticky-filters{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px 4px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
+    /* Opaque rather than blurred. This selector was NOT in the touch-device
+       backdrop-filter drop list, so on a phone it was running a live
+       16px blur + saturate over the whole scrolling list — the most
+       expensive thing on the screen, for an effect nobody can name. */
+    .wo-sticky-filters{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px 4px;background:var(--sf-void);box-shadow:0 1px 0 var(--hair-1)}
 
     /* ── Recipe filter bar ── */
     .recipe-filter-bar{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-ms-overflow-style:none}
@@ -1722,7 +1762,7 @@
     .recipe-ss-group{border-left:2px solid #C4A044;padding-left:8px;margin:4px 0}
 
     /* ── Workout label chips ── */
-    .wo-label-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:.56rem;border:1px solid rgba(196,160,68,.25);color:#C4A044;background:rgba(196,160,68,.08);cursor:pointer;transition:background .15s,border-color .15s;font-family:var(--font-ui);letter-spacing:.02em;white-space:nowrap}
+    .wo-label-chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:var(--rad-chip);font-size:.6rem;font-weight:600;border:1px solid var(--hair-2);color:var(--tx-mid);background:var(--sf-2);cursor:pointer;transition:background-color var(--dur-fast) var(--ease-standard),border-color var(--dur-fast) var(--ease-standard);font-family:var(--font-ui);letter-spacing:.005em;white-space:nowrap}
     .wo-label-chip.sel{border-color:#C4A044;background:rgba(196,160,68,.18)}
     .wo-label-chip:hover{background:rgba(196,160,68,.14)}
     .wo-label-new-row{display:flex;gap:4px;padding:6px 10px;border-top:1px solid rgba(180,172,158,.07);margin-top:4px}
@@ -2398,9 +2438,13 @@
     /* ══ LIVE WORKOUT BANNER + SHEET ══════════════════════════════════════ */
 
     /* Track toggle button on workout cards */
-    .track-toggle-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.07em;text-transform:uppercase;color:#8a8478;background:rgba(45,42,36,.35);border:1px solid rgba(180,172,158,.09);border-radius:20px;cursor:pointer;transition:all .18s;flex-shrink:0;-webkit-tap-highlight-color:transparent}
-    .track-toggle-btn:active{background:rgba(45,42,36,.6)}
-    .track-toggle-btn.on{color:#6dbb3a;background:rgba(109,187,58,.12);border-color:rgba(109,187,58,.32);box-shadow:0 0 10px rgba(109,187,58,.15)}
+    /* The card's one action, so it gets the near-white commit treatment.
+       When a workout is already live the button stops being an invitation
+       and becomes a status, so it drops to --signal on a dim field — the
+       same accent the nav uses for "you are here". */
+    .track-toggle-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;font-family:var(--font-ui);font-size:.68rem;font-weight:700;letter-spacing:.01em;color:var(--cast-ink);background:var(--cast);border:none;border-radius:var(--rad-chip);cursor:pointer;flex-shrink:0;box-shadow:var(--elev-1);transition:transform var(--dur-fast) var(--ease-standard),filter var(--dur-fast) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+    .track-toggle-btn:active{transform:scale(.95);filter:brightness(.9)}
+    .track-toggle-btn.on{color:var(--signal);background:var(--signal-dim);border:1px solid color-mix(in srgb,var(--signal) 38%,transparent);box-shadow:none}
 
     /* Persistent banner pill */
     .lw-banner{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;margin-bottom:8px;background:linear-gradient(135deg,rgba(28,42,18,.65),rgba(18,28,12,.45));border:1px solid rgba(109,187,58,.18);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .18s;text-align:left}

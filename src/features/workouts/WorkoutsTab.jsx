@@ -2,10 +2,11 @@ import React, { memo, useMemo } from 'react';
 import { ExIcon } from '../../components/ExIcon';
 import { getMuscleColor, getTypeColor, calcExXP, calcExEntryXP, calcWorkoutXP } from '../../utils/xp';
 import { lbsToKg, miToKm, isMetric, weightLabel, displayWt } from '../../utils/units';
-import { formatXP } from '../../utils/format';
+import { formatXP, formatXPValue } from '../../utils/format';
 import { todayStr } from '../../utils/helpers';
 import { normalizeHHMM, combineHHMMSec, daysUntil } from '../../utils/time';
 import { S, R, FS, Z } from '../../utils/tokens';
+import { surfaceFor, wearFromCompletions } from '../../utils/surfaceFor';
 import SetsEditor from '../../components/ui/SetsEditor';
 import FilterDropdown from '../exercises/FilterDropdown';
 import IconButton from '../../components/ui/IconButton';
@@ -394,6 +395,23 @@ const woMeta = useMemo(() => {
   return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [allW, profile.chosenClass, allExById]);
+// How many distinct days each workout has been completed on, which drives
+// the --wear polish on its generated surface. Counted by dateKey rather than
+// by entry, because completing one workout writes one log row PER EXERCISE —
+// counting rows would make a 9-exercise workout look nine times more worn
+// than a 1-exercise one done the same number of times.
+const woCompletions = useMemo(() => {
+  const days = new Map();
+  for (const e of profile.log || []) {
+    if (!e.sourceWorkoutId) continue;
+    let set = days.get(e.sourceWorkoutId);
+    if (!set) { set = new Set(); days.set(e.sourceWorkoutId, set); }
+    set.add(e.dateKey);
+  }
+  const counts = new Map();
+  for (const [id, set] of days) counts.set(id, set.size);
+  return counts;
+}, [profile.log]);
 const woLabelCounts = useMemo(() => {
   const c = new Map();
   for (const w of allW) {
@@ -405,7 +423,7 @@ const woLabelCounts = useMemo(() => {
 // ── LIST ───────────────────────────────
 if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div style={{
       marginBottom: S.s8
-    }}><div className={"rpg-sec-header rpg-sec-header-center"}><div className={"rpg-sec-line rpg-sec-line-l"} /><span className={"rpg-sec-title"}>{"✦ Arsenal ✦"}<span className={"info-icon"} style={{
+    }}><div className={"rpg-sec-header rpg-sec-header-center"}><div className={"rpg-sec-line rpg-sec-line-l"} /><span className={"rpg-sec-title"}>{"Arsenal"}<span className={"info-icon"} style={{
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -501,8 +519,9 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
       const _meta = woMeta.get(wo.id) || { xp: calcWorkoutXP(wo, profile.chosenClass, allExById), mgColor: getWorkoutMgColor(wo, allExById, MUSCLE_COLORS) };
       const xp = _meta.xp;
       const woMgColor = _meta.mgColor;
-      return <div key={wo.id} className={"workout-card"} style={{
-        "--mg-color": woMgColor
+      return <div key={wo.id} className={"workout-card metal"} style={{
+        "--mg-color": woMgColor,
+        ...surfaceFor(`${wo.id} ${wo.name}`, { wear: wearFromCompletions(woCompletions.get(wo.id)) })
       }}><div className={"workout-card-top"} style={{
           cursor: "pointer"
         }} onClick={() => {
@@ -511,12 +530,9 @@ if (workoutView === "list") return <><div className={"wo-sticky-filters"}><div s
         }}><div className={"workout-icon"}>{wo.icon}</div><div style={{
             flex: 1,
             minWidth: 0
-          }}><div className={"workout-name"}>{wo.name}</div><div className={"workout-meta"}><span className={"workout-tag"}>{exCount}{" exercise"}{exCount !== 1 ? "s" : ""}</span><span className={"workout-tag"}>{formatXP(xp, {
-                  prefix: "⚡ "
-                })}</span>{(wo.labels || []).map(l => <span key={l} className={"wo-label-chip"} style={{
-                pointerEvents: "none",
-                marginLeft: S.s2
-              }}>{l}</span>)}</div></div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{"Track"}</button></div></div>;
+          }}><div className={"workout-name"}>{wo.name}</div><div className={"workout-meta"}><span>{exCount}{" exercise"}{exCount !== 1 ? "s" : ""}</span><span className={"wo-micro-sep"}>{"·"}</span><span className={"wo-micro-xp"}>{formatXPValue(xp)}</span><span className={"wo-micro-sep"}>{"XP"}</span>{(wo.labels || []).map(l => <span key={l} className={"wo-label-chip"} style={{
+                pointerEvents: "none"
+              }}>{l}</span>)}</div></div><button className={`track-toggle-btn${liveWorkout?.workoutId === wo.id ? " on" : ""}`} onClick={e => { e.stopPropagation(); startLiveWorkout(wo); }}>{liveWorkout?.workoutId === wo.id ? "Live" : "Track"}</button></div></div>;
     })}</>}{workoutSubTab === "oneoff" && <>{(() => {
       const _now = new Date();
       const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
