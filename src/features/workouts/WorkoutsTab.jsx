@@ -12,6 +12,7 @@ import FilterDropdown from '../exercises/FilterDropdown';
 import IconButton from '../../components/ui/IconButton';
 import Sheet from '../../components/ui/Sheet';
 import { buildWorkoutObject } from './workoutModel';
+import { agoLabel } from './lastPerformed';
 import { UI_COLORS, MUSCLE_COLORS, WORKOUT_TEMPLATES, NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES } from '../../data/constants';
 
 /**
@@ -126,6 +127,18 @@ const WbExCard = React.memo(function WbExCard({
       [field]: val
     }));
   }
+  // Blank a stale prefill rather than making the user select-all-and-retype
+  // three fields on a phone. Dropping `prefill` also removes the provenance
+  // chip, so the row stops claiming to remember something.
+  function clearPrefill() {
+    setWbExercises(exs => exs.map((e, j) => j !== i ? e : {
+      ...e,
+      sets: "",
+      reps: "",
+      weightLbs: "",
+      prefill: null
+    }));
+  }
   function removeEx() {
     setWbExercises(exs => {
       const updated = exs.map((e, j) => {
@@ -230,7 +243,16 @@ const WbExCard = React.memo(function WbExCard({
         }} onClick={e => {
           e.stopPropagation();
           openExEditor("edit", exD);
-        }}>{"✎ edit"}</button>}</div>{ex.supersetWith && <span className={"ss-badge"}>{"SS"}</span>}{(isRunningEx && pbDisp || exPBDisp) && <span style={{
+        }}>{"✎ edit"}</button>}{/* Where these numbers came from. A prefilled row that silently
+             shows someone else's default is worse than an empty one, so the
+             row says whose numbers these are and how old they are. Stale
+             (>3wk) gets one tap to clear rather than a silent overwrite. */}
+        {ex.prefill && (ex.prefill.stale
+          ? <button type="button" className={"wb-prefill stale"} onClick={e => {
+              e.stopPropagation();
+              clearPrefill();
+            }} aria-label={`These numbers are from ${agoLabel(ex.prefill.ageDays)}. Clear them.`}>{"last " + agoLabel(ex.prefill.ageDays) + " · clear"}</button>
+          : <span className={"wb-prefill"}>{"last " + agoLabel(ex.prefill.ageDays)}</span>)}</div>{ex.supersetWith && <span className={"ss-badge"}>{"SS"}</span>}{(isRunningEx && pbDisp || exPBDisp) && <span style={{
         fontSize: FS.fs58,
         color: "#b4ac9e",
         flexShrink: 0
@@ -1095,7 +1117,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
   }<div className={"wo-section-hdr"} style={{
     marginTop: S.s18,
     marginBottom: S.s10
-  }}><span className={"wo-section-hdr-text"}>{"⚔ Techniques"}</span></div><div style={{
+  }}><span className={"wo-section-hdr-text"}>{"Exercises"}</span></div><div style={{
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",

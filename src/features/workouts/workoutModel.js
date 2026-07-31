@@ -33,7 +33,17 @@ export function buildWorkoutObject({
     name: (name || "").trim(),
     icon,
     desc: (desc || "").trim(),
-    exercises,
+    // `prefill` records where a row's numbers came from (how old the logged
+    // set was, whether it is stale) so the builder can show provenance. It
+    // describes this editing session, not the workout, and would be wrong the
+    // moment it was reloaded — so it is stripped here rather than at each of
+    // the save call sites, which is exactly the drift this module exists to
+    // prevent.
+    exercises: (exercises || []).map(e => {
+      const row = { ...e };
+      delete row.prefill;
+      return row;
+    }),
     createdAt,
     durationMin: durationMin || null,
     activeCal: activeCal || null,

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useImperativeHandle } from 'reac
 import WorkoutsTab from './WorkoutsTab';
 import WorkoutExercisePicker from './WorkoutExercisePicker';
 import { buildWorkoutObject } from './workoutModel';
+import { buildLastPerformedIndex, lastPerformed } from './lastPerformed';
 import { uid } from '../../utils/helpers';
 import { calcExEntryXP } from '../../utils/xp';
 import { secToHHMMSplit, combineHHMMSec } from '../../utils/time';
@@ -262,19 +263,31 @@ const WorkoutsTabContainer = React.memo(React.forwardRef(function WorkoutsTabCon
     setPickerSelected([]);
   }
 
+  // Memoised on profile.log identity — every log write replaces that array,
+  // so this recomputes once per write, not once per render.
+  const lastPerformedIndex = useMemo(() => buildLastPerformedIndex(profile.log), [profile.log]);
+
   function pickerToggleEx(exId) {
     setPickerSelected(prev => {
       const exists = prev.find(e => e.exId === exId);
       if (exists) return prev.filter(e => e.exId !== exId);
+      // Start from what this user actually did last time rather than from a
+      // universal 3x10 nobody has ever performed. `prefill` is carried on the
+      // row so the builder can show its provenance ("4x8 · 145 lb, 5d ago")
+      // and, when it is stale, offer one tap to clear it. When there is no
+      // history the 3x10 stays — but unmarked, so the UI can render it as a
+      // placeholder instead of passing a guess off as a memory.
+      const prior = lastPerformed(lastPerformedIndex, exId);
       return [...prev, {
         exId,
-        sets: "3",
-        reps: "10",
-        weightLbs: "",
+        sets: prior ? prior.sets : "3",
+        reps: prior ? prior.reps : "10",
+        weightLbs: prior ? prior.weightLbs : "",
         weightPct: 100,
         durationMin: "",
         distanceMi: "",
-        hrZone: null
+        hrZone: null,
+        prefill: prior ? { ageDays: prior.ageDays, stale: prior.stale } : null
       }];
     });
   }
