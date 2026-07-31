@@ -587,7 +587,10 @@
 
     .intensity-title{font-family:var(--font-ui);font-size:.58rem;color:#8a8478;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
     /* LIBRARY HOME — sticky translucent search bar (iOS material) */
-    .lib-sticky-search{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px;background:rgba(12,12,10,.78);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);box-shadow:0 0.5px 0 rgba(180,172,158,.1)}
+    /* Opaque, like .wo-sticky-filters. This was also missing from the
+       touch-device backdrop-filter drop list, so it ran a live 16px blur
+       over a 1,600-row virtualised list while the user scrolled it. */
+    .lib-sticky-search{position:sticky;top:-1px;z-index:var(--z-sticky);margin:0 -12px 10px;padding:8px 12px;background:var(--sf-void);box-shadow:0 1px 0 var(--hair-1)}
 
     /* Virtualised filtered list: the .scroll-area is locked into a non-scrolling
        flex column so react-window's List is the ONLY scroller (no scroll-in-
@@ -706,21 +709,23 @@
     .lib-home-section:nth-child(4){animation-delay:.22s}
     .lib-home-section:nth-child(5){animation-delay:.28s}
 
-    .lib-section-hdr{font-family:var(--font-ui);font-size:.8rem;font-weight:600;color:#b4ac9e;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .lib-section-hdr{font-family:var(--font-ui);font-size:.85rem;font-weight:700;color:var(--tx-hi);letter-spacing:-.01em;text-transform:none;margin-bottom:10px;display:flex;align-items:center;gap:7px}
     .lib-section-hdr .lib-hdr-icon{font-size:.9rem;opacity:.7}
     .lib-see-all{background:transparent;border:none;color:#8a8478;font-size:.65rem;cursor:pointer;padding:2px 0;transition:color var(--dur-base) var(--ease-standard);font-family:var(--font-ui);letter-spacing:.02em}
     .lib-see-all:hover{color:#b4ac9e}
     .lib-divider{height:1px;margin:22px 0;background:linear-gradient(90deg,transparent,rgba(180,172,158,.1) 20%,rgba(180,172,158,.14) 50%,rgba(180,172,158,.1) 80%,transparent)}
 
     /* ── LIBRARY HOME: Hero Cards (Your Exercises) ── */
+    /* Recents rail. Hue is out; the card is a surface like every other, and
+       staleness is expressed as FINISH (see the --staleness rule below):
+       a fresh exercise is polished, a cold one goes matte. */
     .lib-hero-card{
-      position:relative;min-width:108px;max-width:108px;flex-shrink:0;border-radius:11px;
-      padding:12px 8px 10px;cursor:pointer;text-align:center;
-      display:flex;flex-direction:column;align-items:center;gap:6px;
-      background:linear-gradient(165deg,color-mix(in srgb,var(--mg-color) 10%,rgba(45,42,36,.35)),rgba(32,30,26,.2) 60%,color-mix(in srgb,var(--mg-color) 5%,rgba(20,18,14,.3)));
-      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
-      box-shadow:0 2px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.03);
-      transition:all var(--dur-slow) var(--ease-standard);overflow:hidden;scroll-snap-align:start;-webkit-tap-highlight-color:transparent
+      position:relative;min-width:112px;max-width:112px;flex-shrink:0;border-radius:16px;
+      padding:13px 9px 11px;cursor:pointer;text-align:center;
+      display:flex;flex-direction:column;align-items:center;gap:7px;
+      background-color:var(--sf-1);background-image:var(--specular);
+      border:1px solid var(--hair-1);box-shadow:var(--elev-2);overflow:hidden;
+      transition:border-color var(--dur-base) var(--ease-standard),transform var(--dur-fast) var(--ease-standard)
     }
     .lib-hero-card:active{transform:scale(.97);transition:transform var(--dur-instant) var(--ease-standard)}
     .lib-hero-card::before{
@@ -731,13 +736,16 @@
     .lib-hero-card:hover::before{opacity:.65}
 
     @keyframes libOrbGlow{0%,100%{box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 16px color-mix(in srgb,var(--mg-color) 15%,transparent),inset 0 0 8px rgba(0,0,0,.4)}50%{box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 22px color-mix(in srgb,var(--mg-color) 25%,transparent),inset 0 0 8px rgba(0,0,0,.3)}}
+    /* The ambient libOrbGlow pulse is gone with the hue it was tinted from:
+       a 4s box-shadow animation running on every card in a horizontally
+       scrolling rail is a compositor cost with nothing to say. */
     .lib-hero-orb{
-      width:42px;height:42px;border-radius:10px;flex-shrink:0;
+      width:44px;height:44px;border-radius:13px;flex-shrink:0;
       display:flex;align-items:center;justify-content:center;
-      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 28%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 12%,rgba(25,23,18,.6)));
-      box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 16px color-mix(in srgb,var(--mg-color) 15%,transparent),inset 0 0 8px rgba(0,0,0,.4);
-      animation:libOrbGlow 4s ease-in-out infinite
+      background:var(--sf-3);border:1px solid var(--hair-1);
+      box-shadow:inset 0 2px 5px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.05)
     }
+
     /* ── Conscription (select) mode ──────────────────────────────────────
        Select mode used to be indistinguishable from browsing apart from small
        checkboxes, so a tap meant to open an exercise silently recruited it
@@ -775,12 +783,25 @@
     }
     .lib-resume-chip-x:hover{color:#d4cec4;background:rgba(45,42,36,.4)}
 
-    /* Staleness fade — --staleness runs 0 (done today) to 1 (3+ weeks ago).
-       A stale card desaturates and dims so the carousel reads as a freshness
-       gauge rather than a static list of the same few names. */
-    .lib-hero-card{filter:grayscale(calc(var(--staleness,0) * .7)) brightness(calc(1 - var(--staleness,0) * .28))}
+    /* Staleness — --staleness runs 0 (done today) to 1 (3+ weeks ago), so
+       the rail reads as a freshness gauge rather than a static list of the
+       same few names.
+
+       It used to grayscale + dim. In a system that is already monochrome,
+       desaturating says nothing, so staleness becomes FINISH instead: a
+       fresh card is polished (a bright specular band across it) and a cold
+       one goes matte ash. Same signal, expressed in the material language
+       the rest of the app now speaks — and it dims far less, so a
+       three-week-old card is still readable rather than nearly black. */
+    .lib-hero-card{
+      background-image:linear-gradient(var(--light-angle),
+        rgba(255,255,255,calc(.10 - var(--staleness,0) * .085)) 0%,
+        rgba(255,255,255,calc(.02 - var(--staleness,0) * .018)) 38%,
+        rgba(0,0,0,0) 64%, rgba(0,0,0,.10) 100%);
+      filter:brightness(calc(1 - var(--staleness,0) * .12))
+    }
     .lib-hero-card:hover,.lib-hero-card:active{filter:none}
-    .lib-hero-when{font-size:.48rem;color:#8a8478;letter-spacing:.03em;line-height:1}
+    .lib-hero-when{font-size:.58rem;color:var(--tx-lo);letter-spacing:-.005em;line-height:1}
 
     /* ── Body map ────────────────────────────────────────────────────────
        Training heat drawn on a stylised figure. Recency drives how lit a
@@ -919,34 +940,37 @@
     .torch-slot{flex:0 0 auto;scroll-snap-align:start;display:flex}
     .torch-strip::-webkit-scrollbar{height:2px}
     .torch-strip::-webkit-scrollbar-thumb{background:rgba(180,172,158,.2);border-radius:2px}
+    /* Training-heat torches. Heat was carried by a per-muscle hue at an
+       opacity scaled by volume, which in a monochrome system says nothing.
+       It is carried by the surface rung instead: a cold group sits at the
+       bottom of the ladder, a hot one is raised and lit. Same reading,
+       expressed in the material language. */
     .torch{
       flex:0 0 auto;scroll-snap-align:start;
-      display:flex;flex-direction:column;align-items:center;gap:2px;
-      min-width:60px;padding:8px 6px 6px;border-radius:9px;cursor:pointer;
-      background:linear-gradient(180deg,
-        color-mix(in srgb,var(--mg-color) calc(var(--volume,0) * 16%),rgba(45,42,36,.3)),
-        rgba(25,23,20,.35));
-      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
-      transition:all var(--dur-base) var(--ease-standard);
+      display:flex;flex-direction:column;align-items:center;gap:3px;
+      min-width:64px;padding:9px 7px 7px;border-radius:14px;cursor:pointer;
+      background-color:var(--sf-1);
+      border:1px solid var(--hair-1);box-shadow:var(--elev-1);
+      transition:border-color var(--dur-base) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);
       -webkit-tap-highlight-color:transparent
     }
     .torch:active{transform:scale(.96)}
     .torch-flame{font-size:1.05rem;line-height:1;transition:filter var(--dur-base) var(--ease-standard)}
-    .torch-name{font-size:.5rem;color:#b4ac9e;letter-spacing:.02em;white-space:nowrap}
-    .torch-when{font-size:.46rem;color:#6f6a62;font-variant-numeric:tabular-nums}
+    .torch-name{font-size:.6rem;font-weight:600;color:var(--tx-mid);letter-spacing:-.005em;white-space:nowrap}
+    .torch-when{font-size:.56rem;color:var(--tx-lo);font-variant-numeric:tabular-nums}
 
     /* Recency drives how lit the torch is. Cold groups are the fog: legible,
        but plainly unlit. */
-    .torch-hot{border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
-      box-shadow:0 0 12px color-mix(in srgb,var(--mg-color) 22%,transparent)}
+    .torch-hot{background-color:var(--sf-3);border-color:var(--hair-3);box-shadow:var(--elev-2)}
+    .torch-hot .torch-name{color:var(--tx-hi)}
     .torch-hot .torch-flame{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--mg-color) 70%,transparent))}
-    .torch-warm{border-color:color-mix(in srgb,var(--mg-color) 30%,transparent)}
+    .torch-warm{background-color:var(--sf-2);border-color:var(--hair-2)}
     .torch-warm .torch-flame{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 45%,transparent))}
     .torch-fading .torch-flame{filter:grayscale(.45) brightness(.82)}
-    .torch-fading .torch-name{color:#8a8478}
-    .torch-cold{background:rgba(20,19,16,.42);border-color:rgba(180,172,158,.05)}
+    .torch-fading .torch-name{color:var(--tx-mid)}
+    .torch-cold{background-color:var(--sf-0);border-color:var(--hair-1);box-shadow:none}
     .torch-cold .torch-flame{filter:grayscale(.9) brightness(.5)}
-    .torch-cold .torch-name,.torch-cold .torch-when{color:#5f5a52}
+    .torch-cold .torch-name,.torch-cold .torch-when{color:var(--tx-lo)}
 
     /* ── Staging tray ────────────────────────────────────────────────────
        The cart's one visible home, docked above the bottom nav so a selection
@@ -1095,30 +1119,34 @@
     .lib-skel-orb,.lib-skel-line{background:linear-gradient(90deg,rgba(180,172,158,.06) 25%,rgba(180,172,158,.13) 50%,rgba(180,172,158,.06) 75%);background-size:200% 100%;animation:libSkelShimmer 1.4s ease-in-out infinite}
     @keyframes libSkelShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
 
-    .lib-hero-name{font-size:.66rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
-    .lib-muscle-pill{padding:2px 7px;border-radius:9px;font-size:.48rem;font-weight:600;letter-spacing:.02em;color:var(--mg-color);background:color-mix(in srgb,var(--mg-color) 12%,transparent);border:1px solid color-mix(in srgb,var(--mg-color) 15%,transparent);text-transform:capitalize}
+    .lib-hero-name{font-size:.72rem;color:var(--tx-hi);font-weight:600;letter-spacing:-.01em;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
+    .lib-muscle-pill{padding:3px 8px;border-radius:var(--rad-chip);font-size:.56rem;font-weight:600;letter-spacing:-.005em;color:var(--tx-mid);background:var(--sf-2);border:1px solid var(--hair-2);text-transform:capitalize}
 
     /* ── LIBRARY HOME: Muscle Tiles (Browse by Muscle) ── */
+    /* Browse-by-muscle. Positions stay STABLE across sessions: a grid that
+       re-sorts itself by recent usage destroys exactly the muscle memory it
+       claims to serve, and "second tile on the left" is how people actually
+       navigate this. Only the 2px edge carries the muscle colour. */
     .lib-muscle-tile{
-      position:relative;overflow:hidden;border-radius:11px;padding:11px 12px;cursor:pointer;
-      display:flex;align-items:center;gap:10px;min-height:62px;
-      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 15%,rgba(45,42,36,.38)),color-mix(in srgb,var(--mg-color) 5%,rgba(32,30,26,.2)));
-      border:1px solid color-mix(in srgb,var(--mg-color) 22%,transparent);
-      border-left:3px solid color-mix(in srgb,var(--mg-color) 40%,transparent);
-      box-shadow:0 2px 12px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.02);
-      transition:all var(--dur-slow) var(--ease-standard);-webkit-tap-highlight-color:transparent
+      position:relative;overflow:hidden;border-radius:var(--rad-card);padding:13px 14px;cursor:pointer;
+      display:flex;align-items:center;gap:11px;min-height:66px;
+      background-color:var(--sf-1);background-image:var(--specular);
+      border:1px solid var(--hair-1);box-shadow:var(--elev-2);
+      transition:border-color var(--dur-base) var(--ease-standard),transform var(--dur-fast) var(--ease-standard)
     }
+    .lib-muscle-tile::after{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+      background:color-mix(in srgb,var(--mg-color) 60%,var(--sf-3))}
     .lib-muscle-tile:active{transform:scale(.97);transition:transform var(--dur-instant) var(--ease-standard)}
     .lib-muscle-tile:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 32%,transparent);box-shadow:0 6px 22px rgba(0,0,0,.4),0 0 16px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.04)}
     .lib-muscle-tile .lib-tile-watermark{position:absolute;top:4px;right:8px;font-size:2rem;opacity:.07;pointer-events:none;filter:grayscale(.3)}
     .lib-tile-orb{
-      width:32px;height:32px;border-radius:9px;flex-shrink:0;
+      width:34px;height:34px;border-radius:10px;flex-shrink:0;
       display:flex;align-items:center;justify-content:center;
-      background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 25%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 10%,rgba(25,23,18,.6)));
-      box-shadow:0 2px 8px rgba(0,0,0,.4),inset 0 0 6px rgba(0,0,0,.3)
+      background:var(--sf-3);border:1px solid var(--hair-1);
+      box-shadow:inset 0 2px 5px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.05)
     }
-    .lib-tile-name{font-family:var(--font-ui);font-size:.7rem;font-weight:600;color:#d4cec4;letter-spacing:.02em}
-    .lib-tile-count{font-size:.55rem;color:var(--mg-color);font-weight:500;margin-top:2px}
+    .lib-tile-name{font-family:var(--font-ui);font-size:.82rem;font-weight:700;color:var(--tx-hi);letter-spacing:-.015em}
+    .lib-tile-count{font-size:.68rem;color:var(--tx-mid);font-weight:500;margin-top:3px;letter-spacing:-.005em}
 
     /* ── EXERCISE PICKER: Themed Selection Rows (Add Exercise screens) ── */
     .picker-ex-row{
