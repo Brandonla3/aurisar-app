@@ -190,6 +190,40 @@ const C = {
   diffBgAdvanced:     "#2e1515",
 };
 
+// ── Cold Forge ───────────────────────────────────────────────────────────────
+// The monochrome material system, mirrored from the :root block in
+// src/styles/app.css so inline `style={{}}` can reach it. Deliberately small:
+// class-based styling should use the .surface/.sf-N/.elev-N/.finish-* classes
+// rather than these literals, and only inline styles that genuinely cannot be
+// a class belong here.
+//
+// C (above) is the outgoing parchment/gold palette. It stays until the sweep
+// commit so out-of-scope screens keep rendering; new work uses CF.
+const CF = {
+  // Surface ladder — hsl(220 6% L%), L = 4 + rung*5
+  sfVoid: "#06070A", // the field behind everything
+  sf0:    "#0C0E11", // base surface, sheet body
+  sf1:    "#14171B", // resting card
+  sf2:    "#1C2126", // raised card, input well, chip
+  sf3:    "#272D34", // active chip, pressed state, drag handle
+  sf4:    "#343B44", // selected, lifted
+
+  hair1: "rgba(226,232,240,.06)",
+  hair2: "rgba(226,232,240,.11)",
+  hair3: "rgba(226,232,240,.18)",
+
+  // Not derived from the surface rung — contrast is audited once, here.
+  txHi:  "#EDF1F5",
+  txMid: "#9AA4AF",
+  txLo:  "#7E8792", // ≥3:1 on every rung — see the note in app.css
+
+  // The one signal colour. Energy only: XP, live workout, progress, active
+  // nav. --cast is the primary commit action, so the two never compete.
+  signal:  "#7DD3F0",
+  cast:    "#F2F5F8",
+  castInk: "#0A0C0E",
+};
+
 // ── Z-index ──────────────────────────────────────────────────────────────────
 // One ladder for every stacking decision, mirrored as --z-* custom properties
 // on :root in src/styles/app.css. The ordering encodes real UX rules:
@@ -216,6 +250,6 @@ const Z = {
   flash:    9600, // XP flash / transient celebration
 };
 
-const TOKENS = { FS, R, S, M, C, Z };
+const TOKENS = { FS, R, S, M, C, CF, Z };
 
-export { TOKENS, FS, R, S, M, C, Z };
+export { TOKENS, FS, R, S, M, C, CF, Z };

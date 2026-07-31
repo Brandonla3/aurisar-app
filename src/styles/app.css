@@ -51,6 +51,83 @@
       --z-detail:9400;
       --z-confirm:9500;
       --z-flash:9600;
+
+      /* ══ COLD FORGE ══════════════════════════════════════════════════════
+         The monochrome material system. Silver carries surface, a single cold
+         arc-light carries energy, and the light direction is declared once
+         here so no component ever re-guesses where the highlight falls.
+
+         Three independent axes — never conflate them:
+           surface   --sf-*      how far toward the viewer a thing sits
+           finish    .finish-*   what the material is (ash → polished)
+           signal    --signal    whether it is carrying energy
+         A low surface can be polished; a high surface can be matte ash. */
+
+      /* ── Surface ladder ── hsl(220 6% L%), L = 4 + rung*5. The fixed cool
+         hue is what keeps grey reading as steel and not as dead black. */
+      --sf-void:#06070A;   /* the field behind everything */
+      --sf-0:#0C0E11;      /* base surface, sheet body */
+      --sf-1:#14171B;      /* resting card */
+      --sf-2:#1C2126;      /* raised card, input well, chip */
+      --sf-3:#272D34;      /* active chip, pressed state, drag handle */
+      --sf-4:#343B44;      /* selected, lifted */
+
+      --hair-1:rgba(226,232,240,.06);
+      --hair-2:rgba(226,232,240,.11);
+      --hair-3:rgba(226,232,240,.18);
+
+      /* Text is deliberately NOT derived from the surface rung. Contrast is
+         audited once, here; a card changing elevation can never break it. */
+      --tx-hi:#EDF1F5;     /* AA (4.5:1) on every rung above */
+      --tx-mid:#9AA4AF;    /* secondary, the demoted micro-line */
+      /* Lightened from #6C757F: at that value it dropped to 2.97:1 on --sf-3
+         and 2.42:1 on --sf-4, so a unit label on an active chip or a lifted
+         row failed. Fixing the token beats a "don't use tx-lo above sf-2"
+         convention nobody would remember. Verified by the swatch harness. */
+      --tx-lo:#7E8792;     /* units, disabled, decorative — ≥3:1 everywhere */
+
+      /* ── One light source ──────────────────────────────────────────────
+         Consumed as the first background layer of every surface, so the whole
+         app is lit from the same angle. That consistency is the difference
+         between "dark theme" and "cinematic". */
+      --light-angle:155deg;
+      --specular:linear-gradient(var(--light-angle),
+        rgba(255,255,255,.09) 0%, rgba(255,255,255,.02) 34%,
+        rgba(0,0,0,0) 62%, rgba(0,0,0,.10) 100%);
+      --brushed:repeating-linear-gradient(var(--light-angle),
+        rgba(255,255,255,.022) 0 1px, rgba(0,0,0,0) 1px 3px);
+      /* Rolled-steel tooth, not photographic noise — a high base frequency
+         keeps it reading as surface rather than as grain-the-effect. The '#'
+         in url(#g) must stay percent-encoded or the url() terminates early. */
+      --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
+
+      /* Elevation. On a #06070A field a drop shadow is nearly invisible —
+         there is no light left to occlude — so height is carried mostly by
+         the CATCH-LIGHT on the top edge, which brightens as a surface rises
+         toward the source. That is also what actually happens to real metal.
+         The shadow still runs underneath for the contact cue. */
+      --elev-1:0 1px 2px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.045),inset 0 -1px 0 rgba(0,0,0,.3);
+      --elev-2:0 3px 10px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.075),inset 0 -1px 0 rgba(0,0,0,.34);
+      --elev-3:0 8px 24px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.11),inset 0 -1px 0 rgba(0,0,0,.38);
+      --elev-4:0 18px 46px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.155),inset 0 -1px 0 rgba(0,0,0,.42);
+
+      /* ── The one signal colour ─────────────────────────────────────────
+         Reserved for energy: XP, live workout, progress fill, active nav.
+         It only reads as signal because nothing else is allowed to use it.
+         The primary commit button is near-white (--cast) instead, so "the
+         main action" and "energy" never compete for the same glance. */
+      --signal:#7DD3F0;
+      --signal-dim:color-mix(in srgb,var(--signal) 22%,transparent);
+      --cast:#F2F5F8;      /* solid primary pill */
+      --cast-ink:#0A0C0E;  /* text on --cast */
+
+      --rad-chip:999px;
+      --rad-card:18px;
+      --rad-panel:24px;
+      --rad-field:14px;
+
+      --font-ui:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      --font-mono:'JetBrains Mono',ui-monospace,monospace;
     }
     html{font-size:17.333px}
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
@@ -72,6 +149,65 @@
     .builder-ex-input::placeholder{color:#8a8478}
     .r2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
     .field{display:flex;flex-direction:column;gap:4px}
+
+    /* ══ COLD FORGE PRIMITIVES ═════════════════════════════════════════════
+       The material classes redesigned surfaces compose from. Surface, finish
+       and elevation are independent, so they stack:
+         class="surface sf-2 finish-brushed elev-2"
+       Nothing in this block knows about workouts or exercises — keep it that
+       way, so a new screen can adopt the system without a new rule. */
+
+    .surface{background-color:var(--sf-1);background-image:var(--specular);
+      border:1px solid var(--hair-1);border-radius:var(--rad-card);
+      box-shadow:var(--elev-1);color:var(--tx-hi)}
+    .sf-0{background-color:var(--sf-0)}
+    .sf-1{background-color:var(--sf-1)}
+    .sf-2{background-color:var(--sf-2)}
+    .sf-3{background-color:var(--sf-3)}
+    .sf-4{background-color:var(--sf-4)}
+    .elev-1{box-shadow:var(--elev-1)}
+    .elev-2{box-shadow:var(--elev-2)}
+    .elev-3{box-shadow:var(--elev-3)}
+    .elev-4{box-shadow:var(--elev-4)}
+
+    /* Finish is what the material IS, independent of how high it sits — a
+       low card may be polished, a high one matte ash. */
+    .finish-matte{background-image:none}
+    .finish-brushed{background-image:var(--brushed),var(--specular)}
+    .finish-polished{background-image:linear-gradient(var(--light-angle),rgba(255,255,255,.14) 0%,rgba(255,255,255,.03) 26%,rgba(0,0,0,0) 54%,rgba(0,0,0,.12) 100%)}
+
+    /* Generated faces from src/utils/surfaceFor.js. The grain lives here and
+       not in the returned data URI because a pseudo-element can modulate its
+       opacity from --wear, which a baked-in background layer cannot.
+       --wear runs 0 (never completed) → 1 (well worn): the tooth burnishes
+       away as a workout gets used. */
+    .metal{position:relative;background-color:var(--sf-1);isolation:isolate}
+    .metal::after{content:"";position:absolute;inset:0;border-radius:inherit;
+      pointer-events:none;mix-blend-mode:overlay;
+      opacity:calc(.07 - var(--wear,0) * .045);
+      background-image:var(--grain);background-size:140px 140px}
+
+    /* The reference number pairing: a heavy numeral carrying the glance with
+       a demoted unit riding its baseline. One class so every stat in the app
+       shares a rhythm instead of each screen inventing one. */
+    .stat{display:inline-flex;align-items:baseline;gap:.28em;font-family:var(--font-ui);line-height:1}
+    .stat-v{font-size:1.65rem;font-weight:800;letter-spacing:-.02em;color:var(--tx-hi);font-variant-numeric:tabular-nums}
+    .stat-u{font-size:.72rem;font-weight:600;color:var(--tx-lo);letter-spacing:.02em}
+    .stat--signal .stat-v{color:var(--signal)}
+    .stat--lg .stat-v{font-size:2.3rem}
+    .stat--sm .stat-v{font-size:1.15rem}
+
+    /* The single near-white commit action per screen. Deliberately NOT
+       --signal: "the main action" and "energy" must never compete for the
+       same glance. */
+    .pill-cast{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      background:var(--cast);color:var(--cast-ink);border:none;
+      border-radius:var(--rad-chip);font-family:var(--font-ui);font-weight:700;
+      font-size:.8rem;letter-spacing:.01em;padding:13px 22px;cursor:pointer;
+      box-shadow:var(--elev-2);
+      transition:transform var(--dur-fast) var(--ease-standard),filter var(--dur-fast) var(--ease-standard)}
+    .pill-cast:active{transform:scale(.975);filter:brightness(.92)}
+    .pill-cast:disabled{opacity:.35;cursor:not-allowed;transform:none}
     /* ── Button hierarchy ────────────────────────────────────────────────
        One ladder, most to least prominent. Pick the highest rung the
        action deserves; a view should have at most one gold-solid.

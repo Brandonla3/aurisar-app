@@ -15,7 +15,10 @@
   <meta name="theme-color" content="#c49428"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Manrope is the Cold Forge UI face (see the token block in app.css). It
+       loads here rather than in app.css's @import so it starts fetching
+       alongside the preconnect instead of behind the stylesheet. -->
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <!-- Cloudflare Turnstile (bot defence on anonymous endpoints). Loads only if
        VITE_TURNSTILE_SITE_KEY is configured; the widget itself renders via
        data attributes when the support modal mounts. -->

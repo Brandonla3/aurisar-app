@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cold Forge — surface harness</title>
+
+<!-- Deliberately links the REAL stylesheet rather than a copy of the values.
+     A harness that duplicates its tokens drifts from them within a week, and
+     then it is worse than no harness: it certifies a palette nobody ships.
+     Everything below is rendered from the same :root the app renders from.
+
+     Must be viewed through the dev server, not file://, because it imports
+     surfaceFor.js as a module:
+         npm run dev  →  http://localhost:5173/mockups/cold-forge-swatches.html -->
+<link rel="stylesheet" href="/src/styles/app.css"/>
+<!-- app.css does not load Manrope (index.html does), so the harness pulls it
+     in itself or every specimen would render in the system fallback. -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"/>
+
+<style>
+  body{background:var(--sf-void);color:var(--tx-hi);font-family:var(--font-ui);
+       padding:32px 20px 80px;max-width:760px;margin:0 auto}
+  h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+  h2{font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+     color:var(--tx-lo);margin:38px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--hair-1)}
+  .lede{color:var(--tx-mid);font-size:.86rem;line-height:1.5;margin-bottom:8px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .sw{flex:1;min-width:132px;padding:16px 14px;border-radius:var(--rad-card);
+      border:1px solid var(--hair-1)}
+  .sw code{font-family:var(--font-mono);font-size:.62rem;color:var(--tx-lo);display:block;margin-top:6px}
+  .sw b{font-size:.8rem;font-weight:700}
+  .sw .mid{color:var(--tx-mid);font-size:.74rem}
+  .ratio{font-family:var(--font-mono);font-size:.6rem;margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .pass{color:#7BD88F} .fail{color:#F2777A}
+  .tile{height:96px;border-radius:var(--rad-card);border:1px solid var(--hair-1);
+        display:flex;align-items:flex-end;padding:10px;font-size:.68rem;color:var(--tx-mid)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .note{color:var(--tx-lo);font-size:.72rem;line-height:1.5;margin-top:10px}
+</style>
+</head>
+<body>
+
+<h1>Cold Forge</h1>
+<p class="lede">Every value below is read live from <code>src/styles/app.css</code>.
+Contrast ratios are computed at render time against each surface rung — if a
+rung goes red, the palette is wrong, not the harness.</p>
+
+<h2>Surface ladder</h2>
+<div class="row" id="ladder"></div>
+<p class="note">Text tokens are fixed and never derived from the rung, so a card
+changing elevation cannot silently break its own contrast. That is the whole
+reason these two scales are separate.</p>
+
+<h2>Finish — independent of elevation</h2>
+<div class="grid">
+  <div class="tile surface finish-matte">matte</div>
+  <div class="tile surface finish-brushed">brushed</div>
+  <div class="tile surface finish-polished">polished</div>
+  <div class="tile surface sf-3 finish-brushed">brushed on sf-3</div>
+</div>
+
+<h2>Elevation — catch-light, not shadow</h2>
+<p class="lede">On a near-black field there is no ambient light left for a drop
+shadow to occlude, so height is carried by how brightly the top edge catches
+the source. The shadow stays only as a contact cue.</p>
+<div class="row">
+  <div class="tile surface elev-1" style="flex:1">elev-1</div>
+  <div class="tile surface elev-2" style="flex:1">elev-2</div>
+  <div class="tile surface elev-3" style="flex:1">elev-3</div>
+  <div class="tile surface elev-4" style="flex:1">elev-4</div>
+</div>
+
+<h2>Generated faces · <code style="font-family:var(--font-mono);font-size:.7rem">surfaceFor()</code></h2>
+<p class="lede">Six workout names, each hashed to its own face. Same name always
+yields the same surface — reload to confirm nothing drifts.</p>
+<div class="grid" id="faces"></div>
+
+<h2>Wear · 0 → 1</h2>
+<p class="lede">One name, six completion counts. Grain burnishes away and the
+specular band tightens as a workout gets used.</p>
+<div class="row" id="wear"></div>
+
+<h2>Signal &amp; commit</h2>
+<div class="row" style="align-items:center">
+  <div class="surface sf-1" style="flex:1;padding:18px">
+    <div class="stat stat--signal stat--lg"><span class="stat-v">1,163</span><span class="stat-u">XP</span></div>
+    <div class="mid" style="color:var(--tx-mid);font-size:.74rem;margin-top:8px">Total projected</div>
+  </div>
+  <div class="surface sf-1" style="flex:1;padding:18px">
+    <div class="stat"><span class="stat-v">6</span><span class="stat-u">exercises</span></div>
+    <div class="mid" style="color:var(--tx-mid);font-size:.74rem;margin-top:8px">Neutral stat, no signal</div>
+  </div>
+</div>
+<div style="margin-top:12px;display:flex;gap:10px">
+  <button class="pill-cast" style="flex:2">Mark complete</button>
+  <button class="pill-cast" style="flex:1" disabled>Disabled</button>
+</div>
+<p class="note">The commit pill is near-white, not <code>--signal</code>. If both
+were the accent, "the main action" and "energy" would compete for the same
+glance and neither would win.</p>
+
+<script type="module">
+import { surfaceFor, wearFromCompletions } from '/src/utils/surfaceFor.js';
+
+const root = getComputedStyle(document.documentElement);
+const v = n => root.getPropertyValue(n).trim();
+
+// WCAG 2.1 relative luminance → contrast ratio. Hex only; every token in the
+// ladder is authored as hex precisely so this stays a two-line parse.
+const lum = hex => {
+  const c = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map(i => {
+    const s = parseInt(c.slice(i, i + 2), 16) / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratio = (a, b) => {
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+
+const RUNGS = ['--sf-void', '--sf-0', '--sf-1', '--sf-2', '--sf-3', '--sf-4'];
+const TEXT = [['--tx-hi', 'hi'], ['--tx-mid', 'mid'], ['--tx-lo', 'lo']];
+
+document.getElementById('ladder').innerHTML = RUNGS.map(rung => {
+  const bg = v(rung);
+  const chips = TEXT.map(([tok, label]) => {
+    const r = ratio(v(tok), bg);
+    // 4.5 is AA for body text; the mid/lo tokens are only ever used at
+    // >=600 weight or as non-essential units, so 3.0 is the honest bar there.
+    const bar = tok === '--tx-hi' ? 4.5 : 3.0;
+    return `<span class="${r >= bar ? 'pass' : 'fail'}">${label} ${r.toFixed(2)}</span>`;
+  }).join('');
+  return `<div class="sw" style="background:${bg}">
+    <b>${rung.replace('--sf-', 'sf ')}</b>
+    <div class="mid" style="color:${v('--tx-mid')}">secondary line</div>
+    <code>${bg}</code>
+    <div class="ratio">${chips}</div>
+  </div>`;
+}).join('');
+
+const NAMES = ['At home workout', 'Leg Day 5/10', 'Leg Day 5/9', 'Chest Day 5/9',
+               'Shadow Press — Bodyweight Push', 'Morning Mobility'];
+document.getElementById('faces').innerHTML = NAMES.map((n, i) => {
+  const s = surfaceFor(`w${i} ${n}`, { wear: 0.35 });
+  const style = `background-image:${s.backgroundImage};--wear:${s['--wear']}`;
+  return `<div class="tile metal surface" style="${style}">${n}</div>`;
+}).join('');
+
+document.getElementById('wear').innerHTML = [0, 1, 3, 6, 9, 20].map(c => {
+  const w = wearFromCompletions(c);
+  const s = surfaceFor('Leg Day 5/10', { wear: w });
+  const style = `flex:1;min-width:110px;background-image:${s.backgroundImage};--wear:${s['--wear']}`;
+  return `<div class="tile metal surface" style="${style}">${c}× · wear ${w.toFixed(2)}</div>`;
+}).join('');
+</script>
+
+</body>
+</html>
