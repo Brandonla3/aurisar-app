@@ -30,10 +30,10 @@ function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id =
 // ── Virtualized picker row (item 4: react-window) ──────────────────────────
 // Module-level so the component identity is stable across PlanWizard renders;
 // react-window only re-renders rows when `rowProps` change.
-const PICKER_ROW_NAME_STYLE  = { fontFamily: "'Cinzel',serif", fontSize: FS.fs80, fontWeight: 600, color: "#d4cec4", marginBottom: S.s2, letterSpacing: ".01em" };
+const PICKER_ROW_NAME_STYLE  = { fontFamily: "var(--font-ui)", fontSize: FS.fs80, fontWeight: 600, color: "#d4cec4", marginBottom: S.s2, letterSpacing: ".01em" };
 const PICKER_ROW_META_STYLE  = { fontSize: FS.fs60, fontStyle: "italic" };
 const PICKER_ROW_RIGHT_COL   = { flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: S.s4 };
-const PICKER_ROW_XP_STYLE    = { fontFamily: "'Cinzel',serif", fontSize: FS.fs63, fontWeight: 700, color: "#d4cec4", letterSpacing: ".04em" };
+const PICKER_ROW_XP_STYLE    = { fontFamily: "var(--font-ui)", fontSize: FS.fs63, fontWeight: 700, color: "#d4cec4", letterSpacing: ".04em" };
 const PICKER_ROW_NAME_INNER  = { flex: 1, minWidth: 0 };
 
 const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, exercises, selIds, onToggle }) {
@@ -457,7 +457,7 @@ function PlanWizard(props) {
         <div className="ss-section-hdr" onClick={()=>setSsAccordion(p=>({...p,[sectionKey]:!p[sectionKey]}))}>
           <div className="ab-badge">{label}</div>
           <div style={{width:28,height:28,borderRadius:R.r6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.fs80}}>{exData.icon}</div>
-          <span style={{fontFamily:"'Cinzel',serif",fontSize:FS.fs66,color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}>{exData.name}</span>
+          <span style={{fontFamily:"var(--font-ui)",fontSize:FS.fs66,color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}>{exData.name}</span>
           {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs55,color:"#8a8478"}}>{summaryText}</span>}
           <span style={{fontSize:FS.fs60,fontWeight:700,color:"#b4ac9e",flexShrink:0}}>{"+"+xpVal}</span>
           <span style={{fontSize:FS.fs60,color:"#8a8478",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}>{"▼"}</span>

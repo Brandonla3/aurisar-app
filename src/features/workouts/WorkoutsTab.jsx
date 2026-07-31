@@ -358,7 +358,7 @@ function renderSsAccordionSection(ex, idx, exD, label, sectionKey) {
         justifyContent: "center",
         fontSize: FS.fs80
       }}>{exD.icon}</div><span style={{
-        fontFamily: "'Cinzel',serif",
+        fontFamily: "var(--font-ui)",
         fontSize: FS.fs66,
         color: "#d8caba",
         letterSpacing: ".02em",
@@ -964,7 +964,7 @@ if (workoutView === "detail" && activeWorkout) {
         setWorkoutView("list");
         setActiveWorkout(null);
       }}>{"← Back"}</button><div style={{
-        fontFamily: "'Cinzel',serif",
+        fontFamily: "var(--font-ui)",
         fontSize: ".78rem",
         fontWeight: 600,
         color: "#d4cec4",
@@ -992,7 +992,7 @@ if (workoutView === "detail" && activeWorkout) {
         minWidth: 160,
         margin: 0,
         "--mg-color": clsColor || "#b4ac9e"
-      }}><div><div className={"xp-proj-label"}>{"Total Projected XP"}</div><div className={"xp-proj-detail"}>{wo.exercises.length}{" exercises"}</div></div><div className={"xp-proj-value"}>{"⚡ "}{xp.toLocaleString()}</div></div></div><div className={"sec"} style={{
+      }}><div><div className={"xp-proj-label"}>{"Total projected"}</div><div className={"xp-proj-detail"}>{wo.exercises.length}{" exercises"}</div></div><div className={"stat stat--signal"}><span className={"stat-v"}>{formatXPValue(xp)}</span><span className={"stat-u"}>{"XP"}</span></div></div></div><div className={"sec"} style={{
       marginBottom: S.s8
     }}>{"Exercises"}</div>{wo.exercises.map((ex, i) => {
       const exD = allExById[ex.exId];
@@ -1020,16 +1020,15 @@ if (workoutView === "detail" && activeWorkout) {
       display: "flex",
       gap: S.s8,
       flexWrap: "wrap"
-    }}><button className={"btn btn-glass-yellow"} style={{
-        flex: 2,
-        fontSize: FS.sm
+    }}><button className={"btn btn-gold-solid"} style={{
+        flex: 2
       }} onClick={() => {
 openCompletionFlow(wo);
-      }}>{"✓ Mark Complete or Schedule"}</button><button className={"btn btn-gold btn-sm"} style={{
+      }}>{"✓ Mark complete"}</button><button className={"btn btn-ghost btn-sm"} style={{
         flex: 1
       }} onClick={() => setAddToPlanPicker({
         workout: wo
-      })}>{"📋 Add to Plan"}</button><button className={"btn btn-danger btn-sm"} style={{
+      })}>{"Add to plan"}</button><button className={"btn btn-danger btn-sm"} style={{
         flex: 0,
         paddingLeft: 10,
         paddingRight: 10

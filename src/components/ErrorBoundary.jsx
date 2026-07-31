@@ -46,7 +46,7 @@ class ErrorBoundary extends React.Component {
       boxShadow: '0 8px 40px rgba(0,0,0,.6)',
     };
     const h = {
-      fontFamily: "'Cinzel', serif", fontSize: '1.4rem',
+      fontFamily: "var(--font-ui)", fontSize: '1.4rem',
       letterSpacing: '.08em', color: '#c49428', marginBottom: 10,
     };
     const p = { fontSize: '.85rem', color: '#b4ac9e', lineHeight: 1.55, marginBottom: 18 };

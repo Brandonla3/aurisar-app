@@ -78,7 +78,7 @@ const CARD_TITLE = {
   fontSize: ".82rem",
   fontWeight: 700,
   color: "#b4ac9e",
-  fontFamily: "'Cinzel', serif",
+  fontFamily: "var(--font-ui)",
   letterSpacing: ".03em",
   flex: 1,
 };

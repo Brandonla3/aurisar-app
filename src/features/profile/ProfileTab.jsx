@@ -442,7 +442,7 @@ return (
           </div>
           {/* Name + sub + XP bar */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".92rem", fontWeight: 700, color: "#d4cec4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: ".92rem", fontWeight: 700, color: "#d4cec4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {profile.playerName || "Warrior"}
             </div>
             <div style={{ fontFamily: "var(--font-ui)", fontSize: ".62rem", color: "#8a8478", marginTop: 2 }}>
@@ -545,7 +545,7 @@ return (
             onClick={() => setCollapsed(c => ({ ...c, identity: !c.identity }))}>
             <div className={"log-group-icon"}>{"👤"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Identity"}</div>
+              <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Identity"}</div>
               <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>
                 {profile.playerName}{" · #"}{myPublicId || "…"}
               </div>
@@ -584,7 +584,7 @@ return (
             onClick={() => setCollapsed(c => ({ ...c, combatRecord: !c.combatRecord }))}>
             <div className={"log-group-icon"}>{"🏆"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Combat Record"}</div>
+              <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Combat Record"}</div>
               <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{"Lv "}{level}{" · "}{profile.xp.toLocaleString()}{" XP"}</div>
             </div>
             <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: collapsed.combatRecord ? "none" : "rotate(180deg)", flexShrink: 0 }}>{"▼"}</span>
@@ -608,7 +608,7 @@ return (
                     border: "1px solid " + (chip.gold ? `color-mix(in srgb,${cls.color} 25%,transparent)` : "rgba(180,172,158,.05)"),
                     borderRadius: 8, gap: 2,
                   }}>
-                    <span style={{ fontFamily: "'Cinzel',serif", fontSize: "1.05rem", fontWeight: 700, color: chip.gold ? cls.color : "#d4cec4" }}>{chip.val}</span>
+                    <span style={{ fontFamily: "var(--font-ui)", fontSize: "1.05rem", fontWeight: 700, color: chip.gold ? cls.color : "#d4cec4" }}>{chip.val}</span>
                     <span style={{ fontFamily: "var(--font-ui)", fontSize: ".55rem", color: "#8a8478", letterSpacing: ".06em", textAlign: "center" }}>{chip.lbl}</span>
                   </div>
                 ))}
@@ -632,14 +632,14 @@ return (
               onClick={() => setCollapsed(c => ({ ...c, aboutYou: !c.aboutYou }))}>
               <div className={"log-group-icon"}>{"🌿"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"About You"}</div>
+                <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"About You"}</div>
                 <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{"Motto · Style · Priorities"}</div>
               </div>
               <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: collapsed.aboutYou ? "none" : "rotate(180deg)", flexShrink: 0 }}>{"▼"}</span>
             </div>
             {!collapsed.aboutYou && (
               <div style={{ padding: "8px 11px 10px" }}>
-                {profile.motto && <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".72rem", color: "#b4ac9e", fontStyle: "italic", textAlign: "center", marginBottom: S.s8 }}>{`"${profile.motto}"`}</div>}
+                {profile.motto && <div style={{ fontFamily: "var(--font-ui)", fontSize: ".72rem", color: "#b4ac9e", fontStyle: "italic", textAlign: "center", marginBottom: S.s8 }}>{`"${profile.motto}"`}</div>}
                 {profile.disciplineTrait && <div style={{ marginBottom: S.s8 }}>
                   <span style={{ fontSize: FS.sm, color: "#8a8478", display: "block", marginBottom: S.s4 }}>{"Discipline Trait"}</span>
                   <span className={"trait"} style={{ "--cls-color": cls.color, "--cls-glow": cls.glow }}>{profile.disciplineTrait}</span>
@@ -693,7 +693,7 @@ return (
               onClick={() => setCollapsed(c => ({ ...c, personalBests: !c.personalBests }))}>
               <div className={"log-group-icon"}>{"🏆"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Personal Bests"}</div>
+                <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Personal Bests"}</div>
                 <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{pbEntries.length}{" lifts recorded"}</div>
               </div>
               <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: collapsed.personalBests ? "none" : "rotate(180deg)", flexShrink: 0 }}>{"▼"}</span>
@@ -759,7 +759,7 @@ return (
                         <div key={exId} className={"cal-event-row"}>
                           <span style={{ fontSize: FS.fs90, flexShrink: 0 }}>{icon}</span>
                           <span style={{ fontSize: FS.md, color: "#b4ac9e", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                          <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".7rem", color: cls.color, fontWeight: 700, flexShrink: 0 }}>{"🏆 "}{valDisp}</span>
+                          <span style={{ fontFamily: "var(--font-ui)", fontSize: ".7rem", color: cls.color, fontWeight: 700, flexShrink: 0 }}>{"🏆 "}{valDisp}</span>
                         </div>
                       );
                     })}
@@ -774,7 +774,7 @@ return (
             onClick={() => setCollapsed(c => ({ ...c, warriorData: !c.warriorData }))}>
             <div className={"log-group-icon"}>{"⚔️"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{`${cls.name} Data`}</div>
+              <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{`${cls.name} Data`}</div>
               <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{"Weight · Height · Location"}</div>
             </div>
             <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: collapsed.warriorData ? "none" : "rotate(180deg)", flexShrink: 0 }}>{"▼"}</span>
@@ -814,7 +814,7 @@ return (
       }}>
         <span style={{ fontSize: "1.05rem", flexShrink: 0 }}>{icon}</span>
         <span style={{ fontFamily: "var(--font-ui)", fontSize: ".62rem", color: "#b4ac9e", flex: 1 }}>{label}</span>
-        <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".95rem", fontWeight: 700, color: cls.glow, filter: `drop-shadow(0 0 5px color-mix(in srgb, ${cls.glow} 55%, transparent))` }}>{value}</span>
+        <span style={{ fontFamily: "var(--font-ui)", fontSize: ".95rem", fontWeight: 700, color: cls.glow, filter: `drop-shadow(0 0 5px color-mix(in srgb, ${cls.glow} 55%, transparent))` }}>{value}</span>
       </div>
     );
     return (
@@ -824,7 +824,7 @@ return (
           <div className={"log-group-hdr"} style={{ cursor: "default" }}>
             <div className={"log-group-icon"}>{"⌚"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Whoop"}</div>
+              <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Whoop"}</div>
               <div style={{ fontSize: ".58rem", marginTop: 1, color: whoopLinked === null ? "#8a8478" : whoopLinked ? "#6ddfaa" : "#8a8478" }}>
                 {whoopLinked === null ? "Checking…" : whoopLinked ? "Connected — recovery, sleep & strain data" : "Not connected"}
               </div>
@@ -846,7 +846,7 @@ return (
         {whoopLinked === false && (
           <div style={{ textAlign: "center", padding: "24px 14px", color: "#8a8478", fontSize: FS.sm }}>
             <div style={{ fontSize: "2rem", marginBottom: S.s8 }}>{"⌚"}</div>
-            <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".8rem", color: "#b4ac9e", marginBottom: S.s6 }}>{"Connect Whoop"}</div>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: ".8rem", color: "#b4ac9e", marginBottom: S.s6 }}>{"Connect Whoop"}</div>
             <div>{"Link your Whoop device to see recovery, sleep, and strain data right here."}</div>
             <div style={{ fontSize: FS.fs56, marginTop: S.s4 }}>
               {"Linking shares fitness data with Aurisar. "}
@@ -1020,7 +1020,7 @@ return (
       <div className={"log-group-hdr"} style={{ cursor: "default" }}>
         <div className={"log-group-icon"}>{"\uD83D\uDD11"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Account IDs"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Account IDs"}</div>
           <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{"Public \u00b7 Private"}</div>
         </div>
       </div>
@@ -1097,7 +1097,7 @@ return (
         onClick={() => { setEmailPanelOpen(s => !s); if (emailPanelOpen) { setNewEmail(""); setEmailMsg(null); } }}>
         <div className={"log-group-icon"}>{"📧"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Change Email Address"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Change Email Address"}</div>
         </div>
         <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: emailPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
       </div>
@@ -1132,7 +1132,7 @@ return (
         onClick={() => guardRecoveryCodes(() => { setMfaPanelOpen(s => !s); if (mfaPanelOpen) { setMfaMsg(null); setMfaEnrolling(false); setMfaQR(null); setMfaCode(""); } })}>
         <div className={"log-group-icon"}>{"🛡️"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Two-Factor Authentication"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Two-Factor Authentication"}</div>
           <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{mfaEnabled ? `Active · ${mfaCodesRemaining ?? "?"} recovery codes` : "Not enabled"}</div>
         </div>
         <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: mfaPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
@@ -1389,7 +1389,7 @@ return (
         onClick={() => { setPasskeyPanelOpen(s => !s); setPasskeyMsg(null); }}>
         <div className={"log-group-icon"}>{"🔑"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Passkeys"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Passkeys"}</div>
           <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{passkeyFactors.length > 0 ? `${passkeyFactors.length} registered` : "Sign in without a password"}</div>
         </div>
         <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: passkeyPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
@@ -1430,7 +1430,7 @@ return (
         onClick={() => { setPhonePanelOpen(s => !s); if (phonePanelOpen) { setPhoneMsg(null); setPhoneOtpSent(false); setPhoneOtpCode(""); } }}>
         <div className={"log-group-icon"}>{"📱"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Phone Number"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Phone Number"}</div>
           <div style={{ fontSize: ".58rem", color: "#8a8478", marginTop: 1 }}>{profile.phone && profile.phoneVerified ? "✓ Verified" : profile.phone ? "On file" : "Optional"}</div>
         </div>
         <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: phonePanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
@@ -1529,7 +1529,7 @@ return (
         onClick={() => { setPwPanelOpen(s => !s); if (pwPanelOpen) { setPwNew(""); setPwConfirm(""); setPwMsg(null); } }}>
         <div className={"log-group-icon"}>{"🔑"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Set / Change Password"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Set / Change Password"}</div>
         </div>
         <span style={{ fontSize: ".62rem", color: "#8a8478", transition: "transform .2s", transform: pwPanelOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>{"▼"}</span>
       </div>
@@ -1627,7 +1627,7 @@ return (
     <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
       <div className={"log-group-hdr"} style={{ cursor: "default" }}>
         <div className={"log-group-icon"}>{"👤"}</div>
-        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Identity"}</div>
+        <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Identity"}</div>
       </div>
       <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
         <div className={"field"}><label>{"Display Name"}</label><input className={"inp"} value={draft.playerName || ""} onChange={e => setDraft(d => ({ ...d, playerName: e.target.value }))} placeholder={"Your warrior name…"} /></div>
@@ -1646,7 +1646,7 @@ return (
     <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
       <div className={"log-group-hdr"} style={{ cursor: "default" }}>
         <div className={"log-group-icon"}>{"⚖️"}</div>
-        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Measurement Units"}</div>
+        <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Measurement Units"}</div>
       </div>
       <div style={{ padding: "8px 11px 12px" }}>
         <div className={"units-toggle"}>
@@ -1676,7 +1676,7 @@ return (
     <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
       <div className={"log-group-hdr"} style={{ cursor: "default" }}>
         <div className={"log-group-icon"}>{"💪"}</div>
-        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Body Stats"}</div>
+        <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Body Stats"}</div>
       </div>
       <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
         {(draft.units || "imperial") === "imperial" ? <>
@@ -1707,7 +1707,7 @@ return (
     <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
       <div className={"log-group-hdr"} style={{ cursor: "default" }}>
         <div className={"log-group-icon"}>{"🌍"}</div>
-        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Preferences"}</div>
+        <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Preferences"}</div>
       </div>
       <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
         <div className={"field"}><label>{"Home Gym"}</label><input className={"inp"} placeholder={"Planet Fitness, Gold's Gym, Home…"} value={draft.gym || ""} onChange={e => setDraft(d => ({ ...d, gym: e.target.value }))} /></div>
@@ -1723,7 +1723,7 @@ return (
     <div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
       <div className={"log-group-hdr"} style={{ cursor: "default" }}>
         <div className={"log-group-icon"}>{"🌿"}</div>
-        <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"About You"}</div>
+        <div style={{ fontFamily: "var(--font-ui)", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"About You"}</div>
       </div>
       <div style={{ padding: "8px 11px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
         <div className={"field"}><label>{"Personal Motto "}<span style={{ fontSize: FS.fs55, opacity: .6 }}>{"(optional)"}</span></label><input className={"inp"} placeholder={"Your battle cry…"} value={draft.motto || ""} onChange={e => setDraft(d => ({ ...d, motto: e.target.value }))} /></div>

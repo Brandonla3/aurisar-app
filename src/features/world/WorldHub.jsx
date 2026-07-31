@@ -49,7 +49,7 @@ const S_ = {
     borderBottom: `1px solid ${C.line}`, flexShrink: 0,
   },
   title: {
-    fontFamily: "'Cinzel', serif", fontSize: '1.15rem', letterSpacing: '.08em',
+    fontFamily: "var(--font-ui)", fontSize: '1.15rem', letterSpacing: '.08em',
     color: C.gold, margin: 0,
   },
   body: { flex: 1, width: '100%', maxWidth: 560, margin: '0 auto', padding: `${S.s20}px ${S.s16}px ${S.s32}px` },
@@ -59,7 +59,7 @@ const S_ = {
     borderRadius: R.xxl, cursor: 'pointer',
     border: `1px solid ${C.gold}`,
     background: 'linear-gradient(135deg,#c49428,#8a6010)',
-    color: '#fff', fontFamily: "'Cinzel', serif",
+    color: '#fff', fontFamily: "var(--font-ui)",
     fontSize: '1rem', fontWeight: 700, letterSpacing: '.08em',
     WebkitTapHighlightColor: 'transparent',
   },
