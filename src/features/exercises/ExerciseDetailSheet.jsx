@@ -207,7 +207,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
 
         {Array.isArray(ex.tips) && ex.tips.length > 0 && <div style={{ marginBottom: S.s12 }}>
           <div style={{
-            fontFamily: "'Inter',sans-serif",
+            fontFamily: "var(--font-ui)",
             fontSize: FS.sm,
             color: "#8a8478",
             letterSpacing: ".13em",

@@ -4908,7 +4908,7 @@ function App() {
             justifyContent: "center",
             marginBottom: S.s8
           }}><ClassIcon classKey={key} size={32} color={c.glow} /></div><div style={{
-            fontFamily: "'Inter',sans-serif",
+            fontFamily: "var(--font-ui)",
             fontSize: FS.fs63,
             color: c.glow
           }}>{c.name}</div>{c.locked && <div style={{
@@ -5502,7 +5502,7 @@ function App() {
           }}>{[["new", "＋ New Plan"], ["existing", "Add to Existing"]].map(([m, lbl]) => <button key={m} style={{
               flex: 1,
               padding: "8px 4px",
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.fs62,
               letterSpacing: ".03em",
               cursor: "pointer",
@@ -5545,7 +5545,7 @@ function App() {
                 flex: 1,
                 minWidth: 0
               }}><div style={{
-                  fontFamily: "'Inter',sans-serif",
+                  fontFamily: "var(--font-ui)",
                   fontSize: FS.lg,
                   color: "#d4cec4"
                 }}>{pl.name}</div><div style={{
@@ -5674,7 +5674,7 @@ function App() {
         }}><span style={{
             fontSize: "1.4rem"
           }}>{addToPlanPicker.workout.icon}</span><div><div style={{
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.fs76,
               color: "#d4cec4"
             }}>{addToPlanPicker.workout.name}</div><div style={{
@@ -5688,7 +5688,7 @@ function App() {
             flex: 1,
             minWidth: 0
           }}><div style={{
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.lg,
               color: "#d4cec4"
             }}>{pl.name}</div><div style={{
@@ -5731,7 +5731,7 @@ function App() {
           fontSize: FS.sm,
           color: "#8a8478"
         }}><div style={{
-            fontFamily: "'Inter',sans-serif",
+            fontFamily: "var(--font-ui)",
             letterSpacing: ".06em",
             marginBottom: S.s4
           }}>{"Recent Check-Ins"}</div><div style={{
@@ -6184,7 +6184,7 @@ function App() {
             justifyContent: "space-between",
             marginBottom: S.s14
           }}><div style={{
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.fs92,
               color: "#d4cec4",
               fontWeight: 700
@@ -6360,7 +6360,7 @@ function App() {
             justifyContent: "space-between",
             marginBottom: S.s14
           }}><div style={{
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.fs88,
               color: "#d4cec4",
               fontWeight: 700
@@ -6476,7 +6476,7 @@ function App() {
               fontSize: "2rem",
               marginBottom: S.s10
             }}>{"📬"}</div><div style={{
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.fs88,
               color: "#b4ac9e",
               marginBottom: S.s6
@@ -6495,7 +6495,7 @@ function App() {
               fontSize: "2rem",
               marginBottom: S.s10
             }}>{"⚡"}</div><div style={{
-              fontFamily: "'Inter',sans-serif",
+              fontFamily: "var(--font-ui)",
               fontSize: FS.fs88,
               color: "#b4ac9e",
               marginBottom: S.s6

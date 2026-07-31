@@ -1089,7 +1089,7 @@ if (workoutView === "builder") return <><div className={"builder-nav-hdr"}><butt
         marginLeft: S.s8,
         fontSize: FS.fs65,
         color: "#b4ac9e",
-        fontFamily: "'Inter',sans-serif"
+        fontFamily: "var(--font-ui)"
       }}>{"⚡ "}{formatXP(wbTotalXP)}{" total"}</span>}</label><div style={{
       display: "flex",
       gap: S.s6

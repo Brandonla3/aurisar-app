@@ -221,13 +221,13 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
   }{calSelDate && <div className={"cal-day-detail"}><div className={"cal-day-hdr"}><span>{selLabel}</span>{isSelToday && <span style={{
         fontSize: FS.sm,
         color: "#b4ac9e",
-        fontFamily: "'Inter',sans-serif"
+        fontFamily: "var(--font-ui)"
       }}>{"Today"}</span>}</div>
 
     {
       /* Scheduled items */
     }{selSched.length > 0 && <><div style={{
-        fontFamily: "'Inter',sans-serif",
+        fontFamily: "var(--font-ui)",
         fontSize: FS.fs54,
         color: "#8a8478",
         letterSpacing: ".1em",
@@ -259,7 +259,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
       });
       const groupArr = Object.values(groups);
       return <><div style={{
-          fontFamily: "'Inter',sans-serif",
+          fontFamily: "var(--font-ui)",
           fontSize: FS.fs54,
           color: "#8a8478",
           letterSpacing: ".1em",

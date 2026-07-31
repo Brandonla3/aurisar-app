@@ -34,7 +34,7 @@ const RetroEditModal = memo(function RetroEditModal({
 
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: S.s12 }}>
-            <div style={{ fontSize: FS.fs90, color: "#d4cec4", fontFamily: "'Inter',sans-serif", fontWeight: 600 }}>
+            <div style={{ fontSize: FS.fs90, color: "#d4cec4", fontFamily: "var(--font-ui)", fontWeight: 600 }}>
               {"✎ Edit Completed "}{rem.sourceType === "plan" ? "Plan Session" : "Workout"}
             </div>
             <button className={"btn btn-ghost btn-sm"} onClick={() => setRetroEditModal(null)}>{"✕"}</button>

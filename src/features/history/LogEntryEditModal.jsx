@@ -66,7 +66,7 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: FS.fs88, color: "#d4cec4" }}>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: FS.fs88, color: "#d4cec4" }}>
               {"✎ Edit Log Entry"}
             </div>
             <div style={{ fontSize: FS.fs65, color: "#8a8478", marginTop: S.s2 }}>
@@ -165,7 +165,7 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
                 {xpDiff > 0 ? "+" : ""}{xpDiff}{" XP"}
               </div>
             )}
-            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: "1rem", color: "#b4ac9e" }}>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: "1rem", color: "#b4ac9e" }}>
               {"⚡ "}{previewXP}
             </div>
           </div>

@@ -223,7 +223,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
               })} placeholder={"How to perform this exercise, key cues…"} style={{
                 resize: "vertical",
                 minHeight: 70,
-                fontFamily: "'Inter',sans-serif",
+                fontFamily: "var(--font-ui)",
                 lineHeight: 1.5
               }} /></div>
 

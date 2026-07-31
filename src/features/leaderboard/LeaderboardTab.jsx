@@ -558,7 +558,7 @@ return <div> {
               fontSize: FS.lg,
               fontWeight: "700",
               color: rankColor,
-              fontFamily: "'Inter',sans-serif"
+              fontFamily: "var(--font-ui)"
             }}>{rank}</span></div> {
             /* Name + class tag + subtitle */
           }
@@ -611,7 +611,7 @@ return <div> {
               fontSize: FS.fs78,
               fontWeight: "700",
               color: val ? tc : "#8a8478",
-              fontFamily: "'Inter',sans-serif"
+              fontFamily: "var(--font-ui)"
             }}>{fmtVal(lbFilter, val)}</div><div style={{
               fontSize: FS.fs44,
               color: "#8a8478",

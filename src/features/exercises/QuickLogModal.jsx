@@ -373,7 +373,7 @@ const QuickLogModal = memo(function QuickLogModal({
                     key={beat || "flat"}
                     className={beat ? "ql-xp-beat" : undefined}
                     onAnimationEnd={() => setBeat(null)}
-                    style={{ color: beat ? "#e8d08a" : "#b4ac9e", fontFamily: "'Inter',sans-serif" }}
+                    style={{ color: beat ? "#e8d08a" : "#b4ac9e", fontFamily: "var(--font-ui)" }}
                   >{estXP}</span>
                   {beat && ghostXP != null && <span className={"ql-beat-tag"}>{`▲ ${(estXPNum - ghostXP).toLocaleString()} over last time`}</span>}
                   {showHR && hrZone && <span style={{ color: "#e67e22", marginLeft: S.s6 }}>{"Z"}{hrZone}{" +"}{(hrZone - 1) * 4}{"% XP"}</span>}

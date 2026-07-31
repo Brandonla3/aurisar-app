@@ -107,7 +107,7 @@ function WhoopMiniChart({ historyData, extractValue, maxVal = 100, unit = '%', c
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <span className="rpg-sec-title">7-Day Trend</span>
-        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.62rem', color: '#a8a09a' }}>
+        <span style={{ fontFamily: "var(--font-ui)", fontSize: '.62rem', color: '#a8a09a' }}>
           {'avg '}
           <span style={{ color: clsColor, fontWeight: 700 }}>{avg.toFixed(1)}{unit}</span>
         </span>
@@ -445,7 +445,7 @@ return (
             <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".92rem", fontWeight: 700, color: "#d4cec4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {profile.playerName || "Warrior"}
             </div>
-            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: ".62rem", color: "#8a8478", marginTop: 2 }}>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: ".62rem", color: "#8a8478", marginTop: 2 }}>
               {"Lv "}{level}{" "}{cls.name}{" · #"}{myPublicId || "…"}{" · 🔥 "}{profile.checkInStreak}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
@@ -455,11 +455,11 @@ return (
                   background: `linear-gradient(90deg,color-mix(in srgb,${cls.color} 50%,transparent),${cls.color})`,
                 }} />
               </div>
-              <span style={{ fontFamily: "'Inter',sans-serif", fontSize: ".55rem", color: "#8a8478", flexShrink: 0 }}>
+              <span style={{ fontFamily: "var(--font-ui)", fontSize: ".55rem", color: "#8a8478", flexShrink: 0 }}>
                 {"Lv "}{level + 1}{" →"}
               </span>
             </div>
-            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: ".52rem", color: "#5a5650", marginTop: 2 }}>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: ".52rem", color: "#5a5650", marginTop: 2 }}>
               {profile.xp.toLocaleString()}{" / "}{xpAtNext.toLocaleString()}{" XP"}
             </div>
           </div>
@@ -488,7 +488,7 @@ return (
         {tabs.map((t, i) => (
           <div key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === "security") checkMfaStatus(); }} style={{
             flex: 1, textAlign: "center", padding: "7px 4px",
-            fontFamily: "'Inter',sans-serif", fontSize: ".68rem", fontWeight: 600,
+            fontFamily: "var(--font-ui)", fontSize: ".68rem", fontWeight: 600,
             color: activeTab === t.id ? "#d4cec4" : "#8a8478",
             cursor: "pointer",
             borderRight: i < tabs.length - 1 ? "1px solid rgba(180,172,158,.06)" : "none",
@@ -609,7 +609,7 @@ return (
                     borderRadius: 8, gap: 2,
                   }}>
                     <span style={{ fontFamily: "'Cinzel',serif", fontSize: "1.05rem", fontWeight: 700, color: chip.gold ? cls.color : "#d4cec4" }}>{chip.val}</span>
-                    <span style={{ fontFamily: "'Inter',sans-serif", fontSize: ".55rem", color: "#8a8478", letterSpacing: ".06em", textAlign: "center" }}>{chip.lbl}</span>
+                    <span style={{ fontFamily: "var(--font-ui)", fontSize: ".55rem", color: "#8a8478", letterSpacing: ".06em", textAlign: "center" }}>{chip.lbl}</span>
                   </div>
                 ))}
               </div>
@@ -793,7 +793,7 @@ return (
               ].map(([label, val]) => (
                 <div key={label} style={{ display: "flex", alignItems: "baseline", gap: S.s6, paddingBottom: 5, borderBottom: "1px solid rgba(45,42,36,.15)" }}>
                   <span style={{ fontSize: FS.sm, color: "#8a8478", width: 72, flexShrink: 0 }}>{label}</span>
-                  <span style={{ fontSize: FS.fs74, color: "#b4ac9e", fontFamily: "'Inter',sans-serif" }}>{val}</span>
+                  <span style={{ fontSize: FS.fs74, color: "#b4ac9e", fontFamily: "var(--font-ui)" }}>{val}</span>
                 </div>
               ))}
             </div>
@@ -813,7 +813,7 @@ return (
         boxShadow: '0 0 6px rgba(180,172,158,.06)',
       }}>
         <span style={{ fontSize: "1.05rem", flexShrink: 0 }}>{icon}</span>
-        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: ".62rem", color: "#b4ac9e", flex: 1 }}>{label}</span>
+        <span style={{ fontFamily: "var(--font-ui)", fontSize: ".62rem", color: "#b4ac9e", flex: 1 }}>{label}</span>
         <span style={{ fontFamily: "'Cinzel',serif", fontSize: ".95rem", fontWeight: 700, color: cls.glow, filter: `drop-shadow(0 0 5px color-mix(in srgb, ${cls.glow} 55%, transparent))` }}>{value}</span>
       </div>
     );
@@ -867,7 +867,7 @@ return (
               {["recovery", "sleep", "strain", "body"].map(tab => (
                 <div key={tab} onClick={() => setWhoopSubTab(tab)} style={{
                   flex: 1, padding: "8px 4px", textAlign: "center",
-                  fontFamily: "'Inter',sans-serif", fontSize: ".68rem", fontWeight: 600,
+                  fontFamily: "var(--font-ui)", fontSize: ".68rem", fontWeight: 600,
                   color: whoopSubTab === tab ? "#d4cec4" : "#8a8478",
                   borderBottom: "2px solid " + (whoopSubTab === tab ? cls.color : "transparent"),
                   cursor: "pointer", transition: "all .18s", userSelect: "none",
@@ -1636,7 +1636,7 @@ return (
           <div className={"field"} style={{ flex: 1 }}><label>{"Last Name"}</label><input className={"inp"} value={draft.lastName || ""} onChange={e => setDraft(d => ({ ...d, lastName: e.target.value }))} placeholder={"Last name"} /></div>
         </div>
         <div>
-          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: ".6rem", color: "#8a8478", letterSpacing: ".13em", textTransform: "uppercase", marginBottom: S.s8 }}>{"Class"}</div>
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: ".6rem", color: "#8a8478", letterSpacing: ".13em", textTransform: "uppercase", marginBottom: S.s8 }}>{"Class"}</div>
           <div className={"cls-mini-grid"}>{Object.entries(CLASSES).map(([key, c]) => <div key={key} className={`cls-mini ${draft.chosenClass === key ? "sel" : ""}`} style={{ "--bc": c.color, opacity: c.locked ? 0.35 : 1, cursor: c.locked ? "not-allowed" : "pointer" }} onClick={() => { if (!c.locked) setDraft(d => ({ ...d, chosenClass: key })); }}><div className={"cls-mini-icon"} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><ClassIcon classKey={key} size={18} color={c.glow} /></div><span className={"cls-mini-name"}>{c.locked ? "🔒" : c.name}</span></div>)}</div>
         </div>
       </div>

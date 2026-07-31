@@ -89,7 +89,7 @@ export default function WhoopCallbackHandler() {
     height: '100dvh',
     background: '#0c0c0a',
     color: '#d4cec4',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "var(--font-ui)",
     gap: 12,
   };
 

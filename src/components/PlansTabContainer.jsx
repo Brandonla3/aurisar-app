@@ -429,7 +429,7 @@ const PlansTabContainer = React.memo(React.forwardRef(function PlansTabContainer
         <div style={{ display: "flex", alignItems: "center", gap: S.s8, marginBottom: S.s14 }}>
           <button className={"btn btn-ghost btn-sm"} onClick={() => { setPlanView("list"); setActivePlan(null); setDetailDayIdx(0); }}>{"← Back"}</button>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: FS.fs86, color: "#d4cec4" }}>
+            <div style={{ fontFamily: "var(--font-ui)", fontSize: FS.fs86, color: "#d4cec4" }}>
               {plan.icon}{" "}{plan.name}
               {plan.level && <span className={`plan-level-badge ${plan.level.toLowerCase()}`} style={{ marginLeft: S.s8, verticalAlign: "middle" }}>{plan.level}</span>}
             </div>

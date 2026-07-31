@@ -440,7 +440,7 @@ export default function AdminPage({ authUser, onBack }) {
       minHeight: "100vh",
       background: "radial-gradient(ellipse 70% 55% at 30% 20%, rgba(55,48,36,.22) 0%, transparent 65%), #0c0c0a",
       color: "#d4cec4",
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: "var(--font-ui)",
     }}>
       {/* Header */}
       <div style={{

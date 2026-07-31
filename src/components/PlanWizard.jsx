@@ -862,7 +862,7 @@ function PlanWizard(props) {
             <div className="wizard-day-editor">
               <div className="wizard-day-hdr">
                 <input key={"dlbl_"+bDayIdx} className="inp" defaultValue={_optionalChain([bDays, 'access', _4 => _4[bDayIdx], 'optionalAccess', _5 => _5.label])||""} onBlur={e=>updateDayLabel(bDayIdx,e.target.value)} placeholder={"Day label…"} style={{flex:1,padding:"8px 12px",fontSize:FS.fs82}} />
-                <span style={{fontSize:FS.fs72,color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}>{"⚡ "}{wizardDayXPs[bDayIdx]||0}</span>
+                <span style={{fontSize:FS.fs72,color:"#b4ac9e",fontFamily:"var(--font-ui)",whiteSpace:"nowrap"}}>{"⚡ "}{wizardDayXPs[bDayIdx]||0}</span>
                 {bDays.length>1 && <button className="btn btn-danger btn-xs" style={{marginLeft:S.s6,padding:"4px 8px",fontSize:FS.fs60}} onClick={()=>removeDayFromBuilder(bDayIdx)}>{"🗑 Delete Day"}</button>}
               </div>
               {/* Optional day-level stats */}
@@ -1015,7 +1015,7 @@ function PlanWizard(props) {
           <div className="ex-picker-sheet" onClick={e=>e.stopPropagation()} style={{maxHeight:"85vh"}}>
             {/* -- BROWSE VIEW -- */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}>
-              <div style={{fontFamily:"'Inter',sans-serif",fontSize:FS.fs72,fontWeight:600,color:"#8a8478"}}>
+              <div style={{fontFamily:"var(--font-ui)",fontSize:FS.fs72,fontWeight:600,color:"#8a8478"}}>
                 {"Add to Plan"}{pickerSelected.length>0 && <span style={{color:"#b4ac9e",marginLeft:S.s6}}>{pickerSelected.length+" selected"}</span>}
               </div>
               <div style={{display:"flex",gap:S.s6}}>
