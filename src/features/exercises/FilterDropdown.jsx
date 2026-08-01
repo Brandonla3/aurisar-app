@@ -1,15 +1,15 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { S, R, FS, Z } from '../../utils/tokens';
 
 /**
  * Multi-select filter dropdown for the exercise library.
  *
  * Replaces three near-identical hand-rolled dropdowns that were plain divs
- * with onClick handlers â€” no roles, no aria-expanded, no keyboard path. This
+ * with onClick handlers — no roles, no aria-expanded, no keyboard path. This
  * one is a real listbox: arrows move the active option, Enter/Space toggles,
  * Escape closes and returns focus to the trigger, Home/End jump.
  *
- * Each option carries its faceted count â€” how many exercises selecting it
+ * Each option carries its faceted count — how many exercises selecting it
  * would leave, given the search and the other two dimensions. Options that
  * would empty the list are disabled rather than silently returning nothing,
  * which is the failure that used to read as "the catalog is broken".
@@ -17,15 +17,15 @@ import { S, R, FS, Z } from '../../utils/tokens';
 
 function FilterDropdown({
   id,
-  label,          // "Type" â€” shown when nothing is selected
-  shortLabel,     // "Type" â€” shown with a count when something is
+  label,          // "Type" — shown when nothing is selected
+  shortLabel,     // "Type" — shown with a count when something is
   options,        // [value, ...]
   optionLabel,    // value => display string
   selected,       // Set
   counts,         // Map<value, number>
   onToggle,       // value => void
   open,
-  setOpen,        // (openOrNull) => void â€” null closes
+  setOpen,        // (openOrNull) => void — null closes
   accent,         // colour for the selected state
   optionAccent,   // optional value => colour, for per-option tinting
   panelBorder,
@@ -45,7 +45,7 @@ function FilterDropdown({
 
   // Opening lands the active option on the first selected entry, or the first
   // selectable one, so keyboard users don't start from nowhere. Adjusted
-  // during render rather than in an effect â€” setting state from an effect here
+  // during render rather than in an effect — setting state from an effect here
   // would render the list once at the wrong index and then again to correct it.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -111,7 +111,7 @@ function FilterDropdown({
   };
 
   const count = selected.size;
-  const triggerColor = count > 0 ? accent : "#9a9488";
+  const triggerColor = count > 0 ? accent : "#8a8478";
 
   return (
     <div style={{ position: "relative", flex: "1 1 110px", zIndex: Z.dropdown }}>
@@ -127,7 +127,7 @@ function FilterDropdown({
           width: "100%",
           padding: "8px 28px 8px 10px",
           borderRadius: R.xl,
-          border: "1px solid " + (count > 0 ? accent : "rgba(74,69,59,.3)"),
+          border: "1px solid " + (count > 0 ? accent : "rgba(45,42,36,.3)"),
           background: "rgba(14,14,12,.95)",
           color: triggerColor,
           fontSize: FS.lg,
@@ -146,7 +146,7 @@ function FilterDropdown({
           fontSize: FS.sm,
           transition: "transform var(--dur-fast) var(--ease-standard)",
           lineHeight: 1
-        }}>{"â–¼"}</span>
+        }}>{"▼"}</span>
       </button>
 
       {open && <div
@@ -204,7 +204,7 @@ function FilterDropdown({
                 opacity: isEnabled ? 1 : 0.35,
                 background: sel
                   ? `color-mix(in srgb, ${tint} 14%, transparent)`
-                  : isActive ? "rgba(74,69,59,.28)" : "transparent",
+                  : isActive ? "rgba(45,42,36,.28)" : "transparent",
                 boxShadow: isActive ? `inset 0 0 0 1px color-mix(in srgb, ${tint} 30%, transparent)` : "none",
               }}
             >
@@ -219,11 +219,11 @@ function FilterDropdown({
                 alignItems: "center",
                 justifyContent: "center"
               }}>
-                {sel && <span style={{ fontSize: FS.sm, color: tint, lineHeight: 1 }}>{"âœ“"}</span>}
+                {sel && <span style={{ fontSize: FS.sm, color: tint, lineHeight: 1 }}>{"✓"}</span>}
               </div>
               <span style={{
                 fontSize: FS.lg,
-                color: sel ? tint : isEnabled ? "#b4ac9e" : "#9a9488",
+                color: sel ? tint : isEnabled ? "#b4ac9e" : "#8a8478",
                 whiteSpace: "nowrap",
                 flex: 1
               }}>{optionLabel(val)}</span>

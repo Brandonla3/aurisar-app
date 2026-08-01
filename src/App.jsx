@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import './styles/app.css';
 import { CLASSES, EXERCISES } from './data/exercises';
@@ -57,7 +57,7 @@ import StartDock from './components/StartDock';
 import { deriveLastSession } from './utils/repeatLast';
 import { planQuickLogRows } from './utils/quickLogRows';
 
-// â”€â”€ Debounce utility â”€â”€
+// ── Debounce utility ──
 function debounce(fn, ms) {
   let id;
   return (...args) => {
@@ -101,15 +101,15 @@ const LazyFallback = <div style={{
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#9a9488',
+  color: '#8a8478',
   fontSize: '.75rem',
   letterSpacing: '.18em',
   textTransform: 'uppercase'
-}} role={'status'} aria-live={'polite'} aria-label={'Loading'}>{"Loadingâ€¦"}</div>;
+}} role={'status'} aria-live={'polite'} aria-label={'Loading'}>{"Loading…"}</div>;
 const lazyMount = el => <React.Suspense fallback={LazyFallback}>{el}</React.Suspense>;
 
 
-// â”€â”€ Virtualized workout-builder picker row (item 4: react-window) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Virtualized workout-builder picker row (item 4: react-window) ─────────
 // Module-level so its identity is stable across App renders; react-window
 // only re-renders rows when `rowProps` change. Rendered by the wbExPicker
 // modal's <List/>. Styling matches the inline version this replaced; small
@@ -121,14 +121,14 @@ const lazyMount = el => <React.Suspense fallback={LazyFallback}>{el}</React.Susp
 const PREVIEW_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ALLOW_PREVIEW === 'true';
 const PREVIEW_PIN = import.meta.env.VITE_PREVIEW_PIN || '1234';
 
-// Cloudflare Turnstile site key â€” loaded from build env. Empty string means
+// Cloudflare Turnstile site key — loaded from build env. Empty string means
 // the widget renders nothing and the support form sends no token; the matching
 // Netlify functions skip verification when their TURNSTILE_SECRET_KEY env var
 // is also unset. Setting both env vars activates bot defence end-to-end.
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 // Allowed origins for the password-reset redirect target. Each must also be
-// listed in Supabase Dashboard â†’ Authentication â†’ URL Configuration â†’ Redirect URLs.
+// listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
 // Picking the redirect dynamically lets the netlify.app preview / local dev
 // receive their own reset links instead of bouncing to the apex.
 const ALLOWED_RESET_ORIGINS = ["https://aurisargames.com", "https://aurisargames.netlify.app", "http://localhost:5173"];
@@ -183,7 +183,7 @@ async function isPasswordBreached(password) {
 // MFA recovery code helpers. Codes are 80 bits of CSPRNG entropy encoded in
 // Crockford-style base32 (no I/L/O/U to avoid confusion). Hashing happens
 // server-side via the `store_mfa_recovery_codes` RPC, which is responsible
-// for salted/slow hashing â€” DO NOT pre-hash on the client (it adds nothing
+// for salted/slow hashing — DO NOT pre-hash on the client (it adds nothing
 // over TLS and locks salts to the client).
 const _BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 function _base32Encode(bytes) {
@@ -202,7 +202,7 @@ function _base32Encode(bytes) {
   return out;
 }
 function generateRecoveryCode() {
-  // 10 bytes = 80 bits of entropy â†’ 16 base32 chars; chunked as XXXX-XXXX-XXXX-XXXX.
+  // 10 bytes = 80 bits of entropy → 16 base32 chars; chunked as XXXX-XXXX-XXXX-XXXX.
   const bytes = crypto.getRandomValues(new Uint8Array(10));
   const enc = _base32Encode(bytes);
   return enc.slice(0, 4) + "-" + enc.slice(4, 8) + "-" + enc.slice(8, 12) + "-" + enc.slice(12, 16);
@@ -237,7 +237,7 @@ async function validatePasswordPolicy(password) {
   };
 }
 function App() {
-  // â”€â”€ Modal / dialog UI state â€” extracted to ./state/useUiState (item 5a)
+  // ── Modal / dialog UI state — extracted to ./state/useUiState (item 5a)
   const ui = useUiState();
   const {
     exEditorOpen,
@@ -347,7 +347,7 @@ function App() {
     xpFlash,
     setXpFlash
   } = ui;
-  // â”€â”€ Auth flow state â€” extracted to ./state/useAuthState (item 5b)
+  // ── Auth flow state — extracted to ./state/useAuthState (item 5b)
   const auth = useAuthState();
   const {
     authEmail,
@@ -509,7 +509,7 @@ function App() {
         theme: "dark"
       });
       turnstileWidgetIdRef.current = id;
-    } catch {/* api.js still loading â€” skip */}
+    } catch {/* api.js still loading — skip */}
     return () => {
       const id = turnstileWidgetIdRef.current;
       if (id != null && window.turnstile) {
@@ -528,8 +528,8 @@ function App() {
   const [sets, setSets] = useState("");
   const [reps, setReps] = useState("");
   const [exWeight, setExWeight] = useState(""); // base weight in user's unit
-  const [weightPct, setWeightPct] = useState(100); // % multiplier 50â€“200
-  const [hrZone, setHrZone] = useState(null); // 1â€“5 or null
+  const [weightPct, setWeightPct] = useState(100); // % multiplier 50–200
+  const [hrZone, setHrZone] = useState(null); // 1–5 or null
   const [distanceVal, setDistanceVal] = useState(""); // distance in user's unit
   const [exIncline, setExIncline] = useState(null);
   const [exSpeed, setExSpeed] = useState(null);
@@ -537,10 +537,10 @@ function App() {
   const [exSec, setExSec] = useState(""); // 0-59 seconds portion
   const [quickRows, setQuickRows] = useState([]); // extra set rows [{sets,reps,weightLbs}]
   // Where the quick-log sheet was opened from: null | {type:"detail", ex}.
-  // Drives its contextual "â† Back" (only a detail-sheet origin gets one).
+  // Drives its contextual "← Back" (only a detail-sheet origin gets one).
   const [quickLogOrigin, setQuickLogOrigin] = useState(null);
   // The one opener for the quick-log sheet. Resets the form (unless the
-  // caller is returning to fields the user already typed â€” preserve:true),
+  // caller is returning to fields the user already typed — preserve:true),
   // records the origin, and never touches the active tab: the sheet is a
   // root portal, so logging works from Library, Workouts and Plans alike.
   const openQuickLog = useCallback((exId, { origin = null, preserve = false } = {}) => {
@@ -560,7 +560,7 @@ function App() {
   }, []);
   const [exSubTab, setExSubTab] = useState("library"); // "library" | "myworkouts"
   const [favSelectMode, setFavSelectMode] = useState(false);
-  // Only the DEBOUNCED search value stays in App â€” it feeds useExerciseFilters,
+  // Only the DEBOUNCED search value stays in App — it feeds useExerciseFilters,
   // whose libFiltered output App also uses for the detail-sheet sibling list.
   // The raw keystroke value lives inside ExerciseLibraryTab so typing no longer
   // re-renders the whole shell once per character.
@@ -649,7 +649,7 @@ function App() {
   // Exercise editor
   // Save-as-Plan wizard (from history)
   // Schedule picker (for existing plans or exercises)
-  // Workouts tab â€” view/builder/picker state lives in WorkoutsTabContainer;
+  // Workouts tab — view/builder/picker state lives in WorkoutsTabContainer;
   // only the live tracker (rendered at App root, feeds completion) stays.
   const [liveWorkout, setLiveWorkout] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
@@ -662,12 +662,12 @@ function App() {
   // In-app confirm delete (replaces window.confirm which fails in sandbox)
   // Log tab sub-tabs
   const [logSubTab, setLogSubTab] = useState("exercises"); // "exercises"|"workouts"|"plans"|"social"
-  // â”€â”€ Social / Friends â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Social / Friends ──────────────────────────────────────────────
   const [friends, setFriends] = useState([]);
-  // Map of friend user_id â†’ most recent friend_exercise_events row. Populated
+  // Map of friend user_id → most recent friend_exercise_events row. Populated
   // by `loadSocialData` via the get_recent_friend_events RPC. Used to render
-  // the "Latest: ðŸ’ª Squats" line on each friend card. Empty when the RPC is
-  // unavailable (e.g. before script 11 has been applied) â€” card just shows
+  // the "Latest: 💪 Squats" line on each friend card. Empty when the RPC is
+  // unavailable (e.g. before script 11 has been applied) — card just shows
   // "No workouts logged yet".
   const [friendRecentEvents, setFriendRecentEvents] = useState({});
   const [friendRequests, setFriendRequests] = useState([]);
@@ -680,10 +680,10 @@ function App() {
   const [friendSearchResult, setFriendSearchResult] = useState(null); // null | {found:bool, user?}
   const [friendSearchLoading, setFriendSearchLoading] = useState(false);
   // Messaging state + actions live in useMessages (called below, after
-  // showToast is defined â€” see the MESSAGING section).
+  // showToast is defined — see the MESSAGING section).
   // Track which log groups are collapsed (by groupId key). Default all expanded.
   const [logCollapsedGroups, setLogCollapsedGroups] = useState({});
-  // Log groups default to collapsed â€” openLogGroups tracks which ones are OPEN
+  // Log groups default to collapsed — openLogGroups tracks which ones are OPEN
   const [openLogGroups, setOpenLogGroups] = useState({});
   function toggleLogGroup(gid) {
     setOpenLogGroups(prev => ({
@@ -703,15 +703,15 @@ function App() {
     loadExercises();
   }, []);
 
-  // â”€â”€ Modal accessibility lifecycle (item 3 of post-Sprint-3 a11y plan) â”€â”€
+  // ── Modal accessibility lifecycle (item 3 of post-Sprint-3 a11y plan) ──
   // For each modal portal in this component, useModalLifecycle handles:
   //   - inert on #root while the modal is open (background non-interactive,
   //     hidden from screen readers)
   //   - Escape-key dismiss
   //   - Restore focus to the element that opened the modal
-  // The hook stacks correctly when nested modals open (e.g. picker â†’ config).
+  // The hook stacks correctly when nested modals open (e.g. picker → config).
   // Modals that render through the Sheet/ConfirmSheet primitives register
-  // their own lifecycle inside the primitive (onClose wiring) â€” only the
+  // their own lifecycle inside the primitive (onClose wiring) — only the
   // remaining hand-rolled portals keep an entry here.
   useModalLifecycle(savePlanWizard != null, () => setSavePlanWizard(null));
   useModalLifecycle(schedulePicker != null, () => setSchedulePicker(null));
@@ -732,12 +732,12 @@ function App() {
     } = sb.auth.onAuthStateChange(async (_event, session) => {
       const user = _optionalChain([session, 'optionalAccess', _22 => _22.user]) || null;
 
-      // Skip INITIAL_SESSION â€” getSession() below handles the initial page load
+      // Skip INITIAL_SESSION — getSession() below handles the initial page load
       if (_event === "INITIAL_SESSION") return;
 
       // When user clicks a password reset link, direct them to Security tab
       if (_event === "PASSWORD_RECOVERY") {
-        setIsPreviewMode(false); // arriving via password reset is a real auth â€” exit preview
+        setIsPreviewMode(false); // arriving via password reset is a real auth — exit preview
         setAuthUser(user);
         try {
           const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _23a => _23a.id]) || null);
@@ -771,7 +771,7 @@ function App() {
           setPwPanelOpen(true);
           setPwMsg({
             ok: null,
-            text: "ðŸ”‘ You followed a password reset link â€” please set your new password below."
+            text: "🔑 You followed a password reset link — please set your new password below."
           });
         } catch (e) {
           console.error("[auth] PASSWORD_RECOVERY handler threw:", e);
@@ -780,13 +780,13 @@ function App() {
         return;
       }
 
-      // Silent background events â€” never touch the screen
+      // Silent background events — never touch the screen
       if (_event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
         setAuthUser(user);
         return;
       }
 
-      // Explicit sign-out â€” always go to login
+      // Explicit sign-out — always go to login
       if (_event === "SIGNED_OUT") {
         setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
@@ -836,7 +836,7 @@ function App() {
         setScreen(s => s === "main" ? s : "landing");
       }
     });
-    // Check existing session on mount â€” handle both cases explicitly
+    // Check existing session on mount — handle both cases explicitly
     sb.auth.getSession().then(async ({
       data: {
         session
@@ -845,7 +845,7 @@ function App() {
       if (!session) {
         setScreen("landing");
       } else {
-        // Session exists â€” load profile directly without waiting for onAuthStateChange
+        // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
         setIsPreviewMode(false); // a fresh page load with a session is never preview
         setAuthUser(user);
@@ -884,7 +884,7 @@ function App() {
         }
       }
     }).catch(() => setScreen("landing"));
-    // Safety fallback â€” if nothing resolves in 5s, go to landing
+    // Safety fallback — if nothing resolves in 5s, go to landing
     const fallback = setTimeout(() => setScreen(s => s === "loading" ? "landing" : s), 5000);
     return () => {
       subscription.unsubscribe();
@@ -894,7 +894,7 @@ function App() {
   // Mirror isPreviewMode into the storage layer so EVERY save path (this
   // useEffect AND every explicit doSave call site) is gated by the same
   // flag. Without this, an explicit doSave() in preview mode would write
-  // demo data to the real signed-in user's Supabase row â€” that's the bug
+  // demo data to the real signed-in user's Supabase row — that's the bug
   // that lost ~2 weeks of real workout history in April 2026.
   useEffect(() => { setPreviewMode(isPreviewMode); }, [isPreviewMode]);
   useEffect(() => {
@@ -921,7 +921,7 @@ function App() {
 
   // Global ESC handler for modal dismissal. Closes the topmost open modal in
   // priority order so keyboard users can back out of any overlay without
-  // hunting for the âœ• button.
+  // hunting for the ✕ button.
   useEffect(() => {
     const onKey = e => {
       if (e.key !== 'Escape') return;
@@ -1101,7 +1101,7 @@ function App() {
         if (msg.includes("already")) {
           setAuthMsg({
             ok: true,
-            text: "âœ“ If that email is available, an account has been created. Check your inbox to confirm."
+            text: "✓ If that email is available, an account has been created. Check your inbox to confirm."
           });
         } else if (msg.includes("password")) {
           setAuthMsg({
@@ -1116,7 +1116,7 @@ function App() {
         }
         return;
       }
-      // If email confirmation is disabled, a session is returned immediately â€” use it
+      // If email confirmation is disabled, a session is returned immediately — use it
       if (_optionalChain([signUpData, 'optionalAccess', _31 => _31.session, 'optionalAccess', _32 => _32.user])) {
         if (!authRemember) sessionStorage.setItem("ilf_no_persist", "1");else sessionStorage.removeItem("ilf_no_persist");
         const saved = await loadSave(signUpData.session.user.id);
@@ -1152,11 +1152,11 @@ function App() {
           setScreen("intro");
         }
       } else {
-        // Email confirmation is ON â€” tell user to verify before signing in
+        // Email confirmation is ON — tell user to verify before signing in
         setAuthLoading(false);
         setAuthMsg({
           ok: true,
-          text: "âœ“ Account created! Check your email to verify, then sign in."
+          text: "✓ Account created! Check your email to verify, then sign in."
         });
         setAuthIsNew(false);
       }
@@ -1169,7 +1169,7 @@ function App() {
       });
       setAuthLoading(false);
       if (error) {
-        // Generic message â€” never disclose whether the email exists or whether
+        // Generic message — never disclose whether the email exists or whether
         // it just hasn't been confirmed (account-enumeration defence).
         setAuthMsg({
           ok: false,
@@ -1305,7 +1305,7 @@ function App() {
     }
     setPwMsg({
       ok: null,
-      text: "Checking passwordâ€¦"
+      text: "Checking password…"
     });
     const policy = await validatePasswordPolicy(pwNew);
     if (!policy.ok) {
@@ -1327,7 +1327,7 @@ function App() {
     });else {
       setPwMsg({
         ok: true,
-        text: "âœ“ Password updated!"
+        text: "✓ Password updated!"
       });
       setPwNew("");
       setPwConfirm("");
@@ -1335,7 +1335,7 @@ function App() {
     }
   }
 
-  // â”€â”€ CHANGE EMAIL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── CHANGE EMAIL ──────────────────────────────────────────────
   async function changeEmailAddress() {
     if (!newEmail.trim()) {
       setEmailMsg({
@@ -1372,7 +1372,7 @@ function App() {
       });else {
         setEmailMsg({
           ok: true,
-          text: "âœ“ Confirmation sent! Check both your old and new email inboxes to complete the change."
+          text: "✓ Confirmation sent! Check both your old and new email inboxes to complete the change."
         });
         setNewEmail("");
       }
@@ -1384,7 +1384,7 @@ function App() {
     }
   }
 
-  // â”€â”€ MFA (TOTP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── MFA (TOTP) ────────────────────────────────────────────────
   async function checkMfaStatus() {
     try {
       const {
@@ -1435,7 +1435,7 @@ function App() {
       if (error) {
         setPasskeyMsg({ ok: false, text: error.message });
       } else {
-        setPasskeyMsg({ ok: true, text: "âœ“ Passkey registered successfully." });
+        setPasskeyMsg({ ok: true, text: "✓ Passkey registered successfully." });
         await loadPasskeyFactors();
       }
     } catch (e) {
@@ -1451,7 +1451,7 @@ function App() {
         setPasskeyMsg({ ok: false, text: "Failed to remove: " + error.message });
       } else {
         setPasskeyFactors(prev => prev.filter(f => f.id !== factorId));
-        setPasskeyMsg({ ok: true, text: "âœ“ Passkey removed." });
+        setPasskeyMsg({ ok: true, text: "✓ Passkey removed." });
       }
     } catch (e) {
       setPasskeyMsg({ ok: false, text: e.message ?? "Failed to remove passkey." });
@@ -1521,14 +1521,14 @@ function App() {
       if (vErr) {
         setMfaMsg({
           ok: false,
-          text: "Verification failed â€” check the code and try again."
+          text: "Verification failed — check the code and try again."
         });
         return;
       }
 
       // Generate 10 recovery codes
-      // Generate 10 Ã— 80-bit recovery codes. Server-side bcrypt hashing is in
-      // place (scripts/security/04-mfa-recovery-bcrypt.sql) â€” send plaintext
+      // Generate 10 × 80-bit recovery codes. Server-side bcrypt hashing is in
+      // place (scripts/security/04-mfa-recovery-bcrypt.sql) — send plaintext
       // and let the RPC bcrypt them with a per-row salt.
       const codes = Array.from({
         length: 10
@@ -1545,7 +1545,7 @@ function App() {
       setMfaCodesRemaining(10);
       setMfaMsg({
         ok: true,
-        text: "âœ“ MFA is now active! Save your recovery codes below â€” they won't be shown again."
+        text: "✓ MFA is now active! Save your recovery codes below — they won't be shown again."
       });
     } catch (e) {
       setMfaMsg({
@@ -1555,8 +1555,8 @@ function App() {
     }
   }
 
-  // â”€â”€ MFA DISABLE (VERIFIED) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Step 1: User clicks "Disable MFA" â†’ opens confirmation panel
+  // ── MFA DISABLE (VERIFIED) ─────────────────────────────────
+  // Step 1: User clicks "Disable MFA" → opens confirmation panel
   function unenrollMfa() {
     setMfaDisableConfirm(true);
     setMfaDisableCode("");
@@ -1601,12 +1601,12 @@ function App() {
       if (vErr) {
         setMfaDisableMsg({
           ok: false,
-          text: "Invalid code â€” check your authenticator and try again."
+          text: "Invalid code — check your authenticator and try again."
         });
         setMfaUnenrolling(false);
         return;
       }
-      // Code verified â€” now disable
+      // Code verified — now disable
       await doMfaDisable();
     } catch (e) {
       setMfaDisableMsg({
@@ -1645,7 +1645,7 @@ function App() {
       }
       setMfaDisableMsg({
         ok: true,
-        text: "âœ“ Code sent to " + phone.slice(0, -4).replace(/./g, "â€¢") + phone.slice(-4) + ". Expires in 10 minutes."
+        text: "✓ Code sent to " + phone.slice(0, -4).replace(/./g, "•") + phone.slice(-4) + ". Expires in 10 minutes."
       });
     } catch (e) {
       setMfaDisableMsg({
@@ -1727,7 +1727,7 @@ function App() {
       setMfaDisableCode("");
       setMfaMsg({
         ok: true,
-        text: "âœ“ MFA has been disabled."
+        text: "✓ MFA has been disabled."
       });
     } catch (e) {
       setMfaDisableMsg({
@@ -1738,7 +1738,7 @@ function App() {
     setMfaUnenrolling(false);
   }
 
-  // â”€â”€ PHONE NUMBER MANAGEMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── PHONE NUMBER MANAGEMENT ───────────────────────────────
   async function sendPhoneVerification() {
     const phone = phoneInput.trim();
     if (!phone) {
@@ -1775,7 +1775,7 @@ function App() {
       setPhoneOtpSent(true);
       setPhoneMsg({
         ok: true,
-        text: "âœ“ Code sent! Check your phone. Expires in 10 minutes."
+        text: "✓ Code sent! Check your phone. Expires in 10 minutes."
       });
     } catch (e) {
       setPhoneMsg({
@@ -1815,7 +1815,7 @@ function App() {
         });
         return;
       }
-      // Phone verified â€” update local profile
+      // Phone verified — update local profile
       const cleanPhone = phoneInput.trim().replace(/[\s\-()]/g, "");
       setProfile(p => ({
         ...p,
@@ -1827,7 +1827,7 @@ function App() {
       setPhoneInput("");
       setPhoneMsg({
         ok: true,
-        text: "âœ“ Phone number verified!"
+        text: "✓ Phone number verified!"
       });
     } catch (e) {
       setPhoneMsg({
@@ -1851,7 +1851,7 @@ function App() {
     setPhoneInput("");
   }
 
-  // â”€â”€ MFA LOGIN CHALLENGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── MFA LOGIN CHALLENGE ───────────────────────────────────
   async function checkAndHandleMfaChallenge() {
     try {
       const {
@@ -1860,7 +1860,7 @@ function App() {
       } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
       if (error) return false;
       if (data.currentLevel === "aal1" && data.nextLevel === "aal2") {
-        // MFA is required â€” get factor ID
+        // MFA is required — get factor ID
         const {
           data: factors
         } = await sb.auth.mfa.listFactors();
@@ -1872,7 +1872,7 @@ function App() {
           setMfaChallengeMsg(null);
           setMfaRecoveryMode(false);
           setMfaRecoveryInput("");
-          return true; // Intercepted â€” don't proceed to main
+          return true; // Intercepted — don't proceed to main
         }
       }
     } catch (e) {
@@ -1915,12 +1915,12 @@ function App() {
       if (vErr) {
         setMfaChallengeMsg({
           ok: false,
-          text: "Invalid code â€” try again."
+          text: "Invalid code — try again."
         });
         setMfaChallengeLoading(false);
         return;
       }
-      // Success â€” proceed to load profile
+      // Success — proceed to load profile
       setMfaChallengeScreen(false);
       setMfaChallengeLoading(false);
       const {
@@ -1992,7 +1992,7 @@ function App() {
         setMfaChallengeLoading(false);
         return;
       }
-      // MFA has been unenrolled â€” refresh session and proceed
+      // MFA has been unenrolled — refresh session and proceed
       setMfaChallengeScreen(false);
       setMfaChallengeLoading(false);
       const {
@@ -2021,7 +2021,7 @@ function App() {
         } else {
           setScreen("intro");
         }
-        showToast("ðŸ”“ Recovery code accepted â€” MFA has been removed. You can re-enroll in Profile â†’ Security.");
+        showToast("🔓 Recovery code accepted — MFA has been removed. You can re-enroll in Profile → Security.");
       }
     } catch (e) {
       setMfaChallengeMsg({
@@ -2044,7 +2044,7 @@ function App() {
       setMfaCodesRemaining(10);
       setMfaMsg({
         ok: true,
-        text: "âœ“ New recovery codes generated. Save them â€” they won't be shown again."
+        text: "✓ New recovery codes generated. Save them — they won't be shown again."
       });
     } catch (e) {
       setMfaMsg({
@@ -2054,7 +2054,7 @@ function App() {
     }
   }
 
-  // â”€â”€ NOTIFICATION PREFS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── NOTIFICATION PREFS ────────────────────────────────────────
   function toggleNotifPref(key) {
     setProfile(p => ({
       ...p,
@@ -2065,10 +2065,10 @@ function App() {
     }));
   }
 
-  // â”€â”€ RECOVERY CODE NAVIGATION GUARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── RECOVERY CODE NAVIGATION GUARD ────────────────────────
   // Shows a browser confirm dialog if user tries to navigate
   // away while recovery codes are still displayed.
-  // â”€â”€ PROFILE IDS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── PROFILE IDS ──────────────────────────────────────────────
   async function loadProfileIds() {
     try {
       const {
@@ -2081,7 +2081,7 @@ function App() {
     } catch (e) {/* silent */}
   }
 
-  // â”€â”€ MESSAGING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── MESSAGING ──────────────────────────────────────────────
   // State, RPC calls, realtime subscription, and optimistic send all live in
   // the useMessages hook (src/features/social/useMessages.js).
   const {
@@ -2181,7 +2181,7 @@ function App() {
       showFriendExBanner({
         friendName,
         exerciseName: ev.exercise_name || ev.exercise_id || "an exercise",
-        exerciseIcon: ev.exercise_icon || "ðŸ’ª",
+        exerciseIcon: ev.exercise_icon || "💪",
         pbInfo
       });
     }).subscribe();
@@ -2190,11 +2190,11 @@ function App() {
     };
   }, [authUser?.id, friends.map(f => f.id).join(',')]);
 
-  // â”€â”€ LEADERBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── LEADERBOARD ────────────────────────────────────────────
   async function loadLeaderboard() {
     setLbLoading(true);
     try {
-      // Friends scope ignores state/country filters â€” always show all friends
+      // Friends scope ignores state/country filters — always show all friends
       const isFriends = lbScope === 'friends';
       const {
         data,
@@ -2257,9 +2257,9 @@ function App() {
     }
   }, [lbScope, lbStateFilters, lbCountryFilters]);
 
-  // â”€â”€ PROFILE COMPLETION CHECK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── PROFILE COMPLETION CHECK ────────────────────────────────
   // Blocks navigation away from Profile if state or country is missing
-  // â”€â”€ NAME VISIBILITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── NAME VISIBILITY ──────────────────────────────────────────
   // Returns the name to display for a given context ("app" or "game")
   function getNameForContext(ctx, prof) {
     const p = prof || profile;
@@ -2289,7 +2289,7 @@ function App() {
       nv.realName = [...(nv.realName || [])];
       const otherRow = row === "displayName" ? "realName" : "displayName";
       if (box === "hide") {
-        // Toggle hide on this row â€” move all its app/game to the other row
+        // Toggle hide on this row — move all its app/game to the other row
         if (nv[row].includes("hide")) {
           // Unhiding: give this row back whatever the other row has, take from other
           // Default: give this row "app" and "game", other gets "hide"
@@ -2307,18 +2307,18 @@ function App() {
       } else {
         // Toggling app or game
         if (nv[row].includes("hide")) {
-          // Row is hidden â€” unhide it and give it this box, take from other row
+          // Row is hidden — unhide it and give it this box, take from other row
           nv[row] = [box];
           nv[otherRow] = nv[otherRow].filter(b => b !== box);
           if (nv[otherRow].length === 0) nv[otherRow] = ["hide"];
         } else if (nv[row].includes(box)) {
-          // Already has this box â€” remove it, give to other row
+          // Already has this box — remove it, give to other row
           nv[row] = nv[row].filter(b => b !== box);
           nv[otherRow] = nv[otherRow].filter(b => b !== "hide");
           if (!nv[otherRow].includes(box)) nv[otherRow].push(box);
           if (nv[row].length === 0) nv[row] = ["hide"];
         } else {
-          // Doesn't have this box â€” add it, remove from other row
+          // Doesn't have this box — add it, remove from other row
           nv[row] = nv[row].filter(b => b !== "hide");
           nv[row].push(box);
           nv[otherRow] = nv[otherRow].filter(b => b !== box);
@@ -2352,7 +2352,7 @@ function App() {
       return;
     }
     setConfirmDelete({
-      icon: "ðŸ”‘",
+      icon: "🔑",
       title: "Leave without saving codes?",
       body: "You have unsaved recovery codes. If you haven't copied or downloaded them, you won't be able to see them again.",
       confirmLabel: "Leave anyway",
@@ -2375,7 +2375,7 @@ function App() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [mfaRecoveryCodes]);
 
-  // â”€â”€ SOCIAL FUNCTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── SOCIAL FUNCTIONS ──────────────────────────────────────────────
   async function loadSocialData() {
     if (!authUser) return;
     setSocialLoading(true);
@@ -2406,14 +2406,14 @@ function App() {
             playerName: _optionalChain([pRow, 'optionalAccess', _36 => _36.player_name]) || "Unknown Warrior",
             chosenClass: _optionalChain([pRow, 'optionalAccess', _38 => _38.chosen_class]) || null,
             xp: _optionalChain([pRow, 'optionalAccess', _40 => _40.xp]) || 0,
-            // log + exercisePBs intentionally omitted â€” peers shouldn't see them.
+            // log + exercisePBs intentionally omitted — peers shouldn't see them.
             // Recent-activity card and PB banner are deferred to Phase 3b
             // (friend_exercise_events table).
             _reqId: _optionalChain([reqRow, 'optionalAccess', _44 => _44.id]) || null
           };
         });
         setFriends(enriched);
-        // Load most-recent exercise event per friend (best-effort â€” soft-fail
+        // Load most-recent exercise event per friend (best-effort — soft-fail
         // when the RPC isn't deployed yet).
         try {
           const {
@@ -2546,7 +2546,7 @@ function App() {
     });else {
       setSocialMsg({
         ok: true,
-        text: "âš”ï¸ Party Request has been sent!"
+        text: "⚔️ Party Request has been sent!"
       });
       setTimeout(() => setSocialMsg(null), 2000);
       setFriendSearchResult(null);
@@ -2609,7 +2609,7 @@ function App() {
         error
       } = await sb.from("shared_items").insert(payload);
       if (error) throw error;
-      showToast(`Shared with ${toName}! âœ¦`);
+      showToast(`Shared with ${toName}! ✦`);
       setShareModal(null);
     } catch (e) {
       showToast("Share failed. Try again.");
@@ -2664,7 +2664,7 @@ function App() {
           ...p,
           workouts: [...(p.workouts || []), newWo]
         }));
-        showToast(`ðŸ’ª "${item.name}" added to your workouts!`);
+        showToast(`💪 "${item.name}" added to your workouts!`);
       } else if (share.type === "exercise") {
         const newEx = {
           ...item,
@@ -2675,7 +2675,7 @@ function App() {
           ...p,
           customExercises: [...(p.customExercises || []), newEx]
         }));
-        showToast(`âš¡ "${item.name}" added to your exercises!`);
+        showToast(`⚡ "${item.name}" added to your exercises!`);
       }
       await sb.from("shared_items").update({
         status: "accepted"
@@ -2694,7 +2694,7 @@ function App() {
   }
   async function signOut() {
     const prevUserId = _optionalChain([authUser, 'optionalAccess', _signOut1 => _signOut1.id]);
-    // Flush any debounced profile writes BEFORE invalidating auth â€” otherwise
+    // Flush any debounced profile writes BEFORE invalidating auth — otherwise
     // a queued Supabase upsert lands as an unauthenticated request and a
     // queued localStorage write would rewrite the cache after the wipe below.
     // Cap the flush at 3 s so a slow/hung network write never blocks sign-out.
@@ -2762,7 +2762,7 @@ function App() {
     setScreen("landing");
   }
 
-  // â”€â”€ Legacy class migration â€” maps old keys to new equivalents â”€â”€
+  // ── Legacy class migration — maps old keys to new equivalents ──
   const CLASS_MIGRATION = {
     ranger: "warden",
     monk: "druid",
@@ -2787,7 +2787,7 @@ function App() {
   const totalH = (parseInt(profile.heightFt) || 0) * 12 + (parseInt(profile.heightIn) || 0);
   const bmi = calcBMI(profile.weightLbs, totalH);
 
-  // Merged exercise list (built-in + custom) â€” memoized to avoid rebuilding on every render
+  // Merged exercise list (built-in + custom) — memoized to avoid rebuilding on every render
   const _customExRef = profile.customExercises;
   // _allExercisesIncludingAliases keeps duplicate-form imports (e.g. dumbbell-lunges)
   // so user logs that reference legacy IDs still resolve via allExById. The picker-
@@ -2796,26 +2796,26 @@ function App() {
   const allExById = useMemo(() => Object.fromEntries(_allExercisesIncludingAliases.map(e => [e.id, e])), [_allExercisesIncludingAliases]);
   const allExercises = useMemo(() => _allExercisesIncludingAliases.filter(e => !e.alias), [_allExercisesIncludingAliases]);
 
-  // The cart is persisted, so it can outlive the exercises in it â€” a custom
+  // The cart is persisted, so it can outlive the exercises in it — a custom
   // exercise deleted while staged, or an ID restored from storage that the
   // catalog no longer has. Everything downstream reads this resolved list so
   // the tray's count, the library's banner and the forged workout all agree.
   const stagedIds = useMemo(() => cartIds.filter(id => allExById[id]), [cartIds, allExById]);
 
-  // The orb's "Repeat Last" â€” most recent completed session rebuilt from the
+  // The orb's "Repeat Last" — most recent completed session rebuilt from the
   // log's sourceGroupId batches (no new persisted state; see utils/repeatLast).
   const repeatLastSession = useMemo(() => deriveLastSession(profile.log), [profile.log]);
 
 
   // Drop the unresolvable ones from storage too, but only once the catalog has
-  // actually loaded â€” the bundled list is merged with Supabase after mount, so
+  // actually loaded — the bundled list is merged with Supabase after mount, so
   // pruning earlier would delete IDs that are merely late, not missing.
   useEffect(() => {
     if (!_exReady || allExercises.length === 0) return;
     pruneMissing(id => !!allExById[id]);
   }, [_exReady, allExercises.length, allExById, pruneMissing]);
 
-  // â”€â”€ Exercise filter derivations â€” extracted to features/exercises â”€â”€
+  // ── Exercise filter derivations — extracted to features/exercises ──
   // Memoized derivations the library tab consumes. The hook keeps the heavy
   // allExercises scans off the App-render hot path (Finding #5 + #6 from
   // docs/performance-audit.md).
@@ -2882,7 +2882,7 @@ function App() {
     setTimeout(() => setXpFlash(null), 2200);
     showToast(`Quest complete! ${formatXP(q.xp, {
       signed: true
-    })} âœ¦`);
+    })} ✦`);
   }
   function claimManualQuest(qId) {
     const q = QUESTS.find(x => x.id === qId);
@@ -2967,7 +2967,7 @@ function App() {
       prevXp: profile.xp
     });
     setTimeout(() => setXpFlash(null), 2000);
-    showToast(`Checked in! +${xpEarned} XP Â· ${newStreak} day streak ðŸ”¥`);
+    showToast(`Checked in! +${xpEarned} XP · ${newStreak} day streak 🔥`);
   }
   function applyAutoCheckIn(base, dateKey) {
     const today = todayStr();
@@ -3064,7 +3064,7 @@ function App() {
     showToast("Retro check-in for " + d.toLocaleDateString([], {
       month: "short",
       day: "numeric"
-    }) + "! +125 XP Â· " + newStreak + " day streak ðŸ”¥");
+    }) + "! +125 XP · " + newStreak + " day streak 🔥");
     setRetroDate("");
     setRetroCheckInModal(false);
   }
@@ -3111,12 +3111,12 @@ function App() {
     return clsKey ? CLASSES[clsKey]?.bonuses[ex.category] || 1 : 1;
   }
 
-  // â”€â”€ Exercise editor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Exercise editor ─────────────────────────────────────────
   function newExDraft(base) {
     return {
       id: uid(),
       name: base ? base.name + " (Copy)" : "",
-      icon: base ? base.icon : "ðŸ’ª",
+      icon: base ? base.icon : "💪",
       category: base ? base.category : "strength",
       muscleGroup: base ? base.muscleGroup : "chest",
       baseXP: base ? base.baseXP : 40,
@@ -3161,7 +3161,7 @@ function App() {
       }));
     }
     setExEditorOpen(false);
-    showToast(exEditorMode === "edit" ? "Exercise patched! âš¡" : "New exercise uploaded! âš¡");
+    showToast(exEditorMode === "edit" ? "Exercise patched! ⚡" : "New exercise uploaded! ⚡");
   }
   function deleteCustomEx(id) {
     const ex = (profile.customExercises || []).find(e => e.id === id);
@@ -3169,7 +3169,7 @@ function App() {
       type: "exercise",
       id,
       name: ex ? ex.name : "this exercise",
-      icon: ex ? ex.icon : "ðŸ’ª"
+      icon: ex ? ex.icon : "💪"
     });
   }
   function _doDeleteCustomEx(id) {
@@ -3190,7 +3190,7 @@ function App() {
     const isCardioEx = ex.category === "cardio";
     const canHaveZone = isCardioEx;
     // One planner for the estimate AND the entries (utils/quickLogRows): the
-    // Set Forge's Projected XP and what lands in the log are the same rows â€”
+    // Set Forge's Projected XP and what lands in the log are the same rows —
     // primary + any progressive extra rows, one entry per row like the
     // builder's completion path.
     const plan = planQuickLogRows({
@@ -3222,7 +3222,7 @@ function App() {
     // here at the logging seam, layered on top of the honest earned figure
     // (class/travel/region already in), never inside calcExXP (also the
     // estimator). No-op unless perk-bearing gear is equipped. Travel/region/
-    // gear price each row exactly as the old single-entry path did â€” with no
+    // gear price each row exactly as the old single-entry path did — with no
     // extra rows this is the previous math bit-for-bit.
     const pricedRows = plan.rows.map(r => {
       const preGear = Math.round(r.xp * travelMult * regionBoost);
@@ -3249,7 +3249,7 @@ function App() {
         const dateObj = new Date(dateStr + "T12:00:00");
         const displayDate = dateObj.toLocaleDateString();
         // Wall-clock stamp. dateKey alone parses as midnight, which is
-        // useless for anything that reasons about "a moment ago" â€” the
+        // useless for anything that reasons about "a moment ago" — the
         // quick-log carryover window is two minutes.
         const loggedAtStamp = Date.now();
         const timeStr = new Date().toLocaleTimeString([], {
@@ -3326,8 +3326,8 @@ function App() {
           prevXp: profile.xp
         });
         setTimeout(() => setXpFlash(null), 2000);
-        const ciSuffix = _ciResult.checkInApplied ? ` Â· Checked in! +${_ciResult.checkInXP} XP Â· ${_ciResult.checkInStreak} day streak ðŸ”¥` : "";
-        if (newPB !== null && newPB === runPace && (!profile.runningPB || runPace < profile.runningPB)) showToast(`ðŸ† New Personal Best! ${metric ? parseFloat((runPace * 1.60934).toFixed(2)) + " min/km" : parseFloat(runPace.toFixed(2)) + " min/mi"}${ciSuffix}`);else if (isNewPB && curPB.type === "strength") showToast(`ðŸ† New 1RM! ${ex.name} â€” ${curPB.value} lbs${ciSuffix}`);else if (isNewPB && curPB.type === "assisted") showToast(`ðŸ† New 1RM! ${ex.name} â€” ${curPB.value} lbs (assisted PR)${ciSuffix}`);else showToast((travelActive && regionBoost > 1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) âš”ï¸` : travelActive ? `+${finalEarned} XP (+10% travel bonus) âš”ï¸` : regionBoost > 1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`) + ciSuffix);
+        const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
+        if (newPB !== null && newPB === runPace && (!profile.runningPB || runPace < profile.runningPB)) showToast(`🏆 New Personal Best! ${metric ? parseFloat((runPace * 1.60934).toFixed(2)) + " min/km" : parseFloat(runPace.toFixed(2)) + " min/mi"}${ciSuffix}`);else if (isNewPB && curPB.type === "strength") showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs${ciSuffix}`);else if (isNewPB && curPB.type === "assisted") showToast(`🏆 New 1RM! ${ex.name} — ${curPB.value} lbs (assisted PR)${ciSuffix}`);else showToast((travelActive && regionBoost > 1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost > 1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`) + ciSuffix);
         // Clean up form state after successful completion
         setSets("");
         setReps("");
@@ -3355,7 +3355,7 @@ function App() {
         setCompletionDate("");
         setCompletionAction("today");
         setScheduleWoDate("");
-        showToast(`ðŸ“… ${ex.name} scheduled for ${formatScheduledDate(schedDate)}!`);
+        showToast(`📅 ${ex.name} scheduled for ${formatScheduledDate(schedDate)}!`);
         // Clean up form state
         setSets("");
         setReps("");
@@ -3467,7 +3467,7 @@ function App() {
         _ciResult = ci;
         return ci.profile;
       });
-      const ciSuffix = _ciResult.checkInApplied ? ` Â· Checked in! +${_ciResult.checkInXP} XP Â· ${_ciResult.checkInStreak} day streak ðŸ”¥` : "";
+      const ciSuffix = _ciResult.checkInApplied ? ` · Checked in! +${_ciResult.checkInXP} XP · ${_ciResult.checkInStreak} day streak 🔥` : "";
       setXpFlash({
         amount: finalEarned + _ciResult.checkInXP,
         mult,
@@ -3475,7 +3475,7 @@ function App() {
         prevXp: profile.xp
       });
       setTimeout(() => setXpFlash(null), 2000);
-      showToast((travelActive && regionBoost > 1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) âš”ï¸` : travelActive ? `+${finalEarned} XP (+10% travel bonus) âš”ï¸` : regionBoost > 1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`) + ciSuffix);
+      showToast((travelActive && regionBoost > 1 ? `+${finalEarned} XP (+10% travel, +7% ${myRegion.boost.label}) ⚔️` : travelActive ? `+${finalEarned} XP (+10% travel bonus) ⚔️` : regionBoost > 1 ? `+${finalEarned} XP (+7% ${myRegion.boost.label} boost) ${myRegion.icon}` : `+${finalEarned} XP earned!`) + ciSuffix);
     });
   }
 
@@ -3486,7 +3486,7 @@ function App() {
    *
    * confirmSavePlanWizard() only persists entries whose `_idx` is in
    * spwSelected, so any caller that opened the wizard without seeding it got a
-   * sheet where Save just said "Select at least one exercise" â€” and if
+   * sheet where Save just said "Select at least one exercise" — and if
    * spwSelected still held a previous run's ids, it looked fine until it
    * silently saved the wrong thing. Every entry point routes through here so
    * that cannot drift again; `name` defaults to the history path's
@@ -3498,7 +3498,7 @@ function App() {
       label
     });
     setSpwName(name != null ? name : label + " Repeat");
-    setSpwIcon("ðŸ“‹");
+    setSpwIcon("📋");
     setSpwDate("");
     setSpwSelected(entries.map(e => e._idx)); // all pre-selected
     setSpwMode("new");
@@ -3540,7 +3540,7 @@ function App() {
         plans: pr.plans.map(p => p.id === spwTargetPlanId ? updatedPlan : p)
       }));
       setSavePlanWizard(null);
-      showToast("Added to " + targetPlan.name + " âš”ï¸");
+      showToast("Added to " + targetPlan.name + " ⚔️");
     } else {
       if (!spwName.trim()) {
         showToast("Give your plan a name!");
@@ -3567,7 +3567,7 @@ function App() {
         plans: [p, ...pr.plans]
       }));
       setSavePlanWizard(null);
-      showToast("Contract saved! âš¡" + (spwDate ? " Â· Scheduled for " + formatScheduledDate(spwDate) : ""));
+      showToast("Contract saved! ⚡" + (spwDate ? " · Scheduled for " + formatScheduledDate(spwDate) : ""));
     }
   }
 
@@ -3578,7 +3578,7 @@ function App() {
       label
     });
     setSwwName(label);
-    setSwwIcon("ðŸ’ª");
+    setSwwIcon("💪");
     setSwwSelected(entries.map(e => e._idx));
   }
   function confirmSaveWorkoutWizard() {
@@ -3612,7 +3612,7 @@ function App() {
       workouts: [w, ...(pr.workouts || [])]
     }));
     setSaveWorkoutWizard(null);
-    showToast(swwIcon + " " + swwName + " saved to Workouts! ðŸ’ª");
+    showToast(swwIcon + " " + swwName + " saved to Workouts! 💪");
   }
 
   // Workout builder helpers
@@ -3639,7 +3639,7 @@ function App() {
       plans: pr.plans.map(p => p.id === planId ? updated : p)
     }));
     setAddToPlanPicker(null);
-    showToast(workout.icon + " " + workout.name + " added to " + plan.name + " âš”ï¸");
+    showToast(workout.icon + " " + workout.name + " added to " + plan.name + " ⚔️");
   }
   // Open stats prompt if any of duration/activeCal/totalCal are missing, then run onConfirm
   function _buildLiveExercises(wo) {
@@ -3647,7 +3647,7 @@ function App() {
       const exData = allExById[ex.exId];
       const cat = (exData?.category || 'strength').toLowerCase();
       const rows = [{ sets: ex.sets, reps: ex.reps }, ...(ex.extraRows || [])];
-      const setsDesc = rows.map(r => `${r.sets || '?'}Ã—${r.reps || '?'}`).join(' / ');
+      const setsDesc = rows.map(r => `${r.sets || '?'}×${r.reps || '?'}`).join(' / ');
       return {
         exId: ex.exId,
         name: exData?.name || ex.exId,
@@ -3702,7 +3702,7 @@ function App() {
         if (idx !== i) return e;
         const merged = { ...e, ...fields };
         const rows = [{ sets: merged.sets, reps: merged.reps }, ...(merged.extraRows || [])];
-        const setsDesc = rows.map(r => `${r.sets || '?'}Ã—${r.reps || '?'}`).join(' / ');
+        const setsDesc = rows.map(r => `${r.sets || '?'}×${r.reps || '?'}`).join(' / ');
         return { ...merged, setsDesc };
       }) };
     });
@@ -3720,7 +3720,7 @@ function App() {
     const cat = (exData?.category || 'strength').toLowerCase();
     setLiveWorkout(lw => {
       if (!lw) return null;
-      const newEx = { exId, name: exData?.name || exId, category: cat, noSets: NO_SETS_EX_IDS.has(exId), sets, reps, weightLbs: weightLbs || null, extraRows: [], setsDesc: `${sets}Ã—${reps}`, supersetWith: null, done: false };
+      const newEx = { exId, name: exData?.name || exId, category: cat, noSets: NO_SETS_EX_IDS.has(exId), sets, reps, weightLbs: weightLbs || null, extraRows: [], setsDesc: `${sets}×${reps}`, supersetWith: null, done: false };
       return { ...lw, exercises: [...lw.exercises, newEx] };
     });
   }
@@ -3769,7 +3769,7 @@ function App() {
   }
 
   // Workout completion handler is extracted into useWorkoutCompletion (finding
-  // #3 in docs/performance-audit.md) â€” modal close happens before the heavy
+  // #3 in docs/performance-audit.md) — modal close happens before the heavy
   // setProfile re-render and the rest is wrapped in startTransition.
   // The one completion entry point the Workouts container needs: stats
   // prompt first (skippable via prefs), then the completion sheet primed
@@ -3831,7 +3831,7 @@ function App() {
     setCompletionDate("");
     setCompletionAction("today");
     setScheduleWoDate("");
-    showToast(`ðŸ“… ${wo.name} scheduled for ${formatScheduledDate(scheduleWoDate)}!`);
+    showToast(`📅 ${wo.name} scheduled for ${formatScheduledDate(scheduleWoDate)}!`);
   }
   // Pure recomputed base XP for an edited entry (no gear perk). null when the
   // exercise can't be resolved so the caller can fall back to the stored xp.
@@ -3848,7 +3848,7 @@ function App() {
   function calcEntryXP(entry) {
     const base = calcBaseEntryXP(entry);
     if (base == null) return entry.xp;
-    // Preserve the gear boost that was active when this entry was logged â€”
+    // Preserve the gear boost that was active when this entry was logged —
     // re-apply the stored multiplier rather than stripping it or re-reading
     // today's loadout. No-op for entries logged without perks.
     return applyStoredPerk(base, entry.perkMult);
@@ -3872,7 +3872,7 @@ function App() {
     const newXP = calcEntryXP(logEditDraft);
     const xpDiff = newXP - oldEntry.xp;
     // When the entry carries a gear boost, refresh baseXp to the newly
-    // recomputed pre-gear figure so the stored invariant xp â‰ˆ round(baseXp Ã—
+    // recomputed pre-gear figure so the stored invariant xp ≈ round(baseXp ×
     // perkMult) stays true after the edit.
     const _pm = logEditDraft.perkMult;
     const _boosted = typeof _pm === "number" && _pm > 1;
@@ -3901,8 +3901,8 @@ function App() {
     }));
     setLogEditModal(null);
     setLogEditDraft(null);
-    let msg = xpDiff > 0 ? "Updated! +" + xpDiff + " XP âš¡" : xpDiff < 0 ? "Updated! " + xpDiff + " XP" : "Patched! âš¡";
-    if (pbChanged) msg += newPB ? " Â· ðŸ† Run PB updated" : " Â· Run PB cleared";
+    let msg = xpDiff > 0 ? "Updated! +" + xpDiff + " XP ⚡" : xpDiff < 0 ? "Updated! " + xpDiff + " XP" : "Patched! ⚡";
+    if (pbChanged) msg += newPB ? " · 🏆 Run PB updated" : " · Run PB cleared";
     showToast(msg);
   }
   function deleteLogEntryByIdx(idx) {
@@ -3912,7 +3912,7 @@ function App() {
       type: "logEntry",
       id: idx,
       name: entry.exercise,
-      icon: entry.icon || "âš”ï¸",
+      icon: entry.icon || "⚔️",
       xp: entry.xp
     });
   }
@@ -3949,7 +3949,7 @@ function App() {
     showToast("Entry removed. -" + entry.xp + " XP");
   }
 
-  // â”€â”€ Schedule picker helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Schedule picker helpers ──────────────────────────────────
   const openSchedulePlan = useCallback(function openSchedulePlan(plan) {
     setSchedulePicker({ type: "plan", plan });
     setSpDate(plan.scheduledDate || "");
@@ -4103,14 +4103,14 @@ function App() {
     setProfile(u);
     doSave(u, _optionalChain([authUser, 'optionalAccess', _67 => _67.id]) || null, _optionalChain([authUser, 'optionalAccess', _68 => _68.email]) || null);
     setEditMode(false);
-    showToast("Build saved! âš¡");
+    showToast("Build saved! ⚡");
   }
   function resetChar() {
     setConfirmDelete({
       type: "char",
       id: "char",
       name: "your character",
-      icon: "ðŸ›¡ï¸",
+      icon: "🛡️",
       warning: "All XP, history, plans and workouts will be permanently lost."
     });
   }
@@ -4572,15 +4572,15 @@ function App() {
 
   if (screen === "loading") return <div style={{
     minHeight: "100vh",
-    background: "#1a1814",
+    background: "#0c0c0a",
     display: "flex",
     alignItems: "center",
     justifyContent: "center"
   }}><span style={{
-      color: "#9a9488",
+      color: "#8a8478",
       fontFamily: "serif",
       fontStyle: "italic"
-    }}>{"Loading your legendâ€¦"}</span></div>;
+    }}>{"Loading your legend…"}</span></div>;
   if (mfaChallengeScreen) return <div style={{
     minHeight: "100vh",
     background: "radial-gradient(ellipse 70% 55% at 30% 20%, rgba(55,48,36,.28) 0%, transparent 65%), radial-gradient(ellipse 50% 45% at 68% 78%, rgba(35,30,20,.16) 0%, transparent 60%), #0c0c0a",
@@ -4597,7 +4597,7 @@ function App() {
     }}><div style={{
         fontSize: "2.4rem",
         marginBottom: S.s12
-      }}>{"ðŸ›¡ï¸"}</div><div style={{
+      }}>{"🛡️"}</div><div style={{
         fontFamily: "'Cinzel Decorative',serif",
         fontSize: "1rem",
         color: "#d4cec4",
@@ -4606,12 +4606,12 @@ function App() {
         textAlign: "center"
       }}>{"Verification Required"}</div><div style={{
         fontSize: FS.lg,
-        color: "#9a9488",
+        color: "#8a8478",
         marginBottom: S.s24,
         textAlign: "center"
       }}>{"Your account is protected with multi-factor authentication."}</div><div style={{
         width: "100%",
-        background: "linear-gradient(145deg,rgba(74,69,59,.4),rgba(52,48,41,.25))",
+        background: "linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.25))",
         border: "1px solid rgba(180,172,158,.06)",
         borderRadius: R.r12,
         padding: "20px",
@@ -4621,7 +4621,7 @@ function App() {
           display: "flex",
           gap: S.s4,
           marginBottom: S.s16,
-          background: "rgba(74,69,59,.25)",
+          background: "rgba(45,42,36,.25)",
           borderRadius: R.lg,
           padding: S.s4
         }}><div style={{
@@ -4633,8 +4633,8 @@ function App() {
             fontWeight: 600,
             cursor: "pointer",
             transition: "all .15s",
-            background: !mfaRecoveryMode ? "rgba(74,69,59,.5)" : "transparent",
-            color: !mfaRecoveryMode ? "#d4cec4" : "#9a9488",
+            background: !mfaRecoveryMode ? "rgba(45,42,36,.5)" : "transparent",
+            color: !mfaRecoveryMode ? "#d4cec4" : "#8a8478",
             border: !mfaRecoveryMode ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
           }} onClick={() => {
             setMfaRecoveryMode(false);
@@ -4648,8 +4648,8 @@ function App() {
             fontWeight: 600,
             cursor: "pointer",
             transition: "all .15s",
-            background: mfaRecoveryMode ? "rgba(74,69,59,.5)" : "transparent",
-            color: mfaRecoveryMode ? "#d4cec4" : "#9a9488",
+            background: mfaRecoveryMode ? "rgba(45,42,36,.5)" : "transparent",
+            color: mfaRecoveryMode ? "#d4cec4" : "#8a8478",
             border: mfaRecoveryMode ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
           }} onClick={() => {
             setMfaRecoveryMode(true);
@@ -4664,7 +4664,7 @@ function App() {
           gap: S.s10
         }}><div style={{
             fontSize: FS.fs68,
-            color: "#9a9488"
+            color: "#8a8478"
           }}>{"Enter the 6-digit code from your authenticator app."}</div><input className={"inp"} type={"text"} inputMode={"numeric"} maxLength={6} value={mfaChallengeCode} onChange={e => setMfaChallengeCode(e.target.value.replace(/\D/g, ""))} placeholder={"000000"} style={{
             textAlign: "center",
             letterSpacing: ".2em",
@@ -4676,8 +4676,8 @@ function App() {
             padding: "11px",
             borderRadius: R.xl,
             border: "none",
-            background: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "rgba(74,69,59,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-            color: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "#9a9488" : "#0c0c0a",
+            background: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
+            color: mfaChallengeLoading || mfaChallengeCode.length < 6 ? "#8a8478" : "#0c0c0a",
             fontFamily: "'Cinzel',serif",
             fontSize: FS.fs62,
             fontWeight: 700,
@@ -4691,7 +4691,7 @@ function App() {
           gap: S.s10
         }}><div style={{
             fontSize: FS.fs68,
-            color: "#9a9488"
+            color: "#8a8478"
           }}>{"Enter one of your backup recovery codes. This will disable MFA so you can log in and re-enroll."}</div><input className={"inp"} type={"text"} value={mfaRecoveryInput} onChange={e => setMfaRecoveryInput(e.target.value.toUpperCase())} placeholder={"XXXX-XXXX-XXXX"} style={{
             textAlign: "center",
             letterSpacing: ".12em",
@@ -4704,8 +4704,8 @@ function App() {
             padding: "11px",
             borderRadius: R.xl,
             border: "none",
-            background: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "rgba(74,69,59,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
-            color: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "#9a9488" : "#0c0c0a",
+            background: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "rgba(45,42,36,.3)" : "linear-gradient(135deg, #c49428, #8a6010)",
+            color: mfaChallengeLoading || !mfaRecoveryInput.trim() ? "#8a8478" : "#0c0c0a",
             fontFamily: "'Cinzel',serif",
             fontSize: FS.fs62,
             fontWeight: 700,
@@ -4725,7 +4725,7 @@ function App() {
         textAlign: "center"
       }}><span style={{
           fontSize: FS.fs68,
-          color: "#9a9488",
+          color: "#8a8478",
           cursor: "pointer"
         }} onClick={async () => {
           await sb.auth.signOut();
@@ -4736,21 +4736,21 @@ function App() {
           setMfaRecoveryInput("");
           setAuthUser(null);
           setScreen("landing");
-        }}>{"â† Back to Sign In"}</span><div style={{
+        }}>{"← Back to Sign In"}</span><div style={{
           fontSize: FS.fs56,
-          color: "#9a9488",
+          color: "#8a8478",
           marginTop: S.s8
         }}>{"Lost your authenticator AND recovery codes?"}</div><div style={{
           fontSize: FS.fs56,
-          color: "#9a9488"
+          color: "#8a8478"
         }}>{"Contact support for an admin-assisted reset."}</div></div></div></div>;
 
-  /* â•â• ADMIN PANEL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  /* ══ ADMIN PANEL ════════════════════════════════════════════ */
   if (screen === "admin" && authUser && isAdmin) return lazyMount(
     <AdminPage authUser={authUser} onBack={() => setScreen("main")} />
   );
 
-  /* â•â• LANDING PAGE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  /* ══ LANDING PAGE ═══════════════════════════════════════════ */
   if (screen === "landing") return lazyMount(<LandingPage onLogin={() => {
     setAuthIsNew(false);
     setScreen("login");
@@ -4806,18 +4806,18 @@ function App() {
       "--dly": `${p.delay}s`
     }} />)}{xpFlash && <><div className={"xp-flash"}>{formatXP(xpFlash.amount, {
         signed: true
-      })}{xpFlash.mult > 1.02 ? " âš¡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}{toast && <div className={"toast"} role={"status"} aria-live={"polite"} aria-atomic={"true"} onClick={() => setToast(null)}>{toast}</div>}{friendExBanner && <div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
+      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}{toast && <div className={"toast"} role={"status"} aria-live={"polite"} aria-atomic={"true"} onClick={() => setToast(null)}>{toast}</div>}{friendExBanner && <div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
 
-    /* â•â• INTRO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{screen === "intro" && <div className={"screen boot-screen"}><div className={"boot-title"}>{"AURISAR"}<span className={"boot-title-sub"}>{"FITNESS"}</span></div><div className={"boot-log"}><div className={"boot-bar-wrap"}><div className={"boot-bar"} style={{
+    /* ══ INTRO ══════════════════════════════════ */}{screen === "intro" && <div className={"screen boot-screen"}><div className={"boot-title"}>{"AURISAR"}<span className={"boot-title-sub"}>{"FITNESS"}</span></div><div className={"boot-log"}><div className={"boot-bar-wrap"}><div className={"boot-bar"} style={{
             width: bootStep >= 4 ? "100%" : bootStep >= 3 ? "58%" : bootStep >= 2 ? "34%" : bootStep >= 1 ? "12%" : "2%"
-          }} /></div><div className={"boot-log-lines"}>{bootStep >= 1 && <div className={"boot-line boot-line-in"}><span className={"boot-prompt"}>{">"}</span>{" Loading combat modules..."}<span className={"boot-check"}>{" âœ“"}</span></div>}{bootStep >= 2 && <div className={"boot-line boot-line-in"}><span className={"boot-prompt"}>{">"}</span>{" Calibrating XP engine..."}<span className={"boot-check"}>{" âœ“"}</span></div>}{bootStep >= 3 && <div className={"boot-line boot-line-in"}><span className={"boot-prompt"}>{">"}</span>{" Assigning warrior class..."}{bootStep >= 4 ? <span className={"boot-check"}>{" âœ“"}</span> : <span className={"boot-ellipsis"}>{" ..."}</span>}</div>}</div></div><button className={`btn btn-gold${bootStep >= 4 ? " boot-btn-ready" : ""}`} onClick={() => setScreen("onboard")}>{bootStep >= 4 ? "BEGIN" : "BOOT UP"}</button><button className={"btn btn-ghost boot-cancel-btn"} onClick={async () => {
+          }} /></div><div className={"boot-log-lines"}>{bootStep >= 1 && <div className={"boot-line boot-line-in"}><span className={"boot-prompt"}>{">"}</span>{" Loading combat modules..."}<span className={"boot-check"}>{" ✓"}</span></div>}{bootStep >= 2 && <div className={"boot-line boot-line-in"}><span className={"boot-prompt"}>{">"}</span>{" Calibrating XP engine..."}<span className={"boot-check"}>{" ✓"}</span></div>}{bootStep >= 3 && <div className={"boot-line boot-line-in"}><span className={"boot-prompt"}>{">"}</span>{" Assigning warrior class..."}{bootStep >= 4 ? <span className={"boot-check"}>{" ✓"}</span> : <span className={"boot-ellipsis"}>{" ..."}</span>}</div>}</div></div><button className={`btn btn-gold${bootStep >= 4 ? " boot-btn-ready" : ""}`} onClick={() => setScreen("onboard")}>{bootStep >= 4 ? "BEGIN" : "BOOT UP"}</button><button className={"btn btn-ghost boot-cancel-btn"} onClick={async () => {
         await sb.auth.signOut();
         setAuthUser(null);
         setAuthIsNew(false);
         setAuthEmail("");
         setAuthPassword("");
         setScreen("landing");
-      }}>{"â† Cancel"}</button>{obDraft && <div className={"boot-resume-card boot-line-in"}><div className={"boot-resume-label"}>{"âŸ³ Resume where you left off?"}</div><div className={"boot-resume-step"}>{`Step ${obDraft.obStep} of 6${obDraft.obFirstName ? " Â· " + obDraft.obFirstName : ""}`}</div><div style={{
+      }}>{"← Cancel"}</button>{obDraft && <div className={"boot-resume-card boot-line-in"}><div className={"boot-resume-label"}>{"⟳ Resume where you left off?"}</div><div className={"boot-resume-step"}>{`Step ${obDraft.obStep} of 6${obDraft.obFirstName ? " · " + obDraft.obFirstName : ""}`}</div><div style={{
           display: "flex",
           gap: S.s8,
           justifyContent: "center",
@@ -4844,7 +4844,7 @@ function App() {
             setScreen("onboard");
           }}>{"Resume"}</button><span style={{
             fontSize: FS.fs58,
-            color: "#9a9488",
+            color: "#8a8478",
             cursor: "pointer",
             alignSelf: "center",
             padding: "4px 6px"
@@ -4870,7 +4870,7 @@ function App() {
             setScreen("onboard");
           }}>{"Start fresh"}</span></div></div>}</div>
 
-    /* â•â• ONBOARDING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{screen === "onboard" && (
+    /* ══ ONBOARDING ═════════════════════════════ */}{screen === "onboard" && (
       <OnboardingScreen
         obStep={obStep}
         setObStep={setObStep}
@@ -4902,7 +4902,7 @@ function App() {
       />
     )
 
-    /* â•â• CLASS REVEAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{screen === "classReveal" && detectedClass && (
+    /* ══ CLASS REVEAL ═══════════════════════════ */}{screen === "classReveal" && detectedClass && (
       <ClassRevealScreen
         detectedClass={detectedClass}
         confirmClass={confirmClass}
@@ -4910,10 +4910,10 @@ function App() {
       />
     )
 
-    /* â•â• CLASS PICK â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{screen === "classPick" && <div className={"screen"}><h1 className={"title"} style={{
+    /* ══ CLASS PICK ═════════════════════════════ */}{screen === "classPick" && <div className={"screen"}><h1 className={"title"} style={{
         fontSize: "clamp(1.2rem,4vw,1.7rem)"
       }}>{"Choose Your Path"}</h1><p style={{
-        color: "#9a9488",
+        color: "#8a8478",
         fontSize: FS.fs75,
         marginBottom: S.s12,
         textAlign: "center"
@@ -4938,35 +4938,35 @@ function App() {
             color: c.glow
           }}>{c.name}</div>{c.locked && <div style={{
             fontSize: FS.fs58,
-            color: "#9a9488",
+            color: "#8a8478",
             marginTop: S.s2
-          }}>{"ðŸ”’ Coming Soon"}</div>}{!c.locked && <div style={{
+          }}>{"🔒 Coming Soon"}</div>}{!c.locked && <div style={{
             fontSize: FS.fs74,
-            color: "#9a9488",
+            color: "#8a8478",
             marginTop: S.s4,
             lineHeight: 1.4
           }}>{c.description}</div>}</div>)}</div><button className={"btn btn-gold"} disabled={!profile.chosenClass} onClick={() => confirmClass(profile.chosenClass)}>{"Confirm Class"}</button></div>
 
-    /* â•â• MAIN â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
+    /* ══ MAIN ═══════════════════════════════════ */}{screen === "main" && clsKey && <div className={"hud"} style={activeTab === "messages" && msgView === "chat" ? {
       height: "100dvh",
       maxHeight: "100dvh",
       minHeight: 0,
       overflow: "hidden",
       paddingBottom: 0
-    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"â†"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"ðŸ”¥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"â˜°"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
+    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
-        /* â•â• DROPDOWN MENU â€” rendered outside hud-top to escape backdrop-filter stacking context â•â• */
+        /* ══ DROPDOWN MENU — rendered outside hud-top to escape backdrop-filter stacking context ══ */
       }{navMenuOpen && <div onClick={() => setNavMenuOpen(false)} style={{
         position: "fixed",
         inset: 0,
         zIndex: 900
       }} />}{navMenuOpen && <div className={"nav-menu-panel"}>{[
-        // Character moved to the World hub (World tab â†’ Character). The
+        // Character moved to the World hub (World tab → Character). The
         // activeTab === "character" render below stays put so setActiveTab
         // callers elsewhere keep working.
         {
-          icon: "ðŸ“œ",
+          icon: "📜",
           label: "Plans",
           action: () => guardAll(() => {
             setActiveTab("plans");
@@ -4974,21 +4974,21 @@ function App() {
             setNavMenuOpen(false);
           })
         }, {
-          icon: "ðŸ“–",
+          icon: "📖",
           label: "Battle Log",
           action: () => guardAll(() => {
             setActiveTab("history");
             setNavMenuOpen(false);
           })
         }, {
-          icon: "ðŸ†",
+          icon: "🏆",
           label: "Leaderboard",
           action: () => guardAll(() => {
             setActiveTab("leaderboard");
             setNavMenuOpen(false);
           })
         }, {
-          icon: "ðŸ’¬",
+          icon: "💬",
           label: "Messages",
           action: () => guardAll(() => {
             setActiveTab("messages");
@@ -4999,7 +4999,7 @@ function App() {
           badge: msgUnreadTotal || null,
           badgeDanger: true
         }, {
-          icon: "ðŸŽ¯",
+          icon: "🎯",
           label: "Quests",
           action: () => guardAll(() => {
             setActiveTab("quests");
@@ -5007,10 +5007,10 @@ function App() {
           }),
           badge: pendingQuestCount
         }, {
-          // World left the bottom nav for the Forge Glass orb â€” tucked here
+          // World left the bottom nav for the Forge Glass orb — tucked here
           // for alpha (same guarded action, so the Babylon lifecycle,
           // Character slot and Graphics Settings stay reachable).
-          icon: "ðŸŒ",
+          icon: "🌍",
           label: "World",
           action: () => guardAll(() => {
             setPrevTab(activeTab);
@@ -5019,10 +5019,10 @@ function App() {
           }),
           live: true
         },
-        // Map feature hidden â€” re-enable when ready
-        // {icon:"ðŸ—º", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
+        // Map feature hidden — re-enable when ready
+        // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
         isAdmin && {
-          icon: "ðŸ›¡ï¸",
+          icon: "🛡️",
           label: "Admin",
           action: () => {
             setScreen("admin");
@@ -5030,7 +5030,7 @@ function App() {
           }
         },
         {
-          icon: "ðŸ›Ÿ",
+          icon: "🛟",
           label: "Support",
           action: () => {
             setFeedbackOpen(true);
@@ -5043,7 +5043,7 @@ function App() {
             setNavMenuOpen(false);
           }
         }, authUser && {
-          icon: "ðŸšª",
+          icon: "🚪",
           label: "Sign Out",
           action: () => {
             signOut();
@@ -5051,7 +5051,7 @@ function App() {
           },
           danger: true
         }, !authUser && {
-          icon: "ðŸšª",
+          icon: "🚪",
           label: "Exit Preview",
           action: () => {
             setIsPreviewMode(false); // exit preview mode so future saves persist
@@ -5068,7 +5068,7 @@ function App() {
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* â•â• BOTTOM TAB BAR â€” fixed iOS material â•â• */}<BottomNav hidden={activeTab === "messages" && msgView === "chat"} activeTab={activeTab} socialBadge={friendRequests.length + incomingShares.length} orbOpen={orbMenuOpen} onOrbToggle={() => setOrbMenuOpen(v => !v)} onSelectTab={t => guardAll(() => {
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<BottomNav hidden={activeTab === "messages" && msgView === "chat"} activeTab={activeTab} socialBadge={friendRequests.length + incomingShares.length} orbOpen={orbMenuOpen} onOrbToggle={() => setOrbMenuOpen(v => !v)} onSelectTab={t => guardAll(() => {
         setActiveTab(t);
         if (t === "workouts") workoutsRef.current?.showList();
         if (t === "social" && authUser) {
@@ -5092,8 +5092,8 @@ function App() {
             const replacing = liveWorkout && liveWorkout.workoutId !== repeatLastSession.workout.id;
             startLiveWorkout(repeatLastSession.workout);
             // startLiveWorkout opens its own replace-confirm when another
-            // session is live â€” only toast on the direct-start path.
-            if (!replacing) showToast(`â†º Repeating ${repeatLastSession.workout.icon} ${repeatLastSession.workout.name} â€” discard it from the banner anytime`);
+            // session is live — only toast on the direct-start path.
+            if (!replacing) showToast(`↺ Repeating ${repeatLastSession.workout.icon} ${repeatLastSession.workout.name} — discard it from the banner anytime`);
           });
         }
       } : null} /><StartDock profile={profile} allExById={allExById} liveWorkout={liveWorkout} stagedCount={stagedIds.length} onStartWorkout={startLiveWorkout} onQuickLogSolo={quickLogSoloEx} onSeeAll={() => guardAll(() => {
@@ -5101,7 +5101,7 @@ function App() {
         workoutsRef.current?.showSubTab("oneoff");
       })} />{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
         open
-        icon={"âš¡"}
+        icon={"⚡"}
         title={"Replace Active Workout?"}
         body={`You're already tracking ${liveWorkout.icon} ${liveWorkout.name}. Discard it and start ${pendingLiveWorkout.icon} ${pendingLiveWorkout.name}?`}
         confirmLabel={`Discard & Track ${pendingLiveWorkout.icon}`}
@@ -5118,12 +5118,12 @@ function App() {
       } : {}}>{activeTab === "workout" && <>
 
           {
-            /* â•â• EXERCISES SUB-TAB BAR â•â• */
+            /* ══ EXERCISES SUB-TAB BAR ══ */
           }<div className={"log-subtab-bar"} style={{
             marginBottom: S.s14
-          }}>{[["library", "ðŸ“– Library"], ["myworkouts", "ðŸ’ª My Exercises"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${exSubTab === t ? "on" : ""}`} onClick={() => setExSubTab(t)}>{l}</button>)}</div>
+          }}>{[["library", "📖 Library"], ["myworkouts", "💪 My Exercises"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${exSubTab === t ? "on" : ""}`} onClick={() => setExSubTab(t)}>{l}</button>)}</div>
 
-          {/* â•â• LIBRARY SUB-TAB â•â• */}{exSubTab === "library" && <ExerciseLibraryTab
+          {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
             gymKit={profile.gymKit}
             setGymKit={setGymKit}
@@ -5158,7 +5158,7 @@ function App() {
             allExercises={allExercises}
             allExById={allExById}
           />
-          /* â•â• MY WORKOUTS SUB-TAB â•â• */}{exSubTab === "myworkouts" && (
+          /* ══ MY WORKOUTS SUB-TAB ══ */}{exSubTab === "myworkouts" && (
             <MyWorkoutsSubTab
               profile={profile}
               setProfile={setProfile}
@@ -5173,7 +5173,7 @@ function App() {
             />
           )}</>
 
-        /* â”€â”€ WORKOUTS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{<div style={activeTab !== "workouts" ? { display: "none" } : undefined}>
+        /* ── WORKOUTS TAB ────────────────────── */}{<div style={activeTab !== "workouts" ? { display: "none" } : undefined}>
           {/* Keep-alive like PlansTabContainer: the container holds the
               builder draft, so unmounting on tab switch would lose it. The
               ref must also stay live for cross-tab entry points (StagingTray
@@ -5200,9 +5200,9 @@ function App() {
           />
         </div>
 
-        /* â”€â”€ PLANS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setLibDetailEx={setLibDetailEx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
+        /* ── PLANS TAB ───────────────────────── */}{<div style={activeTab !== "plans" ? {display:"none"} : undefined}><PlansTabContainer ref={plansContainerRef} profile={profile} setProfile={setProfile} allExercises={allExercises} allExById={allExById} cls={cls} showToast={showToast} setConfirmDelete={setConfirmDelete} setLibDetailEx={setLibDetailEx} onSchedulePlan={openSchedulePlan} onScheduleEx={openScheduleEx} onRemoveScheduledWorkout={removeScheduledWorkout} onStatsPrompt={openStatsPromptIfNeeded} onOpenExEditor={openExEditor} setXpFlash={setXpFlash} applyAutoCheckIn={applyAutoCheckIn} pendingOpen={plansPendingOpen} onPendingOpenDone={() => setPlansPendingOpen(null)} setRetroEditModal={setRetroEditModal} /></div>
 
-        /* â”€â”€ CALENDAR TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "calendar" && (
+        /* ── CALENDAR TAB ────────────────────── */}{activeTab === "calendar" && (
           <CalendarTab
             calViewDate={calViewDate}
             setCalViewDate={setCalViewDate}
@@ -5220,7 +5220,7 @@ function App() {
           />
         )
 
-        /* â”€â”€ LEADERBOARD TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "leaderboard" && (
+        /* ── LEADERBOARD TAB ─────────────────────── */}{activeTab === "leaderboard" && (
           <LeaderboardTab
             lbFilter={lbFilter}
             setLbFilter={setLbFilter}
@@ -5242,7 +5242,7 @@ function App() {
             authUser={authUser}
           />
         )
-        /* â”€â”€ QUESTS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "quests" && (
+        /* ── QUESTS TAB ──────────────────────── */}{activeTab === "quests" && (
           <QuestsTab
             profile={profile}
             questCat={questCat}
@@ -5252,7 +5252,7 @@ function App() {
           />
         )
 
-        /* â”€â”€ HISTORY TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "history" && <HistoryTab
+        /* ── HISTORY TAB ─────────────────────── */}{activeTab === "history" && <HistoryTab
           profile={profile}
           setProfile={setProfile}
           allExById={allExById}
@@ -5299,7 +5299,7 @@ function App() {
           />
         )
 
-        /* â”€â”€ MESSAGES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "messages" && <MessagesTab
+        /* ── MESSAGES TAB ─────────────────────── */}{activeTab === "messages" && <MessagesTab
           msgConversations={msgConversations}
           msgActiveChannel={msgActiveChannel}
           msgMessages={msgMessages}
@@ -5321,7 +5321,7 @@ function App() {
           authUser={authUser}
         />
 
-        /* â”€â”€ CHARACTER TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "character" && (
+        /* ── CHARACTER TAB ────────────────────── */}{activeTab === "character" && (
           <CharacterTab
             profile={profile}
             cls={cls}
@@ -5336,7 +5336,7 @@ function App() {
           />
         )
 
-        /* â”€â”€ PROFILE TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}{activeTab === "profile" && (
+        /* ── PROFILE TAB ─────────────────────────── */}{activeTab === "profile" && (
           <ProfileTab
             profile={profile}
             setProfile={setProfile}
@@ -5441,11 +5441,11 @@ function App() {
         /* scroll-area */
       }</div>
 
-    /* â•â• EXERCISE EDITOR MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{exEditorOpen && exEditorDraft && (
+    /* ══ EXERCISE EDITOR MODAL ══════════════════ */}{exEditorOpen && exEditorDraft && (
       <ErrorBoundary fallback={(error, reset) => (
         <ConfirmSheet
           open
-          icon={"âš ï¸"}
+          icon={"⚠️"}
           title={"Exercise editor hit an error"}
           body={String(error?.message || error)}
           confirmLabel={"Close"}
@@ -5470,7 +5470,7 @@ function App() {
       </ErrorBoundary>
     )
 
-    /* â•â• STAGING TRAY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{(
+    /* ══ STAGING TRAY ═══════════════════════════ */}{(
       <StagingTray
         cartIds={stagedIds}
         allExById={allExById}
@@ -5511,7 +5511,7 @@ function App() {
       />
     )
 
-    /* â•â• EXERCISE DETAIL SHEET â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{(
+    /* ══ EXERCISE DETAIL SHEET ══════════════════ */}{(
       <ExerciseDetailSheet
         ex={libDetailEx}
         setLibDetailEx={setLibDetailEx}
@@ -5528,13 +5528,13 @@ function App() {
       />
     )
 
-    /* â•â• SAVE-TO-PLAN WIZARD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{savePlanWizard && createPortal(<div className={"spw-backdrop"} onClick={e => {
+    /* ══ SAVE-TO-PLAN WIZARD ════════════════════ */}{savePlanWizard && createPortal(<div className={"spw-backdrop"} onClick={e => {
       if (e.target === e.currentTarget) setSavePlanWizard(null);
-    }}><div className={"spw-sheet"} role={"dialog"} aria-modal={"true"} aria-label={"Save plan"}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"ðŸ“‹ Save To Plan"}</div><div style={{
+    }}><div className={"spw-sheet"} role={"dialog"} aria-modal={"true"} aria-label={"Save plan"}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"📋 Save To Plan"}</div><div style={{
               fontSize: FS.fs65,
-              color: "#9a9488",
+              color: "#8a8478",
               marginTop: S.s2
-            }}>{"Select exercises, then create a new plan or add to an existing one."}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setSavePlanWizard(null)}>{"âœ•"}</button></div><div className={"spw-body"}><div><div style={{
+            }}>{"Select exercises, then create a new plan or add to an existing one."}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setSavePlanWizard(null)}>{"✕"}</button></div><div className={"spw-body"}><div><div style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -5544,10 +5544,10 @@ function App() {
                 gap: S.s6
               }}><button className={"btn btn-ghost btn-xs"} onClick={() => setSpwSelected(savePlanWizard.entries.map(e => e._idx))}>{"All"}</button><button className={"btn btn-ghost btn-xs"} onClick={() => setSpwSelected([])}>{"None"}</button></div></div><div className={"spw-ex-list"}>{savePlanWizard.entries.map(e => {
                 const sel = spwSelected.includes(e._idx);
-                return <div key={e._idx} className={`spw-ex-row ${sel ? "sel" : ""}`} onClick={() => setSpwSelected(s => sel ? s.filter(i => i !== e._idx) : [...s, e._idx])}><div className={"spw-check"}>{sel ? "âœ“" : ""}</div><span className={"spw-ex-icon"}>{e.icon}</span><div style={{
+                return <div key={e._idx} className={`spw-ex-row ${sel ? "sel" : ""}`} onClick={() => setSpwSelected(s => sel ? s.filter(i => i !== e._idx) : [...s, e._idx])}><div className={"spw-check"}>{sel ? "✓" : ""}</div><span className={"spw-ex-icon"}>{e.icon}</span><div style={{
                     flex: 1,
                     minWidth: 0
-                  }}><div className={"spw-ex-name"}>{e.exercise}</div><div className={"spw-ex-meta"}>{e.sets}{"Ã—"}{e.reps}{e.weightLbs ? " Â· " + (isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs") : ""}{"  +"}{e.xp}{" XP"}</div></div></div>;
+                  }}><div className={"spw-ex-name"}>{e.exercise}</div><div className={"spw-ex-meta"}>{e.sets}{"×"}{e.reps}{e.weightLbs ? " · " + (isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs") : ""}{"  +"}{e.xp}{" XP"}</div></div></div>;
               })}</div></div>
 
           {
@@ -5557,7 +5557,7 @@ function App() {
             borderRadius: R.xl,
             overflow: "hidden",
             border: "1px solid rgba(180,172,158,.06)"
-          }}>{[["new", "ï¼‹ New Plan"], ["existing", "Add to Existing"]].map(([m, lbl]) => <button key={m} style={{
+          }}>{[["new", "＋ New Plan"], ["existing", "Add to Existing"]].map(([m, lbl]) => <button key={m} style={{
               flex: 1,
               padding: "8px 4px",
               fontFamily: "'Inter',sans-serif",
@@ -5566,37 +5566,37 @@ function App() {
               cursor: "pointer",
               border: "none",
               borderRight: m === "new" ? "1px solid rgba(180,172,158,.05)" : "none",
-              background: spwMode === m ? "rgba(74,69,59,.3)" : "rgba(74,69,59,.18)",
-              color: spwMode === m ? "#d4cec4" : "#9a9488",
+              background: spwMode === m ? "rgba(45,42,36,.3)" : "rgba(45,42,36,.18)",
+              color: spwMode === m ? "#d4cec4" : "#8a8478",
               transition: "all .18s"
             }} onClick={() => setSpwMode(m)}>{lbl}</button>)}</div>
 
           {
             /* NEW PLAN fields */
-          }{spwMode === "new" && <><div className={"field"}><label>{"Plan Name"}</label><input className={"inp"} value={spwName} onChange={e => setSpwName(e.target.value)} placeholder={"Name your planâ€¦"} /></div><div className={"field"}><label>{"Icon"}</label><div className={"icon-row"} style={{
+          }{spwMode === "new" && <><div className={"field"}><label>{"Plan Name"}</label><input className={"inp"} value={spwName} onChange={e => setSpwName(e.target.value)} placeholder={"Name your plan…"} /></div><div className={"field"}><label>{"Icon"}</label><div className={"icon-row"} style={{
                 flexWrap: "wrap",
                 gap: S.s6
-              }}>{["ðŸ“‹", "âš”ï¸", "ðŸ‹ï¸", "ðŸ”¥", "ðŸ’ª", "ðŸƒ", "ðŸš´", "ðŸ§˜", "âš¡", "ðŸŽ¯", "ðŸ›¡ï¸", "ðŸ†", "ðŸŒŸ", "ðŸ’¥", "ðŸ—¡ï¸"].map(ic => <div key={ic} className={`icon-opt ${spwIcon === ic ? "sel" : ""}`} style={{
+              }}>{["📋", "⚔️", "🏋️", "🔥", "💪", "🏃", "🚴", "🧘", "⚡", "🎯", "🛡️", "🏆", "🌟", "💥", "🗡️"].map(ic => <div key={ic} className={`icon-opt ${spwIcon === ic ? "sel" : ""}`} style={{
                   fontSize: "1.2rem",
                   width: 36,
                   height: 36
                 }} onClick={() => setSpwIcon(ic)}>{ic}</div>)}</div></div><div className={"field"}><label>{"Schedule for a Future Date "}<span style={{
-                  color: "#9a9488",
+                  color: "#8a8478",
                   fontWeight: "normal"
                 }}>{"(optional)"}</span></label><input className={"inp"} type={"date"} min={todayStr()} value={spwDate} onChange={e => setSpwDate(e.target.value)} />{spwDate && <div style={{
                 fontSize: FS.fs65,
                 color: "#b4ac9e",
                 marginTop: S.s4
-              }}>{"ðŸ“… "}{formatScheduledDate(spwDate)}{" Â· "}{(() => {
+              }}>{"📅 "}{formatScheduledDate(spwDate)}{" · "}{(() => {
                   const d = daysUntil(spwDate);
                   return d === 0 ? "Today" : d === 1 ? "Tomorrow" : d + " days from now";
                 })()}</div>}</div></>
 
           /* EXISTING PLAN picker */}{spwMode === "existing" && <>{profile.plans.length === 0 ? <div className={"empty"} style={{
               padding: "14px 0"
-            }}>{"No plans yet â€” create one first!"}</div> : profile.plans.map(pl => <div key={pl.id} className={"atp-plan-row"} style={{
-              borderColor: spwTargetPlanId === pl.id ? "rgba(180,172,158,.15)" : "rgba(74,69,59,.22)",
-              background: spwTargetPlanId === pl.id ? "rgba(74,69,59,.2)" : "rgba(74,69,59,.12)"
+            }}>{"No plans yet — create one first!"}</div> : profile.plans.map(pl => <div key={pl.id} className={"atp-plan-row"} style={{
+              borderColor: spwTargetPlanId === pl.id ? "rgba(180,172,158,.15)" : "rgba(45,42,36,.22)",
+              background: spwTargetPlanId === pl.id ? "rgba(45,42,36,.2)" : "rgba(45,42,36,.12)"
             }} onClick={() => setSpwTargetPlanId(pl.id)}><span style={{
                 fontSize: "1.3rem"
               }}>{pl.icon}</span><div style={{
@@ -5608,8 +5608,8 @@ function App() {
                   color: "#d4cec4"
                 }}>{pl.name}</div><div style={{
                   fontSize: FS.sm,
-                  color: "#9a9488"
-                }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" Â· "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><div style={{
+                  color: "#8a8478"
+                }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" · "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><div style={{
                 width: 18,
                 height: 18,
                 border: "1.5px solid rgba(180,172,158,.08)",
@@ -5621,20 +5621,20 @@ function App() {
                 flexShrink: 0,
                 background: spwTargetPlanId === pl.id ? "rgba(180,172,158,.25)" : "transparent",
                 color: spwTargetPlanId === pl.id ? "#1a1200" : "transparent"
-              }}>{"âœ“"}</div></div>)}</>}<div className={"div"} /><div style={{
+              }}>{"✓"}</div></div>)}</>}<div className={"div"} /><div style={{
             display: "flex",
             gap: S.s8
           }}><button className={"btn btn-ghost btn-sm"} style={{
               flex: 1
             }} onClick={() => setSavePlanWizard(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={confirmSavePlanWizard}>{spwMode === "existing" ? "ðŸ“‹ Add to Plan" : "ðŸ’¾ Save New Plan"}{spwMode === "new" && spwDate ? " & Schedule" : ""}</button></div></div></div></div>, document.body)
+            }} onClick={confirmSavePlanWizard}>{spwMode === "existing" ? "📋 Add to Plan" : "💾 Save New Plan"}{spwMode === "new" && spwDate ? " & Schedule" : ""}</button></div></div></div></div>, document.body)
 
-    /* â•â• SCHEDULE PICKER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{schedulePicker && createPortal(<div className={"sched-backdrop"} onClick={() => setSchedulePicker(null)}><div className={"sched-sheet"} onClick={e => e.stopPropagation()}><div style={{
+    /* ══ SCHEDULE PICKER ════════════════════════ */}{schedulePicker && createPortal(<div className={"sched-backdrop"} onClick={() => setSchedulePicker(null)}><div className={"sched-sheet"} onClick={e => e.stopPropagation()}><div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between"
-        }}><div className={"sched-title"}>{"ðŸ“… Schedule Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setSchedulePicker(null)}>{"âœ•"}</button></div>
+        }}><div className={"sched-title"}>{"📅 Schedule Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setSchedulePicker(null)}>{"✕"}</button></div>
 
         {
           /* Target card */
@@ -5648,21 +5648,21 @@ function App() {
             marginTop: S.s4
           }}>{(() => {
               const d = daysUntil(spDate);
-              return d === 0 ? "Today â€” let's go! ðŸ”¥" : d === 1 ? "Tomorrow âš¡" : d + " days from now";
-            })()}{" â€” "}{formatScheduledDate(spDate)}</div>}</div>
+              return d === 0 ? "Today — let's go! 🔥" : d === 1 ? "Tomorrow ⚡" : d + " days from now";
+            })()}{" — "}{formatScheduledDate(spDate)}</div>}</div>
 
         {
           /* Notes */
         }<div className={"field"}><label>{"Notes "}<span style={{
-              color: "#9a9488",
+              color: "#8a8478",
               fontWeight: "normal"
-            }}>{"(optional)"}</span></label><input className={"inp"} value={spNotes} onChange={e => setSpNotes(e.target.value)} placeholder={"e.g. Morning session, skip leg dayâ€¦"} /></div>
+            }}>{"(optional)"}</span></label><input className={"inp"} value={spNotes} onChange={e => setSpNotes(e.target.value)} placeholder={"e.g. Morning session, skip leg day…"} /></div>
 
         {
           /* If there's already a schedule, offer to clear it */
         }{schedulePicker.type === "plan" && schedulePicker.plan.scheduledDate && <div style={{
           fontSize: FS.fs65,
-          color: "#9a9488",
+          color: "#8a8478",
           fontStyle: "italic"
         }}>{"Currently scheduled: "}{formatScheduledDate(schedulePicker.plan.scheduledDate)}<span className={"upcoming-del"} style={{
             marginLeft: S.s8,
@@ -5670,20 +5670,20 @@ function App() {
           }} onClick={() => {
             removePlanSchedule(schedulePicker.plan.id);
             setSchedulePicker(null);
-          }}>{"Clear âœ•"}</span></div>}<div style={{
+          }}>{"Clear ✕"}</span></div>}<div style={{
           display: "flex",
           gap: S.s8
         }}><button className={"btn btn-ghost btn-sm"} style={{
             flex: 1
           }} onClick={() => setSchedulePicker(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
             flex: 2
-          }} onClick={confirmSchedule}>{"ðŸ“… Schedule"}</button></div></div></div>, document.body)
+          }} onClick={confirmSchedule}>{"📅 Schedule"}</button></div></div></div>, document.body)
 
-    /* â•â• SAVE-AS-WORKOUT WIZARD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{saveWorkoutWizard && createPortal(<div className={"saw-backdrop"} onClick={() => setSaveWorkoutWizard(null)}><div className={"saw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"ðŸ’ª Save As Workout"}</div><div style={{
+    /* ══ SAVE-AS-WORKOUT WIZARD ═════════════════ */}{saveWorkoutWizard && createPortal(<div className={"saw-backdrop"} onClick={() => setSaveWorkoutWizard(null)}><div className={"saw-sheet"} onClick={e => e.stopPropagation()}><div className={"spw-hdr"}><div><div className={"spw-title"}>{"💪 Save As Workout"}</div><div style={{
               fontSize: FS.fs65,
-              color: "#9a9488",
+              color: "#8a8478",
               marginTop: S.s2
-            }}>{"Select exercises and save as a reusable workout."}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setSaveWorkoutWizard(null)}>{"âœ•"}</button></div><div className={"spw-body"}><div><div style={{
+            }}>{"Select exercises and save as a reusable workout."}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setSaveWorkoutWizard(null)}>{"✕"}</button></div><div className={"spw-body"}><div><div style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -5693,20 +5693,20 @@ function App() {
                 gap: S.s6
               }}><button className={"btn btn-ghost btn-xs"} onClick={() => setSwwSelected(saveWorkoutWizard.entries.map(e => e._idx))}>{"All"}</button><button className={"btn btn-ghost btn-xs"} onClick={() => setSwwSelected([])}>{"None"}</button></div></div><div className={"spw-ex-list"}>{saveWorkoutWizard.entries.map(e => {
                 const sel = swwSelected.includes(e._idx);
-                return <div key={e._idx} className={`spw-ex-row ${sel ? "sel" : ""}`} onClick={() => setSwwSelected(s => sel ? s.filter(i => i !== e._idx) : [...s, e._idx])}><div className={"spw-check"}>{sel ? "âœ“" : ""}</div><span className={"spw-ex-icon"}>{e.icon}</span><div style={{
+                return <div key={e._idx} className={`spw-ex-row ${sel ? "sel" : ""}`} onClick={() => setSwwSelected(s => sel ? s.filter(i => i !== e._idx) : [...s, e._idx])}><div className={"spw-check"}>{sel ? "✓" : ""}</div><span className={"spw-ex-icon"}>{e.icon}</span><div style={{
                     flex: 1,
                     minWidth: 0
-                  }}><div className={"spw-ex-name"}>{e.exercise}</div><div className={"spw-ex-meta"}>{e.sets}{"Ã—"}{e.reps}{e.weightLbs ? " Â· " + (isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs") : ""}{"  +"}{e.xp}{" XP"}</div></div></div>;
+                  }}><div className={"spw-ex-name"}>{e.exercise}</div><div className={"spw-ex-meta"}>{e.sets}{"×"}{e.reps}{e.weightLbs ? " · " + (isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs") : ""}{"  +"}{e.xp}{" XP"}</div></div></div>;
               })}</div></div>
           {
             /* Workout name */
-          }<div className={"field"}><label>{"Workout Name"}</label><input className={"inp"} value={swwName} onChange={e => setSwwName(e.target.value)} placeholder={"Name your workoutâ€¦"} /></div>
+          }<div className={"field"}><label>{"Workout Name"}</label><input className={"inp"} value={swwName} onChange={e => setSwwName(e.target.value)} placeholder={"Name your workout…"} /></div>
           {
             /* Icon */
           }<div className={"field"}><label>{"Icon"}</label><div className={"icon-row"} style={{
               flexWrap: "wrap",
               gap: S.s6
-            }}>{["ðŸ’ª", "ðŸ‹ï¸", "ðŸ”¥", "âš”ï¸", "ðŸƒ", "ðŸš´", "ðŸ§˜", "âš¡", "ðŸŽ¯", "ðŸ›¡ï¸", "ðŸ†", "ðŸŒŸ", "ðŸ’¥", "ðŸ—¡ï¸", "ðŸ¥Š"].map(ic => <div key={ic} className={`icon-opt ${swwIcon === ic ? "sel" : ""}`} style={{
+            }}>{["💪", "🏋️", "🔥", "⚔️", "🏃", "🚴", "🧘", "⚡", "🎯", "🛡️", "🏆", "🌟", "💥", "🗡️", "🥊"].map(ic => <div key={ic} className={`icon-opt ${swwIcon === ic ? "sel" : ""}`} style={{
                 fontSize: "1.2rem",
                 width: 36,
                 height: 36
@@ -5717,17 +5717,17 @@ function App() {
               flex: 1
             }} onClick={() => setSaveWorkoutWizard(null)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
               flex: 2
-            }} onClick={confirmSaveWorkoutWizard}>{"ðŸ’ª Save Workout"}</button></div></div></div></div>, document.body)}
+            }} onClick={confirmSaveWorkoutWizard}>{"💪 Save Workout"}</button></div></div></div></div>, document.body)}
 
     {/* Workout exercise picker renders inside WorkoutsTabContainer now. */}
 
-    {/* â•â• ADD WORKOUT TO PLAN PICKER â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{addToPlanPicker && <Sheet open onClose={() => setAddToPlanPicker(null)} layer={"modal"} title={"ðŸ“‹ Add to Plan"} ariaLabel={"Add workout to plan"}><div style={{ display: "flex", flexDirection: "column", gap: S.s12 }}><div style={{
+    {/* ══ ADD WORKOUT TO PLAN PICKER ══════════════ */}{addToPlanPicker && <Sheet open onClose={() => setAddToPlanPicker(null)} layer={"modal"} title={"📋 Add to Plan"} ariaLabel={"Add workout to plan"}><div style={{ display: "flex", flexDirection: "column", gap: S.s12 }}><div style={{
           display: "flex",
           alignItems: "center",
           gap: S.s8,
           padding: "10px 12px",
           borderRadius: R.xl,
-          background: "rgba(74,69,59,.18)",
+          background: "rgba(45,42,36,.18)",
           border: "1px solid rgba(180,172,158,.06)"
         }}><span style={{
             fontSize: "1.4rem"
@@ -5737,7 +5737,7 @@ function App() {
               color: "#d4cec4"
             }}>{addToPlanPicker.workout.name}</div><div style={{
               fontSize: FS.sm,
-              color: "#9a9488"
+              color: "#8a8478"
             }}>{addToPlanPicker.workout.exercises.length}{" exercises will be added as a new day"}</div></div></div>{profile.plans.length === 0 ? <div className={"empty"} style={{
           padding: "14px 0"
         }}>{"No plans yet. Create a plan first in the Plans tab."}</div> : profile.plans.map(pl => <button type={"button"} key={pl.id} className={"atp-plan-row"} onClick={() => addWorkoutToPlan(addToPlanPicker.workout, pl.id)}><span style={{
@@ -5751,19 +5751,19 @@ function App() {
               color: "#d4cec4"
             }}>{pl.name}</div><div style={{
               fontSize: FS.sm,
-              color: "#9a9488"
-            }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" Â· currently "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><span style={{
+              color: "#8a8478"
+            }}>{pl.days.length}{" day"}{pl.days.length !== 1 ? "s" : ""}{" · currently "}{pl.days.reduce((s, d) => s + d.exercises.length, 0)}{" exercises"}</div></div><span style={{
             fontSize: FS.md,
             color: "#b4ac9e"
-          }}>{"â†’"}</span></button>)}<button className={"btn btn-ghost btn-sm"} style={{
+          }}>{"→"}</span></button>)}<button className={"btn btn-ghost btn-sm"} style={{
           width: "100%",
           minHeight: 44
         }} onClick={() => setAddToPlanPicker(null)}>{"Cancel"}</button></div></Sheet>
 
-    /* â•â• RETRO CHECK-IN MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{retroCheckInModal && createPortal(<div className={"cdel-backdrop"} onClick={() => setRetroCheckInModal(false)}><div className={"cdel-sheet"} style={{
+    /* ══ RETRO CHECK-IN MODAL ════════════════════ */}{retroCheckInModal && createPortal(<div className={"cdel-backdrop"} onClick={() => setRetroCheckInModal(false)}><div className={"cdel-sheet"} style={{
         borderColor: "rgba(180,172,158,.08)",
-        background: "linear-gradient(160deg,#232019,#1a1814)"
-      }} onClick={e => e.stopPropagation()}><div className={"cdel-icon"}>{"ðŸ”¥"}</div><div className={"cdel-title"}>{"Retro Check-In"}</div><div className={"cdel-body"}>{"Forgot to check in? Log a past gym visit here. Each day awards +125 XP and updates your streak."}</div><div className={"field"} style={{
+        background: "linear-gradient(160deg,#0c0c0a,#0c0c0a)"
+      }} onClick={e => e.stopPropagation()}><div className={"cdel-icon"}>{"🔥"}</div><div className={"cdel-title"}>{"Retro Check-In"}</div><div className={"cdel-body"}>{"Forgot to check in? Log a past gym visit here. Each day awards +125 XP and updates your streak."}</div><div className={"field"} style={{
           margin: 0
         }}><label>{"Select Date"}</label><input className={"inp"} type={"date"} value={retroDate} max={todayStr()} onChange={e => setRetroDate(e.target.value)} />{retroDate && (() => {
             const d = new Date(retroDate + "T12:00:00");
@@ -5772,11 +5772,11 @@ function App() {
               fontSize: FS.fs68,
               marginTop: S.s6,
               color: already ? UI_COLORS.danger : "#b4ac9e"
-            }}>{already ? "âš  Already checked in for " + d.toLocaleDateString([], {
+            }}>{already ? "⚠ Already checked in for " + d.toLocaleDateString([], {
                 weekday: "long",
                 month: "long",
                 day: "numeric"
-              }) : "ðŸ“… " + d.toLocaleDateString([], {
+              }) : "📅 " + d.toLocaleDateString([], {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
@@ -5787,7 +5787,7 @@ function App() {
           /* Recent history preview */
         }{(profile.checkInHistory || []).length > 0 && <div style={{
           fontSize: FS.sm,
-          color: "#9a9488"
+          color: "#8a8478"
         }}><div style={{
             fontFamily: "'Inter',sans-serif",
             letterSpacing: ".06em",
@@ -5802,9 +5802,9 @@ function App() {
               return <span key={d} style={{
                 padding: "2px 8px",
                 borderRadius: R.r4,
-                background: isToday ? "rgba(74,69,59,.26)" : "rgba(74,69,59,.15)",
+                background: isToday ? "rgba(45,42,36,.26)" : "rgba(45,42,36,.15)",
                 border: `1px solid ${isToday ? "rgba(180,172,158,.08)" : "rgba(180,172,158,.06)"}`,
-                color: isToday ? "#d4cec4" : "#9a9488"
+                color: isToday ? "#d4cec4" : "#8a8478"
               }}>{date.toLocaleDateString([], {
                   month: "short",
                   day: "numeric"
@@ -5816,15 +5816,15 @@ function App() {
             flex: 1
           }} onClick={() => setRetroCheckInModal(false)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
             flex: 2
-          }} disabled={!retroDate || (profile.checkInHistory || []).includes(retroDate)} onClick={doRetroCheckIn}>{"ðŸ”¥ Log Check-In"}</button></div></div></div>, document.body)
+          }} disabled={!retroDate || (profile.checkInHistory || []).includes(retroDate)} onClick={doRetroCheckIn}>{"🔥 Log Check-In"}</button></div></div></div>, document.body)
 
-    /* â•â• WORKOUT COMPLETION MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-    /* â•â• ONE-OFF NAMING MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-    /* â•â• SINGLE EXERCISE QUICK-LOG MODAL â•â•â•â•â•â•â•â• */}{selEx && (
+    /* ══ WORKOUT COMPLETION MODAL ════════════════ */
+    /* ══ ONE-OFF NAMING MODAL ════════════════════ */
+    /* ══ SINGLE EXERCISE QUICK-LOG MODAL ════════ */}{selEx && (
       <ErrorBoundary fallback={(error, reset) => (
         <ConfirmSheet
           open
-          icon={"âš ï¸"}
+          icon={"⚠️"}
           title={"Quick Log hit an error"}
           body={String(error?.message || error)}
           confirmLabel={"Close"}
@@ -5861,25 +5861,25 @@ function App() {
       </ErrorBoundary>
     )}
 
-    {/* â•â• STATS PROMPT MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{statsPromptModal && <Sheet
+    {/* ══ STATS PROMPT MODAL ══════════════════════ */}{statsPromptModal && <Sheet
       open
       onClose={() => setStatsPromptModal(null)}
       layer={"modal"}
       placement={"center"}
       style={{ "--mg-color": cls.color }}
       ariaLabel={"Review battle stats"}
-      title={<span className={"stats-modal-title"}>{"ðŸ“Š Review Battle Stats "}<span style={{ color: "#9a9488", fontWeight: "normal", fontSize: FS.lg }}>{"(Optional)"}</span></span>}
+      title={<span className={"stats-modal-title"}>{"📊 Review Battle Stats "}<span style={{ color: "#8a8478", fontWeight: "normal", fontSize: FS.lg }}>{"(Optional)"}</span></span>}
       headerLeft={<button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={() => {
         setStatsPromptModal(null);
         if (statsPromptModal.wo.soloEx && statsPromptModal.wo._soloExId) {
-          // Return to the form the user was mid-way through â€”
+          // Return to the form the user was mid-way through —
           // preserve their typed values rather than resetting.
           openQuickLog(statsPromptModal.wo._soloExId, { preserve: true });
         } else if (!statsPromptModal.wo.soloEx) {
           workoutsRef.current?.showBuilder();
           setActiveTab("workouts");
         }
-      }}>{"â† Back"}</button>}
+      }}>{"← Back"}</button>}
     ><div><div className={"stats-prompt-banner"} onClick={() => {
             setProfile(p => ({
               ...p,
@@ -5911,7 +5911,7 @@ function App() {
               flex: 1.5,
               marginBottom: S.s0
             }}><label>{"Duration "}<span style={{
-                  color: "#9a9488",
+                  color: "#8a8478",
                   fontWeight: "normal"
                 }}>{"(HH:MM)"}</span></label><input className={"inp"} type={"text"} inputMode={"numeric"} placeholder={"00:00"} value={spDuration} onChange={e => setSpDuration(e.target.value)} onBlur={e => setSpDuration(normalizeHHMM(e.target.value))} /></div><div className={"field"} style={{
               flex: 0.8,
@@ -5924,7 +5924,7 @@ function App() {
               marginBottom: S.s0
             }}><label>{"Total Cal"}</label><input className={"inp"} type={"number"} min={"0"} max={"9999"} placeholder={"e.g. 450"} value={spTotalCal} onChange={e => setSpTotalCal(e.target.value)} /></div></div>
           {
-            /* Make Reusable checkbox â€” only for one-off workouts */
+            /* Make Reusable checkbox — only for one-off workouts */
           }{statsPromptModal.wo.oneOff && <div className={"stats-prompt-reusable"} onClick={() => setSpMakeReusable(v => !v)}><div style={{
               width: 18,
               height: 18,
@@ -5940,7 +5940,7 @@ function App() {
                 fontSize: FS.md,
                 color: "#0c0c0a",
                 fontWeight: "bold"
-              }}>{"âœ“"}</span>}</div><div><div className={"stats-prompt-reusable-title"}>{"ðŸ’ª Also save as Reusable Workout"}</div><div className={"stats-prompt-reusable-sub"}>{"Keep this workout in your Re-Usable tab for future use"}</div></div></div>}<div style={{
+              }}>{"✓"}</span>}</div><div><div className={"stats-prompt-reusable-title"}>{"💪 Also save as Reusable Workout"}</div><div className={"stats-prompt-reusable-sub"}>{"Keep this workout in your Re-Usable tab for future use"}</div></div></div>}<div style={{
             display: "flex",
             gap: S.s8
           }}><button className={"btn btn-cls"} style={{
@@ -5966,9 +5966,9 @@ function App() {
               setStatsPromptModal(null);
               setSpMakeReusable(false);
               setSpDurSec("");
-            }}>{"âœ“ Save & Complete"}</button></div></div></Sheet>
+            }}>{"✓ Save & Complete"}</button></div></div></Sheet>
 
-    /* â•â• CALENDAR EXERCISE READ-ONLY DETAIL MODAL â•â• */}{calExDetailModal && createPortal(<div className={"modal-backdrop"} onClick={() => setCalExDetailModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ CALENDAR EXERCISE READ-ONLY DETAIL MODAL ══ */}{calExDetailModal && createPortal(<div className={"modal-backdrop"} onClick={() => setCalExDetailModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -5982,28 +5982,28 @@ function App() {
               gap: S.s8
             }}><span style={{
                 fontSize: "1.2rem"
-              }}>{calExDetailModal.exerciseIcon}</span><div className={"stats-modal-title"}>{calExDetailModal.exerciseName}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setCalExDetailModal(null)}>{"âœ•"}</button></div>
+              }}>{calExDetailModal.exerciseIcon}</span><div className={"stats-modal-title"}>{calExDetailModal.exerciseName}</div></div><button className={"btn btn-ghost btn-sm"} onClick={() => setCalExDetailModal(null)}>{"✕"}</button></div>
           {
             /* Source info */
           }{calExDetailModal.sourceName && <div style={{
             fontSize: FS.fs65,
-            color: "#9a9488",
+            color: "#8a8478",
             fontStyle: "italic",
             padding: "6px 10px",
-            background: "rgba(74,69,59,.12)",
+            background: "rgba(45,42,36,.12)",
             borderRadius: R.r7,
-            border: "1px solid rgba(74,69,59,.2)",
+            border: "1px solid rgba(45,42,36,.2)",
             marginBottom: S.s10
-          }}><span>{calExDetailModal.sourceIcon || "ðŸ’ª"}{" From: "}<b style={{
+          }}><span>{calExDetailModal.sourceIcon || "💪"}{" From: "}<b style={{
                 color: "#b4ac9e"
               }}>{calExDetailModal.sourceName}</b></span></div>}{!calExDetailModal.sourceName && <div style={{
             fontSize: FS.fs65,
-            color: "#9a9488",
+            color: "#8a8478",
             fontStyle: "italic",
             padding: "6px 10px",
-            background: "rgba(74,69,59,.12)",
+            background: "rgba(45,42,36,.12)",
             borderRadius: R.r7,
-            border: "1px solid rgba(74,69,59,.2)",
+            border: "1px solid rgba(45,42,36,.2)",
             marginBottom: S.s10
           }}>{"Solo Exercise"}</div>
           /* Stats row */}{(calExDetailModal.durationSec > 0 || calExDetailModal.activeCal > 0 || calExDetailModal.totalCal > 0) && <div style={{
@@ -6021,13 +6021,13 @@ function App() {
             marginBottom: S.s8
           }}>{calExDetailModal.entries.length > 1 && <div style={{
               fontSize: FS.fs58,
-              color: "#9a9488",
+              color: "#8a8478",
               textTransform: "uppercase",
               letterSpacing: ".08em",
               marginBottom: S.s6
             }}>{calExDetailModal.entries.length}{" Sets / Rows"}</div>}{calExDetailModal.entries.map((e, i) => <div key={i} style={{
-              background: "rgba(74,69,59,.18)",
-              border: "1px solid rgba(74,69,59,.2)",
+              background: "rgba(45,42,36,.18)",
+              border: "1px solid rgba(45,42,36,.2)",
               borderRadius: R.lg,
               padding: "10px 12px",
               marginBottom: S.s6
@@ -6050,34 +6050,34 @@ function App() {
                 flexWrap: "wrap"
               }}><div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}><span style={{
-                    color: "#9a9488"
+                    color: "#8a8478"
                   }}>{"Sets: "}</span>{e.sets}</div><div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}><span style={{
-                    color: "#9a9488"
+                    color: "#8a8478"
                   }}>{"Reps: "}</span>{e.reps}</div>{e.weightLbs && <div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}><span style={{
-                    color: "#9a9488"
+                    color: "#8a8478"
                   }}>{"Weight: "}</span>{isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs"}</div>}{e.distanceMi && <div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}><span style={{
-                    color: "#9a9488"
+                    color: "#8a8478"
                   }}>{"Distance: "}</span>{isMetric(profile.units) ? miToKm(e.distanceMi) + " km" : e.distanceMi + " mi"}</div>}{e.hrZone && <div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}><span style={{
-                    color: "#9a9488"
+                    color: "#8a8478"
                   }}>{"HR Zone: "}</span>{e.hrZone}</div>}{e.seconds && <div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}><span style={{
-                    color: "#9a9488"
+                    color: "#8a8478"
                   }}>{"Seconds: "}</span>{e.seconds}</div>}</div></div>)}</div>
           {
             /* Total XP */
@@ -6092,7 +6092,7 @@ function App() {
               color: "#b4ac9e"
             }}>{"Total: +"}{calExDetailModal.entries.reduce((s, e) => s + e.xp, 0)}{" XP"}</div></div></div></div></div>, document.body)
 
-    /* â•â• RETRO EDIT MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{retroEditModal && (
+    /* ══ RETRO EDIT MODAL ═══════════════════════ */}{retroEditModal && (
       <RetroEditModal
         retroEditModal={retroEditModal}
         setRetroEditModal={setRetroEditModal}
@@ -6103,11 +6103,11 @@ function App() {
       />
     )
 
-    /* â•â• ADD TO EXISTING WORKOUT PICKER â•â•â•â•â•â•â•â• */}{addToWorkoutPicker && <Sheet open onClose={() => setAddToWorkoutPicker(null)} layer={"modal"} title={"âž• Add to Existing Workout"} ariaLabel={"Add to existing workout"}><div><div style={{
+    /* ══ ADD TO EXISTING WORKOUT PICKER ════════ */}{addToWorkoutPicker && <Sheet open onClose={() => setAddToWorkoutPicker(null)} layer={"modal"} title={"➕ Add to Existing Workout"} ariaLabel={"Add to existing workout"}><div><div style={{
             fontSize: FS.fs65,
-            color: "#9a9488",
+            color: "#8a8478",
             marginBottom: S.s12
-          }}>{"Adding "}{addToWorkoutPicker.exercises.length}{" exercise"}{addToWorkoutPicker.exercises.length !== 1 ? "s" : ""}{" â€” choose a workout to append them to:"}</div>
+          }}>{"Adding "}{addToWorkoutPicker.exercises.length}{" exercise"}{addToWorkoutPicker.exercises.length !== 1 ? "s" : ""}{" — choose a workout to append them to:"}</div>
           {
             /* Re-Usable Workouts */
           }{(profile.workouts || []).filter(w => !w.oneOff).length > 0 && <><div style={{
@@ -6116,7 +6116,7 @@ function App() {
               textTransform: "uppercase",
               letterSpacing: ".08em",
               marginBottom: S.s6
-            }}>{"ðŸ’ª Re-Usable Workouts"}</div>{(profile.workouts || []).filter(w => !w.oneOff).map(wo => <button type={"button"} key={wo.id} style={{
+            }}>{"💪 Re-Usable Workouts"}</div>{(profile.workouts || []).filter(w => !w.oneOff).map(wo => <button type={"button"} key={wo.id} style={{
               display: "flex",
               alignItems: "center",
               gap: S.s10,
@@ -6126,10 +6126,10 @@ function App() {
               fontFamily: "inherit",
               padding: "8px 12px",
               borderRadius: R.xl,
-              border: "1px solid rgba(74,69,59,.2)",
+              border: "1px solid rgba(45,42,36,.2)",
               marginBottom: S.s6,
               cursor: "pointer",
-              background: "rgba(74,69,59,.12)"
+              background: "rgba(45,42,36,.12)"
             }} onClick={() => {
               const merged = {
                 ...wo,
@@ -6139,7 +6139,7 @@ function App() {
                 ...p,
                 workouts: (p.workouts || []).map(w => w.id === wo.id ? merged : w)
               }));
-              showToast(`Added to "${wo.name}"! ðŸ’ª`);
+              showToast(`Added to "${wo.name}"! 💪`);
               setAddToWorkoutPicker(null);
             }}><span style={{
                 fontSize: "1.3rem"
@@ -6152,11 +6152,11 @@ function App() {
                   fontWeight: 600
                 }}>{wo.name}</div><div style={{
                   fontSize: FS.sm,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}>{wo.exercises.length}{" exercises"}</div></div><span style={{
                 fontSize: FS.fs65,
                 color: "#b4ac9e"
-              }}>{"+ add â†’"}</span></button>)}</>
+              }}>{"+ add →"}</span></button>)}</>
           /* Scheduled One-Off Workouts */}{(() => {
             const today = todayStr();
             const grouped = {};
@@ -6166,7 +6166,7 @@ function App() {
               if (!grouped[key]) grouped[key] = {
                 id: sw.sourceWorkoutId,
                 name: sw.sourceWorkoutName,
-                icon: sw.sourceWorkoutIcon || "âš¡",
+                icon: sw.sourceWorkoutIcon || "⚡",
                 date: sw.scheduledDate
               };
             });
@@ -6179,7 +6179,7 @@ function App() {
                 letterSpacing: ".08em",
                 marginBottom: S.s6,
                 marginTop: S.s10
-              }}>{"âš¡ Scheduled One-Off Workouts"}</div>{scheduled.map(g => {
+              }}>{"⚡ Scheduled One-Off Workouts"}</div>{scheduled.map(g => {
                 const wo = (profile.workouts || []).find(w => w.id === g.id) || {
                   id: g.id,
                   name: g.name,
@@ -6214,7 +6214,7 @@ function App() {
                       sourceWorkoutName: merged.name
                     } : sw)
                   }));
-                  showToast(`Added to "${g.name}"! âš¡`);
+                  showToast(`Added to "${g.name}"! ⚡`);
                   setAddToWorkoutPicker(null);
                 }}><span style={{
                     fontSize: "1.3rem"
@@ -6227,11 +6227,11 @@ function App() {
                       fontWeight: 600
                     }}>{g.name}</div><div style={{
                       fontSize: FS.sm,
-                      color: "#9a9488"
-                    }}>{"ðŸ“… "}{formatScheduledDate(g.date)}</div></div><span style={{
+                      color: "#8a8478"
+                    }}>{"📅 "}{formatScheduledDate(g.date)}</div></div><span style={{
                     fontSize: FS.fs65,
                     color: "#e67e22"
-                  }}>{"+ add â†’"}</span></button>;
+                  }}>{"+ add →"}</span></button>;
               })}</>;
           })()}{(profile.workouts || []).filter(w => !w.oneOff).length === 0 && !(profile.scheduledWorkouts || []).some(sw => sw.scheduledDate >= todayStr() && sw.sourceWorkoutId) && <div className={"empty"}>{"No workouts to add to yet."}<br />{"Create a Re-Usable Workout or schedule a One-Off first."}</div>}</div></Sheet>}{oneOffModal && createPortal(<div className={"modal-backdrop"} onClick={() => setOneOffModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
@@ -6246,9 +6246,9 @@ function App() {
               fontSize: FS.fs92,
               color: "#d4cec4",
               fontWeight: 700
-            }}>{"âš¡ Name Your One-Off Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setOneOffModal(null)}>{"âœ•"}</button></div><div className={"field"} style={{
+            }}>{"⚡ Name Your One-Off Workout"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setOneOffModal(null)}>{"✕"}</button></div><div className={"field"} style={{
             marginBottom: S.s10
-          }}><label>{"Workout Name"}</label><input className={"inp"} placeholder={"e.g. Morning Push Sessionâ€¦"} value={oneOffModal.name} onChange={e => setOneOffModal(m => ({
+          }}><label>{"Workout Name"}</label><input className={"inp"} placeholder={"e.g. Morning Push Session…"} value={oneOffModal.name} onChange={e => setOneOffModal(m => ({
               ...m,
               name: e.target.value
             }))} autoFocus={true} /></div><div className={"field"} style={{
@@ -6257,27 +6257,27 @@ function App() {
               display: "flex",
               gap: S.s6,
               flexWrap: "wrap"
-            }}>{["âš¡", "ðŸ’ª", "ðŸ”¥", "ðŸ‹ï¸", "ðŸƒ", "âš”ï¸", "ðŸ§±", "ðŸ¦µ", "ðŸ¤œ"].map(ic => <span key={ic} style={{
+            }}>{["⚡", "💪", "🔥", "🏋️", "🏃", "⚔️", "🧱", "🦵", "🤜"].map(ic => <span key={ic} style={{
                 fontSize: "1.4rem",
                 cursor: "pointer",
                 padding: S.s4,
                 borderRadius: R.md,
-                background: oneOffModal.icon === ic ? "rgba(74,69,59,.3)" : "transparent",
+                background: oneOffModal.icon === ic ? "rgba(45,42,36,.3)" : "transparent",
                 border: oneOffModal.icon === ic ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
               }} onClick={() => setOneOffModal(m => ({
                 ...m,
                 icon: ic
               }))}>{ic}</span>)}</div></div><div style={{
             fontSize: FS.fs65,
-            color: "#9a9488",
+            color: "#8a8478",
             marginBottom: S.s14
-          }}>{oneOffModal.exercises.length}{" exercises selected Â· XP will be calculated on completion"}</div><button className={"btn btn-gold"} style={{
+          }}>{oneOffModal.exercises.length}{" exercises selected · XP will be calculated on completion"}</div><button className={"btn btn-gold"} style={{
             width: "100%"
           }} disabled={!oneOffModal.name.trim()} onClick={() => {
             const wo = {
               id: uid(),
               name: oneOffModal.name.trim(),
-              icon: oneOffModal.icon || "âš¡",
+              icon: oneOffModal.icon || "⚡",
               desc: "",
               exercises: oneOffModal.exercises,
               createdAt: todayStr(),
@@ -6289,7 +6289,7 @@ function App() {
             setCompletionDate(todayStr());
             setCompletionAction("today");
             setOneOffModal(null);
-          }}>{"Next: Log or Schedule â†’"}</button></div></div></div>, document.body)}{completionModal && (
+          }}>{"Next: Log or Schedule →"}</button></div></div></div>, document.body)}{completionModal && (
       <CompletionModal
         completionModal={completionModal}
         setCompletionModal={setCompletionModal}
@@ -6308,7 +6308,7 @@ function App() {
       />
     )
 
-    /* â•â• LOG ENTRY EDIT MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{logEditModal && logEditDraft && (
+    /* ══ LOG ENTRY EDIT MODAL ════════════════════ */}{logEditModal && logEditDraft && (
       <LogEntryEditModal
         logEditModal={logEditModal}
         setLogEditModal={setLogEditModal}
@@ -6321,7 +6321,7 @@ function App() {
       />
     )
 
-    /* â•â• CONFIRM DELETE MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{confirmDelete && (
+    /* ══ CONFIRM DELETE MODAL ════════════════════ */}{confirmDelete && (
       <ConfirmDeleteModal
         confirmDelete={confirmDelete}
         setConfirmDelete={setConfirmDelete}
@@ -6333,7 +6333,7 @@ function App() {
       />
     )
 
-    /* â•â• MAP OVERLAY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{mapOpen && (
+    /* ══ MAP OVERLAY ═════════════════════════════ */}{mapOpen && (
       <MapOverlay
         setMapOpen={setMapOpen}
         level={level}
@@ -6346,7 +6346,7 @@ function App() {
       />
     )
 
-    /* â•â• WORLD HUB â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{activeTab === "world" && (
+    /* ══ WORLD HUB ══════════════════════════════ */}{activeTab === "world" && (
       <React.Suspense fallback={<div style={{position:"fixed",top:0,right:0,bottom:0,left:0,zIndex:9999,background:"#000"}} />}>
         <WorldHub
           onClose={() => setActiveTab(prevTab || "workout")}
@@ -6358,7 +6358,7 @@ function App() {
             fitnessXpBaseline: 0,
             onEquipPerksChange: handleEquipPerksChange,
           }}
-          /* Character and Guild are rendered HERE, not imported by the hub â€”
+          /* Character and Guild are rendered HERE, not imported by the hub —
              every prop below is App-owned state, so keeping the wiring at the
              state's home leaves WorldHub a presentational shell. */
           characterSlot={
@@ -6409,7 +6409,7 @@ function App() {
       </React.Suspense>
     )
 
-    /* â•â• SHARE MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{shareModal && createPortal(<div className={"modal-backdrop"} onClick={() => setShareModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ SHARE MODAL ═════════════════════════════ */}{shareModal && createPortal(<div className={"modal-backdrop"} onClick={() => setShareModal(null)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -6422,9 +6422,9 @@ function App() {
               fontSize: FS.fs88,
               color: "#d4cec4",
               fontWeight: 700
-            }}>{"â‡ª Share with "}{shareModal.friendName}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setShareModal(null)}>{"âœ•"}</button></div>{shareModal.step === "pick-type" && <><div style={{
+            }}>{"⇪ Share with "}{shareModal.friendName}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setShareModal(null)}>{"✕"}</button></div>{shareModal.step === "pick-type" && <><div style={{
               fontSize: FS.lg,
-              color: "#9a9488",
+              color: "#8a8478",
               marginBottom: S.s12
             }}>{"What would you like to share?"}</div><div style={{
               display: "flex",
@@ -6435,22 +6435,22 @@ function App() {
               }} onClick={() => setShareModal({
                 ...shareModal,
                 step: "pick-workout"
-              })}>{"ðŸ’ª A Workout"}</button><button className={"btn btn-ghost btn-sm"} style={{
+              })}>{"💪 A Workout"}</button><button className={"btn btn-ghost btn-sm"} style={{
                 flex: 1,
                 fontSize: FS.lg
               }} onClick={() => setShareModal({
                 ...shareModal,
                 step: "pick-exercise"
-              })}>{"âš¡ A Custom Exercise"}</button></div></>}{shareModal.step === "pick-workout" && <><div style={{
+              })}>{"⚡ A Custom Exercise"}</button></div></>}{shareModal.step === "pick-workout" && <><div style={{
               fontSize: FS.lg,
-              color: "#9a9488",
+              color: "#8a8478",
               marginBottom: S.s10
             }}>{"Choose a workout to share:"}</div>{(profile.workouts || []).length === 0 && <div className={"empty"}>{"No workouts saved yet."}</div>}{(profile.workouts || []).map(wo => <div key={wo.id} style={{
               display: "flex",
               alignItems: "center",
               gap: S.s10,
               padding: "9px 0",
-              borderBottom: "1px solid rgba(74,69,59,.15)",
+              borderBottom: "1px solid rgba(45,42,36,.15)",
               cursor: "pointer"
             }} onClick={() => shareWithFriend("workout", wo, shareModal.friendId, shareModal.friendName)}><span style={{
                 fontSize: "1.2rem"
@@ -6461,26 +6461,26 @@ function App() {
                   color: "#d4cec4"
                 }}>{wo.name}</div><div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488"
+                  color: "#8a8478"
                 }}>{_optionalChain([wo, 'access', _191 => _191.exercises, 'optionalAccess', _192 => _192.length]) || 0}{" exercises"}</div></div><span style={{
                 fontSize: FS.fs65,
                 color: "#b4ac9e"
-              }}>{"Share â†’"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
+              }}>{"Share →"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
               width: "100%",
               marginTop: S.s10
             }} onClick={() => setShareModal({
               ...shareModal,
               step: "pick-type"
-            })}>{"â† Back"}</button></>}{shareModal.step === "pick-exercise" && <><div style={{
+            })}>{"← Back"}</button></>}{shareModal.step === "pick-exercise" && <><div style={{
               fontSize: FS.lg,
-              color: "#9a9488",
+              color: "#8a8478",
               marginBottom: S.s10
             }}>{"Choose a custom exercise to share:"}</div>{(profile.customExercises || []).length === 0 && <div className={"empty"}>{"No custom exercises yet."}</div>}{(profile.customExercises || []).map(ex => <div key={ex.id} style={{
               display: "flex",
               alignItems: "center",
               gap: S.s10,
               padding: "9px 0",
-              borderBottom: "1px solid rgba(74,69,59,.15)",
+              borderBottom: "1px solid rgba(45,42,36,.15)",
               cursor: "pointer"
             }} onClick={() => shareWithFriend("exercise", ex, shareModal.friendId, shareModal.friendName)}><span style={{
                 fontSize: "1.2rem"
@@ -6491,20 +6491,20 @@ function App() {
                   color: "#d4cec4"
                 }}>{ex.name}</div><div style={{
                   fontSize: FS.fs62,
-                  color: "#9a9488",
+                  color: "#8a8478",
                   textTransform: "capitalize"
                 }}>{ex.category}</div></div><span style={{
                 fontSize: FS.fs65,
                 color: "#b4ac9e"
-              }}>{"Share â†’"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
+              }}>{"Share →"}</span></div>)}<button className={"btn btn-ghost btn-sm"} style={{
               width: "100%",
               marginTop: S.s10
             }} onClick={() => setShareModal({
               ...shareModal,
               step: "pick-type"
-            })}>{"â† Back"}</button></>}</div></div></div>, document.body)
+            })}>{"← Back"}</button></>}</div></div></div>, document.body)
 
-    /* â•â• FEEDBACK MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{feedbackOpen && createPortal(<div className={"modal-backdrop"} onClick={() => setFeedbackOpen(false)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
+    /* ══ FEEDBACK MODAL ══════════════════════════ */}{feedbackOpen && createPortal(<div className={"modal-backdrop"} onClick={() => setFeedbackOpen(false)}><div className={"modal-sheet"} onClick={e => e.stopPropagation()} style={{
         borderRadius: R.r16,
         padding: S.s0
       }}><div className={"modal-body"}><div style={{
@@ -6512,7 +6512,7 @@ function App() {
             alignItems: "center",
             justifyContent: "space-between",
             marginBottom: S.s14
-          }}><div className={"feedback-title"}>{"ðŸ›Ÿ Support"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setFeedbackOpen(false)}>{"âœ•"}</button></div>{!feedbackSent && <div style={{
+          }}><div className={"feedback-title"}>{"🛟 Support"}</div><button className={"btn btn-ghost btn-sm"} onClick={() => setFeedbackOpen(false)}>{"✕"}</button></div>{!feedbackSent && <div style={{
             display: "flex",
             gap: S.s6,
             marginBottom: S.s14
@@ -6524,27 +6524,27 @@ function App() {
               fontWeight: 600,
               border: feedbackType === t ? "1.5px solid #c9a84c" : "1.5px solid #3a342c",
               background: feedbackType === t ? "#2a2318" : "transparent",
-              color: feedbackType === t ? "#c9a84c" : "#9a9488",
+              color: feedbackType === t ? "#c9a84c" : "#8a8478",
               cursor: "pointer",
               textTransform: "capitalize"
-            }}>{t === "bug" ? "ðŸ› Bug" : t === "idea" ? "ðŸ’¡ Idea" : "ðŸ›Ÿ Help"}</button>)}</div>}{feedbackSent ? helpConfirmShown ? <div style={{
+            }}>{t === "bug" ? "🐛 Bug" : t === "idea" ? "💡 Idea" : "🛟 Help"}</button>)}</div>}{feedbackSent ? helpConfirmShown ? <div style={{
             textAlign: "center",
             padding: "24px 0"
           }}><div style={{
               fontSize: "2rem",
               marginBottom: S.s10
-            }}>{"ðŸ“¬"}</div><div style={{
+            }}>{"📬"}</div><div style={{
               fontFamily: "'Inter',sans-serif",
               fontSize: FS.fs88,
               color: "#b4ac9e",
               marginBottom: S.s6
             }}>{"Help request received!"}</div><div style={{
               fontSize: FS.lg,
-              color: "#9a9488",
+              color: "#8a8478",
               lineHeight: 1.6,
               maxWidth: 280,
               margin: "0 auto"
-            }}>{"Youâ€™ll receive an email from Support@aurisargames.com upon review that will ask for your 12-character Private User ID to verify your identity."}</div><button className={"btn btn-ghost btn-sm"} style={{
+            }}>{"You’ll receive an email from Support@aurisargames.com upon review that will ask for your 12-character Private User ID to verify your identity."}</div><button className={"btn btn-ghost btn-sm"} style={{
               marginTop: S.s16
             }} onClick={() => setFeedbackOpen(false)}>{"Close"}</button></div> : <div style={{
             textAlign: "center",
@@ -6552,14 +6552,14 @@ function App() {
           }}><div style={{
               fontSize: "2rem",
               marginBottom: S.s10
-            }}>{"âš¡"}</div><div style={{
+            }}>{"⚡"}</div><div style={{
               fontFamily: "'Inter',sans-serif",
               fontSize: FS.fs88,
               color: "#b4ac9e",
               marginBottom: S.s6
             }}>{"Feedback received!"}</div><div style={{
               fontSize: FS.lg,
-              color: "#9a9488"
+              color: "#8a8478"
             }}>{"Thanks for helping forge Aurisar into something legendary."}</div><button className={"btn btn-ghost btn-sm"} style={{
               marginTop: S.s16
             }} onClick={() => setFeedbackOpen(false)}>{"Close"}</button></div> : <><div className={"field"} style={{
@@ -6572,7 +6572,7 @@ function App() {
                 resize: "vertical",
                 minHeight: 100,
                 lineHeight: 1.5
-              }} placeholder={feedbackType === "idea" ? "I'd love to seeâ€¦" : feedbackType === "bug" ? "When I tapâ€¦ it doesâ€¦" : "Describe your issueâ€¦"} value={feedbackText} onChange={e => setFeedbackText(e.target.value)} /></div>
+              }} placeholder={feedbackType === "idea" ? "I'd love to see…" : feedbackType === "bug" ? "When I tap… it does…" : "Describe your issue…"} value={feedbackText} onChange={e => setFeedbackText(e.target.value)} /></div>
             // Cloudflare Turnstile widget (skipped if site key not set).
             {TURNSTILE_SITE_KEY && <div ref={turnstileContainerRef} style={{
               marginBottom: 12,

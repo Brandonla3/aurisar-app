@@ -1,10 +1,10 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import { getMapPosition, MapSVG } from '../../components/MapSVG';
 import { MAP_REGIONS, UI_COLORS } from '../../data/constants';
 import { S, FS, R } from '../../utils/tokens';
 
 /**
- * World map overlay â€” extracted from the inline IIFE in App.jsx as part of
+ * World map overlay — extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Rendered when mapOpen is true. Shows the Auranthel world map with the
@@ -51,14 +51,14 @@ const MapOverlay = memo(function MapOverlay({
       {/* Header */}
       <div style={{ width: "100%", maxWidth: 420, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: S.s10, flexShrink: 0 }}>
         <div>
-          <div style={{ fontFamily: "'Cinzel Decorative',serif,Arial", fontSize: FS.fs95, color: "#b4ac9e", letterSpacing: ".08em" }}>{"âš”ï¸ Auranthel"}</div>
-          <div style={{ fontSize: FS.fs65, color: "#9a9488", marginTop: S.s2, display: "flex", gap: S.s8, alignItems: "center", flexWrap: "wrap" }}>
-            <span>{myRegion.icon}{" "}{myRegion.name}{" Â· Level "}{level}</span>
+          <div style={{ fontFamily: "'Cinzel Decorative',serif,Arial", fontSize: FS.fs95, color: "#b4ac9e", letterSpacing: ".08em" }}>{"⚔️ Auranthel"}</div>
+          <div style={{ fontSize: FS.fs65, color: "#8a8478", marginTop: S.s2, display: "flex", gap: S.s8, alignItems: "center", flexWrap: "wrap" }}>
+            <span>{myRegion.icon}{" "}{myRegion.name}{" · Level "}{level}</span>
             <span style={{ color: "#b4ac9e" }}>{myRegion.boost.emoji}{" +7% "}{myRegion.boost.label}</span>
-            {travelActive && <span style={{ color: UI_COLORS.success }}>{"âš¡ +10% Travel"}</span>}
+            {travelActive && <span style={{ color: UI_COLORS.success }}>{"⚡ +10% Travel"}</span>}
           </div>
         </div>
-        <button className={"btn btn-ghost btn-sm"} onClick={() => { setMapOpen(false); setMapTooltip(null); }}>{"âœ•"}</button>
+        <button className={"btn btn-ghost btn-sm"} onClick={() => { setMapOpen(false); setMapTooltip(null); }}>{"✕"}</button>
       </div>
 
       {/* Zoom controls + map */}
@@ -70,13 +70,13 @@ const MapOverlay = memo(function MapOverlay({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: S.s8 }}>
             <div>
               <div style={{ fontSize: FS.fs84, color: "#d4cec4", fontWeight: 600 }}>{mapTooltip.name}</div>
-              <div style={{ fontSize: FS.fs65, color: "#9a9488", marginTop: S.s2 }}>{mapTooltip.cls || "Unknown"}{" Â· "}{mapTooltip.region}</div>
+              <div style={{ fontSize: FS.fs65, color: "#8a8478", marginTop: S.s2 }}>{mapTooltip.cls || "Unknown"}{" · "}{mapTooltip.region}</div>
             </div>
-            <button className={"btn btn-ghost btn-xs"} onClick={() => setMapTooltip(null)}>{"âœ•"}</button>
+            <button className={"btn btn-ghost btn-xs"} onClick={() => setMapTooltip(null)}>{"✕"}</button>
           </div>
           {!mapTooltip.alreadyTraveling ? (
             <div>
-              <div style={{ fontSize: FS.fs68, color: "#9a9488", marginBottom: S.s8, lineHeight: 1.5 }}>
+              <div style={{ fontSize: FS.fs68, color: "#8a8478", marginBottom: S.s8, lineHeight: 1.5 }}>
                 {"Travel to their location for "}<strong style={{ color: "#b4ac9e" }}>{"+10% XP boost"}</strong>{" on all workouts this week."}
               </div>
               <button className={"btn btn-gold"} style={{ width: "100%", fontSize: FS.lg }} onClick={() => {
@@ -87,14 +87,14 @@ const MapOverlay = memo(function MapOverlay({
                   return d.toISOString().slice(0, 10);
                 })();
                 setProfile(p => ({ ...p, travelBoost: { friendId: mapTooltip.id, friendName: mapTooltip.name, weekStart: ws } }));
-                showToast(`âš”ï¸ Traveling with ${mapTooltip.name}! +10% XP this week.`);
+                showToast(`⚔️ Traveling with ${mapTooltip.name}! +10% XP this week.`);
                 setMapTooltip(null);
-              }}>{"âš”ï¸ Travel with "}{mapTooltip.name}</button>
+              }}>{"⚔️ Travel with "}{mapTooltip.name}</button>
             </div>
           ) : (
-            <div style={{ fontSize: FS.fs68, color: profile.travelBoost?.friendId === mapTooltip.id ? UI_COLORS.success : "#9a9488", textAlign: "center", padding: "6px 0" }}>
+            <div style={{ fontSize: FS.fs68, color: profile.travelBoost?.friendId === mapTooltip.id ? UI_COLORS.success : "#8a8478", textAlign: "center", padding: "6px 0" }}>
               {profile.travelBoost?.friendId === mapTooltip.id
-                ? "âœ“ You are traveling with this warrior this week"
+                ? "✓ You are traveling with this warrior this week"
                 : `Already traveling with ${profile.travelBoost?.friendName} this week`}
             </div>
           )}
@@ -103,20 +103,20 @@ const MapOverlay = memo(function MapOverlay({
 
       {/* Legend */}
       <div style={{ width: "100%", maxWidth: 420, marginTop: S.s12, flexShrink: 0 }}>
-        <div style={{ fontSize: FS.sm, color: "#9a9488", marginBottom: S.s6, letterSpacing: ".06em", textTransform: "uppercase" }}>{"Your Journey"}</div>
+        <div style={{ fontSize: FS.sm, color: "#8a8478", marginBottom: S.s6, letterSpacing: ".06em", textTransform: "uppercase" }}>{"Your Journey"}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: S.s6 }}>
           {MAP_REGIONS.map((r, i) => {
             const isVisited = i <= myPos.regionIdx;
             const isCurrent = i === myPos.regionIdx;
             return (
-              <div key={r.id} style={{ display: "flex", alignItems: "center", gap: S.s6, padding: "4px 8px", background: isCurrent ? "rgba(74,69,59,.2)" : "rgba(74,69,59,.12)", border: `1px solid ${isCurrent ? "rgba(180,172,158,.15)" : isVisited ? "rgba(74,69,59,.22)" : "rgba(74,69,59,.18)"}`, borderRadius: R.md, opacity: isVisited ? 1 : .4 }}>
+              <div key={r.id} style={{ display: "flex", alignItems: "center", gap: S.s6, padding: "4px 8px", background: isCurrent ? "rgba(45,42,36,.2)" : "rgba(45,42,36,.12)", border: `1px solid ${isCurrent ? "rgba(180,172,158,.15)" : isVisited ? "rgba(45,42,36,.22)" : "rgba(45,42,36,.18)"}`, borderRadius: R.md, opacity: isVisited ? 1 : .4 }}>
                 <span style={{ fontSize: FS.lg }}>{r.icon}</span>
                 <div>
                   <div style={{ fontSize: FS.sm, color: isCurrent ? "#b4ac9e" : isVisited ? "#d4cec4" : "#5a6060", lineHeight: 1.2 }}>
-                    {r.name}{isCurrent && <span style={{ color: "#b4ac9e", marginLeft: S.s4 }}>{"â—€"}</span>}
+                    {r.name}{isCurrent && <span style={{ color: "#b4ac9e", marginLeft: S.s4 }}>{"◀"}</span>}
                   </div>
-                  <div style={{ fontSize: FS.fs52, color: isCurrent ? "#b4ac9e" : isVisited ? "#9a9488" : "#3a4040", lineHeight: 1.2 }}>
-                    {r.boost.emoji}{" "}{r.boost.label}{" +7% Â· Lv"}{r.levels[0]}{"â€“"}{r.levels[1]}
+                  <div style={{ fontSize: FS.fs52, color: isCurrent ? "#b4ac9e" : isVisited ? "#8a8478" : "#3a4040", lineHeight: 1.2 }}>
+                    {r.boost.emoji}{" "}{r.boost.label}{" +7% · Lv"}{r.levels[0]}{"–"}{r.levels[1]}
                   </div>
                 </div>
               </div>
@@ -129,9 +129,9 @@ const MapOverlay = memo(function MapOverlay({
       {travelActive && (
         <div style={{ width: "100%", maxWidth: 420, marginTop: S.s10, padding: "10px 14px", background: "rgba(46,204,113,.06)", border: "1px solid rgba(46,204,113,.2)", borderRadius: R.r10, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: FS.lg, color: UI_COLORS.success }}>{"âš¡ Travel Boost Active"}</div>
-            <div style={{ fontSize: FS.fs62, color: "#9a9488", marginTop: S.s2 }}>
-              {"With "}<strong style={{ color: "#d4cec4" }}>{profile.travelBoost.friendName}</strong>{" Â· +10% XP all workouts this week"}
+            <div style={{ fontSize: FS.lg, color: UI_COLORS.success }}>{"⚡ Travel Boost Active"}</div>
+            <div style={{ fontSize: FS.fs62, color: "#8a8478", marginTop: S.s2 }}>
+              {"With "}<strong style={{ color: "#d4cec4" }}>{profile.travelBoost.friendName}</strong>{" · +10% XP all workouts this week"}
             </div>
           </div>
           <button className={"btn btn-ghost btn-xs"} style={{ fontSize: FS.sm, color: UI_COLORS.danger, borderColor: "rgba(231,76,60,.3)" }} onClick={() => {

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { sb } from '../../utils/supabase';
 
 export default function WhoopCallbackHandler() {
@@ -15,7 +15,7 @@ export default function WhoopCallbackHandler() {
 
     if (oauthError) {
       setStatus('error');
-      setErrorDetail(`Whoop returned error: ${oauthError}${oauthErrDesc ? ` â€” ${oauthErrDesc}` : ''}`);
+      setErrorDetail(`Whoop returned error: ${oauthError}${oauthErrDesc ? ` — ${oauthErrDesc}` : ''}`);
       return;
     }
 
@@ -37,7 +37,7 @@ export default function WhoopCallbackHandler() {
         const { data: { session } } = await sb.auth.getSession();
         if (!session) {
           setStatus('error');
-          setErrorDetail('No Supabase session â€” please sign in to Aurisar first, then reconnect Whoop.');
+          setErrorDetail('No Supabase session — please sign in to Aurisar first, then reconnect Whoop.');
           return;
         }
 
@@ -56,7 +56,7 @@ export default function WhoopCallbackHandler() {
           // show a one-shot success banner.
           sessionStorage.setItem('aurisar_post_oauth_tab', 'profile');
           sessionStorage.setItem('aurisar_whoop_just_connected', '1');
-          // Kick off the first sync in the background â€” don't block the
+          // Kick off the first sync in the background — don't block the
           // redirect on it. If it fails, the profile tab's manual Sync
           // button will still work.
           fetch('/.netlify/functions/whoop-fetch-data', {
@@ -87,7 +87,7 @@ export default function WhoopCallbackHandler() {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100dvh',
-    background: '#1a1814',
+    background: '#0c0c0a',
     color: '#d4cec4',
     fontFamily: "'Inter', sans-serif",
     gap: 12,
@@ -97,26 +97,26 @@ export default function WhoopCallbackHandler() {
     <div style={card}>
       {status === 'loading' && (
         <>
-          <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>âŸ³</div>
+          <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>⟳</div>
           <div style={{ fontSize: 16 }}>Connecting Whoop...</div>
         </>
       )}
       {status === 'success' && (
         <>
-          <div style={{ fontSize: 40, color: '#2ecc71' }}>âœ“</div>
+          <div style={{ fontSize: 40, color: '#2ecc71' }}>✓</div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>Whoop connected!</div>
-          <div style={{ fontSize: 13, color: '#9a9488' }}>Returning to app...</div>
+          <div style={{ fontSize: 13, color: '#8a8478' }}>Returning to app...</div>
         </>
       )}
       {status === 'error' && (
         <>
-          <div style={{ fontSize: 40, color: '#e74c3c' }}>âœ—</div>
+          <div style={{ fontSize: 40, color: '#e74c3c' }}>✗</div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>Connection failed</div>
           {errorDetail && (
             <div style={{
               fontSize: 12,
               color: '#c4b8a4',
-              background: '#2a2620',
+              background: '#1a1a16',
               border: '1px solid #2a2a24',
               padding: '12px 16px',
               borderRadius: 8,

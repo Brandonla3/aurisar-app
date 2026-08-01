@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -85,7 +85,7 @@ const CARD_TITLE = {
 
 const INSIGHT_STYLE = {
   fontSize: ".62rem",
-  color: "#9a9488",
+  color: "#8a8478",
   fontStyle: "italic",
   marginTop: 8,
   lineHeight: 1.5,
@@ -98,7 +98,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
   const [dragIdx, setDragIdx] = useState(null);
   const metric = isMetric(units);
 
-  // â”€â”€ Retroactive stats lookup (mirrors getEntryStats in App.js) â”€â”€
+  // ── Retroactive stats lookup (mirrors getEntryStats in App.js) ──
   function getEntryStats(entry) {
     let dur = Number(entry.sourceDurationSec) || 0;
     let act = Number(entry.sourceActiveCal) || 0;
@@ -117,7 +117,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     return { durationSec: dur, activeCal: act, totalCal: tot };
   }
 
-  // â”€â”€ Chart order â”€â”€
+  // ── Chart order ──
   const chartOrder = useMemo(() => {
     if (savedOrder && Array.isArray(savedOrder) && savedOrder.length === DEFAULT_CHART_ORDER.length) return savedOrder;
     return DEFAULT_CHART_ORDER;
@@ -131,7 +131,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     if (onChartOrderChange) onChartOrderChange(next);
   }
 
-  // â”€â”€ Filtered log â”€â”€
+  // ── Filtered log ──
   const filtered = useMemo(() => {
     const co = cutoffDate(range);
     if (!co) return log;
@@ -141,16 +141,16 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     });
   }, [log, range]);
 
-  // â”€â”€ Distinct weeks in filtered range (for per-week averages) â”€â”€
+  // ── Distinct weeks in filtered range (for per-week averages) ──
   const distinctWeeks = useMemo(() => {
     const wks = new Set();
     filtered.forEach(e => { if (e.dateKey) wks.add(weekKey(e.dateKey)); });
     return Math.max(1, wks.size);
   }, [filtered]);
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART: Best Training Days (day-of-week bar)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   const dowData = useMemo(() => {
     const buckets = DOW_LABELS.map((label, i) => ({
       day: label, dow: i, sessions: 0, duration: 0, totalCal: 0, activeCal: 0, _dates: new Set()
@@ -186,9 +186,9 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
 
   const dowMax = useMemo(() => Math.max(1, ...dowData.map(b => b[heatMetric])), [dowData, heatMetric]);
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART: Sets Over Time (avg sets per session per week)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   const setsData = useMemo(() => {
     // Build sessions: solo exercise = own session, grouped entries = one session per sourceGroupId+dateKey
     const sessionMap = {}; // sessionKey -> { week, totalSets }
@@ -216,9 +216,9 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
       }));
   }, [filtered]);
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART: Muscle Group Frequency (avg per week)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   const muscleFreqData = useMemo(() => {
     // Count distinct weeks each muscle group appears in
     const mgWeeks = {}; // muscleGroup -> Set of weekKeys
@@ -244,9 +244,9 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
 
   const topMuscle = muscleFreqData.length > 0 ? muscleFreqData[0] : null;
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART: Volume Over Time (per muscle group)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   const muscleGroupsInLog = useMemo(() => {
     const mgs = new Set();
     log.forEach(e => {
@@ -290,9 +290,9 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     return Array.from(keys).sort();
   }, [volOverTimeData, volMuscleFilter]);
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART: Workout Consistency (Area chart)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   const consistencyData = useMemo(() => {
     const weeks = {};
     const seen = new Set();
@@ -312,9 +312,9 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
       .map(w => ({ ...w, label: weekLabel(w.week) }));
   }, [filtered]);
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART: Top Exercises
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   const topExData = useMemo(() => {
     const counts = {};
     filtered.forEach(e => {
@@ -327,24 +327,24 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
       .slice(0, 10)
       .map(c => {
         const ex = allExById[c.exId] || {};
-        return { name: ex.name || c.exId, icon: ex.icon || "ðŸ’ª", count: c.count, xp: c.xp, cat: ex.category || "strength" };
+        return { name: ex.name || c.exId, icon: ex.icon || "💪", count: c.count, xp: c.xp, cat: ex.category || "strength" };
       });
   }, [filtered, allExById]);
 
-  // â”€â”€ Empty state â”€â”€
+  // ── Empty state ──
   if (!log.length) {
     return (
       <div style={{ ...CARD_STYLE, textAlign: "center", padding: "40px 20px" }}>
-        <div style={{ fontSize: "2rem", marginBottom: 10 }}>ðŸ“Š</div>
-        <div style={{ fontSize: ".78rem", color: "#9a9488", fontWeight: 600 }}>No workout data yet</div>
-        <div style={{ fontSize: ".62rem", color: "#9a9488", marginTop: 6 }}>
+        <div style={{ fontSize: "2rem", marginBottom: 10 }}>📊</div>
+        <div style={{ fontSize: ".78rem", color: "#8a8478", fontWeight: 600 }}>No workout data yet</div>
+        <div style={{ fontSize: ".62rem", color: "#8a8478", marginTop: 6 }}>
           Log some exercises to see your trends and analytics here.
         </div>
       </div>
     );
   }
 
-  // â”€â”€ Helpers â”€â”€
+  // ── Helpers ──
   function metricLabel(m) {
     switch (m) {
       case "sessions": return "sessions";
@@ -369,7 +369,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     );
   }
 
-  // â”€â”€ Card wrapper with reorder controls â”€â”€
+  // ── Card wrapper with reorder controls ──
   function ChartCard({ title, icon, idx, children }) {
     const isFirst = idx === 0;
     const isLast = idx === chartOrder.length - 1;
@@ -392,15 +392,15 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
               onClick={() => moveChart(idx, idx - 1)}
               title="Move up"
               aria-label={`Move ${title} up`}
-            >â†‘</button>
+            >↑</button>
             <button
               className="trends-reorder-btn"
               disabled={isLast}
               onClick={() => moveChart(idx, idx + 1)}
               title="Move down"
               aria-label={`Move ${title} down`}
-            >â†“</button>
-            <span className="trends-drag-handle" title="Drag to reorder" aria-hidden="true">â‹®â‹®</span>
+            >↓</button>
+            <span className="trends-drag-handle" title="Drag to reorder" aria-hidden="true">⋮⋮</span>
           </div>
         </div>
         {children}
@@ -408,13 +408,13 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     );
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // CHART RENDERERS (keyed by chart order ID)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
 
   function renderDow(idx) {
     return (
-      <ChartCard key="dow" title="Best Training Days" icon="âš”ï¸" idx={idx}>
+      <ChartCard key="dow" title="Best Training Days" icon="⚔️" idx={idx}>
         <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
           {HEATMAP_METRICS.map(([val, label]) => (
             <button
@@ -428,8 +428,8 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={dowData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
-            <XAxis dataKey="day" tick={{ fill: "#9a9488", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="day" tick={{ fill: "#8a8478", fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip content={<DarkTooltip suffix={metricLabel(heatMetric)} />} />
             <Bar dataKey={heatMetric} radius={[4, 4, 0, 0]}>
               {dowData.map((entry, i) => (
@@ -454,24 +454,24 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
 
   function renderSets(idx) {
     return (
-      <ChartCard key="sets" title="Sets Over Time" icon="ðŸ‹ï¸" idx={idx}>
+      <ChartCard key="sets" title="Sets Over Time" icon="🏋️" idx={idx}>
         {setsData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={setsData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
-              <XAxis dataKey="label" tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="label" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Bar dataKey="avgSets" name="Avg Sets/Session" fill="#c49428" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ fontSize: ".62rem", color: "#9a9488", padding: "20px 0", textAlign: "center" }}>
+          <div style={{ fontSize: ".62rem", color: "#8a8478", padding: "20px 0", textAlign: "center" }}>
             No session data in this range.
           </div>
         )}
         <div style={INSIGHT_STYLE}>
-          Average total sets per session each week â€” ensure sufficient training stimulus.
+          Average total sets per session each week — ensure sufficient training stimulus.
         </div>
       </ChartCard>
     );
@@ -479,13 +479,13 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
 
   function renderMuscleFreq(idx) {
     return (
-      <ChartCard key="muscleFreq" title="Muscle Group Frequency" icon="ðŸ¦¾" idx={idx}>
+      <ChartCard key="muscleFreq" title="Muscle Group Frequency" icon="🦾" idx={idx}>
         {muscleFreqData.length > 0 ? (
           <ResponsiveContainer width="100%" height={Math.max(160, muscleFreqData.length * 32)}>
             <BarChart data={muscleFreqData} layout="vertical" margin={{ top: 5, right: 15, bottom: 5, left: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
-              <XAxis type="number" tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fill: "#9a9488", fontSize: 11 }} axisLine={false} tickLine={false} width={70} />
+              <XAxis type="number" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fill: "#8a8478", fontSize: 11 }} axisLine={false} tickLine={false} width={70} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Bar dataKey="avgPerWeek" name="Avg/Week" radius={[0, 4, 4, 0]}>
                 {muscleFreqData.map((entry, i) => (
@@ -495,7 +495,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ fontSize: ".62rem", color: "#9a9488", padding: "20px 0", textAlign: "center" }}>
+          <div style={{ fontSize: ".62rem", color: "#8a8478", padding: "20px 0", textAlign: "center" }}>
             No muscle group data in this range.
           </div>
         )}
@@ -511,7 +511,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
 
   function renderVolume(idx) {
     return (
-      <ChartCard key="volume" title="Volume Over Time" icon="ðŸ“ˆ" idx={idx}>
+      <ChartCard key="volume" title="Volume Over Time" icon="📈" idx={idx}>
         <div style={{ marginBottom: 10 }}>
           <select
             className="inp"
@@ -530,8 +530,8 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={volOverTimeData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
-              <XAxis dataKey="label" tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="label" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               {volMuscleKeys.map(mk => (
                 <Bar
@@ -546,12 +546,12 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ fontSize: ".62rem", color: "#9a9488", padding: "20px 0", textAlign: "center" }}>
+          <div style={{ fontSize: ".62rem", color: "#8a8478", padding: "20px 0", textAlign: "center" }}>
             No weighted exercise data in this range.
           </div>
         )}
         <div style={INSIGHT_STYLE}>
-          Total load (sets Ã— reps Ã— weight) per muscle group each week â€” track hypertrophy stimulus.
+          Total load (sets × reps × weight) per muscle group each week — track hypertrophy stimulus.
         </div>
       </ChartCard>
     );
@@ -560,12 +560,12 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
   function renderConsistency(idx) {
     if (consistencyData.length <= 1) return null;
     return (
-      <ChartCard key="consistency" title="Workout Consistency" icon="ðŸ“…" idx={idx}>
+      <ChartCard key="consistency" title="Workout Consistency" icon="📅" idx={idx}>
         <ResponsiveContainer width="100%" height={180}>
           <AreaChart data={consistencyData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,172,158,.06)" />
-            <XAxis dataKey="label" tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#9a9488", fontSize: 10 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="label" tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#8a8478", fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={TOOLTIP_STYLE} />
             <Area
               type="monotone" dataKey="sessions" name="Sessions"
@@ -583,7 +583,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
     if (topExData.length === 0) return null;
     const maxCount = topExData[0].count;
     return (
-      <ChartCard key="topEx" title="Most Trained Exercises" icon="ðŸ†" idx={idx}>
+      <ChartCard key="topEx" title="Most Trained Exercises" icon="🏆" idx={idx}>
         {topExData.map((ex, i) => {
           const catColor = CAT_ICON_COLORS[ex.cat] || "#c49428";
           return (
@@ -594,19 +594,19 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
                 borderBottom: i < topExData.length - 1 ? "1px solid rgba(180,172,158,.04)" : "none",
               }}
             >
-              <span style={{ fontSize: ".7rem", color: "#9a9488", width: 18, textAlign: "right", flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
+              <span style={{ fontSize: ".7rem", color: "#8a8478", width: 18, textAlign: "right", flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
               <span style={{ fontSize: ".85rem", flexShrink: 0 }}>{ex.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: ".65rem", color: "#d4cec4", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {ex.name}
                 </div>
-                <div style={{ marginTop: 3, height: 4, borderRadius: 2, background: "rgba(74,69,59,.3)", overflow: "hidden" }}>
+                <div style={{ marginTop: 3, height: 4, borderRadius: 2, background: "rgba(45,42,36,.3)", overflow: "hidden" }}>
                   <div style={{ height: "100%", borderRadius: 2, width: (ex.count / maxCount * 100) + "%", background: catColor, transition: "width .3s" }} />
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: ".62rem", color: "#b4ac9e", fontWeight: 700 }}>{ex.count + "Ã—"}</div>
-                <div style={{ fontSize: ".48rem", color: "#9a9488" }}>{"+" + ex.xp + " XP"}</div>
+                <div style={{ fontSize: ".62rem", color: "#b4ac9e", fontWeight: 700 }}>{ex.count + "×"}</div>
+                <div style={{ fontSize: ".48rem", color: "#8a8478" }}>{"+" + ex.xp + " XP"}</div>
               </div>
             </div>
           );
@@ -617,10 +617,10 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
 
   const CHART_RENDERERS = { dow: renderDow, sets: renderSets, muscleFreq: renderMuscleFreq, volume: renderVolume, consistency: renderConsistency, topEx: renderTopEx };
 
-  // â”€â”€ Render â”€â”€
+  // ── Render ──
   return (
     <>
-      {/* â”€â”€ Time Range Filter â”€â”€ */}
+      {/* ── Time Range Filter ── */}
       <div className="trends-range-bar">
         {RANGE_OPTIONS.map(([val, label]) => (
           <button
@@ -630,7 +630,7 @@ function TrendsTab({ log, allExById, clsColor, units, chartOrder: savedOrder, on
           >{label}</button>
         ))}
       </div>
-      {/* â”€â”€ Charts in user-defined order â”€â”€ */}
+      {/* ── Charts in user-defined order ── */}
       {chartOrder.map((key, idx) => {
         const render = CHART_RENDERERS[key];
         return render ? render(idx) : null;

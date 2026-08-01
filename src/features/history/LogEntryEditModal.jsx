@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import { createPortal } from 'react-dom';
 import { S, R, FS } from '../../utils/tokens';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, weightLabel, distLabel } from '../../utils/units';
@@ -7,7 +7,7 @@ import { applyStoredPerk } from '../../utils/gearPerks';
 import { HR_ZONES, UI_COLORS } from '../../data/constants';
 
 /**
- * Log-entry edit modal â€” extracted from the inline IIFE in App.jsx as part of
+ * Log-entry edit modal — extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Rendered when logEditModal is non-null. Lets the user patch sets/reps/weight/
@@ -67,20 +67,20 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontFamily: "'Inter',sans-serif", fontSize: FS.fs88, color: "#d4cec4" }}>
-              {"âœŽ Edit Log Entry"}
+              {"✎ Edit Log Entry"}
             </div>
-            <div style={{ fontSize: FS.fs65, color: "#9a9488", marginTop: S.s2 }}>
+            <div style={{ fontSize: FS.fs65, color: "#8a8478", marginTop: S.s2 }}>
               {d.icon}{" "}{d.exercise}
             </div>
           </div>
-          <button className={"btn btn-ghost btn-sm"} onClick={() => setLogEditModal(null)}>{"âœ•"}</button>
+          <button className={"btn btn-ghost btn-sm"} onClick={() => setLogEditModal(null)}>{"✕"}</button>
         </div>
 
         {/* Source info */}
         {(d.sourcePlanName || d.sourceWorkoutName) && (
-          <div style={{ fontSize: FS.fs65, color: "#9a9488", fontStyle: "italic", padding: "6px 10px", background: "rgba(74,69,59,.12)", borderRadius: R.r7, border: "1px solid rgba(74,69,59,.2)" }}>
-            {d.sourcePlanName && <span>{"ðŸ“‹ From plan: "}<b style={{ color: "#b4ac9e" }}>{d.sourcePlanName}</b></span>}
-            {d.sourceWorkoutName && <span>{"ðŸ’ª From workout: "}<b style={{ color: UI_COLORS.accent }}>{d.sourceWorkoutName}</b></span>}
+          <div style={{ fontSize: FS.fs65, color: "#8a8478", fontStyle: "italic", padding: "6px 10px", background: "rgba(45,42,36,.12)", borderRadius: R.r7, border: "1px solid rgba(45,42,36,.2)" }}>
+            {d.sourcePlanName && <span>{"📋 From plan: "}<b style={{ color: "#b4ac9e" }}>{d.sourcePlanName}</b></span>}
+            {d.sourceWorkoutName && <span>{"💪 From workout: "}<b style={{ color: UI_COLORS.accent }}>{d.sourceWorkoutName}</b></span>}
           </div>
         )}
 
@@ -145,7 +145,7 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
                 const zn = zi + 1;
                 return (
                   <div key={zn} className={`hr-zone-btn ${d.hrZone === zn ? "sel" : ""}`}
-                    style={{ "--zc": z.color, borderColor: d.hrZone === zn ? z.color : "rgba(74,69,59,.2)" }}
+                    style={{ "--zc": z.color, borderColor: d.hrZone === zn ? z.color : "rgba(45,42,36,.2)" }}
                     onClick={() => setD({ hrZone: d.hrZone === zn ? null : zn })}>
                     <span className={"hz-name"} style={{ color: z.color }}>{"Z"}{zn}</span>
                     <span className={"hz-bpm"}>{z.short}</span>
@@ -157,8 +157,8 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
         )}
 
         {/* XP preview */}
-        <div style={{ background: "rgba(74,69,59,.16)", border: "1px solid rgba(180,172,158,.06)", borderRadius: R.xl, padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: FS.md, color: "#9a9488" }}>{"New XP for this entry"}</div>
+        <div style={{ background: "rgba(45,42,36,.16)", border: "1px solid rgba(180,172,158,.06)", borderRadius: R.xl, padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontSize: FS.md, color: "#8a8478" }}>{"New XP for this entry"}</div>
           <div style={{ display: "flex", alignItems: "center", gap: S.s8 }}>
             {xpDiff !== 0 && (
               <div style={{ fontSize: FS.md, color: xpDiff > 0 ? UI_COLORS.success : UI_COLORS.danger }}>
@@ -166,7 +166,7 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
               </div>
             )}
             <div style={{ fontFamily: "'Inter',sans-serif", fontSize: "1rem", color: "#b4ac9e" }}>
-              {"âš¡ "}{previewXP}
+              {"⚡ "}{previewXP}
             </div>
           </div>
         </div>
@@ -177,11 +177,11 @@ const LogEntryEditModal = memo(function LogEntryEditModal({
             onClick={() => {
               setLogEditModal(null);
               deleteLogEntryByIdx(logEditModal.idx);
-            }}>{"ðŸ—‘"}</button>
+            }}>{"🗑"}</button>
           <button className={"btn btn-ghost btn-sm"} style={{ flex: 1 }}
             onClick={() => setLogEditModal(null)}>{"Cancel"}</button>
           <button className={"btn btn-gold"} style={{ flex: 2 }}
-            onClick={saveLogEdit}>{"âœ¦ Save Changes"}</button>
+            onClick={saveLogEdit}>{"✦ Save Changes"}</button>
         </div>
 
       </div>

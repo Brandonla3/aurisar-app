@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import { S, R, FS } from '../../utils/tokens';
 import Sheet from '../../components/ui/Sheet';
 import { MUSCLE_OPTS, muscleLabel } from './exerciseFilterOptions';
@@ -7,14 +7,14 @@ import { getMuscleColor, hrRange } from '../../utils/xp';
 import { HR_ZONES } from '../../data/constants';
 
 /**
- * Exercise editor modal â€” extracted from the inline IIFE in App.jsx as part of
+ * Exercise editor modal — extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Supports three modes: "create" | "edit" | "copy".
  * Uses createPortal to render into document.body.
  */
 
-const EX_ICON_LIST = ["ðŸ‹ï¸", "ðŸ’ª", "âš¡", "ðŸ¦¾", "ðŸªƒ", "ðŸƒ", "ðŸš´", "ðŸ”¥", "â­•", "ðŸ§˜", "ðŸ¤¸", "ðŸ§±", "ðŸª", "ðŸŠ", "ðŸ”»", "ðŸ¦µ", "ðŸš¶", "ðŸ§—", "ðŸŽ¯", "ðŸŒï¸", "â›¹ï¸", "ðŸ¤¼", "ðŸ‡", "ðŸ¥Š", "ðŸ¤º", "ðŸ‹", "ðŸ¦¶", "ðŸ«€", "ðŸ§ ", "ðŸ›Œ", "ðŸ’¤", "ðŸŒ™", "â˜•", "ðŸ§Š", "ðŸ–ï¸"];
+const EX_ICON_LIST = ["🏋️", "💪", "⚡", "🦾", "🪃", "🏃", "🚴", "🔥", "⭕", "🧘", "🤸", "🧱", "🪝", "🏊", "🔻", "🦵", "🚶", "🧗", "🎯", "🏌️", "⛹️", "🤼", "🏇", "🥊", "🤺", "🏋", "🦶", "🫀", "🧠", "🛌", "💤", "🌙", "☕", "🧊", "🏖️"];
 
 const ExerciseEditorModal = memo(function ExerciseEditorModal({
   // Draft state
@@ -44,7 +44,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
   const wUnit = weightLabel(profile.units);
   const dUnit = distLabel(profile.units);
   const age = profile.age || 30;
-  const title = exEditorMode === "edit" ? "âœŽ Edit Technique" : exEditorMode === "copy" ? "âŽ˜ Copy Technique" : "âš” Forge Technique";
+  const title = exEditorMode === "edit" ? "✎ Edit Technique" : exEditorMode === "copy" ? "⎘ Copy Technique" : "⚔ Forge Technique";
   return <Sheet open onClose={() => setExEditorOpen(false)} layer={"editor"} title={title} titleFont={"cinzel"} ariaLabel={title} className={"ex-editor-sheet"} style={{
         "--mg-color": getMuscleColor(ed.muscleGroup || "chest")
       }}><div className={"ex-editor-body"}><div className={"ex-editor-subtitle"}>{exEditorMode === "edit" ? "Sharpen your custom technique" : "Forge a new technique for your grimoire"}</div>{exEditorMode !== "edit" && <div className={"field"}><label>{"Start from existing exercise (optional)"}</label><select className={"inp"} style={{
@@ -54,7 +54,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 if (!e.target.value) return;
                 const base = allExById[e.target.value];
                 if (base) setExEditorDraft(newExDraft(base));
-              }} defaultValue={""}><option value={""}>{"â€” Start from scratch â€”"}</option>{["strength", "cardio", "flexibility", "endurance"].map(cat => <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>{allExercises.filter(ex => ex.category === cat).map(ex => <option key={ex.id} value={ex.id}>{ex.icon}{" "}{ex.name}</option>)}</optgroup>)}</select></div>
+              }} defaultValue={""}><option value={""}>{"— Start from scratch —"}</option>{["strength", "cardio", "flexibility", "endurance"].map(cat => <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>{allExercises.filter(ex => ex.category === cat).map(ex => <option key={ex.id} value={ex.id}>{ex.icon}{" "}{ex.name}</option>)}</optgroup>)}</select></div>
 
             /* Name + Icon row */}<div style={{
               display: "flex",
@@ -70,7 +70,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                   fontSize: "1.4rem",
                   padding: "5px 0",
                   cursor: "default"
-                }}>{ed.icon || "ðŸ’ª"}</div></div></div>
+                }}>{ed.icon || "💪"}</div></div></div>
 
             {
               /* Icon grid */
@@ -90,8 +90,8 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 fontSize: "1.15rem",
                 cursor: "pointer",
                 borderRadius: R.r7,
-                border: `1px solid ${ed.icon === ic ? "rgba(180,172,158,.2)" : "rgba(74,69,59,.22)"}`,
-                background: ed.icon === ic ? "rgba(74,69,59,.25)" : "rgba(74,69,59,.12)",
+                border: `1px solid ${ed.icon === ic ? "rgba(180,172,158,.2)" : "rgba(45,42,36,.22)"}`,
+                background: ed.icon === ic ? "rgba(45,42,36,.25)" : "rgba(45,42,36,.12)",
                 transition: "all .15s",
                 padding: 0
               }}>{ic}</button>)}</div>
@@ -127,17 +127,17 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
               /* Base XP */
             }<div className={"field"}><label>{"Base XP per session "}<span style={{
                   fontSize: FS.sm,
-                  color: "#9a9488",
+                  color: "#8a8478",
                   fontStyle: "italic"
-                }}>{"â€” typical: 20â€“80"}</span></label><input className={"inp"} type={"number"} min={"1"} max={"500"} value={ed.baseXP || 40} onChange={e => setEd({
+                }}>{"— typical: 20–80"}</span></label><input className={"inp"} type={"number"} min={"1"} max={"500"} value={ed.baseXP || 40} onChange={e => setEd({
                 baseXP: parseInt(e.target.value) || 1
               })} /></div>
 
             {
-              /* â”€â”€ Default Workout Values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+              /* ── Default Workout Values ───────────────── */
             }<div className={"ex-editor-section"}><div className={"ex-editor-section-title"}>{"Default Values When Logging"}</div><div style={{
                 fontSize: FS.fs63,
-                color: "#9a9488",
+                color: "#8a8478",
                 marginTop: S.sNeg6,
                 fontStyle: "italic"
               }}>{"Pre-filled each time you log this exercise"}</div>
@@ -157,7 +157,7 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                   }} /></div></div>
 
               {
-                /* Weight â€” strength/endurance only */
+                /* Weight — strength/endurance only */
               }{hasWeightED && <><div className={"r2"}><div className={"field"}><label>{"Default Base Weight ("}{wUnit}{")"}</label><input className={"inp"} type={"number"} min={"0"} max={"2000"} step={metric ? "0.5" : "2.5"} value={ed.defaultWeightLbs ? metric ? lbsToKg(ed.defaultWeightLbs) : ed.defaultWeightLbs : ""} onChange={e => {
                       const v = e.target.value;
                       const lbs = v && metric ? kgToLbs(v) : v;
@@ -172,11 +172,11 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                     display: "flex",
                     justifyContent: "space-between",
                     fontSize: FS.fs56,
-                    color: "#9a9488",
+                    color: "#8a8478",
                     marginTop: S.s2
                   }}><span>{"50% Deload"}</span><span>{"100% Normal"}</span><span>{"200% Max"}</span></div></div></>
 
-              /* Distance â€” cardio only */}{isCardioED && <div className={"field"}><label>{"Default Distance ("}{dUnit}{")"}</label><input className={"inp"} type={"number"} min={"0"} max={"200"} step={"0.1"} value={ed.defaultDistanceMi ? metric ? miToKm(ed.defaultDistanceMi) : ed.defaultDistanceMi : ""} onChange={e => {
+              /* Distance — cardio only */}{isCardioED && <div className={"field"}><label>{"Default Distance ("}{dUnit}{")"}</label><input className={"inp"} type={"number"} min={"0"} max={"200"} step={"0.1"} value={ed.defaultDistanceMi ? metric ? miToKm(ed.defaultDistanceMi) : ed.defaultDistanceMi : ""} onChange={e => {
                   const v = e.target.value;
                   const mi = v && metric ? kmToMi(v) : v;
                   setEd({
@@ -184,43 +184,43 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                   });
                 }} placeholder={metric ? "5.0" : "3.1"} /></div>
 
-              /* HR Zone â€” cardio only */}{isCardioED && <div className={"field"}><label>{"Default Heart Rate Zone "}{profile.age ? `(Age ${profile.age})` : ""}</label><div className={"hr-zone-row"}>{HR_ZONES.map(z => {
+              /* HR Zone — cardio only */}{isCardioED && <div className={"field"}><label>{"Default Heart Rate Zone "}{profile.age ? `(Age ${profile.age})` : ""}</label><div className={"hr-zone-row"}>{HR_ZONES.map(z => {
                     const range = hrRange(age, z);
                     const sel = (ed.defaultHrZone || null) === z.z;
                     return <button type={"button"} key={z.z} aria-pressed={sel} className={`hr-zone-btn ${sel ? "sel" : ""}`} style={{
                       "--zc": z.color,
-                      borderColor: sel ? z.color : "rgba(74,69,59,.2)",
-                      background: sel ? `${z.color}22` : "rgba(74,69,59,.12)"
+                      borderColor: sel ? z.color : "rgba(45,42,36,.2)",
+                      background: sel ? `${z.color}22` : "rgba(45,42,36,.12)"
                     }} onClick={() => setEd({
                       defaultHrZone: sel ? null : z.z
                     })}><span className={"hz-name"} style={{
-                        color: sel ? z.color : "#9a9488"
+                        color: sel ? z.color : "#8a8478"
                       }}>{"Z"}{z.z}{" "}{z.name}</span><span className={"hz-bpm"} style={{
-                        color: sel ? z.color : "#9a9488"
-                      }}>{range.lo}{"â€“"}{range.hi}</span></button>;
+                        color: sel ? z.color : "#8a8478"
+                      }}>{range.lo}{"–"}{range.hi}</span></button>;
                   })}</div>{!profile.age && <div style={{
                   fontSize: FS.sm,
-                  color: "#9a9488",
+                  color: "#8a8478",
                   marginTop: S.s4
                 }}>{"Set your age in Profile for accurate BPM ranges"}</div>}</div>}</div>
 
             {
-              /* â”€â”€ Exercise Details (optional) â”€â”€â”€â”€â”€â”€â”€ */
+              /* ── Exercise Details (optional) ─────── */
             }<div className={"ex-editor-section-title"} style={{
               marginTop: S.s4
-            }}>{"âœ¦ Exercise Details (optional)"}</div>
+            }}>{"✦ Exercise Details (optional)"}</div>
 
             {
               /* Muscles */
             }<div className={"field"}><label>{"Target Muscles"}</label><input className={"inp"} value={ed.muscles || ""} onChange={e => setEd({
                 muscles: e.target.value
-              })} placeholder={"e.g. Chest Â· Front Deltoids Â· Triceps"} /></div>
+              })} placeholder={"e.g. Chest · Front Deltoids · Triceps"} /></div>
 
             {
               /* Description */
             }<div className={"field"}><label>{"Description"}</label><textarea className={"inp"} rows={3} value={ed.desc || ""} onChange={e => setEd({
                 desc: e.target.value
-              })} placeholder={"How to perform this exercise, key cuesâ€¦"} style={{
+              })} placeholder={"How to perform this exercise, key cues…"} style={{
                 resize: "vertical",
                 minHeight: 70,
                 fontFamily: "'Inter',sans-serif",
@@ -237,10 +237,10 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 setEd({
                   tips: t
                 });
-              }} placeholder={`Tip ${ti + 1}â€¦`} />)}</div>
+              }} placeholder={`Tip ${ti + 1}…`} />)}</div>
 
             {
-              /* â”€â”€ Action Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+              /* ── Action Buttons ─────────────────── */
             }<div className={"div"} /><div style={{
               display: "flex",
               gap: S.s8
@@ -248,15 +248,15 @@ const ExerciseEditorModal = memo(function ExerciseEditorModal({
                 flex: 1
               }} onClick={() => setExEditorOpen(false)}>{"Cancel"}</button><button className={"btn btn-gold"} style={{
                 flex: 2
-              }} onClick={saveExEditor}>{exEditorMode === "edit" ? "âœ¦ Save Changes" : "âš” Forge Technique"}</button></div>{exEditorMode === "edit" && <button className={"btn btn-ghost btn-sm"} style={{
+              }} onClick={saveExEditor}>{exEditorMode === "edit" ? "✦ Save Changes" : "⚔ Forge Technique"}</button></div>{exEditorMode === "edit" && <button className={"btn btn-ghost btn-sm"} style={{
               width: "100%",
               marginTop: S.s6
-            }} onClick={() => openExEditor("copy", ed)}>{"âŽ˜ Duplicate as New Exercise"}</button>}{exEditorMode === "edit" && <button className={"btn btn-danger"} style={{
+            }} onClick={() => openExEditor("copy", ed)}>{"⎘ Duplicate as New Exercise"}</button>}{exEditorMode === "edit" && <button className={"btn btn-danger"} style={{
               width: "100%",
               marginTop: S.s8,
               padding: "10px",
               fontSize: FS.fs78
-            }} onClick={() => deleteCustomEx(ed.id)}>{"ðŸ—‘ Delete Exercise"}</button>}</div></Sheet>;
+            }} onClick={() => deleteCustomEx(ed.id)}>{"🗑 Delete Exercise"}</button>}</div></Sheet>;
 });
 
 export default ExerciseEditorModal;

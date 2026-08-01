@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import { xpToLevel } from '../../utils/xp';
 import { formatXP } from '../../utils/format';
 import { S, R, FS } from '../../utils/tokens';
@@ -6,7 +6,7 @@ import { UI_COLORS } from '../../data/constants';
 import { CLASSES } from '../../data/exercises';
 
 /**
- * Leaderboard tab â€” extracted from the inline IIFE in App.jsx as part of
+ * Leaderboard tab — extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Renders the world/friends leaderboard with filter chips (state, country)
@@ -36,61 +36,61 @@ const LB_FILTERS = [{
   id: "overall_xp",
   label: "Overall XP",
   type: "xp",
-  icon: "âš”ï¸",
+  icon: "⚔️",
   desc: "Total XP earned all time"
 }, {
   id: "weekly_xp",
   label: "Weekly XP",
   type: "xp",
-  icon: "ðŸ“…",
+  icon: "📅",
   desc: "XP earned this week (resets Monday)"
 }, {
   id: "bench_1rm",
   label: "Bench Press",
   type: "strength",
-  icon: "ðŸ‹ï¸",
+  icon: "🏋️",
   desc: "Heaviest 1x1 set"
 }, {
   id: "squat_1rm",
   label: "Squat",
   type: "strength",
-  icon: "ðŸ¦µ",
+  icon: "🦵",
   desc: "Heaviest 1x1 set"
 }, {
   id: "deadlift_1rm",
   label: "Deadlift",
   type: "strength",
-  icon: "ðŸ’€",
+  icon: "💀",
   desc: "Heaviest 1x1 set"
 }, {
   id: "ohp_1rm",
   label: "Overhead Press",
   type: "strength",
-  icon: "ðŸ¹",
+  icon: "🏹",
   desc: "Heaviest 1x1 set"
 }, {
   id: "pullup_reps",
   label: "Pull-Ups",
   type: "reps",
-  icon: "ðŸ’ª",
+  icon: "💪",
   desc: "Most reps in 1 set"
 }, {
   id: "pushup_reps",
   label: "Push-Ups",
   type: "reps",
-  icon: "ðŸ¤¸",
+  icon: "🤸",
   desc: "Most reps in 1 set"
 }, {
   id: "run_pace",
   label: "Running Pace",
   type: "cardio",
-  icon: "ðŸƒ",
+  icon: "🏃",
   desc: "Best min/mi (lower = faster)"
 }, {
   id: "streak",
   label: "Streak",
   type: "habit",
-  icon: "ðŸ”¥",
+  icon: "🔥",
   desc: "Longest consecutive check-in streak"
 }];
 const TC = {
@@ -181,13 +181,13 @@ const MultiDrop = ({
     flex: 1
   }}>
     <div style={{
-      background: open ? "rgba(74,69,59,.45)" : "rgba(74,69,59,.2)",
+      background: open ? "rgba(45,42,36,.45)" : "rgba(45,42,36,.2)",
       border: "1px solid " + (open ? "rgba(180,172,158,.12)" : "rgba(180,172,158,.06)"),
       borderRadius: R.lg,
       padding: "8px 10px",
       fontSize: FS.sm,
       fontWeight: 600,
-      color: noneSelected ? "#9a9488" : "#b4ac9e",
+      color: noneSelected ? "#8a8478" : "#b4ac9e",
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
@@ -210,7 +210,7 @@ const MultiDrop = ({
         whiteSpace: "nowrap"
       }}>{chipLabel}</span><span style={{
         fontSize: FS.fs46,
-        color: "#9a9488",
+        color: "#8a8478",
         flexShrink: 0
       }}>{open ? "\u25B2" : "\u25BC"}</span></div>{
     // Dropdown overlay
@@ -231,7 +231,7 @@ const MultiDrop = ({
         justifyContent: "space-between",
         padding: "8px 10px",
         borderBottom: "1px solid rgba(180,172,158,.06)",
-        background: "rgba(74,69,59,.15)"
+        background: "rgba(45,42,36,.15)"
       }}><span style={{
           fontSize: FS.fs56,
           color: "#b4ac9e",
@@ -261,7 +261,7 @@ const MultiDrop = ({
             background: on ? "rgba(180,172,158,.07)" : "transparent",
             transition: "background .1s",
             fontSize: FS.fs62,
-            color: on ? "#d4cec4" : "#9a9488"
+            color: on ? "#d4cec4" : "#8a8478"
           }} onClick={() => {
             setSelected(on ? selected.filter(s => s !== opt) : [...selected, opt]);
           }}><span style={{
@@ -281,7 +281,7 @@ const MultiDrop = ({
       <div style={{
         padding: "6px 10px",
         borderTop: "1px solid rgba(180,172,158,.06)",
-        background: "rgba(74,69,59,.1)"
+        background: "rgba(45,42,36,.1)"
       }}><div style={{
           textAlign: "center",
           fontSize: FS.fs58,
@@ -294,14 +294,14 @@ const MultiDrop = ({
 return <div> {
     /* Header */
   }
-  <div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"âœ¦ Leaderboard âœ¦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div> {
+  <div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Leaderboard ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div> {
     /* Scope toggle: Friends / World */
   }
   <div style={{
     display: "flex",
     gap: S.s4,
     marginBottom: S.s12,
-    background: "rgba(74,69,59,.25)",
+    background: "rgba(45,42,36,.25)",
     borderRadius: R.lg,
     padding: S.s4
   }}>{["friends", "world"].map(scope => <div key={scope} style={{
@@ -314,8 +314,8 @@ return <div> {
       cursor: "pointer",
       transition: "all .15s",
       letterSpacing: ".04em",
-      background: lbScope === scope ? "rgba(74,69,59,.5)" : "transparent",
-      color: lbScope === scope ? "#d4cec4" : "#9a9488",
+      background: lbScope === scope ? "rgba(45,42,36,.5)" : "transparent",
+      color: lbScope === scope ? "#d4cec4" : "#8a8478",
       border: lbScope === scope ? "1px solid rgba(180,172,158,.08)" : "1px solid transparent"
     }} onClick={() => setLbScope(scope)}>{scope === "friends" ? "\uD83D\uDC65 Friends" : "\uD83C\uDF0D World"}</div>)}</div>{/* Filter row: State + Country multi-selects (World only) */
   lbScope === "world" && <div style={{
@@ -357,20 +357,20 @@ return <div> {
       color: tc,
       pointerEvents: "none",
       fontSize: FS.fs65
-    }}>{"â–¼"}</span></div> {
+    }}>{"▼"}</span></div> {
     /* Active filter description */
   }
   <div style={{
     fontSize: FS.sm,
-    color: "#9a9488",
+    color: "#8a8478",
     marginBottom: S.s12,
     paddingLeft: 4,
     fontStyle: "italic"
-  }}>{af.desc}</div>{/* Your standing card â€” Design 3 accent strip */
+  }}>{af.desc}</div>{/* Your standing card — Design 3 accent strip */
   myRow && <div style={{
     display: "flex",
     alignItems: "stretch",
-    background: "linear-gradient(145deg,rgba(74,69,59,.3),rgba(52,48,41,.15))",
+    background: "linear-gradient(145deg,rgba(45,42,36,.3),rgba(32,30,26,.15))",
     border: "1px solid rgba(180,172,158,.1)",
     borderRadius: R.r12,
     marginBottom: S.s14,
@@ -404,7 +404,7 @@ return <div> {
         }}>{myRank === 1 ? "\uD83E\uDD47" : myRank === 2 ? "\uD83E\uDD48" : "\uD83E\uDD49"}</span>}<span style={{
           fontSize: FS.fs82,
           fontWeight: "700",
-          color: myRank === 1 ? "#c49428" : myRank === 2 ? "#9a9488" : myRank === 3 ? "#7a5230" : "#b4ac9e"
+          color: myRank === 1 ? "#c49428" : myRank === 2 ? "#8a8478" : myRank === 3 ? "#7a5230" : "#b4ac9e"
         }}>{myRank}</span></div> {
         /* Name + class tag + subtitle */
       }
@@ -425,11 +425,11 @@ return <div> {
             marginLeft: S.s6
           }}>{cls.icon + " " + cls.name}</span>{myPublicId && <span style={{
             fontSize: FS.fs44,
-            color: "#9a9488",
+            color: "#8a8478",
             marginLeft: S.s4
           }}>{"#" + myPublicId}</span>}<span style={{
             fontSize: FS.fs50,
-            color: "#9a9488",
+            color: "#8a8478",
             marginLeft: S.s4
           }}>{"you"}</span></div><div style={{
           display: "flex",
@@ -438,14 +438,14 @@ return <div> {
           flexWrap: "wrap"
         }}><span style={{
             fontSize: FS.fs56,
-            color: "#9a9488"
+            color: "#8a8478"
           }}>{"Lv." + xpToLevel(profile.xp || 0)}{profile.state || profile.country ? " \u00b7 " : ""}{profile.state ? profile.state : ""}{profile.country ? (profile.state ? ", " : "") + (profile.country === "United States" ? "US" : profile.country === "United Kingdom" ? "UK" : profile.country === "Canada" ? "CA" : profile.country === "Australia" ? "AU" : profile.country === "Germany" ? "DE" : profile.country === "France" ? "FR" : profile.country === "Mexico" ? "MX" : profile.country === "Brazil" ? "BR" : profile.country === "India" ? "IN" : profile.country === "Japan" ? "JP" : profile.country === "South Korea" ? "KR" : profile.country === "Philippines" ? "PH" : profile.country || "") : ""}{profile.gym ? " \u00b7 " + profile.gym : ""}{profile.checkInStreak > 0 ? " \u00b7 \uD83D\uDD25" + profile.checkInStreak : ""}</span>{lbScope === "friends" && authUser && lbWorldRanks[authUser.id] && <span style={{
             fontSize: FS.fs46,
             fontWeight: 700,
             padding: "2px 6px",
             borderRadius: R.r4,
             background: "rgba(180,172,158,.08)",
-            color: "#9a9488"
+            color: "#8a8478"
           }}>{"\uD83C\uDF0D #" + lbWorldRanks[authUser.id]}</span>}</div></div> {
         /* Stat value */
       }
@@ -458,14 +458,14 @@ return <div> {
           color: tc
         }}>{fmtVal(lbFilter, myVal)}</div><div style={{
           fontSize: FS.fs50,
-          color: "#9a9488",
+          color: "#8a8478",
           marginTop: S.s2
         }}>{af.label}</div></div></div></div>} {
     /* Leaderboard list */
   }
   <div style={{
-    background: "rgba(74,69,59,.1)",
-    border: "1px solid rgba(74,69,59,.2)",
+    background: "rgba(45,42,36,.1)",
+    border: "1px solid rgba(45,42,36,.2)",
     borderRadius: R.r12,
     overflow: "hidden"
   }}> {
@@ -476,17 +476,17 @@ return <div> {
       alignItems: "center",
       padding: "8px 12px 8px 18px",
       borderBottom: "1px solid rgba(180,172,158,.05)",
-      background: "rgba(74,69,59,.12)"
+      background: "rgba(45,42,36,.12)"
     }}><span style={{
         width: 36,
         fontSize: FS.fs52,
-        color: "#9a9488",
+        color: "#8a8478",
         textTransform: "uppercase",
         letterSpacing: ".08em"
       }}>{"#"}</span><span style={{
         flex: 1,
         fontSize: FS.fs52,
-        color: "#9a9488",
+        color: "#8a8478",
         textTransform: "uppercase",
         letterSpacing: ".08em"
       }}>{"Player"}</span><span style={{
@@ -509,14 +509,14 @@ return <div> {
         margin: "0 auto 8px"
       }} /><div style={{
         fontSize: FS.fs62,
-        color: "#9a9488"
-      }}>{"Loading rankingsâ€¦"}</div></div>}{/* Player rows â€” Design 3: accent strip + medals */
+        color: "#8a8478"
+      }}>{"Loading rankings…"}</div></div>}{/* Player rows — Design 3: accent strip + medals */
     !lbLoading && sorted.map(function (row, idx) {
       var rank = idx + 1;
       var val = getRowVal(row, lbFilter);
       var rowCls = row.chosen_class ? CLASSES[row.chosen_class] || CLASSES.warrior : CLASSES.warrior;
       var isMe = row.is_me;
-      var rankColor = rank === 1 ? "#c49428" : rank === 2 ? "#9a9488" : rank === 3 ? "#7a5230" : "#9a9488";
+      var rankColor = rank === 1 ? "#c49428" : rank === 2 ? "#8a8478" : rank === 3 ? "#7a5230" : "#8a8478";
       var medal = rank === 1 ? "\uD83E\uDD47" : rank === 2 ? "\uD83E\uDD48" : rank === 3 ? "\uD83E\uDD49" : null;
       var worldRank = lbScope === "friends" ? lbWorldRanks[row.user_id] : null;
       var countryCode = row.country === "United States" ? "US" : row.country === "United Kingdom" ? "UK" : row.country === "Canada" ? "CA" : row.country === "Australia" ? "AU" : row.country === "Germany" ? "DE" : row.country === "France" ? "FR" : row.country === "Mexico" ? "MX" : row.country === "Brazil" ? "BR" : row.country === "India" ? "IN" : row.country === "Japan" ? "JP" : row.country === "South Korea" ? "KR" : row.country === "Philippines" ? "PH" : row.country || "";
@@ -524,8 +524,8 @@ return <div> {
       return <div key={row.user_id} style={{
         display: "flex",
         alignItems: "stretch",
-        background: isMe ? "rgba(74,69,59,.25)" : "linear-gradient(145deg,rgba(74,69,59,.18),rgba(52,48,41,.08))",
-        borderBottom: "1px solid rgba(74,69,59,.12)"
+        background: isMe ? "rgba(45,42,36,.25)" : "linear-gradient(145deg,rgba(45,42,36,.18),rgba(32,30,26,.08))",
+        borderBottom: "1px solid rgba(45,42,36,.12)"
       }}> {
           /* Class color accent strip */
         }
@@ -579,11 +579,11 @@ return <div> {
                 marginLeft: S.s6
               }}>{rowCls.icon + " " + rowCls.name}</span>{row.public_id && <span style={{
                 fontSize: FS.fs44,
-                color: "#9a9488",
+                color: "#8a8478",
                 marginLeft: S.s4
               }}>{"#" + row.public_id}</span>}{isMe && <span style={{
                 fontSize: FS.fs48,
-                color: "#9a9488",
+                color: "#8a8478",
                 marginLeft: S.s4
               }}>{"you"}</span>}</div><div style={{
               display: "flex",
@@ -592,14 +592,14 @@ return <div> {
               flexWrap: "wrap"
             }}><span style={{
                 fontSize: FS.fs52,
-                color: "#9a9488"
+                color: "#8a8478"
               }}>{"Lv." + row.level}{loc ? " \u00b7 " + loc : ""}{row.gym ? " \u00b7 " + row.gym : ""}{row.streak > 0 ? " \u00b7 \uD83D\uDD25" + row.streak : ""}</span>{worldRank && <span style={{
                 fontSize: FS.fs46,
                 fontWeight: 700,
                 padding: "2px 6px",
                 borderRadius: R.r4,
                 background: "rgba(180,172,158,.08)",
-                color: "#9a9488"
+                color: "#8a8478"
               }}>{"\uD83C\uDF0D #" + worldRank}</span>}</div></div> {
             /* Stat value */
           }
@@ -610,11 +610,11 @@ return <div> {
           }}><div style={{
               fontSize: FS.fs78,
               fontWeight: "700",
-              color: val ? tc : "#9a9488",
+              color: val ? tc : "#8a8478",
               fontFamily: "'Inter',sans-serif"
             }}>{fmtVal(lbFilter, val)}</div><div style={{
               fontSize: FS.fs44,
-              color: "#9a9488",
+              color: "#8a8478",
               marginTop: S.s2
             }}>{af.label}</div></div></div></div>;
     })}{/* Empty state */
@@ -622,16 +622,16 @@ return <div> {
       padding: "24px 14px",
       textAlign: "center",
       fontSize: FS.fs66,
-      color: "#9a9488",
+      color: "#8a8478",
       fontStyle: "italic"
     }}>{lbScope === "friends" ? "No friends to rank yet. Add friends in the Guild tab!" : "No warriors found matching your filters."}</div>}{/* Player count footer */
     !lbLoading && sorted.length > 0 && <div style={{
       padding: "8px 14px",
       textAlign: "center",
       fontSize: FS.fs56,
-      color: "#9a9488",
+      color: "#8a8478",
       fontStyle: "italic",
-      borderTop: "1px solid rgba(74,69,59,.12)"
+      borderTop: "1px solid rgba(45,42,36,.12)"
     }}>{sorted.length + " warrior" + (sorted.length !== 1 ? "s" : "") + " ranked" + (lbStateFilters.length || lbCountryFilters.length ? " (filtered)" : "")}</div>}</div></div>;
 });
 

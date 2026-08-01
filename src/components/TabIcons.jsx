@@ -1,11 +1,11 @@
-﻿import React from 'react';
+import React from 'react';
 
 // Authentic icon path data sourced from npm (NOT the iconify CDN, which the
 // sandbox proxy blocks):
 //   MDI icons   -> @mdi/js@7.4.47                 (viewBox 0 0 24 24)
 //   game-icons  -> @iconify-json/game-icons@1.2.4 (viewBox 0 0 512 512)
 // All paths render with fill="currentColor" so each icon inherits the tab
-// button color (.tab -> #9a9488, .tab.on -> #d4cec4). No network at runtime.
+// button color (.tab -> #8a8478, .tab.on -> #d4cec4). No network at runtime.
 const ICONS = {
   // Exercises  (mdi:dumbbell)
   workout: {
@@ -37,7 +37,7 @@ const ICONS = {
 /**
  * Bottom-tab icon rendered as an inline SVG whose fill is currentColor, so it
  * inherits the active/inactive color from the enclosing .tab / .tab.on button.
- * Decorative by default (aria-hidden) â€” each tab already has a visible label.
+ * Decorative by default (aria-hidden) — each tab already has a visible label.
  *
  * @param {string} name  workout | workouts | calendar | social | world
  * @param {number} size  px (default 22)

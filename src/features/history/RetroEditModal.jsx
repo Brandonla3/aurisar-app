@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import { createPortal } from 'react-dom';
 import { uid } from '../../utils/helpers';
 import { calcExXP } from '../../utils/xp';
@@ -6,7 +6,7 @@ import { applyStoredPerk } from '../../utils/gearPerks';
 import { S, FS, R } from '../../utils/tokens';
 
 /**
- * Retro-edit modal â€” extracted from the inline IIFE in App.jsx as part of
+ * Retro-edit modal — extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Rendered when retroEditModal is non-null. Lets the user correct sets/reps/
@@ -35,29 +35,29 @@ const RetroEditModal = memo(function RetroEditModal({
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: S.s12 }}>
             <div style={{ fontSize: FS.fs90, color: "#d4cec4", fontFamily: "'Inter',sans-serif", fontWeight: 600 }}>
-              {"âœŽ Edit Completed "}{rem.sourceType === "plan" ? "Plan Session" : "Workout"}
+              {"✎ Edit Completed "}{rem.sourceType === "plan" ? "Plan Session" : "Workout"}
             </div>
-            <button className={"btn btn-ghost btn-sm"} onClick={() => setRetroEditModal(null)}>{"âœ•"}</button>
+            <button className={"btn btn-ghost btn-sm"} onClick={() => setRetroEditModal(null)}>{"✕"}</button>
           </div>
 
           {/* Subtitle */}
-          <div style={{ fontSize: FS.fs65, color: "#9a9488", marginBottom: S.s14, lineHeight: 1.5 }}>
-            {rem.sourceName}{" Â· "}{rem.entries?.[0]?.date}{" Â· Editing will recalculate XP and update your log."}
+          <div style={{ fontSize: FS.fs65, color: "#8a8478", marginBottom: S.s14, lineHeight: 1.5 }}>
+            {rem.sourceName}{" · "}{rem.entries?.[0]?.date}{" · Editing will recalculate XP and update your log."}
           </div>
 
-          {/* Exercise list â€” editable */}
+          {/* Exercise list — editable */}
           <div style={{ marginBottom: S.s12 }}>
             {rem.entries.map((e, i) => {
               const exData = allExById[e.exId];
               if (!exData) return null;
               return (
-                <div key={i} style={{ background: "rgba(74,69,59,.18)", border: "1px solid rgba(74,69,59,.2)", borderRadius: R.lg, padding: "10px 12px", marginBottom: S.s6 }}>
+                <div key={i} style={{ background: "rgba(45,42,36,.18)", border: "1px solid rgba(45,42,36,.2)", borderRadius: R.lg, padding: "10px 12px", marginBottom: S.s6 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: S.s8, marginBottom: S.s6 }}>
                     <span style={{ fontSize: "1rem" }}>{exData.icon}</span>
                     <span style={{ fontSize: FS.fs78, color: "#d4cec4", flex: 1, fontWeight: 600 }}>{exData.name}</span>
                     <button className={"btn btn-danger btn-xs"} onClick={() => {
                       setRetroEditModal(prev => ({ ...prev, entries: prev.entries.filter((_, j) => j !== i) }));
-                    }}>{"âœ•"}</button>
+                    }}>{"✕"}</button>
                   </div>
                   <div style={{ display: "flex", gap: S.s6 }}>
                     <div style={{ flex: 1 }}>
@@ -99,7 +99,7 @@ const RetroEditModal = memo(function RetroEditModal({
                 if (!updated) return null;
                 const base = calcExXP(updated.exId, parseInt(updated.sets) || 3, parseInt(updated.reps) || 10, profile.chosenClass, allExById);
                 // Preserve the entry's stored gear boost; refresh baseXp so the
-                // xp â‰ˆ round(baseXp Ã— perkMult) invariant survives the edit.
+                // xp ≈ round(baseXp × perkMult) invariant survives the edit.
                 const boosted = typeof e.perkMult === "number" && e.perkMult > 1;
                 const xp = applyStoredPerk(base, e.perkMult);
                 return { ...e, ...updated, xp, ...(boosted ? { baseXp: base } : {}), sets: parseInt(updated.sets) || e.sets, reps: parseInt(updated.reps) || e.reps };
@@ -112,8 +112,8 @@ const RetroEditModal = memo(function RetroEditModal({
               });
               setProfile(p => ({ ...p, log: updatedLog }));
               setRetroEditModal(null);
-              showToast("âœ“ Workout log updated!");
-            }}>{"âœ“ Save Changes"}</button>
+              showToast("✓ Workout log updated!");
+            }}>{"✓ Save Changes"}</button>
           </div>
 
         </div>

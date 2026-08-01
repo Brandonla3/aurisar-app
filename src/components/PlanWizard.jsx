@@ -1,4 +1,4 @@
-﻿import React, { useState, useReducer, useMemo, useCallback, useTransition, useEffect, useRef, useId } from 'react';
+import React, { useState, useReducer, useMemo, useCallback, useTransition, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { List } from 'react-window';
 import { useModalLifecycle } from '../utils/useModalLifecycle';
@@ -15,7 +15,7 @@ import FilterDropdown from '../features/exercises/FilterDropdown';
 import { TYPE_OPTS, TYPE_LABELS, MUSCLE_OPTS, EQUIP_OPTS, muscleLabel, equipLabel } from '../features/exercises/exerciseFilterOptions';
 import { matchesAll, facetCounts as countFacet, muscleKeys, typeKeys, equipKeys } from '../features/exercises/matchesFacets';
 
-const ICONS = ["âš”ï¸","ðŸ¹","ðŸ§˜","ðŸ›¡ï¸","ðŸ”¥","ðŸ’ª","ðŸ‹ï¸","âš¡","ðŸƒ","ðŸš´","ðŸŒ…","ðŸŒ™","ðŸ”ï¸","ðŸ—¡ï¸","ðŸ§—","ðŸŽ¯"];
+const ICONS = ["⚔️","🏹","🧘","🛡️","🔥","💪","🏋️","⚡","🏃","🚴","🌅","🌙","🏔️","🗡️","🧗","🎯"];
 
 function formatScheduledDate(dateStr) {
   if(!dateStr) return "";
@@ -27,7 +27,7 @@ function formatScheduledDate(dateStr) {
 
 function debounce(fn, ms) { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); }; }
 
-// â”€â”€ Virtualized picker row (item 4: react-window) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Virtualized picker row (item 4: react-window) ──────────────────────────
 // Module-level so the component identity is stable across PlanWizard renders;
 // react-window only re-renders rows when `rowProps` change.
 const PICKER_ROW_NAME_STYLE  = { fontFamily: "'Cinzel',serif", fontSize: FS.fs80, fontWeight: 600, color: "#d4cec4", marginBottom: S.s2, letterSpacing: ".01em" };
@@ -59,7 +59,7 @@ const PickerRow = React.memo(function PickerRow({ ariaAttributes, index, style, 
           </div>
           <div style={PICKER_ROW_META_STYLE}>
             {ex.category && <span style={{color:getTypeColor(ex.category)}}>{ex.category.charAt(0).toUpperCase()+ex.category.slice(1)}</span>}
-            {ex.category && ex.muscleGroup && <span style={{color:"#9a9488"}}>{" Â· "}</span>}
+            {ex.category && ex.muscleGroup && <span style={{color:"#8a8478"}}>{" · "}</span>}
             {ex.muscleGroup && <span style={{color:exMgColor}}>{ex.muscleGroup.charAt(0).toUpperCase()+ex.muscleGroup.slice(1)}</span>}
           </div>
         </div>
@@ -111,8 +111,8 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
       {/* Header row */}
       <div className="wb-ex-hdr" style={{display:"flex",alignItems:"center",gap:S.s4,marginBottom:collapsed?0:8,cursor:"pointer"}} onClick={toggleCollapse}>
         <div style={{display:"flex",flexDirection:"column",gap:S.s2,flexShrink:0}}>
-          <button className="btn btn-ghost btn-xs" style={{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===0?.3:1}} disabled={i===0} onClick={e=>{e.stopPropagation();moveUp();}}>{"â–²"}</button>
-          <button className="btn btn-ghost btn-xs" style={{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===planExCount-1?.3:1}} disabled={i===planExCount-1} onClick={e=>{e.stopPropagation();moveDown();}}>{"â–¼"}</button>
+          <button className="btn btn-ghost btn-xs" style={{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===0?.3:1}} disabled={i===0} onClick={e=>{e.stopPropagation();moveUp();}}>{"▲"}</button>
+          <button className="btn btn-ghost btn-xs" style={{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:i===planExCount-1?.3:1}} disabled={i===planExCount-1} onClick={e=>{e.stopPropagation();moveDown();}}>{"▼"}</button>
         </div>
         {ex.supersetWith==null && planExCount>=2 && (
           <div
@@ -124,14 +124,14 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             <span style={{fontSize:FS.fs55,color:ssCheckedPlan.has(i)?"#b0b8c0":"#8a8f96",fontWeight:600,letterSpacing:".03em",userSelect:"none"}}>Superset</span>
           </div>
         )}
-        {exData.custom && <div className="ex-edit-btn" style={{position:"static",marginRight:S.s2}} onClick={e=>{e.stopPropagation();onOpenExEditor("edit",exData);}}>{"âœŽ"}</div>}
+        {exData.custom && <div className="ex-edit-btn" style={{position:"static",marginRight:S.s2}} onClick={e=>{e.stopPropagation();onOpenExEditor("edit",exData);}}>{"✎"}</div>}
         <div className="builder-ex-orb" style={{"--cat-color":catColorPlan}}>{exData.icon}</div>
         <span className="builder-ex-name-styled" style={{flex:1}}>{exData.name}</span>
-        {(isRunningEx&&pbDisp||exPBDisp3) && <span style={{fontSize:FS.fs58,color:"#b4ac9e",flexShrink:0}}>{"ðŸ† "}{isRunningEx&&pbDisp?pbDisp:exPBDisp3}</span>}
-        {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs60,color:"#9a9488"}}>{noSetsEx?"":ex.sets+"Ã—"}{ex.reps}{ex.weightLbs?` Â· ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:""}</span>}
+        {(isRunningEx&&pbDisp||exPBDisp3) && <span style={{fontSize:FS.fs58,color:"#b4ac9e",flexShrink:0}}>{"🏆 "}{isRunningEx&&pbDisp?pbDisp:exPBDisp3}</span>}
+        {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs60,color:"#8a8478"}}>{noSetsEx?"":ex.sets+"×"}{ex.reps}{ex.weightLbs?` · ${bMetric?lbsToKg(ex.weightLbs):ex.weightLbs}${bWUnit}`:""}</span>}
         <span style={{fontSize:FS.fs63,color:"#b4ac9e",minWidth:36,textAlign:"right"}}>{"+"+(xp||0).toLocaleString()}</span>
-        <span style={{fontSize:FS.fs60,color:"#9a9488",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}>{"â–¼"}</span>
-        <button className="btn btn-danger btn-xs" style={{marginLeft:S.s2}} onClick={e=>{e.stopPropagation();removeEx();}}>{"âœ•"}</button>
+        <span style={{fontSize:FS.fs60,color:"#8a8478",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)",flexShrink:0,lineHeight:1}}>{"▼"}</span>
+        <button className="btn btn-danger btn-xs" style={{marginLeft:S.s2}} onClick={e=>{e.stopPropagation();removeEx();}}>{"✕"}</button>
       </div>
       {!collapsed && exData.id!=="rest_day" && (
         <>
@@ -191,7 +191,7 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                   <div style={{flex:1.2,minWidth:0}}>
                     <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>{bWUnit}</label>
                     <input className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal" step={bMetric?"0.5":"2.5"}
-                      defaultValue={dispW} placeholder={"â€”"}
+                      defaultValue={dispW} placeholder={"—"}
                       onBlur={e=>{const v=e.target.value;const lbs=v&&bMetric?kgToLbs(v):v;updateField("weightLbs",lbs||null);}} />
                   </div>
                 )}
@@ -199,26 +199,26 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
             )}
           </div>
           {isRunningEx && runBoostPct>0 && (
-            <div style={{fontSize:FS.fs65,color:UI_COLORS.warning,marginBottom:S.s6}}>{"âš¡ +"}{runBoostPct}{"% pace bonus"}{runBoostPct===20?" (sub-8 mi!)":""}</div>
+            <div style={{fontSize:FS.fs65,color:UI_COLORS.warning,marginBottom:S.s6}}>{"⚡ +"}{runBoostPct}{"% pace bonus"}{runBoostPct===20?" (sub-8 mi!)":""}</div>
           )}
           {/* Treadmill controls */}
           {hasDur && exData.hasTreadmill && (
             <div style={{marginBottom:S.s6}}>
               <div style={{display:"flex",gap:S.s8}}>
                 <div style={{flex:1}}>
-                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Incline <span style={{opacity:.6,fontSize:FS.fs55}}>{"(0.5â€“15)"}</span></label>
-                  <input className="builder-ex-input" style={{width:"100%"}} type="number" min="0.5" max="15" step="0.5" placeholder={"â€”"} defaultValue={ex.incline||""} onBlur={e=>updateField("incline",e.target.value?parseFloat(e.target.value):null)} />
+                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Incline <span style={{opacity:.6,fontSize:FS.fs55}}>{"(0.5–15)"}</span></label>
+                  <input className="builder-ex-input" style={{width:"100%"}} type="number" min="0.5" max="15" step="0.5" placeholder={"—"} defaultValue={ex.incline||""} onBlur={e=>updateField("incline",e.target.value?parseFloat(e.target.value):null)} />
                 </div>
                 <div style={{flex:1}}>
-                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Speed <span style={{opacity:.6,fontSize:FS.fs55}}>{"(0.5â€“15)"}</span></label>
-                  <input className="builder-ex-input" style={{width:"100%"}} type="number" min="0.5" max="15" step="0.5" placeholder={"â€”"} defaultValue={ex.speed||""} onBlur={e=>updateField("speed",e.target.value?parseFloat(e.target.value):null)} />
+                  <label style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Speed <span style={{opacity:.6,fontSize:FS.fs55}}>{"(0.5–15)"}</span></label>
+                  <input className="builder-ex-input" style={{width:"100%"}} type="number" min="0.5" max="15" step="0.5" placeholder={"—"} defaultValue={ex.speed||""} onBlur={e=>updateField("speed",e.target.value?parseFloat(e.target.value):null)} />
                 </div>
               </div>
             </div>
           )}
           {/* Extra interval/set rows */}
           {(ex.extraRows||[]).map((row,ri)=>(
-            <div key={ri} style={{display:"flex",gap:S.s4,marginTop:S.s4,padding:"6px 8px",background:"rgba(74,69,59,.18)",borderRadius:R.r6,alignItems:"center",flexWrap:"wrap"}}>
+            <div key={ri} style={{display:"flex",gap:S.s4,marginTop:S.s4,padding:"6px 8px",background:"rgba(45,42,36,.18)",borderRadius:R.r6,alignItems:"center",flexWrap:"wrap"}}>
               <span style={{fontSize:FS.fs58,color:"#9a8a78",flexShrink:0,minWidth:18}}>{hasDur?`I${ri+2}`:`S${ri+2}`}</span>
               {!hasDur && !noSetsEx && <input className="builder-ex-input" style={{flex:1,minWidth:40,fontSize:FS.fs70}} type="text" inputMode="decimal" placeholder="Sets" defaultValue={row.sets||""} onBlur={e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],sets:e.target.value};updateField("extraRows",rr);}} />}
               <input className="builder-ex-input" style={{flex:1.5,minWidth:52,fontSize:FS.fs70}} type="text" inputMode="numeric" placeholder="HH:MM"
@@ -229,15 +229,15 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
               {hasDur && exData.hasTreadmill && <input className="builder-ex-input" style={{flex:0.8,minWidth:34,fontSize:FS.fs70}} type="number" min="0.5" max="15" step="0.5" placeholder="Inc" defaultValue={row.incline||""} onBlur={e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],incline:e.target.value};updateField("extraRows",rr);}} />}
               {hasDur && exData.hasTreadmill && <input className="builder-ex-input" style={{flex:0.8,minWidth:34,fontSize:FS.fs70}} type="number" min="0.5" max="15" step="0.5" placeholder="Spd" defaultValue={row.speed||""} onBlur={e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],speed:e.target.value};updateField("extraRows",rr);}} />}
               {hasWeight && <input className="builder-ex-input" style={{flex:1,minWidth:38,fontSize:FS.fs70}} type="text" inputMode="decimal" placeholder={bWUnit} defaultValue={row.weightLbs||""} onBlur={e=>{const rr=[...(ex.extraRows||[])];rr[ri]={...rr[ri],weightLbs:e.target.value||null};updateField("extraRows",rr);}} />}
-              <button className="btn btn-danger btn-xs" style={{padding:"2px 6px",flexShrink:0}} onClick={()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateFieldNow("extraRows",rr);}}>{"âœ•"}</button>
+              <button className="btn btn-danger btn-xs" style={{padding:"2px 6px",flexShrink:0}} onClick={()=>{const rr=(ex.extraRows||[]).filter((_,j)=>j!==ri);updateFieldNow("extraRows",rr);}}>{"✕"}</button>
             </div>
           ))}
-          <button className="btn btn-ghost btn-xs" style={{width:"100%",marginTop:S.s4,marginBottom:S.s8,fontSize:FS.fs60,color:"#9a9488",borderStyle:"dashed"}}
-            onClick={()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateFieldNow("extraRows",rr);}}>{"ï¼‹ Add Row (e.g. "}{hasDur?"interval":"progressive weight"}{")"}</button>
+          <button className="btn btn-ghost btn-xs" style={{width:"100%",marginTop:S.s4,marginBottom:S.s8,fontSize:FS.fs60,color:"#8a8478",borderStyle:"dashed"}}
+            onClick={()=>{const rr=[...(ex.extraRows||[]),hasDur?{hhmm:"",sec:"",distanceMi:"",incline:"",speed:""}:{sets:ex.sets||"",reps:ex.reps||"",weightLbs:ex.weightLbs||""}];updateFieldNow("extraRows",rr);}}>{"＋ Add Row (e.g. "}{hasDur?"interval":"progressive weight"}{")"}</button>
           {/* Avg HR Zone -- last for cardio */}
           {hasDur && (
             <div role="group" aria-labelledby={`${cardId}-hr`}>
-              {/* Not a <label> â€” the HR zones below are a custom widget, not a single form control */}
+              {/* Not a <label> — the HR zones below are a custom widget, not a single form control */}
               <div id={`${cardId}-hr`} style={{fontSize:FS.fs60,color:"#b0a898",marginBottom:S.s4,display:"block"}}>Avg Heart Rate Zone <span style={{opacity:.6,fontSize:FS.fs55}}>(optional)</span></div>
               <div className="hr-zone-row">
                 {HR_ZONES.map(z=>{
@@ -245,15 +245,15 @@ const PlanExCard = React.memo(function PlanExCard({ ex, i, exData, bDayIdx, xp, 
                   const range=hrRange(age,z);
                   return (
                     <div key={z.z} className={`hr-zone-btn ${sel?"sel":""}`}
-                      style={{"--zc":z.color,borderColor:sel?z.color:"rgba(74,69,59,.2)",background:sel?`${z.color}22`:"rgba(74,69,59,.12)"}}
+                      style={{"--zc":z.color,borderColor:sel?z.color:"rgba(45,42,36,.2)",background:sel?`${z.color}22`:"rgba(45,42,36,.12)"}}
                       onClick={()=>updateField("hrZone",sel?null:z.z)}>
-                      <span className="hz-name" style={{color:sel?z.color:"#9a9488"}}>{"Z"}{z.z}{" "}{z.name}</span>
-                      <span className="hz-bpm" style={{color:sel?z.color:"#9a9488"}}>{range.lo}{"â€“"}{range.hi}</span>
+                      <span className="hz-name" style={{color:sel?z.color:"#8a8478"}}>{"Z"}{z.z}{" "}{z.name}</span>
+                      <span className="hz-bpm" style={{color:sel?z.color:"#8a8478"}}>{range.lo}{"–"}{range.hi}</span>
                     </div>
                   );
                 })}
               </div>
-              {ex.hrZone && <div style={{fontSize:FS.fs65,color:"#9a9488",fontStyle:"italic",marginTop:S.s4}}>{HR_ZONES[ex.hrZone-1].desc}</div>}
+              {ex.hrZone && <div style={{fontSize:FS.fs65,color:"#8a8478",fontStyle:"italic",marginTop:S.s4}}>{HR_ZONES[ex.hrZone-1].desc}</div>}
             </div>
           )}
         </>
@@ -270,7 +270,7 @@ function PlanWizard(props) {
 
   const [isPending, startTransition] = useTransition();
 
-  // â”€â”€ Plan metadata state â”€â”€
+  // ── Plan metadata state ──
   const [bEditId, setBEditId] = useState(() => {
     if(editPlan) return editPlan.id;
     if(templatePlan && templatePlan.customize && templatePlan.custom) return templatePlan.id;
@@ -307,14 +307,14 @@ function PlanWizard(props) {
     return "";
   });
   const [bIcon, setBIcon] = useState(() => {
-    if(editPlan) return editPlan.icon || "âš”ï¸";
-    if(templatePlan) return templatePlan.icon || "âš”ï¸";
-    return "âš”ï¸";
+    if(editPlan) return editPlan.icon || "⚔️";
+    if(templatePlan) return templatePlan.icon || "⚔️";
+    return "⚔️";
   });
   const [bDays, dispatch] = useReducer(bDaysReducer, { editPlan, templatePlan }, initBDays);
   const [bDayIdx, setBDayIdx] = useState(0);
 
-  // â”€â”€ Wizard/UI state â”€â”€
+  // ── Wizard/UI state ──
   const [wizardWeekIdx, setWizardWeekIdx] = useState(0);
   const [collapsedWeeks, setCollapsedWeeks] = useState({});
   const [planWizardOpen, setPlanWizardOpen] = useState(false);
@@ -323,7 +323,7 @@ function PlanWizard(props) {
   const [ssAccordion, setSsAccordion] = useState({});
   const [ssCheckedPlan, setSsCheckedPlan] = useState(()=>new Set());
 
-  // â”€â”€ Picker state â”€â”€
+  // ── Picker state ──
   const [exPickerOpen, setExPickerOpen] = useState(false);
   const [bWoPickerOpen, setBWoPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -336,14 +336,14 @@ function PlanWizard(props) {
   const [pickerOpenDrop, setPickerOpenDrop] = useState(null);
   const [pickerSelected, setPickerSelected] = useState([]);
 
-  // â”€â”€ Body overflow effect â”€â”€
+  // ── Body overflow effect ──
   useEffect(() => {
     if(planWizardOpen) { document.body.style.overflow = 'hidden'; }
     else { document.body.style.overflow = ''; }
     return () => { document.body.style.overflow = ''; };
   }, [planWizardOpen]);
 
-  // â”€â”€ Modal accessibility lifecycle (item 3 of post-Sprint-3 a11y plan) â”€â”€
+  // ── Modal accessibility lifecycle (item 3 of post-Sprint-3 a11y plan) ──
   // Three nested modals in this component: the plan wizard itself, the
   // workout picker, and the exercise picker. Each gets inert / ESC / focus
   // restoration via useModalLifecycle. The exercise picker's close handler
@@ -353,11 +353,11 @@ function PlanWizard(props) {
   useModalLifecycle(bWoPickerOpen, () => setBWoPickerOpen(false));
   useModalLifecycle(exPickerOpen, () => closePicker());
 
-  // â”€â”€ Class multiplier helper â”€â”€
+  // ── Class multiplier helper ──
   const clsKey = profile.chosenClass;
   const getMult = (ex) => clsKey ? (_optionalChain([CLASSES, 'access', _ => _[clsKey], 'optionalAccess', _2 => _2.bonuses, 'access', _3 => _3[ex.category]])||1) : 1;
 
-  // â”€â”€ useMemos â”€â”€
+  // ── useMemos ──
   const builderXP = useMemo(()=>bDays.reduce((t,d)=>t+d.exercises.reduce((s,ex)=>{
     const base=calcExXP(ex.exId,ex.sets,ex.reps,profile.chosenClass,allExById);
     const rowsXP=(ex.extraRows||[]).reduce((rs,row)=>rs+calcExXP(ex.exId,parseInt(row.sets)||parseInt(ex.sets)||3,parseInt(row.reps)||parseInt(ex.reps)||10,profile.chosenClass,allExById),0);
@@ -399,7 +399,7 @@ function PlanWizard(props) {
     return next;
   });
 
-  // â”€â”€ Functions â”€â”€
+  // ── Functions ──
   function togglePlanEx(dayIdx,exIdx){ const k=`${dayIdx}_${exIdx}`; setCollapsedPlanEx(s=>({...s,[k]:!s[k]})); }
   function toggleWeek(wk){ setCollapsedWeeks(s=>({...s,[wk]:!s[wk]})); }
 
@@ -428,7 +428,7 @@ function PlanWizard(props) {
   function removeExFromDay(di,ei){ startTransition(()=>{ dispatch({ type: A.REMOVE_EX, dayIdx: di, exIdx: ei }); }); }
 
   function updateExInDay(di,ei,field,val){ startTransition(()=>{ dispatch({ type: A.UPDATE_EX_FIELD, dayIdx: di, exIdx: ei, field, val }); }); }
-  // Direct (non-deferred) version for add/delete row â€” gives instant visual feedback
+  // Direct (non-deferred) version for add/delete row — gives instant visual feedback
   function updateExInDayNow(di,ei,field,val){ dispatch({ type: A.UPDATE_EX_FIELD, dayIdx: di, exIdx: ei, field, val }); }
 
   function updateExInDayBatch(di,ei,fields){ startTransition(()=>{ dispatch({ type: A.UPDATE_EX_FIELD_BATCH, dayIdx: di, exIdx: ei, fields }); }); }
@@ -451,16 +451,16 @@ function PlanWizard(props) {
     const _hasDur = _isC||_isF; const _hasW = !_isC&&!_isF;
     const _m = isMetric(profile.units); const _wU = weightLabel(profile.units); const _dU = distLabel(profile.units);
     const xpVal = wizardExXPs[exIdx]||0;
-    const summaryText = (_noSets?"":ex.sets+"Ã—") + ex.reps + (ex.weightLbs?` Â· ${_m?lbsToKg(ex.weightLbs):ex.weightLbs}${_wU}`:"");
+    const summaryText = (_noSets?"":ex.sets+"×") + ex.reps + (ex.weightLbs?` · ${_m?lbsToKg(ex.weightLbs):ex.weightLbs}${_wU}`:"");
     return (
       <div className="ss-section">
         <div className="ss-section-hdr" onClick={()=>setSsAccordion(p=>({...p,[sectionKey]:!p[sectionKey]}))}>
           <div className="ab-badge">{label}</div>
-          <div style={{width:28,height:28,borderRadius:R.r6,flexShrink:0,background:"rgba(74,69,59,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.fs80}}>{exData.icon}</div>
+          <div style={{width:28,height:28,borderRadius:R.r6,flexShrink:0,background:"rgba(45,42,36,.15)",border:"1px solid rgba(180,172,158,.05)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:FS.fs80}}>{exData.icon}</div>
           <span style={{fontFamily:"'Cinzel',serif",fontSize:FS.fs66,color:"#d8caba",letterSpacing:".02em",flex:1,minWidth:0}}>{exData.name}</span>
-          {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs55,color:"#9a9488"}}>{summaryText}</span>}
+          {collapsed && exData.id!=="rest_day" && <span style={{fontSize:FS.fs55,color:"#8a8478"}}>{summaryText}</span>}
           <span style={{fontSize:FS.fs60,fontWeight:700,color:"#b4ac9e",flexShrink:0}}>{"+"+xpVal}</span>
-          <span style={{fontSize:FS.fs60,color:"#9a9488",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}>{"â–¼"}</span>
+          <span style={{fontSize:FS.fs60,color:"#8a8478",transition:"transform .2s",transform:collapsed?"rotate(0deg)":"rotate(180deg)"}}>{"▼"}</span>
         </div>
         {!collapsed && exData.id!=="rest_day" && (
           <div className="ss-section-body">
@@ -502,7 +502,7 @@ function PlanWizard(props) {
                       <input id={`${sectionKey}-weight`} className="builder-ex-input" style={{width:"100%"}} type="text" inputMode="decimal"
                         defaultValue={ex.weightLbs!=null&&ex.weightLbs!==""?(_m?lbsToKg(ex.weightLbs):String(ex.weightLbs)):""}
                         onBlur={e=>{const v=e.target.value;const lbs=v&&_m?kgToLbs(v):v;updateExInDay(dayIdx,exIdx,"weightLbs",lbs||null);}}
-                        placeholder={"â€”"} />
+                        placeholder={"—"} />
                     </div>
                   )}
                 </>
@@ -581,21 +581,21 @@ function PlanWizard(props) {
     closePicker();
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   // RENDER
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════
   return (
     <>
-      {/* â”€â”€ 1. BUILDER OVERVIEW FORM â”€â”€ */}
+      {/* ── 1. BUILDER OVERVIEW FORM ── */}
       {!planWizardOpen && (
         <div className="builder-nav-hdr">
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>{"â† Back"}</button>
-          <div className="builder-nav-title">{bEditId ? "âœŽ Overview" : "ðŸ“œ New Plan"}</div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>{"← Back"}</button>
+          <div className="builder-nav-title">{bEditId ? "✎ Overview" : "📜 New Plan"}</div>
         </div>
       )}
       {!planWizardOpen && (
         <div className="builder-wrap">
-          <div className="field"><label htmlFor={`${formId}-name`}>Plan Name</label><input id={`${formId}-name`} className="inp" value={bName} onChange={e=>setBName(e.target.value)} placeholder={"Name your planâ€¦"} /></div>
+          <div className="field"><label htmlFor={`${formId}-name`}>Plan Name</label><input id={`${formId}-name`} className="inp" value={bName} onChange={e=>setBName(e.target.value)} placeholder={"Name your plan…"} /></div>
           <div className="field">
             <label htmlFor={`${formId}-level-0`}>Level <span style={{fontSize:FS.fs55,opacity:.6}}>(optional)</span></label>
             <div style={{display:"flex",gap:S.s6}}>
@@ -604,7 +604,7 @@ function PlanWizard(props) {
                   style={{flex:1,fontSize:FS.fs62,
                     border:bLevel===lvl?`1px solid ${lvl==="Beginner"?"#5A8A58":lvl==="Intermediate"?"#A8843C":"#7A2838"}`:"",
                     color:bLevel===lvl?(lvl==="Beginner"?"#5A8A58":lvl==="Intermediate"?"#A8843C":"#7A2838"):"",
-                    background:bLevel===lvl?"rgba(74,69,59,.15)":""}}
+                    background:bLevel===lvl?"rgba(45,42,36,.15)":""}}
                   onClick={()=>setBLevel(bLevel===lvl?"":lvl)}>
                   {lvl}
                 </button>
@@ -668,7 +668,7 @@ function PlanWizard(props) {
                 <option value="year">Year{bDurCount>1?"s":""}</option>
               </select>
             </div>
-            <div style={{fontSize:FS.fs62,color:"#9a9488",marginTop:S.s4,fontStyle:"italic"}}>
+            <div style={{fontSize:FS.fs62,color:"#8a8478",marginTop:S.s4,fontStyle:"italic"}}>
               {bDurCount===1?"Single "+bType+" plan":`${bDurCount}-${bType} program`}
             </div>
           </div>
@@ -720,29 +720,29 @@ function PlanWizard(props) {
             </div>
           </div>
           {bStartDate && bEndDate && (
-            <div style={{fontSize:FS.fs65,color:"#b4ac9e",marginTop:S.sNeg8,marginBottom:S.s4,fontStyle:"italic"}}>{"ðŸ“… "}{(()=>{
+            <div style={{fontSize:FS.fs65,color:"#b4ac9e",marginTop:S.sNeg8,marginBottom:S.s4,fontStyle:"italic"}}>{"📅 "}{(()=>{
               const s=new Date(bStartDate+"T12:00:00");
               const e=new Date(bEndDate+"T12:00:00");
               const days=Math.round((e-s)/(1000*60*60*24))+1;
-              return s.toLocaleDateString([],{month:"short",day:"numeric"})+" â†’ "+e.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})+" ("+days+" day"+(days!==1?"s":"")+")"
+              return s.toLocaleDateString([],{month:"short",day:"numeric"})+" → "+e.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})+" ("+days+" day"+(days!==1?"s":"")+")"
             })()}</div>
           )}
           <div className="field" role="group" aria-labelledby={`${formId}-icon`}>
-            {/* Not a <label> â€” the icon options below are a custom radio group of
+            {/* Not a <label> — the icon options below are a custom radio group of
                  non-input elements, so a labelable association isn't possible.
                  Keeping the same visual style via the .field-label class. */}
             <span id={`${formId}-icon`} className="field-label">Icon</span>
             <div className="icon-row">{ICONS.map(ic=><div key={ic} className={`icon-opt ${bIcon===ic?"sel":""}`} onClick={()=>setBIcon(ic)}>{ic}</div>)}</div>
           </div>
           <div className="xp-projection">
-            <div><div className="xp-proj-label">Projected Total XP</div><div className="xp-proj-detail">{bDays.filter(d=>d.exercises.length>0).length}{" active days Â· "}{bDays.reduce((t,d)=>t+d.exercises.length,0)}{" exercises"}</div></div>
-            <div className="xp-proj-value">{"âš¡ "}{builderXP.toLocaleString()}</div>
+            <div><div className="xp-proj-label">Projected Total XP</div><div className="xp-proj-detail">{bDays.filter(d=>d.exercises.length>0).length}{" active days · "}{bDays.reduce((t,d)=>t+d.exercises.length,0)}{" exercises"}</div></div>
+            <div className="xp-proj-value">{"⚡ "}{builderXP.toLocaleString()}</div>
           </div>
           <button className="btn btn-gold btn-plan-action"
             onClick={()=>{setPlanWizardOpen(true);setWizardWeekIdx(0);}}>
-            {bEditId ? "âœŽ Edit Plan" : "âš” Create Plan"}
+            {bEditId ? "✎ Edit Plan" : "⚔ Create Plan"}
           </button>
-          <div style={{fontSize:FS.fs58,color:"#9a9488",textAlign:"center",marginTop:S.s6,fontStyle:"italic"}}>
+          <div style={{fontSize:FS.fs58,color:"#8a8478",textAlign:"center",marginTop:S.s6,fontStyle:"italic"}}>
             {bEditId ? "Open the plan wizard to edit days and exercises" : "Open the plan wizard to add days and exercises"}
           </div>
           {/* Action buttons -- only for existing plans in user's collection */}
@@ -756,29 +756,29 @@ function PlanWizard(props) {
                   <button className={`plan-sched-btn ${plan.scheduledDate?"plan-sched-active":""}`}
                     style={{flex:1,padding:"8px 12px",textAlign:"center"}}
                     onClick={()=>onSchedulePlan(plan)}>
-                    {plan.scheduledDate?"ðŸ“… "+formatScheduledDate(plan.scheduledDate):"ðŸ“… Schedule"}
+                    {plan.scheduledDate?"📅 "+formatScheduledDate(plan.scheduledDate):"📅 Schedule"}
                   </button>
-                  {plan.custom && <button className="btn btn-danger btn-sm" style={{flex:1}} onClick={()=>{onDeletePlan(plan.id);onClose();}}>{"ðŸ—‘ Delete"}</button>}
+                  {plan.custom && <button className="btn btn-danger btn-sm" style={{flex:1}} onClick={()=>{onDeletePlan(plan.id);onClose();}}>{"🗑 Delete"}</button>}
                 </div>
-                {plan.custom && <button className="btn btn-glass" style={{width:"100%",marginTop:S.s8}} onClick={()=>onStartPlanWorkout(plan)}>{"ðŸ“‹ Mark Plan Complete"}</button>}
+                {plan.custom && <button className="btn btn-glass" style={{width:"100%",marginTop:S.s8}} onClick={()=>onStartPlanWorkout(plan)}>{"📋 Mark Plan Complete"}</button>}
               </>
             );
           })()}
         </div>
       )}
 
-      {/* â”€â”€ 2. PLAN WIZARD FULL-SCREEN OVERLAY â”€â”€ */}
+      {/* ── 2. PLAN WIZARD FULL-SCREEN OVERLAY ── */}
       {planWizardOpen && createPortal(
         <div className="plan-wizard-backdrop" onClick={e=>e.stopPropagation()}>
           <div className="plan-wizard-inner">
             {/* Wizard Header */}
             <div className="plan-wizard-hdr">
-              <button className="btn btn-ghost btn-sm" onClick={()=>setPlanWizardOpen(false)}>{"â† Back"}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setPlanWizardOpen(false)}>{"← Back"}</button>
               <div className="plan-wizard-hdr-title">
                 <span className="plan-wizard-hdr-icon">{bIcon}</span>
                 {" "}{bName||"Untitled Plan"}
               </div>
-              <button className="btn btn-gold btn-sm" onClick={()=>{saveBuiltPlan();setPlanWizardOpen(false);}}>{"ðŸ’¾ Save"}</button>
+              <button className="btn btn-gold btn-sm" onClick={()=>{saveBuiltPlan();setPlanWizardOpen(false);}}>{"💾 Save"}</button>
             </div>
 
             {/* Week tabs (only for multi-week plans) */}
@@ -796,7 +796,7 @@ function PlanWizard(props) {
                         onClick={()=>{setWizardWeekIdx(wk);setBDayIdx(wk*7);}}>
                         <span>{"Week "}{wk+1}</span>
                         <span className="wk-days">{activeDays}{"/"}{weekDays.length}{" active"}</span>
-                        <span className="wk-xp">{"âš¡"}{weekXP.toLocaleString()}</span>
+                        <span className="wk-xp">{"⚡"}{weekXP.toLocaleString()}</span>
                       </div>
                     );
                   })}
@@ -805,7 +805,7 @@ function PlanWizard(props) {
                       const newDays = Array.from({length:7},(_,i)=>({label:`Day ${bDays.length+i+1}`,exercises:[]}));
                       startTransition(()=>{ dispatch({ type: A.ADD_DAYS, days: newDays }); });
                       setWizardWeekIdx(Math.ceil((bDays.length+7)/7)-1);
-                    }}>{"ï¼‹ Week"}</div>
+                    }}>{"＋ Week"}</div>
                 </div>
               );
             })()}
@@ -827,21 +827,21 @@ function PlanWizard(props) {
                         onClick={()=>setBDayIdx(globalIdx)}>
                         {reorderMode && weekDays.length>1 && (
                           <span style={{display:"flex",flexDirection:"column",gap:S.s0,flexShrink:0}}>
-                            <button className="btn btn-ghost btn-xs" style={{padding:"2px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===0?.3:1}} disabled={wi===0} onClick={e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx-1);}}>{"â—€"}</button>
-                            <button className="btn btn-ghost btn-xs" style={{padding:"2px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===weekDays.length-1?.3:1}} disabled={wi===weekDays.length-1} onClick={e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx+1);}}>{"â–¶"}</button>
+                            <button className="btn btn-ghost btn-xs" style={{padding:"2px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===0?.3:1}} disabled={wi===0} onClick={e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx-1);}}>{"◀"}</button>
+                            <button className="btn btn-ghost btn-xs" style={{padding:"2px 4px",fontSize:FS.fs50,lineHeight:1,minWidth:0,opacity:wi===weekDays.length-1?.3:1}} disabled={wi===weekDays.length-1} onClick={e=>{e.stopPropagation();reorderDay(globalIdx,globalIdx+1);}}>{"▶"}</button>
                           </span>
                         )}
                         <span>{d.label||`Day ${globalIdx+1}`}</span>
                         {hasExercises
-                          ? <span className="day-xp-mini">{"âš¡"}{dayXP}</span>
+                          ? <span className="day-xp-mini">{"⚡"}{dayXP}</span>
                           : <span className="day-rest-badge">REST</span>}
                       </div>
                     );
                   })}
                   <div className="wizard-day-tab" style={{color:"#b4ac9e",borderStyle:"dashed",borderColor:"rgba(180,172,158,.12)",minWidth:52}}
-                    onClick={addDayToBuilder}>{"ï¼‹"}</div>
+                    onClick={addDayToBuilder}>{"＋"}</div>
                   {weekDays.length>1 && <div className={`wizard-day-tab ${reorderMode?"on":""}`} style={{minWidth:52,fontSize:FS.fs52,cursor:"pointer",borderColor:reorderMode?"rgba(180,172,158,.15)":"rgba(180,172,158,.06)"}}
-                    onClick={()=>setReorderMode(r=>!r)}>{reorderMode?"âœ“ Done":"â‡„ Reorder"}</div>}
+                    onClick={()=>setReorderMode(r=>!r)}>{reorderMode?"✓ Done":"⇄ Reorder"}</div>}
                 </div>
               );
             })()}
@@ -849,21 +849,21 @@ function PlanWizard(props) {
             {/* Multi-week: duplicate week + week XP info */}
             {bDays.length > 7 && (
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s8}}>
-                <span style={{fontSize:FS.fs62,color:"#9a9488"}}>
-                  {"Week "}{wizardWeekIdx+1}{" Â· "}
+                <span style={{fontSize:FS.fs62,color:"#8a8478"}}>
+                  {"Week "}{wizardWeekIdx+1}{" · "}
                   {(()=>{const wDays=bDays.slice(wizardWeekIdx*7,wizardWeekIdx*7+7);return wDays.filter(d=>d.exercises.length>0).length;})()}{" active days"}
                 </span>
                 <button className="btn btn-ghost btn-xs" style={{fontSize:FS.fs58}}
-                  onClick={()=>duplicateWeek(wizardWeekIdx)}>{"âŽ˜ Duplicate Week"}</button>
+                  onClick={()=>duplicateWeek(wizardWeekIdx)}>{"⎘ Duplicate Week"}</button>
               </div>
             )}
 
             {/* Selected day editor */}
             <div className="wizard-day-editor">
               <div className="wizard-day-hdr">
-                <input key={"dlbl_"+bDayIdx} className="inp" defaultValue={_optionalChain([bDays, 'access', _4 => _4[bDayIdx], 'optionalAccess', _5 => _5.label])||""} onBlur={e=>updateDayLabel(bDayIdx,e.target.value)} placeholder={"Day labelâ€¦"} style={{flex:1,padding:"8px 12px",fontSize:FS.fs82}} />
-                <span style={{fontSize:FS.fs72,color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}>{"âš¡ "}{wizardDayXPs[bDayIdx]||0}</span>
-                {bDays.length>1 && <button className="btn btn-danger btn-xs" style={{marginLeft:S.s6,padding:"4px 8px",fontSize:FS.fs60}} onClick={()=>removeDayFromBuilder(bDayIdx)}>{"ðŸ—‘ Delete Day"}</button>}
+                <input key={"dlbl_"+bDayIdx} className="inp" defaultValue={_optionalChain([bDays, 'access', _4 => _4[bDayIdx], 'optionalAccess', _5 => _5.label])||""} onBlur={e=>updateDayLabel(bDayIdx,e.target.value)} placeholder={"Day label…"} style={{flex:1,padding:"8px 12px",fontSize:FS.fs82}} />
+                <span style={{fontSize:FS.fs72,color:"#b4ac9e",fontFamily:"'Inter',sans-serif",whiteSpace:"nowrap"}}>{"⚡ "}{wizardDayXPs[bDayIdx]||0}</span>
+                {bDays.length>1 && <button className="btn btn-danger btn-xs" style={{marginLeft:S.s6,padding:"4px 8px",fontSize:FS.fs60}} onClick={()=>removeDayFromBuilder(bDayIdx)}>{"🗑 Delete Day"}</button>}
               </div>
               {/* Optional day-level stats */}
               <div key={"dstats_"+bDayIdx} className="wizard-day-stats">
@@ -885,8 +885,8 @@ function PlanWizard(props) {
                   onBlur={e=>startTransition(()=>{ dispatch({ type: A.UPDATE_DAY_FIELD, dayIdx: bDayIdx, fields: {totalCal:e.target.value||null} }); })} />
               </div>
               <div style={{display:"flex",gap:S.s6,marginBottom:S.s8}}>
-                <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setExPickerOpen(true)}>{"ï¼‹ Add Exercise"}</button>
-                <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setBWoPickerOpen(true)}>{"ðŸ’ª Add Workout"}</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setExPickerOpen(true)}>{"＋ Add Exercise"}</button>
+                <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setBWoPickerOpen(true)}>{"💪 Add Workout"}</button>
               </div>
               {(()=>{const minSsCheckedPlan = ssCheckedPlan.size>0 ? Math.min(...ssCheckedPlan) : -1; return (_optionalChain([bDays, 'access', _20 => _20[bDayIdx], 'optionalAccess', _21 => _21.exercises])||[]).map((ex,i)=>{
                 const exData=allExById[ex.exId]; if(!exData) return null;
@@ -910,19 +910,19 @@ function PlanWizard(props) {
                               const minI=Math.min(i,planPartnerIdx);
                               if(minI<=0) return;
                               startTransition(()=>{ dispatch({ type: A.MOVE_SUPERSET_UP, dayIdx: bDayIdx, minI }); });
-                            }}>{"â–²"}</button>
+                            }}>{"▲"}</button>
                           <button className="btn btn-ghost btn-xs" style={{padding:"2px 6px",fontSize:FS.fs65,lineHeight:1,minWidth:0,opacity:Math.max(i,planPartnerIdx)>=((_optionalChain([bDays, 'access', _22 => _22[bDayIdx], 'optionalAccess', _23 => _23.exercises, 'access', _24 => _24.length])||1)-1)?.3:1}}
                             onClick={e=>{e.stopPropagation();
                               const maxI=Math.max(i,planPartnerIdx); const minI=Math.min(i,planPartnerIdx);
                               const len=(_optionalChain([bDays, 'access', _25 => _25[bDayIdx], 'optionalAccess', _26 => _26.exercises, 'access', _27 => _27.length])||0);
                               if(maxI>=len-1) return;
                               startTransition(()=>{ dispatch({ type: A.MOVE_SUPERSET_DOWN, dayIdx: bDayIdx, minI, maxI }); });
-                            }}>{"â–¼"}</button>
+                            }}>{"▼"}</button>
                         </div>
-                        <span className="ss-accordion-hdr-title">{"ðŸ”— Superset"}</span>
+                        <span className="ss-accordion-hdr-title">{"🔗 Superset"}</span>
                         <span className="ss-accordion-xp">{(xpA+xpB)+" XP total"}</span>
                         <button className="ss-accordion-ungroup"
-                          onClick={()=>planUngroupSuperset(bDayIdx,i,planPartnerIdx)}>{"âœ• Ungroup"}</button>
+                          onClick={()=>planUngroupSuperset(bDayIdx,i,planPartnerIdx)}>{"✕ Ungroup"}</button>
                       </div>
                       {renderPlanSsSection(ex, bDayIdx, i, exData, "A", "plan_"+bDayIdx+"_"+i+"_a")}
                       {renderPlanSsSection(planPartnerEx, bDayIdx, planPartnerIdx, planPartnerExD, "B", "plan_"+bDayIdx+"_"+i+"_b")}
@@ -936,8 +936,8 @@ function PlanWizard(props) {
                         <span className="ss-action-text">{ssCheckedPlan.size+" selected"}</span>
                         {ssCheckedPlan.size===2 && <button className="ss-action-btn" onClick={()=>{
                           const [a,b]=[...ssCheckedPlan]; planGroupSuperset(bDayIdx,a,b);
-                        }}>{"ðŸ”— Group as Superset"}</button>}
-                        <button className="ss-action-cancel" onClick={()=>setSsCheckedPlan(new Set())}>{"âœ•"}</button>
+                        }}>{"🔗 Group as Superset"}</button>}
+                        <button className="ss-action-cancel" onClick={()=>setSsCheckedPlan(new Set())}>{"✕"}</button>
                       </div>
                     )}
                     <PlanExCard
@@ -957,29 +957,29 @@ function PlanWizard(props) {
                 onClick={()=>{
                   const plan=(profile.plans||[]).find(p=>p.id===bEditId); if(!plan) return;
                   const currentDay=bDays[bDayIdx]; if(!currentDay) return;
-                  const synth={name:currentDay.label||"Day",icon:bIcon||"ðŸ“‹",exercises:currentDay.exercises,
+                  const synth={name:currentDay.label||"Day",icon:bIcon||"📋",exercises:currentDay.exercises,
                     durationMin:currentDay.durationMin||null,activeCal:currentDay.activeCal||null,totalCal:currentDay.totalCal||null};
                   if(onCompleteDayStart) {
                     onCompleteDayStart(synth, (woWithStats) => {
                       onStartPlanWorkout({...plan,days:[{...currentDay,durationMin:woWithStats.durationMin,activeCal:woWithStats.activeCal,totalCal:woWithStats.totalCal}]});
                     });
                   }
-                }}>{"âœ“ Complete Day"}</button>}
+                }}>{"✓ Complete Day"}</button>}
               <div className="div" style={{margin:"3px 0"}} />
-              <button className="btn btn-gold" style={{width:"100%"}} onClick={saveBuiltPlan}>{"ðŸ’¾ Save Plan"}</button>
+              <button className="btn btn-gold" style={{width:"100%"}} onClick={saveBuiltPlan}>{"💾 Save Plan"}</button>
             </div>{/* close wizard-day-editor */}
           </div>{/* close plan-wizard-inner */}
         </div>,
         document.body
       )}
 
-      {/* â”€â”€ 3. WORKOUT PICKER PORTAL â”€â”€ */}
+      {/* ── 3. WORKOUT PICKER PORTAL ── */}
       {bWoPickerOpen && createPortal(
         <div className="ex-picker-backdrop" onClick={e=>{e.stopPropagation();setBWoPickerOpen(false);}}>
           <div className="ex-picker-sheet" onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}>
               <div className="sec" style={{margin:0,border:"none",padding:S.s0}}>Add Workout to Day</div>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setBWoPickerOpen(false)}>{"âœ•"}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setBWoPickerOpen(false)}>{"✕"}</button>
             </div>
             {profile.workouts && profile.workouts.length>0 ? profile.workouts.map(wo=>(
               <div key={wo.id} className="ex-pick-item" style={{marginBottom:S.s6,flexDirection:"column",alignItems:"flex-start",gap:S.s4}}
@@ -1002,34 +1002,34 @@ function PlanWizard(props) {
                 </div>
               </div>
             )) : (
-              <div className="empty" style={{padding:"20px 0"}}>{"No saved workouts yet. Build one in the ðŸ’ª Work tab first."}</div>
+              <div className="empty" style={{padding:"20px 0"}}>{"No saved workouts yet. Build one in the 💪 Work tab first."}</div>
             )}
           </div>
         </div>,
         document.body
       )}
 
-      {/* â”€â”€ 4. EXERCISE PICKER PORTAL â”€â”€ */}
+      {/* ── 4. EXERCISE PICKER PORTAL ── */}
       {exPickerOpen && createPortal(
         <div className="ex-picker-backdrop" onClick={e=>{e.stopPropagation();closePicker();}}>
           <div className="ex-picker-sheet" onClick={e=>e.stopPropagation()} style={{maxHeight:"85vh"}}>
             {/* -- BROWSE VIEW -- */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:S.s10}}>
-              <div style={{fontFamily:"'Inter',sans-serif",fontSize:FS.fs72,fontWeight:600,color:"#9a9488"}}>
+              <div style={{fontFamily:"'Inter',sans-serif",fontSize:FS.fs72,fontWeight:600,color:"#8a8478"}}>
                 {"Add to Plan"}{pickerSelected.length>0 && <span style={{color:"#b4ac9e",marginLeft:S.s6}}>{pickerSelected.length+" selected"}</span>}
               </div>
               <div style={{display:"flex",gap:S.s6}}>
-                {pickerSelected.length>0 && <button className="btn btn-gold btn-xs" onClick={commitPickerToPlan}>{"ï¼‹ Add "+pickerSelected.length}</button>}
-                <button className="btn btn-ghost btn-xs" onClick={()=>{closePicker();if(onOpenExEditor)onOpenExEditor("create",null);}}>{"âœ¦ New Custom"}</button>
-                <button className="btn btn-ghost btn-sm" onClick={closePicker}>{"âœ•"}</button>
+                {pickerSelected.length>0 && <button className="btn btn-gold btn-xs" onClick={commitPickerToPlan}>{"＋ Add "+pickerSelected.length}</button>}
+                <button className="btn btn-ghost btn-xs" onClick={()=>{closePicker();if(onOpenExEditor)onOpenExEditor("create",null);}}>{"✦ New Custom"}</button>
+                <button className="btn btn-ghost btn-sm" onClick={closePicker}>{"✕"}</button>
               </div>
             </div>
             <div style={{marginBottom:S.s8}}>
                   <input className="inp" style={{width:"100%",padding:"8px 12px",fontSize:FS.fs82}}
-                    placeholder={"Search exercisesâ€¦"} ref={pickerSearchRef}
+                    placeholder={"Search exercises…"} ref={pickerSearchRef}
                     onChange={e=>debouncedSetSearch(e.target.value)} autoFocus={true} />
                 </div>
-                {/* Filter dropdowns â€” the fourth copy of this pattern lived
+                {/* Filter dropdowns — the fourth copy of this pattern lived
                     here, with its own PMUSCLE_OPTS2 that omitted tricep and
                     full_body, so 188 exercises could not be filtered to while
                     building a plan. Shared FilterDropdown + vocabulary now,
@@ -1088,12 +1088,12 @@ function PlanWizard(props) {
                   if(filteredExercises.length===0) return <div className="empty" style={{padding:"20px 0"}}>No exercises found.</div>;
                   return (
                     <>
-                      <div style={{fontSize:FS.fs62,color:"#9a9488",marginBottom:S.s6,textAlign:"right"}}>
+                      <div style={{fontSize:FS.fs62,color:"#8a8478",marginBottom:S.s6,textAlign:"right"}}>
                         {filteredExercises.length+" match"+(filteredExercises.length!==1?"es":"")}
                       </div>
                       {/* Virtualized: rowHeight 60px = .picker-ex-row content (~52px) + 8px slot padding.
                           height: min(60vh, 480px) keeps the list inside the modal sheet without
-                          overflowing on small screens. The previous slice(0,80) cap is gone â€”
+                          overflowing on small screens. The previous slice(0,80) cap is gone —
                           users can scroll through all matches. */}
                       <List
                         rowCount={filteredExercises.length}

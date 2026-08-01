@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS } from '../../utils/tokens';
@@ -9,8 +9,8 @@ import { DIFF_FG, DIFF_BG } from './difficulty';
  * The exercise list row, shared by the library tab and the workout-builder
  * picker.
  *
- * These were two hand-written copies that had already drifted â€” the library
- * showed equipment and a favourite star, the picker a "custom" badge â€” and
+ * These were two hand-written copies that had already drifted — the library
+ * showed equipment and a favourite star, the picker a "custom" badge — and
  * both were a plain `<div>` with an `onClick`, so the entire exercise list was
  * unreachable by keyboard and announced as nothing in particular.
  *
@@ -19,7 +19,7 @@ import { DIFF_FG, DIFF_BG } from './difficulty';
  * by an absolutely-positioned `::after`. That gives correct semantics and a
  * focus ring without nesting the favourite button inside another button (which
  * is invalid, and hides the inner control from assistive tech), and without
- * changing a single box in the layout â€” the overlay is out of flow.
+ * changing a single box in the layout — the overlay is out of flow.
  */
 
 // Prefer the stored difficulty, fall back to XP tiers. Was duplicated verbatim
@@ -39,7 +39,7 @@ const ExerciseRow = memo(function ExerciseRow({
   // Selection semantics: when the row toggles membership rather than opening
   // something, it reports pressed state instead of acting as a plain button.
   selectable = false,
-  // Optional trimmings â€” the two call sites want different subsets.
+  // Optional trimmings — the two call sites want different subsets.
   showEquipment = false,
   showPB = false,
   showCustomBadge = false,
@@ -98,7 +98,7 @@ const ExerciseRow = memo(function ExerciseRow({
               letterSpacing: ".01em"
             }}
           >{ex.name}</button>
-          {showPB && <span aria-hidden="true" style={{ fontSize: FS.sm }}>{"ðŸ†"}</span>}
+          {showPB && <span aria-hidden="true" style={{ fontSize: FS.sm }}>{"🏆"}</span>}
           {showCustomBadge && ex.custom && (
             <span className={"custom-ex-badge"} style={{ marginLeft: S.s4 }}>{"custom"}</span>
           )}
@@ -106,11 +106,11 @@ const ExerciseRow = memo(function ExerciseRow({
 
         <div aria-hidden="true" style={{ fontSize: FS.fs62, fontStyle: "italic", lineHeight: 1.4 }}>
           {ex.category && <span style={{ color: getTypeColor(ex.category) }}>{cap(ex.category)}</span>}
-          {ex.category && ex.muscleGroup && <span style={{ color: "#9a9488" }}>{" Â· "}</span>}
+          {ex.category && ex.muscleGroup && <span style={{ color: "#8a8478" }}>{" · "}</span>}
           {ex.muscleGroup && <span style={{ color: mg }}>{muscleLabel(ex.muscleGroup)}</span>}
           {showEquipment && ex.equipment && ex.equipment !== "bodyweight" && <>
-            <span style={{ color: "#9a9488" }}>{" Â· "}</span>
-            <span style={{ color: "#9a9488" }}>{equipLabel(ex.equipment)}</span>
+            <span style={{ color: "#8a8478" }}>{" · "}</span>
+            <span style={{ color: "#8a8478" }}>{equipLabel(ex.equipment)}</span>
           </>}
         </div>
       </div>
@@ -151,13 +151,13 @@ const ExerciseRow = memo(function ExerciseRow({
             style={{
               background: "transparent",
               border: "none",
-              color: isFav ? "#d4cec4" : "#9a9488",
+              color: isFav ? "#d4cec4" : "#8a8478",
               fontSize: FS.fs90,
               cursor: "pointer",
               padding: S.s0,
               lineHeight: 1
             }}
-          >{isFav ? "â­" : "â˜†"}</button>
+          >{isFav ? "⭐" : "☆"}</button>
         )}
       </div>
     </div>

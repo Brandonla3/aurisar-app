@@ -1,15 +1,15 @@
-﻿import React from 'react';
+import React from 'react';
 import { pctToSlider, sliderToPct } from '../../utils/units';
 import { FG, FS } from '../../utils/tokens';
 
-// â”€â”€â”€ Weight-intensity wheel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// The Forge Glass skin over the 50â€“200% Weight Intensity mechanic. Same math as
+// ─── Weight-intensity wheel ────────────────────────────────────────────────────
+// The Forge Glass skin over the 50–200% Weight Intensity mechanic. Same math as
 // the old range slider (pctToSlider/sliderToPct, non-linear above 100%); the
-// interaction is a native horizontal scroll strip read CONTINUOUSLY â€” the value
+// interaction is a native horizontal scroll strip read CONTINUOUSLY — the value
 // live-updates while the wheel spins (momentum included), nothing snaps back.
 //
-// A plain tap on the strip nudges the weight one plate-step (Â±2.5 lbs /
-// Â±1.25 kg) via onTapStep: left of the needle steps down, right steps up.
+// A plain tap on the strip nudges the weight one plate-step (±2.5 lbs /
+// ±1.25 kg) via onTapStep: left of the needle steps down, right steps up.
 //
 // A visually-hidden-but-focusable range input mirrors the value so keyboard
 // and assistive tech keep the exact affordance the old slider had; the strip
@@ -38,7 +38,7 @@ function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
     el.scrollLeft = value * STOP_PX;
   }, []);
 
-  // Follow EXTERNAL pct changes (ghost repeat, carry-over, mount) â€” never
+  // Follow EXTERNAL pct changes (ghost repeat, carry-over, mount) — never
   // fight a live spin: skip while the user scrolled within the last 400ms,
   // and skip when the strip already sits on the value.
   React.useEffect(() => {
@@ -50,7 +50,7 @@ function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
     if (Math.abs(current - target) > 0.5) syncScroll(target);
   }, [pct, syncScroll]);
 
-  // Continuous read â€” scroll events are already frame-paced by the browser
+  // Continuous read — scroll events are already frame-paced by the browser
   // and the math is trivial, so no extra throttle: the value tracks the strip
   // live while it spins, momentum included.
   const onScroll = () => {
@@ -79,7 +79,7 @@ function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Accessible twin â€” the real input for keyboard/AT. */}
+      {/* Accessible twin — the real input for keyboard/AT. */}
       <input
         type={'range'}
         min={'0'}
@@ -109,7 +109,7 @@ function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
           display: 'flex',
           justifyContent: 'space-between',
           fontSize: FS.fs58,
-          color: '#9a9488',
+          color: '#8a8478',
           marginTop: 2,
           fontFamily: FG.fontCond,
           letterSpacing: '.06em',
@@ -132,7 +132,7 @@ function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
             fontFamily: FG.fontCond,
           }}
         >
-          {`spin to scale Â· tap sides to nudge ${stepLabel || 'Â±2.5 lbs'}`}
+          {`spin to scale · tap sides to nudge ${stepLabel || '±2.5 lbs'}`}
         </div>
       )}
     </div>

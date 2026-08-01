@@ -1,23 +1,23 @@
-﻿// â”€â”€â”€ Design tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Design tokens ─────────────────────────────────────────────────────────────
 // Single source of truth for the values inline JSX styles repeat across the app.
-// CSS files (src/styles/*.css) keep their literal values â€” class-based styling
+// CSS files (src/styles/*.css) keep their literal values — class-based styling
 // already gives them a single edit point. Tokens here are for inline `style={{}}`.
 //
 // Audit history:
 //   #74 introduced this module with 8 FS, 6 R, 12 S tokens, and migrated the top
 //   3 most-frequent inline values for each scale (329 sites total).
 //   The token-sweep follow-up adds two parallel naming systems:
-//     â€¢ Numeric tokens (FS.fs50, R.r4, S.s4) â€” one per unique value, for
+//     • Numeric tokens (FS.fs50, R.r4, S.s4) — one per unique value, for
 //       mechanical migration of stragglers with zero visual change.
-//     â€¢ Semantic aliases (FS.sm, R.md, S.s8) â€” for code that wants to express
+//     • Semantic aliases (FS.sm, R.md, S.s8) — for code that wants to express
 //       intent. Aliases are preserved from #74 with their original values, so
 //       earlier migrations keep working.
 
-// â”€â”€ Font size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Font size ────────────────────────────────────────────────────────────────
 // Two parallel naming systems share the same underlying values:
-//   1. Numeric tokens: fs44, fs45, â€¦, fs95 â€” 100 Ã— the rem value. Use for
+//   1. Numeric tokens: fs44, fs45, …, fs95 — 100 × the rem value. Use for
 //      straggler migration.
-//   2. Semantic aliases: xxs, xs, sm, base, md, lg, xl, xxl â€” preserved from
+//   2. Semantic aliases: xxs, xs, sm, base, md, lg, xl, xxl — preserved from
 //      #74. Prefer these in new code.
 const FS = {
   // Numeric (one per unique rem value found in the codebase)
@@ -66,7 +66,7 @@ const FS = {
   xxl:  ".9rem",   // headings
 };
 
-// â”€â”€ Border radius â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Border radius ────────────────────────────────────────────────────────────
 // Numeric tokens for every unique px value, plus the semantic aliases from #74.
 const R = {
   // Numeric (one per unique value)
@@ -93,15 +93,15 @@ const R = {
   full: 9999, // pills
 };
 
-// â”€â”€ Spacing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Unitless â€” React inline styles interpret as px. After the Option B snap
+// ── Spacing ──────────────────────────────────────────────────────────────────
+// Unitless — React inline styles interpret as px. After the Option B snap
 // migration, the canonical scale is even-step (2,4,6,8,10,12,14,16,18,20,24,
 // 28,32). Off-by-1 values from the original codebase (1,3,5,7,9,11,13) snap
 // to the nearest even token. Negative tokens (sNeg4/6/8) preserve intentional
 // overlap effects.
 //
 // Snap rules applied in the migration PR (kept here for future reference):
-//   1  â†’ s2  | 3 â†’ s4 | 5 â†’ s6  | 7 â†’ s8 | 9 â†’ s8 | 11 â†’ s12 | 13 â†’ s14
+//   1  → s2  | 3 → s4 | 5 → s6  | 7 → s8 | 9 → s8 | 11 → s12 | 13 → s14
 const S = {
   s0:  0,
   s2:  2,
@@ -117,13 +117,13 @@ const S = {
   s24: 24,
   s28: 28,
   s32: 32,
-  // Negative â€” kept distinct for intentional overlap (hero text, etc.)
+  // Negative — kept distinct for intentional overlap (hero text, etc.)
   sNeg4: -4,
   sNeg6: -6,
   sNeg8: -8,
 };
 
-// â”€â”€ Motion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Motion ───────────────────────────────────────────────────────────────────
 // Mirrors the --dur-* / --ease-* custom properties declared on :root in
 // src/styles/app.css. Class-based styling should use the CSS vars directly;
 // these are for inline `style={{}}` and for JS that needs the raw value
@@ -135,7 +135,7 @@ const S = {
 const M = {
   instant: ".1s",  // colour/opacity-only state flips
   fast:    ".15s", // press feedback, hover tints
-  base:    ".2s",  // the default â€” most transitions
+  base:    ".2s",  // the default — most transitions
   slow:    ".3s",  // entrances that carry distance
   sheet:   ".3s",  // bottom sheets and modals
   reveal:  ".5s",  // scroll reveals, staggered list entrances
@@ -149,40 +149,35 @@ const M = {
   ms: { instant: 100, fast: 150, base: 200, slow: 300, sheet: 300, reveal: 500 },
 };
 
-// â”€â”€ Color â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Color ────────────────────────────────────────────────────────────────────
 // The parchment/gold palette the app already uses everywhere as hex literals,
 // named once. Same philosophy as the other scales: for inline `style={{}}`;
 // CSS files keep their literals. Semantic status colors (success/danger/xp)
-// stay in UI_COLORS (src/data/constants.js) â€” no overlap.
-// Ambience note: these mirror the --canvas / --surface-rgb / ink values in
-// src/styles/app.css. The app was effectively pure black with surfaces only
-// 1.07:1 above the canvas; canvas, surfaces and the dim end of the ink ramp
-// were lifted together so panels read as lit objects and muted text keeps its
-// WCAG AA margin. Change these only alongside their CSS counterparts.
+// stay in UI_COLORS (src/data/constants.js) — no overlap.
 const C = {
-  // Parchment ink ramp â€” text, brightest to faintest
+  // Parchment ink ramp — text, brightest to faintest
   inkBright: "#e8e0d0", // headline emphasis
   ink:       "#d4cec4", // primary text
   inkMid:    "#b4ac9e", // secondary text, active-filter accents
   inkLabel:  "#b0a898", // form labels
-  inkDim:    "#9a9488", // muted text, placeholders (lifted from #8a8478)
-  inkFaint:  "#969082", // disabled, decorative (lifted from #5f5a52)
+  inkDim:    "#8a8478", // muted text, placeholders
+  inkFaint:  "#5f5a52", // disabled, decorative
 
   // Gold accents
   gold:     "#C4A044", // brand accent (matches UI_COLORS.accent usage)
   goldDeep: "#c49428", // focus rings, gradients
 
   // Surfaces
-  bg:        "#1a1814", // app background (lifted from #0c0c0a)
-  panel:     "#232019", // raised panels (lifted from #12120e)
-  panelWarm: "#232019", // warm-tinted sheets
+  bg:        "#0c0c0a", // app background
+  panel:     "#12120e", // raised panels
+  panelWarm: "#16140e", // warm-tinted sheets
 
   // Hairlines and edges (rgba strings, ready for `border`)
   line:       "rgba(180,172,158,.06)",
   lineMid:    "rgba(180,172,158,.08)",
   lineStrong: "rgba(180,172,158,.12)",
-  edge:       "rgba(74,69,59,.2)",
-  edgeStrong: "rgba(74,69,59,.3)",
+  edge:       "rgba(45,42,36,.2)",
+  edgeStrong: "rgba(45,42,36,.3)",
 
   // Exercise difficulty (single home for the badge colors)
   diffBeginner:     "#5A8A58",
@@ -195,14 +190,14 @@ const C = {
   diffBgAdvanced:     "#2e1515",
 };
 
-// â”€â”€ Z-index â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Z-index ──────────────────────────────────────────────────────────────────
 // One ladder for every stacking decision, mirrored as --z-* custom properties
 // on :root in src/styles/app.css. The ordering encodes real UX rules:
-//   â€¢ the staging tray must sit above tab content but below every sheet
-//   â€¢ the live-workout banner sits above the tray but below modals, because
+//   • the staging tray must sit above tab content but below every sheet
+//   • the live-workout banner sits above the tray but below modals, because
 //     finishing a live workout opens the stats/completion sheets on top of it
-//   â€¢ detail sits above modal so QuickLog's "â† Back" can reveal the sheet
-//   â€¢ confirm tops everything â€” a destructive prompt may interrupt any layer
+//   • detail sits above modal so QuickLog's "← Back" can reveal the sheet
+//   • confirm tops everything — a destructive prompt may interrupt any layer
 const Z = {
   sticky:   5,    // in-flow sticky headers
   scrim:    19,   // outside-click catcher for dropdowns
@@ -221,7 +216,7 @@ const Z = {
   flash:    9600, // XP flash / transient celebration
 };
 
-// â”€â”€ Forge Glass (redesign surface language) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Forge Glass (redesign surface language) ──────────────────────────────────
 // Values lifted from the approved "Forge Glass" prototype. Gold means earned
 // (XP, PBs, level) and nothing else; teal is the action accent. Glass surfaces
 // need `solidBg` as the background when backdrop-filter is unavailable (the
