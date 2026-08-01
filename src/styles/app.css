@@ -595,79 +595,6 @@
     .lib-hero-card:hover,.lib-hero-card:active{filter:none}
     .lib-hero-when{font-size:.48rem;color:#8a8478;letter-spacing:.03em;line-height:1}
 
-    /* ── Body map ────────────────────────────────────────────────────────
-       Training heat drawn on a stylised figure. Recency drives how lit a
-       plate is; --volume (0..1, relative to the busiest group) drives how
-       filled it looks, so a hot-but-light week reads differently from a
-       hot-and-heavy one. */
-    .mm-wrap{display:flex;align-items:center;gap:14px;justify-content:center}
-    .mm-svg{width:min(200px,52vw);height:auto;flex-shrink:0;overflow:visible}
-
-    .mm-frame{fill:rgba(45,42,36,.34);stroke:rgba(180,172,158,.07);stroke-width:1}
-
-    .mm-region rect{
-      fill:color-mix(in srgb,var(--mg-color) calc(14% + var(--volume,0) * 46%),rgba(28,26,22,.75));
-      stroke:color-mix(in srgb,var(--mg-color) 42%,transparent);
-      stroke-width:1.2;
-      transition:fill var(--dur-slow) var(--ease-standard),
-                 stroke var(--dur-slow) var(--ease-standard)
-    }
-    .mm-region g{cursor:pointer;outline:none}
-    .mm-region g:focus-visible rect{stroke:var(--cls-color,#c49428);stroke-width:2.4}
-    .mm-region g:hover rect{stroke-width:2}
-
-    /* Recency. Cold is the fog: displaced, blurred and desaturated, so an
-       untrained region reads as unknown territory rather than a dead control. */
-    .mm-hot rect{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--mg-color) 60%,transparent))}
-    .mm-warm rect{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 34%,transparent))}
-    .mm-fading rect{opacity:.72;filter:grayscale(.4)}
-    .mm-cold rect{opacity:.5;filter:grayscale(.85) url(#mm-fog)}
-
-    /* Groups with no place on a body (cardio). Without these the map would be
-       a strictly worse navigator than the strip. */
-    .mm-offbody{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
-    .mm-chip{
-      display:flex;align-items:center;gap:5px;
-      padding:4px 11px;border-radius:12px;cursor:pointer;
-      background:color-mix(in srgb,var(--mg-color) calc(10% + var(--volume,0) * 26%),rgba(45,42,36,.3));
-      border:1px solid color-mix(in srgb,var(--mg-color) 30%,transparent);
-      color:#b4ac9e;font-size:.6rem;font-family:'Inter',sans-serif;
-      transition:all var(--dur-fast) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .mm-chip:active{transform:scale(.96)}
-    .mm-chip.mm-hot{box-shadow:0 0 8px color-mix(in srgb,var(--mg-color) 34%,transparent)}
-    .mm-chip.mm-fading{opacity:.75}
-    .mm-chip.mm-cold{opacity:.55;filter:grayscale(.8)}
-
-    .mm-hdr-controls{display:flex;align-items:center;gap:6px;margin-left:auto}
-    .mm-hdr-controls .mm-viewtoggle{margin-left:0}
-    .mm-viewtoggle{display:flex;gap:2px;margin-left:auto}
-    .mm-viewtoggle button{
-      background:rgba(45,42,36,.3);border:1px solid rgba(180,172,158,.07);
-      color:#8a8478;font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.1em;
-      text-transform:uppercase;padding:3px 9px;cursor:pointer;
-      transition:all var(--dur-fast) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .mm-viewtoggle button:first-child{border-radius:6px 0 0 6px}
-    .mm-viewtoggle button:last-child{border-radius:0 6px 6px 0}
-    .mm-viewtoggle button.on{background:rgba(196,148,40,.16);border-color:rgba(196,148,40,.36);color:#c4a044}
-
-    .mm-legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
-    .mm-legend li{display:flex;align-items:center;gap:6px;font-size:.55rem;color:#8a8478;white-space:nowrap}
-    .mm-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;background:#8a8478;border:1px solid rgba(180,172,158,.2)}
-    .mm-swatch.mm-hot{background:#c49428;box-shadow:0 0 5px rgba(196,148,40,.6)}
-    .mm-swatch.mm-warm{background:rgba(196,148,40,.55)}
-    .mm-swatch.mm-fading{background:rgba(138,132,120,.55)}
-    .mm-swatch.mm-cold{background:rgba(60,58,52,.8)}
-
-    /* The fog displacement is a continuous filter; drop it when motion is
-       reduced and lean on opacity alone. */
-    @media (prefers-reduced-motion: reduce){
-      .mm-cold rect{filter:grayscale(.85)}
-    }
-
     /* ── Discover carousel customize menu ────────────────────────────────
        Nested/cascading pick-3 for the Library home's discover rows. Reuses
        .myex-accordion for the group disclosure; the option rows below are
@@ -701,47 +628,6 @@
       flex-shrink:0;font-size:.56rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
       color:#c4a044
     }
-
-    /* ── Training heat torches ───────────────────────────────────────────
-       One torch per muscle group, coldest first. Brightness carries recency
-       and --volume carries how hard the group was worked, so the row reads
-       as a gauge rather than a list. Horizontally scrollable: 11 groups do
-       not fit a 375px screen, and wrapping would bury the cold end. */
-    .torch-strip{
-      display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0;
-      list-style:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch
-    }
-    .torch-slot{flex:0 0 auto;scroll-snap-align:start;display:flex}
-    .torch-strip::-webkit-scrollbar{height:2px}
-    .torch-strip::-webkit-scrollbar-thumb{background:rgba(180,172,158,.2);border-radius:2px}
-    .torch{
-      flex:0 0 auto;scroll-snap-align:start;
-      display:flex;flex-direction:column;align-items:center;gap:2px;
-      min-width:60px;padding:8px 6px 6px;border-radius:9px;cursor:pointer;
-      background:linear-gradient(180deg,
-        color-mix(in srgb,var(--mg-color) calc(var(--volume,0) * 16%),rgba(45,42,36,.3)),
-        rgba(25,23,20,.35));
-      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
-      transition:all var(--dur-base) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .torch:active{transform:scale(.96)}
-    .torch-flame{font-size:1.05rem;line-height:1;transition:filter var(--dur-base) var(--ease-standard)}
-    .torch-name{font-size:.5rem;color:#b4ac9e;letter-spacing:.02em;white-space:nowrap}
-    .torch-when{font-size:.46rem;color:#6f6a62;font-variant-numeric:tabular-nums}
-
-    /* Recency drives how lit the torch is. Cold groups are the fog: legible,
-       but plainly unlit. */
-    .torch-hot{border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
-      box-shadow:0 0 12px color-mix(in srgb,var(--mg-color) 22%,transparent)}
-    .torch-hot .torch-flame{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--mg-color) 70%,transparent))}
-    .torch-warm{border-color:color-mix(in srgb,var(--mg-color) 30%,transparent)}
-    .torch-warm .torch-flame{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 45%,transparent))}
-    .torch-fading .torch-flame{filter:grayscale(.45) brightness(.82)}
-    .torch-fading .torch-name{color:#8a8478}
-    .torch-cold{background:rgba(20,19,16,.42);border-color:rgba(180,172,158,.05)}
-    .torch-cold .torch-flame{filter:grayscale(.9) brightness(.5)}
-    .torch-cold .torch-name,.torch-cold .torch-when{color:#5f5a52}
 
     /* ── Staging tray ────────────────────────────────────────────────────
        The cart's one visible home, docked above the bottom nav so a selection

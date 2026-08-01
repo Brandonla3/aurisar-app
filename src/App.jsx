@@ -2832,7 +2832,6 @@ function App() {
     libMuscleCounts,
     libEquipCounts,
     libMuscleCardData,
-    libMuscleMapData,
     libDiscoverRows,
     libDiscoverCategoryCounts,
     libMuscleOpts,
@@ -2840,7 +2839,6 @@ function App() {
   } = useExerciseFilters({
     allExercises,
     _exReady,
-    exerciseLog: profile.log,
     discoverPicks: profile.libDiscoverPicks || DEFAULT_DISCOVER_PICKS,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
@@ -5182,7 +5180,6 @@ function App() {
             libMuscleCounts={libMuscleCounts}
             libEquipCounts={libEquipCounts}
             libMuscleCardData={libMuscleCardData}
-            libMuscleMapData={libMuscleMapData}
             libDiscoverRows={libDiscoverRows}
             libDiscoverCategoryCounts={libDiscoverCategoryCounts}
             libMuscleOpts={libMuscleOpts}

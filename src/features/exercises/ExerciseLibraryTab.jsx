@@ -6,8 +6,6 @@ import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS, Z } from '../../utils/tokens';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
-import MuscleTorchStrip from './MuscleTorchStrip';
-import MuscleMap from './MuscleMap';
 import ExerciseRow from './ExerciseRow';
 import DiscoverCustomizeMenu from './DiscoverCustomizeMenu';
 import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
@@ -57,7 +55,7 @@ const LibExRow = React.memo(function LibExRow({
 const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const {
     // Hook outputs
-    libFiltered, libMuscleCardData, libMuscleMapData, libDiscoverRows, libMuscleOpts, libEquipOpts,
+    libFiltered, libMuscleCardData, libDiscoverRows, libMuscleOpts, libEquipOpts,
     libTypeCounts, libMuscleCounts, libEquipCounts,
     // Filter state
     setLibSearchDebounced,
@@ -89,36 +87,6 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const [libOpenDrop, setLibOpenDrop] = useState(null); // "type"|"muscle"|"equip"|null
   const [libBrowseMode, setLibBrowseMode] = useState("home"); // "home"|"filtered"
 
-  // Which reading of the training-heat data to show. The strip is the default
-  // and the accessible fallback; the map is opt-in and remembered.
-  const [browseView, setBrowseView] = useState(() => {
-    try { return localStorage.getItem('aurisar-heat-view') === 'map' ? 'map' : 'strip'; }
-    catch { return 'strip'; }
-  });
-  const setHeatView = v => {
-    setBrowseView(v);
-    try { localStorage.setItem('aurisar-heat-view', v); } catch { /* private mode */ }
-  };
-  // Rendered inside the heat section header rather than under "Browse by
-  // Muscle", which sits below it — a control has to live with the thing it
-  // controls or it reads as belonging to the next section down.
-  const heatToggle = (
-    <div className={"mm-viewtoggle"} role={"group"} aria-label={"Heat display"}>
-      {[["strip", "▦ Strip"], ["map", "🗺 Map"]].map(([v, label]) => (
-        <button
-          key={v}
-          type="button"
-          className={browseView === v ? "on" : undefined}
-          aria-pressed={browseView === v}
-          onClick={() => setHeatView(v)}
-        >{label}</button>
-      ))}
-    </div>
-  );
-  const pickMuscle = mg => {
-    setLibMuscleFilters(new Set([mg]));
-    setLibBrowseMode("filtered");
-  };
   // Separate keys per view: returning to the home carousels shouldn't drop
   // you at the offset you had in a 1,500-row filtered list.
   useScrollRestore(`lib-${libBrowseMode}`);
@@ -342,14 +310,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         <span aria-hidden="true">{resumeIcon}</span>
         <span className={"lib-resume-chip-label"}>{`${resumeSummary} — View ${libFiltered.length} result${libFiltered.length !== 1 ? "s" : ""} →`}</span>
         <span role={"button"} tabIndex={0} aria-label={"Clear filters and search"} className={"lib-resume-chip-x"} onClick={e => { e.stopPropagation(); clearAll(); }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); clearAll(); } }}>{"✕"}</span>
-      </button>} {
-        /* Browse by Muscle — feature tiles */
-      }
-      {browseView === "map"
-        ? <MuscleMap data={libMuscleMapData} onPick={pickMuscle} viewToggle={heatToggle} />
-        : <MuscleTorchStrip data={libMuscleMapData} onPick={pickMuscle} viewToggle={heatToggle} />}
-      {libMuscleMapData.some(d => d.state !== "cold") && <div className={"lib-divider"} />}
-
+      </button>}
       <div className={"lib-home-section"} style={{
         marginBottom: S.s4
       }}><div className={"lib-section-hdr"} style={{ display: "flex", alignItems: "center" }}><span className={"lib-hdr-icon"}>{"🗺️"}</span>{"Browse by Muscle"}</div><div style={{
