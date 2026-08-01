@@ -3708,7 +3708,15 @@ function App() {
     if (!liveWorkout || exercises.length === 0) { setLiveWorkout(null); return; }
     const filteredWo = {
       id: liveWorkout.workoutId, name: liveWorkout.name, icon: liveWorkout.icon,
-      exercises: exercises.map(ex => ({ exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null, extraRows: ex.extraRows || [] })),
+      // Mirrors exactly the fields _buildLiveExercises puts on a live exercise
+      // — this used to drop distanceMi/hrZone/seconds even though the live
+      // object carried them, so finishing a cardio/timed Repeat Last session
+      // silently logged blank distance/zone/duration.
+      exercises: exercises.map(ex => ({
+        exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null,
+        distanceMi: ex.distanceMi || null, hrZone: ex.hrZone || null, seconds: ex.seconds || null,
+        extraRows: ex.extraRows || [],
+      })),
       durationMin: null, activeCal: null, totalCal: null,
     };
     openStatsPromptIfNeeded(filteredWo, (woWithStats, _sr) => {

@@ -9,7 +9,7 @@ import FilterDropdown from './FilterDropdown';
 import ExerciseRow from './ExerciseRow';
 import DiscoverCustomizeMenu from './DiscoverCustomizeMenu';
 import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
-import { DISCOVER_CATEGORY_GROUPS, DISCOVER_PICK_COUNT } from './discoverCategories';
+import { DISCOVER_CATEGORY_GROUPS, DISCOVER_PICK_COUNT, DISCOVER_CATEGORIES_BY_KEY } from './discoverCategories';
 
 // Row adapter for the virtualised filtered list — mirrors
 // WorkoutExercisePicker's WbExPickerRow: maps react-window's props onto the
@@ -86,6 +86,10 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   const [search, setSearch] = useState("");
   const [libOpenDrop, setLibOpenDrop] = useState(null); // "type"|"muscle"|"equip"|null
   const [libBrowseMode, setLibBrowseMode] = useState("home"); // "home"|"filtered"
+  // Difficulty has no facet in the shared filter system (see discoverCategories.js),
+  // so a "See All →" tap on a difficulty row is tracked locally here instead —
+  // the category's own `match` predicate is applied on top of libFiltered below.
+  const [libDifficultyPick, setLibDifficultyPick] = useState(null);
 
   // Separate keys per view: returning to the home carousels shouldn't drop
   // you at the offset you had in a 1,500-row filtered list.
@@ -168,12 +172,13 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     setLibTypeFilters(new Set());
     setLibMuscleFilters(new Set());
     setLibEquipFilters(new Set());
+    setLibDifficultyPick(null);
     setSearch("");
     setLibSearchDebounced("");
     setLibBrowseMode("home");
   };
-  const hasFilters = libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0 || !!search;
-  const activeFilterCount = libTypeFilters.size + libMuscleFilters.size + libEquipFilters.size;
+  const hasFilters = libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0 || !!libDifficultyPick || !!search;
+  const activeFilterCount = libTypeFilters.size + libMuscleFilters.size + libEquipFilters.size + (libDifficultyPick ? 1 : 0);
   // Resume-chip state: the non-destructive "← Browse Library" keeps BOTH
   // filters and the search term, so the home chip must appear for a search-only
   // browse too — not just active facets.
@@ -212,8 +217,13 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       ? () => { setLibEquipFilters(new Set([row.seeAll.value])); setLibBrowseMode("filtered"); }
       : row.seeAll?.kind === "muscle"
       ? () => { setLibMuscleFilters(new Set([row.seeAll.value])); setLibBrowseMode("filtered"); }
-      : () => setLibBrowseMode("filtered"),
+      : () => { setLibDifficultyPick(DISCOVER_CATEGORIES_BY_KEY[row.key] || null); setLibBrowseMode("filtered"); },
   }));
+
+  // Difficulty sits outside the shared facet system, so it's applied as one
+  // more predicate on top of the already-faceted libFiltered rather than a
+  // fourth Set-based filter threaded through useExerciseFilters.
+  const visibleFiltered = libDifficultyPick ? libFiltered.filter(libDifficultyPick.match) : libFiltered;
 
   // Tapping a picked category removes it; tapping an unpicked one adds it —
   // and only evicts the oldest pick when already at the 3-category cap, so
@@ -308,7 +318,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       the results they'd show. */
       hasResumeState && <button type={"button"} className={"lib-resume-chip"} onClick={() => setLibBrowseMode("filtered")}>
         <span aria-hidden="true">{resumeIcon}</span>
-        <span className={"lib-resume-chip-label"}>{`${resumeSummary} — View ${libFiltered.length} result${libFiltered.length !== 1 ? "s" : ""} →`}</span>
+        <span className={"lib-resume-chip-label"}>{`${resumeSummary} — View ${visibleFiltered.length} result${visibleFiltered.length !== 1 ? "s" : ""} →`}</span>
         <span role={"button"} tabIndex={0} aria-label={"Clear filters and search"} className={"lib-resume-chip-x"} onClick={e => { e.stopPropagation(); clearAll(); }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); clearAll(); } }}>{"✕"}</span>
       </button>}
       <div className={"lib-home-section"} style={{
@@ -449,7 +459,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           panelBorder="rgba(196,148,40,0.25)"
         />
       </div>{/* Active filter tags — show what's selected, tap to remove */
-      (libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0) && <div style={{
+      (libTypeFilters.size > 0 || libMuscleFilters.size > 0 || libEquipFilters.size > 0 || !!libDifficultyPick) && <div style={{
         display: "flex",
         gap: S.s6,
         flexWrap: "wrap",
@@ -487,7 +497,18 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
           display: "flex",
           alignItems: "center",
           gap: S.s4
-        }}>{v.charAt(0).toUpperCase() + v.slice(1)}{" ✕"}</button>)}</div>} {
+        }}>{v.charAt(0).toUpperCase() + v.slice(1)}{" ✕"}</button>)}{libDifficultyPick && <button type="button" key="diff" aria-label={`Remove ${libDifficultyPick.label} filter`} onClick={() => setLibDifficultyPick(null)} style={{
+          background: "rgba(196,148,40,0.15)",
+          border: "1px solid rgba(196,148,40,0.27)",
+          color: UI_COLORS.accent,
+          fontSize: FS.fs62,
+          padding: "4px 8px",
+          borderRadius: R.r12,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: S.s4
+        }}>{libDifficultyPick.label}{" ✕"}</button>}</div>} {
         /* Count + clear row */
       }
       <div style={{
@@ -498,7 +519,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       }}><div style={{
           fontSize: FS.fs68,
           color: "#8a8478"
-        }}>{libFiltered.length + " exercises"}</div>{hasFilters && <button onClick={clearAll} style={{
+        }}>{visibleFiltered.length + " exercises"}</div>{hasFilters && <button onClick={clearAll} style={{
           background: "transparent",
           border: "none",
           color: "#b4ac9e",
@@ -511,7 +532,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       null}  {
         /* Exercise list (paginated) */
       }
-      <div className={"lib-vlist-wrap"}>{libFiltered.length === 0
+      <div className={"lib-vlist-wrap"}>{visibleFiltered.length === 0
         ? (_exReady
             ? <div className={"empty"} style={{ padding: "24px 0" }}>{"No exercises match your filters."}</div>
             // Nothing matched *yet* only because the catalog is still arriving —
@@ -525,11 +546,11 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
               </div>)}</div>)
         : <List
             listRef={listRef}
-            rowCount={libFiltered.length}
+            rowCount={visibleFiltered.length}
             rowHeight={LIB_ROW_H}
             rowComponent={LibExRow}
             rowProps={{
-              exercises: libFiltered,
+              exercises: visibleFiltered,
               cartSet, favSet, pbSet,
               selectable: libSelectMode,
               onOpen: setLibDetailEx,

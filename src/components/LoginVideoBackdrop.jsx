@@ -61,8 +61,14 @@ function LoginVideoBackdrop() {
       onError={() => setBroken(true)}
       style={VIDEO_STYLE}
     >
-      <source src={loginMp4} type="video/mp4" />
+      {/* WebM first: browsers use the first <source> whose type they
+          support, and this WebM is ~780KB against the MP4's ~8.2MB for
+          identical content — no reason to make Chrome/Firefox/Edge fetch
+          the heavier file. Safari has no WebM decoder, so it just skips
+          this source and falls through to the MP4 below regardless of
+          order; listing WebM first costs it nothing. */}
       <source src={loginWebm} type="video/webm" />
+      <source src={loginMp4} type="video/mp4" />
     </video>
   );
 }
