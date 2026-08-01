@@ -12,11 +12,18 @@ at runtime.
 ## The one rule
 
 ```
-model/  gen/  sim/  settings/     PURE. May never reference BABYLON.
-view/                            The ONLY layer allowed to touch the engine.
+view/        The ONLY place BABYLON may be referenced.
+everywhere   Engine-free. No exceptions, including the realm root.
+else/
 ```
 
 `boundary.test.js` enforces this, plus a 400-line-per-file ceiling. Both fail the build.
+
+Note the rule is phrased as *"everything outside `view/`"*, not as a list of pure folders.
+An allowlist only polices the folders you thought of — the first version of this test named
+`model|gen|sim|settings`, which left the realm root and any folder added later free to
+import the engine while this README claimed otherwise. Inverting it means the doc and the
+test cannot drift apart. Tests are exempt (they stand up a `NullEngine` legitimately).
 
 This is not stylistic. The stack being replaced started clean and ended as a single
 3,794-line file owning the engine, camera, mobs, shadows and streaming at once. Conventions

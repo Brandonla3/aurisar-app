@@ -50,9 +50,11 @@ export function startRenderLoop(engine, scene, { onError } = {}) {
     try {
       scene.render();
     } catch (err) {
-      // One throw per frame would flood the console and hide the first, real
-      // error. Stop the loop and hand the cause up once.
+      // One throw per frame would flood the console and bury the first, real
+      // error. Actually stop the loop rather than just latching a flag — a
+      // latched no-op callback stays scheduled every frame forever.
       failed = true;
+      engine.stopRenderLoop();
       console.error('[RealmScene] render loop stopped:', err);
       onError?.(err);
     }

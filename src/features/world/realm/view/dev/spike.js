@@ -13,12 +13,12 @@
 
 // MUST be first: establishes window.BABYLON before anything reads the ambient
 // global. See src/babylonGlobal.js for why this is load-bearing.
-import '../../../babylonGlobal.js';
+import '../../../../../babylonGlobal.js';
 import 'babylonjs-gui';
 
-import { chooseRenderer, RENDERER_PREF } from './settings/rendererChoice.js';
-import { createRealmEngine, bindContextLoss } from './view/RealmEngine.js';
-import { createRealmScene, startRenderLoop } from './view/RealmScene.js';
+import { chooseRenderer, RENDERER_PREF } from '../../settings/rendererChoice.js';
+import { createRealmEngine, bindContextLoss } from '../RealmEngine.js';
+import { createRealmScene, startRenderLoop } from '../RealmScene.js';
 
 /* global BABYLON */
 

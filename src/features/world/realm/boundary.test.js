@@ -23,10 +23,26 @@ import { fileURLToPath } from 'node:url';
 
 const REALM_ROOT = dirname(fileURLToPath(import.meta.url));
 
-/** Layers that must never reference the Babylon global. */
-const PURE_LAYERS = ['model', 'gen', 'sim', 'settings'];
-/** The single layer permitted to touch BABYLON. */
+/**
+ * The single layer permitted to touch BABYLON.
+ *
+ * The rule is expressed as "everything OUTSIDE view/ is engine-free" rather than
+ * as a list of pure folders. An allowlist of pure folders only polices the
+ * folders you thought of: the first version of this test named model/gen/sim/
+ * settings, which left root-level files — and any folder added later — free to
+ * import the engine while the README claimed otherwise. Inverting it means the
+ * test and the README say the same thing, permanently.
+ */
 const RENDER_LAYER = 'view';
+
+/**
+ * Files outside view/ that may reference BABYLON anyway. Deliberately empty.
+ *
+ * If something needs the engine, it belongs in view/. A facade that merely
+ * orchestrates view/ modules does not need to name BABYLON at all. Adding an
+ * entry here should feel like it needs justifying, because it does.
+ */
+const ENGINE_ALLOWLIST = new Set([]);
 
 /** Nothing in the Realm may grow into the next BabylonWorldScene.js. */
 const MAX_LINES = 400;
@@ -64,11 +80,17 @@ function stripComments(src) {
 const rel = (f) => relative(REALM_ROOT, f).split(sep).join('/');
 
 const ALL_FILES = walk(REALM_ROOT);
-const pureFiles = ALL_FILES.filter((f) => {
-  const top = rel(f).split('/')[0];
-  return PURE_LAYERS.includes(top) && !TEST_FILE.test(f);
-});
-const viewFiles = ALL_FILES.filter((f) => rel(f).split('/')[0] === RENDER_LAYER);
+const inView = (f) => rel(f).split('/')[0] === RENDER_LAYER;
+
+/**
+ * Everything that must be engine-free: any non-test source outside view/.
+ * Tests are exempt — they legitimately `import BABYLON from 'babylonjs'` to
+ * stand up a NullEngine, and they ship to nobody.
+ */
+const pureFiles = ALL_FILES.filter(
+  (f) => !inView(f) && !TEST_FILE.test(f) && !ENGINE_ALLOWLIST.has(rel(f)),
+);
+const viewFiles = ALL_FILES.filter(inView);
 
 describe('realm boundary', () => {
   // Guards against a vacuous pass: an empty or mis-rooted tree would otherwise
@@ -77,25 +99,30 @@ describe('realm boundary', () => {
     expect(ALL_FILES.length).toBeGreaterThan(0);
   });
 
-  it('pure layers never reference BABYLON', () => {
+  it('nothing outside view/ references BABYLON', () => {
     const offenders = pureFiles
       .filter((f) => /\bBABYLON\b/.test(stripComments(readFileSync(f, 'utf8'))))
       .map(rel);
 
     expect(
       offenders,
-      `These files are in a PURE layer (${PURE_LAYERS.join(', ')}) but reference BABYLON.\n` +
+      'These files live outside view/ but reference BABYLON.\n' +
         'Move the engine-facing code into view/, or invert the dependency so the pure\n' +
         'module returns plain data that view/ turns into Babylon objects.',
     ).toEqual([]);
   });
 
-  it('pure layers never import babylonjs', () => {
+  it('nothing outside view/ imports babylonjs', () => {
     const offenders = pureFiles
       .filter((f) => /from\s+['"]babylonjs/.test(readFileSync(f, 'utf8')))
       .map(rel);
 
-    expect(offenders, 'Pure layers must not import babylonjs.').toEqual([]);
+    expect(offenders, 'Only view/ may import babylonjs.').toEqual([]);
+  });
+
+  it('has at least one engine-free file to police', () => {
+    // The inverted rule would pass trivially if everything ended up in view/.
+    expect(pureFiles.length).toBeGreaterThan(0);
   });
 
   it('view files that use BABYLON declare the global', () => {
