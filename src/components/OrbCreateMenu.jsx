@@ -53,13 +53,20 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
   const [query, setQuery] = React.useState("");
   const searchRef = React.useRef(null);
 
-  React.useEffect(() => {
+  // Reset to a fresh fan whenever the orb closes — done during render (the
+  // sanctioned derived-state adjustment) rather than in an effect.
+  const [prevOpen, setPrevOpen] = React.useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (!open) {
       setView("menu");
       setQuery("");
       setArmed(false);
-      return undefined;
     }
+  }
+
+  React.useEffect(() => {
+    if (!open) return undefined;
     const arm = setTimeout(() => setArmed(true), 320);
     const onKey = e => {
       if (e.key === "Escape") onClose();
