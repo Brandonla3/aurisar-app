@@ -15,7 +15,12 @@ function basic(user, pass) {
 /** Install a fake Netlify.env (credentials) backed by the given map. */
 function withEnv(env) {
   const prev = globalThis.Netlify;
-  globalThis.Netlify = { env: { get: (key) => env[key] } };
+  globalThis.Netlify = {
+    env: {
+      get: (key) => env[key],
+      has: (key) => env[key] !== undefined,
+    },
+  };
   return () => {
     globalThis.Netlify = prev;
   };
