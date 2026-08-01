@@ -43,8 +43,12 @@ const GLASS_BTN = {
 
 function pbText(pb, units) {
   if (!pb) return "—";
+  // Legacy PB shape ({weight: 185}) predates calcExercisePBs' {type, value}.
+  if (pb.weight != null) return displayWt(pb.weight, units) || String(pb.weight);
+  if (pb.value == null) return "—";
   if (/Weight|1RM/i.test(pb.type || "")) return displayWt(pb.value, units) || String(pb.value);
   if (/Reps/i.test(pb.type || "")) return `${pb.value} reps`;
+  if (/Pace|cardio/i.test(pb.type || "")) return `${parseFloat(Number(pb.value).toFixed(2))} min/mi`;
   return String(pb.value);
 }
 
