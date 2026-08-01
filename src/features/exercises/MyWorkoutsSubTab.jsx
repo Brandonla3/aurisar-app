@@ -175,22 +175,12 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               if (!ex) return null;
               const hasPB = !!(profile.exercisePBs || {})[ex.id];
               const isSel = isInCart(exId);
+              const mgColor = getMuscleColor(ex.muscleGroup);
               return (
                 <div
                   key={exId}
-                  className={"stretch-row"}
-                  style={{
-                    background: isSel ? "rgba(45,42,36,.3)" : "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                    border: "1px solid " + (isSel ? "rgba(180,172,158,.2)" : "rgba(180,172,158,.05)"),
-                    borderRadius: R.r10,
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: S.s12,
-                    cursor: "pointer",
-                    boxShadow: isSel ? "0 0 0 1.5px rgba(180,172,158,.2)" : "none",
-                    transition: "all .15s"
-                  }}
+                  className={`picker-ex-row stretch-row${isSel ? " sel" : ""}`}
+                  style={{ '--mg-color': mgColor }}
                 >
                   {favSelectMode && (
                     <div style={{
@@ -207,18 +197,8 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                       {isSel && <span style={{ color: "#b4ac9e", fontSize: FS.fs65 }}>{"✓"}</span>}
                     </div>
                   )}
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: R.lg,
-                    flexShrink: 0,
-                    background: "rgba(45,42,36,.15)",
-                    border: "1px solid rgba(180,172,158,.05)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                  }}>
-                    <ExIcon ex={ex} size={"1rem"} color={"#b4ac9e"} />
+                  <div className={"picker-ex-orb"}>
+                    <ExIcon ex={ex} size={"1rem"} color={"#d4cec4"} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
@@ -336,34 +316,15 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               const isFav = (profile.favoriteExercises || []).includes(ex.id);
               const diffLabel = ex.difficulty || (ex.baseXP >= 60 ? "Advanced" : ex.baseXP >= 45 ? "Intermediate" : "Beginner");
               const rowDiffColor = diffColor(diffLabel);
+              const mgColor = getMuscleColor(ex.muscleGroup);
               return (
                 <div
                   key={ex.id}
-                  className={"stretch-row"}
-                  style={{
-                    background: "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                    border: "1px solid rgba(180,172,158,.05)",
-                    borderRadius: R.r10,
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: S.s12,
-                    cursor: "pointer",
-                    transition: "all .18s"
-                  }}
+                  className={"picker-ex-row stretch-row"}
+                  style={{ '--mg-color': mgColor }}
                 >
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: R.lg,
-                    flexShrink: 0,
-                    background: "rgba(45,42,36,.15)",
-                    border: "1px solid rgba(180,172,158,.05)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                  }}>
-                    <ExIcon ex={ex} size={"1rem"} color={"#b4ac9e"} />
+                  <div className={"picker-ex-orb"}>
+                    <ExIcon ex={ex} size={"1rem"} color={"#d4cec4"} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
@@ -514,34 +475,15 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
               const hasPB = !!(profile.exercisePBs || {})[ex.id];
               const isFav = (profile.favoriteExercises || []).includes(ex.id);
               const whenLabel = days == null ? null : days === 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`;
+              const mgColor = getMuscleColor(ex.muscleGroup);
               return (
                 <div
                   key={ex.id}
-                  className={"stretch-row"}
-                  style={{
-                    background: "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
-                    border: "1px solid rgba(180,172,158,.05)",
-                    borderRadius: R.r10,
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: S.s12,
-                    cursor: "pointer",
-                    transition: "all .15s"
-                  }}
+                  className={"picker-ex-row stretch-row"}
+                  style={{ '--mg-color': mgColor }}
                 >
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: R.lg,
-                    flexShrink: 0,
-                    background: "rgba(45,42,36,.15)",
-                    border: "1px solid rgba(180,172,158,.05)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                  }}>
-                    <ExIcon ex={ex} size={"1rem"} color={"#b4ac9e"} />
+                  <div className={"picker-ex-orb"}>
+                    <ExIcon ex={ex} size={"1rem"} color={"#d4cec4"} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
