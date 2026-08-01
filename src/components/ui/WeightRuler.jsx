@@ -2,56 +2,80 @@ import React from 'react';
 import { pctToSlider, sliderToPct } from '../../utils/units';
 import { FG, FS } from '../../utils/tokens';
 
-// ─── Weight-intensity drag ruler ───────────────────────────────────────────────
+// ─── Weight-intensity wheel ────────────────────────────────────────────────────
 // The Forge Glass skin over the 50–200% Weight Intensity mechanic. Same math as
-// the old range slider (pctToSlider/sliderToPct, non-linear above 100%); only
-// the interaction changed: a native horizontal scroll strip whose scrollLeft IS
-// the slider value — browser inertia for free, no pointer math, and no gesture
-// fight with the sheet (scrolling is pan-x, not a drag we have to own).
+// the old range slider (pctToSlider/sliderToPct, non-linear above 100%); the
+// interaction is a native horizontal scroll strip read CONTINUOUSLY — the value
+// live-updates while the wheel spins (momentum included), nothing snaps back.
+//
+// A plain tap on the strip nudges the weight one plate-step (±2.5 lbs /
+// ±1.25 kg) via onTapStep: left of the needle steps down, right steps up.
 //
 // A visually-hidden-but-focusable range input mirrors the value so keyboard
 // and assistive tech keep the exact affordance the old slider had; the strip
 // is presentation.
 
 const STOP_PX = 9; // px per slider unit (domain 0..100)
-const SNAP = 5; // slider units per detent (matches the old slider's step)
+const TAP_SLOP_PX = 7; // movement beyond this is a scroll, not a tap
+const TAP_MAX_MS = 350;
 
-function WeightRuler({ pct, onPctChange }) {
+function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
   const scrollRef = React.useRef(null);
-  const settleTimer = React.useRef(null);
+  const lastUserScrollAt = React.useRef(0);
   const suppressUntil = React.useRef(0);
-  const sv = pctToSlider(pct);
+  // onScroll compares against the latest committed pct without re-binding the
+  // handler; the ref is only ever read in event handlers.
+  const pctRef = React.useRef(pct);
+  React.useEffect(() => {
+    pctRef.current = pct;
+  }, [pct]);
+  const tapStart = React.useRef(null);
 
-  const syncScroll = React.useCallback((value, smooth) => {
+  const syncScroll = React.useCallback(value => {
     const el = scrollRef.current;
     if (!el) return;
-    suppressUntil.current = Date.now() + 260;
-    const left = value * STOP_PX;
-    if (smooth && el.scrollTo) el.scrollTo({ left, behavior: 'smooth' });
-    else el.scrollLeft = left;
+    suppressUntil.current = Date.now() + 160;
+    el.scrollLeft = value * STOP_PX;
   }, []);
 
-  // Keep the strip in sync when the pct changes from outside (ghost repeat,
-  // carry-over) — and on mount.
+  // Follow EXTERNAL pct changes (ghost repeat, carry-over, mount) — never
+  // fight a live spin: skip while the user scrolled within the last 400ms,
+  // and skip when the strip already sits on the value.
   React.useEffect(() => {
-    syncScroll(pctToSlider(pct), false);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (Date.now() - lastUserScrollAt.current < 400) return;
+    const target = pctToSlider(pct);
+    const current = el.scrollLeft / STOP_PX;
+    if (Math.abs(current - target) > 0.5) syncScroll(target);
   }, [pct, syncScroll]);
 
+  // Continuous read — scroll events are already frame-paced by the browser
+  // and the math is trivial, so no extra throttle: the value tracks the strip
+  // live while it spins, momentum included.
   const onScroll = () => {
     if (Date.now() < suppressUntil.current) return;
-    clearTimeout(settleTimer.current);
-    settleTimer.current = setTimeout(() => {
-      const el = scrollRef.current;
-      if (!el) return;
-      const raw = el.scrollLeft / STOP_PX;
-      const snapped = Math.max(0, Math.min(100, Math.round(raw / SNAP) * SNAP));
-      const newPct = sliderToPct(snapped);
-      if (newPct !== pct) onPctChange(newPct);
-      syncScroll(snapped, true);
-    }, 90);
+    lastUserScrollAt.current = Date.now();
+    const el = scrollRef.current;
+    if (!el) return;
+    const sv = Math.max(0, Math.min(100, el.scrollLeft / STOP_PX));
+    const newPct = Math.round(sliderToPct(sv));
+    if (newPct !== pctRef.current) onPctChange(newPct);
   };
 
-  React.useEffect(() => () => clearTimeout(settleTimer.current), []);
+  const onPointerDown = e => {
+    tapStart.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+  };
+  const onPointerUp = e => {
+    const s = tapStart.current;
+    tapStart.current = null;
+    if (!s || !onTapStep) return;
+    if (Date.now() - s.t > TAP_MAX_MS) return;
+    if (Math.abs(e.clientX - s.x) > TAP_SLOP_PX || Math.abs(e.clientY - s.y) > TAP_SLOP_PX) return;
+    const rect = scrollRef.current ? scrollRef.current.getBoundingClientRect() : null;
+    if (!rect) return;
+    onTapStep(e.clientX >= rect.left + rect.width / 2 ? 1 : -1);
+  };
 
   return (
     <div style={{ position: 'relative' }}>
@@ -60,8 +84,8 @@ function WeightRuler({ pct, onPctChange }) {
         type={'range'}
         min={'0'}
         max={'100'}
-        step={String(SNAP)}
-        value={sv}
+        step={'1'}
+        value={pctToSlider(pct)}
         aria-label={'Weight intensity'}
         onChange={e => onPctChange(sliderToPct(Number(e.target.value)))}
         className={'sf-ruler-a11y'}
@@ -69,6 +93,8 @@ function WeightRuler({ pct, onPctChange }) {
       <div
         ref={scrollRef}
         onScroll={onScroll}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
         className={'sf-ruler'}
         aria-hidden={'true'}
       >
@@ -93,6 +119,22 @@ function WeightRuler({ pct, onPctChange }) {
         <span>{'100% Normal'}</span>
         <span>{'200% Max'}</span>
       </div>
+      {onTapStep && (
+        <div
+          aria-hidden={'true'}
+          style={{
+            textAlign: 'center',
+            fontSize: FS.fs48,
+            letterSpacing: '.16em',
+            textTransform: 'uppercase',
+            color: 'rgba(228,222,211,.32)',
+            marginTop: 2,
+            fontFamily: FG.fontCond,
+          }}
+        >
+          {`spin to scale · tap sides to nudge ${stepLabel || '±2.5 lbs'}`}
+        </div>
+      )}
     </div>
   );
 }

@@ -377,6 +377,7 @@ const QuickLogModal = memo(function QuickLogModal({
                   allowExtraRows={true}
                   onPrimaryBlur={checkBeat}
                   onRowFocus={setActiveRow}
+                  activeRow={effActiveRow}
                 />
               )}
 
@@ -414,14 +415,24 @@ const QuickLogModal = memo(function QuickLogModal({
                     <label style={{ marginBottom: S.s0, flex: 1 }}>{"Weight Intensity"}</label>
                     <span className={"intensity-val"}>{weightPct}{"%"}</span>
                   </div>
-                  <WeightRuler pct={weightPct} onPctChange={newPct => {
-                    const curW = parseFloat(exWeight);
-                    if (curW && weightPct > 0) {
-                      const scaled = Math.round(curW * newPct / weightPct * 100) / 100;
-                      setExWeight(String(scaled));
-                    }
-                    setWeightPct(newPct);
-                  }} />
+                  <WeightRuler
+                    pct={weightPct}
+                    onPctChange={newPct => {
+                      const curW = parseFloat(exWeight);
+                      if (curW && weightPct > 0) {
+                        const scaled = Math.round(curW * newPct / weightPct * 100) / 100;
+                        setExWeight(String(scaled));
+                      }
+                      setWeightPct(newPct);
+                    }}
+                    onTapStep={dir => {
+                      // Plate-step nudge on the typed weight (intensity % untouched).
+                      const step = metric ? 1.25 : 2.5;
+                      const cur = parseFloat(exWeight) || 0;
+                      setExWeight(String(Math.max(0, Math.round((cur + dir * step) * 100) / 100)));
+                    }}
+                    stepLabel={metric ? "±1.25 kg" : "±2.5 lbs"}
+                  />
                 </div>
               )}
 

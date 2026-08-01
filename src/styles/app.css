@@ -55,10 +55,11 @@
       /* ── Forge Glass ambient tint ───────────────────────────────────────
          The "ambient light travel": two drifting radial layers in the app
          backdrop read these vars, and App.jsx retints them to the muscle
-         group in context (configure > detail > library filter > default).
-         The 800ms transition lives on the layers, not here. */
-      --ambient-tint:rgba(232,180,74,.14);
-      --ambient-tint2:rgba(232,180,74,.11);
+         group in context (configure > detail > library filter). TRANSPARENT
+         at rest — the raw backdrop video is the whole background until a
+         muscle is in context. The 800ms transition lives on the layers. */
+      --ambient-tint:transparent;
+      --ambient-tint2:transparent;
 
       /* Forge Glass font stacks (Barlow ships via index.html; Cinzel via the
          @import above). Referenced by redesigned rules; legacy rules keep
@@ -489,6 +490,8 @@
        vocabulary lifted from the live tracker's .lw-ex-edit-* family. */
     .se{display:flex;flex-direction:column}
     .se-row{display:flex;align-items:flex-end;gap:6px;padding:5px 0;border-bottom:1px solid rgba(45,42,36,.18)}
+    /* Set Forge: the claimed row (weight-chip target) — tap anywhere to claim */
+    .se-row--active{background:rgba(232,180,74,.07);box-shadow:inset 0 0 0 1px rgba(232,180,74,.32);border-radius:8px;border-bottom-color:transparent;padding-left:6px;padding-right:6px}
     .se-row:last-of-type{border-bottom:none}
     .se-row-lbl{font-family:'Cinzel',serif;font-size:.54rem;color:#8a8478;letter-spacing:.06em;min-width:18px;flex-shrink:0;align-self:center}
     .se-cell{display:flex;flex-direction:column;flex:1;min-width:0}

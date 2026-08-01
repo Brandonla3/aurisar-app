@@ -48,9 +48,11 @@ const SetsEditor = React.memo(function SetsEditor({
   showDist = true,        // distance field on cardio rows
   allowExtraRows = true,  // the "＋ Add Row" progressive-row affordance
   onPrimaryBlur,          // optional blur hook (quick-log's ghost comparison)
-  onRowFocus,             // optional: reports which row has focus (0 = primary,
+  onRowFocus,             // optional: reports which row was claimed (0 = primary,
                           // n = extra row n) — the Set Forge's weight chips
-                          // target the active row. Undefined elsewhere = no-op.
+                          // target the active row. Clicking anywhere on a row
+                          // claims it, not just focusing an input.
+  activeRow,              // optional: index of the claimed row — highlights it.
 }) {
   const isC = exD.category === 'cardio';
   const isF = exD.category === 'flexibility';
@@ -99,6 +101,13 @@ const SetsEditor = React.memo(function SetsEditor({
     onField('extraRows', rr);
   };
   const focusProps = row => (onRowFocus ? { onFocus: () => onRowFocus(row) } : {});
+  // Whole-row claim: tap/click anywhere on the row (not just an input) makes
+  // it the active target for the weight chips. Visual highlight rides the
+  // activeRow prop so surfaces without the concept render exactly as before.
+  const rowClaimProps = row =>
+    onRowFocus ? { onClick: () => onRowFocus(row), style: { cursor: "pointer" } } : {};
+  const rowClass = (base, row) =>
+    `${base}${onRowFocus && activeRow === row ? " se-row--active" : ""}`;
   const rowInputProps = (ri, field, mapVal = v => v) =>
     rowsCommitOn === 'change'
       ? { value: rows[ri][field] || '', onChange: e => setRow(ri, field, mapVal(e.target.value)), ...focusProps(ri + 1) }
@@ -137,7 +146,7 @@ const SetsEditor = React.memo(function SetsEditor({
   return (
     <div className={`se se--${variant}`}>
       {/* ── Primary row ── */}
-      <div className={'se-row'}>
+      <div className={rowClass('se-row', 0)} {...rowClaimProps(0)}>
         <span className={'se-row-lbl'}>{`${rowLbl}1`}</span>
         {!noSets && cell('Sets', (
           <input className={'se-inp'} type={'text'} inputMode={'decimal'}
@@ -206,7 +215,7 @@ const SetsEditor = React.memo(function SetsEditor({
 
       {/* ── Extra rows ── */}
       {rows.map((row, ri) => (
-        <div key={ri} className={'se-row se-row--extra'}>
+        <div key={ri} className={rowClass('se-row se-row--extra', ri + 1)} {...rowClaimProps(ri + 1)}>
           <span className={'se-row-lbl'} aria-hidden={'true'}>{`${rowLbl}${ri + 2}`}</span>
           {(() => { const rn = `${timed ? 'Interval' : 'Set'} ${ri + 2}`; return timed ? (
             <>
