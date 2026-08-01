@@ -117,10 +117,19 @@ export default async (request, context) => {
   // Fail closed: a public preview with no configured credentials must never be
   // reachable. Set both vars in Netlify for Deploy Previews / Branch deploys.
   if (!expectedUser || !expectedPass) {
-    return new Response(
+    // TEMPORARY DIAGNOSTIC (no secret values leaked): reports the deploy context
+    // and whether each expected variable NAME is visible to the edge function,
+    // so we can distinguish a scope/naming/context problem from a stale build.
+    const diag = [
       'Preview access is not configured. Set PREVIEW_BASIC_AUTH_USER and PREVIEW_BASIC_AUTH_PASSWORD in Netlify.',
-      { status: 503, headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
-    );
+      `deployContext=${deployContext || '(empty)'}`,
+      `PREVIEW_BASIC_AUTH_USER visible=${Netlify.env.has('PREVIEW_BASIC_AUTH_USER')}`,
+      `PREVIEW_BASIC_AUTH_PASSWORD visible=${Netlify.env.has('PREVIEW_BASIC_AUTH_PASSWORD')}`,
+    ].join('\n');
+    return new Response(diag, {
+      status: 503,
+      headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' },
+    });
   }
 
   const authHeader = request.headers.get('authorization');
