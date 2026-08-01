@@ -96,6 +96,7 @@ function challenge() {
     headers: {
       'WWW-Authenticate': `Basic realm="${REALM}", charset="UTF-8"`,
       'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex',
     },
   });
 }
@@ -118,7 +119,7 @@ export default async (request, context) => {
   if (!expectedUser || !expectedPass) {
     return new Response(
       'Preview access is not configured. Set PREVIEW_BASIC_AUTH_USER and PREVIEW_BASIC_AUTH_PASSWORD in Netlify.',
-      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
     );
   }
 

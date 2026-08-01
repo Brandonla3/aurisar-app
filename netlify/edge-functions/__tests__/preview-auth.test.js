@@ -129,6 +129,7 @@ describe('handler (default export)', () => {
     const res = await handler(req(), context);
     expect(res.status).toBe(401);
     expect(res.headers.get('www-authenticate')).toContain('Basic');
+    expect(res.headers.get('x-robots-tag')).toBe('noindex');
     expect(context.next).not.toHaveBeenCalled();
     restore();
   });
