@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { sb } from '../utils/supabase';
 import aurisarLogo from '../assets/aurisar-logo.png';
+import LoginVideoBackdrop from './LoginVideoBackdrop';
 
 // ─── Ambient particles + vignette + grain ─────────────────────────────────────
 function Ambient({ animated = true, density = 28 }) {
@@ -151,6 +152,8 @@ export default function LoginScreen({
           filter: 'blur(24px)',
           pointerEvents: 'none',
         }} />
+
+        <LoginVideoBackdrop />
       </div>
 
       <Ambient animated={true} />
