@@ -53,6 +53,8 @@ import Sheet from './components/ui/Sheet';
 import ConfirmSheet from './components/ui/ConfirmSheet';
 import AmbientBackdrop from './features/ambient/AmbientBackdrop';
 import { tintRgba } from './features/ambient/ambientTint';
+import BottomNav from './components/BottomNav';
+import OrbCreateMenu from './components/OrbCreateMenu';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -568,6 +570,7 @@ function App() {
   const [libEquipFilters, setLibEquipFilters] = useState(() => new Set());
   const [libDetailEx, setLibDetailEx] = useState(null);
   const [libSelectMode, setLibSelectMode] = useState(false);
+  const [orbMenuOpen, setOrbMenuOpen] = useState(false);
   const setGymKit = useCallback(v => setProfile(p => ({ ...p, gymKit: v })), []);
   // One shared, persisted basket replaces the three throwaway selection Sets
   // the library, favourites list and builder picker each used to keep.
@@ -5008,6 +5011,18 @@ function App() {
             setNavMenuOpen(false);
           }),
           badge: pendingQuestCount
+        }, {
+          // World left the bottom nav for the Forge Glass orb — tucked here
+          // for alpha (same guarded action, so the Babylon lifecycle,
+          // Character slot and Graphics Settings stay reachable).
+          icon: "🌍",
+          label: "World",
+          action: () => guardAll(() => {
+            setPrevTab(activeTab);
+            setActiveTab("world");
+            setNavMenuOpen(false);
+          }),
+          live: true
         },
         // Map feature hidden — re-enable when ready
         // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
@@ -5053,22 +5068,28 @@ function App() {
         }].filter(Boolean).map(item => <button key={item.label} className={"nav-menu-item"} style={item.danger ? {
           color: "#7A2838",
           borderTop: "1px solid rgba(180,172,158,.04)"
-        } : {}} onClick={item.action}>{item.icon}{" "}{item.label}{item.badge > 0 && <span className={"nav-menu-badge"} style={item.badgeDanger ? {
+        } : {}} onClick={item.action}>{item.icon}{" "}{item.label}{item.live && <span style={{width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80",display:"inline-block",marginLeft:6,verticalAlign:"middle"}} />}{item.badge > 0 && <span className={"nav-menu-badge"} style={item.badgeDanger ? {
             background: UI_COLORS.danger,
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"} style={activeTab === "messages" && msgView === "chat" ? { display: "none" } : undefined}><div className={"tabs"}>{[["workout", "Exercises"], ["workouts", "Workouts"], ["calendar", "Calendar"], ["social", "Guild"]].map(([t, l]) => {
-            const isOn = activeTab === t;
-            return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
-              setActiveTab(t);
-              if (t === "workouts") workoutsRef.current?.showList();
-              if (t === "social" && authUser) {
-                loadSocialData();
-                loadIncomingShares();
-              }
-            })}><span className={"tab-icon"}><TabIcon name={t} size={22} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}<button key="world" className={`tab ${activeTab === "world" ? "on" : ""}`} title="Enter Aurisar World" onClick={() => guardAll(() => { setPrevTab(activeTab); setActiveTab("world"); })} style={{position:"relative"}}><span className={"tab-icon"}><TabIcon name="world" size={22} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<BottomNav hidden={activeTab === "messages" && msgView === "chat"} activeTab={activeTab} socialBadge={friendRequests.length + incomingShares.length} orbOpen={orbMenuOpen} onOrbToggle={() => setOrbMenuOpen(v => !v)} onSelectTab={t => guardAll(() => {
+        setActiveTab(t);
+        if (t === "workouts") workoutsRef.current?.showList();
+        if (t === "social" && authUser) {
+          loadSocialData();
+          loadIncomingShares();
+        }
+      })} /><OrbCreateMenu open={orbMenuOpen} onClose={() => setOrbMenuOpen(false)} log={profile.log} allExercises={allExercises} onPickExercise={exId => {
+        setOrbMenuOpen(false);
+        openQuickLog(exId, { origin: { type: "orb" } });
+      }} onBuildWorkout={() => {
+        setOrbMenuOpen(false);
+        guardAll(() => {
+          setActiveTab("workouts");
+          setTimeout(() => workoutsRef.current?.openBuilderWithExercises([]), 0);
+        });
+      }} repeatLast={null} />{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
         open
         icon={"⚡"}
         title={"Replace Active Workout?"}

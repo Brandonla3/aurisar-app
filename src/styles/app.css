@@ -1495,6 +1495,16 @@
     .tab.on .tab-icon{transform:translateY(-1px)}
     .tab:active .tab-icon{transform:scale(.88)}
 
+    /* ── Create orb (Forge Glass nav) ────────────────────────────────────
+       Docks between the two tab pairs; the crown rides 22px above the bar
+       (--bottom-nav-h is untouched — consumers keep their offsets). */
+    .orb-slot{flex:none;width:64px;display:flex;justify-content:center;align-items:flex-start}
+    .orb-btn{width:56px;height:56px;margin-top:-22px;border-radius:50%;cursor:pointer;border:1px solid rgba(232,180,74,.55);background:radial-gradient(circle at 36% 30%,#F2CE7A,#C08C20);color:#171106;font-family:var(--font-cond);font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 8px 26px rgba(232,180,74,.35),inset 0 1px 2px rgba(255,255,255,.5);transition:transform var(--dur-base) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+    .orb-btn.open{transform:rotate(90deg)}
+    .orb-btn:active{transform:scale(.94)}
+    @keyframes orbRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    @keyframes orbFade{from{opacity:0}to{opacity:1}}
+
     /* ── Workout cards (Forge tab) — themed via --mg-color ── */
     .workout-card{
       --mg-color:#B0A090;
@@ -2211,7 +2221,7 @@
          left stranded mid-keyframe once that animation is neutralised. */
       .scroll-reveal { opacity: 1; transform: none; }
       .sheet-slide-up, .sheet-enter-left, .sheet-enter-right,
-      .ui-sheet-pop, .lib-home-section {
+      .ui-sheet-pop, .lib-home-section, .orb-action {
         animation: none; opacity: 1; transform: none;
       }
       /* Purely decorative loops — stop outright rather than run 500×/s. */
