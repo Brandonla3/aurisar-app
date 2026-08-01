@@ -7,10 +7,11 @@ import { S, R, FS, Z } from '../../utils/tokens';
 import { useScrollRestore } from '../../hooks/useScrollRestore';
 import FilterDropdown from './FilterDropdown';
 import MuscleTorchStrip from './MuscleTorchStrip';
-import GymKitBar from './GymKitBar';
 import MuscleMap from './MuscleMap';
 import ExerciseRow from './ExerciseRow';
+import DiscoverCustomizeMenu from './DiscoverCustomizeMenu';
 import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
+import { DISCOVER_CATEGORY_GROUPS } from './discoverCategories';
 
 // Row adapter for the virtualised filtered list — mirrors
 // WorkoutExercisePicker's WbExPickerRow: maps react-window's props onto the
@@ -72,11 +73,12 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     profile, setProfile,
     allExercises,
     _exReady, _exLoadError,
-    gymKit, setGymKit, kitTotalAll, libKitCount,
+    libDiscoverPicks, setLibDiscoverPicks, libDiscoverCategoryCounts,
     // Quick-log (for "Configure" action)
       } = props;
 
   const [catalogNoteDismissed, setCatalogNoteDismissed] = useState(false);
+  const [discoverMenuOpen, setDiscoverMenuOpen] = useState(false);
 
   // Raw search keystrokes, the open dropdown, the browse mode and the page
   // depth are all local now — none is read by App, and keeping the raw search
@@ -234,14 +236,24 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
 
   // Discover rows — labels + exercise lists are memoized at App body
   // (libDiscoverRows). Wire onSeeAll closures here so the lifted memo stays
-  // free of setter dependencies.
-  const _equipFor = { "Bodyweight Only": "bodyweight", "Dumbbell Exercises": "dumbbell", "Barbell Essentials": "barbell" };
+  // free of setter dependencies. Each category carries its own seeAll intent
+  // (equip/muscle facet, or none for a computed category like difficulty).
   const discoverRows = libDiscoverRows.map(row => ({
     ...row,
-    onSeeAll: _equipFor[row.label]
-      ? () => { setLibEquipFilters(new Set([_equipFor[row.label]])); setLibBrowseMode("filtered"); }
+    onSeeAll: row.seeAll?.kind === "equip"
+      ? () => { setLibEquipFilters(new Set([row.seeAll.value])); setLibBrowseMode("filtered"); }
+      : row.seeAll?.kind === "muscle"
+      ? () => { setLibMuscleFilters(new Set([row.seeAll.value])); setLibBrowseMode("filtered"); }
       : () => setLibBrowseMode("filtered"),
   }));
+
+  // Swap-in-place selection: picking a new category always replaces the
+  // oldest of the 3 current picks, so the count never needs enforcing and
+  // there is no separate "remove" affordance to design.
+  const pickDiscoverCategory = key => {
+    if ((libDiscoverPicks || []).includes(key)) return;
+    setLibDiscoverPicks([...(libDiscoverPicks || []).slice(1), key]);
+  };
 
   // Fade-edge scroll handler
   const handleHScroll = e => {
@@ -270,7 +282,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       }}><div className={"tech-search-wrap"} style={{
           flex: 1,
           marginBottom: S.s0
-        }}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={`Search ${libKitCount} exercises…`} value={search} onChange={e => {
+        }}><span className={"tech-search-icon"}>{"🔍"}</span><input className={"tech-search-inp"} placeholder={"Search…"} value={search} onChange={e => {
             const v = e.target.value;
             setSearch(v);
             debouncedSetLibSearch(v);
@@ -315,13 +327,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         background: "transparent", border: "none", color: "inherit",
         cursor: "pointer", fontSize: FS.fs78, lineHeight: 1, padding: S.s2
       }}>{"✕"}</button>
-    </div>}{
-    /* Gym kit sits above both views, not just the filtered one. It shrinks
-       the home view's muscle tiles and discover rows too, so scoping it to
-       the filtered list would leave tiles vanishing with no visible cause and
-       no way to switch it off from where you noticed. */
-    }
-    <GymKitBar gymKit={gymKit} setGymKit={setGymKit} totalShown={libKitCount} totalAll={kitTotalAll} />
+    </div>}
     {/* ═══ HOME VIEW ═══ */
     libBrowseMode === "home" && <div>{/* Resume chip — active filters survive a
       non-destructive "← Browse Library", so make them visible and one tap from
@@ -362,14 +368,19 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
                 category: "strength"
               }} size={"1.15rem"} color={color} /></div><div><div className={"lib-tile-name"}>{label}</div><div className={"lib-tile-count"} style={{
                 '--mg-color': color
-              }}>{count + " exercises"}</div></div></button>)}</div></div><div className={"lib-divider"} />{/* Discover Rows — Netflix-style horizontal scroll */
-      discoverRows.map((row, ri) => row.exercises.length >= 3 && <div key={"dr-" + row.label} className={"lib-home-section"} style={{
-        marginBottom: ri < discoverRows.length - 1 ? 18 : 0
+              }}>{count + " exercises"}</div></div></button>)}</div></div><div className={"lib-divider"} />{/* Discover Rows — Netflix-style horizontal scroll */}
+      {_exReady && <div style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        marginBottom: S.s6
+      }}><button type="button" className={"lib-discover-cust-trigger"} onClick={() => setDiscoverMenuOpen(true)}>{"🎛 Customize"}</button></div>}
+      {discoverRows.map((row, ri) => row.exercises.length >= 3 && <div key={"dr-" + row.key} className={"lib-home-section lib-home-section--compact"} style={{
+        marginBottom: ri < discoverRows.length - 1 ? 14 : 0
       }}><div style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: S.s10
+          marginBottom: S.s8
         }}><span className={"lib-section-hdr"} style={{
             marginBottom: S.s0
           }}>{row.label}</span><button className={"lib-see-all"} onClick={row.onSeeAll}>{"See All →"}</button></div><div className={"lib-hscroll-wrap"}><div className={"lib-hscroll"} onScroll={handleHScroll}>{row.exercises.map(ex => {
@@ -381,7 +392,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
                 '--mg-color': mgColor
               }}><div className={"lib-discover-orb"} style={{
                   '--mg-color': mgColor
-                }}><ExIcon ex={ex} size={"1.1rem"} color={mgColor} /></div><span className={"lib-discover-name"}>{ex.name}</span><div className={"lib-discover-meta"}>{mgLabel && <span style={{
+                }}><ExIcon ex={ex} size={"0.95rem"} color={mgColor} /></div><span className={"lib-discover-name"}>{ex.name}</span><div className={"lib-discover-meta"}>{mgLabel && <span style={{
                     fontSize: FS.fs50,
                     color: mgColor,
                     fontWeight: 500
@@ -569,6 +580,14 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
        any tab — the Plans tab used to open a second, divergent modal for the
        same data. */
     }
+    <DiscoverCustomizeMenu
+      open={discoverMenuOpen}
+      onClose={() => setDiscoverMenuOpen(false)}
+      groups={DISCOVER_CATEGORY_GROUPS}
+      counts={libDiscoverCategoryCounts}
+      picks={libDiscoverPicks || []}
+      onPick={pickDiscoverCategory}
+    />
   </div>;
 });
 

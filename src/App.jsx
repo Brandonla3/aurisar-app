@@ -20,6 +20,7 @@ import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
 import { useExerciseFilters } from './features/exercises/useExerciseFilters';
+import { DEFAULT_DISCOVER_PICKS } from './features/exercises/discoverCategories';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
 import MyWorkoutsSubTab from './features/exercises/MyWorkoutsSubTab';
 import MessagesTab from './features/social/MessagesTab';
@@ -572,7 +573,7 @@ function App() {
   const [libDetailEx, setLibDetailEx] = useState(null);
   const [libSelectMode, setLibSelectMode] = useState(false);
   const [orbMenuOpen, setOrbMenuOpen] = useState(false);
-  const setGymKit = useCallback(v => setProfile(p => ({ ...p, gymKit: v })), []);
+  const setLibDiscoverPicks = useCallback(picks => setProfile(p => ({ ...p, libDiscoverPicks: picks })), []);
   // One shared, persisted basket replaces the three throwaway selection Sets
   // the library, favourites list and builder picker each used to keep.
   const {
@@ -2825,7 +2826,6 @@ function App() {
   // allExercises scans off the App-render hot path (Finding #5 + #6 from
   // docs/performance-audit.md).
   const {
-    libKitCount,
     libFiltered,
     libAvailableTypes,
     libTypeCounts,
@@ -2834,13 +2834,14 @@ function App() {
     libMuscleCardData,
     libMuscleMapData,
     libDiscoverRows,
+    libDiscoverCategoryCounts,
     libMuscleOpts,
     libEquipOpts,
   } = useExerciseFilters({
     allExercises,
     _exReady,
     exerciseLog: profile.log,
-    gymKit: profile.gymKit,
+    discoverPicks: profile.libDiscoverPicks || DEFAULT_DISCOVER_PICKS,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
 
@@ -5163,10 +5164,8 @@ function App() {
 
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
-            gymKit={profile.gymKit}
-            setGymKit={setGymKit}
-            libKitCount={libKitCount}
-            kitTotalAll={allExercises.length}
+            libDiscoverPicks={profile.libDiscoverPicks || DEFAULT_DISCOVER_PICKS}
+            setLibDiscoverPicks={setLibDiscoverPicks}
             _exReady={_exReady}
             _exLoadError={_exLoadError}
             libTypeCounts={libTypeCounts}
@@ -5175,6 +5174,7 @@ function App() {
             libMuscleCardData={libMuscleCardData}
             libMuscleMapData={libMuscleMapData}
             libDiscoverRows={libDiscoverRows}
+            libDiscoverCategoryCounts={libDiscoverCategoryCounts}
             libMuscleOpts={libMuscleOpts}
             libEquipOpts={libEquipOpts}
             setLibSearchDebounced={setLibSearchDebounced}

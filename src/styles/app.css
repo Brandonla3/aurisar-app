@@ -417,7 +417,8 @@
     .lib-hscroll-wrap::after{right:0;background:linear-gradient(to left,rgba(10,10,8,1) 0%,transparent 100%);opacity:1}
     .lib-hscroll-wrap.fade-left::before{opacity:1}
     .lib-hscroll-wrap.fade-right-off::after{opacity:0}
-    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent;scroll-snap-type:x mandatory;scroll-padding-left:2px}
+    .lib-hscroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent;scroll-snap-type:x mandatory;scroll-padding-left:2px}
+    .lib-home-section--compact .lib-section-hdr{font-size:.7rem}
     .lib-hscroll::-webkit-scrollbar{height:6px}
     .lib-hscroll::-webkit-scrollbar-track{background:rgba(45,42,36,.15);border-radius:3px}
     .lib-hscroll::-webkit-scrollbar-thumb{background:rgba(180,172,158,.25);border-radius:3px}
@@ -667,57 +668,38 @@
       .mm-cold rect{filter:grayscale(.85)}
     }
 
-    /* ── Gym kit filter ──────────────────────────────────────────────────
-       Persistent "equipment I have" filter. Quiet when off, clearly marked
-       when on — it hides a large share of the catalog, so it must never be
-       something you forget is active. */
-    .gymkit{margin-bottom:10px}
-    .gymkit-row{display:flex;align-items:center;gap:6px}
-    .gymkit-toggle{
-      flex:1;display:flex;align-items:center;gap:7px;
-      padding:6px 10px;border-radius:8px;cursor:pointer;text-align:left;
+    /* ── Discover carousel customize menu ────────────────────────────────
+       Nested/cascading pick-3 for the Library home's discover rows. Reuses
+       .myex-accordion for the group disclosure; the option rows below are
+       deliberately not checkboxes — see DiscoverCustomizeMenu.jsx. */
+    .lib-discover-cust-trigger{
+      background:rgba(45,42,36,.22);border:1px solid rgba(180,172,158,.1);
+      border-radius:8px;padding:5px 11px;color:#8a8478;font-size:.62rem;
+      font-family:'Inter',sans-serif;cursor:pointer;
+      -webkit-tap-highlight-color:transparent
+    }
+    .lib-discover-cust-trigger:hover{color:#b4ac9e;border-color:rgba(180,172,158,.22)}
+    .discover-cust-hint{font-size:.66rem;color:#8a8478;line-height:1.5;margin:0 0 14px}
+    .discover-cust-opts{display:flex;flex-direction:column;gap:5px}
+    .discover-cust-opt{
+      display:flex;align-items:center;justify-content:space-between;gap:8px;
+      min-height:40px;padding:0 12px;border-radius:9px;text-align:left;cursor:pointer;
       background:rgba(45,42,36,.22);border:1px solid rgba(180,172,158,.07);
-      color:#8a8478;font-size:.66rem;font-family:'Inter',sans-serif;
+      color:#b4ac9e;font-size:.68rem;font-family:'Inter',sans-serif;
       transition:all var(--dur-fast) var(--ease-standard);
       -webkit-tap-highlight-color:transparent
     }
-    .gymkit-toggle:hover{border-color:rgba(180,172,158,.16);color:#b4ac9e}
-    .gymkit-on .gymkit-toggle{
-      background:rgba(196,148,40,.1);border-color:rgba(196,148,40,.32);color:#c4a044
+    .discover-cust-opt:hover:not(:disabled){border-color:rgba(180,172,158,.2)}
+    .discover-cust-opt:disabled{opacity:.35;cursor:default}
+    .discover-cust-opt.on{
+      background:rgba(196,148,40,.14);border-color:rgba(196,148,40,.4);color:#e8d08a
     }
-    .gymkit-count{
-      margin-left:auto;font-variant-numeric:tabular-nums;font-size:.58rem;color:#6f6a62
+    .discover-cust-opt-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .discover-cust-opt-count{font-variant-numeric:tabular-nums;font-size:.6rem;color:#6f6a62;flex-shrink:0}
+    .discover-cust-opt-tag{
+      flex-shrink:0;font-size:.56rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:#c4a044
     }
-    .gymkit-on .gymkit-count{color:#c4a044}
-    .gymkit-chev{font-size:.6rem;flex-shrink:0}
-    .gymkit-clear{
-      flex-shrink:0;background:transparent;border:1px solid rgba(180,172,158,.1);
-      border-radius:7px;padding:6px 9px;color:#8a8478;font-size:.6rem;cursor:pointer;
-      -webkit-tap-highlight-color:transparent
-    }
-    .gymkit-clear:hover{color:#d4cec4;border-color:rgba(180,172,158,.24)}
-    .gymkit-panel{
-      margin-top:6px;padding:9px 10px;border-radius:8px;
-      background:rgba(20,19,15,.6);border:1px solid rgba(180,172,158,.07)
-    }
-    .gymkit-hint{font-size:.58rem;color:#6f6a62;margin:0 0 7px;line-height:1.45}
-    .gymkit-warn{color:#c4a044;margin:7px 0 0}
-    .gymkit-opts{display:flex;flex-wrap:wrap;gap:5px}
-    /* Sized for a thumb on a gym floor, not a mouse: the 24px-tall chips this
-       started as were too small to hit reliably mid-session. */
-    .gymkit-opt{
-      min-height:36px;display:inline-flex;align-items:center;
-      padding:0 14px;border-radius:18px;cursor:pointer;
-      background:rgba(45,42,36,.28);border:1px solid rgba(180,172,158,.08);
-      color:#8a8478;font-size:.66rem;font-family:'Inter',sans-serif;
-      transition:all var(--dur-fast) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .gymkit-opt:hover{color:#b4ac9e;border-color:rgba(180,172,158,.2)}
-    .gymkit-opt.on{
-      background:rgba(196,148,40,.16);border-color:rgba(196,148,40,.42);color:#e8d08a
-    }
-    .gymkit-opt:active{transform:scale(.96)}
 
     /* ── Training heat torches ───────────────────────────────────────────
        One torch per muscle group, coldest first. Brightness carries recency
@@ -952,7 +934,7 @@
       font:inherit;color:inherit;text-align:left;width:100%;appearance:none
     }
     .lib-hero-card{text-align:center}
-    .lib-discover-card{text-align:center;width:125px}
+    .lib-discover-card{text-align:center;width:100px}
 
     /* Stretched primary action. The row is a layout container; the button
        wrapping the exercise name owns the whole row's hit area via an
@@ -1000,9 +982,9 @@
 
     /* ── LIBRARY HOME: Discover Cards ── */
     .lib-discover-card{
-      position:relative;min-width:125px;max-width:125px;flex-shrink:0;border-radius:11px;
-      padding:12px 8px 10px;cursor:pointer;text-align:center;
-      display:flex;flex-direction:column;align-items:center;gap:6px;overflow:hidden;
+      position:relative;min-width:100px;max-width:100px;flex-shrink:0;border-radius:10px;
+      padding:9px 6px 8px;cursor:pointer;text-align:center;
+      display:flex;flex-direction:column;align-items:center;gap:4px;overflow:hidden;
       background:linear-gradient(160deg,color-mix(in srgb,var(--mg-color) 6%,rgba(45,42,36,.32)),rgba(32,30,26,.18));
       border:1px solid color-mix(in srgb,var(--mg-color) 12%,transparent);
       box-shadow:0 2px 10px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.03);
@@ -1016,12 +998,12 @@
     .lib-discover-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 20%,transparent);box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
     .lib-discover-card:hover::before{opacity:.5}
     .lib-discover-orb{
-      width:40px;height:40px;border-radius:10px;flex-shrink:0;
+      width:32px;height:32px;border-radius:9px;flex-shrink:0;
       display:flex;align-items:center;justify-content:center;
       background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 22%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 8%,rgba(25,23,18,.6)));
       box-shadow:0 2px 10px rgba(0,0,0,.45),inset 0 0 6px rgba(0,0,0,.35)
     }
-    .lib-discover-name{font-size:.65rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
+    .lib-discover-name{font-size:.6rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
     .lib-diff-badge{padding:1px 6px;border-radius:8px;font-size:.5rem;font-weight:700;letter-spacing:.02em;text-transform:capitalize}
     .lib-diff-beginner{background:rgba(90,138,88,.12);color:#6aaa68;border:1px solid rgba(90,138,88,.2)}
     .lib-diff-intermediate{background:rgba(168,132,60,.12);color:#c4a044;border:1px solid rgba(168,132,60,.2)}
