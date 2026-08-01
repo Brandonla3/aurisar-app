@@ -43,7 +43,15 @@ export function createInputSnapshot() {
     buttons: BUTTON.NONE,
     /** Hotbar slot pressed this frame, or NO_HOTBAR. */
     hotbar: NO_HOTBAR,
-    /** Current target, or null. Not a position — identity. */
+    /**
+     * Current target, or null. Identity, not a position.
+     *
+     * In memory this may be a string or a BigInt — SpacetimeDB ids are u64, and
+     * the existing client already reads wallet balances as BigInt. On the WIRE
+     * it is always a decimal string or null: `JSON.stringify` THROWS on BigInt,
+     * and a u64 beyond 2^53 loses precision as a JSON number. String is the only
+     * form that is both serialisable and lossless.
+     */
     targetId: null,
   };
 }
@@ -119,6 +127,17 @@ const AXIS_Q = 1000;
 const ANGLE_Q = 10000;
 const q = (v, f) => Math.round(v * f) / f;
 
+/**
+ * Normalise an id to its wire form: a decimal string, or null.
+ *
+ * BigInt is not JSON-serialisable (`JSON.stringify(1n)` throws), and a u64 id
+ * above 2^53 cannot survive as a JSON number. Every transport JSON-encodes at
+ * some point, so the conversion happens here, once, rather than in each one.
+ */
+export function packId(id) {
+  return id == null ? null : String(id);
+}
+
 export function packInputSnapshot(s) {
   return [
     s.seq,
@@ -129,7 +148,7 @@ export function packInputSnapshot(s) {
     q(s.pitch, ANGLE_Q),
     s.buttons,
     s.hotbar,
-    s.targetId,
+    packId(s.targetId),
   ];
 }
 

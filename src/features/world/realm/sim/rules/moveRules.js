@@ -16,6 +16,20 @@
  * deltas, so treating them as cheating would punish honest players constantly.
  */
 
+/**
+ * ─── Deliberately NOT Ashwood's number ───────────────────────────────────────
+ * The live stack caps at `MAX_MOVE_SPEED_MPS = 12` flat, plus a separate jitter
+ * grace (spacetimedb/src/world/moveGuard.ts). That 12 was derived from
+ * BabylonWorldScene's locomotion speed, which the Realm does not share and has
+ * not defined yet — Realm locomotion lands in P2.
+ *
+ * So this is PROVISIONAL. The number that matters is "sprint speed plus enough
+ * headroom to survive jitter", and it can only be pinned once Realm locomotion
+ * exists. When the SpacetimeDB reducer starts calling this module, one number
+ * must be chosen and mirrored, or the two stacks drift the way the Ashwood
+ * client and server nearly did. `movement speed is pinned deliberately` in the
+ * tests exists to make that a conscious edit rather than a silent one.
+ */
 export const MOVE_LIMITS = Object.freeze({
   /** Sprint speed. Anything sustained above this is not a real player. */
   maxSpeedMps: 7,

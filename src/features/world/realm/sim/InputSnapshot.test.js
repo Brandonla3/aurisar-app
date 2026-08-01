@@ -8,6 +8,7 @@ import {
   createInputSnapshot,
   hasMovement,
   isDown,
+  packId,
   packInputSnapshot,
   resetInputSnapshot,
   setButton,
@@ -177,12 +178,40 @@ describe('pack/unpack', () => {
     expect(Math.abs(back.yaw - s.yaw)).toBeLessThan(0.0001);
   });
 
-  it('survives JSON, which is what a transport will do to it', () => {
+  it('survives JSON with a BigInt target id', () => {
+    // The bug this pins: SpacetimeDB ids are u64 and the existing client already
+    // reads BigInts. `JSON.stringify(1n)` THROWS, so a raw BigInt on the wire
+    // would blow up inside whichever transport serialised first. An earlier
+    // version of this test passed only because it never set a target.
     const s = createInputSnapshot();
     s.seq = 3;
     s.moveZ = 0.75;
-    const wire = JSON.parse(JSON.stringify(packInputSnapshot(s)));
-    expect(unpackInputSnapshot(wire).moveZ).toBe(0.75);
+    s.targetId = 12345678901234567890n;
+
+    const wire = packInputSnapshot(s);
+    expect(() => JSON.stringify(wire)).not.toThrow();
+
+    const back = unpackInputSnapshot(JSON.parse(JSON.stringify(wire)));
+    expect(back.moveZ).toBe(0.75);
+    // Decimal string, not a number: as a JSON number this would silently lose
+    // precision above 2^53.
+    expect(back.targetId).toBe('12345678901234567890');
+  });
+
+  it('normalises every id form to a decimal string on the wire', () => {
+    const cases = [
+      [7n, '7'],
+      ['mob-9', 'mob-9'],
+      [42, '42'],
+      [null, null],
+      [undefined, null],
+    ];
+    for (const [input, expected] of cases) {
+      const s = createInputSnapshot();
+      s.targetId = input;
+      expect(packId(s.targetId)).toBe(expected);
+      expect(unpackInputSnapshot(packInputSnapshot(s)).targetId).toBe(expected);
+    }
   });
 
   it('restores a null target rather than undefined', () => {

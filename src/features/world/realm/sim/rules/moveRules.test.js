@@ -111,6 +111,21 @@ describe('resolveMove', () => {
     }
   });
 
+  it('movement speed is pinned deliberately', () => {
+    // Not a tautology test. The live Ashwood guard caps at 12 m/s flat
+    // (spacetimedb/src/world/moveGuard.ts MAX_MOVE_SPEED_MPS), derived from a
+    // locomotion speed the Realm does not share and has not defined yet.
+    //
+    // These values are PROVISIONAL until Realm locomotion lands in P2, at which
+    // point the reducer will call this same module and the two must agree on one
+    // number. Failing here means someone changed the ceiling — which is fine,
+    // but it should be a decision, not a drive-by edit that silently diverges
+    // client from server.
+    expect(MOVE_LIMITS.maxSpeedMps).toBe(7);
+    expect(MOVE_LIMITS.toleranceMult).toBe(1.35);
+    expect(MOVE_LIMITS.maxSpeedMps * MOVE_LIMITS.toleranceMult).toBeCloseTo(9.45, 6);
+  });
+
   it('is deterministic — same inputs, same verdict', () => {
     // No clock, no randomness: this is what lets the reducer and LocalTransport
     // stay in agreement.
