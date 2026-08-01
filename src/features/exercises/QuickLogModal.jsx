@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+﻿import React, { memo, useMemo, useState } from 'react';
 import { UI_COLORS, NO_SETS_EX_IDS, RUNNING_EX_ID } from '../../data/constants';
 import { calcExXP } from '../../utils/xp';
 import { planQuickLogRows } from '../../utils/quickLogRows';
@@ -11,7 +11,7 @@ import { entryTime } from './logEntryTime';
 import { planEntry } from './planEntry';
 
 /**
- * Single-exercise quick-log modal — extracted from the inline IIFE in
+ * Single-exercise quick-log modal â€” extracted from the inline IIFE in
  * App.jsx as part of Finding #6 (App.jsx decomposition) per
  * docs/performance-audit.md (PR #116).
  *
@@ -19,7 +19,7 @@ import { planEntry } from './planEntry';
  * All state and callbacks come in as props; no internal hooks.
  */
 
-// A ghost older than this is shown faded — chasing a number you set six weeks
+// A ghost older than this is shown faded â€” chasing a number you set six weeks
 // ago is rarely the right target, so the UI stops pushing it.
 const GHOST_STALE_DAYS = 14;
 // Two entries logged within this window are treated as the same gym session,
@@ -47,7 +47,7 @@ const QuickLogModal = memo(function QuickLogModal({
   quickRows, setQuickRows,
   weightPct, setWeightPct,
   setPendingSoloRemoveId,
-  // Where the sheet was opened from. {type:"detail", ex} adds a "← Back"
+  // Where the sheet was opened from. {type:"detail", ex} adds a "â† Back"
   // that returns to the detail sheet; any other origin gets no Back button,
   // so dismissal is exactly X / backdrop / Escape.
   quickLogOrigin,
@@ -61,10 +61,10 @@ const QuickLogModal = memo(function QuickLogModal({
 }) {
   const ex = allExById[selEx];
 
-  // ── Ghost of your last performance ──────────────────────────────────────
+  // â”€â”€ Ghost of your last performance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The form used to open blank every time, so a set you have done fifty
   // times still meant retyping it, and there was nothing to push against.
-  // These are read-only derivations from data already in `profile` — no new
+  // These are read-only derivations from data already in `profile` â€” no new
   // persisted state.
   const ghost = useMemo(() => {
     if (!ex) return null;
@@ -93,7 +93,7 @@ const QuickLogModal = memo(function QuickLogModal({
   }, [profile.log, allExById, ex]);
 
   // "beat" is evaluated on blur against derived XP rather than per keystroke
-  // against raw fields — typing "1" on the way to "15" briefly looks like a
+  // against raw fields â€” typing "1" on the way to "15" briefly looks like a
   // regression, and sets/reps/weight are coupled anyway, so a single quality
   // number is the only comparison that agrees with what the app rewards.
   const [beat, setBeat] = useState(null); // null | "ghost" | "pb"
@@ -144,7 +144,7 @@ const QuickLogModal = memo(function QuickLogModal({
   const runPace = isRunning && distMi > 0 && durationMin > 0 ? durationMin / distMi : null;
   const runBoostPct = runPace ? runPace <= 8 ? 20 : 5 : 0;
 
-  // One planner for the estimate AND the logged entries (utils/quickLogRows) —
+  // One planner for the estimate AND the logged entries (utils/quickLogRows) â€”
   // what this card projects is what logExercise writes, by construction.
   const rowPlan = planQuickLogRows({
     exId: ex.id,
@@ -176,7 +176,7 @@ const QuickLogModal = memo(function QuickLogModal({
     setQuickRows([]);
   };
 
-  // Pull the compatible parts of the previous exercise across — load and
+  // Pull the compatible parts of the previous exercise across â€” load and
   // effort settings, not sets/reps, which are specific to the movement.
   const applyCarryover = () => {
     const c = carryover && carryover.entry;
@@ -186,7 +186,7 @@ const QuickLogModal = memo(function QuickLogModal({
   };
 
   // The +weight chips: one tap adds a plate-step to the active row's typed
-  // weight (display units — kg users get kg steps). Pre-intensity, additive.
+  // weight (display units â€” kg users get kg steps). Pre-intensity, additive.
   const chipSteps = metric ? [2.5, 5, 7.5] : [5, 10, 15];
   const effActiveRow = Math.min(activeRow, quickRows.length);
   const bumpWeight = inc => {
@@ -202,7 +202,7 @@ const QuickLogModal = memo(function QuickLogModal({
     }
   };
 
-  // One compact line rather than a ghost value beside every input — the sheet
+  // One compact line rather than a ghost value beside every input â€” the sheet
   // is already dense, and the numbers only mean anything together.
   const ghostSummary = (() => {
     const g = ghost && ghost.entry;
@@ -213,16 +213,16 @@ const QuickLogModal = memo(function QuickLogModal({
       if (g.distanceMi) parts.push(`${metric ? parseFloat(miToKm(g.distanceMi)).toFixed(2) : g.distanceMi} ${dUnit}`);
       if (g.hrZone) parts.push(`Z${g.hrZone}`);
     } else {
-      if (g.sets && g.reps) parts.push(`${g.sets} × ${g.reps}`);
+      if (g.sets && g.reps) parts.push(`${g.sets} Ã— ${g.reps}`);
       else if (g.reps) parts.push(`${g.reps} reps`);
       if (g.weightLbs) parts.push(`${metric ? parseFloat(lbsToKg(g.weightLbs)).toFixed(1) : g.weightLbs} ${wUnit}`);
     }
     if (Number.isFinite(g.xp)) parts.push(`${g.xp.toLocaleString()} XP`);
-    return parts.join(" · ");
+    return parts.join(" Â· ");
   })();
 
-  // The XP stored on a log entry is the *earned* figure — class multiplier,
-  // streak and quest bonuses already applied — so it is not comparable with
+  // The XP stored on a log entry is the *earned* figure â€” class multiplier,
+  // streak and quest bonuses already applied â€” so it is not comparable with
   // the raw estimate shown here. Re-run the ghost's numbers through the same
   // calcExXP the estimate uses so both sides measure the same thing.
   //
@@ -244,13 +244,13 @@ const QuickLogModal = memo(function QuickLogModal({
     setBeat(estXPNum > ghostXP ? "ghost" : null);
   };
 
-  // ── SetsEditor adapter ──────────────────────────────────────────────────
+  // â”€â”€ SetsEditor adapter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The quick log predates the entry-object shape: each field is its own
   // useState, weight/distance are stored in DISPLAY units (converted at
   // submit inside logExercise), and extra-row distance is keyed `dist`.
   // SetsEditor's display valueMode + distKey cover those differences; the
   // adapter just fans onField out to the per-field setters. `durationSec`
-  // patches are intentionally dropped — the submit path derives seconds from
+  // patches are intentionally dropped â€” the submit path derives seconds from
   // exHHMM/exSec itself.
   const seValue = {
     sets, reps, weightLbs: exWeight,
@@ -297,17 +297,17 @@ const QuickLogModal = memo(function QuickLogModal({
       title={`${ex.icon || ""} ${ex.name}`.trim()}
       ariaLabel={ex.name}
       headerLeft={fromDetail ? (
-        <button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={backToDetail}>{"← Back"}</button>
+        <button className={"btn btn-ghost btn-sm"} style={{ padding: "4px 8px", fontSize: FS.fs75, flexShrink: 0 }} onClick={backToDetail}>{"â† Back"}</button>
       ) : null}
     >
       <div>
             <div className={"log-form"}>
               {/* Rest day */}
               {ex.id === "rest_day" && (
-                <div style={{ textAlign: "center", padding: "18px 0", color: "#8a8478", fontSize: FS.fs78, fontStyle: "italic" }}>{"🛌 Rest day — no stats to track. Recover well!"}</div>
+                <div style={{ textAlign: "center", padding: "18px 0", color: "#9a9488", fontSize: FS.fs78, fontStyle: "italic" }}>{"ðŸ›Œ Rest day â€” no stats to track. Recover well!"}</div>
               )}
 
-              {/* Projected XP — the gold card. Same estimate + beat animation
+              {/* Projected XP â€” the gold card. Same estimate + beat animation
                   as the old Est. XP line, on the design's earned-gold chassis. */}
               {ex.id !== "rest_day" && (
                 <div className={"sf-xp-card"}>
@@ -323,16 +323,16 @@ const QuickLogModal = memo(function QuickLogModal({
                       >{estXP}</div>
                     </div>
                     <div style={{ flex: 1, textAlign: "right", paddingBottom: 2, fontSize: FS.fs58 }}>
-                      {beat && ghostXP != null && <span className={"ql-beat-tag"}>{`▲ ${(estXPNum - ghostXP).toLocaleString()} over last time`}</span>}
+                      {beat && ghostXP != null && <span className={"ql-beat-tag"}>{`â–² ${(estXPNum - ghostXP).toLocaleString()} over last time`}</span>}
                       {showWeight && effW > 0 && <span style={{ color: UI_COLORS.success, marginLeft: S.s6 }}>{"+"}{Math.round(Math.min(effW / 500, 0.3) * 100)}{"% wt bonus"}</span>}
-                      {runBoostPct > 0 && <span style={{ color: UI_COLORS.warning, marginLeft: S.s6 }}>{"⚡ +"}{runBoostPct}{"% pace bonus"}</span>}
+                      {runBoostPct > 0 && <span style={{ color: UI_COLORS.warning, marginLeft: S.s6 }}>{"âš¡ +"}{runBoostPct}{"% pace bonus"}</span>}
                       {quickRows.length > 0 && <span style={{ color: "rgba(228,222,211,.45)", marginLeft: S.s6 }}>{`${quickRows.length + 1} sets`}</span>}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Ghost bar — what you did last time, and one tap to match it */}
+              {/* Ghost bar â€” what you did last time, and one tap to match it */}
               {ex.id !== "rest_day" && ghost && (
                 <div className={`ql-ghost-bar${ghost.stale ? " ql-ghost-stale" : ""}`}>
                   <span className={"ql-ghost-label"}>{"Last time"}</span>
@@ -340,20 +340,20 @@ const QuickLogModal = memo(function QuickLogModal({
                   <span className={"ql-ghost-when"}>
                     {ghost.days == null ? "" : ghost.days === 0 ? "today" : ghost.days === 1 ? "yesterday" : `${ghost.days}d ago`}
                   </span>
-                  <button type="button" className={"ql-ghost-repeat"} onClick={repeatLast}>{"⟲ Repeat"}</button>
+                  <button type="button" className={"ql-ghost-repeat"} onClick={repeatLast}>{"âŸ² Repeat"}</button>
                 </div>
               )}
 
-              {/* Carryover — same session, same muscle or kit, load already known */}
+              {/* Carryover â€” same session, same muscle or kit, load already known */}
               {ex.id !== "rest_day" && carryover && (
                 <div className={"ql-ghost-bar ql-carryover-bar"}>
                   <span className={"ql-ghost-label"}>{"Carry over"}</span>
                   <span className={"ql-ghost-vals"}>{`from ${carryover.from}`}</span>
-                  <button type="button" className={"ql-ghost-repeat"} onClick={applyCarryover}>{"↳ Use load"}</button>
+                  <button type="button" className={"ql-ghost-repeat"} onClick={applyCarryover}>{"â†³ Use load"}</button>
                 </div>
               )}
 
-              {/* ── Set Forge ── one SetsEditor across builder / live / quick
+              {/* â”€â”€ Set Forge â”€â”€ one SetsEditor across builder / live / quick
                   log; per-set rows are the shared extraRows mechanism, now
                   enabled here. Focus claims a row for the +weight chips. */}
               {ex.id !== "rest_day" && (
@@ -381,7 +381,7 @@ const QuickLogModal = memo(function QuickLogModal({
                 />
               )}
 
-              {/* Plate chips — bump the active row's weight without typing */}
+              {/* Plate chips â€” bump the active row's weight without typing */}
               {ex.id !== "rest_day" && showWeight && (
                 <div style={{ display: "flex", alignItems: "center", gap: S.s6, marginBottom: S.s10 }}>
                   {chipSteps.map(step => (
@@ -393,20 +393,20 @@ const QuickLogModal = memo(function QuickLogModal({
                     >{`+${step} ${wUnit}`}</button>
                   ))}
                   <span style={{ marginLeft: "auto", fontSize: FS.fs55, color: "rgba(228,222,211,.4)", fontFamily: FG.fontCond, letterSpacing: ".08em", textTransform: "uppercase" }}>
-                    {`→ S${effActiveRow + 1}`}
+                    {`â†’ S${effActiveRow + 1}`}
                   </span>
                 </div>
               )}
 
               {/* Distance bonus info */}
               {ex.id !== "rest_day" && showDist && rawDist > 0 && (
-                <div style={{ fontSize: FS.fs62, color: "#8a8478", marginBottom: S.s6, marginTop: S.sNeg4 }}>
+                <div style={{ fontSize: FS.fs62, color: "#9a9488", marginBottom: S.s6, marginTop: S.sNeg4 }}>
                   {metric ? `${rawDist} km = ${parseFloat(kmToMi(rawDist)).toFixed(2)} mi` : `${rawDist} mi = ${parseFloat(miToKm(rawDist)).toFixed(2)} km`}
                   <span style={{ color: "#e67e22", marginLeft: S.s6 }}>{"+"}{Math.round(Math.min(distMi * 0.05, 0.5) * 100)}{"% dist bonus"}</span>
                 </div>
               )}
 
-              {/* Weight Intensity — same 50–200% rescale mechanic, now a
+              {/* Weight Intensity â€” same 50â€“200% rescale mechanic, now a
                   Forge Glass drag/scrub ruler (WeightRuler keeps a hidden
                   range input for keyboard & AT). */}
               {ex.id !== "rest_day" && showWeight && (
@@ -431,7 +431,7 @@ const QuickLogModal = memo(function QuickLogModal({
                       const cur = parseFloat(exWeight) || 0;
                       setExWeight(String(Math.max(0, Math.round((cur + dir * step) * 100) / 100)));
                     }}
-                    stepLabel={metric ? "±1.25 kg" : "±2.5 lbs"}
+                    stepLabel={metric ? "Â±1.25 kg" : "Â±2.5 lbs"}
                   />
                 </div>
               )}
@@ -439,27 +439,27 @@ const QuickLogModal = memo(function QuickLogModal({
               {/* Personal Best */}
               {ex.id !== "rest_day" && (isRunning && pbDisp || exPBDisp4) && (
                 <div style={{ fontSize: FS.fs68, color: "#b4ac9e", marginBottom: S.s8, display: "flex", alignItems: "center", gap: S.s6 }}>
-                  <span>{"🏆"}</span>
+                  <span>{"ðŸ†"}</span>
                   <span>{"Current PB: "}{isRunning && pbDisp ? pbDisp : exPBDisp4}</span>
                 </div>
               )}
 
-              {/* Primary action row — Copy retired with Forge Glass; custom
-                  exercises keep their ✎ Edit entry point. */}
+              {/* Primary action row â€” Copy retired with Forge Glass; custom
+                  exercises keep their âœŽ Edit entry point. */}
               <div style={{ display: "flex", gap: S.s6, marginBottom: S.s8 }}>
-                <button className={"btn btn-glass-yellow"} style={{ flex: 2, fontSize: FS.sm, padding: "8px 10px" }} onClick={logExercise}>{"✓ Complete / Schedule"}</button>
+                <button className={"btn btn-glass-yellow"} style={{ flex: 2, fontSize: FS.sm, padding: "8px 10px" }} onClick={logExercise}>{"âœ“ Complete / Schedule"}</button>
                 {ex.id !== "rest_day" && ex.custom && (
                   <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.sm, padding: "8px 6px" }} onClick={() => {
                     openExEditor("edit", ex);
                     dismiss();
-                  }}>{"✎ Edit"}</button>
+                  }}>{"âœŽ Edit"}</button>
                 )}
               </div>
 
               {/* Secondary actions */}
               <div style={{ display: "flex", gap: S.s6 }}>
                 {ex.id !== "rest_day" && (
-                  <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(45,42,36,.3)", color: "#8a8478" }} onClick={() => {
+                  <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(74,69,59,.3)", color: "#9a9488" }} onClick={() => {
                     const exEntry = {
                       exId: ex.id,
                       sets: parseInt(sets) || 0,
@@ -472,13 +472,13 @@ const QuickLogModal = memo(function QuickLogModal({
                     };
                     setAddToWorkoutPicker({ exercises: [exEntry] });
                     dismiss();
-                  }}>{"➕ Add to Workout"}</button>
+                  }}>{"âž• Add to Workout"}</button>
                 )}
-                <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(45,42,36,.3)", color: "#8a8478" }} onClick={() => {
+                <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(74,69,59,.3)", color: "#9a9488" }} onClick={() => {
                   // Shared opener seeds spwSelected for every entry point.
                   openSavePlanWizard([planEntry(ex, profile.chosenClass, allExById)], ex.name, ex.name);
                   dismiss();
-                }}>{"📋 Add to Plan"}</button>
+                }}>{"ðŸ“‹ Add to Plan"}</button>
               </div>
             </div>
       </div>

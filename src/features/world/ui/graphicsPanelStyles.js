@@ -1,17 +1,17 @@
-/**
+﻿/**
  * Two skins for GraphicsSettingsPanel.
  *
  * The panel appears in two places with two visual languages: the pre-world hub
  * belongs to the main app (Cinzel/Inter over parchment, tokens.js) and the game
  * menu belongs to the world overlay (slate + blur, panelTheme.js). Rather than
- * fork the component, the skin is data — so the two can never disagree about
+ * fork the component, the skin is data â€” so the two can never disagree about
  * which settings exist, only about how they look.
  */
 
 import { C, FS, R, S } from '../../../utils/tokens.js';
 import { FONT, ghostBtn as worldGhostBtn, primaryBtn as worldPrimaryBtn } from './panelTheme.js';
 
-// ── World overlay (in-game menu) ─────────────────────────────────────────────
+// â”€â”€ World overlay (in-game menu) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const worldOptionBtn = {
   ...worldGhostBtn,
@@ -46,12 +46,12 @@ export const worldGraphicsStyles = Object.freeze({
   metaAccent: { color: '#7dd3fc' },
 });
 
-// ── Main app (pre-world hub) ─────────────────────────────────────────────────
+// â”€â”€ Main app (pre-world hub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const APP_FONT = 'Inter, system-ui, sans-serif';
 
 const hubOptionBtn = {
-  background: 'rgba(45,42,36,.35)',
+  background: 'rgba(74,69,59,.35)',
   border: `1px solid ${C.lineStrong}`,
   borderRadius: R.md,
   color: C.inkMid,

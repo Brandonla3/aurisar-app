@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { isChunkLoadError } from '../utils/lazyWithRetry';
 
 // React class component because ErrorBoundary requires lifecycle methods.
@@ -36,12 +36,12 @@ class ErrorBoundary extends React.Component {
 
     const wrap = {
       minHeight: '100vh', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', padding: 24, background: '#0c0c0a',
+      justifyContent: 'center', padding: 24, background: '#1a1814',
       color: '#d4cec4', fontFamily: 'Inter, sans-serif',
     };
     const card = {
       maxWidth: 480, width: '100%', padding: 28, borderRadius: 14,
-      background: 'linear-gradient(145deg,rgba(45,42,36,.45),rgba(32,30,26,.25))',
+      background: 'linear-gradient(145deg,rgba(74,69,59,.45),rgba(52,48,41,.25))',
       border: '1px solid rgba(180,172,158,.08)',
       boxShadow: '0 8px 40px rgba(0,0,0,.6)',
     };
@@ -51,7 +51,7 @@ class ErrorBoundary extends React.Component {
     };
     const p = { fontSize: '.85rem', color: '#b4ac9e', lineHeight: 1.55, marginBottom: 18 };
     const pre = {
-      fontSize: '.7rem', color: '#8a8478', background: 'rgba(0,0,0,.35)',
+      fontSize: '.7rem', color: '#9a9488', background: 'rgba(0,0,0,.35)',
       padding: 10, borderRadius: 8, overflow: 'auto', maxHeight: 160,
       marginBottom: 18, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     };
@@ -60,14 +60,14 @@ class ErrorBoundary extends React.Component {
       flex: 1, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
       fontSize: '.7rem', fontWeight: 700, letterSpacing: '.08em',
       textTransform: 'uppercase', border: '1px solid rgba(180,172,158,.18)',
-      background: 'linear-gradient(135deg,rgba(45,42,36,.5),rgba(45,42,36,.35))',
+      background: 'linear-gradient(135deg,rgba(74,69,59,.5),rgba(74,69,59,.35))',
       color: '#d4cec4',
     };
     const btnGold = { ...btn, background: 'linear-gradient(135deg,#c49428,#8a6010)', color: '#fff', borderColor: '#c49428' };
 
     // Chunk-load failures usually mean the user's tab outlived a deploy and
     // the JS bundle hash is gone. lazyWithRetry will have already auto-
-    // reloaded once — if we reach the boundary, the reload didn't help, so
+    // reloaded once â€” if we reach the boundary, the reload didn't help, so
     // show a clear "refresh" prompt instead of the cryptic MIME message.
     if (isChunkLoadError(error)) {
       return (
@@ -75,7 +75,7 @@ class ErrorBoundary extends React.Component {
           <div style={card}>
             <div style={h}>Aurisar was updated.</div>
             <div style={p}>
-              A new version is available. Tap reload to get the latest — your saved data is safe.
+              A new version is available. Tap reload to get the latest â€” your saved data is safe.
             </div>
             <div style={btnRow}>
               <button type="button" style={btnGold} onClick={this.reload}>Reload</button>
@@ -90,7 +90,7 @@ class ErrorBoundary extends React.Component {
         <div style={card}>
           <div style={h}>Something broke.</div>
           <div style={p}>
-            Aurisar hit an unexpected error. Your saved data is safe — try reloading or going back to the home screen.
+            Aurisar hit an unexpected error. Your saved data is safe â€” try reloading or going back to the home screen.
           </div>
           {error?.message && <pre style={pre}>{String(error.message)}</pre>}
           <div style={btnRow}>

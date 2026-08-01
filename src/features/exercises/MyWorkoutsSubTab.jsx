@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+﻿import React, { memo, useState } from 'react';
 import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { ExIcon } from '../../components/ExIcon';
@@ -6,7 +6,7 @@ import { S, R, FS } from '../../utils/tokens';
 import { diffColor, diffBg } from './difficulty';
 
 /**
- * My Workouts sub-tab (Favorites + Custom Exercises) — extracted from the
+ * My Workouts sub-tab (Favorites + Custom Exercises) â€” extracted from the
  * inline block in App.jsx as part of Finding #6 (App.jsx decomposition)
  * per docs/performance-audit.md (PR #116).
  *
@@ -14,7 +14,7 @@ import { diffColor, diffBg } from './difficulty';
  * Pure presentational; all state and setters are threaded in as props.
  */
 
-// Favourites render in pages rather than all at once — the list is unbounded
+// Favourites render in pages rather than all at once â€” the list is unbounded
 // and every row does a lookup + colour derivation.
 const FAV_PAGE = 20;
 
@@ -38,7 +38,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
   const [favVisibleCount, setFavVisibleCount] = useState(FAV_PAGE);
   return (
     <div>
-      {/* ── Favorites ─────────────────────────────────── */}
+      {/* â”€â”€ Favorites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div style={{ marginBottom: S.s14 }}>
         <div style={{
           display: "flex",
@@ -48,28 +48,28 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
         }}>
           <div style={{
             fontSize: FS.fs65,
-            color: "#8a8478",
+            color: "#9a9488",
             textTransform: "uppercase",
             letterSpacing: ".1em"
           }}>{"Favorite Exercises"}</div>
           {(profile.favoriteExercises || []).length > 0 && (
             <button
               onClick={() => {
-                // Exits select mode only — see ExerciseLibraryTab: the cart is
+                // Exits select mode only â€” see ExerciseLibraryTab: the cart is
                 // persistent, so Cancel must not discard it.
                 setFavSelectMode(!favSelectMode);
               }}
               style={{
-                background: favSelectMode ? "rgba(45,42,36,.3)" : "transparent",
+                background: favSelectMode ? "rgba(74,69,59,.3)" : "transparent",
                 border: "1px solid " + (favSelectMode ? "rgba(180,172,158,.15)" : "rgba(180,172,158,.06)"),
-                color: favSelectMode ? "#d4cec4" : "#8a8478",
+                color: favSelectMode ? "#d4cec4" : "#9a9488",
                 fontSize: FS.sm,
                 padding: "4px 10px",
                 borderRadius: R.md,
                 cursor: "pointer"
               }}
             >
-              {favSelectMode ? "✕ Cancel" : "☐ Select"}
+              {favSelectMode ? "âœ• Cancel" : "â˜ Select"}
             </button>
           )}
         </div>
@@ -79,7 +79,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
 
         {(profile.favoriteExercises || []).length === 0 ? (
           <div className={"empty"} style={{ padding: "16px 0" }}>
-            {"No favorites yet — tap ⭐ on any exercise."}
+            {"No favorites yet â€” tap â­ on any exercise."}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: S.s6 }}>
@@ -93,7 +93,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                   key={exId}
                   className={"stretch-row"}
                   style={{
-                    background: isSel ? "rgba(45,42,36,.3)" : "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
+                    background: isSel ? "rgba(74,69,59,.3)" : "linear-gradient(145deg,rgba(74,69,59,.35),rgba(52,48,41,.2))",
                     border: "1px solid " + (isSel ? "rgba(180,172,158,.2)" : "rgba(180,172,158,.05)"),
                     borderRadius: R.r10,
                     padding: "12px 14px",
@@ -112,12 +112,12 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                       borderRadius: R.r5,
                       flexShrink: 0,
                       border: "1.5px solid " + (isSel ? "rgba(180,172,158,.3)" : "rgba(180,172,158,.08)"),
-                      background: isSel ? "rgba(45,42,36,.35)" : "transparent",
+                      background: isSel ? "rgba(74,69,59,.35)" : "transparent",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center"
                     }}>
-                      {isSel && <span style={{ color: "#b4ac9e", fontSize: FS.fs65 }}>{"✓"}</span>}
+                      {isSel && <span style={{ color: "#b4ac9e", fontSize: FS.fs65 }}>{"âœ“"}</span>}
                     </div>
                   )}
                   <div style={{
@@ -125,7 +125,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                     height: 34,
                     borderRadius: R.lg,
                     flexShrink: 0,
-                    background: "rgba(45,42,36,.15)",
+                    background: "rgba(74,69,59,.15)",
                     border: "1px solid rgba(180,172,158,.05)",
                     display: "flex",
                     alignItems: "center",
@@ -149,7 +149,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                         onClick={() => (favSelectMode ? toggleCart(exId) : setLibDetailEx(ex))}
                         style={{ fontSize: FS.fs83, fontWeight: 600, color: "#d4cec4", letterSpacing: ".01em" }}
                       >{ex.name}</button>
-                      {hasPB && <span style={{ fontSize: FS.sm }}>{"🏆"}</span>}
+                      {hasPB && <span style={{ fontSize: FS.sm }}>{"ðŸ†"}</span>}
                     </div>
                     <div style={{ fontSize: FS.fs62, fontStyle: "italic", lineHeight: 1.4 }}>
                       {ex.category && (
@@ -157,7 +157,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           {ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}
                         </span>
                       )}
-                      {ex.category && ex.muscleGroup && <span style={{ color: "#8a8478" }}>{" · "}</span>}
+                      {ex.category && ex.muscleGroup && <span style={{ color: "#9a9488" }}>{" Â· "}</span>}
                       {ex.muscleGroup && (
                         <span style={{ color: getMuscleColor(ex.muscleGroup) }}>
                           {ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}
@@ -195,7 +195,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                         }}
                         aria-pressed={true}
                         aria-label={`Remove ${ex.name} from favourites`}
-                      >{"⭐"}</button>
+                      >{"â­"}</button>
                     </div>
                   )}
                   {favSelectMode && (
@@ -215,7 +215,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                 type="button"
                 onClick={() => setFavVisibleCount(c => c + FAV_PAGE)}
                 style={{
-                  background: "rgba(45,42,36,.2)",
+                  background: "rgba(74,69,59,.2)",
                   border: "1px solid rgba(180,172,158,.08)",
                   color: "#b4ac9e",
                   padding: "9px",
@@ -230,11 +230,11 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
         )}
       </div>
 
-      {/* ── Custom Exercises ───────────────────────────── */}
+      {/* â”€â”€ Custom Exercises â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div style={{ marginTop: S.s8 }}>
         <div style={{
           fontSize: FS.fs65,
-          color: "#8a8478",
+          color: "#9a9488",
           textTransform: "uppercase",
           letterSpacing: ".1em",
           marginBottom: S.s10
@@ -253,7 +253,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                   key={ex.id}
                   className={"stretch-row"}
                   style={{
-                    background: "linear-gradient(145deg,rgba(45,42,36,.35),rgba(32,30,26,.2))",
+                    background: "linear-gradient(145deg,rgba(74,69,59,.35),rgba(52,48,41,.2))",
                     border: "1px solid rgba(180,172,158,.05)",
                     borderRadius: R.r10,
                     padding: "12px 14px",
@@ -269,7 +269,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                     height: 34,
                     borderRadius: R.lg,
                     flexShrink: 0,
-                    background: "rgba(45,42,36,.15)",
+                    background: "rgba(74,69,59,.15)",
                     border: "1px solid rgba(180,172,158,.05)",
                     display: "flex",
                     alignItems: "center",
@@ -293,7 +293,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                         style={{ fontSize: FS.fs83, fontWeight: 600, color: "#d4cec4", letterSpacing: ".01em" }}
                       >{ex.name}</button>
                       <span className={"custom-ex-badge"} style={{ marginLeft: S.s2 }}>{"custom"}</span>
-                      {hasPB && <span style={{ fontSize: FS.sm }}>{"🏆"}</span>}
+                      {hasPB && <span style={{ fontSize: FS.sm }}>{"ðŸ†"}</span>}
                     </div>
                     <div style={{ fontSize: FS.fs62, fontStyle: "italic", lineHeight: 1.4 }}>
                       {ex.category && (
@@ -301,7 +301,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           {ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}
                         </span>
                       )}
-                      {ex.category && ex.muscleGroup && <span style={{ color: "#8a8478" }}>{" · "}</span>}
+                      {ex.category && ex.muscleGroup && <span style={{ color: "#9a9488" }}>{" Â· "}</span>}
                       {ex.muscleGroup && (
                         <span style={{ color: getMuscleColor(ex.muscleGroup) }}>
                           {ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1)}
@@ -333,16 +333,16 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           openExEditor("edit", ex);
                         }}
                         style={{
-                          background: "rgba(45,42,36,.25)",
+                          background: "rgba(74,69,59,.25)",
                           border: "1px solid rgba(180,172,158,.08)",
-                          color: "#8a8478",
+                          color: "#9a9488",
                           fontSize: FS.fs55,
                           cursor: "pointer",
                           padding: "4px 8px",
                           borderRadius: R.r5,
                           fontFamily: "'Barlow',sans-serif"
                         }}
-                      aria-label={`Edit ${ex.name}`}>{"✎ edit"}</button>
+                      aria-label={`Edit ${ex.name}`}>{"âœŽ edit"}</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -357,7 +357,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                           padding: "4px 8px",
                           borderRadius: R.r5
                         }}
-                      aria-label={`Delete ${ex.name}`}>{"🗑"}</button>
+                      aria-label={`Delete ${ex.name}`}>{"ðŸ—‘"}</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -371,14 +371,14 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
                         style={{
                           background: "transparent",
                           border: "none",
-                          color: isFav ? "#d4cec4" : "#8a8478",
+                          color: isFav ? "#d4cec4" : "#9a9488",
                           fontSize: FS.fs90,
                           cursor: "pointer",
                           padding: S.s0,
                           lineHeight: 1
                         }}
                       aria-pressed={isFav}
-                      aria-label={isFav ? `Remove ${ex.name} from favourites` : `Add ${ex.name} to favourites`}>{isFav ? "⭐" : "☆"}</button>
+                      aria-label={isFav ? `Remove ${ex.name} from favourites` : `Add ${ex.name} to favourites`}>{isFav ? "â­" : "â˜†"}</button>
                     </div>
                   </div>
                 </div>
@@ -399,7 +399,7 @@ const MyWorkoutsSubTab = memo(function MyWorkoutsSubTab({
             fontSize: FS.fs78,
             cursor: "pointer"
           }}
-        >{"＋ Create Custom Exercise"}</button>
+        >{"ï¼‹ Create Custom Exercise"}</button>
       </div>
     </div>
   );

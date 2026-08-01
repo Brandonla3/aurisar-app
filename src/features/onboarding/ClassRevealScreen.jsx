@@ -1,9 +1,9 @@
-import React, { memo } from 'react';
+﻿import React, { memo } from 'react';
 import { S, FS } from '../../utils/tokens';
 import { CLASSES } from '../../data/exercises';
 
 /**
- * Class reveal screen — extracted from the inline IIFE in App.jsx as part of
+ * Class reveal screen â€” extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Shown after onboarding completes when the system detects a class for the
@@ -20,15 +20,15 @@ const ClassRevealScreen = memo(function ClassRevealScreen({
     "--cls-color": dc.color,
     "--cls-glow": dc.glow
   }}><p style={{
-      color: "#8a8478",
+      color: "#9a9488",
       fontSize: FS.md,
       letterSpacing: ".14em",
       textTransform: "uppercase"
-    }}>{"The Fates have spoken…"}</p><div className={"reveal-card"} style={{
+    }}>{"The Fates have spokenâ€¦"}</p><div className={"reveal-card"} style={{
       "--cls-color": dc.color,
       "--cls-glow": dc.glow
     }}><span className={"reveal-icon"}>{dc.icon}</span><div className={"reveal-name"}>{dc.name}</div><p style={{
-        color: "#8a8478",
+        color: "#9a9488",
         fontStyle: "italic",
         lineHeight: 1.5,
         fontSize: FS.fs90

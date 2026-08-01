@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { sb } from '../utils/supabase';
 
-/* ═══════════════════════════════════════════════════════════════
-   Aurisar — Admin Panel
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Aurisar â€” Admin Panel
    Accessible only when profiles.is_admin = true (set server-side).
    All write operations go through /api/admin/* Netlify functions
    using the service-role key; the frontend only holds the user's
    Bearer token (anon-scoped) to call those endpoints.
-   ═══════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 const API = {
   listUsers:    "/api/admin/list-users",
@@ -34,7 +34,7 @@ async function adminFetch(url, { method = "GET", token, body } = {}) {
   return json;
 }
 
-// ── Tiny reusable status pill ─────────────────────────────────────────────────
+// â”€â”€ Tiny reusable status pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatusPill({ user }) {
   if (user.is_admin) {
     return <span style={pill("rgba(196,148,40,.2)", "#c49428")}>Admin</span>;
@@ -60,7 +60,7 @@ function pill(bg, color) {
   };
 }
 
-// ── Confirmation modal ────────────────────────────────────────────────────────
+// â”€â”€ Confirmation modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ConfirmModal({ title, body, confirmLabel, confirmDanger, onConfirm, onCancel, children }) {
   return createPortal(
     <div style={{
@@ -71,7 +71,7 @@ function ConfirmModal({ title, body, confirmLabel, confirmDanger, onConfirm, onC
     }}>
       <div style={{
         width: "100%", maxWidth: 420,
-        background: "linear-gradient(145deg, rgba(45,42,36,.97) 0%, rgba(28,26,20,.98) 100%)",
+        background: "linear-gradient(145deg, rgba(74,69,59,.97) 0%, rgba(28,26,20,.98) 100%)",
         border: "1px solid rgba(180,172,158,.12)",
         borderRadius: 12,
         padding: "28px 24px",
@@ -79,7 +79,7 @@ function ConfirmModal({ title, body, confirmLabel, confirmDanger, onConfirm, onC
         <h3 style={{ margin: "0 0 10px", fontSize: "1rem", color: "#d4cec4", fontWeight: 700 }}>
           {title}
         </h3>
-        <p style={{ margin: "0 0 20px", fontSize: ".85rem", color: "#8a8478", lineHeight: 1.5 }}>
+        <p style={{ margin: "0 0 20px", fontSize: ".85rem", color: "#9a9488", lineHeight: 1.5 }}>
           {body}
         </p>
         {children}
@@ -98,7 +98,7 @@ function ConfirmModal({ title, body, confirmLabel, confirmDanger, onConfirm, onC
   );
 }
 
-// ── MFA reset dropdown ────────────────────────────────────────────────────────
+// â”€â”€ MFA reset dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MfaMenu({ user, token, onDone, onError }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(null);
@@ -116,7 +116,7 @@ function MfaMenu({ user, token, onDone, onError }) {
     setOpen(false);
     try {
       await adminFetch(API.resetMfa, { method: "POST", token, body: { userId: user.id, factor } });
-      onDone(`✓ ${factor === "all" ? "All MFA factors" : factor.toUpperCase()} reset for ${user.player_name || user.email}`);
+      onDone(`âœ“ ${factor === "all" ? "All MFA factors" : factor.toUpperCase()} reset for ${user.player_name || user.email}`);
     } catch (e) {
       onError(`Failed to reset ${factor} MFA: ${e.message}`);
     } finally {
@@ -138,7 +138,7 @@ function MfaMenu({ user, token, onDone, onError }) {
         onClick={() => setOpen(o => !o)}
         disabled={!!loading}
       >
-        {loading ? "…" : "Reset 2FA ▾"}
+        {loading ? "â€¦" : "Reset 2FA â–¾"}
       </button>
       {open && (
         <div style={{
@@ -174,7 +174,7 @@ function MfaMenu({ user, token, onDone, onError }) {
   );
 }
 
-// ── User row ──────────────────────────────────────────────────────────────────
+// â”€â”€ User row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function UserRow({ user, token, currentUserId, onRefresh, onToast }) {
   const [confirm, setConfirm] = useState(null); // null | 'disable' | 'reinstate' | 'delete'
   const [deleteEmail, setDeleteEmail] = useState("");
@@ -186,10 +186,10 @@ function UserRow({ user, token, currentUserId, onRefresh, onToast }) {
     setBusy(true);
     try {
       await adminFetch(API[action], { method: "POST", token, body });
-      onToast(`✓ Done`);
+      onToast(`âœ“ Done`);
       onRefresh();
     } catch (e) {
-      onToast(`✗ ${e.message}`, true);
+      onToast(`âœ— ${e.message}`, true);
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -203,9 +203,9 @@ function UserRow({ user, token, currentUserId, onRefresh, onToast }) {
         redirectTo: "https://aurisargames.com",
       });
       if (error) throw new Error(error.message);
-      onToast(`✓ Password reset email sent to ${user.email}`);
+      onToast(`âœ“ Password reset email sent to ${user.email}`);
     } catch (e) {
-      onToast(`✗ ${e.message}`, true);
+      onToast(`âœ— ${e.message}`, true);
     } finally {
       setBusy(false);
     }
@@ -219,7 +219,7 @@ function UserRow({ user, token, currentUserId, onRefresh, onToast }) {
           <div style={{ fontSize: ".85rem", fontWeight: 700, color: "#d4cec4", marginBottom: 2 }}>
             {user.player_name || <em style={{ color: "#5a5650" }}>No name</em>}
           </div>
-          <div style={{ fontSize: ".7rem", color: "#8a8478", wordBreak: "break-all" }}>
+          <div style={{ fontSize: ".7rem", color: "#9a9488", wordBreak: "break-all" }}>
             {user.email}
           </div>
           {user.public_id && (
@@ -303,7 +303,7 @@ function UserRow({ user, token, currentUserId, onRefresh, onToast }) {
           confirmDanger
           onConfirm={() => {
             if (deleteEmail.toLowerCase() !== user.email?.toLowerCase()) {
-              onToast("✗ Email does not match", true);
+              onToast("âœ— Email does not match", true);
               return;
             }
             doAction("deleteUser", { userId: user.id, confirmEmail: deleteEmail });
@@ -324,7 +324,7 @@ function UserRow({ user, token, currentUserId, onRefresh, onToast }) {
   );
 }
 
-// ── Invite modal ──────────────────────────────────────────────────────────────
+// â”€â”€ Invite modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function InviteModal({ token, onClose, onToast }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -334,10 +334,10 @@ function InviteModal({ token, onClose, onToast }) {
     setBusy(true);
     try {
       await adminFetch(API.sendInvite, { method: "POST", token, body: { email: email.trim() } });
-      onToast(`✓ Invite sent to ${email.trim()}`);
+      onToast(`âœ“ Invite sent to ${email.trim()}`);
       onClose();
     } catch (e) {
-      onToast(`✗ ${e.message}`, true);
+      onToast(`âœ— ${e.message}`, true);
     } finally {
       setBusy(false);
     }
@@ -352,7 +352,7 @@ function InviteModal({ token, onClose, onToast }) {
     }}>
       <div style={{
         width: "100%", maxWidth: 380,
-        background: "linear-gradient(145deg, rgba(45,42,36,.97) 0%, rgba(28,26,20,.98) 100%)",
+        background: "linear-gradient(145deg, rgba(74,69,59,.97) 0%, rgba(28,26,20,.98) 100%)",
         border: "1px solid rgba(180,172,158,.12)",
         borderRadius: 12,
         padding: "28px 24px",
@@ -360,7 +360,7 @@ function InviteModal({ token, onClose, onToast }) {
         <h3 style={{ margin: "0 0 10px", fontSize: "1rem", color: "#d4cec4", fontWeight: 700 }}>
           Send Invite
         </h3>
-        <p style={{ margin: "0 0 16px", fontSize: ".82rem", color: "#8a8478", lineHeight: 1.5 }}>
+        <p style={{ margin: "0 0 16px", fontSize: ".82rem", color: "#9a9488", lineHeight: 1.5 }}>
           A branded invite link (valid 7 days) will be sent via email.
         </p>
         <input
@@ -377,7 +377,7 @@ function InviteModal({ token, onClose, onToast }) {
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
           <button style={ghostBtn()} onClick={onClose} disabled={busy}>Cancel</button>
           <button style={goldBtn()} onClick={send} disabled={busy || !email.trim()}>
-            {busy ? "Sending…" : "Send Invite"}
+            {busy ? "Sendingâ€¦" : "Send Invite"}
           </button>
         </div>
       </div>
@@ -386,7 +386,7 @@ function InviteModal({ token, onClose, onToast }) {
   );
 }
 
-// ── Main AdminPage component ──────────────────────────────────────────────────
+// â”€â”€ Main AdminPage component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AdminPage({ authUser, onBack }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -455,10 +455,10 @@ export default function AdminPage({ authUser, onBack }) {
           style={{ ...ghostBtn(), padding: "6px 12px", fontSize: ".75rem" }}
           onClick={onBack}
         >
-          ← Back
+          â† Back
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: ".62rem", letterSpacing: ".3em", color: "#8a8478", textTransform: "uppercase" }}>
+          <div style={{ fontSize: ".62rem", letterSpacing: ".3em", color: "#9a9488", textTransform: "uppercase" }}>
             Aurisar
           </div>
           <div style={{ fontSize: "1rem", fontWeight: 900, letterSpacing: ".12em", color: "#c49428" }}>
@@ -478,7 +478,7 @@ export default function AdminPage({ authUser, onBack }) {
           <input
             className="inp"
             style={{ width: "100%", boxSizing: "border-box" }}
-            placeholder="Search by name, email, or Account ID…"
+            placeholder="Search by name, email, or Account IDâ€¦"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -494,20 +494,20 @@ export default function AdminPage({ authUser, onBack }) {
           ].map(({ label, value }) => (
             <div key={label} style={statCard()}>
               <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#c49428" }}>{value}</div>
-              <div style={{ fontSize: ".62rem", color: "#8a8478", letterSpacing: ".08em", textTransform: "uppercase" }}>{label}</div>
+              <div style={{ fontSize: ".62rem", color: "#9a9488", letterSpacing: ".08em", textTransform: "uppercase" }}>{label}</div>
             </div>
           ))}
         </div>
 
         {/* User list */}
         {loading && (
-          <div style={{ textAlign: "center", color: "#8a8478", fontSize: ".78rem", padding: "40px 0" }}>
-            Loading warriors…
+          <div style={{ textAlign: "center", color: "#9a9488", fontSize: ".78rem", padding: "40px 0" }}>
+            Loading warriorsâ€¦
           </div>
         )}
         {loadErr && (
           <div style={{ color: "#c47878", fontSize: ".82rem", padding: "20px 0" }}>
-            ✗ {loadErr}
+            âœ— {loadErr}
             <button style={{ ...ghostBtn(), marginLeft: 12, padding: "4px 12px", fontSize: ".72rem" }} onClick={() => loadUsers(token)}>
               Retry
             </button>
@@ -580,7 +580,7 @@ export default function AdminPage({ authUser, onBack }) {
   );
 }
 
-// ── Style helpers (keep consistent with app's design system) ─────────────────
+// â”€â”€ Style helpers (keep consistent with app's design system) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function rowStyle(disabled) {
   return {
     display: "flex",
@@ -592,7 +592,7 @@ function rowStyle(disabled) {
     marginBottom: 4,
     background: disabled
       ? "rgba(122,40,56,.06)"
-      : "rgba(45,42,36,.3)",
+      : "rgba(74,69,59,.3)",
     border: "1px solid rgba(180,172,158,.06)",
     opacity: disabled ? 0.7 : 1,
   };
@@ -601,7 +601,7 @@ function rowStyle(disabled) {
 function statCard() {
   return {
     flex: "1 1 100px",
-    background: "rgba(45,42,36,.4)",
+    background: "rgba(74,69,59,.4)",
     border: "1px solid rgba(180,172,158,.08)",
     borderRadius: 10,
     padding: "12px 16px",
@@ -628,7 +628,7 @@ function ghostBtn() {
   return {
     padding: "8px 14px",
     background: "transparent",
-    color: "#8a8478",
+    color: "#9a9488",
     border: "1px solid rgba(180,172,158,.15)",
     borderRadius: 7,
     fontSize: ".75rem",
@@ -639,7 +639,7 @@ function ghostBtn() {
 function actionBtn() {
   return {
     padding: "5px 10px",
-    background: "rgba(45,42,36,.6)",
+    background: "rgba(74,69,59,.6)",
     color: "#b4ac9e",
     border: "1px solid rgba(180,172,158,.12)",
     borderRadius: 6,

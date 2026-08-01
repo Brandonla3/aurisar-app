@@ -1,8 +1,8 @@
-import React, { memo } from 'react';
+﻿import React, { memo } from 'react';
 import { S, R, FS } from '../../utils/tokens';
 
 /**
- * Onboarding screen — extracted from the inline IIFE in App.jsx as part of
+ * Onboarding screen â€” extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Renders the 6-step onboarding wizard (name, demographics, sports, priorities,
@@ -11,7 +11,7 @@ import { S, R, FS } from '../../utils/tokens';
  */
 
 const OnboardingScreen = memo(function OnboardingScreen({
-  // Current step (1–6)
+  // Current step (1â€“6)
   obStep, setObStep,
   // Name fields
   obName, setObName,
@@ -29,115 +29,115 @@ const OnboardingScreen = memo(function OnboardingScreen({
   // Location
   obState, setObState,
   obCountry, setObCountry,
-  // Submit — defined in App, writes profile + sets screen
+  // Submit â€” defined in App, writes profile + sets screen
   handleOnboard,
 }) {
 const OB_SPORTS = [{
   val: "football",
-  label: "🏈 Football"
+  label: "ðŸˆ Football"
 }, {
   val: "basketball",
-  label: "🏀 Basketball"
+  label: "ðŸ€ Basketball"
 }, {
   val: "soccer",
-  label: "⚽ Soccer"
+  label: "âš½ Soccer"
 }, {
   val: "baseball",
-  label: "⚾ Baseball"
+  label: "âš¾ Baseball"
 }, {
   val: "volleyball",
-  label: "🏐 Volleyball"
+  label: "ðŸ Volleyball"
 }, {
   val: "tennis",
-  label: "🎾 Tennis"
+  label: "ðŸŽ¾ Tennis"
 }, {
   val: "running",
-  label: "🏃 Track/Running"
+  label: "ðŸƒ Track/Running"
 }, {
   val: "cycling",
-  label: "🚴 Cycling"
+  label: "ðŸš´ Cycling"
 }, {
   val: "swimming",
-  label: "🏊 Swimming"
+  label: "ðŸŠ Swimming"
 }, {
   val: "triathlon",
-  label: "🏅 Triathlon"
+  label: "ðŸ… Triathlon"
 }, {
   val: "rowing",
-  label: "🚣 Rowing"
+  label: "ðŸš£ Rowing"
 }, {
   val: "boxing",
-  label: "🥊 Boxing/Kickboxing"
+  label: "ðŸ¥Š Boxing/Kickboxing"
 }, {
   val: "mma",
-  label: "🥋 MMA/Martial Arts"
+  label: "ðŸ¥‹ MMA/Martial Arts"
 }, {
   val: "wrestling",
-  label: "🤼 Wrestling"
+  label: "ðŸ¤¼ Wrestling"
 }, {
   val: "crossfit",
-  label: "🔁 CrossFit"
+  label: "ðŸ” CrossFit"
 }, {
   val: "powerlifting",
-  label: "🏋️ Powerlifting"
+  label: "ðŸ‹ï¸ Powerlifting"
 }, {
   val: "bodybuilding",
-  label: "💪 Bodybuilding"
+  label: "ðŸ’ª Bodybuilding"
 }, {
   val: "yoga",
-  label: "🧘 Yoga/Pilates"
+  label: "ðŸ§˜ Yoga/Pilates"
 }, {
   val: "dance",
-  label: "💃 Dance/Cheer"
+  label: "ðŸ’ƒ Dance/Cheer"
 }, {
   val: "hiking",
-  label: "🥾 Hiking/Rucking"
+  label: "ðŸ¥¾ Hiking/Rucking"
 }, {
   val: "gymnastics",
-  label: "🤸 Gymnastics"
+  label: "ðŸ¤¸ Gymnastics"
 }, {
   val: "golf",
-  label: "⛳ Golf"
+  label: "â›³ Golf"
 }, {
   val: "none",
-  label: "🚫 No sports background"
+  label: "ðŸš« No sports background"
 }];
 const OB_PRIORITIES = [{
   val: "be_strong",
-  label: "💪 Being Strong"
+  label: "ðŸ’ª Being Strong"
 }, {
   val: "look_strong",
-  label: "🪞 Looking Strong"
+  label: "ðŸªž Looking Strong"
 }, {
   val: "feel_good",
-  label: "🌿 Feeling Good"
+  label: "ðŸŒ¿ Feeling Good"
 }, {
   val: "eat_right",
-  label: "🥗 Eating Right"
+  label: "ðŸ¥— Eating Right"
 }, {
   val: "mental_clarity",
-  label: "🧠 Mental Clarity"
+  label: "ðŸ§  Mental Clarity"
 }, {
   val: "athletic_perf",
-  label: "🏅 Athletic Performance"
+  label: "ðŸ… Athletic Performance"
 }, {
   val: "endurance",
-  label: "🔥 Endurance & Stamina"
+  label: "ðŸ”¥ Endurance & Stamina"
 }, {
   val: "longevity",
-  label: "🕊️ Longevity & Recovery"
+  label: "ðŸ•Šï¸ Longevity & Recovery"
 }, {
   val: "competition",
-  label: "🏆 Competition"
+  label: "ðŸ† Competition"
 }, {
   val: "social",
-  label: "👥 Social/Community"
+  label: "ðŸ‘¥ Social/Community"
 }, {
   val: "flexibility",
-  label: "🤸 Mobility & Flex"
+  label: "ðŸ¤¸ Mobility & Flex"
 }, {
   val: "weight_loss",
-  label: "⚖️ Weight Management"
+  label: "âš–ï¸ Weight Management"
 }];
 const prog = `${obStep / 6 * 100}%`;
 const chipSt = active => ({
@@ -146,8 +146,8 @@ const chipSt = active => ({
   padding: "8px 12px",
   borderRadius: R.r20,
   border: `1px solid ${active ? "#d4cec4" : "rgba(180,172,158,.06)"}`,
-  background: active ? "rgba(45,42,36,.25)" : "rgba(45,42,36,.12)",
-  color: active ? "#d4cec4" : "#8a8478",
+  background: active ? "rgba(74,69,59,.25)" : "rgba(74,69,59,.12)",
+  color: active ? "#d4cec4" : "#9a9488",
   fontSize: FS.fs78,
   cursor: "pointer",
   margin: "3px",
@@ -160,7 +160,7 @@ const radioSt = active => ({
   padding: "12px 14px",
   border: `1px solid ${active ? "#d4cec4" : "rgba(180,172,158,.06)"}`,
   borderRadius: R.r10,
-  background: active ? "rgba(45,42,36,.25)" : "rgba(45,42,36,.12)",
+  background: active ? "rgba(74,69,59,.25)" : "rgba(74,69,59,.12)",
   cursor: "pointer",
   marginBottom: S.s8
 });
@@ -186,7 +186,7 @@ return <div className={"screen"}><div style={{
       transition: "width .3s"
     }} /></div><div style={{
     fontSize: FS.fs62,
-    color: "#8a8478",
+    color: "#9a9488",
     letterSpacing: ".14em",
     textTransform: "uppercase",
     marginBottom: S.s6
@@ -235,38 +235,38 @@ return <div className={"screen"}><div style={{
           flex: 1
         }}><label>{"Country"}</label><select className={"inp"} value={obCountry} onChange={e => setObCountry(e.target.value)} style={{
             cursor: "pointer"
-          }}>{["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Mexico", "Brazil", "India", "Japan", "South Korea", "Philippines", "Other"].map(c => <option key={c} value={c}>{c}</option>)}</select></div></div><button className={"btn btn-gold"} disabled={!obName.trim() || !obFirstName.trim() || !obLastName.trim() || !obState || !obCountry} onClick={() => setObStep(2)}>{"Continue →"}</button></div></div>}{obStep === 2 && <div><h1 className={"title"} style={{
+          }}>{["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Mexico", "Brazil", "India", "Japan", "South Korea", "Philippines", "Other"].map(c => <option key={c} value={c}>{c}</option>)}</select></div></div><button className={"btn btn-gold"} disabled={!obName.trim() || !obFirstName.trim() || !obLastName.trim() || !obState || !obCountry} onClick={() => setObStep(2)}>{"Continue â†’"}</button></div></div>}{obStep === 2 && <div><h1 className={"title"} style={{
       fontSize: "clamp(1.3rem,4vw,1.9rem)"
     }}>{"Athletic History"}</h1><p style={{
-      color: "#8a8478",
+      color: "#9a9488",
       fontSize: FS.fs82,
       marginBottom: S.s12
-    }}>{"Select all sports you've played — past or present. This is your strongest class signal."}</p><div style={{
+    }}>{"Select all sports you've played â€” past or present. This is your strongest class signal."}</p><div style={{
       marginBottom: S.s16
     }}>{OB_SPORTS.map(s => <span key={s.val} style={chipSt(obSports.includes(s.val))} onClick={() => toggleSport(s.val)}>{s.label}</span>)}</div><div style={{
       display: "flex",
       gap: S.s8
-    }}><button className={"btn btn-ghost"} onClick={() => setObStep(1)}>{"← Back"}</button><button className={"btn btn-gold"} onClick={() => setObStep(3)}>{"Continue →"}</button></div></div>}{obStep === 3 && <div><h1 className={"title"} style={{
+    }}><button className={"btn btn-ghost"} onClick={() => setObStep(1)}>{"â† Back"}</button><button className={"btn btn-gold"} onClick={() => setObStep(3)}>{"Continue â†’"}</button></div></div>}{obStep === 3 && <div><h1 className={"title"} style={{
       fontSize: "clamp(1.3rem,4vw,1.9rem)"
     }}>{"Current Routine"}</h1><p style={{
-      color: "#8a8478",
+      color: "#9a9488",
       fontSize: FS.fs82,
       marginBottom: S.s12
-    }}>{"How often do you work out today? Be honest — this calibrates your starting stats."}</p>{[{
+    }}>{"How often do you work out today? Be honest â€” this calibrates your starting stats."}</p>{[{
       val: "never",
       label: "Just getting started",
       sub: "Little to no workout history"
     }, {
       val: "light",
-      label: "1–2 times a week",
+      label: "1â€“2 times a week",
       sub: "Casual, inconsistent routine"
     }, {
       val: "moderate",
-      label: "3–4 times a week",
+      label: "3â€“4 times a week",
       sub: "Solid habit, building consistency"
     }, {
       val: "dedicated",
-      label: "5–6 times a week",
+      label: "5â€“6 times a week",
       sub: "Dedicated athlete"
     }, {
       val: "elite",
@@ -278,84 +278,84 @@ return <div className={"screen"}><div style={{
           color: obFreq === o.val ? "#d4cec4" : "#b4ac9e"
         }}>{o.label}</div><div style={{
           fontSize: FS.lg,
-          color: "#8a8478",
+          color: "#9a9488",
           marginTop: S.s2
         }}>{o.sub}</div></div></div>)}<div style={{
       display: "flex",
       gap: S.s8,
       marginTop: S.s6
-    }}><button className={"btn btn-ghost"} onClick={() => setObStep(2)}>{"← Back"}</button><button className={"btn btn-gold"} disabled={!obFreq} onClick={() => setObStep(4)}>{"Continue →"}</button></div></div>}{obStep === 4 && <div><h1 className={"title"} style={{
+    }}><button className={"btn btn-ghost"} onClick={() => setObStep(2)}>{"â† Back"}</button><button className={"btn btn-gold"} disabled={!obFreq} onClick={() => setObStep(4)}>{"Continue â†’"}</button></div></div>}{obStep === 4 && <div><h1 className={"title"} style={{
       fontSize: "clamp(1.3rem,4vw,1.9rem)"
     }}>{"Discipline Trait"}</h1><p style={{
-      color: "#8a8478",
+      color: "#9a9488",
       fontSize: FS.fs82,
       marginBottom: S.s12
     }}>{"When do you usually work out? Timing unlocks hidden character traits."}</p>{[{
       val: "earlymorning",
       label: "Early morning (before 7am)",
-      sub: "⚡ Iron Discipline — +WIS +CON boost. One of the rarest traits."
+      sub: "âš¡ Iron Discipline â€” +WIS +CON boost. One of the rarest traits."
     }, {
       val: "morning",
-      label: "Morning (7am–12pm)",
-      sub: "☀️ Disciplined — +WIS boost"
+      label: "Morning (7amâ€“12pm)",
+      sub: "â˜€ï¸ Disciplined â€” +WIS boost"
     }, {
       val: "afternoon",
-      label: "Afternoon (12pm–5pm)",
-      sub: "Balanced — no trait modifier"
+      label: "Afternoon (12pmâ€“5pm)",
+      sub: "Balanced â€” no trait modifier"
     }, {
       val: "evening",
-      label: "Evening (5pm–9pm)",
-      sub: "🌙 Night Owl — +VIT boost"
+      label: "Evening (5pmâ€“9pm)",
+      sub: "ðŸŒ™ Night Owl â€” +VIT boost"
     }, {
       val: "varies",
       label: "It varies / no routine yet",
-      sub: "No trait — earn one as you build your routine"
+      sub: "No trait â€” earn one as you build your routine"
     }].map(o => <div key={o.val} style={radioSt(obTiming === o.val)} onClick={() => setObTiming(o.val)}><div><div style={{
           fontSize: FS.fs82,
           fontWeight: 600,
           color: obTiming === o.val ? "#d4cec4" : "#b4ac9e"
         }}>{o.label}</div><div style={{
           fontSize: FS.lg,
-          color: "#8a8478",
+          color: "#9a9488",
           marginTop: S.s2
         }}>{o.sub}</div></div></div>)}<div style={{
       display: "flex",
       gap: S.s8,
       marginTop: S.s6
-    }}><button className={"btn btn-ghost"} onClick={() => setObStep(3)}>{"← Back"}</button><button className={"btn btn-gold"} disabled={!obTiming} onClick={() => setObStep(5)}>{"Continue →"}</button></div></div>}{obStep === 5 && <div><h1 className={"title"} style={{
+    }}><button className={"btn btn-ghost"} onClick={() => setObStep(3)}>{"â† Back"}</button><button className={"btn btn-gold"} disabled={!obTiming} onClick={() => setObStep(5)}>{"Continue â†’"}</button></div></div>}{obStep === 5 && <div><h1 className={"title"} style={{
       fontSize: "clamp(1.3rem,4vw,1.9rem)"
     }}>{"Fitness Identity"}</h1><p style={{
-      color: "#8a8478",
+      color: "#9a9488",
       fontSize: FS.fs82,
       marginBottom: S.s12
     }}>{"Pick up to 3 that best describe your mindset. These shape your stat affinity."}</p><div style={{
       marginBottom: S.s12
     }}>{OB_PRIORITIES.map(p => <span key={p.val} style={chipSt(obPriorities.includes(p.val))} onClick={() => togglePri(p.val)}>{p.label}</span>)}<div style={{
         fontSize: FS.fs68,
-        color: "#8a8478",
+        color: "#9a9488",
         marginTop: S.s6,
         fontStyle: "italic"
       }}>{`${obPriorities.length}/3 selected`}</div></div><div style={{
       display: "flex",
       gap: S.s8
-    }}><button className={"btn btn-ghost"} onClick={() => setObStep(4)}>{"← Back"}</button><button className={"btn btn-gold"} onClick={() => setObStep(6)}>{"Continue →"}</button></div></div>}{obStep === 6 && <div><h1 className={"title"} style={{
+    }}><button className={"btn btn-ghost"} onClick={() => setObStep(4)}>{"â† Back"}</button><button className={"btn btn-gold"} onClick={() => setObStep(6)}>{"Continue â†’"}</button></div></div>}{obStep === 6 && <div><h1 className={"title"} style={{
       fontSize: "clamp(1.3rem,4vw,1.9rem)"
     }}>{"Training Style"}</h1><p style={{
-      color: "#8a8478",
+      color: "#9a9488",
       fontSize: FS.fs82,
       marginBottom: S.s12
-    }}>{"Your natural approach to fitness — this fine-tunes your class assignment."}</p>{[{
+    }}>{"Your natural approach to fitness â€” this fine-tunes your class assignment."}</p>{[{
       val: "heavy",
       label: "Heavy compound lifts",
-      sub: "Squats, deadlifts, bench — I chase weight on the bar"
+      sub: "Squats, deadlifts, bench â€” I chase weight on the bar"
     }, {
       val: "cardio",
       label: "Cardio & endurance",
-      sub: "Running, cycling, swimming — I chase distance and time"
+      sub: "Running, cycling, swimming â€” I chase distance and time"
     }, {
       val: "sculpt",
       label: "Sculpting & aesthetics",
-      sub: "Isolation work and volume — I chase the look"
+      sub: "Isolation work and volume â€” I chase the look"
     }, {
       val: "hiit",
       label: "HIIT & explosive power",
@@ -363,28 +363,28 @@ return <div className={"screen"}><div style={{
     }, {
       val: "mindful",
       label: "Mindful movement",
-      sub: "Yoga, mobility, breath work — mind-body connection"
+      sub: "Yoga, mobility, breath work â€” mind-body connection"
     }, {
       val: "sport",
       label: "Sport-specific training",
-      sub: "I train to compete or perform — sport is the goal"
+      sub: "I train to compete or perform â€” sport is the goal"
     }, {
       val: "mixed",
       label: "I mix everything",
-      sub: "No single focus — variety keeps me going"
+      sub: "No single focus â€” variety keeps me going"
     }].map(o => <div key={o.val} style={radioSt(obStyle === o.val)} onClick={() => setObStyle(o.val)}><div><div style={{
           fontSize: FS.fs82,
           fontWeight: 600,
           color: obStyle === o.val ? "#d4cec4" : "#b4ac9e"
         }}>{o.label}</div><div style={{
           fontSize: FS.lg,
-          color: "#8a8478",
+          color: "#9a9488",
           marginTop: S.s2
         }}>{o.sub}</div></div></div>)}<div style={{
       display: "flex",
       gap: S.s8,
       marginTop: S.s6
-    }}><button className={"btn btn-ghost"} onClick={() => setObStep(5)}>{"← Back"}</button><button className={"btn btn-gold"} disabled={!obStyle} onClick={handleOnboard}>{"Forge My Character →"}</button></div></div>}</div>;
+    }}><button className={"btn btn-ghost"} onClick={() => setObStep(5)}>{"â† Back"}</button><button className={"btn btn-gold"} disabled={!obStyle} onClick={handleOnboard}>{"Forge My Character â†’"}</button></div></div>}</div>;
 });
 
 export default OnboardingScreen;

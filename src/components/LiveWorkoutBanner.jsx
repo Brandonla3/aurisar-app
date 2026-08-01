@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { isMetric, lbsToKg, kgToLbs, weightLabel } from '../utils/units';
 import Sheet from './ui/Sheet';
 import ConfirmSheet from './ui/ConfirmSheet';
@@ -60,7 +60,7 @@ export default function LiveWorkoutBanner({
     setAddExOpen(false);
   }
 
-  // Add exercise search — requires 2+ chars
+  // Add exercise search â€” requires 2+ chars
   const addExResults = addExSearch.length >= 2
     ? (allExercises || [])
         .filter(e => e.name.toLowerCase().includes(addExSearch.toLowerCase()) && e.id !== 'rest_day')
@@ -89,14 +89,14 @@ export default function LiveWorkoutBanner({
         <span className="lw-banner-icon">{icon}</span>
         <span className="lw-name">{name}</span>
         <span className="lw-progress-badge">
-          <span style={{ color: doneCount > 0 ? '#6dbb3a' : '#8a8478', fontWeight: 700 }}>{doneCount}</span>
+          <span style={{ color: doneCount > 0 ? '#6dbb3a' : '#9a9488', fontWeight: 700 }}>{doneCount}</span>
           <span className="lw-progress-sep">{"/"}</span>
           {total}
         </span>
-        <span className="lw-chevron">{"›"}</span>
+        <span className="lw-chevron">{"â€º"}</span>
       </button>
 
-      {/* The tracker sheet sits on the live layer — below every modal, so
+      {/* The tracker sheet sits on the live layer â€” below every modal, so
           Finish can stack the stats/completion sheets above it. navOffset
           is off: like the old .lw-sheet it deliberately covers the tab bar. */}
       <Sheet
@@ -110,7 +110,7 @@ export default function LiveWorkoutBanner({
         footer={confirmFinish ? (
               <div className="lw-confirm-panel">
                 <div className="lw-confirm-msg">
-                  {`${total - doneCount} exercise${total - doneCount !== 1 ? 's' : ''} still unchecked — how would you like to finish?`}
+                  {`${total - doneCount} exercise${total - doneCount !== 1 ? 's' : ''} still unchecked â€” how would you like to finish?`}
                 </div>
                 <div className="lw-confirm-btns">
                   <button className="btn btn-gold" onClick={() => {
@@ -125,20 +125,20 @@ export default function LiveWorkoutBanner({
                   }}>
                     {`Log Only Checked (${doneCount})`}
                   </button>
-                  <button className="btn btn-ghost btn-sm" style={{ color: '#8a8478' }} onClick={() => setConfirmFinish(false)}>
-                    {"← Keep Going"}
+                  <button className="btn btn-ghost btn-sm" style={{ color: '#9a9488' }} onClick={() => setConfirmFinish(false)}>
+                    {"â† Keep Going"}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="lw-sheet-footer">
-                <button className="btn btn-ghost btn-sm" style={{ color: '#8a8478' }} onClick={() => setConfirmDiscard(true)}>
+                <button className="btn btn-ghost btn-sm" style={{ color: '#9a9488' }} onClick={() => setConfirmDiscard(true)}>
                   {"Discard"}
                 </button>
                 <button className="btn btn-gold" style={{ flex: 1 }} onClick={handleFinishPress}>
                   {doneCount < total
-                    ? `✓ Finish (${doneCount}/${total})`
-                    : '✓ Finish Workout'}
+                    ? `âœ“ Finish (${doneCount}/${total})`
+                    : 'âœ“ Finish Workout'}
                 </button>
               </div>
             )}
@@ -151,7 +151,7 @@ export default function LiveWorkoutBanner({
             </div>
             <div className="lw-prog-lbl">
               {doneCount === total && total > 0
-                ? '✓ All exercises complete'
+                ? 'âœ“ All exercises complete'
                 : `${doneCount} of ${total} complete`}
             </div>
 
@@ -165,10 +165,10 @@ export default function LiveWorkoutBanner({
                 return (
                   <React.Fragment key={i}>
                     {isFirstOfSuperset && (
-                      <div className="lw-superset-label">{"⚡ Superset"}</div>
+                      <div className="lw-superset-label">{"âš¡ Superset"}</div>
                     )}
                     <div className="lw-ex-item-wrap">
-                      {/* ── Collapsed row ── */}
+                      {/* â”€â”€ Collapsed row â”€â”€ */}
                       <div
                         className={`lw-ex-row${ex.done ? ' done' : ''}${isInSuperset ? ' in-superset' : ''}`}
                         onClick={() => onToggleExercise(i)}
@@ -183,15 +183,15 @@ export default function LiveWorkoutBanner({
                         tabIndex={0}
                       >
                         <div className={`lw-ex-cb${ex.done ? ' done' : ''}`}>
-                          {ex.done && <span className="lw-ex-check-mark">{"✓"}</span>}
+                          {ex.done && <span className="lw-ex-check-mark">{"âœ“"}</span>}
                         </div>
                         <div className="lw-ex-info">
                           <div className="lw-ex-name">{ex.name}</div>
                           {canEdit && (
                             <div className="lw-ex-meta">
-                              {ex.setsDesc || `${ex.sets}×${ex.reps}`}
+                              {ex.setsDesc || `${ex.sets}Ã—${ex.reps}`}
                               {ex.weightLbs
-                                ? ` · ${dispW(ex.weightLbs)} ${wLabel}`
+                                ? ` Â· ${dispW(ex.weightLbs)} ${wLabel}`
                                 : ''}
                             </div>
                           )}
@@ -202,16 +202,16 @@ export default function LiveWorkoutBanner({
                             onClick={(e) => toggleExpand(e, i)}
                             aria-label="Edit exercise"
                           >
-                            {"···"}
+                            {"Â·Â·Â·"}
                           </button>
                         )}
                       </div>
 
-                      {/* ── Inline edit panel ── */}
+                      {/* â”€â”€ Inline edit panel â”€â”€ */}
                       {expanded && (
                         <div className="lw-ex-edit">
                           {/* Same SetsEditor as the workout builder and the
-                              quick log — the live variant hides HR/treadmill/
+                              quick log â€” the live variant hides HR/treadmill/
                               distance (never part of mid-session tracking)
                               and commits extra rows per keystroke. */}
                           <SetsEditor
@@ -234,7 +234,7 @@ export default function LiveWorkoutBanner({
                               {"Remove Exercise"}
                             </button>
                             <button className="btn btn-ghost btn-sm" onClick={() => setExpandedIdx(null)}>
-                              {"Done ✓"}
+                              {"Done âœ“"}
                             </button>
                           </div>
                         </div>
@@ -244,7 +244,7 @@ export default function LiveWorkoutBanner({
                 );
               })}
 
-              {/* ── Add Exercise ── */}
+              {/* â”€â”€ Add Exercise â”€â”€ */}
               <div className="lw-add-ex-wrap">
                 {!addExOpen ? (
                   <button
@@ -261,7 +261,7 @@ export default function LiveWorkoutBanner({
                           <input
                             className="lw-add-ex-input"
                             type="text"
-                            placeholder="Search exercises…"
+                            placeholder="Search exercisesâ€¦"
                             autoFocus
                             value={addExSearch}
                             onChange={e => setAddExSearch(e.target.value)}
@@ -270,7 +270,7 @@ export default function LiveWorkoutBanner({
                             className="lw-add-ex-cancel"
                             onClick={() => { setAddExOpen(false); setAddExSearch(''); }}
                           >
-                            {"✕"}
+                            {"âœ•"}
                           </button>
                         </div>
                         {addExSearch.length >= 2 && addExResults.length === 0 && (
@@ -287,7 +287,7 @@ export default function LiveWorkoutBanner({
                       <div className="lw-add-ex-config">
                         <div className="lw-add-ex-config-name">
                           <span>{addExSelected.name}</span>
-                          <button className="lw-add-ex-cancel" onClick={() => setAddExSelected(null)}>{"←"}</button>
+                          <button className="lw-add-ex-cancel" onClick={() => setAddExSelected(null)}>{"â†"}</button>
                         </div>
                         {(() => {
                           const selCat = (addExSelected.category || '').toLowerCase();
@@ -306,7 +306,7 @@ export default function LiveWorkoutBanner({
                               {selShowW && (
                                 <div className="lw-ex-edit-cell">
                                   <span className="lw-ex-edit-col-hdr">{wLabel}</span>
-                                  <input className="lw-ex-edit-inp" type="text" inputMode="decimal" placeholder="—" value={addExWeight} onChange={e => setAddExWeight(e.target.value)} />
+                                  <input className="lw-ex-edit-inp" type="text" inputMode="decimal" placeholder="â€”" value={addExWeight} onChange={e => setAddExWeight(e.target.value)} />
                                 </div>
                               )}
                               <div className="lw-ex-edit-spacer" />
@@ -325,10 +325,10 @@ export default function LiveWorkoutBanner({
       </Sheet>
 
       {/* In-app confirm instead of window.confirm (which is jarring and
-          fails in sandboxed frames — see the note in App.jsx). */}
+          fails in sandboxed frames â€” see the note in App.jsx). */}
       <ConfirmSheet
         open={confirmDiscard}
-        icon={"🗑"}
+        icon={"ðŸ—‘"}
         title={"Discard Workout?"}
         body={`Discard "${name}"? Your progress will be lost.`}
         confirmLabel={"Discard"}

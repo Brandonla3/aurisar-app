@@ -1,4 +1,4 @@
-import React, { memo, useState, Suspense } from 'react';
+﻿import React, { memo, useState, Suspense } from 'react';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { UI_COLORS } from '../../data/constants';
 import { calcCharStats } from '../../utils/xp';
@@ -6,7 +6,7 @@ import { ClassIcon } from '../../components/ClassIcon';
 import { S, R, FS } from '../../utils/tokens';
 
 /**
- * Character tab — extracted from the inline IIFE in App.jsx as part of
+ * Character tab â€” extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Pure presentational tab. State + setters come in as props from App;
@@ -18,39 +18,39 @@ import { S, R, FS } from '../../utils/tokens';
 
 // Both of these pull in babylonjs (the turntable directly, the creator via
 // AvatarPreview). Lazy-loading them keeps the ~engine off the eager bundle
-// graph — the Character tab is statically imported, so a static import here
+// graph â€” the Character tab is statically imported, so a static import here
 // would drag Babylon onto first paint for every user, world or not.
 const AvatarCreator = lazyWithRetry(() => import('../avatar/AvatarCreator.jsx'));
 const CharacterTurntable = lazyWithRetry(() => import('../avatar/CharacterTurntable.jsx'));
 const Avatar3DFallback = (
-  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a8478', fontSize: '.75rem', letterSpacing: '.14em', textTransform: 'uppercase' }} role="status" aria-live="polite">
-    {'Loading…'}
+  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a9488', fontSize: '.75rem', letterSpacing: '.14em', textTransform: 'uppercase' }} role="status" aria-live="polite">
+    {'Loadingâ€¦'}
   </div>
 );
 
-// ── Module-level constants (hoisted from the IIFE) ──
+// â”€â”€ Module-level constants (hoisted from the IIFE) â”€â”€
 const STAT_META = {
-  STR: { label: "Strength", icon: "💪", color: UI_COLORS.danger },
-  END: { label: "Endurance", icon: "🔥", color: "#e67e22" },
-  DEX: { label: "Dexterity", icon: "⚡", color: UI_COLORS.accent },
-  CON: { label: "Constitution", icon: "🛡️", color: "#27ae60" },
-  INT: { label: "Intelligence", icon: "🔮", color: UI_COLORS.accent },
-  CHA: { label: "Charisma", icon: "✨", color: "#e91e8c" },
-  WIS: { label: "Wisdom", icon: "🌿", color: "#1abc9c" },
-  VIT: { label: "Vitality", icon: "❤️", color: UI_COLORS.danger },
+  STR: { label: "Strength", icon: "ðŸ’ª", color: UI_COLORS.danger },
+  END: { label: "Endurance", icon: "ðŸ”¥", color: "#e67e22" },
+  DEX: { label: "Dexterity", icon: "âš¡", color: UI_COLORS.accent },
+  CON: { label: "Constitution", icon: "ðŸ›¡ï¸", color: "#27ae60" },
+  INT: { label: "Intelligence", icon: "ðŸ”®", color: UI_COLORS.accent },
+  CHA: { label: "Charisma", icon: "âœ¨", color: "#e91e8c" },
+  WIS: { label: "Wisdom", icon: "ðŸŒ¿", color: "#1abc9c" },
+  VIT: { label: "Vitality", icon: "â¤ï¸", color: UI_COLORS.danger },
 };
 
 const EQUIP_SLOTS = [
-  { key: "slot_helmet",      icon: "⛑️",  label: "Helmet",    hint: "INT / WIS" },
-  { key: "slot_glasses",     icon: "👓",  label: "Glasses",   hint: "INT cosmetic" },
-  { key: "slot_shoulders",   icon: "🦺",  label: "Shoulders", hint: "CON / STR" },
-  { key: "slot_chest",       icon: "👕",  label: "Chest",     hint: "VIT / CON" },
-  { key: "slot_belt",        icon: "🩱",  label: "Belt",      hint: "STR / CON" },
-  { key: "slot_gloves",      icon: "🧤",  label: "Gloves",    hint: "STR / DEX" },
-  { key: "slot_legs",        icon: "👖",  label: "Legs",      hint: "DEX / END" },
-  { key: "slot_shoes",       icon: "👟",  label: "Shoes",     hint: "DEX / END" },
-  { key: "slot_weapon_main", icon: "⚔️",  label: "Weapon",    hint: "STR / CHA" },
-  { key: "slot_weapon_off",  icon: "🛡️",  label: "Off-hand",  hint: "DEX / CON" },
+  { key: "slot_helmet",      icon: "â›‘ï¸",  label: "Helmet",    hint: "INT / WIS" },
+  { key: "slot_glasses",     icon: "ðŸ‘“",  label: "Glasses",   hint: "INT cosmetic" },
+  { key: "slot_shoulders",   icon: "ðŸ¦º",  label: "Shoulders", hint: "CON / STR" },
+  { key: "slot_chest",       icon: "ðŸ‘•",  label: "Chest",     hint: "VIT / CON" },
+  { key: "slot_belt",        icon: "ðŸ©±",  label: "Belt",      hint: "STR / CON" },
+  { key: "slot_gloves",      icon: "ðŸ§¤",  label: "Gloves",    hint: "STR / DEX" },
+  { key: "slot_legs",        icon: "ðŸ‘–",  label: "Legs",      hint: "DEX / END" },
+  { key: "slot_shoes",       icon: "ðŸ‘Ÿ",  label: "Shoes",     hint: "DEX / END" },
+  { key: "slot_weapon_main", icon: "âš”ï¸",  label: "Weapon",    hint: "STR / CHA" },
+  { key: "slot_weapon_off",  icon: "ðŸ›¡ï¸",  label: "Off-hand",  hint: "DEX / CON" },
 ];
 
 const CharacterTab = memo(function CharacterTab({
@@ -72,7 +72,7 @@ const CharacterTab = memo(function CharacterTab({
   const charStats = calcCharStats(cls, level, clsKey, profile);
   const statMax = Math.max(...Object.values(charStats));
 
-  // `profile.equipment` is read but never written via setProfile —
+  // `profile.equipment` is read but never written via setProfile â€”
   // it's intentionally a write-once-via-rewards / read-only-from-app
   // shape that doesn't yet have a setter.
   const equipment = profile.equipment || {};
@@ -83,7 +83,7 @@ const CharacterTab = memo(function CharacterTab({
   };
   const rune = label => <div className={"profile-rune-divider"} style={{
     margin: "0 0 10px"
-  }}><span className={"profile-rune-label"}>{`⠿ ${label} ⠿`}</span></div>;
+  }}><span className={"profile-rune-label"}>{`â ¿ ${label} â ¿`}</span></div>;
 
   return <div style={{
     "--cls-color": cls.color,
@@ -99,23 +99,23 @@ const CharacterTab = memo(function CharacterTab({
                 minWidth: 0
               }}><div className={"profile-name"}>{profile.playerName}{myPublicId && <span style={{
                     fontSize: FS.fs58,
-                    color: "#8a8478",
+                    color: "#9a9488",
                     fontWeight: 400,
                     marginLeft: S.s8,
                     letterSpacing: ".03em"
-                  }}>{"#" + myPublicId}</span>}</div><div className={"profile-class-line"}>{cls.name}{" · Level "}{level}</div>{profile.disciplineTrait && <span className={"trait"} style={{
+                  }}>{"#" + myPublicId}</span>}</div><div className={"profile-class-line"}>{cls.name}{" Â· Level "}{level}</div>{profile.disciplineTrait && <span className={"trait"} style={{
                   "--cls-color": cls.color,
                   "--cls-glow": cls.glow,
                   fontSize: FS.fs65
                 }}>{profile.disciplineTrait}</span>}</div></div><div className={"profile-rune-divider"} style={{
               margin: "10px 0 8px"
-            }}><span className={"profile-rune-label"}>{"⠿ Class Traits ⠿"}</span></div><div className={"traits"}>{cls.traits.map(t => <span key={t} className={"trait"} style={{
+            }}><span className={"profile-rune-label"}>{"â ¿ Class Traits â ¿"}</span></div><div className={"traits"}>{cls.traits.map(t => <span key={t} className={"trait"} style={{
                 "--cls-color": cls.color,
                 "--cls-glow": cls.glow
               }}>{t}</span>)}</div></div></div>
 
       {
-        /* ── SUB-TABS ── */
+        /* â”€â”€ SUB-TABS â”€â”€ */
       }<div style={{
         display: "flex",
         gap: S.s6,
@@ -124,10 +124,10 @@ const CharacterTab = memo(function CharacterTab({
             flex: 1,
             textAlign: "center",
             padding: "8px 4px"
-          }}>{t === "avatar" ? "⚔️ Avatar" : t === "stats" ? "📊 Stats" : "🎒 Equipment"}</button>)}</div>
+          }}>{t === "avatar" ? "âš”ï¸ Avatar" : t === "stats" ? "ðŸ“Š Stats" : "ðŸŽ’ Equipment"}</button>)}</div>
 
       {
-        /* ══ AVATAR SUB-TAB ══════════════════════════ */
+        /* â•â• AVATAR SUB-TAB â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
       }{charSubTab === "avatar" && <div>
         <div className={"char-section"} style={{ textAlign: "center", padding: "20px 16px 28px" }}>
           {/* P1: live auto-rotating review of the saved avatar (drag to spin,
@@ -140,12 +140,12 @@ const CharacterTab = memo(function CharacterTab({
               </Suspense>
             </div>
           ) : (
-            <div style={{ fontSize: "2.6rem", margin: `20px 0 ${S.s14}px` }}>{"⚔️"}</div>
+            <div style={{ fontSize: "2.6rem", margin: `20px 0 ${S.s14}px` }}>{"âš”ï¸"}</div>
           )}
           <div style={{ fontSize: FS.fs95, color: "#b4ac9e", fontWeight: 600, marginBottom: S.s8, letterSpacing: ".02em" }}>
             {"Appearance"}
           </div>
-          <div style={{ fontSize: FS.fs76, color: "#8a8478", lineHeight: 1.7, maxWidth: 240, margin: "0 auto 20px" }}>
+          <div style={{ fontSize: FS.fs76, color: "#9a9488", lineHeight: 1.7, maxWidth: 240, margin: "0 auto 20px" }}>
             {"Customise your body, face, hair, species features, and base outfit."}
           </div>
           <button
@@ -181,13 +181,13 @@ const CharacterTab = memo(function CharacterTab({
           </Suspense>
         )}
       </div>
-      /* ══ STATS SUB-TAB ════════════════════════════ */}{charSubTab === "stats" && <div><div className={"char-section"}>{rune("Character Stats")}<div style={{
+      /* â•â• STATS SUB-TAB â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{charSubTab === "stats" && <div><div className={"char-section"}>{rune("Character Stats")}<div style={{
             fontSize: FS.sm,
-            color: "#8a8478",
+            color: "#9a9488",
             fontStyle: "italic",
             textAlign: "center",
             marginBottom: S.s10
-          }}>{"Stats grow dynamically as you train — full calculation coming soon"}</div>{Object.entries(STAT_META).map(([key, meta]) => {
+          }}>{"Stats grow dynamically as you train â€” full calculation coming soon"}</div>{Object.entries(STAT_META).map(([key, meta]) => {
             const val = charStats[key] || 0,
               pct = Math.round(val / statMax * 100);
             return <div key={key} className={"char-stat-row"}><span className={"char-stat-icon"}>{meta.icon}</span><span className={"char-stat-label"} style={{
@@ -198,7 +198,7 @@ const CharacterTab = memo(function CharacterTab({
                 }} /></div><span className={"char-stat-val"}>{val}</span></div>;
           })}</div></div>
 
-      /* ══ EQUIPMENT SUB-TAB ═══════════════════════ */}{charSubTab === "equipment" && <div><div className={"char-section"}>{rune("Equipment")}<div style={{
+      /* â•â• EQUIPMENT SUB-TAB â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}{charSubTab === "equipment" && <div><div className={"char-section"}>{rune("Equipment")}<div style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: "7px"
@@ -209,7 +209,7 @@ const CharacterTab = memo(function CharacterTab({
                   height: 30,
                   borderRadius: R.r7,
                   border: `1px solid ${item ? "rgba(180,172,158,.1)" : "rgba(180,172,158,.06)"}`,
-                  background: item ? "rgba(45,42,36,.18)" : "rgba(45,42,36,.12)",
+                  background: item ? "rgba(74,69,59,.18)" : "rgba(74,69,59,.12)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -220,11 +220,11 @@ const CharacterTab = memo(function CharacterTab({
                 }}><div className={"char-equip-label"} style={{
                     fontWeight: 600
                   }}>{slot.label}</div><div className={"char-equip-name"} style={{
-                    color: item ? "#b4ac9e" : "#8a8478"
+                    color: item ? "#b4ac9e" : "#9a9488"
                   }}>{item || slot.hint}</div></div></div>;
             })}</div><div style={{
             fontSize: FS.fs62,
-            color: "#8a8478",
+            color: "#9a9488",
             fontStyle: "italic",
             textAlign: "center",
             marginTop: S.s8

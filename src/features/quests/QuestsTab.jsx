@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+﻿import React, { memo } from 'react';
 import { QUESTS } from '../../data/constants';
 import { EXERCISES } from '../../data/exercises';
 import { _optionalChain } from '../../utils/helpers';
@@ -6,7 +6,7 @@ import { formatXP } from '../../utils/format';
 import { S, FS } from '../../utils/tokens';
 
 /**
- * Quests tab — extracted from the inline fragment in App.jsx as part of
+ * Quests tab â€” extracted from the inline fragment in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Pure presentational tab. State + setters come in as props from App;
@@ -25,7 +25,7 @@ const QuestsTab = memo(function QuestsTab({
   claimQuestReward,
   claimManualQuest,
 }) {
-  return <><div className={"rpg-sec-header"}><div className={"rpg-sec-line rpg-sec-line-l"} /><span className={"rpg-sec-title"}>{"✦ Deeds & Quests ✦"}</span><div className={"rpg-sec-line rpg-sec-line-r"} /></div>
+  return <><div className={"rpg-sec-header"}><div className={"rpg-sec-line rpg-sec-line-l"} /><span className={"rpg-sec-title"}>{"âœ¦ Deeds & Quests âœ¦"}</span><div className={"rpg-sec-line rpg-sec-line-r"} /></div>
           {
             /* Category filter */
           }<div className={"quest-cats"}>{["All", "Cardio", "Strength", "Flexibility", "Consistency", "Competition"].map(cat => <div key={cat} className={`quest-cat-btn ${questCat === cat ? "on" : ""}`} onClick={() => setQuestCat(cat)}>{cat}</div>)}</div>
@@ -41,7 +41,7 @@ const QuestsTab = memo(function QuestsTab({
                   flex: 1
                 }}><div className={"quest-name"}>{q.name}</div><div className={"quest-desc"}>{q.desc}</div><div className={"quest-reward"}>{formatXP(q.xp, {
                       signed: true,
-                      prefix: "⚡ "
+                      prefix: "âš¡ "
                     })}{" reward"}</div></div><button className={"btn btn-gold btn-sm"} onClick={() => claimQuestReward(q.id)}>{"Claim!"}</button></div></div>;
           })
 
@@ -66,12 +66,12 @@ const QuestsTab = memo(function QuestsTab({
                   flex: 1
                 }}><div className={"quest-name"}>{q.name}</div><div className={"quest-desc"}>{q.desc}</div>{progressText && !isDone && <div style={{
                     fontSize: FS.fs65,
-                    color: "#8a8478",
+                    color: "#9a9488",
                     marginTop: S.s4
-                  }}>{"Progress: "}{progressText}</div>}<div className={"quest-reward"}>{isClaimed ? "✓ Claimed " + formatXP(q.xp) : formatXP(q.xp, {
+                  }}>{"Progress: "}{progressText}</div>}<div className={"quest-reward"}>{isClaimed ? "âœ“ Claimed " + formatXP(q.xp) : formatXP(q.xp, {
                       signed: true,
-                      prefix: "⚡ "
-                    })}</div></div><div className={"quest-status"}>{isClaimed ? <div className={"quest-check claimed-check"}>{"✓"}</div> : isDone ? <div className={"quest-check done"}>{"!"}</div> : q.manual ? <button className={"btn btn-ghost btn-xs"} onClick={() => claimManualQuest(q.id)}>{"Done?"}</button> : <div className={"quest-check"}>{"○"}</div>}</div></div></div>;
+                      prefix: "âš¡ "
+                    })}</div></div><div className={"quest-status"}>{isClaimed ? <div className={"quest-check claimed-check"}>{"âœ“"}</div> : isDone ? <div className={"quest-check done"}>{"!"}</div> : q.manual ? <button className={"btn btn-ghost btn-xs"} onClick={() => claimManualQuest(q.id)}>{"Done?"}</button> : <div className={"quest-check"}>{"â—‹"}</div>}</div></div></div>;
           })}</>;
 });
 

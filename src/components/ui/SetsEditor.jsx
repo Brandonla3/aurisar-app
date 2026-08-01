@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { NO_SETS_EX_IDS, RUNNING_EX_ID, HR_ZONES, UI_COLORS } from '../../data/constants';
 import { hrRange } from '../../utils/xp';
 import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, weightLabel, distLabel } from '../../utils/units';
@@ -7,7 +7,7 @@ import { commitDurationBlur, commitSecChange, durationDisplay } from './setsEdit
 import { S, FS } from '../../utils/tokens';
 
 /**
- * The one sets/reps/weight — duration/distance/HR editor.
+ * The one sets/reps/weight â€” duration/distance/HR editor.
  *
  * This exact field group used to exist three times (workout-builder card,
  * superset accordion, live tracker) plus a fourth sibling in the quick-log
@@ -15,26 +15,26 @@ import { S, FS } from '../../utils/tokens';
  * now render this component and differ only by the flags below.
  *
  * State contract: fully controlled. `value` is the exercise entry; every
- * change is reported as onField(field, val) — the same field vocabulary the
+ * change is reported as onField(field, val) â€” the same field vocabulary the
  * builder already persists (sets, reps, weightLbs, durationSec, _durHHMM,
  * _durSecRaw, distanceMi, hrZone, incline, speed, extraRows).
  *
  * The duration pair keeps the builder's scratch-field semantics VERBATIM:
  * `_durHHMM`/`_durSecRaw` hold the in-progress keystrokes; blur (HH:MM) or
  * change (Sec) normalizes and derives `durationSec` + minute-`reps`. These
- * two commit paths are exported as pure functions so tests can pin them —
+ * two commit paths are exported as pure functions so tests can pin them â€”
  * corrupting this sync corrupts saved workouts.
  */
 
-// ── Component ───────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SetsEditor = React.memo(function SetsEditor({
-  exD,                    // catalog entry (category, hasTreadmill, id, …)
+  exD,                    // catalog entry (category, hasTreadmill, id, â€¦)
   value,                  // the exercise entry being edited
   onField,                // (field, val) => void
   units,
   age = 30,
-  variant = 'builder',    // "builder" | "live" | "quicklog" — density class
+  variant = 'builder',    // "builder" | "live" | "quicklog" â€” density class
   valueMode = 'canonical',// "canonical": weightLbs in lbs / distanceMi in mi,
                           //   inputs convert per `units`.
                           // "display": weight+distance passed through raw in
@@ -46,13 +46,13 @@ const SetsEditor = React.memo(function SetsEditor({
   showTreadmill = true,   // incline/speed pair (treadmill exercises only)
   showPaceBonus = true,   // running pace-bonus hint line
   showDist = true,        // distance field on cardio rows
-  allowExtraRows = true,  // the "＋ Add Row" progressive-row affordance
+  allowExtraRows = true,  // the "ï¼‹ Add Row" progressive-row affordance
   onPrimaryBlur,          // optional blur hook (quick-log's ghost comparison)
   onRowFocus,             // optional: reports which row was claimed (0 = primary,
-                          // n = extra row n) — the Set Forge's weight chips
+                          // n = extra row n) â€” the Set Forge's weight chips
                           // target the active row. Clicking anywhere on a row
                           // claims it, not just focusing an input.
-  activeRow,              // optional: index of the claimed row — highlights it.
+  activeRow,              // optional: index of the claimed row â€” highlights it.
 }) {
   const isC = exD.category === 'cardio';
   const isF = exD.category === 'flexibility';
@@ -133,7 +133,7 @@ const SetsEditor = React.memo(function SetsEditor({
   const removeRow = ri => onField('extraRows', rows.filter((_, j) => j !== ri));
 
   // The visible column header isn't programmatically tied to its input, so
-  // give each field an aria-label ("Set 1 Reps", "Interval 1 Duration…") and
+  // give each field an aria-label ("Set 1 Reps", "Interval 1 Durationâ€¦") and
   // hide the header text from the a11y tree to avoid a double announcement.
   const primaryRowName = timed ? 'Interval 1' : 'Set 1';
   const cell = (hdr, input) => (
@@ -145,7 +145,7 @@ const SetsEditor = React.memo(function SetsEditor({
 
   return (
     <div className={`se se--${variant}`}>
-      {/* ── Primary row ── */}
+      {/* â”€â”€ Primary row â”€â”€ */}
       <div className={rowClass('se-row', 0)} {...rowClaimProps(0)}>
         <span className={'se-row-lbl'}>{`${rowLbl}1`}</span>
         {!noSets && cell('Sets', (
@@ -180,7 +180,7 @@ const SetsEditor = React.memo(function SetsEditor({
                 onChange={e => onField('reps', e.target.value)} onBlur={onPrimaryBlur} />
             ))}
             {showW && cell(wUnit, (
-              <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'—'}
+              <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'â€”'}
                 step={metric ? '0.5' : '2.5'}
                 value={dispW}
                 onChange={e => commitWeight(e.target.value)} onBlur={onPrimaryBlur} />
@@ -189,31 +189,31 @@ const SetsEditor = React.memo(function SetsEditor({
         )}
       </div>
 
-      {/* ── Pace bonus ── */}
+      {/* â”€â”€ Pace bonus â”€â”€ */}
       {showPaceBonus && isRunning && runBoostPct > 0 && (
         <div className={'se-pace'} style={{ color: UI_COLORS.warning }}>
-          {'⚡ +'}{runBoostPct}{'% pace bonus'}{runBoostPct === 20 ? ' (sub-8 mi!)' : ''}
+          {'âš¡ +'}{runBoostPct}{'% pace bonus'}{runBoostPct === 20 ? ' (sub-8 mi!)' : ''}
         </div>
       )}
 
-      {/* ── Treadmill ── */}
+      {/* â”€â”€ Treadmill â”€â”€ */}
       {showTreadmill && isTread && (
         <div className={'se-row se-row--tread'}>
           <span className={'se-row-lbl'} aria-hidden={'true'} />
-          {cell('Incline (0.5–15)', (
-            <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'—'}
+          {cell('Incline (0.5â€“15)', (
+            <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'â€”'}
               value={value.incline || ''}
               onChange={e => onField('incline', e.target.value ? parseFloat(e.target.value) : null)} />
           ))}
-          {cell('Speed (0.5–15)', (
-            <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'—'}
+          {cell('Speed (0.5â€“15)', (
+            <input className={'se-inp'} type={'number'} min={'0.5'} max={'15'} step={'0.5'} placeholder={'â€”'}
               value={value.speed || ''}
               onChange={e => onField('speed', e.target.value ? parseFloat(e.target.value) : null)} />
           ))}
         </div>
       )}
 
-      {/* ── Extra rows ── */}
+      {/* â”€â”€ Extra rows â”€â”€ */}
       {rows.map((row, ri) => (
         <div key={ri} className={rowClass('se-row se-row--extra', ri + 1)} {...rowClaimProps(ri + 1)}>
           <span className={'se-row-lbl'} aria-hidden={'true'}>{`${rowLbl}${ri + 2}`}</span>
@@ -245,20 +245,20 @@ const SetsEditor = React.memo(function SetsEditor({
             </>
           ); })()}
           <button type={'button'} className={'se-row-remove'} aria-label={`Remove ${timed ? 'interval' : 'set'} ${ri + 2}`}
-            onClick={() => removeRow(ri)}>{'✕'}</button>
+            onClick={() => removeRow(ri)}>{'âœ•'}</button>
         </div>
       ))}
 
-      {/* ── Add row ── */}
+      {/* â”€â”€ Add row â”€â”€ */}
       {allowExtraRows && (
         <button type={'button'} className={'se-add-row'} onClick={addRow}>
           {variant === 'quicklog'
-            ? `＋ Add ${timed ? 'Interval' : 'Set'} (own ${timed ? 'duration' : 'reps & weight'})`
-            : `＋ Add Row (${timed ? 'e.g. interval' : 'e.g. progressive weight'})`}
+            ? `ï¼‹ Add ${timed ? 'Interval' : 'Set'} (own ${timed ? 'duration' : 'reps & weight'})`
+            : `ï¼‹ Add Row (${timed ? 'e.g. interval' : 'e.g. progressive weight'})`}
         </button>
       )}
 
-      {/* ── HR zone ── */}
+      {/* â”€â”€ HR zone â”€â”€ */}
       {showHR && isC && (
         <div className={'se-hr'}>
           <label style={{ fontSize: FS.sm, color: '#b0a898', marginBottom: S.s4, display: 'block' }}>
@@ -271,16 +271,16 @@ const SetsEditor = React.memo(function SetsEditor({
               return (
                 <button type={'button'} key={z.z} aria-pressed={sel}
                   className={`hr-zone-btn ${sel ? 'sel' : ''}`}
-                  style={{ '--zc': z.color, borderColor: sel ? z.color : 'rgba(45,42,36,.2)', background: sel ? `${z.color}22` : 'rgba(45,42,36,.12)' }}
+                  style={{ '--zc': z.color, borderColor: sel ? z.color : 'rgba(74,69,59,.2)', background: sel ? `${z.color}22` : 'rgba(74,69,59,.12)' }}
                   onClick={() => onField('hrZone', sel ? null : z.z)}>
-                  <span className={'hz-name'} style={{ color: sel ? z.color : '#8a8478' }}>{'Z'}{z.z}{' '}{z.name}</span>
-                  <span className={'hz-bpm'} style={{ color: sel ? z.color : '#8a8478' }}>{range.lo}{'–'}{range.hi}</span>
+                  <span className={'hz-name'} style={{ color: sel ? z.color : '#9a9488' }}>{'Z'}{z.z}{' '}{z.name}</span>
+                  <span className={'hz-bpm'} style={{ color: sel ? z.color : '#9a9488' }}>{range.lo}{'â€“'}{range.hi}</span>
                 </button>
               );
             })}
           </div>
           {value.hrZone && (
-            <div style={{ fontSize: FS.fs65, color: '#8a8478', fontStyle: 'italic', marginTop: S.s4 }}>
+            <div style={{ fontSize: FS.fs65, color: '#9a9488', fontStyle: 'italic', marginTop: S.s4 }}>
               {HR_ZONES[value.hrZone - 1].desc}
             </div>
           )}

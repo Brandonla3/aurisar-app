@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+﻿import React, { memo } from 'react';
 import { isMetric, lbsToKg, miToKm } from '../../utils/units';
 import { formatXP } from '../../utils/format';
 import { getMuscleColor, calcExercisePBs } from '../../utils/xp';
@@ -7,7 +7,7 @@ import { S, R, FS } from '../../utils/tokens';
 import { UI_COLORS, HR_ZONES } from '../../data/constants';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
 
-// Lazy TrendsTab — same pattern as App.jsx so recharts stays out of the
+// Lazy TrendsTab â€” same pattern as App.jsx so recharts stays out of the
 // main chunk until the user actually opens the trends sub-tab.
 const TrendsTab = React.lazy(() => import('../../components/TrendsTab').then(m => ({
   default: m.TrendsTab
@@ -25,21 +25,21 @@ const LazyFallback = <div style={{
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#8a8478',
+  color: '#9a9488',
   fontSize: '.75rem',
   letterSpacing: '.18em',
   textTransform: 'uppercase'
-}} role={'status'} aria-live={'polite'} aria-label={'Loading'}>{"Loading…"}</div>;
+}} role={'status'} aria-live={'polite'} aria-label={'Loading'}>{"Loadingâ€¦"}</div>;
 const lazyMount = el => <React.Suspense fallback={LazyFallback}>{el}</React.Suspense>;
 
 /**
- * History tab — extracted from the inline IIFE in App.jsx as the
+ * History tab â€” extracted from the inline IIFE in App.jsx as the
  * fifth slice of Finding #6 (App.jsx decomposition) per
  * docs/performance-audit.md (PR #116).
  *
  * Pure presentational tab. State + setters come in as props from App.
  * Inner components (EntryRow, ExercisesTab, WorkoutsTab/GroupCard,
- * PlansTab) stay co-located inside HistoryTab — they close over props
+ * PlansTab) stay co-located inside HistoryTab â€” they close over props
  * and the locally-derived `logWithIdx` / `metric`.
  *
  * Wrapped in React.memo so unrelated App re-renders (toast, xpFlash,
@@ -79,7 +79,7 @@ const HistoryTab = memo(function HistoryTab({
     _idx: i
   }));
 
-  // ── helper: single exercise row ──────────────────────────────
+  // â”€â”€ helper: single exercise row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function EntryRow({
     e,
     showSource = false,
@@ -103,7 +103,7 @@ const HistoryTab = memo(function HistoryTab({
             borderRadius: R.r3,
             fontWeight: 600,
             verticalAlign: "middle"
-          }}>{"Superset"}</span>}{showSource && e.sourcePlanName && <span className={"log-source-badge plan"}>{"📋 "}{e.sourcePlanName}</span>}{showSource && e.sourceWorkoutName && e.sourceWorkoutType !== "oneoff" && <span className={"log-source-badge workout"}>{"💪 "}{e.sourceWorkoutName}</span>}{e.sourceWorkoutType === "oneoff" && e.sourceWorkoutName && <span style={{
+          }}>{"Superset"}</span>}{showSource && e.sourcePlanName && <span className={"log-source-badge plan"}>{"ðŸ“‹ "}{e.sourcePlanName}</span>}{showSource && e.sourceWorkoutName && e.sourceWorkoutType !== "oneoff" && <span className={"log-source-badge workout"}>{"ðŸ’ª "}{e.sourceWorkoutName}</span>}{e.sourceWorkoutType === "oneoff" && e.sourceWorkoutName && <span style={{
             display: "inline-flex",
             alignItems: "center",
             gap: S.s4,
@@ -115,18 +115,18 @@ const HistoryTab = memo(function HistoryTab({
             color: "#e67e22",
             border: "1px solid rgba(230,126,34,.3)",
             verticalAlign: "middle"
-          }}>{"⚡ "}{e.sourceWorkoutName}</span>}</div></div><div style={{
+          }}>{"âš¡ "}{e.sourceWorkoutName}</span>}</div></div><div style={{
         display: "flex",
         alignItems: "center",
         gap: S.s6,
         flexShrink: 0
-      }}><div className={"h-xp"}>{"+"}{e.xp}{" XP"}</div><button className={"btn btn-ghost btn-xs"} title={"Edit entry"} onClick={() => openLogEdit(e._idx)}>{"✎"}</button><button className={"btn btn-danger btn-xs"} title={"Delete entry"} style={{
+      }}><div className={"h-xp"}>{"+"}{e.xp}{" XP"}</div><button className={"btn btn-ghost btn-xs"} title={"Edit entry"} onClick={() => openLogEdit(e._idx)}>{"âœŽ"}</button><button className={"btn btn-danger btn-xs"} title={"Delete entry"} style={{
           padding: "2px 6px"
-        }} onClick={() => deleteLogEntryByIdx(e._idx)}>{"✕"}</button></div></div><div className={"h-entry-body"}><div className={"h-meta"}>{e.sets}{"×"}{e.reps}{isC || isF ? " min" : ""}{e.distanceMi ? <span style={{
+        }} onClick={() => deleteLogEntryByIdx(e._idx)}>{"âœ•"}</button></div></div><div className={"h-entry-body"}><div className={"h-meta"}>{e.sets}{"Ã—"}{e.reps}{isC || isF ? " min" : ""}{e.distanceMi ? <span style={{
             color: UI_COLORS.accent,
             marginLeft: S.s6
           }}>{metric ? miToKm(e.distanceMi) + " km" : e.distanceMi + " mi"}</span> : ""}{e.weightLbs ? <span style={{
-            color: "#8a8478",
+            color: "#9a9488",
             marginLeft: S.s6
           }}>{metric ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs"}{e.weightPct && e.weightPct !== 100 ? <span style={{
               color: "#e67e22"
@@ -135,11 +135,11 @@ const HistoryTab = memo(function HistoryTab({
             color: _optionalChain([HR_ZONES, 'access', _139 => _139[e.hrZone - 1], 'optionalAccess', _140 => _140.color])
           }}>{"Z"}{e.hrZone}</span> : ""}<span style={{
             marginLeft: S.s6,
-            color: "#8a8478"
-          }}>{e.time}{" · "}{e.date}</span></div></div></div>;
+            color: "#9a9488"
+          }}>{e.time}{" Â· "}{e.date}</span></div></div></div>;
   }
 
-  // ── EXERCISES sub-tab ────────────────────────────────────────
+  // â”€â”€ EXERCISES sub-tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function ExercisesTab() {
     const standaloneEntries = logWithIdx.filter(e => !e.sourceWorkoutId && !e.sourcePlanId);
     const groups = {};
@@ -159,11 +159,11 @@ const HistoryTab = memo(function HistoryTab({
         const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
         return <div key={dk} className={"log-group-card"} style={{
           "--mg-color": grpMgColor
-        }}><div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleLogGroup("ex_" + dk)}><span className={"log-group-icon"}>{"📅"}</span><div style={{
+        }}><div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleLogGroup("ex_" + dk)}><span className={"log-group-icon"}>{"ðŸ“…"}</span><div style={{
               flex: 1,
               minWidth: 0
-            }}><div className={"log-group-name"}>{displayDate}</div><div className={"log-group-meta"}>{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}{" · "}{formatXP(groupXP, {
-                  prefix: "⚡ "
+            }}><div className={"log-group-name"}>{displayDate}</div><div className={"log-group-meta"}>{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}{" Â· "}{formatXP(groupXP, {
+                  prefix: "âš¡ "
                 })}</div></div>{!collapsed && <div style={{
               display: "flex",
               gap: S.s6,
@@ -171,10 +171,10 @@ const HistoryTab = memo(function HistoryTab({
             }} onClick={e => e.stopPropagation()}><button className={"btn btn-ghost btn-xs"} style={{
                 fontSize: FS.fs55,
                 whiteSpace: "nowrap"
-              }} onClick={() => openSaveWorkoutWizard(entries, displayDate)}>{"💪 Save"}</button><button className={"btn btn-ghost btn-xs"} style={{
+              }} onClick={() => openSaveWorkoutWizard(entries, displayDate)}>{"ðŸ’ª Save"}</button><button className={"btn btn-ghost btn-xs"} style={{
                 fontSize: FS.fs55,
                 whiteSpace: "nowrap"
-              }} onClick={() => openSavePlanWizard(entries, displayDate)}>{"📋 Plan"}</button></div>}<svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} xmlns={"http://www.w3.org/2000/svg"} style={{
+              }} onClick={() => openSavePlanWizard(entries, displayDate)}>{"ðŸ“‹ Plan"}</button></div>}<svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} xmlns={"http://www.w3.org/2000/svg"} style={{
               flexShrink: 0,
               transition: "transform .22s ease",
               transform: collapsed ? "rotate(0deg)" : "rotate(180deg)"
@@ -182,7 +182,7 @@ const HistoryTab = memo(function HistoryTab({
       })}</>;
   }
 
-  // ── WORKOUTS sub-tab ─────────────────────────────────────────
+  // â”€â”€ WORKOUTS sub-tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function WorkoutsTab() {
     const grouped = {};
     logWithIdx.forEach(e => {
@@ -211,7 +211,7 @@ const HistoryTab = memo(function HistoryTab({
       const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
       return <div className={"log-group-card"} style={{
         "--mg-color": grpMgColor
-      }}><div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleLogGroup(gid)}><span className={"log-group-icon"}>{first.sourceWorkoutIcon || "💪"}</span><div style={{
+      }}><div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleLogGroup(gid)}><span className={"log-group-icon"}>{first.sourceWorkoutIcon || "ðŸ’ª"}</span><div style={{
             flex: 1,
             minWidth: 0
           }}><div className={"log-group-name"}>{first.sourceWorkoutName}{isOneOff && <span style={{
@@ -223,8 +223,8 @@ const HistoryTab = memo(function HistoryTab({
                 borderRadius: R.r4,
                 padding: "2px 6px",
                 verticalAlign: "middle"
-              }}>{"one-off"}</span>}</div><div className={"log-group-meta"}>{"📅 "}{first.date}{" · "}{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}</div></div><div className={"log-group-xp"}>{formatXP(groupXP, {
-              prefix: "⚡ "
+              }}>{"one-off"}</span>}</div><div className={"log-group-meta"}>{"ðŸ“… "}{first.date}{" Â· "}{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}</div></div><div className={"log-group-xp"}>{formatXP(groupXP, {
+              prefix: "âš¡ "
             })}</div><button className={"btn btn-ghost btn-xs"} style={{
             fontSize: FS.sm,
             marginRight: S.s2,
@@ -237,10 +237,10 @@ const HistoryTab = memo(function HistoryTab({
               dateKey: first.dateKey,
               sourceType: isOneOff ? "oneoff" : "reusable",
               sourceName: first.sourceWorkoutName,
-              sourceIcon: first.sourceWorkoutIcon || "💪",
+              sourceIcon: first.sourceWorkoutIcon || "ðŸ’ª",
               sourceId: first.sourceWorkoutId
             });
-          }}>{"✎"}</button><button className={"btn btn-ghost btn-xs"} style={{
+          }}>{"âœŽ"}</button><button className={"btn btn-ghost btn-xs"} style={{
             fontSize: FS.sm,
             marginRight: S.s2,
             flexShrink: 0,
@@ -249,12 +249,12 @@ const HistoryTab = memo(function HistoryTab({
             e.stopPropagation();
             const totalXP = entries.reduce((s, en) => s + en.xp, 0);
             setConfirmDelete({
-              icon: first.sourceWorkoutIcon || "💪",
+              icon: first.sourceWorkoutIcon || "ðŸ’ª",
               title: "Delete workout session?",
-              body: `Delete entire "${first.sourceWorkoutName}" session — ${entries.length} exercises, ${formatXP(-totalXP, {
+              body: `Delete entire "${first.sourceWorkoutName}" session â€” ${entries.length} exercises, ${formatXP(-totalXP, {
                 signed: true
               })}. This cannot be undone.`,
-              confirmLabel: "🗑 Delete session",
+              confirmLabel: "ðŸ—‘ Delete session",
               onConfirm: () => {
                 const idxSet = new Set(entries.map(en => en._idx));
                 const deletedEntries = entries.map(en => ({
@@ -278,7 +278,7 @@ const HistoryTab = memo(function HistoryTab({
                 }));
               }
             });
-          }}>{"🗑"}</button><svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} style={{
+          }}>{"ðŸ—‘"}</button><svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} style={{
             flexShrink: 0,
             transition: "transform .22s ease",
             transform: collapsed ? "rotate(0deg)" : "rotate(180deg)"
@@ -301,18 +301,18 @@ const HistoryTab = memo(function HistoryTab({
     if (sortedGroups.length === 0) return <div className={"empty"}>{"No workout completions logged yet."}<br />{"Complete a workout to see it here."}</div>;
     return <>{reusableGroups.length > 0 && <><div className={"sec"} style={{
           marginBottom: S.s8
-        }}>{"💪 Re-Usable Workouts"}</div>{reusableGroups.map((entries, gi) => <GroupCard key={gi} entries={entries} gi={gi} />)}</>}{oneoffGroups.length > 0 && <><div className={"sec"} style={{
+        }}>{"ðŸ’ª Re-Usable Workouts"}</div>{reusableGroups.map((entries, gi) => <GroupCard key={gi} entries={entries} gi={gi} />)}</>}{oneoffGroups.length > 0 && <><div className={"sec"} style={{
           marginBottom: S.s8,
           marginTop: reusableGroups.length > 0 ? 12 : 0
-        }}>{"⚡ One-Off Workouts"}</div>{oneoffGroups.map((entries, gi) => <GroupCard key={gi} entries={entries} gi={gi} />)}</>}</>;
+        }}>{"âš¡ One-Off Workouts"}</div>{oneoffGroups.map((entries, gi) => <GroupCard key={gi} entries={entries} gi={gi} />)}</>}</>;
   }
 
-  // ── PLANS sub-tab ────────────────────────────────────────────
+  // â”€â”€ PLANS sub-tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function PlansTab() {
     // Only include entries that belong to a plan
     const grouped = {};
     logWithIdx.forEach(e => {
-      if (!e.sourcePlanId) return; // exclude standalone — they belong in Exercises tab
+      if (!e.sourcePlanId) return; // exclude standalone â€” they belong in Exercises tab
       const gid = e.sourceGroupId || e.sourcePlanId;
       if (!grouped[gid]) grouped[gid] = [];
       grouped[gid].push(e);
@@ -332,11 +332,11 @@ const HistoryTab = memo(function HistoryTab({
         const grpMgColor = getMuscleColor(grpFirstEx && grpFirstEx.muscleGroup);
         return <div key={gid} className={"log-group-card"} style={{
           "--mg-color": grpMgColor
-        }}><div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleLogGroup(gid)}><span className={"log-group-icon"}>{first.sourcePlanIcon || "📋"}</span><div style={{
+        }}><div className={`log-group-hdr ${collapsed ? "collapsed" : ""}`} onClick={() => toggleLogGroup(gid)}><span className={"log-group-icon"}>{first.sourcePlanIcon || "ðŸ“‹"}</span><div style={{
               flex: 1,
               minWidth: 0
-            }}><div className={"log-group-name"}>{first.sourcePlanName}</div><div className={"log-group-meta"}>{"📅 "}{first.date}{" · "}{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}</div></div><div className={"log-group-xp"}>{formatXP(groupXP, {
-                prefix: "⚡ "
+            }}><div className={"log-group-name"}>{first.sourcePlanName}</div><div className={"log-group-meta"}>{"ðŸ“… "}{first.date}{" Â· "}{entries.length}{" exercise"}{entries.length !== 1 ? "s" : ""}</div></div><div className={"log-group-xp"}>{formatXP(groupXP, {
+                prefix: "âš¡ "
               })}</div><button className={"btn btn-ghost btn-xs"} style={{
               fontSize: FS.sm,
               marginRight: S.s2,
@@ -349,10 +349,10 @@ const HistoryTab = memo(function HistoryTab({
                 dateKey: first.dateKey,
                 sourceType: "plan",
                 sourceName: first.sourcePlanName,
-                sourceIcon: first.sourcePlanIcon || "📋",
+                sourceIcon: first.sourcePlanIcon || "ðŸ“‹",
                 sourceId: first.sourcePlanId
               });
-            }}>{"✎"}</button><button className={"btn btn-ghost btn-xs"} style={{
+            }}>{"âœŽ"}</button><button className={"btn btn-ghost btn-xs"} style={{
               fontSize: FS.sm,
               marginRight: S.s2,
               flexShrink: 0,
@@ -361,12 +361,12 @@ const HistoryTab = memo(function HistoryTab({
               e.stopPropagation();
               const totalXP = entries.reduce((s, en) => s + en.xp, 0);
               setConfirmDelete({
-                icon: first.sourcePlanIcon || "📋",
+                icon: first.sourcePlanIcon || "ðŸ“‹",
                 title: "Delete plan session?",
-                body: `Delete entire "${first.sourcePlanName}" session — ${entries.length} exercises, ${formatXP(-totalXP, {
+                body: `Delete entire "${first.sourcePlanName}" session â€” ${entries.length} exercises, ${formatXP(-totalXP, {
                   signed: true
                 })}. This cannot be undone.`,
-                confirmLabel: "🗑 Delete session",
+                confirmLabel: "ðŸ—‘ Delete session",
                 onConfirm: () => {
                   const idxSet = new Set(entries.map(en => en._idx));
                   const deletedEntries = entries.map(en => ({
@@ -390,16 +390,16 @@ const HistoryTab = memo(function HistoryTab({
                   }));
                 }
               });
-            }}>{"🗑"}</button><svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} xmlns={"http://www.w3.org/2000/svg"} style={{
+            }}>{"ðŸ—‘"}</button><svg width={"13"} height={"13"} viewBox={"0 0 14 14"} fill={"none"} xmlns={"http://www.w3.org/2000/svg"} style={{
               flexShrink: 0,
               transition: "transform .22s ease",
               transform: collapsed ? "rotate(0deg)" : "rotate(180deg)"
             }}><defs><linearGradient id={"cg5"} x1={"0"} y1={"0"} x2={"0"} y2={"1"}><stop offset={"0%"} stopColor={"#b4ac9e"} /><stop offset={"100%"} stopColor={"#7a4e1a"} /></linearGradient></defs><polyline points={"3,5 7,9 11,5"} stroke={"url(#cg5)"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"} /></svg></div>{!collapsed && <div className={"log-group-body"}>{entries.map((e, i) => <EntryRow key={i} e={e} showSource={false} />)}</div>}</div>;
       })}</>;
   }
-  return <><div className={"sec"}>{"Battle Record — "}{profile.log.length}{" sessions · "}{formatXP(profile.xp)}{" total"}</div><div className={"log-subtab-bar"}>{[["exercises", "⚔️ Exercises"], ["workouts", "💪 Workouts"], ["trends", "📊 Trends"], ["deleted", "🗑 Deleted"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${logSubTab === t ? "on" : ""}`} onClick={() => setLogSubTab(t)}>{l}{t === "deleted" && (profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length > 0 && <span style={{
+  return <><div className={"sec"}>{"Battle Record â€” "}{profile.log.length}{" sessions Â· "}{formatXP(profile.xp)}{" total"}</div><div className={"log-subtab-bar"}>{[["exercises", "âš”ï¸ Exercises"], ["workouts", "ðŸ’ª Workouts"], ["trends", "ðŸ“Š Trends"], ["deleted", "ðŸ—‘ Deleted"]].map(([t, l]) => <button key={t} className={`log-subtab-btn ${logSubTab === t ? "on" : ""}`} onClick={() => setLogSubTab(t)}>{l}{t === "deleted" && (profile.deletedItems || []).filter(d => (new Date() - new Date(d.deletedAt)) / (1000 * 60 * 60 * 24) < 7).length > 0 && <span style={{
           marginLeft: S.s4,
-          background: "#8a8478",
+          background: "#9a9488",
           color: "#fff",
           borderRadius: "50%",
           width: 14,
@@ -452,21 +452,21 @@ const HistoryTab = memo(function HistoryTab({
       }
       return <div><div style={{
           fontSize: FS.fs65,
-          color: "#8a8478",
+          color: "#9a9488",
           marginBottom: S.s12,
           lineHeight: 1.5
         }}>{"Deleted items are kept for "}<strong style={{
             color: "#d4cec4"
           }}>{"7 days"}</strong>{" before being permanently removed. Tap Restore to recover them."}</div>{active.length === 0 && <div className={"empty"}>{"No recently deleted items."}<br />{"Deleted exercises, workouts and plans will appear here."}</div>}{active.map(entry => {
           const dl = daysLeft(entry);
-          const urgentColor = dl <= 1 ? UI_COLORS.danger : dl <= 2 ? "#e67e22" : "#8a8478";
+          const urgentColor = dl <= 1 ? UI_COLORS.danger : dl <= 2 ? "#e67e22" : "#9a9488";
           const itemName = entry.type === "logEntry" ? entry.item.exercise || "Exercise" : entry.item.name || "Item";
           const itemIcon = entry.type === "logEntry" ? entry.item.icon || "\u2694\uFE0F" : entry.item.icon || "\uD83D\uDCE6";
           const typeLabel = entry.type === "logEntry" ? "exercise" : entry.type;
           const xpNote = entry.type === "logEntry" && entry.item.xp ? " \u00b7 " + entry.item.xp + " XP" : "";
           return <div key={entry.id} style={{
-            background: "rgba(45,42,36,.12)",
-            border: "1px solid rgba(45,42,36,.2)",
+            background: "rgba(74,69,59,.12)",
+            border: "1px solid rgba(74,69,59,.2)",
             borderRadius: R.r10,
             padding: "12px 14px",
             marginBottom: S.s8,
@@ -492,19 +492,19 @@ const HistoryTab = memo(function HistoryTab({
                 display: "flex",
                 gap: S.s8
               }}><span style={{
-                  color: "#8a8478",
+                  color: "#9a9488",
                   textTransform: "capitalize"
                 }}>{typeLabel}{xpNote}</span><span style={{
                   color: urgentColor
                 }}>{dl === 0 ? "Expires today" : dl === 1 ? "1 day left" : `${dl} days left`}</span></div></div><button className={"btn btn-gold btn-xs"} style={{
               flexShrink: 0,
               fontSize: FS.fs65
-            }} onClick={() => restoreItem(entry)}>{"↩ Restore"}</button><button className={"btn btn-ghost btn-xs"} style={{
+            }} onClick={() => restoreItem(entry)}>{"â†© Restore"}</button><button className={"btn btn-ghost btn-xs"} style={{
               flexShrink: 0,
               fontSize: FS.sm,
               color: UI_COLORS.danger,
               borderColor: "rgba(231,76,60,.25)"
-            }} onClick={() => permanentDelete(entry)}>{"✕"}</button></div>;
+            }} onClick={() => permanentDelete(entry)}>{"âœ•"}</button></div>;
         })}</div>;
     })()}</>;
 });

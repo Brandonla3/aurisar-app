@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
+﻿import React, { memo, useEffect, useRef, useState } from 'react';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
 import { displayWt } from '../../utils/units';
 import { getExerciseHistory } from '../../utils/exerciseHistory';
@@ -14,13 +14,13 @@ import { diffColor } from './difficulty';
  * Previously rendered inline inside ExerciseLibraryTab, which meant no
  * background inert, no Escape dismiss, and no way to open it from another
  * tab. It now lives at the App root as a portal so any surface can open it
- * by setting `libDetailEx` — the Plans tab's ℹ button used to open a second,
+ * by setting `libDetailEx` â€” the Plans tab's â„¹ button used to open a second,
  * divergent image modal for the same data; that modal is gone and both
  * entry points land here.
  *
  * `siblings` is the list the sheet can page through (the current filtered
  * library list). When it contains the open exercise, left/right swipe and
- * the ←/→ keys move to the neighbouring exercise without closing the sheet.
+ * the â†/â†’ keys move to the neighbouring exercise without closing the sheet.
  * Callers that have no meaningful list (e.g. Plans) just omit it.
  *
  * Content is split across About | Form | History subtabs; History derives
@@ -42,10 +42,10 @@ const GLASS_BTN = {
 };
 
 function pbText(pb, units) {
-  if (!pb) return "—";
+  if (!pb) return "â€”";
   // Legacy PB shape ({weight: 185}) predates calcExercisePBs' {type, value}.
   if (pb.weight != null) return displayWt(pb.weight, units) || String(pb.weight);
-  if (pb.value == null) return "—";
+  if (pb.value == null) return "â€”";
   if (/Weight|1RM/i.test(pb.type || "")) return displayWt(pb.value, units) || String(pb.value);
   if (/Reps/i.test(pb.type || "")) return `${pb.value} reps`;
   if (/Pace|cardio/i.test(pb.type || "")) return `${parseFloat(Number(pb.value).toFixed(2))} min/mi`;
@@ -84,7 +84,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
 
   // Arrow keys page through siblings. Escape is already handled by
   // useModalLifecycle. Keyed on the three ids the handler actually closes
-  // over — without a dependency array this detached and re-attached a
+  // over â€” without a dependency array this detached and re-attached a
   // document-level listener on every render of the sheet.
   useEffect(() => {
     if (!ex) return undefined;
@@ -147,7 +147,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
       style={{
         background: "transparent",
         border: "none",
-        color: target ? "#8a8478" : "rgba(138,132,120,.25)",
+        color: target ? "#9a9488" : "rgba(138,132,120,.25)",
         fontSize: FS.fs82,
         cursor: target ? "pointer" : "default",
         padding: `${S.s4}px ${S.s8}px`,
@@ -208,7 +208,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
     );
   };
 
-  // History chart geometry: weight when logged, else XP, scaled 14→54px.
+  // History chart geometry: weight when logged, else XP, scaled 14â†’54px.
   const histVals = history.map(h => (h.weightLbs != null ? h.weightLbs : h.xp));
   const histMax = Math.max(...histVals, 1);
   const histMin = Math.min(...histVals, histMax);
@@ -236,21 +236,21 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
       className={turn ? `sheet-${turn}` : ""}
     >
       <div>
-        {/* Pager — only rendered when there is a list to page through. */}
+        {/* Pager â€” only rendered when there is a list to page through. */}
         {(prev || next) && <div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: S.s4
         }}>
-          {pagerBtn("‹ Prev", prev, "prev", "Previous exercise")}
-          <span style={{ fontSize: FS.fs60, color: "#5f5a52", letterSpacing: ".06em" }}>
+          {pagerBtn("â€¹ Prev", prev, "prev", "Previous exercise")}
+          <span style={{ fontSize: FS.fs60, color: "#969082", letterSpacing: ".06em" }}>
             {`${idx + 1} / ${siblings.length}`}
           </span>
-          {pagerBtn("Next ›", next, "next", "Next exercise")}
+          {pagerBtn("Next â€º", next, "next", "Next exercise")}
         </div>}
 
-        {/* Hero — muscle-washed glass panel. */}
+        {/* Hero â€” muscle-washed glass panel. */}
         <div style={{
           position: "relative",
           overflow: "hidden",
@@ -288,7 +288,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
                 padding: "2px 8px",
                 borderRadius: R.r4,
                 fontWeight: "700"
-              }}>{"🏆 PB"}</span>}
+              }}>{"ðŸ† PB"}</span>}
             </div>
             <div style={{ display: "flex", gap: S.s8, flexWrap: "wrap", alignItems: "baseline" }}>
               <span style={{
@@ -298,16 +298,16 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
                 textTransform: "uppercase",
                 color: `color-mix(in srgb,${mgColor} 55%,#fff)`,
               }}>{ex.muscleGroup ? ex.muscleGroup.charAt(0).toUpperCase() + ex.muscleGroup.slice(1) : ""}</span>
-              {ex.equipment && <span style={{ fontSize: FS.sm, color: "rgba(228,222,211,.5)", textTransform: "capitalize" }}>{"· " + ex.equipment}</span>}
-              {ex.difficulty && <span style={{ fontSize: FS.sm, fontWeight: 700, color: diffColor(ex.difficulty) }}>{"· " + ex.difficulty}</span>}
+              {ex.equipment && <span style={{ fontSize: FS.sm, color: "rgba(228,222,211,.5)", textTransform: "capitalize" }}>{"Â· " + ex.equipment}</span>}
+              {ex.difficulty && <span style={{ fontSize: FS.sm, fontWeight: 700, color: diffColor(ex.difficulty) }}>{"Â· " + ex.difficulty}</span>}
             </div>
           </div>
         </div>
 
-        {/* Stat chips — Base XP / Tier / Your PB. */}
+        {/* Stat chips â€” Base XP / Tier / Your PB. */}
         <div style={{ display: "flex", gap: S.s8, marginBottom: S.s10 }}>
           {statChip("Base XP", `${ex.baseXP}`, true)}
-          {statChip("Tier", ex.difficulty || "—")}
+          {statChip("Tier", ex.difficulty || "â€”")}
           {statChip("Your PB", pbText(pb, profile.units))}
         </div>
 
@@ -334,7 +334,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             marginBottom: S.s12
           }}>{ex.desc}</p> : <div style={{
             fontSize: FS.lg,
-            color: "#8a8478",
+            color: "#9a9488",
             fontStyle: "italic",
             marginBottom: S.s12
           }}>{"No description yet."}</div>}
@@ -346,14 +346,14 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             padding: "8px 12px",
             marginBottom: S.s12,
             fontSize: FS.lg,
-            color: "#8a8478"
+            color: "#9a9488"
           }}>
             <span style={{ color: "#b4ac9e", fontWeight: "700" }}>{"PB: "}</span>{ex.pbType}
             {ex.pbTier === "Leaderboard" && <span style={{
               marginLeft: S.s8,
               color: FG.goldSoft,
               fontSize: FS.fs65
-            }}>{"🏆 Leaderboard"}</span>}
+            }}>{"ðŸ† Leaderboard"}</span>}
           </div>}
         </div>}
 
@@ -388,7 +388,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             border: "1px dashed rgba(255,255,255,.15)",
             textAlign: "center",
             fontSize: FS.lg,
-            color: "#8a8478",
+            color: "#9a9488",
             fontStyle: "italic",
           }}>{"No form guide for this exercise yet."}</div>}
         </div>}
@@ -400,9 +400,9 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             border: "1px dashed rgba(255,255,255,.15)",
             textAlign: "center",
             fontSize: FS.lg,
-            color: "#8a8478",
+            color: "#9a9488",
             fontStyle: "italic",
-          }}>{"No logged sessions yet — Configure below to forge the first."}</div> : <>
+          }}>{"No logged sessions yet â€” Configure below to forge the first."}</div> : <>
             <div style={{
               display: "flex",
               alignItems: "flex-end",
@@ -416,7 +416,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
               {history.map((h, i) => {
                 const v = h.weightLbs != null ? h.weightLbs : h.xp;
                 const isLast = i === history.length - 1;
-                const day = h.dateKey ? new Date(h.dateKey + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }) : "·";
+                const day = h.dateKey ? new Date(h.dateKey + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }) : "Â·";
                 return (
                   <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, justifyContent: "flex-end", height: "100%" }}>
                     <span style={{ fontFamily: FG.fontCond, fontSize: FS.fs48, color: isLast ? FG.goldGlow : "rgba(228,222,211,.4)" }}>{v}</span>
@@ -435,13 +435,13 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
               <div style={{ flex: 1, padding: "8px 10px", borderRadius: R.xxl, background: FG.glassBgSoft, border: `1px solid ${FG.glassBorder}` }}>
                 <div style={{ fontFamily: FG.fontSerif, fontSize: FS.fs44, letterSpacing: ".24em", textTransform: "uppercase", color: "rgba(228,222,211,.4)", marginBottom: 3 }}>{"Last session"}</div>
                 <div style={{ fontFamily: FG.fontCond, fontSize: FS.xl, fontWeight: 600, color: FG.ink, lineHeight: 1 }}>
-                  {lastRow ? `${lastRow.sets}×${lastRow.reps}${lastRow.weightLbs != null ? " · " + (displayWt(lastRow.weightLbs, profile.units) || "") : ""}` : "—"}
+                  {lastRow ? `${lastRow.sets}Ã—${lastRow.reps}${lastRow.weightLbs != null ? " Â· " + (displayWt(lastRow.weightLbs, profile.units) || "") : ""}` : "â€”"}
                 </div>
               </div>
               <div style={{ flex: 1, padding: "8px 10px", borderRadius: R.xxl, background: "rgba(143,227,210,.07)", border: "1px solid rgba(143,227,210,.2)" }}>
                 <div style={{ fontFamily: FG.fontSerif, fontSize: FS.fs44, letterSpacing: ".24em", textTransform: "uppercase", color: "rgba(143,227,210,.7)", marginBottom: 3 }}>{"Trend"}</div>
                 <div style={{ fontFamily: FG.fontCond, fontSize: FS.xl, fontWeight: 600, color: FG.teal, lineHeight: 1 }}>
-                  {trendDelta == null ? "—" : trendDelta === 0 ? "Holding steady" : `${trendDelta > 0 ? "▲ +" : "▼ "}${Math.abs(trendDelta)} lbs`}
+                  {trendDelta == null ? "â€”" : trendDelta === 0 ? "Holding steady" : `${trendDelta > 0 ? "â–² +" : "â–¼ "}${Math.abs(trendDelta)} lbs`}
                 </div>
               </div>
             </div>
@@ -458,10 +458,10 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           background: isFav ? "rgba(232,180,74,.12)" : FG.glassBgSoft,
           border: `1px solid ${isFav ? "rgba(232,180,74,.35)" : FG.glassBorder}`,
           color: isFav ? FG.goldSoft : "#b4ac9e",
-        }}>{isFav ? "⭐ Saved to Favorites" : "☆ Save to Favorites"}</button>
+        }}>{isFav ? "â­ Saved to Favorites" : "â˜† Save to Favorites"}</button>
 
         {/* Staging was reachable only from a list in select mode, so the sheet
-            — the one place showing enough detail to actually decide — couldn't
+            â€” the one place showing enough detail to actually decide â€” couldn't
             add to the basket it was deciding for. */}
         {ex.id !== "rest_day" && toggleCart && (
           <button
@@ -475,7 +475,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
               border: `1px solid ${staged ? "rgba(196,148,40,.42)" : FG.glassBorder}`,
               color: staged ? "#e8d08a" : "#b4ac9e",
             }}
-          >{staged ? "⊟ Staged — tap to remove" : "⊞ Stage for later"}</button>
+          >{staged ? "âŠŸ Staged â€” tap to remove" : "âŠž Stage for later"}</button>
         )}
         {/* The tray sits at z-index 780 and the sheet at 9400, so staging from
             here updates a bar the user cannot see. Report the count inline
@@ -483,10 +483,10 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
         {ex.id !== "rest_day" && toggleCart && stagedCount > 0 && (
           <div role="status" style={{
             fontSize: FS.fs62,
-            color: "#8a8478",
+            color: "#9a9488",
             textAlign: "center",
             marginTop: S.s4
-          }}>{`In staging tray · ${stagedCount}`}</div>
+          }}>{`In staging tray Â· ${stagedCount}`}</div>
         )}
 
         <div style={{ display: "flex", gap: S.s8, marginTop: S.s8 }}>
@@ -512,10 +512,10 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             fontWeight: "600",
             fontSize: FS.lg,
             textAlign: "center",
-          }}>{"💪 Add to Workout"}</button>}
+          }}>{"ðŸ’ª Add to Workout"}</button>}
 
           <button onClick={() => {
-            // Via the shared opener, which also seeds spwSelected — opening
+            // Via the shared opener, which also seeds spwSelected â€” opening
             // the wizard without it left Save refusing with "Select at least
             // one exercise", or worse, silently reusing a previous run's
             // selection.
@@ -529,12 +529,12 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
             fontWeight: "600",
             fontSize: FS.lg,
             textAlign: "center",
-          }}>{"📋 Add to Plan"}</button>
+          }}>{"ðŸ“‹ Add to Plan"}</button>
         </div>
 
-        {/* Opens the quick-log sheet in place — the log form is a root portal
+        {/* Opens the quick-log sheet in place â€” the log form is a root portal
             with no tab dependency, so the user stays on whatever tab they
-            came from and "← Back" (origin-aware) returns to this sheet. */}
+            came from and "â† Back" (origin-aware) returns to this sheet. */}
         <button onClick={() => {
           openQuickLog(ex.id, { origin: { type: "detail", ex } });
           close();
@@ -553,7 +553,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
           textTransform: "uppercase",
           cursor: "pointer",
           textAlign: "center"
-        }}>{"⚙ Configure"}</button>
+        }}>{"âš™ Configure"}</button>
       </div>
     </Sheet>
   );

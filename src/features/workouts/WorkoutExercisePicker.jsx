@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+﻿import React, { memo, useMemo } from 'react';
 import { List } from 'react-window';
 import { UI_COLORS } from '../../data/constants';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
@@ -13,7 +13,7 @@ import {
 } from '../exercises/exerciseFilterOptions';
 
 /**
- * Workout exercise picker modal — extracted from the inline block in App.jsx
+ * Workout exercise picker modal â€” extracted from the inline block in App.jsx
  * as part of Finding #6 (App.jsx decomposition) per docs/performance-audit.md
  * (PR #116).
  *
@@ -23,7 +23,7 @@ import {
  */
 
 // Row adapter for the virtualised list. The row itself is the shared
-// ExerciseRow — this only maps react-window's props onto it. The picker used
+// ExerciseRow â€” this only maps react-window's props onto it. The picker used
 // to carry its own hand-written copy that had already drifted from the
 // library's.
 const WbExPickerRow = React.memo(function WbExPickerRow({
@@ -80,7 +80,7 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
   }), [allExercises, q, pickerMuscle, pickerTypeFilter, pickerEquipFilter]);
 
   return (
-    // onClose is closePicker — the FULL teardown (search, facets, selection),
+    // onClose is closePicker â€” the FULL teardown (search, facets, selection),
     // never a bare setter; see rowInvariants.test.js.
     <Sheet
       open
@@ -88,30 +88,30 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
       layer={"picker"}
       tall
       scroll={"none"}
-      title={pickerSelected.length > 0 ? `Add to Workout · ${pickerSelected.length} selected` : "Add to Workout"}
+      title={pickerSelected.length > 0 ? `Add to Workout Â· ${pickerSelected.length} selected` : "Add to Workout"}
       ariaLabel={"Add exercises to workout"}
       headerRight={
         <div style={{ display: "flex", gap: S.s6, flexShrink: 0 }}>
           {pickerSelected.length > 0 && (
-            <button className={"btn btn-gold btn-xs"} onClick={commitPickerToWorkout}>{"＋ Add " + pickerSelected.length}</button>
+            <button className={"btn btn-gold btn-xs"} onClick={commitPickerToWorkout}>{"ï¼‹ Add " + pickerSelected.length}</button>
           )}
-          <button className={"btn btn-ghost btn-xs"} onClick={() => { closePicker(); openExEditor("create", null); }}>{"✦ New Custom"}</button>
+          <button className={"btn btn-ghost btn-xs"} onClick={() => { closePicker(); openExEditor("create", null); }}>{"âœ¦ New Custom"}</button>
         </div>
       }
     >
-        {/* ── Search bar ── */}
+        {/* â”€â”€ Search bar â”€â”€ */}
         <div style={{ marginBottom: S.s8, flexShrink: 0 }}>
           <input
             className={"inp"}
             style={{ width: "100%", padding: "8px 12px", fontSize: FS.fs82 }}
-            placeholder={"Search exercises…"}
+            placeholder={"Search exercisesâ€¦"}
             value={pickerSearch}
             onChange={e => setPickerSearch(e.target.value)}
             autoFocus={true}
           />
         </div>
 
-        {/* ── Filter dropdowns ──
+        {/* â”€â”€ Filter dropdowns â”€â”€
             Three hand-rolled single-select panels used to live here: ~100
             lines of div-with-onClick, no roles, no keyboard path, no counts,
             duplicating what the library tab already had in an accessible
@@ -167,7 +167,7 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
           </div>
         </div>
 
-        {/* ── Exercise list (virtualized) ── */}
+        {/* â”€â”€ Exercise list (virtualized) â”€â”€ */}
         {(() => {
           const filtered = allExercises.filter(e => matches(e, pickerMuscle, pickerTypeFilter, pickerEquipFilter));
 
@@ -175,11 +175,11 @@ const WorkoutExercisePicker = memo(function WorkoutExercisePicker({
           const selIds = new Set(pickerSelected.map(e => e.exId));
           return (
             <>
-              <div style={{ fontSize: FS.fs62, color: "#8a8478", marginBottom: S.s6, textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: FS.fs62, color: "#9a9488", marginBottom: S.s6, textAlign: "right", flexShrink: 0 }}>
                 {filtered.length + " match" + (filtered.length !== 1 ? "es" : "")}
               </div>
               {/* The virtualized list is the sheet's ONLY scroller (the
-                  Sheet body is scroll="none") — no more scroll-in-scroll. */}
+                  Sheet body is scroll="none") â€” no more scroll-in-scroll. */}
               <div style={{ flex: "1 1 auto", minHeight: 120 }}>
                 <List
                   rowCount={filtered.length}

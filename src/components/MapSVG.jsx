@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { MAP_REGIONS, MAP_POINTS, UI_COLORS } from '../data/constants';
 import { CLASSES } from '../data/exercises';
 
@@ -12,7 +12,7 @@ function getMapPosition(xp, level) {
   const pt = MAP_POINTS[regionIdx];
   const nextPt = MAP_POINTS[Math.min(regionIdx+1, MAP_POINTS.length-1)];
   // Progress within region based on XP mod 1000 (every 1000 XP moves forward)
-  const xpInRegion = xp % 5000; // 5 levels ≈ 5000 XP
+  const xpInRegion = xp % 5000; // 5 levels â‰ˆ 5000 XP
   const progress = Math.min(xpInRegion / 5000, 0.95);
   return {
     x: pt.x + (nextPt.x - pt.x) * progress,
@@ -86,7 +86,7 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
     dragStart.current = null;
   }
 
-  // Friend click — only fire if we didn't drag
+  // Friend click â€” only fire if we didn't drag
   function onFriendClick(e, f, fCls) {
     if(dragging) return;
     setMapTooltip((mapTooltip?.id)===f.id?null:{
@@ -106,8 +106,8 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
           disabled={zoom <= ZOOM_STEPS[0]}
           onClick={zoomOut}
           aria-label="Zoom out"
-        >−</button>
-        <span style={{ fontSize: ".65rem", color: "#8a8478", minWidth: 28, textAlign: "center" }}>{zoom}×</span>
+        >âˆ’</button>
+        <span style={{ fontSize: ".65rem", color: "#9a9488", minWidth: 28, textAlign: "center" }}>{zoom}Ã—</span>
         <button
           className="btn btn-ghost btn-xs"
           style={{ fontSize: ".7rem", minWidth: 32 }}
@@ -125,7 +125,7 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
               setPan(clampPan(-(myPos.x / 360 * svgW * zoom - svgW / 2), -(myPos.y / 540 * svgH * zoom - svgH / 2), zoom));
             }}
             aria-label="Center map on me"
-          >📍 Me</button>
+          >ðŸ“ Me</button>
         )}
       </div>
       {/* Map */}
@@ -158,12 +158,12 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
         >
           <rect width="360" height="540" fill="#0e1820" />
           {[...Array(18)].map((_, i) => (
-            <line key={`h${i}`} x1="0" y1={30 * i} x2="360" y2={30 * i} stroke="rgba(45,42,36,.15)" strokeWidth="1" />
+            <line key={`h${i}`} x1="0" y1={30 * i} x2="360" y2={30 * i} stroke="rgba(74,69,59,.15)" strokeWidth="1" />
           ))}
           {[...Array(12)].map((_, i) => (
-            <line key={`v${i}`} x1={30 * i} y1="0" x2={30 * i} y2="540" stroke="rgba(45,42,36,.15)" strokeWidth="1" />
+            <line key={`v${i}`} x1={30 * i} y1="0" x2={30 * i} y2="540" stroke="rgba(74,69,59,.15)" strokeWidth="1" />
           ))}
-          <rect width="360" height="540" fill="none" stroke="rgba(45,42,36,.18)" strokeWidth="6" />
+          <rect width="360" height="540" fill="none" stroke="rgba(74,69,59,.18)" strokeWidth="6" />
           {/* Paths */}
           {MAP_POINTS.slice(0, -1).map((pt, i) => {
             const next = MAP_POINTS[i + 1];
@@ -178,7 +178,7 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
               />
             );
           })}
-          {/* Regions — font sizes increased ~50% */}
+          {/* Regions â€” font sizes increased ~50% */}
           {MAP_POINTS.map((pt, i) => {
             const r = MAP_REGIONS[i];
             const vis = i <= myPos.regionIdx;
@@ -189,26 +189,26 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
                 <circle
                   cx={pt.x} cy={pt.y} r={cur ? 28 : 22}
                   fill={vis ? r.color : "#1a2530"}
-                  stroke={cur ? "#b4ac9e" : vis ? "rgba(180,172,158,.3)" : "rgba(45,42,36,.26)"}
+                  stroke={cur ? "#b4ac9e" : vis ? "rgba(180,172,158,.3)" : "rgba(74,69,59,.26)"}
                   strokeWidth={cur ? 2 : 1}
                 />
                 {!vis && <circle cx={pt.x} cy={pt.y} r={24} fill="rgba(14,24,32,.55)" strokeWidth="0" />}
                 {/* Icon */}
                 <text x={pt.x} y={pt.y - 6} textAnchor="middle" fontSize={cur ? 17 : 13} opacity={vis ? 1 : 0.65}>{r.icon}</text>
-                {/* Region name — 50% bigger: was 6.5 → now 9.5 */}
+                {/* Region name â€” 50% bigger: was 6.5 â†’ now 9.5 */}
                 <text
                   x={pt.x} y={pt.y + 17} textAnchor="middle" fontSize="9.5"
                   fill={cur ? "#f0d060" : vis ? "#d4cec4" : "#b4ac9e"}
                   fontFamily="'Inter'"
                   fontWeight={cur ? "bold" : "normal"}
                 >{r.name}</text>
-                {/* Boost label — was 5.5 → now 8 */}
+                {/* Boost label â€” was 5.5 â†’ now 8 */}
                 <text
                   x={pt.x} y={pt.y + 28} textAnchor="middle" fontSize="8"
-                  fill={cur ? "#b4ac9e" : vis ? "#8a8478" : "#8a8478"}
+                  fill={cur ? "#b4ac9e" : vis ? "#9a9488" : "#9a9488"}
                   fontFamily="'Inter'"
                 >{r.boost.emoji} {r.boost.label} +7%</text>
-                {!vis && <text x={pt.x + 16} y={pt.y - 14} textAnchor="middle" fontSize="8" opacity=".45">🔒</text>}
+                {!vis && <text x={pt.x + 16} y={pt.y - 14} textAnchor="middle" fontSize="8" opacity=".45">ðŸ”’</text>}
               </g>
             );
           })}
@@ -223,8 +223,8 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
                   fill={traveling ? UI_COLORS.success : (fCls?.color) || "#b4ac9e"}
                   stroke="rgba(255,255,255,.8)" strokeWidth="1.5" opacity=".9"
                 />
-                <text x={f.mapX} y={f.mapY + 4} textAnchor="middle" fontSize="8" fill="white">{(fCls?.icon) || "⚔️"}</text>
-                {/* Friend name — was 5.5 → now 8 */}
+                <text x={f.mapX} y={f.mapY + 4} textAnchor="middle" fontSize="8" fill="white">{(fCls?.icon) || "âš”ï¸"}</text>
+                {/* Friend name â€” was 5.5 â†’ now 8 */}
                 <text x={f.mapX} y={f.mapY - 14} textAnchor="middle" fontSize="8" fill="#d4cec4" fontFamily="'Inter'">
                   {(f.playerName || "?").split(" ")[0]}
                 </text>
@@ -233,24 +233,24 @@ function MapSVG({myPos,myRegion,friendPositions,mapTooltip,setMapTooltip,travelA
           })}
           {/* Player */}
           <g>
-            {/* "YOU" label — was 7 → now 10 */}
+            {/* "YOU" label â€” was 7 â†’ now 10 */}
             <text x={myPos.x} y={myPos.y - 22} textAnchor="middle" fontSize="10" fill="#f0d060" fontFamily="'Inter'" fontWeight="bold" letterSpacing="1">YOU</text>
             <line x1={myPos.x} y1={myPos.y - 18} x2={myPos.x} y2={myPos.y - 14} stroke="#f0d060" strokeWidth="1" opacity=".6" />
-            <circle cx={myPos.x} cy={myPos.y} r={14} fill="rgba(45,42,36,.3)" stroke="#b4ac9e" strokeWidth="2" />
+            <circle cx={myPos.x} cy={myPos.y} r={14} fill="rgba(74,69,59,.3)" stroke="#b4ac9e" strokeWidth="2" />
             <circle cx={myPos.x} cy={myPos.y} r={8} fill="#b4ac9e" stroke="#f0d060" strokeWidth="1.5" />
-            <text x={myPos.x} y={myPos.y + 4} textAnchor="middle" fontSize="9" fill="#0c0c0a">{(CLASSES[profile.chosenClass || "warrior"]?.icon) || "⚔"}</text>
+            <text x={myPos.x} y={myPos.y + 4} textAnchor="middle" fontSize="9" fill="#0c0c0a">{(CLASSES[profile.chosenClass || "warrior"]?.icon) || "âš”"}</text>
             <circle cx={myPos.x} cy={myPos.y} r={17} fill="none" stroke="#b4ac9e" strokeWidth="1" opacity=".3" />
           </g>
         </svg>
       </div>
       {/* Region boost callout */}
-      <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(45,42,36,.16)", border: "1px solid rgba(180,172,158,.06)", borderRadius: 8, display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(74,69,59,.16)", border: "1px solid rgba(180,172,158,.06)", borderRadius: 8, display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: "1.1rem" }}>{myRegion.boost.emoji}</span>
         <div>
           <div style={{ fontSize: ".7rem", color: "#b4ac9e", fontWeight: 600 }}>{myRegion.name} Bonus</div>
-          <div style={{ fontSize: ".62rem", color: "#8a8478", marginTop: 1 }}>
+          <div style={{ fontSize: ".62rem", color: "#9a9488", marginTop: 1 }}>
             <strong style={{ color: "#d4cec4" }}>{myRegion.boost.label}</strong> exercises earn{" "}
-            <strong style={{ color: "#b4ac9e" }}>+7% XP</strong> here · {myRegion.desc}
+            <strong style={{ color: "#b4ac9e" }}>+7% XP</strong> here Â· {myRegion.desc}
           </div>
         </div>
       </div>

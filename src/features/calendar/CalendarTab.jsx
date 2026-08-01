@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+﻿import React, { memo } from 'react';
 import { getMuscleColor } from '../../utils/xp';
 import { isMetric, lbsToKg, miToKm } from '../../utils/units';
 import { formatXP } from '../../utils/format';
@@ -8,7 +8,7 @@ import { S, R, FS } from '../../utils/tokens';
 import { UI_COLORS } from '../../data/constants';
 
 /**
- * Calendar tab — extracted from the inline IIFE in App.jsx as part of
+ * Calendar tab â€” extracted from the inline IIFE in App.jsx as part of
  * Finding #6 (App.jsx decomposition) per docs/performance-audit.md (PR #116).
  *
  * Renders the "Chronicle" calendar view: month grid with scheduled workouts
@@ -74,9 +74,9 @@ const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
 const daysInMonth = new Date(y, m + 1, 0).getDate();
 const daysInPrev = new Date(y, m, 0).getDate();
 
-// Build date→events maps
-const schedMap = {}; // dateStr → [{kind,icon,name,id,planId}]
-// Scheduled plans — populate every day in their date range
+// Build dateâ†’events maps
+const schedMap = {}; // dateStr â†’ [{kind,icon,name,id,planId}]
+// Scheduled plans â€” populate every day in their date range
 profile.plans.filter(p => p.scheduledDate || p.startDate).forEach(p => {
   const start = p.startDate || p.scheduledDate;
   const end = p.endDate || p.scheduledDate || p.startDate;
@@ -108,14 +108,14 @@ profile.plans.filter(p => p.scheduledDate || p.startDate).forEach(p => {
   if (!schedMap[dk]) schedMap[dk] = [];
   schedMap[dk].push({
     kind: "ex",
-    icon: ex ? ex.icon : "💪",
+    icon: ex ? ex.icon : "ðŸ’ª",
     name: ex ? ex.name : "Exercise",
     id: s.id,
     notes: s.notes
   });
 });
 // Logged workouts (past)
-const logMap = {}; // dateKey → [{...entry}]
+const logMap = {}; // dateKey â†’ [{...entry}]
 profile.log.forEach(e => {
   const dk = e.dateKey || "";
   if (!dk) return;
@@ -158,7 +158,7 @@ const selLabel = selDateObj ? selDateObj.toLocaleDateString([], {
 const isSelToday = calSelDate === today;
 return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
     marginBottom: S.s10
-  }}><div className={"rpg-sec-line rpg-sec-line-l"} /><span className={"rpg-sec-title"}>{"✦ Chronicle ✦"}</span><div className={"rpg-sec-line rpg-sec-line-r"} /></div>
+  }}><div className={"rpg-sec-line rpg-sec-line-l"} /><span className={"rpg-sec-title"}>{"âœ¦ Chronicle âœ¦"}</span><div className={"rpg-sec-line rpg-sec-line-r"} /></div>
 
   {
     /* Month navigator */
@@ -171,7 +171,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
     } : {
       y,
       m: m - 1
-    })}>{"‹"}</div><div className={"cal-month-lbl"}>{monthNames[m]}{" "}{y}</div><div className={"cal-nav-btn"} onClick={() => setCalViewDate(({
+    })}>{"â€¹"}</div><div className={"cal-month-lbl"}>{monthNames[m]}{" "}{y}</div><div className={"cal-nav-btn"} onClick={() => setCalViewDate(({
       y,
       m
     }) => m === 11 ? {
@@ -180,7 +180,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
     } : {
       y,
       m: m + 1
-    })}>{"›"}</div></div>
+    })}>{"â€º"}</div></div>
 
   {
     /* Day-of-week headers */
@@ -213,7 +213,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
       }} />{" Completed session"}</div></div>
 
   {
-    /* Monthly Totals — moved from above to be grouped with Month summary below */
+    /* Monthly Totals â€” moved from above to be grouped with Month summary below */
   }
 
   {
@@ -229,7 +229,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
     }{selSched.length > 0 && <><div style={{
         fontFamily: "'Inter',sans-serif",
         fontSize: FS.fs54,
-        color: "#8a8478",
+        color: "#9a9488",
         letterSpacing: ".1em",
         textTransform: "uppercase",
         marginBottom: S.s6
@@ -242,11 +242,11 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
             setPlansPendingOpen({ plan: pl, isEdit: true });
             setActiveTab("plans");
           }
-        }}>{"View →"}</button>}<div className={"upcoming-del"} onClick={() => {
+        }}>{"View â†’"}</button>}<div className={"upcoming-del"} onClick={() => {
           ev.kind === "plan" ? removePlanSchedule(ev.planId) : removeScheduledWorkout(ev.id);
-        }}>{"✕"}</div></div>)}</>
+        }}>{"âœ•"}</div></div>)}</>
 
-    /* Logged sessions — grouped by workout/plan */}{selLog.length > 0 && (() => {
+    /* Logged sessions â€” grouped by workout/plan */}{selLog.length > 0 && (() => {
       /* Group by sourceGroupId */
       const groups = {};
       const ungrouped = [];
@@ -261,7 +261,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
       return <><div style={{
           fontFamily: "'Inter',sans-serif",
           fontSize: FS.fs54,
-          color: "#8a8478",
+          color: "#9a9488",
           letterSpacing: ".1em",
           textTransform: "uppercase",
           marginBottom: S.s6,
@@ -276,7 +276,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
           const cKey = "cal_" + gid;
           const collapsed = !openLogGroups[cKey];
           const label = first.sourcePlanName || first.sourceWorkoutName || "Workout";
-          const icon = first.sourcePlanIcon || first.sourceWorkoutIcon || "💪";
+          const icon = first.sourcePlanIcon || first.sourceWorkoutIcon || "ðŸ’ª";
           const uniqueExCount = new Set(entries.map(e => e.exId)).size;
           const gStats = getEntryStats(first);
           const hasStats = gStats.durationSec || gStats.activeCal || gStats.totalCal;
@@ -290,22 +290,22 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
             }}><span className={"log-group-icon"}>{icon}</span><div style={{
                 flex: 1,
                 minWidth: 0
-              }}><div className={"log-group-name"}>{label}</div><div className={"log-group-meta"}>{uniqueExCount}{" exercise"}{uniqueExCount !== 1 ? "s" : ""}{" · "}{first.time}</div>{hasStats && <div style={{
+              }}><div className={"log-group-name"}>{label}</div><div className={"log-group-meta"}>{uniqueExCount}{" exercise"}{uniqueExCount !== 1 ? "s" : ""}{" Â· "}{first.time}</div>{hasStats && <div style={{
                   fontSize: FS.fs50,
-                  color: "#8a8478",
+                  color: "#9a9488",
                   marginTop: S.s2,
                   display: "flex",
                   gap: S.s8
-                }}>{gStats.durationSec > 0 && <span>{"⏱ "}{secToHMS(gStats.durationSec)}</span>}{gStats.totalCal > 0 && <span>{"🔥 "}{gStats.totalCal}{" cal"}</span>}{gStats.activeCal > 0 && <span>{"⚡ "}{gStats.activeCal}{" active"}</span>}</div>}</div><div className={"log-group-xp"}>{formatXP(groupXP, {
-                  prefix: "⚡ "
+                }}>{gStats.durationSec > 0 && <span>{"â± "}{secToHMS(gStats.durationSec)}</span>}{gStats.totalCal > 0 && <span>{"ðŸ”¥ "}{gStats.totalCal}{" cal"}</span>}{gStats.activeCal > 0 && <span>{"âš¡ "}{gStats.activeCal}{" active"}</span>}</div>}</div><div className={"log-group-xp"}>{formatXP(groupXP, {
+                  prefix: "âš¡ "
                 })}</div><span style={{
                 fontSize: FS.sm,
-                color: "#8a8478",
+                color: "#9a9488",
                 flexShrink: 0,
                 transition: "transform .2s",
                 transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
                 marginLeft: S.s6
-              }}>{"▾"}</span></div>{!collapsed && (() => {
+              }}>{"â–¾"}</span></div>{!collapsed && (() => {
               // Consolidate entries by exId
               const byExId = {};
               entries.forEach(e => {
@@ -348,7 +348,7 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
                           fontWeight: 600
                         }}>{"SS"}</span>}{exEntries.length > 1 && <span style={{
                           fontSize: FS.fs48,
-                          color: "#8a8478",
+                          color: "#9a9488",
                           background: "rgba(180,172,158,.08)",
                           padding: "2px 6px",
                           borderRadius: R.r3
@@ -373,20 +373,20 @@ return <><div className={"rpg-sec-header rpg-sec-header-center"} style={{
           })}><span className={"cal-event-icon"}>{e.icon}</span><div style={{
               flex: 1,
               minWidth: 0
-            }}><div className={"cal-event-name"}>{e.exercise}</div><div className={"cal-event-sub"}>{e.sets}{"×"}{e.reps}{e.weightLbs ? <span style={{
+            }}><div className={"cal-event-name"}>{e.exercise}</div><div className={"cal-event-sub"}>{e.sets}{"Ã—"}{e.reps}{e.weightLbs ? <span style={{
                   marginLeft: S.s6
                 }}>{isMetric(profile.units) ? lbsToKg(e.weightLbs) + " kg" : e.weightLbs + " lbs"}</span> : ""}{e.distanceMi ? <span style={{
                   marginLeft: S.s6
                 }}>{isMetric(profile.units) ? miToKm(e.distanceMi) + " km" : e.distanceMi + " mi"}</span> : ""}<span style={{
                   marginLeft: S.s6,
-                  color: "#8a8478"
+                  color: "#9a9488"
                 }}>{e.time}</span></div>{uHasStats && <div style={{
                 fontSize: FS.fs50,
-                color: "#8a8478",
+                color: "#9a9488",
                 marginTop: S.s2,
                 display: "flex",
                 gap: S.s8
-              }}>{uStats.durationSec > 0 && <span>{"⏱ "}{secToHMS(uStats.durationSec)}</span>}{uStats.totalCal > 0 && <span>{"🔥 "}{uStats.totalCal}{" cal"}</span>}{uStats.activeCal > 0 && <span>{"⚡ "}{uStats.activeCal}{" active"}</span>}</div>}</div><div className={"cal-event-xp"}>{"+"}{e.xp}{" XP"}</div></div>;
+              }}>{uStats.durationSec > 0 && <span>{"â± "}{secToHMS(uStats.durationSec)}</span>}{uStats.totalCal > 0 && <span>{"ðŸ”¥ "}{uStats.totalCal}{" cal"}</span>}{uStats.activeCal > 0 && <span>{"âš¡ "}{uStats.activeCal}{" active"}</span>}</div>}</div><div className={"cal-event-xp"}>{"+"}{e.xp}{" XP"}</div></div>;
         })}</>;
     })()}{selSched.length === 0 && selLog.length === 0 && <div className={"cal-empty-day"}>{"No workouts "}{calSelDate >= today ? "planned" : "logged"}{" for this day."}</div>}</div>
 

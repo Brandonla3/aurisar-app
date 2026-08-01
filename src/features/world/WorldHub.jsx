@@ -1,9 +1,9 @@
-/**
- * WorldHub — the screen the World tab lands on, before the 3D scene exists.
+﻿/**
+ * WorldHub â€” the screen the World tab lands on, before the 3D scene exists.
  *
  * The World tab used to mount BabylonWorldScene the instant it was pressed:
  * no entry screen, no loading state, no error boundary. That made the graphics
- * settings unreachable for the one player who most needs them — someone whose
+ * settings unreachable for the one player who most needs them â€” someone whose
  * GPU cannot survive the tier the sniff picked never gets far enough into the
  * world to open the in-game menu, and a throw in the scene constructor took
  * down the whole app.
@@ -27,7 +27,7 @@ import { applySafeModePreset, didLastBootFail, markBootSucceeded } from './game/
 import { C, FS, R, S } from '../../utils/tokens.js';
 
 // Lazy so that opening the World tab does not pay Babylon's module parse cost.
-// A static import would pull the whole engine in just to render a menu — which
+// A static import would pull the whole engine in just to render a menu â€” which
 // is exactly the weight the hub exists to let players avoid.
 const WorldOverlay = React.lazy(() => import('./WorldOverlay.jsx'));
 
@@ -68,7 +68,7 @@ const S_ = {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: S.s4,
     padding: `${S.s14}px ${S.s14}px`, borderRadius: R.xxl, cursor: 'pointer',
     border: `1px solid ${C.lineStrong}`,
-    background: 'linear-gradient(145deg,rgba(45,42,36,.45),rgba(32,30,26,.25))',
+    background: 'linear-gradient(145deg,rgba(74,69,59,.45),rgba(52,48,41,.25))',
     color: C.ink, fontFamily: FONT, textAlign: 'left',
     WebkitTapHighlightColor: 'transparent',
   },
@@ -172,7 +172,7 @@ export default function WorldHub({ onClose, characterSlot = null, guildSlot = nu
           style={S_.backBtn}
           onClick={() => (view === 'hub' ? onClose() : setView('hub'))}
         >
-          {view === 'hub' ? '✕ Close' : '← Back'}
+          {view === 'hub' ? 'âœ• Close' : 'â† Back'}
         </button>
       </div>
 
@@ -184,7 +184,7 @@ export default function WorldHub({ onClose, characterSlot = null, guildSlot = nu
                 <div style={S_.bannerTitle}>Last visit didn&apos;t finish loading</div>
                 <div style={S_.bannerBody}>
                   The world was opened but never drew a frame. That usually means the
-                  graphics settings are too heavy for this device — try lowering them
+                  graphics settings are too heavy for this device â€” try lowering them
                   before entering again.
                 </div>
                 <div style={S_.bannerRow}>
@@ -202,30 +202,30 @@ export default function WorldHub({ onClose, characterSlot = null, guildSlot = nu
             )}
 
             <p style={S_.lede}>
-              Step into Ashwood — or set up your character and check in with your
+              Step into Ashwood â€” or set up your character and check in with your
               guild first. Graphics settings are here too, so you can tune them
               without loading the world.
             </p>
 
             <button type="button" style={S_.enterBtn} onClick={enter}>
-              ⚔ Enter Aurisar World
+              âš” Enter Aurisar World
             </button>
 
             <div style={S_.tileRow}>
               <HubTile
-                label="🧙 Character"
+                label="ðŸ§™ Character"
                 hint="Appearance, class and gear"
                 disabled={!characterSlot}
                 onClick={() => setView('character')}
               />
               <HubTile
-                label="🛡 Guild"
+                label="ðŸ›¡ Guild"
                 hint="Friends, channels and chat"
                 disabled={!guildSlot}
                 onClick={() => setView('guild')}
               />
               <HubTile
-                label="⚙ Graphics"
+                label="âš™ Graphics"
                 hint="Quality, shadows, fog and more"
                 onClick={() => setView('settings')}
               />
@@ -236,7 +236,7 @@ export default function WorldHub({ onClose, characterSlot = null, guildSlot = nu
         {view === 'settings' && (
           // No `scene` prop: nothing is running, so every change is written
           // straight to the store and read when the world boots. onReloadRequest
-          // replaces the panel's default location.reload() — reloading the whole
+          // replaces the panel's default location.reload() â€” reloading the whole
           // SPA from the hub would be absurd when entering the world is already
           // a fresh scene.
           <GraphicsSettingsPanel
@@ -286,8 +286,8 @@ function WorldCrashFallback({ error, onBack, onSettings }) {
           </pre>
         )}
         <div style={S_.bannerRow}>
-          <button type="button" style={S_.backBtn} onClick={onSettings}>⚙ Graphics settings</button>
-          <button type="button" style={S_.backBtn} onClick={onBack}>← Back</button>
+          <button type="button" style={S_.backBtn} onClick={onSettings}>âš™ Graphics settings</button>
+          <button type="button" style={S_.backBtn} onClick={onBack}>â† Back</button>
         </div>
       </div>
     </div>

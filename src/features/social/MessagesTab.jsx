@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
+﻿import React, { memo, useEffect, useRef, useState } from 'react';
 import { CLASSES } from '../../data/exercises';
 import { UI_COLORS } from '../../data/constants';
 import { S, FS } from '../../utils/tokens';
@@ -6,7 +6,7 @@ import { ClassIcon } from '../../components/ClassIcon';
 import { groupMessages } from './messageUtils';
 
 /**
- * Messages tab — extracted from the inline IIFE in App.jsx as the
+ * Messages tab â€” extracted from the inline IIFE in App.jsx as the
  * fourth slice of Finding #6 (App.jsx decomposition) per
  * docs/performance-audit.md (PR #116). State + actions now live in
  * useMessages.js; this stays purely presentational.
@@ -29,9 +29,9 @@ function timeAgoLabel(iso) {
 
 function ErrorPanel({ message, onRetry }) {
   return <div className={"msg-error-panel"} role="alert">
-    <div style={{ fontSize: "1.4rem", marginBottom: S.s6 }}>{"⚠️"}</div>
+    <div style={{ fontSize: "1.4rem", marginBottom: S.s6 }}>{"âš ï¸"}</div>
     <div style={{ fontSize: FS.fs68, color: "#b4ac9e", marginBottom: S.s8 }}>{message}</div>
-    <button className={"btn btn-ghost btn-xs"} onClick={onRetry}>{"↺ Retry"}</button>
+    <button className={"btn btn-ghost btn-xs"} onClick={onRetry}>{"â†º Retry"}</button>
   </div>;
 }
 
@@ -58,7 +58,7 @@ const MessagesTab = memo(function MessagesTab({
   const CLASSES_REF = CLASSES;
 
   // Smart auto-scroll: pin to bottom on open + own sends; if the reader has
-  // scrolled up, don't yank — surface a "new messages" pill instead.
+  // scrolled up, don't yank â€” surface a "new messages" pill instead.
   const scrollRef = useRef(null);
   const nearBottomRef = useRef(true);
   const lastChannelRef = useRef(null);
@@ -72,7 +72,7 @@ const MessagesTab = memo(function MessagesTab({
   const activeChannelId = msgActiveChannel?.channel_id ?? null;
   useEffect(() => {
     if (!scrollRef.current) return;
-    // Opening a different conversation always pins to the newest message —
+    // Opening a different conversation always pins to the newest message â€”
     // reset the scroll-position ref so a scroll-up left over from a previous
     // conversation can't suppress it (and show a spurious "new messages" pill).
     if (lastChannelRef.current !== activeChannelId) {
@@ -96,19 +96,19 @@ const MessagesTab = memo(function MessagesTab({
     if (nearBottom) setShowJump(false);
   };
 
-  // ── Signed out ──
+  // â”€â”€ Signed out â”€â”€
   if (!authUser) {
-    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Messages ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
+    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"âœ¦ Messages âœ¦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
       <div style={{ textAlign: "center", padding: "30px 14px" }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: S.s10, opacity: .3 }}>{"💬"}</div>
-        <div style={{ fontSize: FS.fs78, color: "#8a8478", marginBottom: S.s6 }}>{"Sign in to send messages"}</div>
-        <div style={{ fontSize: FS.fs62, color: "#8a8478" }}>{"Messaging is only available with an account — preview mode can't chat."}</div>
+        <div style={{ fontSize: "2.5rem", marginBottom: S.s10, opacity: .3 }}>{"ðŸ’¬"}</div>
+        <div style={{ fontSize: FS.fs78, color: "#9a9488", marginBottom: S.s6 }}>{"Sign in to send messages"}</div>
+        <div style={{ fontSize: FS.fs62, color: "#9a9488" }}>{"Messaging is only available with an account â€” preview mode can't chat."}</div>
       </div></div>;
   }
 
-  // ── Conversation List ──
+  // â”€â”€ Conversation List â”€â”€
   if (msgView === "list") {
-    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"✦ Messages ✦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
+    return <div><div className={"techniques-header"}><div className={"tech-hdr-left"}><div className={"tech-ornament-line tech-ornament-line-l"} /><span className={"tech-hdr-title"}>{"âœ¦ Messages âœ¦"}</span><div className={"tech-ornament-line tech-ornament-line-r"} /></div></div>
       {msgListError && <ErrorPanel message={msgListError} onRetry={loadConversations} />}
       {!msgListError && msgListLoading && msgConversations.length === 0 && [0, 1, 2].map(i => <div key={i} className={"msg-skeleton-card"}>
         <div className={"msg-skeleton-dot"} />
@@ -124,18 +124,18 @@ const MessagesTab = memo(function MessagesTab({
           fontSize: "2.5rem",
           marginBottom: S.s10,
           opacity: .3
-        }}>{"💬"}</div><div style={{
+        }}>{"ðŸ’¬"}</div><div style={{
           fontSize: FS.fs78,
-          color: "#8a8478",
+          color: "#9a9488",
           marginBottom: S.s6
         }}>{"No conversations yet"}</div><div style={{
           fontSize: FS.fs62,
-          color: "#8a8478",
+          color: "#9a9488",
           marginBottom: S.s10
         }}>{"Tap "}<span style={{
             color: UI_COLORS.info
-          }}>{"💬 Chat"}</span>{" on a friend’s card in the Guild tab to start a conversation."}</div>
-        {goToGuild && <button className={"btn btn-ghost btn-xs"} style={{ color: UI_COLORS.info }} onClick={goToGuild}>{"👥 Go to Guild"}</button>}</div>}
+          }}>{"ðŸ’¬ Chat"}</span>{" on a friendâ€™s card in the Guild tab to start a conversation."}</div>
+        {goToGuild && <button className={"btn btn-ghost btn-xs"} style={{ color: UI_COLORS.info }} onClick={goToGuild}>{"ðŸ‘¥ Go to Guild"}</button>}</div>}
       {!msgListError && msgConversations.map(conv => {
         const other = conv.other_user;
         const otherCls = other ? CLASSES_REF[other.chosen_class] : null;
@@ -153,9 +153,9 @@ const MessagesTab = memo(function MessagesTab({
             }
           }}>
           <div className={"msg-avatar"} style={{
-            background: (otherCls ? otherCls.color : "#8a8478") + "18",
-            border: "1px solid " + (otherCls ? otherCls.color : "#8a8478") + "44"
-          }}>{otherCls ? <ClassIcon classKey={other.chosen_class} size={18} color={otherCls.color} /> : "💬"}</div>
+            background: (otherCls ? otherCls.color : "#9a9488") + "18",
+            border: "1px solid " + (otherCls ? otherCls.color : "#9a9488") + "44"
+          }}>{otherCls ? <ClassIcon classKey={other.chosen_class} size={18} color={otherCls.color} /> : "ðŸ’¬"}</div>
           <div style={{
             flex: 1,
             minWidth: 0
@@ -171,11 +171,11 @@ const MessagesTab = memo(function MessagesTab({
                 whiteSpace: "nowrap"
               }}>{other ? other.player_name : conv.name || "Chat"}</span><span style={{
                 fontSize: FS.fs52,
-                color: "#8a8478",
+                color: "#9a9488",
                 flexShrink: 0
               }}>{timeAgo}</span></div>{convLastMsg && <div className={`msg-conv-preview${unread > 0 ? " unread" : ""}`}>{convLastMsg.sender_id === authUser?.id ? "You: " : ""}{convLastMsg.content}</div>}{!convLastMsg && <div style={{
               fontSize: FS.fs62,
-              color: "#8a8478",
+              color: "#9a9488",
               fontStyle: "italic",
               marginTop: S.s2
             }}>{"No messages yet"}</div>}</div>{
@@ -183,7 +183,7 @@ const MessagesTab = memo(function MessagesTab({
       })}</div>;
   }
 
-  // ── Chat View ──
+  // â”€â”€ Chat View â”€â”€
   const other = msgActiveChannel?.other_user;
   const otherCls = other ? CLASSES_REF[other.chosen_class] : null;
   const grouped = groupMessages(msgMessages);
@@ -201,18 +201,18 @@ const MessagesTab = memo(function MessagesTab({
         fontSize: FS.fs82,
         cursor: "pointer",
         padding: "4px"
-      }} onClick={closeConversation}>{"←"}</button><div style={{
+      }} onClick={closeConversation}>{"â†"}</button><div style={{
         width: 30,
         height: 30,
         borderRadius: "50%",
         flexShrink: 0,
-        background: (otherCls ? otherCls.color : "#8a8478") + "18",
-        border: "1.5px solid " + (otherCls ? otherCls.color : "#8a8478") + "44",
+        background: (otherCls ? otherCls.color : "#9a9488") + "18",
+        border: "1.5px solid " + (otherCls ? otherCls.color : "#9a9488") + "44",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: FS.fs85
-      }}>{otherCls ? <ClassIcon classKey={other.chosen_class} size={14} color={otherCls.color} /> : "💬"}</div><div style={{
+      }}>{otherCls ? <ClassIcon classKey={other.chosen_class} size={14} color={otherCls.color} /> : "ðŸ’¬"}</div><div style={{
         flex: 1,
         minWidth: 0
       }}><div style={{
@@ -221,8 +221,8 @@ const MessagesTab = memo(function MessagesTab({
           color: "#d4cec4"
         }}>{other ? other.player_name : "Chat"}</div>{other && <div style={{
           fontSize: FS.fs52,
-          color: "#8a8478"
-        }}>{otherCls ? otherCls.name : "Unknown"}{" · Lv."}{other.level || 1}{other.public_id ? " · #" + other.public_id : ""}</div>}</div></div>
+          color: "#9a9488"
+        }}>{otherCls ? otherCls.name : "Unknown"}{" Â· Lv."}{other.level || 1}{other.public_id ? " Â· #" + other.public_id : ""}</div>}</div></div>
     <div ref={scrollRef} onScroll={onScroll} role="log" aria-live="polite" aria-label={"Message history"} style={{
       flex: 1,
       minHeight: 0,
@@ -246,12 +246,12 @@ const MessagesTab = memo(function MessagesTab({
           margin: "0 auto 6px"
         }} /><div style={{
           fontSize: FS.fs58,
-          color: "#8a8478"
-        }}>{"Loading…"}</div></div>}{!msgChatError && !msgLoading && msgMessages.length === 0 && <div style={{
+          color: "#9a9488"
+        }}>{"Loadingâ€¦"}</div></div>}{!msgChatError && !msgLoading && msgMessages.length === 0 && <div style={{
         textAlign: "center",
         padding: "30px 0",
         fontSize: FS.fs68,
-        color: "#8a8478",
+        color: "#9a9488",
         fontStyle: "italic"
       }}>{"No messages yet. Say hello!"}</div>}{!msgChatError && !msgLoading && grouped.map(msg => {
         const isMine = msg.is_mine;
@@ -275,16 +275,16 @@ const MessagesTab = memo(function MessagesTab({
           alignSelf: isMine ? "flex-end" : "flex-start"
         }}>{msg._showSender && <div style={{
             fontSize: FS.fs48,
-            color: "#8a8478",
+            color: "#9a9488",
             marginBottom: S.s2,
             marginLeft: S.s4
-          }}>{msg.sender_name}</div>}<div className={`msg-bubble ${isMine ? "own" : "other"}${msg.pending ? " pending" : ""}${msg.failed ? " failed" : ""}`}>{msg.content}</div>{msg.failed && <div className={"msg-retry"}><button onClick={() => retryFailedMsg(msg.id)}>{"⚠ Failed — tap to retry"}</button><button aria-label={"Discard message"} onClick={() => discardFailedMsg(msg.id)}>{"✕"}</button></div>}{msg._showTime && !msg.failed && <div className={"msg-timestamp"} style={{
+          }}>{msg.sender_name}</div>}<div className={`msg-bubble ${isMine ? "own" : "other"}${msg.pending ? " pending" : ""}${msg.failed ? " failed" : ""}`}>{msg.content}</div>{msg.failed && <div className={"msg-retry"}><button onClick={() => retryFailedMsg(msg.id)}>{"âš  Failed â€” tap to retry"}</button><button aria-label={"Discard message"} onClick={() => discardFailedMsg(msg.id)}>{"âœ•"}</button></div>}{msg._showTime && !msg.failed && <div className={"msg-timestamp"} style={{
             marginLeft: S.s4,
             marginRight: S.s4
-          }}>{msg.pending ? "Sending…" : time}{msg.edited_at ? " · edited" : ""}</div>}</div></React.Fragment>;
+          }}>{msg.pending ? "Sendingâ€¦" : time}{msg.edited_at ? " Â· edited" : ""}</div>}</div></React.Fragment>;
       })}</div>
-    {showJump && <button className={"msg-jump-pill"} onClick={() => scrollToBottom(true)}>{"↓ New messages"}</button>}
-    <div className={"msg-input-bar"}><input className={"msg-input"} placeholder={"Type a message…"} aria-label={"Message text"} value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => {
+    {showJump && <button className={"msg-jump-pill"} onClick={() => scrollToBottom(true)}>{"â†“ New messages"}</button>}
+    <div className={"msg-input-bar"}><input className={"msg-input"} placeholder={"Type a messageâ€¦"} aria-label={"Message text"} value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           sendMsg();
@@ -294,7 +294,7 @@ const MessagesTab = memo(function MessagesTab({
         height: 40,
         opacity: msgInput.trim() ? 1 : .4,
         cursor: msgInput.trim() ? "pointer" : "default"
-      }} disabled={!msgInput.trim()} onClick={sendMsg}>{"↑"}</button></div></div>;
+      }} disabled={!msgInput.trim()} onClick={sendMsg}>{"â†‘"}</button></div></div>;
 });
 
 export default MessagesTab;
