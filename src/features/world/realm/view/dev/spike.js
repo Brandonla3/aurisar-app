@@ -1,14 +1,13 @@
 /**
- * spike.js — P0 risk-retirement entry for realm-spike.html. Dev only.
+ * spike.js — dev entry for realm-spike.html. P2: the first walkable world.
  *
- * Proves, on a real GPU, the three things P0 exists to de-risk:
- *   1. The Realm engine + scene boot and hold a render loop.
- *   2. babylonjs-gui's AdvancedDynamicTexture renders text over that scene
- *      (it CANNOT be constructed headlessly — it needs OffscreenCanvas — so this
- *      page is the only place the GUI stack can actually be verified).
- *   3. The UMD global ordering survives real bundling, not just node's require.
+ * WASD + shift-sprint over streamed procedural terrain, chase camera, and the
+ * P0 GUI overlay still proving ADT works. Wiring is the same shape RealmWorld
+ * will formalise: sample input → fixed-step the pure walker → copy the result
+ * onto transforms. Rendering never advances the simulation.
  *
- * This file is a scaffold, not architecture. It is replaced by RealmWorld in P2.
+ * Still a scaffold, not architecture — replaced by RealmWorld when the facade
+ * lands. Dev/preview builds only, never production.
  */
 
 // MUST be first: establishes window.BABYLON before anything reads the ambient
@@ -19,130 +18,163 @@ import 'babylonjs-gui';
 import { chooseRenderer, RENDERER_PREF } from '../../settings/rendererChoice.js';
 import { createRealmEngine, bindContextLoss } from '../RealmEngine.js';
 import { createRealmScene, startRenderLoop } from '../RealmScene.js';
+import { createTerrainField } from '../../model/terrainField.js';
+import { TerrainStreamer } from '../terrain/TerrainStreamer.js';
+import { createWalkerState, integrateWalker } from '../../model/walker.js';
+import {
+  BUTTON, createInputSnapshot, resetInputSnapshot, setButton,
+} from '../../sim/InputSnapshot.js';
 
 /* global BABYLON */
 
 const diag = document.getElementById('diag');
-const lines = [];
-const say = (s) => { lines.push(s); if (diag) diag.textContent = lines.join('\n'); };
+const SIM_STEP_MS = 1000 / 60;
 
 async function boot() {
   const canvas = document.getElementById('realm-canvas');
 
-  // ?renderer=webgpu opts this page into the WebGPU path for manual comparison.
   const pref = new URLSearchParams(location.search).get('renderer') ?? RENDERER_PREF.AUTO;
-  const hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
-  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
-  const choice = chooseRenderer({ pref, hasWebGPU, isIOS });
-  say(`renderer  : ${choice.renderer} (${choice.reason})`);
+  const choice = chooseRenderer({
+    pref,
+    hasWebGPU: typeof navigator !== 'undefined' && !!navigator.gpu,
+    isIOS: /iP(hone|ad|od)/.test(navigator.userAgent),
+  });
 
-  // `liveCanvas` may not be the element we passed in: a failed WebGPU init leaves
-  // the original bound to a context type WebGL2 cannot use, so the fallback swaps
-  // in a fresh one. Input binding must follow the canvas that actually rendered.
   const { engine, renderer, canvas: liveCanvas, degraded } = await createRealmEngine(canvas, {
     renderer: choice.renderer,
     isMobile: window.matchMedia('(pointer: coarse)').matches,
   });
-  say(`engine    : ${renderer}${degraded ? ' [degraded]' : ''}`);
-  say(`babylon   : ${BABYLON.Engine.Version}`);
-
   bindContextLoss(engine, {
-    onLost: () => say('context   : LOST'),
-    onRestored: () => say('context   : restored'),
+    onLost: () => console.warn('[spike] context lost'),
+    onRestored: () => console.warn('[spike] context restored'),
   });
 
   const scene = createRealmScene(engine);
 
-  const camera = new BABYLON.ArcRotateCamera('spikeCam', -Math.PI / 2, Math.PI / 3.2, 14,
-    new BABYLON.Vector3(0, 1, 0), scene);
-  camera.attachControl(liveCanvas, true);
-  camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 40;
-
-  const key = new BABYLON.DirectionalLight('key', new BABYLON.Vector3(-0.6, -1, 0.4), scene);
-  key.intensity = 2.2;
+  // ── Lights ──────────────────────────────────────────────────────────────────
+  const key = new BABYLON.DirectionalLight('key', new BABYLON.Vector3(-0.55, -1, 0.35), scene);
+  key.intensity = 2.4;
   const fill = new BABYLON.HemisphericLight('fill', new BABYLON.Vector3(0, 1, 0), scene);
-  fill.intensity = 0.45;
+  fill.intensity = 0.5;
   fill.groundColor = new BABYLON.Color3(0.16, 0.20, 0.15);
 
-  // Bare geometry only — real terrain is P2. This exists so there is something
-  // for the light and the fog to act on while we verify the GUI overlays it.
-  const ground = BABYLON.MeshBuilder.CreateGround('spikeGround', { width: 60, height: 60, subdivisions: 24 }, scene);
-  const groundMat = new BABYLON.StandardMaterial('spikeGroundMat', scene);
-  groundMat.diffuseColor = new BABYLON.Color3(0.28, 0.40, 0.26);
+  // ── Terrain ─────────────────────────────────────────────────────────────────
+  const field = createTerrainField();
+  const groundMat = new BABYLON.StandardMaterial('spikeGround', scene);
+  groundMat.diffuseColor = new BABYLON.Color3(0.42, 0.47, 0.36); // grey-green placeholder — painted terrain is P3
   groundMat.specularColor = new BABYLON.Color3(0, 0, 0);
-  ground.material = groundMat;
+  groundMat.freeze();
+  const streamer = new TerrainStreamer(scene, field, { radius: 3, subdivisions: 48, material: groundMat });
 
-  const pillar = BABYLON.MeshBuilder.CreateCylinder('spikePillar', { height: 5, diameterTop: 1.1, diameterBottom: 1.6, tessellation: 9 }, scene);
-  pillar.position.y = 2.5;
-  const pillarMat = new BABYLON.StandardMaterial('spikePillarMat', scene);
-  pillarMat.diffuseColor = new BABYLON.Color3(0.55, 0.52, 0.46);
-  pillarMat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-  pillar.material = pillarMat;
+  // ── Player: a capsule with a nose so facing is visible ─────────────────────
+  let walker = createWalkerState(0, 0, field);
+  const playerRoot = new BABYLON.TransformNode('playerRoot', scene);
+  const body = BABYLON.MeshBuilder.CreateCapsule('playerBody', { height: 1.8, radius: 0.38 }, scene);
+  body.parent = playerRoot;
+  body.position.y = 0.9;
+  const bodyMat = new BABYLON.StandardMaterial('playerMat', scene);
+  bodyMat.diffuseColor = new BABYLON.Color3(0.78, 0.63, 0.29);
+  bodyMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+  body.material = bodyMat;
+  const nose = BABYLON.MeshBuilder.CreateCylinder('playerNose', { height: 0.45, diameterTop: 0, diameterBottom: 0.3, tessellation: 8 }, scene);
+  nose.parent = playerRoot;
+  nose.position.set(0, 1.4, 0.5);
+  nose.rotation.x = Math.PI / 2;
+  nose.material = bodyMat;
 
-  // ── The actual GUI risk retirement ──────────────────────────────────────────
-  // babylonjs-gui attaches to the GLOBAL BABYLON namespace, never to the
-  // `babylonjs` module exports. Reaching for it via a default import returns
-  // undefined; this is the correct access path.
+  // ── Chase camera ────────────────────────────────────────────────────────────
+  const camera = new BABYLON.ArcRotateCamera('chase', -Math.PI / 2, Math.PI / 3.1, 11,
+    new BABYLON.Vector3(0, 1.4, 0), scene);
+  camera.attachControl(liveCanvas, true);
+  camera.lowerRadiusLimit = 3.5;
+  camera.upperRadiusLimit = 28;
+  camera.lowerBetaLimit = 0.25;
+  camera.upperBetaLimit = 1.5;
+  camera.wheelDeltaPercentage = 0.05;
+  camera.panningSensibility = 0; // pan would detach the chase target
+
+  // ── Input sampling (keyboard → InputSnapshot) ──────────────────────────────
+  const keys = new Set();
+  window.addEventListener('keydown', (e) => { keys.add(e.code); });
+  window.addEventListener('keyup', (e) => { keys.delete(e.code); });
+  window.addEventListener('blur', () => keys.clear()); // alt-tab must not stick a key
+
+  const snapshot = createInputSnapshot();
+  function sampleInput() {
+    resetInputSnapshot(snapshot);
+    snapshot.seq += 1;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) snapshot.moveZ += 1;
+    if (keys.has('KeyS') || keys.has('ArrowDown')) snapshot.moveZ -= 1;
+    if (keys.has('KeyD') || keys.has('ArrowRight')) snapshot.moveX += 1;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) snapshot.moveX -= 1;
+    setButton(snapshot, BUTTON.SPRINT, keys.has('ShiftLeft') || keys.has('ShiftRight'));
+    // ArcRotate alpha → the walker's yaw convention (forward = (sin θ, cos θ)).
+    snapshot.yaw = Math.atan2(-Math.cos(camera.alpha), -Math.sin(camera.alpha));
+    return snapshot;
+  }
+
+  // ── Fixed-step sim, variable-rate render ───────────────────────────────────
+  let accumulator = 0;
+  let lastMs = performance.now();
+  scene.onBeforeRenderObservable.add(() => {
+    const nowMs = performance.now();
+    // Spiral guard: a background tab returning owes thousands of steps; cap it.
+    accumulator = Math.min(accumulator + (nowMs - lastMs), 250);
+    lastMs = nowMs;
+
+    while (accumulator >= SIM_STEP_MS) {
+      walker = integrateWalker(walker, sampleInput(), SIM_STEP_MS, field);
+      accumulator -= SIM_STEP_MS;
+    }
+
+    playerRoot.position.set(walker.x, walker.y, walker.z);
+    playerRoot.rotation.y = walker.yaw;
+    // Chase: ease the camera target to the player's head.
+    camera.target.x += (walker.x - camera.target.x) * 0.18;
+    camera.target.y += (walker.y + 1.4 - camera.target.y) * 0.18;
+    camera.target.z += (walker.z - camera.target.z) * 0.18;
+
+    streamer.update(walker.x, walker.z);
+  });
+
+  // ── GUI (the P0 ADT proof, kept) ───────────────────────────────────────────
   const GUI = BABYLON.GUI;
-  if (!GUI) { say('GUI       : NOT PRESENT — spike failed'); return; }
-
   const adt = GUI.AdvancedDynamicTexture.CreateFullscreenUI('realmSpikeUI', true, scene);
-  // Ideal-size scaling is how the HUD stays legible from a 4K desktop to a phone:
-  // controls are authored once in 1280x720 space and scaled to the viewport.
   adt.idealWidth = 1280;
   adt.renderAtIdealSize = true;
-
   const title = new GUI.TextBlock('spikeTitle', 'AURISAR');
   title.color = '#E8C572';
-  title.fontSize = 44;
+  title.fontSize = 40;
   title.fontFamily = 'Georgia, serif';
-  title.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
   title.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-  title.top = '36px';
+  title.top = '28px';
   adt.addControl(title);
+  const hint = new GUI.TextBlock('spikeHint', 'WASD move · Shift sprint · drag to orbit · wheel to zoom');
+  hint.color = '#94A3B8';
+  hint.fontSize = 14;
+  hint.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+  hint.top = '-16px';
+  adt.addControl(hint);
 
-  // A health bar in the locked palette — the first pixel of the real HUD, and a
-  // check that nested containers and gradients behave under renderAtIdealSize.
-  const barBg = new GUI.Rectangle('spikeBarBg');
-  barBg.width = '320px';
-  barBg.height = '26px';
-  barBg.cornerRadius = 4;
-  barBg.thickness = 2;
-  barBg.color = '#C8A24A';
-  barBg.background = '#1A2130';
-  barBg.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-  barBg.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
-  barBg.top = '-48px';
-  adt.addControl(barBg);
-
-  const barFill = new GUI.Rectangle('spikeBarFill');
-  barFill.width = 0.72;
-  barFill.height = 1;
-  barFill.thickness = 0;
-  barFill.background = '#4ADE80';
-  barFill.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-  barBg.addControl(barFill);
-
-  const barText = new GUI.TextBlock('spikeBarText', '72 / 100');
-  barText.color = '#EDE9DE';
-  barText.fontSize = 14;
-  barText.fontFamily = 'monospace';
-  barBg.addControl(barText);
-
-  say(`GUI       : ADT ok, ${adt.getChildren()[0].children.length} root controls`);
-
-  startRenderLoop(engine, scene, { onError: (e) => say(`render    : FAILED ${e.message}`) });
+  startRenderLoop(engine, scene, { onError: (e) => { diag.textContent = `RENDER FAILED: ${e.message}`; } });
   window.addEventListener('resize', () => engine.resize());
 
-  // Report a settled framerate so the page is self-verifying at a glance.
-  setTimeout(() => say(`fps       : ${engine.getFps().toFixed(0)}`), 1500);
+  // ── Diag readout ────────────────────────────────────────────────────────────
+  setInterval(() => {
+    if (!diag) return;
+    diag.textContent = [
+      `renderer  : ${renderer}${degraded ? ' [degraded]' : ''} (${choice.reason})`,
+      `pos       : ${walker.x.toFixed(1)}, ${walker.y.toFixed(1)}, ${walker.z.toFixed(1)}`,
+      `speed     : ${walker.speedMps.toFixed(1)} m/s`,
+      `chunks    : ${streamer.residentCount()} resident`,
+      `fps       : ${engine.getFps().toFixed(0)}`,
+    ].join('\n');
+  }, 250);
 
-  // Handy for browser-side assertions during verification.
-  window.__realmSpike = { engine, scene, adt };
+  window.__realmSpike = { engine, scene, adt, field, streamer, camera, getWalker: () => walker };
 }
 
 boot().catch((err) => {
-  say(`BOOT FAILED: ${err?.message ?? err}`);
+  if (diag) diag.textContent = `BOOT FAILED: ${err?.message ?? err}`;
   console.error(err);
 });
