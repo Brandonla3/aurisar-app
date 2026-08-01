@@ -680,6 +680,7 @@
     }
     .lib-discover-cust-trigger:hover{color:#b4ac9e;border-color:rgba(180,172,158,.22)}
     .discover-cust-hint{font-size:.66rem;color:#8a8478;line-height:1.5;margin:0 0 14px}
+    .discover-cust-empty{color:#c4a044;margin-top:-8px}
     .discover-cust-opts{display:flex;flex-direction:column;gap:5px}
     .discover-cust-opt{
       display:flex;align-items:center;justify-content:space-between;gap:8px;

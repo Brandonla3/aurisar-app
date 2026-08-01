@@ -29,7 +29,7 @@ function BottomNav({ activeTab, onSelectTab, socialBadge, hidden, orbOpen, onOrb
           <button
             type="button"
             className={`orb-btn ${orbOpen ? "open" : ""}`}
-            aria-label={orbOpen ? "Close create menu" : "Create: quick log, build workout, repeat last"}
+            aria-label={orbOpen ? "Close create menu" : "Create: quick log, build workout, log full workout, repeat last"}
             aria-expanded={orbOpen}
             onClick={onOrbToggle}
           >

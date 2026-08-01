@@ -7,17 +7,19 @@ import { FG } from "../utils/tokens";
 
 // ─── Orb Create menu ───────────────────────────────────────────────────────────
 // The fan that opens from the bottom-nav orb: Quick Log / Build Workout /
-// Repeat Last. A light popover, not a modal — useModalLifecycle would inert
-// #root and freeze the orb button itself, so Escape + scrim handle dismissal
-// (same pattern as StagingTray). The scrim stops above the nav so the orb
-// stays visible and tappable as its own ✕.
+// Log Full Workout / Repeat Last. A light popover, not a modal —
+// useModalLifecycle would inert #root and freeze the orb button itself, so
+// Escape + scrim handle dismissal (same pattern as StagingTray). The scrim
+// stops above the nav so the orb stays visible and tappable as its own ✕.
 //
 // Misfire-proofing: rows ignore pointers until the entrance animation has
 // settled (~armed), so a mid-fan tap can't land on Repeat Last.
 //
-// "Quick Log" flips the fan into a self-contained mini-picker (recent
-// exercises + name search) — the full library picker is builder-owned state
-// and deliberately not threaded up here.
+// "Quick Log" and "Log Full Workout" each flip the fan into a self-contained
+// mini-picker (recent/saved + name search) — the full library picker and
+// the Workouts tab list are builder-owned state and deliberately not
+// threaded up here.
+const WORKOUT_BLUE = "#3498db"; // matches .log-source-badge.workout elsewhere
 
 const ROW_BASE = {
   display: "flex",
@@ -47,11 +49,13 @@ function recentFromLog(log, allById, limit) {
   return out;
 }
 
-function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBuildWorkout, repeatLast, activeTab }) {
-  const [view, setView] = React.useState("menu"); // "menu" | "pick"
+function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBuildWorkout, repeatLast, workouts, onPickWorkout, activeTab }) {
+  const [view, setView] = React.useState("menu"); // "menu" | "pick" | "workouts"
   const [armed, setArmed] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const [workoutQuery, setWorkoutQuery] = React.useState("");
   const searchRef = React.useRef(null);
+  const workoutSearchRef = React.useRef(null);
   const firstRowRef = React.useRef(null);
   // Whatever had focus (the orb toggle, for a keyboard/AT user) when the fan
   // opened, so closing — Escape, scrim, a selection — returns focus there
@@ -66,6 +70,7 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
     if (!open) {
       setView("menu");
       setQuery("");
+      setWorkoutQuery("");
       setArmed(false);
     }
   }
@@ -95,6 +100,7 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
   React.useEffect(() => {
     if (!open) return;
     if (view === "pick") searchRef.current?.focus();
+    else if (view === "workouts") workoutSearchRef.current?.focus();
     else firstRowRef.current?.focus();
   }, [view, open]);
 
@@ -121,6 +127,13 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
     return (allExercises || []).filter(ex => ex.name.toLowerCase().includes(q)).slice(0, 20);
   }, [view, query, log, allById, allExercises]);
 
+  const workoutPickList = React.useMemo(() => {
+    if (view !== "workouts") return [];
+    const q = workoutQuery.trim().toLowerCase();
+    const list = workouts || [];
+    return q ? list.filter(wo => wo.name.toLowerCase().includes(q)) : list;
+  }, [view, workoutQuery, workouts]);
+
   if (!open) return null;
 
   const actions = [
@@ -143,6 +156,17 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
       border: "rgba(143,227,210,.38)",
       orb: "rgba(143,227,210,.22)",
       run: onBuildWorkout,
+    },
+    {
+      key: "workout",
+      label: "Log Full Workout",
+      sub: (workouts || []).length > 0 ? `Start one of ${workouts.length} saved workouts` : "No saved workouts yet",
+      glyph: "📋",
+      color: WORKOUT_BLUE,
+      border: "rgba(52,152,219,.4)",
+      orb: "rgba(52,152,219,.22)",
+      run: () => setView("workouts"),
+      disabled: (workouts || []).length === 0,
     },
     {
       key: "repeat",
@@ -199,7 +223,7 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
             animation: "orbRise var(--dur-slow) var(--ease-out) both",
           }}
         >
-          {view === "pick" ? "Quick Log" : "Create"}
+          {view === "pick" ? "Quick Log" : view === "workouts" ? "Log Full Workout" : "Create"}
         </div>
 
         {view === "menu" &&
@@ -330,6 +354,73 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
                   </button>
                 );
               })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setView("menu")}
+              className={"btn btn-ghost btn-sm"}
+              style={{ width: "100%", marginTop: 8 }}
+            >
+              {"← Back"}
+            </button>
+          </div>
+        )}
+
+        {view === "workouts" && (
+          <div
+            style={{
+              borderRadius: 17,
+              border: `1px solid ${FG.glassBorder}`,
+              background: FG.solidBg,
+              boxShadow: "0 12px 34px rgba(0,0,0,.5)",
+              padding: 10,
+              animation: "orbRise .3s var(--ease-out) both",
+            }}
+          >
+            <input
+              ref={workoutSearchRef}
+              value={workoutQuery}
+              onChange={e => setWorkoutQuery(e.target.value)}
+              placeholder={"Search saved workouts…"}
+              className={"inp"}
+              style={{ marginBottom: 8 }}
+            />
+            <div style={{ maxHeight: 264, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+              {workoutPickList.length === 0 && (
+                <div style={{ padding: "14px 6px", textAlign: "center", fontSize: ".7rem", color: "rgba(232,226,216,.5)", fontStyle: "italic" }}>
+                  {workoutQuery ? "No workouts match" : "No saved workouts yet"}
+                </div>
+              )}
+              {workoutPickList.map(wo => (
+                <button
+                  key={wo.id}
+                  type="button"
+                  onClick={() => onPickWorkout(wo)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 10px",
+                    borderRadius: 12,
+                    border: `1px solid ${FG.glassBorderMid}`,
+                    borderLeft: `3px solid ${WORKOUT_BLUE}`,
+                    background: FG.glassBgSoft,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ flex: "none", fontSize: "1.05rem" }}>{wo.icon || "📋"}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: ".74rem", fontWeight: 600, color: FG.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {wo.name}
+                    </span>
+                    <span style={{ display: "block", fontSize: ".56rem", letterSpacing: ".08em", textTransform: "uppercase", color: WORKOUT_BLUE, marginTop: 1 }}>
+                      {`${(wo.exercises || []).length} exercise${(wo.exercises || []).length !== 1 ? "s" : ""}`}
+                    </span>
+                  </span>
+                  <span style={{ flex: "none", fontFamily: FG.fontCond, fontSize: ".8rem", color: FG.tealSoft, opacity: 0.7 }}>→</span>
+                </button>
+              ))}
             </div>
             <button
               type="button"

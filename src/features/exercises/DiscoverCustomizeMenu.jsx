@@ -3,13 +3,14 @@ import Sheet from '../../components/ui/Sheet';
 import { DISCOVER_PICK_COUNT } from './discoverCategories';
 
 /**
- * Nested/cascading picker for the Library home's 3 "discover" carousels.
+ * Nested/cascading picker for the Library home's up-to-3 "discover"
+ * carousels.
  *
- * Deliberately not a checkbox list: this isn't "select any number of
- * filters", it's "swap which 3 categories are on stage" — picking a new one
- * always replaces the longest-standing pick, so the count never needs
- * enforcing and there's nothing to validate before closing. A picked row
- * reads as active via fill + a "Showing" tag, not a checkbox square.
+ * Deliberately not a checkbox list: a picked row reads as active via fill
+ * plus a "Showing" tag rather than a checkbox square. Tapping a picked
+ * category removes it; tapping an unpicked one adds it, evicting the
+ * oldest pick only once already at the cap — so the count can freely sit
+ * anywhere from 0 to DISCOVER_PICK_COUNT.
  *
  * Groups (By Difficulty / By Equipment / By Muscle) are collapsible —
  * reuses the .myex-accordion track/body pattern (0fr→1fr grid-rows) so
@@ -25,12 +26,16 @@ const DiscoverCustomizeMenu = memo(function DiscoverCustomizeMenu({ open, onClos
       onClose={onClose}
       layer={"modal"}
       title={"Customize Discover"}
-      icon={"🎛"}
       ariaLabel={"Customize discover carousels"}
     >
       <p className={"discover-cust-hint"}>
-        {`Pick ${DISCOVER_PICK_COUNT} categories for the home screen's carousels. Picking a new one replaces your oldest pick.`}
+        {`Pick up to ${DISCOVER_PICK_COUNT} categories for the home screen's carousels. Tap a picked category to remove it.`}
       </p>
+      {picks.length === 0 && (
+        <p className={"discover-cust-hint discover-cust-empty"}>
+          {"Nothing picked — the home screen won't show any carousels until you add one below."}
+        </p>
+      )}
       {groups.map(g => {
         const isOpen = openGroup === g.group;
         const activeInGroup = g.categories.filter(c => pickSet.has(c.key)).length;

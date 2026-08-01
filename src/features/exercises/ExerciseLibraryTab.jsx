@@ -11,7 +11,7 @@ import MuscleMap from './MuscleMap';
 import ExerciseRow from './ExerciseRow';
 import DiscoverCustomizeMenu from './DiscoverCustomizeMenu';
 import { TYPE_OPTS, TYPE_LABELS, muscleLabel } from './exerciseFilterOptions';
-import { DISCOVER_CATEGORY_GROUPS } from './discoverCategories';
+import { DISCOVER_CATEGORY_GROUPS, DISCOVER_PICK_COUNT } from './discoverCategories';
 
 // Row adapter for the virtualised filtered list — mirrors
 // WorkoutExercisePicker's WbExPickerRow: maps react-window's props onto the
@@ -247,12 +247,18 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
       : () => setLibBrowseMode("filtered"),
   }));
 
-  // Swap-in-place selection: picking a new category always replaces the
-  // oldest of the 3 current picks, so the count never needs enforcing and
-  // there is no separate "remove" affordance to design.
+  // Tapping a picked category removes it; tapping an unpicked one adds it —
+  // and only evicts the oldest pick when already at the 3-category cap, so
+  // the count can freely sit anywhere from 0 to 3.
   const pickDiscoverCategory = key => {
-    if ((libDiscoverPicks || []).includes(key)) return;
-    setLibDiscoverPicks([...(libDiscoverPicks || []).slice(1), key]);
+    const cur = libDiscoverPicks || [];
+    if (cur.includes(key)) {
+      setLibDiscoverPicks(cur.filter(k => k !== key));
+    } else if (cur.length >= DISCOVER_PICK_COUNT) {
+      setLibDiscoverPicks([...cur.slice(1), key]);
+    } else {
+      setLibDiscoverPicks([...cur, key]);
+    }
   };
 
   // Fade-edge scroll handler
@@ -373,7 +379,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         display: "flex",
         justifyContent: "flex-end",
         marginBottom: S.s6
-      }}><button type="button" className={"lib-discover-cust-trigger"} onClick={() => setDiscoverMenuOpen(true)}>{"🎛 Customize"}</button></div>}
+      }}><button type="button" className={"lib-discover-cust-trigger"} onClick={() => setDiscoverMenuOpen(true)}>{"Customize"}</button></div>}
       {discoverRows.map((row, ri) => row.exercises.length >= 3 && <div key={"dr-" + row.key} className={"lib-home-section lib-home-section--compact"} style={{
         marginBottom: ri < discoverRows.length - 1 ? 14 : 0
       }}><div style={{

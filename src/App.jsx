@@ -5111,6 +5111,16 @@ function App() {
           setActiveTab("workouts");
           setTimeout(() => workoutsRef.current?.openBuilderWithExercises([]), 0);
         });
+      }} workouts={(profile.workouts || []).filter(w => !w.oneOff)} onPickWorkout={wo => {
+        setOrbMenuOpen(false);
+        guardAll(() => {
+          // Same protection as Repeat Last below: any active session must go
+          // through the explicit replace-confirm, same-id workout or not,
+          // rather than startLiveWorkout's default id-mismatch-only check
+          // silently discarding in-progress sets.
+          if (liveWorkout) setPendingLiveWorkout(wo);
+          else startLiveWorkout(wo);
+        });
       }} repeatLast={repeatLastSession ? {
         sub: `Clone ${repeatLastSession.workout.name} as a live session`,
         run: () => {
