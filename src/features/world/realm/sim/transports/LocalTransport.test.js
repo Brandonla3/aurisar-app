@@ -177,4 +177,43 @@ describe('reconnect', () => {
     // Position survives a reconnect — the world is authoritative, not the session.
     expect(t._db.get('player', 'player-1')).toMatchObject({ x: 3, z: 2 });
   });
+
+  it('does not mint a fresh move budget on reconnect', async () => {
+    // The exploit this pins (found in review, reproduced before fixing): move
+    // timing lived in a transport-local variable that connect() nulled, so
+    // disconnect→reconnect at the same timestamp granted another full maxDtMs
+    // budget — a free ~9.45m hop per reconnect, repeatable forever. Timing now
+    // lives on the player row, where a reconnect cannot touch it.
+    clock.nowMs = 1000;
+    const first = await t.send('moveIntent', { x: 9.4, z: 0 }, 41);
+    expect(first.data.accepted).toBe(true);
+
+    await t.disconnect();
+    await t.connect('player-1');
+
+    // Same timestamp, full-budget claim again: must be clamped near where the
+    // player already was, not accepted and not granted a second budget.
+    const cheat = await t.send('moveIntent', { x: 18.8, z: 0 }, 42);
+    expect(cheat.data.accepted).toBe(false);
+    expect(cheat.data.x).toBeLessThan(9.5);
+  });
+
+  it('grants the full first-move budget only on a true first spawn', async () => {
+    // The reconnect fix must not break the legitimate case: a brand-new player
+    // (no lastMoveAtMs on the row) still gets maxDtMs of budget for their
+    // first move rather than being clamped by a zero dt.
+    const fresh = createLocalTransport({ now: () => 5000 });
+    await fresh.connect('newcomer');
+    const r = await fresh.send('moveIntent', { x: 9, z: 0 }, 1);
+    expect(r.data.accepted).toBe(true);
+  });
+
+  it('keeps move timing out of the public event stream', async () => {
+    // lastMoveAtMs is server bookkeeping; clients have no business seeing it.
+    let captured;
+    t.subscribe((kind, payload) => { if (kind === EVENT.ENTITY_UPSERT) captured = payload; });
+    clock.nowMs = 500;
+    await t.send('moveIntent', { x: 1, z: 0 }, 43);
+    expect(captured).not.toHaveProperty('lastMoveAtMs');
+  });
 });

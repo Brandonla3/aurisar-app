@@ -7,9 +7,10 @@
  * This is NOT a mock. The gameplay decisions live in shared rules modules
  * (rules/moveRules.js today; combat/resources later), and this transport calls
  * exactly the code the SpacetimeDB reducer will call. What is faked is only the
- * plumbing: no socket, no auth, no latency unless injected. That is what lets
- * offline dev, unit tests and the no-auth viewer exercise real behaviour
- * instead of a copy that drifts.
+ * plumbing: no socket, no auth, and send() settles synchronously — there is no
+ * latency hook (tests that need delayed settles script their own transport, as
+ * dispatch.test.js does). That is what lets offline dev, unit tests and the
+ * no-auth viewer exercise real behaviour instead of a copy that drifts.
  *
  * Time is injected (`now`) rather than read from Date.now(), so tests are
  * deterministic and a forged-dt scenario is expressible.
@@ -36,7 +37,6 @@ export function createLocalTransport({ now = () => 0 } = {}) {
   const subscribers = new Set();
   let identity = null;
   let connected = false;
-  let lastMoveAtMs = null;
 
   function emit(kind, payload) {
     for (const fn of [...subscribers]) {
@@ -48,8 +48,14 @@ export function createLocalTransport({ now = () => 0 } = {}) {
     }
   }
 
-  /** Public row shape — a copy, never the live reference. */
-  const playerView = (row) => ({ ...row });
+  /**
+   * Public row shape — a copy, never the live reference. Server-internal
+   * bookkeeping (move timing) stays out of the event stream.
+   */
+  const playerView = (row) => {
+    const { lastMoveAtMs: _internal, ...view } = row;
+    return view;
+  };
 
   const commands = {
     /**
@@ -63,16 +69,21 @@ export function createLocalTransport({ now = () => 0 } = {}) {
       if (!me) return nack(seq, REJECT.NOT_FOUND, 'player not spawned');
 
       const tMs = now();
-      const dtMs = lastMoveAtMs == null ? MOVE_LIMITS.maxDtMs : tMs - lastMoveAtMs;
+      // Move timing lives ON THE ROW, not in transport memory. A transport-
+      // local variable reset by connect() let disconnect→reconnect mint a fresh
+      // full budget at the same timestamp — a ~9.45m free hop per reconnect
+      // (verified before fixing). Row storage survives reconnects, is
+      // per-player by construction, and matches where a SpacetimeDB reducer
+      // would keep it.
+      const dtMs = me.lastMoveAtMs == null ? MOVE_LIMITS.maxDtMs : tMs - me.lastMoveAtMs;
       const r = resolveMove(me, { x: payload?.x, z: payload?.z }, dtMs);
 
       if (r.verdict === 'rejected_nan') {
         return nack(seq, REJECT.INVALID_PAYLOAD, 'non-finite position');
       }
 
-      lastMoveAtMs = tMs;
       const yaw = Number.isFinite(payload?.yaw) ? payload.yaw : me.yaw;
-      const updated = db.upsert('player', identity, { x: r.x, z: r.z, yaw });
+      const updated = db.upsert('player', identity, { x: r.x, z: r.z, yaw, lastMoveAtMs: tMs });
 
       emit(EVENT.ENTITY_UPSERT, playerView(updated));
       if (!r.accepted) {
@@ -101,12 +112,13 @@ export function createLocalTransport({ now = () => 0 } = {}) {
       if (id == null || id === '') throw new Error('[LocalTransport] identity required');
       identity = packId(id);
       connected = true;
-      lastMoveAtMs = null;
 
       // Spawn (or resume) the player — same row shape the reducer will keep.
+      // On resume, the row arrives with its lastMoveAtMs intact: "no last move"
+      // means a true first spawn, never a reconnect.
       const existing = db.get('player', identity);
       const row = existing ?? db.upsert('player', identity, {
-        ...SPAWN, hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, targetId: null,
+        ...SPAWN, hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, targetId: null, lastMoveAtMs: null,
       });
 
       emit(EVENT.CONNECTION, { connected: true, reason: 'local' });

@@ -13,6 +13,22 @@
  * This module owns `seq`. Commands are numbered here and nowhere else, so the
  * transport, the reconciler and the store all agree on what "up to seq N" means.
  *
+ * ─── Settle semantics under latency (the contract, stated plainly) ───────────
+ * `ok: true` means THE SERVER ACCEPTED THE COMMAND. It does not promise the
+ * local optimism is still applied. With delayed, out-of-order settles, a nacked
+ * command's rollback sweeps every LATER prediction with it (they were built on
+ * its state); if one of those later commands then acks, its optimistic effect
+ * is already gone and dispatch does not re-apply it. The store converges to
+ * server truth through the event stream (ENTITY_UPSERT / RECONCILE), which is
+ * authoritative regardless of what optimism did. Consumers must treat events
+ * as truth and `ok` as "the server said yes", nothing more.
+ *
+ * This is safe today because events carry full authoritative rows. If P12's
+ * SpacetimeTransport surfaces real reordering and the sweep proves too lossy in
+ * practice, the alternative is settling strictly in seq order (buffering acks
+ * until the oldest pending settles) — a deliberate decision for then, recorded
+ * here so it is not rediscovered as a bug.
+ *
  * A command definition is data, not a subclass:
  *   { validate?(payload, store) -> string|null,   // REJECT code or ok
  *     predict?(payload, store)  -> undo|null }    // apply optimism, return undo

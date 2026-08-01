@@ -199,6 +199,41 @@ describe('prediction and rollback', () => {
     expect(d.pendingCount()).toBe(0);
   });
 
+  it('ack-after-cascade: ok means server-accepted, optimism is NOT re-applied', async () => {
+    // The documented settle contract, pinned so it cannot drift silently:
+    // A nacks first and its rollback sweeps B's prediction; B's ack then
+    // arrives for a prediction that no longer exists. B still reports ok:true
+    // (the server DID accept it) and dispatch does not re-apply B's optimism —
+    // the store converges to server truth via the event stream instead. If
+    // P12's real-latency transport makes this too lossy, the alternative is
+    // seq-ordered settling; changing THIS test is that decision being made.
+    const store = newStore();
+    let resolveA, resolveB;
+    const answers = {
+      1: new Promise((res) => { resolveA = res; }),
+      2: new Promise((res) => { resolveB = res; }),
+    };
+    const d = createDispatcher({
+      store,
+      transport: stubTransport((t, p, seq) => answers[seq]),
+      commands: COMMANDS,
+    });
+
+    const a = d.dispatch('optimistic', { cost: 30 }); // hp 100 -> 70
+    const b = d.dispatch('optimistic', { cost: 20 }); // hp 70 -> 50
+
+    resolveA(nack(1, REJECT.ON_COOLDOWN, 'nope'));
+    await a;
+    expect(store.get('player').hp).toBe(100); // sweep took B's optimism too
+
+    resolveB(ack(2));
+    const rb = await b;
+
+    expect(rb.ok).toBe(true); // the server accepted B...
+    expect(store.get('player').hp).toBe(100); // ...and optimism stays gone, by contract
+    expect(d.pendingCount()).toBe(0);
+  });
+
   it('exposes the oldest pending seq for the reconciler', async () => {
     const store = newStore();
     let release;
