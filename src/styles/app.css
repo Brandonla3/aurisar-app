@@ -2068,10 +2068,6 @@
     .au-spin{width:14px;height:14px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:au-spin-anim 0.7s linear infinite;flex-shrink:0}
     @keyframes au-spin-anim{to{transform:rotate(360deg)}}
 
-    /* Back link */
-    .au-back-link{background:none;border:0;padding:0;color:var(--au-text-faint);font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;transition:color .15s;display:inline-flex;align-items:center;gap:6px}
-    .au-back-link:hover{color:var(--au-text)}
-
     /* Two-column login layout */
     .au-login-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;width:100%;max-width:1280px;margin:0 auto;align-items:center}
     .au-login-hero{max-width:480px}

@@ -1210,7 +1210,7 @@ const TYPE_COLORS = {
   stretching:"#B0A898", warmup:"#B0A898", cooldown:"#B0A898"
 };
 // Canonical UI semantic colors. Use these in inline JSX styles instead of raw hex.
-// CSS files (app.css, landing.css) keep their hex values — the stylesheet IS the
+// CSS files (app.css) keep their hex values — the stylesheet IS the
 // tokenization layer for class-based styling.
 const UI_COLORS = {
   success:      "#2ecc71", // positive actions, beginner difficulty, cardio category

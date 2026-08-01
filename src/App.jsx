@@ -74,15 +74,12 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import LoginScreen from './components/LoginScreen';
 import PrivacyPolicy from './components/PrivacyPolicy';
 // Heavy / route-scoped components are lazy-loaded so first paint doesn't pay for
-// recharts (~150KB) or the landing page assets.
+// recharts (~150KB).
 const TrendsTab = lazyWithRetry(() => import('./components/TrendsTab').then(m => ({
   default: m.TrendsTab
 })));
 const PlanWizard = lazyWithRetry(() => import('./components/PlanWizard'));
 const WorkoutNotificationMockup = lazyWithRetry(() => import('./components/WorkoutNotificationMockup'));
-const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({
-  default: m.LandingPage
-})));
 const AdminPage = lazyWithRetry(() => import('./components/AdminPage'));
 // The World tab lands on the hub, not the scene. WorldHub owns entry, the
 // graphics settings (reachable with no engine running) and the error boundary
@@ -781,7 +778,7 @@ function App() {
           });
         } catch (e) {
           console.error("[auth] PASSWORD_RECOVERY handler threw:", e);
-          setScreen("landing");
+          setScreen("login");
         }
         return;
       }
@@ -797,7 +794,7 @@ function App() {
         setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
         setIsAdmin(false);
-        setScreen("landing");
+        setScreen("login");
         return;
       }
       // Sign-in (or any other auth event with a real user) implicitly exits
@@ -839,7 +836,7 @@ function App() {
         }
       } catch (e) {
         console.error("[auth] onAuthStateChange SIGNED_IN handler threw:", e);
-        setScreen(s => s === "main" ? s : "landing");
+        setScreen(s => s === "main" ? s : "login");
       }
     });
     // Check existing session on mount — handle both cases explicitly
@@ -849,7 +846,7 @@ function App() {
       }
     }) => {
       if (!session) {
-        setScreen("landing");
+        setScreen("login");
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
@@ -882,16 +879,18 @@ function App() {
             }));
             setScreen("main");
           } else {
-            setScreen("landing");
+            // Signed in but never finished character creation — matches the
+            // parallel branch in the onAuthStateChange SIGNED_IN handler above.
+            setScreen("intro");
           }
         } catch (e) {
           console.error("loadSave error:", e);
-          setScreen("landing");
+          setScreen("login");
         }
       }
-    }).catch(() => setScreen("landing"));
-    // Safety fallback — if nothing resolves in 5s, go to landing
-    const fallback = setTimeout(() => setScreen(s => s === "loading" ? "landing" : s), 5000);
+    }).catch(() => setScreen("login"));
+    // Safety fallback — if nothing resolves in 5s, go to login
+    const fallback = setTimeout(() => setScreen(s => s === "loading" ? "login" : s), 5000);
     return () => {
       subscription.unsubscribe();
       clearTimeout(fallback);
@@ -2765,7 +2764,7 @@ function App() {
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
-    setScreen("landing");
+    setScreen("login");
   }
 
   // ── Legacy class migration — maps old keys to new equivalents ──
@@ -4760,7 +4759,7 @@ function App() {
           setMfaRecoveryMode(false);
           setMfaRecoveryInput("");
           setAuthUser(null);
-          setScreen("landing");
+          setScreen("login");
         }}>{"← Back to Sign In"}</span><div style={{
           fontSize: FS.fs56,
           color: "#8a8478",
@@ -4775,14 +4774,6 @@ function App() {
     <AdminPage authUser={authUser} onBack={() => setScreen("main")} />
   );
 
-  /* ══ LANDING PAGE ═══════════════════════════════════════════ */
-  if (screen === "landing") return lazyMount(<LandingPage onLogin={() => {
-    setAuthIsNew(false);
-    setScreen("login");
-  }} onSignUp={() => {
-    setAuthIsNew(true);
-    setScreen("login");
-  }} />);
   if (screen === "login") return (
     <LoginScreen
       authEmail={authEmail}
@@ -4817,7 +4808,6 @@ function App() {
       PREVIEW_PIN={PREVIEW_PIN}
       launchPreviewMode={launchPreviewMode}
       onSubmit={handleAuthSubmit}
-      onBack={() => setScreen("landing")}
       sendPasswordReset={sendPasswordReset}
       lookupByPrivateId={lookupByPrivateId}
     />
@@ -4841,7 +4831,7 @@ function App() {
         setAuthIsNew(false);
         setAuthEmail("");
         setAuthPassword("");
-        setScreen("landing");
+        setScreen("login");
       }}>{"← Cancel"}</button>{obDraft && <div className={"boot-resume-card boot-line-in"}><div className={"boot-resume-label"}>{"⟳ Resume where you left off?"}</div><div className={"boot-resume-step"}>{`Step ${obDraft.obStep} of 6${obDraft.obFirstName ? " · " + obDraft.obFirstName : ""}`}</div><div style={{
           display: "flex",
           gap: S.s8,
@@ -5080,7 +5070,7 @@ function App() {
           label: "Exit Preview",
           action: () => {
             setIsPreviewMode(false); // exit preview mode so future saves persist
-            setScreen("landing");
+            setScreen("login");
             setProfile(EMPTY_PROFILE);
             setNavMenuOpen(false);
           },

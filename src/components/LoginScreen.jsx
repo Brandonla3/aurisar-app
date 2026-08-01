@@ -97,7 +97,6 @@ export default function LoginScreen({
   launchPreviewMode,
   // handlers
   onSubmit,
-  onBack,
   sendPasswordReset,
   lookupByPrivateId,
 }) {
@@ -156,19 +155,12 @@ export default function LoginScreen({
 
       <Ambient animated={true} />
 
-      {/* ── Top nav ── */}
-      <header style={{
+      {/* Top safe-area spacer — login is the entry screen now, so there's
+          nothing above it to navigate back to. */}
+      <div style={{
         position: 'relative', zIndex: 3,
-        padding: 'calc(24px + env(safe-area-inset-top,0px)) 40px 24px',
-      }}>
-        <button
-          onClick={onBack}
-          className="au-back-link"
-          type="button"
-        >
-          ← Back
-        </button>
-      </header>
+        paddingTop: 'calc(24px + env(safe-area-inset-top,0px))',
+      }} />
 
       {/* ── Main two-column content ── */}
       <main style={{
