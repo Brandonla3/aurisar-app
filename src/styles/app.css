@@ -1984,13 +1984,25 @@
       --au-accent-soft:oklch(0.74 0.11 var(--au-accent-h) / 0.18);
       --au-accent-glow:oklch(0.74 0.11 var(--au-accent-h) / 0.32);
       --au-accent-deep:oklch(0.55 0.09 var(--au-accent-h));
-      --au-bg:oklch(0.13 0.006 60);
-      --au-bg-deep:oklch(0.09 0.005 60);
-      --au-hairline:oklch(0.28 0.012 70 / 0.5);
-      --au-hairline-strong:oklch(0.4 0.02 75 / 0.6);
-      --au-text:oklch(0.92 0.01 80);
-      --au-text-dim:oklch(0.7 0.012 75);
-      --au-text-faint:oklch(0.52 0.01 70);
+      /* Sampled from login-backdrop-poster.jpg (fog mid-tone regions cluster
+         oklch hue 183-196; deep shadow 220-249) — 200 sits between the two
+         so the card's neutrals read as "in this room's teal light" rather
+         than the old warm-amber (hue 60-80) leftover from the pre-video
+         background. --au-accent-h stayed at 75 deliberately: the video's
+         actual gold-beam pixels sample to oklch hue 75-76, an exact match. */
+      --au-env-h:200;
+      --au-bg:oklch(0.13 0.01 var(--au-env-h));
+      --au-bg-deep:oklch(0.09 0.012 var(--au-env-h));
+      --au-hairline:oklch(0.28 0.025 var(--au-env-h) / 0.5);
+      --au-hairline-strong:oklch(0.4 0.035 var(--au-env-h) / 0.6);
+      --au-text:oklch(0.92 0.006 var(--au-env-h));
+      --au-text-dim:oklch(0.7 0.025 var(--au-env-h));
+      /* L bumped from the pre-existing 0.52 to 0.58 — measured against the
+         card background, 0.52 sat at ~3.55:1 (fails WCAG AA's 4.5:1 for
+         this size of text; true before this retint too, at ~3.52:1). 0.58
+         clears it at ~4.59:1 without reading as a lightness change on
+         screen, since it's still the dimmest text on the card. */
+      --au-text-faint:oklch(0.58 0.022 var(--au-env-h));
       --au-danger:oklch(0.62 0.16 28);
       --au-danger-soft:oklch(0.62 0.16 28 / 0.14);
       --au-font-display:'Cinzel','Trajan Pro','Times New Roman',serif;
@@ -2009,9 +2021,15 @@
     .au-mote{position:absolute;width:2px;height:2px;border-radius:50%;background:var(--au-accent);filter:blur(0.5px);opacity:0;animation:au-mote-rise linear infinite}
     @keyframes au-mote-rise{0%{opacity:0;transform:translateY(0) translateX(0) scale(0.6)}10%{opacity:0.8}90%{opacity:0.6}100%{opacity:0;transform:translateY(-120vh) translateX(var(--mote-drift,20px)) scale(1)}}
 
-    /* Faceted card */
-    .au-card{position:relative;background:linear-gradient(180deg,oklch(0.18 0.008 60 / 0.85),oklch(0.14 0.006 60 / 0.92));border:1px solid var(--au-hairline);clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px);backdrop-filter:blur(6px)}
-    .au-card::before{content:"";position:absolute;inset:0;background:linear-gradient(140deg,var(--au-accent-glow),transparent 35%,transparent 65%,var(--au-accent-glow));opacity:0.25;pointer-events:none;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
+    /* Faceted card. The video's one light source comes from the upper right
+       ("Beam from upper-right" div in LoginScreen.jsx) — the card reads as
+       an object it actually touches, not a decal, via three cues keyed to
+       that same corner: the ::before glow now lives ONLY at top-right
+       (previously a symmetric two-corner sheen with no relationship to the
+       footage), the drop-shadow below leans away from it, and the near
+       corner is the one spot on the card that gets a hint of warm bounce. */
+    .au-card{position:relative;background:linear-gradient(180deg,oklch(0.18 0.012 var(--au-env-h) / 0.85),oklch(0.14 0.01 var(--au-env-h) / 0.92));border:1px solid var(--au-hairline);clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px);backdrop-filter:blur(6px);box-shadow:-14px 22px 40px -14px oklch(0.05 0.02 var(--au-env-h) / 0.55),6px -4px 20px -12px var(--au-accent-glow)}
+    .au-card::before{content:"";position:absolute;inset:0;background:linear-gradient(to bottom left,var(--au-accent-glow),transparent 45%);opacity:0.3;pointer-events:none;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
 
     /* Typography */
     .au-eyebrow{font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.32em;text-transform:uppercase;color:var(--au-accent);margin-bottom:14px}
@@ -2019,10 +2037,12 @@
     .au-creed{font-family:var(--au-font-body);font-style:italic;font-size:14px;line-height:1.55;color:var(--au-text-dim);margin:0 0 26px;max-width:36ch}
     .au-label{display:block;font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--au-text-faint);margin-bottom:8px}
 
-    /* Input */
-    .au-input{width:100%;background:oklch(0.1 0.005 60);border:1px solid var(--au-hairline);color:var(--au-text);font:400 15px/1.4 var(--au-font-body);padding:13px 14px;border-radius:2px;outline:none;transition:border-color 0.18s,box-shadow 0.18s,background 0.18s}
+    /* Input — recessed like a carved-out cutout rather than a flat swatch;
+       gold only shows up on focus (the one moment this element "catches
+       the light"), matching the beam being the scene's single accent. */
+    .au-input{width:100%;background:oklch(0.1 0.008 var(--au-env-h));border:1px solid var(--au-hairline);color:var(--au-text);font:400 15px/1.4 var(--au-font-body);padding:13px 14px;border-radius:2px;outline:none;box-shadow:inset 0 1px 3px oklch(0.02 0.01 var(--au-env-h) / 0.6);transition:border-color 0.18s,box-shadow 0.18s,background 0.18s}
     .au-input::placeholder{color:var(--au-text-faint)}
-    .au-input:focus{border-color:var(--au-accent);box-shadow:0 0 0 3px var(--au-accent-soft),inset 0 0 24px oklch(0.74 0.11 75 / 0.04);background:oklch(0.12 0.006 60)}
+    .au-input:focus{border-color:var(--au-accent);box-shadow:inset 0 1px 3px oklch(0.02 0.01 var(--au-env-h) / 0.6),0 0 0 3px var(--au-accent-soft),inset 0 0 24px oklch(0.74 0.11 75 / 0.04);background:oklch(0.12 0.01 var(--au-env-h))}
     .au-input-wrap{position:relative}
     .au-input-action{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--au-text-dim);font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;padding:6px 8px;transition:color .15s}
     .au-input-action:hover{color:var(--au-accent)}
