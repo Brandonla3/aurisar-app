@@ -56,6 +56,7 @@ import { tintRgba } from './features/ambient/ambientTint';
 import BottomNav from './components/BottomNav';
 import OrbCreateMenu from './components/OrbCreateMenu';
 import StartDock from './components/StartDock';
+import { deriveLastSession } from './utils/repeatLast';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -2802,6 +2803,10 @@ function App() {
   // the tray's count, the library's banner and the forged workout all agree.
   const stagedIds = useMemo(() => cartIds.filter(id => allExById[id]), [cartIds, allExById]);
 
+  // The orb's "Repeat Last" — most recent completed session rebuilt from the
+  // log's sourceGroupId batches (no new persisted state; see utils/repeatLast).
+  const repeatLastSession = useMemo(() => deriveLastSession(profile.log), [profile.log]);
+
   // ── Ambient light travel ──
   // The muscle group "in context" retints the backdrop's drift layers (CSS vars
   // read by .ambient-drift/.ambient-drift2, which transition 800ms). Priority:
@@ -5090,7 +5095,19 @@ function App() {
           setActiveTab("workouts");
           setTimeout(() => workoutsRef.current?.openBuilderWithExercises([]), 0);
         });
-      }} repeatLast={null} /><StartDock profile={profile} allExById={allExById} liveWorkout={liveWorkout} stagedCount={stagedIds.length} onStartWorkout={startLiveWorkout} onQuickLogSolo={quickLogSoloEx} onSeeAll={() => guardAll(() => {
+      }} repeatLast={repeatLastSession ? {
+        sub: `Clone ${repeatLastSession.workout.name} as a live session`,
+        run: () => {
+          setOrbMenuOpen(false);
+          guardAll(() => {
+            const replacing = liveWorkout && liveWorkout.workoutId !== repeatLastSession.workout.id;
+            startLiveWorkout(repeatLastSession.workout);
+            // startLiveWorkout opens its own replace-confirm when another
+            // session is live — only toast on the direct-start path.
+            if (!replacing) showToast(`↺ Repeating ${repeatLastSession.workout.icon} ${repeatLastSession.workout.name} — discard it from the banner anytime`);
+          });
+        }
+      } : null} /><StartDock profile={profile} allExById={allExById} liveWorkout={liveWorkout} stagedCount={stagedIds.length} onStartWorkout={startLiveWorkout} onQuickLogSolo={quickLogSoloEx} onSeeAll={() => guardAll(() => {
         setActiveTab("workouts");
         workoutsRef.current?.showSubTab("oneoff");
       })} />{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
