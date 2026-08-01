@@ -39,6 +39,7 @@ The payoff is that most of the Realm is testable in plain node — no GPU, no js
 | `model/` | Deterministic world math — the height field, noise, biomes, LOD policy, collision | plain node |
 | `gen/` | Mesh generation. Emits typed-array payloads, never Babylon objects | plain node |
 | `sim/` | Game simulation, state store, transports. Stateful but engine-free | plain node |
+| &nbsp;&nbsp;↳ | `RealmStore` (sliced state, rev counters) · `dispatch` (validate → predict → send → settle, owns `seq`) · `WorldTransport` (the server seam) · `transports/LocalTransport` + `memoryDb` (the authoritative world in-process — shared rules, not a mock) · `rules/` (validation both the reducer and LocalTransport call) | |
 | `settings/` | Graphics tiers, renderer choice. DOM only inside `realmProbe` | plain node |
 | `view/` | Everything Babylon. Turns payloads into meshes and draws them | `NullEngine` / browser |
 
