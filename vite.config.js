@@ -26,9 +26,19 @@ export default defineConfig({
       // splitting — it broke the babylon decoders out into their own chunk that
       // reads the ambient BABYLON global before it is set — so prod stays default.
       // CONTEXT is set by Netlify ('production' | 'deploy-preview' | 'branch-deploy').
+      // realm-spike.html is the Aurisar Realm's real-GPU verification surface.
+      // AdvancedDynamicTexture cannot be constructed headlessly (it needs
+      // OffscreenCanvas), so the GUI layer has no unit-test path at all — this
+      // page is where it gets verified. Same non-prod rule as world-viewer.
       ...(process.env.CONTEXT === 'production'
         ? {}
-        : { input: { main: 'index.html', worldViewer: 'world-viewer.html' } }),
+        : {
+            input: {
+              main: 'index.html',
+              worldViewer: 'world-viewer.html',
+              realmSpike: 'realm-spike.html',
+            },
+          }),
       output: {
         // Split heavy libraries into their own chunks so the main bundle
         // doesn't pay for recharts on first paint. Combined with React.lazy at
