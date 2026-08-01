@@ -51,6 +51,21 @@
       --z-detail:9400;
       --z-confirm:9500;
       --z-flash:9600;
+
+      /* ── Forge Glass ambient tint ───────────────────────────────────────
+         The "ambient light travel": two drifting radial layers in the app
+         backdrop read these vars, and App.jsx retints them to the muscle
+         group in context (configure > detail > library filter > default).
+         The 800ms transition lives on the layers, not here. */
+      --ambient-tint:rgba(232,180,74,.14);
+      --ambient-tint2:rgba(232,180,74,.11);
+
+      /* Forge Glass font stacks (Barlow ships via index.html; Cinzel via the
+         @import above). Referenced by redesigned rules; legacy rules keep
+         their literals until they are migrated. */
+      --font-body:'Barlow','Inter',system-ui,sans-serif;
+      --font-cond:'Barlow Condensed','Barlow',sans-serif;
+      --font-serif:'Cinzel',serif;
     }
     html{font-size:17.333px}
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
