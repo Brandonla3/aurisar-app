@@ -6,13 +6,20 @@ import useAmbientVideoActive from "./useAmbientVideoActive";
 import { isMediaQuarantined, quarantineMedia, probeVideoHealth } from "../../utils/mediaHealth";
 
 // ─── Forge backdrop ────────────────────────────────────────────────────────────
-// The forge-backdrop video IS the background, served raw — no grade filter, no
-// screen blend, no authored gradient environment, no scrims (user call: the
-// master is dark enough on its own and should look exactly like the file).
+// PARKED — not mounted anywhere. The app renders its original `.bg` gradient
+// backdrop; this component and its assets are kept so the video background can
+// be reinstated without redoing the work.
 //
-// The two drift layers are the "ambient light travel": fully TRANSPARENT at
-// rest, they only glow once App tints --ambient-tint to the muscle group in
-// context (tapping a muscle tile, viewing or configuring an exercise).
+// To re-enable: render <AmbientBackdrop suspendVideo={activeTab === "world"} />
+// next to the `.bg` div in App.jsx. The drift layers below are the "ambient
+// light travel" — they need `--ambient-tint`/`--ambient-tint2` re-declared in
+// app.css (transparent at rest) plus the App effect that retints them to the
+// muscle group in context; both were removed with the mount and are recoverable
+// from commit c9d8159.
+//
+// The forge-backdrop video renders raw — no grade filter, no screen blend, no
+// authored gradient environment, no scrims: the master is dark enough on its
+// own and should look exactly like the file.
 //
 // Degraded states (world tab GPU handoff, hidden tab, prefers-reduced-motion,
 // Save-Data, frame-drop quarantine, decode error) drop the <video>; the app's
