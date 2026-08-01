@@ -91,7 +91,7 @@ export function isAuthorized(authorizationHeader, expectedUser, expectedPass) {
 }
 
 function challenge() {
-  return new Response('Authentication required.', {
+  return new Response('Authentication required to view this preview deployment.', {
     status: 401,
     headers: {
       'WWW-Authenticate': `Basic realm="${REALM}", charset="UTF-8"`,
