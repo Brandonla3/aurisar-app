@@ -70,7 +70,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
     cartIds, toggleCart,
     // Profile / data
     profile, setProfile,
-    allExercises, allExById,
+    allExercises,
     _exReady, _exLoadError,
     gymKit, setGymKit, kitTotalAll, libKitCount,
     // Quick-log (for "Configure" action)
@@ -232,38 +232,6 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
   /* ── Home view computed data ── */
   const MUSCLE_CARD_DATA = libMuscleCardData;
 
-  // Recent exercises — deduped from log, padded with favorites. Memoized so
-  // the dedup walk doesn't repeat on every render of the tab; deps are the
-  // log + favorites + lookup map.
-  // Each card also carries how long it's been since you last did it, so the
-  // carousel reports freshness instead of showing the same few names forever:
-  // recent entries sit at full strength and stale ones visibly fade.
-  const yourExercises = useMemo(() => {
-    const now = Date.now();
-    const out = [];
-    const seenIds = new Set();
-    const daysSince = ts => {
-      const t = ts ? new Date(ts).getTime() : NaN;
-      return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 86400000)) : null;
-    };
-    for (const entry of (profile.log || []).slice(0, 100)) {
-      if (entry.exId && !seenIds.has(entry.exId) && allExById[entry.exId]) {
-        seenIds.add(entry.exId);
-        out.push({ ex: allExById[entry.exId], days: daysSince(entry.date || entry.ts || entry.dateKey) });
-      }
-      if (out.length >= 10) break;
-    }
-    // Favorites pad the row out but have no "last done" date of their own.
-    for (const fId of profile.favoriteExercises || []) {
-      if (!seenIds.has(fId) && allExById[fId]) {
-        seenIds.add(fId);
-        out.push({ ex: allExById[fId], days: null });
-      }
-      if (out.length >= 10) break;
-    }
-    return out;
-  }, [profile.log, profile.favoriteExercises, allExById]);
-
   // Discover rows — labels + exercise lists are memoized at App body
   // (libDiscoverRows). Wire onSeeAll closures here so the lifted memo stays
   // free of setter dependencies.
@@ -362,24 +330,7 @@ const ExerciseLibraryTab = React.memo(function ExerciseLibraryTab(props) {
         <span aria-hidden="true">{resumeIcon}</span>
         <span className={"lib-resume-chip-label"}>{`${resumeSummary} — View ${libFiltered.length} result${libFiltered.length !== 1 ? "s" : ""} →`}</span>
         <span role={"button"} tabIndex={0} aria-label={"Clear filters and search"} className={"lib-resume-chip-x"} onClick={e => { e.stopPropagation(); clearAll(); }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); clearAll(); } }}>{"✕"}</span>
-      </button>}{/* Your Exercises — hero carousel */
-      yourExercises.length > 0 && <div className={"lib-home-section"} style={{
-        marginBottom: S.s4
-      }}><div className={"lib-section-hdr"}><span className={"lib-hdr-icon"}>{"⚔️"}</span>{"Your Exercises"}</div><div className={"lib-hscroll-wrap"}><div className={"lib-hscroll"} onScroll={handleHScroll}>{yourExercises.map(({ ex, days }) => {
-              const mgColor = getMuscleColor(ex.muscleGroup);
-              const mgLabel = (MUSCLE_META[(ex.muscleGroup || "").toLowerCase()] || {}).label || ex.muscleGroup || "";
-              // 0 days = full torchlight, 21+ days = fully faded. Drives a
-              // CSS filter so the card itself carries the recency signal.
-              const staleness = days == null ? 0.55 : Math.min(1, days / 21);
-              return <button type="button" key={"yr-" + ex.id} className={"lib-hero-card"} aria-label={`${ex.name}${days == null ? "" : days === 0 ? ", done today" : days === 1 ? ", done yesterday" : `, last done ${days} days ago`}`} onClick={() => setLibDetailEx(ex)} style={{
-                '--mg-color': mgColor,
-                '--staleness': staleness
-              }}><div className={"lib-hero-orb"} style={{
-                  '--mg-color': mgColor
-                }}><ExIcon ex={ex} size={"1.4rem"} color={mgColor} /></div><span className={"lib-hero-name"}>{ex.name}</span>{days != null && <span className={"lib-hero-when"}>{days === 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`}</span>}{mgLabel && <span className={"lib-muscle-pill"} style={{
-                  '--mg-color': mgColor
-                }}>{mgLabel}</span>}</button>;
-            })}</div></div></div>}{yourExercises.length > 0 && <div className={"lib-divider"} />} {
+      </button>} {
         /* Browse by Muscle — feature tiles */
       }
       {browseView === "map"

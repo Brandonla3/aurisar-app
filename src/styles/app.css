@@ -1067,6 +1067,25 @@
     .custom-ex-badge{font-size:.52rem;background:rgba(45,42,36,.22);color:#b4ac9e;border:1px solid rgba(180,172,158,.07);border-radius:3px;padding:1px 4px;margin-left:4px;font-family:'Inter',sans-serif;letter-spacing:.03em;vertical-align:middle}
     .ex-edit-btn{position:absolute;top:7px;left:7px;font-size:.58rem;color:#8a8478;cursor:pointer;width:18px;height:18px;border-radius:50%;background:rgba(45,42,36,.15);display:flex;align-items:center;justify-content:center;transition:all .2s}
     .ex-edit-btn:hover{color:#b4ac9e;background:rgba(45,42,36,.22)}
+
+    /* ── My Exercises accordion (Favorites / Custom / Recent) ────────────
+       Single-open-or-none. The track is a 1-row CSS grid animated between
+       0fr and 1fr, so height always matches real content — a list that
+       grows after opening (Favorites' "Show more") is never clipped by a
+       stale measured max-height. Padding lives on .myex-accordion-inner,
+       never on the animated .myex-accordion-body itself, or some browsers
+       leave a residual gap at 0fr. */
+    .myex-accordion{border-radius:12px;overflow:hidden;margin-bottom:10px;background:rgba(45,42,36,.14);border:1px solid rgba(180,172,158,.06)}
+    .myex-accordion-hdr{width:100%;display:flex;align-items:center;gap:8px;padding:13px 14px;background:transparent;border:none;cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent}
+    .myex-accordion-hdr-icon{font-size:.85rem;opacity:.75;flex-shrink:0}
+    .myex-accordion-hdr-title{font-family:'Cinzel',serif;font-size:.72rem;font-weight:600;color:#d4cec4;letter-spacing:.08em;text-transform:uppercase}
+    .myex-accordion-hdr-meta{flex:1;min-width:0;text-align:right;font-size:.62rem;color:#8a8478;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .myex-accordion-chevron{flex-shrink:0;font-size:.7rem;color:#8a8478;transition:transform var(--dur-base) var(--ease-standard)}
+    .myex-accordion-chevron.open{transform:rotate(180deg)}
+    .myex-accordion-track{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dur-slow) var(--ease-out)}
+    .myex-accordion-track.open{grid-template-rows:1fr}
+    .myex-accordion-body{overflow:hidden;min-height:0}
+    .myex-accordion-inner{padding:2px 14px 14px}
     /* SAVE-AS-PLAN WIZARD */
     .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-wizard);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .spw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
