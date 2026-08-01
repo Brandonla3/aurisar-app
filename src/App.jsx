@@ -55,6 +55,7 @@ import AmbientBackdrop from './features/ambient/AmbientBackdrop';
 import { tintRgba } from './features/ambient/ambientTint';
 import BottomNav from './components/BottomNav';
 import OrbCreateMenu from './components/OrbCreateMenu';
+import StartDock from './components/StartDock';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -5089,7 +5090,10 @@ function App() {
           setActiveTab("workouts");
           setTimeout(() => workoutsRef.current?.openBuilderWithExercises([]), 0);
         });
-      }} repeatLast={null} />{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
+      }} repeatLast={null} /><StartDock profile={profile} allExById={allExById} liveWorkout={liveWorkout} stagedCount={stagedIds.length} onStartWorkout={startLiveWorkout} onQuickLogSolo={quickLogSoloEx} onSeeAll={() => guardAll(() => {
+        setActiveTab("workouts");
+        workoutsRef.current?.showSubTab("oneoff");
+      })} />{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
         open
         icon={"⚡"}
         title={"Replace Active Workout?"}
