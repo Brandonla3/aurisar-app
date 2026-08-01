@@ -68,7 +68,7 @@
       --font-serif:'Cinzel',serif;
     }
     html{font-size:17.333px}
-    .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
+    .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:var(--font-body);position:relative;overflow-x:hidden}
     .bg{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 60% at 30% 20%,rgba(45,42,36,.3) 0%,transparent 65%),radial-gradient(ellipse 50% 45% at 70% 75%,rgba(32,30,26,.18) 0%,transparent 55%),#0c0c0a}.bg::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 45%,transparent 40%,rgba(0,0,0,.2) 100%);z-index:0}
     .pt{position:fixed;border-radius:50%;background:var(--cls-color);opacity:.13;animation:flt var(--dur) var(--dly) infinite ease-in-out alternate;pointer-events:none;z-index:1;filter:blur(1px)}
     /* ── Forge Glass ambient drift ───────────────────────────────────────
@@ -104,7 +104,7 @@
          btn-danger      destructive
        Sizes: btn-sm / btn-xs (both get a 44px touch extension on coarse
        pointers, below). For bare glyph actions use .icon-btn instead. */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font-body);font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
     .btn-gold-solid{background:linear-gradient(135deg,#8B7425,#A89030);color:#d4cec4;border:1px solid rgba(196,160,68,.35);box-shadow:0 2px 14px rgba(140,116,37,.28);text-shadow:0 1px 2px rgba(0,0,0,.35)}
     .btn-gold-solid:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(140,116,37,.4)}
     .btn-gold{background:linear-gradient(135deg,rgba(45,42,36,.5),rgba(45,42,36,.35));color:#d4cec4;box-shadow:none;border:1px solid rgba(180,172,158,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
@@ -2203,12 +2203,46 @@
       .au-stage main{padding:0 16px 32px}
     }
 
+    /* ── Forge Glass surface pass ────────────────────────────────────────
+       Deepened glass bases so cards read as panes over the ambient video
+       (the light shows through the GAPS, not through the cards). Solid-ish
+       rgba grounds mean the look survives the touch-perf blur kill below;
+       blur is the desktop garnish. Muscle tint stays via color-mix. */
+    .lib-hero-card, .lib-discover-card{
+      background:linear-gradient(165deg,color-mix(in srgb,var(--mg-color) 14%,rgba(9,9,13,.6)),color-mix(in srgb,var(--mg-color) 4%,rgba(9,9,13,.52)) 70%);
+      backdrop-filter:blur(14px) saturate(150%);
+      -webkit-backdrop-filter:blur(14px) saturate(150%);
+    }
+    .lib-muscle-tile{
+      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 16%,rgba(9,9,13,.6)),color-mix(in srgb,var(--mg-color) 5%,rgba(9,9,13,.52)));
+      backdrop-filter:blur(14px) saturate(150%);
+      -webkit-backdrop-filter:blur(14px) saturate(150%);
+    }
+    .workout-card{
+      background:linear-gradient(150deg,color-mix(in srgb,var(--mg-color) 10%,rgba(11,11,14,.88)),rgba(9,9,13,.86));
+      backdrop-filter:blur(12px) saturate(150%);
+      -webkit-backdrop-filter:blur(12px) saturate(150%);
+    }
+    .ui-sheet{
+      background:linear-gradient(160deg,rgba(16,15,18,.94),rgba(10,10,12,.96));
+      border-color:rgba(255,255,255,.1);
+      backdrop-filter:blur(26px) saturate(160%);
+      -webkit-backdrop-filter:blur(26px) saturate(160%);
+    }
+    /* Section headers float directly over the moving plate — anchor them. */
+    .lib-section-hdr, .sec{text-shadow:0 1px 3px rgba(4,4,6,.9),0 2px 12px rgba(4,4,6,.7)}
+
     /* Perf overrides — touch devices skip live blur and decorative motion */
     @media (hover: none) and (pointer: coarse) {
       .hud-nav-panel,
       .ex-picker-sheet,
       .completion-sheet,
       .modal-sheet,
+      .ui-sheet,
+      .lib-hero-card,
+      .lib-discover-card,
+      .lib-muscle-tile,
+      .workout-card,
       .hud-top {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
