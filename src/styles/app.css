@@ -2190,46 +2190,12 @@
       .au-stage main{padding:0 16px 32px}
     }
 
-    /* ── Forge Glass surface pass ────────────────────────────────────────
-       Deepened glass bases so cards read as panes over the ambient video
-       (the light shows through the GAPS, not through the cards). Solid-ish
-       rgba grounds mean the look survives the touch-perf blur kill below;
-       blur is the desktop garnish. Muscle tint stays via color-mix. */
-    .lib-hero-card, .lib-discover-card{
-      background:linear-gradient(165deg,color-mix(in srgb,var(--mg-color) 14%,rgba(9,9,13,.6)),color-mix(in srgb,var(--mg-color) 4%,rgba(9,9,13,.52)) 70%);
-      backdrop-filter:blur(14px) saturate(150%);
-      -webkit-backdrop-filter:blur(14px) saturate(150%);
-    }
-    .lib-muscle-tile{
-      background:linear-gradient(155deg,color-mix(in srgb,var(--mg-color) 16%,rgba(9,9,13,.6)),color-mix(in srgb,var(--mg-color) 5%,rgba(9,9,13,.52)));
-      backdrop-filter:blur(14px) saturate(150%);
-      -webkit-backdrop-filter:blur(14px) saturate(150%);
-    }
-    .workout-card{
-      background:linear-gradient(150deg,color-mix(in srgb,var(--mg-color) 10%,rgba(11,11,14,.88)),rgba(9,9,13,.86));
-      backdrop-filter:blur(12px) saturate(150%);
-      -webkit-backdrop-filter:blur(12px) saturate(150%);
-    }
-    .ui-sheet{
-      background:linear-gradient(160deg,rgba(16,15,18,.94),rgba(10,10,12,.96));
-      border-color:rgba(255,255,255,.1);
-      backdrop-filter:blur(26px) saturate(160%);
-      -webkit-backdrop-filter:blur(26px) saturate(160%);
-    }
-    /* Section headers float directly over the moving plate — anchor them. */
-    .lib-section-hdr, .sec{text-shadow:0 1px 3px rgba(4,4,6,.9),0 2px 12px rgba(4,4,6,.7)}
-
     /* Perf overrides — touch devices skip live blur and decorative motion */
     @media (hover: none) and (pointer: coarse) {
       .hud-nav-panel,
       .ex-picker-sheet,
       .completion-sheet,
       .modal-sheet,
-      .ui-sheet,
-      .lib-hero-card,
-      .lib-discover-card,
-      .lib-muscle-tile,
-      .workout-card,
       .hud-top {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
