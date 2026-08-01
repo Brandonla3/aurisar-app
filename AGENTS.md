@@ -37,10 +37,16 @@ gated by a server-side HTTP Basic Auth edge function,
 env vars `PREVIEW_BASIC_AUTH_USER` / `PREVIEW_BASIC_AUTH_PASSWORD`, so the
 credential never reaches the client bundle. Non-obvious behavior:
 
-- Production and local dev are **never** gated (checked via the `CONTEXT` env
-  var), so `npm run dev` is unaffected. To exercise the gate locally you must
-  run through Netlify's edge runtime with a gated `CONTEXT` (e.g. `netlify dev`
-  with `CONTEXT=deploy-preview`) and both credential vars set.
+- Production and local dev are **never** gated. The deploy context is read at
+  runtime from `context.deploy.context` (the build-time `CONTEXT` env var is
+  NOT available to edge functions at runtime), so `npm run dev` is unaffected.
+  To exercise the gate locally, run through Netlify's edge runtime with a gated
+  context, e.g. `netlify dev --context deploy-preview`, with both credential
+  vars set.
+- Because the gate is decided in code, the credential env vars can be set as
+  plain, all-context Netlify variables — no per-deploy-context scoping needed.
+  (If your plan exposes variable scopes, include the **Functions** scope so the
+  edge function can read them.)
 - On a gated deploy with the vars unset, the edge function returns `503`
   (fails closed) rather than serving an unprotected site.
 - The client-side "Preview Mode" PIN is a dev convenience only — it is not a

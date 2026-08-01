@@ -12,13 +12,20 @@
  * client. The gate runs at the edge, before any static asset or function
  * response is served, so the whole preview site is protected.
  *
- * Scope (by Netlify deploy context, read from the CONTEXT env var):
+ * Scope (by Netlify deploy context, read at runtime from context.deploy.context):
  *   - production                     → never gated (the real app; real Supabase
  *                                       auth is the access control there).
  *   - deploy-preview / branch-deploy → REQUIRE Basic Auth. If the credential
  *                                       env vars are unset, the deploy is locked
  *                                       (503) rather than silently left open.
  *   - local dev / anything else      → not gated (developer convenience).
+ *
+ * IMPORTANT: the build-time `CONTEXT` environment variable is NOT available to
+ * edge functions at runtime, so the deploy context is read from the Context
+ * object (`context.deploy.context`), which IS available at runtime. Because the
+ * gate is decided here in code, the credential env vars can be set as plain
+ * all-context variables in Netlify — no per-deploy-context scoping required
+ * (production and local dev are ignored regardless of the values).
  *
  * Configuration (Netlify → Site settings → Environment variables; scope them to
  * "Deploy Previews" and "Branch deploys"):
@@ -94,7 +101,9 @@ function challenge() {
 }
 
 export default async (request, context) => {
-  const deployContext = Netlify.env.get('CONTEXT') ?? '';
+  // The build-time CONTEXT env var is unavailable at edge runtime; the deploy
+  // context is exposed on the Context object instead.
+  const deployContext = context?.deploy?.context ?? '';
 
   // Production and local dev pass straight through, untouched.
   if (!shouldGate(deployContext)) {

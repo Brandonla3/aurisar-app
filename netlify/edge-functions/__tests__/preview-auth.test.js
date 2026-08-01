@@ -12,7 +12,7 @@ function basic(user, pass) {
   return `Basic ${btoa(`${user}:${pass}`)}`;
 }
 
-/** Install a fake Netlify.env backed by the given map, returning a restore fn. */
+/** Install a fake Netlify.env (credentials) backed by the given map. */
 function withEnv(env) {
   const prev = globalThis.Netlify;
   globalThis.Netlify = { env: { get: (key) => env[key] } };
@@ -23,14 +23,21 @@ function withEnv(env) {
 
 /** A sentinel returned by context.next() so we can assert pass-through. */
 const NEXT = Symbol('next');
-const context = { next: vi.fn(() => NEXT) };
+
+/**
+ * Build a Context like the one Netlify passes to an edge function. The deploy
+ * context is read at runtime from `context.deploy.context` (the build-time
+ * CONTEXT env var is not available at the edge).
+ */
+function ctx(deployContext) {
+  return { deploy: { context: deployContext }, next: vi.fn(() => NEXT) };
+}
 
 function req(headers = {}) {
   return new Request('https://preview.example/', { headers });
 }
 
 afterEach(() => {
-  context.next.mockClear();
   delete globalThis.Netlify;
 });
 
@@ -88,7 +95,8 @@ describe('isAuthorized', () => {
 
 describe('handler (default export)', () => {
   it('passes production through without touching auth', async () => {
-    const restore = withEnv({ CONTEXT: 'production' });
+    const restore = withEnv({});
+    const context = ctx('production');
     const res = await handler(req(), context);
     expect(res).toBe(NEXT);
     expect(context.next).toHaveBeenCalledTimes(1);
@@ -96,14 +104,16 @@ describe('handler (default export)', () => {
   });
 
   it('passes local dev through', async () => {
-    const restore = withEnv({ CONTEXT: 'dev' });
+    const restore = withEnv({});
+    const context = ctx('dev');
     const res = await handler(req(), context);
     expect(res).toBe(NEXT);
     restore();
   });
 
   it('returns 503 when a gated deploy has no credentials configured', async () => {
-    const restore = withEnv({ CONTEXT: 'deploy-preview' });
+    const restore = withEnv({});
+    const context = ctx('deploy-preview');
     const res = await handler(req(), context);
     expect(res.status).toBe(503);
     expect(context.next).not.toHaveBeenCalled();
@@ -112,10 +122,10 @@ describe('handler (default export)', () => {
 
   it('challenges with 401 when no auth header is sent', async () => {
     const restore = withEnv({
-      CONTEXT: 'deploy-preview',
       PREVIEW_BASIC_AUTH_USER: USER,
       PREVIEW_BASIC_AUTH_PASSWORD: PASS,
     });
+    const context = ctx('deploy-preview');
     const res = await handler(req(), context);
     expect(res.status).toBe(401);
     expect(res.headers.get('www-authenticate')).toContain('Basic');
@@ -125,10 +135,10 @@ describe('handler (default export)', () => {
 
   it('challenges with 401 on wrong credentials', async () => {
     const restore = withEnv({
-      CONTEXT: 'branch-deploy',
       PREVIEW_BASIC_AUTH_USER: USER,
       PREVIEW_BASIC_AUTH_PASSWORD: PASS,
     });
+    const context = ctx('branch-deploy');
     const res = await handler(req({ authorization: basic(USER, 'wrong') }), context);
     expect(res.status).toBe(401);
     expect(context.next).not.toHaveBeenCalled();
@@ -137,10 +147,10 @@ describe('handler (default export)', () => {
 
   it('lets the request through on correct credentials', async () => {
     const restore = withEnv({
-      CONTEXT: 'deploy-preview',
       PREVIEW_BASIC_AUTH_USER: USER,
       PREVIEW_BASIC_AUTH_PASSWORD: PASS,
     });
+    const context = ctx('deploy-preview');
     const res = await handler(req({ authorization: basic(USER, PASS) }), context);
     expect(res).toBe(NEXT);
     expect(context.next).toHaveBeenCalledTimes(1);
