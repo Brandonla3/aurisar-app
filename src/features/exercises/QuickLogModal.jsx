@@ -2,7 +2,7 @@ import React, { memo, useMemo, useState } from 'react';
 import { UI_COLORS, NO_SETS_EX_IDS, RUNNING_EX_ID } from '../../data/constants';
 import { calcExXP } from '../../utils/xp';
 import { planQuickLogRows } from '../../utils/quickLogRows';
-import { isMetric, kgToLbs, lbsToKg, kmToMi, miToKm, weightLabel, distLabel } from '../../utils/units';
+import { isMetric, kgToLbs, lbsToKg, kmToMi, miToKm, weightLabel, distLabel, displayPace } from '../../utils/units';
 import { S, R, FS, FG } from '../../utils/tokens';
 import Sheet from '../../components/ui/Sheet';
 import SetsEditor from '../../components/ui/SetsEditor';
@@ -72,7 +72,18 @@ const QuickLogModal = memo(function QuickLogModal({
     if (!entry) return null;
     const t = entryTime(entry);
     const days = Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : null;
-    return { entry, days, stale: days != null && days > GHOST_STALE_DAYS };
+    // A Set Forge completion can span multiple rows sharing one
+    // sourceGroupId (the primary plus any progressive extras); Repeat needs
+    // the WHOLE session, not just whichever row .find() landed on. entry is
+    // guaranteed to be the group's primary row — it's the newest logged row
+    // for this exercise, and a batch's primary is always written before its
+    // own extras. Legacy rows without a sourceGroupId are their own
+    // one-row session, same conservative fallback History/Repeat Last use.
+    const groupRows = entry.sourceGroupId
+      ? (profile.log || []).filter(e => e.sourceGroupId === entry.sourceGroupId)
+      : [entry];
+    const extraGroupRows = groupRows.slice(1);
+    return { entry, extraGroupRows, days, stale: days != null && days > GHOST_STALE_DAYS };
   }, [profile.log, ex]);
 
   // Cross-dock carryover: the exercise logged moments ago in the same session
@@ -126,13 +137,11 @@ const QuickLogModal = memo(function QuickLogModal({
   const distMi = rawDist > 0 ? metric ? parseFloat(kmToMi(rawDist)) : rawDist : 0;
 
   const pbPaceMi = profile.runningPB || null;
-  const pbDisp = pbPaceMi
-    ? metric ? `${(pbPaceMi / 1.60934).toFixed(2)} min/km` : `${pbPaceMi.toFixed(2)} min/mi`
-    : null;
+  const pbDisp = displayPace(pbPaceMi, profile.units);
   const exPB4 = (profile.exercisePBs || {})[ex.id] || null;
   const pbWeightDisp = v => (metric ? parseFloat(lbsToKg(v)).toFixed(1) : v) + (metric ? " kg" : " lbs");
   const exPBDisp4 = exPB4
-    ? exPB4.type === "Cardio Pace" ? metric ? (exPB4.value / 1.60934).toFixed(2) + " min/km" : exPB4.value.toFixed(2) + " min/mi"
+    ? exPB4.type === "Cardio Pace" ? displayPace(exPB4.value, profile.units)
     : exPB4.type === "Assisted Weight" ? "1RM: " + pbWeightDisp(exPB4.value) + " (Assisted)"
     : exPB4.type === "Max Reps Per 1 Set" ? exPB4.value + " reps"
     : exPB4.type === "Longest Hold" || exPB4.type === "Fastest Time" ? parseFloat(exPB4.value.toFixed(2)) + " min"
@@ -173,7 +182,26 @@ const QuickLogModal = memo(function QuickLogModal({
       setExHHMM(`${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`);
       setExSec("");
     }
-    setQuickRows([]);
+    // Restore any progressive extra rows the last session had, converting
+    // canonical storage back to the display units the Set Forge edits in.
+    // This used to unconditionally clear quickRows, so repeating a pyramid
+    // silently dropped every row but the first.
+    const extras = (ghost.extraGroupRows || []).map(r => {
+      if (isCardio || isFlex) {
+        const mins = parseInt(r.reps) || 0;
+        return {
+          hhmm: `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`,
+          sec: "",
+          dist: r.distanceMi != null ? String(metric ? parseFloat(miToKm(r.distanceMi)).toFixed(2) : r.distanceMi) : "",
+        };
+      }
+      return {
+        sets: r.sets != null ? String(r.sets) : "",
+        reps: r.reps != null ? String(r.reps) : "",
+        weightLbs: r.weightLbs != null ? String(metric ? parseFloat(lbsToKg(r.weightLbs)).toFixed(1) : r.weightLbs) : "",
+      };
+    });
+    setQuickRows(extras);
   };
 
   // Pull the compatible parts of the previous exercise across — load and
@@ -460,15 +488,26 @@ const QuickLogModal = memo(function QuickLogModal({
               <div style={{ display: "flex", gap: S.s6 }}>
                 {ex.id !== "rest_day" && (
                   <button className={"btn btn-ghost btn-sm"} style={{ flex: 1, fontSize: FS.fs58, padding: "6px 8px", borderColor: "rgba(45,42,36,.3)", color: "#8a8478" }} onClick={() => {
+                    // rowPlan is the same planner logExercise() writes from —
+                    // reusing it here (instead of re-deriving sets/reps from
+                    // raw state) is what carries a timed duration and any
+                    // Set Forge extra rows into the workout, rather than
+                    // silently dropping them.
+                    const [primaryRow, ...extraPlanRows] = rowPlan.rows;
                     const exEntry = {
                       exId: ex.id,
-                      sets: parseInt(sets) || 0,
-                      reps: parseInt(reps) || 0,
-                      weightLbs: wLbs || null,
+                      sets: primaryRow.sets,
+                      reps: primaryRow.reps,
+                      weightLbs: primaryRow.weightLbs,
                       durationMin: null,
                       weightPct,
-                      distanceMi: distMi || null,
-                      hrZone: hrZone || null
+                      distanceMi: primaryRow.distanceMi,
+                      hrZone: hrZone || null,
+                      ...(extraPlanRows.length ? {
+                        extraRows: extraPlanRows.map(r => ({
+                          sets: r.sets, reps: r.reps, weightLbs: r.weightLbs, distanceMi: r.distanceMi,
+                        })),
+                      } : {}),
                     };
                     setAddToWorkoutPicker({ exercises: [exEntry] });
                     dismiss();

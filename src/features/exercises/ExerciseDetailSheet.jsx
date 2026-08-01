@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { getMuscleColor, getTypeColor } from '../../utils/xp';
-import { displayWt } from '../../utils/units';
+import { displayWt, displayPace } from '../../utils/units';
 import { getExerciseHistory } from '../../utils/exerciseHistory';
 import { ExIcon } from '../../components/ExIcon';
 import { S, R, FS, FG } from '../../utils/tokens';
@@ -48,7 +48,7 @@ function pbText(pb, units) {
   if (pb.value == null) return "—";
   if (/Weight|1RM/i.test(pb.type || "")) return displayWt(pb.value, units) || String(pb.value);
   if (/Reps/i.test(pb.type || "")) return `${pb.value} reps`;
-  if (/Pace|cardio/i.test(pb.type || "")) return `${parseFloat(Number(pb.value).toFixed(2))} min/mi`;
+  if (/Pace|cardio/i.test(pb.type || "")) return displayPace(pb.value, units) || String(pb.value);
   return String(pb.value);
 }
 
@@ -441,7 +441,7 @@ const ExerciseDetailSheet = memo(function ExerciseDetailSheet({
               <div style={{ flex: 1, padding: "8px 10px", borderRadius: R.xxl, background: "rgba(143,227,210,.07)", border: "1px solid rgba(143,227,210,.2)" }}>
                 <div style={{ fontFamily: FG.fontSerif, fontSize: FS.fs44, letterSpacing: ".24em", textTransform: "uppercase", color: "rgba(143,227,210,.7)", marginBottom: 3 }}>{"Trend"}</div>
                 <div style={{ fontFamily: FG.fontCond, fontSize: FS.xl, fontWeight: 600, color: FG.teal, lineHeight: 1 }}>
-                  {trendDelta == null ? "—" : trendDelta === 0 ? "Holding steady" : `${trendDelta > 0 ? "▲ +" : "▼ "}${Math.abs(trendDelta)} lbs`}
+                  {trendDelta == null ? "—" : trendDelta === 0 ? "Holding steady" : `${trendDelta > 0 ? "▲ +" : "▼ "}${displayWt(Math.abs(trendDelta), profile.units)}`}
                 </div>
               </div>
             </div>

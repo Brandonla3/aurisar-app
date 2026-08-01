@@ -75,6 +75,40 @@ describe('planQuickLogRows — Set Forge parity', () => {
     expect(plan.rows[1].reps).toBe(10);
     expect(plan.rows[0].xp).toBe(calcExXP(CARDIO.id, plan.sv, 20, null, BY_ID, null, null, null, 1));
   });
+
+  it('an untouched (fully blank) timed extra row inherits the primary duration and distance, never a bare 1-minute row', () => {
+    // "＋ Add Interval" creates a row with no hhmm/sec/dist typed. Math.max(1, 0)
+    // is truthy, so the old `|| rv` fallback could never fire — a 30-minute,
+    // 2-mile primary with one blank interval used to persist and price that
+    // row as 1 minute with a null distance.
+    const plan = planQuickLogRows(base({
+      exId: CARDIO.id, category: 'cardio', exWeight: '',
+      exHHMM: '00:30', exSec: '', reps: '', distanceVal: '2',
+      quickRows: [{ hhmm: '', sec: '', dist: '' }],
+    }));
+    expect(plan.rv).toBe(30);
+    expect(plan.distMi).toBe(2);
+    expect(plan.rows[1]).toMatchObject({ reps: 30, distanceMi: 2 });
+    expect(plan.rows[1].xp).toBe(calcExXP(CARDIO.id, plan.sv, 30, null, BY_ID, 2, null, null, 1));
+    // A row where the user typed 0 seconds (a real, if unusual, choice) is
+    // NOT blank and must still price at its own (near-zero) duration.
+    const typedZero = planQuickLogRows(base({
+      exId: CARDIO.id, category: 'cardio', exWeight: '',
+      exHHMM: '00:30', exSec: '', reps: '', distanceVal: '2',
+      quickRows: [{ hhmm: '00:00', sec: '5', dist: '' }],
+    }));
+    expect(typedZero.rows[1].reps).toBe(1); // Math.max(1, floor(5s/60)) = 1
+    expect(typedZero.rows[1].distanceMi).toBe(2); // still inherits primary distance
+  });
+
+  it('an extra row with its own distance keeps it, unaffected by primary fallback', () => {
+    const plan = planQuickLogRows(base({
+      exId: CARDIO.id, category: 'cardio', exWeight: '',
+      exHHMM: '00:30', exSec: '', reps: '', distanceVal: '2',
+      quickRows: [{ hhmm: '00:15', sec: '', dist: '0.75' }],
+    }));
+    expect(plan.rows[1]).toMatchObject({ reps: 15, distanceMi: 0.75 });
+  });
 });
 
 describe('single write path (source-level)', () => {
@@ -86,5 +120,20 @@ describe('single write path (source-level)', () => {
     expect(app).toContain('planQuickLogRows(');
     // The modal must not keep a private duplicate of the row-XP math.
     expect(modal).not.toMatch(/rowsXP/);
+  });
+
+  it('Add to Workout builds its entry from rowPlan (not raw sets/reps state), carrying extra rows through', () => {
+    // rowPlan.rows[0] already holds the correctly-derived sets/reps/weight/
+    // distance (timed duration via combineHHMMSec, noSets handling, etc) —
+    // re-deriving from the raw `sets`/`reps` strings here used to silently
+    // drop a typed duration and every Set Forge extra row.
+    const modal = readFileSync(ROOT + 'src/features/exercises/QuickLogModal.jsx', 'utf8');
+    const marker = 'Add to Workout';
+    const btnStart = modal.lastIndexOf('onClick', modal.indexOf(marker));
+    const btnBody = modal.slice(btnStart, modal.indexOf(marker) + marker.length);
+    expect(btnBody).toContain('rowPlan.rows');
+    expect(btnBody).toContain('extraRows');
+    expect(btnBody).not.toMatch(/parseInt\(sets\)/);
+    expect(btnBody).not.toMatch(/parseInt\(reps\)/);
   });
 });

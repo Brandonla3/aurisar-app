@@ -16,7 +16,13 @@ import { combineHHMMSec } from './time';
 //     the weight bonus saturates and extras inherit the working load
 //   • extraCount (number of extra rows) is passed to every calcExXP call
 //   • an extra row's blank sets/reps inherit the primary values
-//   • extra-row distance falls back to the primary distance for pricing
+//   • an untouched (blank) timed extra row inherits the PRIMARY duration —
+//     never priced as a bare 1-minute row — because "＋ Add Interval"
+//     creates an empty row before the user has typed anything into it
+//   • extra-row distance falls back to the primary distance, for BOTH
+//     pricing and the persisted record — a row that inherits the primary's
+//     duration must also record that duration, or the stored entry and the
+//     number it was priced at silently disagree
 export function planQuickLogRows({
   exId,
   category,
@@ -70,17 +76,28 @@ export function planQuickLogRows({
     },
     ...rowsIn.map(row => {
       const rs = noSets ? 1 : parseInt(row.sets) || sv;
+      // Math.max(1, x) is never falsy, so `|| rv` here used to be dead code:
+      // an untouched row (no hhmm, no sec typed) computed to 1 minute and
+      // STAYED at 1 minute instead of falling through to the primary
+      // duration. Test blankness explicitly instead of relying on the
+      // fallback operator to catch a value that can never trigger it.
+      const hasTimedInput = !!(row.hhmm || row.sec);
       const rr = timed
-        ? Math.max(1, Math.floor(combineHHMMSec(row.hhmm || '', row.sec || '') / 60)) || rv
+        ? (hasTimedInput ? Math.max(1, Math.floor(combineHHMMSec(row.hhmm || '', row.sec || '') / 60)) : rv)
         : parseInt(row.reps) || rv;
+      // A row with no distance of its own inherits the primary's — applied
+      // to BOTH the priced value and the persisted record, so what gets
+      // logged is what it was priced at (previously only pricing fell back;
+      // storage kept a bare null, silently disagreeing with its own XP).
       const rowDistMi = toMi(row.dist);
+      const effDistMi = rowDistMi != null ? rowDistMi : distMi;
       return {
         primary: false,
         sets: rs,
         reps: rr,
         weightLbs: toLbs(row.weightLbs),
-        distanceMi: rowDistMi,
-        xp: calcExXP(exId, rs, rr, chosenClass, allExById, rowDistMi || distMi || null, effW || null, hrZone, extraCount),
+        distanceMi: effDistMi,
+        xp: calcExXP(exId, rs, rr, chosenClass, allExById, effDistMi || null, effW || null, hrZone, extraCount),
       };
     }),
   ];

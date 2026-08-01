@@ -1519,7 +1519,13 @@
     @keyframes sfSweep{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
     .sf-chip{padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--font-cond);font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(228,222,211,.75);background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.12);transition:transform var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard);-webkit-tap-highlight-color:transparent}
     .sf-chip:active{transform:scale(.94);background:rgba(232,180,74,.16);border-color:rgba(232,180,74,.4)}
-    .sf-ruler{position:relative;height:38px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;padding:0 50%;cursor:ew-resize}
+    /* touch-action:pan-x alone claims vertical panning too (it opts this
+       element OUT of native y-panning rather than leaving it unclaimed), so
+       a swipe that starts on this 38px strip couldn't fall through to the
+       sheet's own vertical scroll. pan-x pan-y hands vertical intent to the
+       nearest scrollable ancestor, same as the default, while still keeping
+       this the element that natively handles horizontal drag. */
+    .sf-ruler{position:relative;height:38px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;overscroll-behavior-x:contain;scrollbar-width:none;padding:0 50%;cursor:ew-resize}
     .sf-ruler::-webkit-scrollbar{display:none}
     .sf-ruler-strip{height:100%;background:repeating-linear-gradient(90deg,rgba(240,200,104,.5) 0 1.5px,transparent 1.5px 45px),repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 1px,transparent 1px 9px);background-position:0 6px,0 12px;background-size:auto 20px,auto 10px;background-repeat:repeat-x}
     .sf-ruler-fade{position:absolute;top:0;height:38px;width:56px;pointer-events:none;z-index:1}

@@ -19,6 +19,15 @@ function buildFromRows(rows, head) {
       sets: parseInt(r.sets) || 3,
       reps: parseInt(r.reps) || 10,
       weightLbs: r.weightLbs != null ? r.weightLbs : null,
+      // Every dimension a completion can persist (workout completions write
+      // distanceMi/hrZone; solo Set Forge rows write distanceMi/seconds via
+      // sourceDurationSec on the primary) carried through — this used to
+      // hard-code distance/zone to null and drop seconds outright, so
+      // repeating a run, cardio interval, or timed workout silently
+      // produced a different prescription and a different XP total.
+      distanceMi: r.distanceMi != null ? r.distanceMi : null,
+      hrZone: r.hrZone != null ? r.hrZone : null,
+      seconds: r.seconds != null ? r.seconds : null,
     });
   }
   const exercises = [];
@@ -30,8 +39,9 @@ function buildFromRows(rows, head) {
       reps: primary.reps,
       weightLbs: primary.weightLbs,
       weightPct: 100,
-      distanceMi: null,
-      hrZone: null,
+      distanceMi: primary.distanceMi,
+      hrZone: primary.hrZone,
+      seconds: primary.seconds,
       ...(extras.length ? { extraRows: extras } : {}),
     });
   }
@@ -63,8 +73,16 @@ export function deriveLastSession(log) {
       );
     }
     if (e.sourceWorkoutId) {
+      // Legacy rows predate sourceGroupId, so workoutId+dateKey is the best
+      // available proxy for "one completion" — but two SEPARATE completions
+      // of the same workout on the same day would also match that pair,
+      // fabricating a merged session with duplicated exercises folded into
+      // extraRows. Every row within one real completion shares the exact
+      // `time` stamp (confirmWorkoutComplete computes it once, outside the
+      // per-row map), so require it too; two completions logged in the same
+      // day but different minutes now correctly stay separate.
       return buildFromRows(
-        (log || []).filter(x => x && x.sourceWorkoutId === e.sourceWorkoutId && x.dateKey === e.dateKey),
+        (log || []).filter(x => x && x.sourceWorkoutId === e.sourceWorkoutId && x.dateKey === e.dateKey && x.time === e.time),
         e
       );
     }

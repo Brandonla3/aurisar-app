@@ -47,11 +47,16 @@ function recentFromLog(log, allById, limit) {
   return out;
 }
 
-function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBuildWorkout, repeatLast }) {
+function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBuildWorkout, repeatLast, activeTab }) {
   const [view, setView] = React.useState("menu"); // "menu" | "pick"
   const [armed, setArmed] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const searchRef = React.useRef(null);
+  const firstRowRef = React.useRef(null);
+  // Whatever had focus (the orb toggle, for a keyboard/AT user) when the fan
+  // opened, so closing — Escape, scrim, a selection — returns focus there
+  // instead of stranding it on a removed element.
+  const returnFocusRef = React.useRef(null);
 
   // Reset to a fresh fan whenever the orb closes — done during render (the
   // sanctioned derived-state adjustment) rather than in an effect.
@@ -79,8 +84,29 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
   }, [open, onClose]);
 
   React.useEffect(() => {
-    if (view === "pick" && searchRef.current) searchRef.current.focus();
-  }, [view]);
+    if (open) {
+      returnFocusRef.current = document.activeElement;
+    } else if (returnFocusRef.current && document.body.contains(returnFocusRef.current)) {
+      returnFocusRef.current.focus();
+      returnFocusRef.current = null;
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (view === "pick") searchRef.current?.focus();
+    else firstRowRef.current?.focus();
+  }, [view, open]);
+
+  // The scrim doesn't cover the bottom nav (it stops above it so the orb
+  // itself stays tappable as its own ✕), so tapping another tab while the
+  // fan is open is reachable without dismissing it first — close whenever
+  // the active tab changes underneath.
+  const activeTabRef = React.useRef(activeTab);
+  React.useEffect(() => {
+    if (open && activeTabRef.current !== activeTab) onClose();
+    activeTabRef.current = activeTab;
+  }, [activeTab, open, onClose]);
 
   const allById = React.useMemo(() => {
     const m = {};
@@ -180,7 +206,10 @@ function OrbCreateMenu({ open, onClose, log, allExercises, onPickExercise, onBui
           actions.map((a, i) => (
             <button
               key={a.key}
+              ref={i === 0 ? firstRowRef : undefined}
               type="button"
+              disabled={a.disabled}
+              aria-disabled={a.disabled}
               onClick={a.disabled ? undefined : () => a.run && a.run()}
               className={"orb-action"}
               style={{

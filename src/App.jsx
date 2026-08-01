@@ -655,6 +655,11 @@ function App() {
     try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
   });
   const [pendingLiveWorkout, setPendingLiveWorkout] = useState(null);
+  // Set only by Repeat Last just before it opens the replace-confirm, so
+  // confirmReplaceLiveWorkout knows to toast — a plain Start-triggered
+  // replace (Workouts tab, StartDock) has nothing to say beyond the confirm
+  // itself. Ref, not state: it's write-then-read-once, never rendered.
+  const pendingLiveWorkoutToastRef = useRef(null);
   const [pendingSoloRemoveId, setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
   const [bootStep, setBootStep] = useState(0);
   const workoutsRef = useRef(null);
@@ -3256,8 +3261,12 @@ function App() {
           hour: "2-digit",
           minute: "2-digit"
         });
-        // One log entry per Set Forge row (primary + progressive extras),
-        // mirroring the builder's completion path.
+        // One completion, one receipt: every row from this Set Forge
+        // submission (primary + progressive extras) shares one id, mirroring
+        // the builder's per-workout batchId. Without this, a multi-row
+        // pyramid had no durable session boundary — History counted each row
+        // as its own session, and ghost/Repeat only ever saw the first row.
+        const sourceGroupId = uid();
         const entries = pricedRows.map(r => ({
           exercise: ex.name,
           icon: ex.icon,
@@ -3277,6 +3286,7 @@ function App() {
           date: displayDate,
           dateKey: dateStr,
           loggedAt: loggedAtStamp,
+          sourceGroupId,
           exId: ex.id,
           sourceTotalCal: woWithStats.totalCal || null,
           sourceActiveCal: woWithStats.activeCal || null,
@@ -3655,6 +3665,16 @@ function App() {
         noSets: NO_SETS_EX_IDS.has(ex.exId),
         sets: ex.sets, reps: ex.reps,
         weightLbs: ex.weightLbs || null,
+        // Carried through even though the live banner's UI doesn't surface
+        // them for mid-session editing: useWorkoutCompletion's entry-builder
+        // reads these three fields straight off this object, so passing
+        // them through here is what lets Repeat Last's distance/HR-zone/
+        // duration survive the full round-trip into the finished log,
+        // rather than silently reverting to null the moment a repeated
+        // cardio or timed workout goes live.
+        distanceMi: ex.distanceMi || null,
+        hrZone: ex.hrZone || null,
+        seconds: ex.seconds || null,
         extraRows: ex.extraRows || [],
         setsDesc,
         supersetWith: (typeof ex.supersetWith === 'number' && ex.supersetWith >= 0) ? ex.supersetWith : null,
@@ -3674,6 +3694,12 @@ function App() {
   function confirmReplaceLiveWorkout() {
     setLiveWorkout({ workoutId: pendingLiveWorkout.id, name: pendingLiveWorkout.name, icon: pendingLiveWorkout.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(pendingLiveWorkout), userId: authUser?.id || null });
     setPendingLiveWorkout(null);
+    // Only Repeat Last's replace-confirm stamps this — a plain "Start"
+    // replace (Workouts tab, StartDock) confirms silently, same as before.
+    if (pendingLiveWorkoutToastRef.current) {
+      showToast(pendingLiveWorkoutToastRef.current);
+      pendingLiveWorkoutToastRef.current = null;
+    }
   }
 
   function handleToggleLiveEx(i) {
@@ -5075,7 +5101,7 @@ function App() {
           loadSocialData();
           loadIncomingShares();
         }
-      })} /><OrbCreateMenu open={orbMenuOpen} onClose={() => setOrbMenuOpen(false)} log={profile.log} allExercises={allExercises} onPickExercise={exId => {
+      })} /><OrbCreateMenu open={orbMenuOpen} onClose={() => setOrbMenuOpen(false)} activeTab={activeTab} log={profile.log} allExercises={allExercises} onPickExercise={exId => {
         setOrbMenuOpen(false);
         openQuickLog(exId, { origin: { type: "orb" } });
       }} onBuildWorkout={() => {
@@ -5089,11 +5115,20 @@ function App() {
         run: () => {
           setOrbMenuOpen(false);
           guardAll(() => {
-            const replacing = liveWorkout && liveWorkout.workoutId !== repeatLastSession.workout.id;
-            startLiveWorkout(repeatLastSession.workout);
-            // startLiveWorkout opens its own replace-confirm when another
-            // session is live — only toast on the direct-start path.
-            if (!replacing) showToast(`↺ Repeating ${repeatLastSession.workout.icon} ${repeatLastSession.workout.name} — discard it from the banner anytime`);
+            const repeatToast = `↺ Repeating ${repeatLastSession.workout.icon} ${repeatLastSession.workout.name} — discard it from the banner anytime`;
+            if (liveWorkout) {
+              // startLiveWorkout only opens its replace-confirm when the ids
+              // differ — Repeat Last targeting the SAME workout you're mid-
+              // way through matched that id and skipped straight to
+              // overwriting it, silently discarding checked-off progress.
+              // Any active session, same id or not, must go through the
+              // explicit confirm.
+              pendingLiveWorkoutToastRef.current = repeatToast;
+              setPendingLiveWorkout(repeatLastSession.workout);
+            } else {
+              startLiveWorkout(repeatLastSession.workout);
+              showToast(repeatToast);
+            }
           });
         }
       } : null} /><StartDock profile={profile} allExById={allExById} liveWorkout={liveWorkout} stagedCount={stagedIds.length} onStartWorkout={startLiveWorkout} onQuickLogSolo={quickLogSoloEx} onSeeAll={() => guardAll(() => {
@@ -5107,7 +5142,10 @@ function App() {
         confirmLabel={`Discard & Track ${pendingLiveWorkout.icon}`}
         cancelLabel={"Keep Current"}
         onConfirm={confirmReplaceLiveWorkout}
-        onCancel={() => setPendingLiveWorkout(null)}
+        onCancel={() => {
+          setPendingLiveWorkout(null);
+          pendingLiveWorkoutToastRef.current = null;
+        }}
       />}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",

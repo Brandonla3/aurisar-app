@@ -22,6 +22,10 @@ const weightLabel = (units) => isMetric(units) ? "kg" : "lbs";
 const distLabel   = (units) => isMetric(units) ? "km" : "mi";
 const displayWt   = (lbs, units) => lbs  ? (isMetric(units) ? lbsToKg(lbs)+" kg"  : lbs+" lbs") : null;
 const displayDist = (mi, units)  => mi   ? (isMetric(units) ? miToKm(mi)+" km"    : mi+" mi")   : null;
+// Pace is stored/typed as minutes-per-mile everywhere (calcExercisePBs,
+// profile.runningPB); converting the minutes value by distance ratio is what
+// min/km actually is, not a straight unit swap on the number itself.
+const displayPace = (minPerMi, units) => minPerMi ? (isMetric(units) ? (parseFloat(minPerMi)/1.60934).toFixed(2)+" min/km" : parseFloat(minPerMi).toFixed(2)+" min/mi") : null;
 
 export {
   pctToSlider,
@@ -36,5 +40,6 @@ export {
   weightLabel,
   distLabel,
   displayWt,
-  displayDist
+  displayDist,
+  displayPace
 };

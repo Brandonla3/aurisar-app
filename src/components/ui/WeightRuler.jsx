@@ -87,6 +87,11 @@ function WeightRuler({ pct, onPctChange, onTapStep, stepLabel }) {
         step={'1'}
         value={pctToSlider(pct)}
         aria-label={'Weight intensity'}
+        // The 0-100 slider domain is a non-linear remap (pctToSlider), so its
+        // raw value doesn't match what's shown — at the visually-displayed
+        // 100%, the underlying value is 50, and AT would announce "50 of
+        // 100" instead of the real percentage.
+        aria-valuetext={`${pct}%`}
         onChange={e => onPctChange(sliderToPct(Number(e.target.value)))}
         className={'sf-ruler-a11y'}
       />
