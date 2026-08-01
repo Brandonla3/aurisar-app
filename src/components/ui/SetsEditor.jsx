@@ -48,6 +48,9 @@ const SetsEditor = React.memo(function SetsEditor({
   showDist = true,        // distance field on cardio rows
   allowExtraRows = true,  // the "＋ Add Row" progressive-row affordance
   onPrimaryBlur,          // optional blur hook (quick-log's ghost comparison)
+  onRowFocus,             // optional: reports which row has focus (0 = primary,
+                          // n = extra row n) — the Set Forge's weight chips
+                          // target the active row. Undefined elsewhere = no-op.
 }) {
   const isC = exD.category === 'cardio';
   const isF = exD.category === 'flexibility';
@@ -95,10 +98,11 @@ const SetsEditor = React.memo(function SetsEditor({
     rr[ri] = { ...rr[ri], [field]: val };
     onField('extraRows', rr);
   };
+  const focusProps = row => (onRowFocus ? { onFocus: () => onRowFocus(row) } : {});
   const rowInputProps = (ri, field, mapVal = v => v) =>
     rowsCommitOn === 'change'
-      ? { value: rows[ri][field] || '', onChange: e => setRow(ri, field, mapVal(e.target.value)) }
-      : { defaultValue: rows[ri][field] || '', onBlur: e => setRow(ri, field, mapVal(e.target.value)) };
+      ? { value: rows[ri][field] || '', onChange: e => setRow(ri, field, mapVal(e.target.value)), ...focusProps(ri + 1) }
+      : { defaultValue: rows[ri][field] || '', onBlur: e => setRow(ri, field, mapVal(e.target.value)), ...focusProps(ri + 1) };
   // Live converts extra-row weight like the primary; builder/quick-log store raw.
   const rowWeightProps = ri =>
     extraWeightMode === 'lbs'
@@ -126,7 +130,7 @@ const SetsEditor = React.memo(function SetsEditor({
   const cell = (hdr, input) => (
     <div className={'se-cell'}>
       <span className={'se-col-hdr'} aria-hidden={'true'}>{hdr}</span>
-      {React.cloneElement(input, { 'aria-label': `${primaryRowName} ${hdr}` })}
+      {React.cloneElement(input, { 'aria-label': `${primaryRowName} ${hdr}`, ...focusProps(0) })}
     </div>
   );
 
@@ -223,7 +227,11 @@ const SetsEditor = React.memo(function SetsEditor({
                 {...rowInputProps(ri, 'sets')} />}
               <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={'Reps'} aria-label={`${rn} reps`}
                 {...rowInputProps(ri, 'reps')} />
-              {showW && <input className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={wUnit} aria-label={`${rn} weight`}
+              {/* Keyed on the committed weight so an external write (the Set
+                  Forge's +5/+10/+15 chips) remounts this uncontrolled input
+                  with the new defaultValue. Remounts never race typing: the
+                  state only changes on blur-commit or chip tap. */}
+              {showW && <input key={`ew${ri}:${rows[ri].weightLbs ?? ''}`} className={'se-inp'} type={'text'} inputMode={'decimal'} placeholder={wUnit} aria-label={`${rn} weight`}
                 {...rowWeightProps(ri)} />}
             </>
           ); })()}
@@ -235,7 +243,9 @@ const SetsEditor = React.memo(function SetsEditor({
       {/* ── Add row ── */}
       {allowExtraRows && (
         <button type={'button'} className={'se-add-row'} onClick={addRow}>
-          {'＋ Add Row ('}{timed ? 'e.g. interval' : 'e.g. progressive weight'}{')'}
+          {variant === 'quicklog'
+            ? `＋ Add ${timed ? 'Interval' : 'Set'} (own ${timed ? 'duration' : 'reps & weight'})`
+            : `＋ Add Row (${timed ? 'e.g. interval' : 'e.g. progressive weight'})`}
         </button>
       )}
 

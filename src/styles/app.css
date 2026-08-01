@@ -1505,6 +1505,25 @@
     @keyframes orbRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
     @keyframes orbFade{from{opacity:0}to{opacity:1}}
 
+    /* ── Set Forge (Forge Glass quick log) ───────────────────────────────
+       Gold = earned: the Projected-XP card is the one gold surface in the
+       sheet. The ruler is a native horizontal scroller (see WeightRuler). */
+    .sf-xp-card{position:relative;overflow:hidden;border-radius:16px;padding:11px 13px;margin-bottom:10px;background:linear-gradient(150deg,rgba(232,180,74,.16),rgba(232,180,74,.04) 70%);border:1px solid rgba(232,180,74,.28)}
+    .sf-xp-sweep{position:absolute;top:0;bottom:0;left:0;width:38%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:sfSweep 3.4s var(--ease-out) infinite;pointer-events:none}
+    @keyframes sfSweep{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
+    .sf-chip{padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--font-cond);font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(228,222,211,.75);background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.12);transition:transform var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+    .sf-chip:active{transform:scale(.94);background:rgba(232,180,74,.16);border-color:rgba(232,180,74,.4)}
+    .sf-ruler{position:relative;height:38px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;padding:0 50%;cursor:ew-resize}
+    .sf-ruler::-webkit-scrollbar{display:none}
+    .sf-ruler-strip{height:100%;background:repeating-linear-gradient(90deg,rgba(240,200,104,.5) 0 1.5px,transparent 1.5px 45px),repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 1px,transparent 1px 9px);background-position:0 6px,0 12px;background-size:auto 20px,auto 10px;background-repeat:repeat-x}
+    .sf-ruler-fade{position:absolute;top:0;height:38px;width:56px;pointer-events:none;z-index:1}
+    .sf-ruler-fade--l{left:0;background:linear-gradient(90deg,rgba(20,18,14,.95),transparent)}
+    .sf-ruler-fade--r{right:0;background:linear-gradient(270deg,rgba(20,18,14,.95),transparent)}
+    .sf-ruler-needle{position:absolute;left:50%;top:2px;height:28px;width:2px;transform:translateX(-50%);background:#8FE3D2;box-shadow:0 0 14px rgba(143,227,210,.75);pointer-events:none;z-index:2}
+    /* Screen-reader/keyboard twin of the ruler — revealed on keyboard focus */
+    .sf-ruler-a11y{position:absolute;width:1px;height:1px;opacity:.01;overflow:hidden;left:0;top:0;margin:0;pointer-events:none}
+    .sf-ruler-a11y:focus-visible{position:relative;width:100%;height:14px;opacity:1;pointer-events:auto}
+
     /* ── Workout cards (Forge tab) — themed via --mg-color ── */
     .workout-card{
       --mg-color:#B0A090;
@@ -2225,7 +2244,7 @@
         animation: none; opacity: 1; transform: none;
       }
       /* Purely decorative loops — stop outright rather than run 500×/s. */
-      .lib-hero-orb, .lw-dot, .ambient-drift, .ambient-drift2 { animation: none; }
+      .lib-hero-orb, .lw-dot, .ambient-drift, .ambient-drift2, .sf-xp-sweep { animation: none; }
       .pt { display: none; }
       /* Hover/press displacement reads as motion too. */
       .lib-hero-card:hover, .lib-muscle-tile:hover, .lib-discover-card:hover,

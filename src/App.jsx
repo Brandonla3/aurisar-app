@@ -6,7 +6,7 @@ import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FAL
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './utils/storage';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
+import { isMetric, lbsToKg, kgToLbs, miToKm, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { perkAward, applyStoredPerk } from './utils/gearPerks';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec, daysUntil } from './utils/time';
@@ -57,6 +57,7 @@ import BottomNav from './components/BottomNav';
 import OrbCreateMenu from './components/OrbCreateMenu';
 import StartDock from './components/StartDock';
 import { deriveLastSession } from './utils/repeatLast';
+import { planQuickLogRows } from './utils/quickLogRows';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -3211,20 +3212,25 @@ function App() {
     if (!ex) return;
     const metric = isMetric(profile.units);
     const noSetsEx = NO_SETS_EX_IDS.has(ex.id);
-    const mult = getMult(ex),
-      rv = parseInt(reps) || 0,
-      sv = noSetsEx ? 1 : parseInt(sets) || 0;
-    // Convert weight to lbs for internal storage/XP (weight input already reflects intensity)
-    const rawW = parseFloat(exWeight || 0);
-    const weightInLbs = metric ? parseFloat(kgToLbs(rawW)) : rawW;
-    const effectiveW = weightInLbs;
-    // Convert distance to miles for storage
-    const rawDist = parseFloat(distanceVal || 0);
-    const distMi = rawDist > 0 ? metric ? parseFloat(kmToMi(rawDist)) : rawDist : null;
+    const mult = getMult(ex);
     const isCardioEx = ex.category === "cardio";
     const canHaveZone = isCardioEx;
+    // One planner for the estimate AND the entries (utils/quickLogRows): the
+    // Set Forge's Projected XP and what lands in the log are the same rows —
+    // primary + any progressive extra rows, one entry per row like the
+    // builder's completion path.
+    const plan = planQuickLogRows({
+      exId: ex.id,
+      category: ex.category,
+      noSets: noSetsEx,
+      chosenClass: profile.chosenClass,
+      allExById,
+      sets, reps, exWeight, exHHMM, exSec, distanceVal, quickRows,
+      metric,
+      hrZone: canHaveZone ? hrZone : null,
+    });
+    const { sv, rv, effW: effectiveW, distMi } = plan;
     const runPace = ex.id === RUNNING_EX_ID && distMi && rv ? rv / distMi : null;
-    const earned = calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi || null, effectiveW || null, canHaveZone ? hrZone : null);
     // Apply 10% travel boost if active this week
     const weekStart = () => {
       const d = new Date();
@@ -3238,13 +3244,18 @@ function App() {
     const myRegion = MAP_REGIONS[myRegionIdx];
     const regionBoost = myRegion && (myRegion.boost.muscle === "all" || myRegion.boost.muscle === ex.muscleGroup) ? 1.07 : 1;
     const travelMult = travelActive ? 1.1 : 1;
-    const preGearEarned = Math.round(earned * travelMult * regionBoost);
     // Equipped-gear XP perk (Batch C2): gear boosts real workout XP. Applied
     // here at the logging seam, layered on top of the honest earned figure
     // (class/travel/region already in), never inside calcExXP (also the
-    // estimator). No-op unless perk-bearing gear is equipped.
-    const _award = perkAward(preGearEarned, profile.equipPerks, { exId: ex.id, category: ex.category, muscleGroup: ex.muscleGroup });
-    const finalEarned = _award.xp;
+    // estimator). No-op unless perk-bearing gear is equipped. Travel/region/
+    // gear price each row exactly as the old single-entry path did — with no
+    // extra rows this is the previous math bit-for-bit.
+    const pricedRows = plan.rows.map(r => {
+      const preGear = Math.round(r.xp * travelMult * regionBoost);
+      const award = perkAward(preGear, profile.equipPerks, { exId: ex.id, category: ex.category, muscleGroup: ex.muscleGroup });
+      return { ...r, earned: award.xp, perkMult: award.perkMult, baseXp: award.baseXp };
+    });
+    const finalEarned = pricedRows.reduce((s, r) => s + r.earned, 0);
     // Capture current state values before clearing UI
     const capturedPendingSoloRemoveId = pendingSoloRemoveId;
     const capturedHrZone = canHaveZone && hrZone || null;
@@ -3263,37 +3274,41 @@ function App() {
       const soloExCallback = dateStr => {
         const dateObj = new Date(dateStr + "T12:00:00");
         const displayDate = dateObj.toLocaleDateString();
-        const entry = {
+        // Wall-clock stamp. dateKey alone parses as midnight, which is
+        // useless for anything that reasons about "a moment ago" — the
+        // quick-log carryover window is two minutes.
+        const loggedAtStamp = Date.now();
+        const timeStr = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+        // One log entry per Set Forge row (primary + progressive extras),
+        // mirroring the builder's completion path.
+        const entries = pricedRows.map(r => ({
           exercise: ex.name,
           icon: ex.icon,
-          xp: finalEarned,
+          xp: r.earned,
           // Gear XP factor for this row (>1 = boosted); omitted with no perks so
           // it doesn't bloat the persisted log. baseXp is the pre-gear figure so a
           // later server recompute can verify/strip without reconstructing it.
-          ...(_award.perkMult !== 1 ? { perkMult: _award.perkMult, baseXp: _award.baseXp } : {}),
+          ...(r.perkMult !== 1 ? { perkMult: r.perkMult, baseXp: r.baseXp } : {}),
           mult,
-          reps: rv,
-          sets: sv,
-          weightLbs: effectiveW || null,
+          reps: r.reps,
+          sets: r.sets,
+          weightLbs: r.weightLbs,
           weightPct,
           hrZone: capturedHrZone,
-          distanceMi: distMi || null,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit"
-          }),
+          distanceMi: r.distanceMi,
+          time: timeStr,
           date: displayDate,
           dateKey: dateStr,
-          // Wall-clock stamp. dateKey alone parses as midnight, which is
-          // useless for anything that reasons about "a moment ago" — the
-          // quick-log carryover window is two minutes.
-          loggedAt: Date.now(),
+          loggedAt: loggedAtStamp,
           exId: ex.id,
           sourceTotalCal: woWithStats.totalCal || null,
           sourceActiveCal: woWithStats.activeCal || null,
           sourceDurationSec: woWithStats.durationMin || null
-        };
-        const newLog = [entry, ...profile.log];
+        }));
+        const newLog = [...entries, ...profile.log];
         const newQuests = {
           ...(profile.quests || {})
         };
@@ -3307,8 +3322,8 @@ function App() {
         let newPB = profile.runningPB || null;
         if (runPace && (!newPB || runPace < newPB)) newPB = runPace;
         const newExPBs = calcExercisePBs(newLog);
-        const oldPB = (profile.exercisePBs || {})[entry.exId];
-        const curPB = newExPBs[entry.exId];
+        const oldPB = (profile.exercisePBs || {})[ex.id];
+        const curPB = newExPBs[ex.id];
         const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
         let _ciResult = {
           checkInApplied: false,
