@@ -51,6 +51,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import TabIcon from './components/TabIcons';
 import Sheet from './components/ui/Sheet';
 import ConfirmSheet from './components/ui/ConfirmSheet';
+import AmbientBackdrop from './features/ambient/AmbientBackdrop';
+import { tintRgba } from './features/ambient/ambientTint';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -2796,6 +2798,31 @@ function App() {
   // the tray's count, the library's banner and the forged workout all agree.
   const stagedIds = useMemo(() => cartIds.filter(id => allExById[id]), [cartIds, allExById]);
 
+  // ── Ambient light travel ──
+  // The muscle group "in context" retints the backdrop's drift layers (CSS vars
+  // read by .ambient-drift/.ambient-drift2, which transition 800ms). Priority:
+  // exercise being configured > exercise being viewed > a single active library
+  // muscle filter (tapping a muscle tile sets exactly that) > default gold.
+  const ambientMuscle = useMemo(() => {
+    const cfgEx = selEx ? allExById[selEx] : null;
+    return (
+      (cfgEx && cfgEx.muscleGroup) ||
+      (libDetailEx && libDetailEx.muscleGroup) ||
+      (libMuscleFilters.size === 1 ? Array.from(libMuscleFilters)[0] : null)
+    );
+  }, [selEx, libDetailEx, libMuscleFilters, allExById]);
+  useEffect(() => {
+    const rootEl = document.documentElement;
+    const hex = ambientMuscle ? MUSCLE_COLORS[(ambientMuscle || "").toLowerCase()] : null;
+    if (hex) {
+      rootEl.style.setProperty("--ambient-tint", tintRgba(hex, 0.22));
+      rootEl.style.setProperty("--ambient-tint2", tintRgba(hex, 0.17));
+    } else {
+      rootEl.style.removeProperty("--ambient-tint");
+      rootEl.style.removeProperty("--ambient-tint2");
+    }
+  }, [ambientMuscle]);
+
   // Drop the unresolvable ones from storage too, but only once the catalog has
   // actually loaded — the bundled list is merged with Supabase after mount, so
   // pruning earlier would delete IDs that are merely late, not missing.
@@ -4772,7 +4799,7 @@ function App() {
       lookupByPrivateId={lookupByPrivateId}
     />
   );
-  return <div className={"root"} style={rootStyle}><style>{CSS}</style><div className={"bg"} />{PARTICLES.map(p => <div key={p.id} className={"pt"} style={{
+  return <div className={"root"} style={rootStyle}><style>{CSS}</style><div className={"bg"} /><AmbientBackdrop suspendVideo={activeTab === "world"} />{PARTICLES.map(p => <div key={p.id} className={"pt"} style={{
       left: `${p.x}%`,
       bottom: `${p.bottom}%`,
       width: p.size,

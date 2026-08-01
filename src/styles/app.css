@@ -71,6 +71,13 @@
     .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
     .bg{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 60% at 30% 20%,rgba(45,42,36,.3) 0%,transparent 65%),radial-gradient(ellipse 50% 45% at 70% 75%,rgba(32,30,26,.18) 0%,transparent 55%),#0c0c0a}.bg::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 45%,transparent 40%,rgba(0,0,0,.2) 100%);z-index:0}
     .pt{position:fixed;border-radius:50%;background:var(--cls-color);opacity:.13;animation:flt var(--dur) var(--dly) infinite ease-in-out alternate;pointer-events:none;z-index:1;filter:blur(1px)}
+    /* ── Forge Glass ambient drift ───────────────────────────────────────
+       Two full-viewport radial washes colored by --ambient-tint(-2); App
+       retints the vars to the muscle group in context and the 800ms
+       background transition is the "ambient light travel". */
+    .ambient-drift{position:absolute;inset:-15%;pointer-events:none;opacity:.9;background:radial-gradient(46% 34% at 50% 4%,var(--ambient-tint),transparent 68%);animation:ambientDrift 26s ease-in-out infinite;transition:background 800ms var(--ease-standard)}
+    .ambient-drift2{position:absolute;left:-20%;right:-20%;bottom:-24%;height:52%;pointer-events:none;opacity:.75;background:radial-gradient(50% 60% at 50% 100%,var(--ambient-tint2),transparent 70%);animation:ambientDrift 34s ease-in-out infinite reverse;transition:background 800ms var(--ease-standard)}
+    @keyframes ambientDrift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(-4%,3%,0) scale(1.12)}100%{transform:translate3d(0,0,0) scale(1)}}
     @keyframes flt{from{transform:translateY(0) scaleX(1);opacity:.1}to{transform:translateY(-12px) scaleX(2);opacity:.3}}
     .screen{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:20px}
     .title{font-family:'Cinzel Decorative',serif,Arial;font-size:clamp(1.6rem,5vw,2.8rem);font-weight:900;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;letter-spacing:.1em;line-height:1.15}
@@ -2208,7 +2215,7 @@
         animation: none; opacity: 1; transform: none;
       }
       /* Purely decorative loops — stop outright rather than run 500×/s. */
-      .lib-hero-orb, .lw-dot { animation: none; }
+      .lib-hero-orb, .lw-dot, .ambient-drift, .ambient-drift2 { animation: none; }
       .pt { display: none; }
       /* Hover/press displacement reads as motion too. */
       .lib-hero-card:hover, .lib-muscle-tile:hover, .lib-discover-card:hover,
