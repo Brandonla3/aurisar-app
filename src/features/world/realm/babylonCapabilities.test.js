@@ -82,13 +82,10 @@ describe('babylon capabilities', () => {
     expect(bundle).toContain('_babylonSLtoGLSL');
   });
 
-  it('CustomBlock exists but is deliberately unused', () => {
-    // Present in the bundle, and a trap: its build path emits code verbatim with
-    // no language branch, so GLSL written into a CustomBlock compiles on WebGL2
-    // and fails ONLY on WebGPU. RealmFnBlock subclasses NodeMaterialBlock and
-    // transpiles instead. Asserted so nobody "helpfully" reaches for it.
-    expect(typeof BABYLON.CustomBlock).toBe('function');
-  });
+  // NOTE: the CustomBlock ban is enforced in boundary.test.js, which scans Realm
+  // sources for actual use. Asserting here that the class exists proved only that
+  // Babylon ships it — nothing about whether our own code avoids it, which is the
+  // invariant that matters.
 
   it('GUI is reachable ONLY via the global namespace, not the module exports', async () => {
     // A real trap. `import BABYLON from 'babylonjs'` gives you the module exports

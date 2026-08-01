@@ -40,29 +40,53 @@ const MINIMAL_OPTIONS = {
 };
 
 /**
- * @returns {Promise<{engine: object, renderer: string, degraded: boolean}>}
+ * A canvas can only ever hand out ONE kind of rendering context. Once
+ * `getContext('webgpu')` has succeeded, `getContext('webgl2')` on that same
+ * element returns null forever. So if WebGPU init fails *after* acquiring the
+ * context — which is exactly what a configuration failure looks like — falling
+ * back on the same canvas is guaranteed to fail too, turning a degraded-but-
+ * working boot into a dead one.
+ *
+ * Swapping in a clone (attributes and id preserved, no children) gives WebGL2 an
+ * unbound element to work with.
+ */
+function replaceCanvas(canvas) {
+  const fresh = canvas.cloneNode(false);
+  if (canvas.parentNode) canvas.parentNode.replaceChild(fresh, canvas);
+  return fresh;
+}
+
+/**
+ * @returns {Promise<{engine: object, renderer: string, canvas: object, degraded: boolean}>}
  *   `degraded` is true when we fell back to minimal options or to WebGL2 after a
- *   WebGPU failure — the caller surfaces it rather than hiding it.
+ *   WebGPU failure — the caller surfaces it rather than hiding it. `canvas` is
+ *   returned because the fallback may have had to swap the element; callers that
+ *   bind input (camera.attachControl) must use the one handed back, not the one
+ *   they passed in.
  */
 export async function createRealmEngine(canvas, { renderer = RENDERER.WEBGL2, isMobile = false } = {}) {
   if (!canvas) throw new Error('[RealmEngine] a canvas is required');
 
   if (renderer === RENDERER.WEBGPU) {
+    let gpuEngine = null;
     try {
-      const engine = new BABYLON.WebGPUEngine(canvas, { stencil: true, antialias: true });
-      await engine.initAsync();
-      return { engine, renderer: RENDERER.WEBGPU, degraded: false };
+      gpuEngine = new BABYLON.WebGPUEngine(canvas, { stencil: true, antialias: true });
+      await gpuEngine.initAsync();
+      return { engine: gpuEngine, renderer: RENDERER.WEBGPU, canvas, degraded: false };
     } catch (err) {
       // WebGPU is opt-in, so a failure here is a preference we could not honour,
       // not a fatal error. Fall through to WebGL2 and report it.
       console.warn('[RealmEngine] WebGPU init failed, falling back to WebGL2:', err?.message ?? err);
-      const { engine } = createWebGL2(canvas, isMobile);
-      return { engine, renderer: RENDERER.WEBGL2, degraded: true };
+      // Release whatever the half-built engine grabbed before abandoning it.
+      try { gpuEngine?.dispose(); } catch { /* best effort — it never fully initialised */ }
+      const freshCanvas = replaceCanvas(canvas);
+      const { engine } = createWebGL2(freshCanvas, isMobile);
+      return { engine, renderer: RENDERER.WEBGL2, canvas: freshCanvas, degraded: true };
     }
   }
 
   const { engine, degraded } = createWebGL2(canvas, isMobile);
-  return { engine, renderer: RENDERER.WEBGL2, degraded };
+  return { engine, renderer: RENDERER.WEBGL2, canvas, degraded };
 }
 
 function createWebGL2(canvas, isMobile) {

@@ -36,7 +36,10 @@ async function boot() {
   const choice = chooseRenderer({ pref, hasWebGPU, isIOS });
   say(`renderer  : ${choice.renderer} (${choice.reason})`);
 
-  const { engine, renderer, degraded } = await createRealmEngine(canvas, {
+  // `liveCanvas` may not be the element we passed in: a failed WebGPU init leaves
+  // the original bound to a context type WebGL2 cannot use, so the fallback swaps
+  // in a fresh one. Input binding must follow the canvas that actually rendered.
+  const { engine, renderer, canvas: liveCanvas, degraded } = await createRealmEngine(canvas, {
     renderer: choice.renderer,
     isMobile: window.matchMedia('(pointer: coarse)').matches,
   });
@@ -52,7 +55,7 @@ async function boot() {
 
   const camera = new BABYLON.ArcRotateCamera('spikeCam', -Math.PI / 2, Math.PI / 3.2, 14,
     new BABYLON.Vector3(0, 1, 0), scene);
-  camera.attachControl(canvas, true);
+  camera.attachControl(liveCanvas, true);
   camera.lowerRadiusLimit = 4;
   camera.upperRadiusLimit = 40;
 

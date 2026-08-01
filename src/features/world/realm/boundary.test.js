@@ -18,7 +18,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { dirname, join, relative, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REALM_ROOT = dirname(fileURLToPath(import.meta.url));
@@ -79,6 +79,27 @@ function stripComments(src) {
 
 const rel = (f) => relative(REALM_ROOT, f).split(sep).join('/');
 
+const VIEW_ROOT = join(REALM_ROOT, RENDER_LAYER);
+
+/** Every import/re-export specifier in a source file, including bare side-effect imports. */
+function importSpecifiers(src) {
+  const out = [];
+  const re = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s+\*\s+from\s*)['"]([^'"]+)['"]/g;
+  let m;
+  while ((m = re.exec(src)) !== null) out.push(m[1]);
+  return out;
+}
+
+/** Does this file reach into view/ via a relative import? */
+function importsView(file, src) {
+  return importSpecifiers(src)
+    .filter((s) => s.startsWith('.'))
+    .some((s) => {
+      const target = resolve(dirname(file), s);
+      return target === VIEW_ROOT || target.startsWith(VIEW_ROOT + sep);
+    });
+}
+
 const ALL_FILES = walk(REALM_ROOT);
 const inView = (f) => rel(f).split('/')[0] === RENDER_LAYER;
 
@@ -118,6 +139,44 @@ describe('realm boundary', () => {
       .map(rel);
 
     expect(offenders, 'Only view/ may import babylonjs.').toEqual([]);
+  });
+
+  it('nothing outside view/ imports from view/', () => {
+    // Token scanning alone is not enough. A module under model/ or sim/ could
+    // `import { createRealmScene } from '../view/RealmScene.js'` without ever
+    // spelling BABYLON or 'babylonjs', and both checks above would stay green
+    // while the supposedly node-testable layer had grown a hard dependency on
+    // engine code. Transitive reach counts as touching the engine.
+    const offenders = pureFiles
+      .filter((f) => importsView(f, readFileSync(f, 'utf8')))
+      .map(rel);
+
+    expect(
+      offenders,
+      'These files live outside view/ but import from view/, which makes them\n' +
+        'transitively engine-dependent. Invert the dependency: view/ should import\n' +
+        'the pure module, not the other way round.',
+    ).toEqual([]);
+  });
+
+  it('realm sources never use CustomBlock', () => {
+    // Not a style rule. CustomBlock emits its source verbatim with no language
+    // branch, so GLSL written into one compiles fine on WebGL2 and fails ONLY on
+    // WebGPU — a backend-specific break that no amount of desktop testing sees.
+    // Custom shader math goes through RealmFnBlock, which transpiles per target.
+    //
+    // Asserting the class merely EXISTS proved nothing about our own code; this
+    // scans for actual use, which is the invariant worth holding.
+    const offenders = ALL_FILES.filter((f) => !TEST_FILE.test(f))
+      .filter((f) => /\bCustomBlock\b/.test(stripComments(readFileSync(f, 'utf8'))))
+      .map(rel);
+
+    expect(
+      offenders,
+      'These files reference CustomBlock. Use a NodeMaterialBlock subclass that\n' +
+        'runs its source through Babylon’s BabylonSL transpiler instead — see the\n' +
+        'realm README. CustomBlock silently breaks the WebGPU backend only.',
+    ).toEqual([]);
   });
 
   it('has at least one engine-free file to police', () => {
