@@ -29,6 +29,23 @@ up: on the login screen click "Preview Mode" and enter the dev PIN `1234`
 data so you can build/log a one-off workout and see XP gained. Preview Mode is
 dev-only (`import.meta.env.DEV`) unless `VITE_ALLOW_PREVIEW=true` at build time.
 
+### Preview/branch deploy access gate
+
+Public non-production Netlify deploys (`deploy-preview`, `branch-deploy`) are
+gated by a server-side HTTP Basic Auth edge function,
+`netlify/edge-functions/preview-auth.js`. It reads server-side (non-`VITE_`)
+env vars `PREVIEW_BASIC_AUTH_USER` / `PREVIEW_BASIC_AUTH_PASSWORD`, so the
+credential never reaches the client bundle. Non-obvious behavior:
+
+- Production and local dev are **never** gated (checked via the `CONTEXT` env
+  var), so `npm run dev` is unaffected. To exercise the gate locally you must
+  run through Netlify's edge runtime with a gated `CONTEXT` (e.g. `netlify dev`
+  with `CONTEXT=deploy-preview`) and both credential vars set.
+- On a gated deploy with the vars unset, the edge function returns `503`
+  (fails closed) rather than serving an unprotected site.
+- The client-side "Preview Mode" PIN is a dev convenience only — it is not a
+  security boundary and cannot be kept secret in a public bundle.
+
 ### Lint / test / build
 
 Standard scripts live in `package.json`. Non-obvious notes:
