@@ -483,7 +483,7 @@ return (
       <div style={{
         display: "flex", gap: 0, border: "1px solid rgba(180,172,158,.06)",
         borderRadius: 8, overflow: "hidden", marginBottom: 12,
-        background: "rgba(32,29,24,.8)",
+        background: "rgba(20,18,14,.8)",
       }}>
         {tabs.map((t, i) => (
           <div key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === "security") checkMfaStatus(); }} style={{
