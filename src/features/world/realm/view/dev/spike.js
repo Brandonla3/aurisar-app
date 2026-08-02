@@ -21,6 +21,8 @@ import { createRealmScene, startRenderLoop } from '../RealmScene.js';
 import { createTerrainField } from '../../model/terrainField.js';
 import { TerrainStreamer } from '../terrain/TerrainStreamer.js';
 import { buildTerrainMaterial } from '../materials/terrainNME.js';
+import { buildSkyDomeMaterial, createSkyDome } from '../materials/skyDomeNME.js';
+import { FogDriver } from '../atmosphere/FogDriver.js';
 import { createWalkerState, integrateWalker } from '../../model/walker.js';
 import {
   BUTTON, createInputSnapshot, resetInputSnapshot, setButton,
@@ -62,14 +64,25 @@ async function boot() {
   const scene = createRealmScene(engine);
 
   // ── Lights ──────────────────────────────────────────────────────────────────
-  // Tuned for the NodeMaterial's linear albedo*(diffuse+ambient) response —
-  // hotter values (2.4) were Standard-material numbers and pushed every sunlit
-  // fragment past the shade clamp, flattening the terrain to one tone.
+  // Lights exist here; their direction/tint/intensity are OWNED by the
+  // FogDriver from P4 on — one skyState evaluation drives fog, dome, and
+  // lights together so they can never disagree about what moment it is.
   const key = new BABYLON.DirectionalLight('key', new BABYLON.Vector3(-0.55, -1, 0.35), scene);
   key.intensity = 1.25;
   const fill = new BABYLON.HemisphericLight('fill', new BABYLON.Vector3(0, 1, 0), scene);
   fill.intensity = 0.3;
   fill.groundColor = new BABYLON.Color3(0.16, 0.20, 0.15);
+
+  // ── Atmosphere (P4): dome + the single-writer FogDriver ────────────────────
+  const { material: skyMat, applyState: applyDomeState } = await buildSkyDomeMaterial(scene);
+  createSkyDome(scene, skyMat);
+  // ?timewarp=40 compresses the 40-min cycle into one minute for verification.
+  const timewarp = Number(new URLSearchParams(location.search).get('timewarp')) || 1;
+  const fogDriver = new FogDriver(scene, {
+    sunLight: key,
+    ambientLight: fill,
+    applyDomeState,
+  }, { timeScale: timewarp });
 
   // ── Terrain ─────────────────────────────────────────────────────────────────
   // P3: the painted NodeMaterial — slope/height splat + noise variation,
@@ -139,6 +152,9 @@ async function boot() {
       accumulator -= SIM_STEP_MS;
     }
 
+    // One skyState per frame drives fog + clear + dome + lights, atomically.
+    fogDriver.update(nowMs);
+
     playerRoot.position.set(walker.x, walker.y, walker.z);
     playerRoot.rotation.y = walker.yaw;
     // Chase: ease the camera target to the player's head.
@@ -179,11 +195,12 @@ async function boot() {
       `pos       : ${walker.x.toFixed(1)}, ${walker.y.toFixed(1)}, ${walker.z.toFixed(1)}`,
       `speed     : ${walker.speedMps.toFixed(1)} m/s`,
       `chunks    : ${streamer.residentCount()} resident`,
+      `sky       : ${fogDriver.state?.fogDensity ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
       `fps       : ${engine.getFps().toFixed(0)}`,
     ].join('\n');
   }, 250);
 
-  window.__realmSpike = { engine, scene, adt, field, streamer, camera, getWalker: () => walker };
+  window.__realmSpike = { engine, scene, adt, field, streamer, camera, fogDriver, getWalker: () => walker };
 }
 
 boot().catch((err) => {
