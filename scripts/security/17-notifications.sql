@@ -249,6 +249,15 @@ BEGIN
     IF v_sent_24h >= 20 THEN
       RETURN 'defer';
     END IF;
+
+    -- Quiet hours: hold non-transactional email during the US night
+    -- (05:00–13:00 UTC ≈ 10pm PT – 9am ET; users are US-centric and no
+    -- per-user timezone exists yet). Deferred, not skipped — the drain
+    -- retries after the window. Welcome/security mail is exempt.
+    IF p_event_type NOT IN ('welcome', 'security_alert')
+       AND extract(hour FROM now()) >= 5 AND extract(hour FROM now()) < 13 THEN
+      RETURN 'defer';
+    END IF;
   END IF;
 
   -- Transactional types are not opt-out-able.
@@ -482,6 +491,71 @@ DROP TRIGGER IF EXISTS trg_notify_message_received ON public.messages;
 CREATE TRIGGER trg_notify_message_received
   AFTER INSERT ON public.messages
   FOR EACH ROW EXECUTE FUNCTION public.notify_message_received();
+
+-- ── 7. Daily reminder producer ───────────────────────────────────────────────
+-- Called once a day (23:00 UTC) by netlify/functions/reminders-producer.js.
+-- Dates are UTC-day strings matching the client's todayStr() format
+-- (YYYY-MM-DD); no per-user timezone exists yet, so reminder timing is
+-- approximate — acceptable while workout_reminder email defaults to opt-in.
+-- Both scans dedupe against a same-day row, so re-runs are harmless.
+
+CREATE OR REPLACE FUNCTION public.produce_daily_reminders()
+RETURNS TABLE (streak_rows int, workout_rows int)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_today     text := to_char(now(), 'YYYY-MM-DD');
+  v_yesterday text := to_char(now() - interval '1 day', 'YYYY-MM-DD');
+  v_streak    int;
+  v_workout   int;
+BEGIN
+  -- streak_at_risk: streak alive through yesterday, no check-in yet today.
+  -- (lastCheckIn older than yesterday = streak already broken, not "at risk".)
+  INSERT INTO public.notifications (recipient_id, event_type, payload)
+  SELECT p.id, 'streak_at_risk',
+         jsonb_build_object('streak', COALESCE((p.data->>'checkInStreak')::int, 0))
+  FROM public.profiles p
+  WHERE p.disabled_at IS NULL
+    AND COALESCE((p.data->>'checkInStreak')::int, 0) > 0
+    AND p.data->>'lastCheckIn' = v_yesterday
+    AND NOT EXISTS (
+      SELECT 1 FROM public.notifications n
+      WHERE n.recipient_id = p.id
+        AND n.event_type = 'streak_at_risk'
+        AND n.created_at >= date_trunc('day', now())
+    );
+  GET DIAGNOSTICS v_streak = ROW_COUNT;
+
+  -- workout_reminder: something scheduled for today, nothing logged today.
+  INSERT INTO public.notifications (recipient_id, event_type, payload)
+  SELECT p.id, 'workout_reminder',
+         jsonb_build_object('text', 'You have training scheduled today. Your quest awaits.')
+  FROM public.profiles p
+  WHERE p.disabled_at IS NULL
+    AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(
+        CASE WHEN jsonb_typeof(p.data->'scheduledWorkouts') = 'array'
+             THEN p.data->'scheduledWorkouts' ELSE '[]'::jsonb END) sw
+      WHERE sw->>'scheduledDate' = v_today
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(
+        CASE WHEN jsonb_typeof(p.data->'log') = 'array'
+             THEN p.data->'log' ELSE '[]'::jsonb END) l
+      WHERE l->>'date' = v_today
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.notifications n
+      WHERE n.recipient_id = p.id
+        AND n.event_type = 'workout_reminder'
+        AND n.created_at >= date_trunc('day', now())
+    );
+  GET DIAGNOSTICS v_workout = ROW_COUNT;
+
+  RETURN QUERY SELECT v_streak, v_workout;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.produce_daily_reminders() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.produce_daily_reminders() TO service_role;
 
 COMMIT;
 
