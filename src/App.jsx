@@ -21,6 +21,7 @@ import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
 import { useNotificationPrefs } from './state/useNotificationPrefs';
 import { showToast } from './components/toast/toastStore';
+import { shouldChallengeMfa } from './utils/mfaGate';
 import ToastHost from './components/toast/ToastHost';
 import useNotifications from './features/notifications/useNotifications';
 import NotificationInbox from './features/notifications/NotificationInbox';
@@ -821,6 +822,10 @@ function App() {
       // every workout save until the next page reload.
       setIsPreviewMode(false);
       setAuthUser(user);
+      // Assurance gate — covers passkey sign-in and any other event that
+      // lands here. Runs before the profile load so an aal1 session with a
+      // verified factor never renders the app.
+      if (await checkAndHandleMfaChallenge()) return;
       try {
         const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _25a => _25a.id]) || null);
         if (adminFlags.disabled_at) {
@@ -871,6 +876,10 @@ function App() {
         setIsPreviewMode(false); // a fresh page load with a session is never preview
         setAuthUser(user);
         checkMfaStatus();
+        // THE refresh-bypass fix: without this, reloading the page with a
+        // stolen/valid aal1 token walked straight into "main" despite MFA
+        // being enrolled. checkMfaStatus() above only sets display state.
+        if (await checkAndHandleMfaChallenge()) return;
         try {
           const adminFlags = await loadAdminFlags(user.id);
           if (adminFlags.disabled_at) {
@@ -1873,6 +1882,11 @@ function App() {
   }
 
   // ── MFA LOGIN CHALLENGE ───────────────────────────────────
+  // THE assurance gate. Must be awaited before any path reaches "main":
+  // password sign-in, the getSession() bootstrap, AND the onAuthStateChange
+  // signed-in branch (which also covers passkeys). Previously only the first
+  // called it, so a page reload walked straight past MFA at aal1.
+  // Returns true when it has taken over the screen.
   async function checkAndHandleMfaChallenge() {
     try {
       const {
@@ -1880,21 +1894,18 @@ function App() {
         error
       } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
       if (error) return false;
-      if (data.currentLevel === "aal1" && data.nextLevel === "aal2") {
-        // MFA is required — get factor ID
-        const {
-          data: factors
-        } = await sb.auth.mfa.listFactors();
-        const totp = (factors.totp || []).find(f => f.status === "verified");
-        if (totp) {
-          setMfaChallengeFactorId(totp.id);
-          setMfaChallengeScreen(true);
-          setMfaChallengeCode("");
-          setMfaChallengeMsg(null);
-          setMfaRecoveryMode(false);
-          setMfaRecoveryInput("");
-          return true; // Intercepted — don't proceed to main
-        }
+      const {
+        data: factors
+      } = await sb.auth.mfa.listFactors();
+      const { challenge, factorId } = shouldChallengeMfa(data, factors);
+      if (challenge) {
+        setMfaChallengeFactorId(factorId);
+        setMfaChallengeScreen(true);
+        setMfaChallengeCode("");
+        setMfaChallengeMsg(null);
+        setMfaRecoveryMode(false);
+        setMfaRecoveryInput("");
+        return true; // Intercepted — don't proceed to main
       }
     } catch (e) {
       console.warn("MFA assurance check:", e);
@@ -4611,7 +4622,11 @@ function App() {
   }
   if (window.location.pathname === '/privacy') return <PrivacyPolicy />;
 
-  if (screen === "loading") return <div style={{
+  // The MFA challenge outranks the loading screen: the bootstrap assurance
+  // gate fires while `screen` is still "loading" and returns early without
+  // advancing it, so checking loading first would strand an MFA user on
+  // "Loading your legend…" with the challenge never rendered.
+  if (screen === "loading" && !mfaChallengeScreen) return <div style={{
     minHeight: "100vh",
     background: "#0c0c0a",
     display: "flex",
