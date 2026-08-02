@@ -40,7 +40,36 @@ const REPLAY_TOLERANCE_S = 60 * 60 * 24;
 // about which Resend actually sends.
 const HEADER_FAMILIES = ["svix", "webhook"];
 
-export function verifyWebhook(secret, headers, payload, nowMs = Date.now()) {
+// Env vars pick up damage on the way in. A secret pasted into a web form
+// commonly arrives with a trailing newline, a leading/trailing space, or
+// wrapping quotes — none visible in the UI. `whsec_` is stripped before
+// base64-decoding, so any of those makes the remainder invalid base64 and the
+// library throws "Base64Coder: incorrect characters for decoding" — which is
+// exactly what production returned once this handler started reporting why.
+export function normaliseSecret(raw) {
+  return String(raw ?? "")
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .trim();
+}
+
+/**
+ * Describe a secret WITHOUT leaking it, so a misconfiguration is diagnosable
+ * from a log line. Never returns any part of the value itself.
+ */
+export function describeSecret(raw) {
+  const s = normaliseSecret(raw);
+  const body = s.replace(/^whsec_/, "");
+  return [
+    `len=${s.length}`,
+    `prefix=${s.startsWith("whsec_")}`,
+    `base64=${/^[A-Za-z0-9+/]*={0,2}$/.test(body)}`,
+    `trimmed=${s.length !== String(raw ?? "").length}`,
+  ].join(" ");
+}
+
+export function verifyWebhook(rawSecret, headers, payload, nowMs = Date.now()) {
+  const secret = normaliseSecret(rawSecret);
   const h = {};
   for (const [k, v] of headers.entries()) h[k.toLowerCase()] = v;
   const headerNames = Object.keys(h);
@@ -66,8 +95,14 @@ export function verifyWebhook(secret, headers, payload, nowMs = Date.now()) {
     // Library-computed, so the scheme cannot drift from the spec again.
     expected = new Webhook(secret).sign(id, new Date(ts * 1000), payload);
   } catch (e) {
-    // Bad secret shape (wrong padding, stray whitespace from a paste, …).
-    return { ok: false, reason: `bad_secret: ${e.message}`, headerNames, family };
+    // Bad secret shape. The description is safe to log and return: it reports
+    // length and character-class only, never any part of the value.
+    return {
+      ok: false,
+      reason: `bad_secret [${describeSecret(rawSecret)}]: ${e.message}`,
+      headerNames,
+      family,
+    };
   }
   const expectedSig = expected.startsWith("v1,") ? expected.slice(3) : expected;
 

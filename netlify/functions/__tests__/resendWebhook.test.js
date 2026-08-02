@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { Webhook } from 'svix';
-import { verifyWebhook } from '../resend-webhook.js';
+import { verifyWebhook, normaliseSecret, describeSecret } from '../resend-webhook.js';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const src = readFileSync(ROOT + 'netlify/functions/resend-webhook.js', 'utf8');
@@ -108,6 +108,42 @@ describe('rejects what it should', () => {
     const r = verifyWebhook('not-a-real-secret', signed('svix'), BODY);
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/^(bad_secret|signature_mismatch)/);
+  });
+});
+
+describe('secret normalisation — the ACTUAL production root cause', () => {
+  // Production returned:
+  //   bad_secret: Base64Coder: incorrect characters for decoding
+  //   (signing headers: svix-id,svix-signature,svix-timestamp)
+  // The headers were fine all along. The stored env var was not valid base64
+  // after stripping `whsec_` — i.e. the pasted value carried invisible damage.
+  const GOOD = 'whsec_' + Buffer.from('0123456789abcdefghijklmn').toString('base64');
+
+  it('recovers from every common paste artifact', () => {
+    for (const damaged of [GOOD + '\n', GOOD + '\r\n', '  ' + GOOD + '  ', `"${GOOD}"`, `'${GOOD}'`]) {
+      expect(normaliseSecret(damaged), JSON.stringify(damaged)).toBe(GOOD);
+    }
+  });
+
+  it('verification succeeds even when the secret arrives damaged', () => {
+    const h = signed('svix', 0, { secret: GOOD });
+    expect(verifyWebhook(GOOD + '\n', h, BODY).ok).toBe(true);
+    expect(verifyWebhook(`"${GOOD}"`, h, BODY).ok).toBe(true);
+  });
+
+  it('describeSecret reports shape without leaking any of the value', () => {
+    const d = describeSecret(GOOD + '\n');
+    expect(d).toContain('prefix=true');
+    expect(d).toContain('base64=true');
+    expect(d).toContain('trimmed=true');
+    // Nothing from the secret body may appear in a loggable description.
+    expect(d).not.toContain(GOOD.replace('whsec_', '').slice(0, 8));
+  });
+
+  it('a genuinely malformed secret still fails, with a diagnosable reason', () => {
+    const r = verifyWebhook('whsec_not-valid-base64!!', signed('svix'), BODY);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/^bad_secret \[len=\d+ prefix=(true|false) base64=false/);
   });
 });
 
