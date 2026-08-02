@@ -368,6 +368,121 @@ BEGIN
 END;
 $$;
 
+-- ── 6. Producer triggers — the five "dead toggles" gain real senders ─────────
+-- Each producer inserts outbox rows; the checkpoint decides delivery later.
+-- (friend_level_up is section 5; friend_exercise deliberately stays on its
+-- dedicated friend_exercise_events table — one row visible to all friends
+-- via RLS beats a per-friend fan-out for the highest-volume event class.
+-- review_battle_stats is a purely local prompt: pref rows only, no outbox.)
+
+-- Display-name lookup used by all producers.
+CREATE OR REPLACE FUNCTION public.notif_player_name(p_user uuid)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT COALESCE(p.data->>'playerName', 'A warrior')
+  FROM public.profiles p WHERE p.id = p_user;
+$$;
+REVOKE ALL ON FUNCTION public.notif_player_name(uuid) FROM PUBLIC;
+
+-- 6a. friend_request — someone sent you a request.
+CREATE OR REPLACE FUNCTION public.notify_friend_request()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF NEW.status = 'pending' THEN
+    INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
+    VALUES (
+      NEW.to_user_id, NEW.from_user_id, 'friend_request',
+      jsonb_build_object('fromName', public.notif_player_name(NEW.from_user_id))
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_notify_friend_request ON public.friend_requests;
+CREATE TRIGGER trg_notify_friend_request
+  AFTER INSERT ON public.friend_requests
+  FOR EACH ROW EXECUTE FUNCTION public.notify_friend_request();
+
+-- 6b. friend_accepted — your request was accepted (notify the requester).
+CREATE OR REPLACE FUNCTION public.notify_friend_accepted()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF NEW.status = 'accepted' AND OLD.status IS DISTINCT FROM 'accepted' THEN
+    INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
+    VALUES (
+      NEW.from_user_id, NEW.to_user_id, 'friend_accepted',
+      jsonb_build_object('friendName', public.notif_player_name(NEW.to_user_id))
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_notify_friend_accepted ON public.friend_requests;
+CREATE TRIGGER trg_notify_friend_accepted
+  AFTER UPDATE ON public.friend_requests
+  FOR EACH ROW EXECUTE FUNCTION public.notify_friend_accepted();
+
+-- 6c. shared_workout — a workout/plan was shared with you.
+CREATE OR REPLACE FUNCTION public.notify_shared_item()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_item_name text;
+BEGIN
+  BEGIN
+    v_item_name := (NEW.item_data::jsonb)->>'name';
+  EXCEPTION WHEN others THEN
+    v_item_name := NULL;  -- item_data is client-supplied text; never let a bad blob block the share
+  END;
+  INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
+  VALUES (
+    NEW.to_user_id, NEW.from_user_id, 'shared_workout',
+    jsonb_build_object(
+      'fromName',    public.notif_player_name(NEW.from_user_id),
+      'workoutName', COALESCE(v_item_name, 'a workout'),
+      'shareType',   NEW.type
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_notify_shared_item ON public.shared_items;
+CREATE TRIGGER trg_notify_shared_item
+  AFTER INSERT ON public.shared_items
+  FOR EACH ROW EXECUTE FUNCTION public.notify_shared_item();
+
+-- 6d. message_received — a DM arrived. Burst-guarded: while a recipient
+-- already has an UNREAD message notification from the same sender, further
+-- messages don't stack rows (or emails) — one unread row per conversation
+-- burst. Message contents never enter the payload.
+CREATE OR REPLACE FUNCTION public.notify_message_received()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
+  SELECT
+    cm.user_id, NEW.sender_id, 'message_received',
+    jsonb_build_object('fromName', public.notif_player_name(NEW.sender_id))
+  FROM public.channel_members cm
+  WHERE cm.channel_id = NEW.channel_id
+    AND cm.user_id <> NEW.sender_id
+    AND NOT EXISTS (
+      SELECT 1 FROM public.notifications n
+      WHERE n.recipient_id = cm.user_id
+        AND n.actor_id = NEW.sender_id
+        AND n.event_type = 'message_received'
+        AND n.read_at IS NULL
+    );
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_notify_message_received ON public.messages;
+CREATE TRIGGER trg_notify_message_received
+  AFTER INSERT ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION public.notify_message_received();
+
 COMMIT;
 
 -- =============================================================================

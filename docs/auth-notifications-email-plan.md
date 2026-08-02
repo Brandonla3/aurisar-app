@@ -64,8 +64,8 @@ Client: replace the jsonb-blob prefs with a small `useNotificationPrefs` hook ba
 - **Returns desk:** `netlify/functions/resend-webhook.js` consumes Resend bounce/complaint events → `notification_suppressions`.
 
 ### D. Wire the checkpoint = the 5 dead toggles become real — `M`
-- `sharedWorkout`, `friendLevelUp`, `friendRequest`, `friendAccepted`, `messageReceived` gain real senders (DB triggers or existing RPC call sites insert outbox rows).
-- Fold the two already-working prefs (`friendExercise`, `reviewBattleStats`) onto the same table for one consistent path.
+- `sharedWorkout`, `friendLevelUp`, `friendRequest`, `friendAccepted`, `messageReceived` gain real senders — DB triggers on `friend_requests` / `shared_items` / `messages` insert outbox rows (migration 17 §6). `message_received` is burst-guarded: no new row while an unread one from the same sender exists, and message contents never enter the payload.
+- `friendExercise` + `reviewBattleStats` prefs migrated to typed rows in Batch A. **Design deviation, deliberate:** `friend_exercise_events` keeps its dedicated table (one row visible to all friends via RLS) rather than fanning one outbox row per friend — it is the highest-volume event class and per-recipient fan-out would explode row counts for zero UX gain. `review_battle_stats` is a purely local prompt; pref rows only.
 - **Enforce email verification:** `should_deliver(channel='email')` checks `email_confirmed_at`, making the "✓ Verified" badge and the "Email notifications require a verified email" copy finally true.
 
 ### E. Reminder producer (bidirectional scheduler) — `M`
