@@ -15,6 +15,12 @@
  * the identity numerically and snapshots the emitted source — a curve change
  * that touches only one emitter cannot land.
  *
+ * Precision of the claim: this is SOURCE-LEVEL identity — same constants,
+ * same algebraic form — not a bit-identical JS-vs-GPU numerical proof. For a
+ * cosmetic sky under EXP2 fog that is the right guarantee (sub-1/255 GPU
+ * float divergence is invisible); nothing gameplay-authoritative may ever
+ * lean on this the way P12's server validation leans on tolerances.
+ *
  * The gradient is deliberately simple: three color stops (horizon / mid /
  * zenith) blended by smoothstep over normalized elevation, plus a sun-glow
  * term that warms the sky around the sun's azimuth near the horizon. All the

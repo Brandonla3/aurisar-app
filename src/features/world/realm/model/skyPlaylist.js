@@ -12,11 +12,13 @@
  * Two schedules, deliberately decoupled:
  *  - COLORS (stops, fog, ambient, star visibility) follow the dwell-and-rush
  *    segment table — they may hold and then sweep.
- *  - THE SUN follows a C1 Catmull-Rom spline over raw cycle phase. Players
- *    read shadow motion continuously even when they ignore sky color; if the
- *    sun obeyed the dwell schedule, shadows would park during a dwell and
- *    lurch through transitions. Splining direction over phase keeps shadow
- *    motion smooth while the mood still lingers.
+ *  - THE SUN follows a Catmull-Rom spline over raw cycle phase (C1 in R³;
+ *    the post-spline normalize makes it only approximately C1 on the sphere —
+ *    the bounded-angular-step test is the actual continuity contract).
+ *    Players read shadow motion continuously even when they ignore sky
+ *    color; if the sun obeyed the dwell schedule, shadows would park during
+ *    a dwell and lurch through transitions. Splining direction over phase
+ *    keeps shadow motion smooth while the mood still lingers.
  */
 
 /** One full cycle. 40 minutes: a median session always banks a dusk or dawn. */

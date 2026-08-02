@@ -195,7 +195,7 @@ async function boot() {
       `pos       : ${walker.x.toFixed(1)}, ${walker.y.toFixed(1)}, ${walker.z.toFixed(1)}`,
       `speed     : ${walker.speedMps.toFixed(1)} m/s`,
       `chunks    : ${streamer.residentCount()} resident`,
-      `sky       : ${fogDriver.state?.fogDensity ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
+      `sky       : ${fogDriver.state?.fogDensity != null ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
       `fps       : ${engine.getFps().toFixed(0)}`,
     ].join('\n');
   }, 250);

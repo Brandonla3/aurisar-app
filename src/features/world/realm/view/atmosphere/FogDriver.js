@@ -23,6 +23,9 @@ export class FogDriver {
    * @param {object} rig { sunLight, ambientLight, applyDomeState } — all optional
    * @param {object} opts { epochMs, timeScale } — timeScale warps the cycle for
    *   dev verification (?timewarp=40 → full day in 60s). 1 in production.
+   *   NOTE: timeScale multiplies nowMs only; epochMs is therefore in the
+   *   WARPED time domain. Anchoring to a real server epoch and warping at the
+   *   same time is unsupported by design — timewarp is a dev-only lens.
    */
   constructor(scene, rig = {}, { epochMs = 0, timeScale = 1 } = {}) {
     this._scene = scene;
@@ -42,7 +45,9 @@ export class FogDriver {
     // Mutate in place — replacing scene.fogColor is the historical bug.
     scene.fogColor.copyFromFloats(s.fogColor[0], s.fogColor[1], s.fogColor[2]);
     scene.fogDensity = s.fogDensity;
-    scene.clearColor.copyFromFloats(s.clearColor[0], s.clearColor[1], s.clearColor[2]);
+    // Alpha passed explicitly: clearColor is a Color4, and relying on a 3-arg
+    // copyFromFloats to leave alpha alone is a bet on Babylon internals.
+    scene.clearColor.copyFromFloats(s.clearColor[0], s.clearColor[1], s.clearColor[2], 1);
 
     const { sunLight, ambientLight, applyDomeState } = this._rig;
     if (sunLight) {
