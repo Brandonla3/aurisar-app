@@ -101,7 +101,22 @@ export function classifyError(error) {
   return { kind: KIND.UNKNOWN, code, permanent: false, report: true };
 }
 
-export const STATUS = { OK: 'ok', EMPTY: 'empty', UNAVAILABLE: 'unavailable' };
+export const STATUS = {
+  LOADING: 'loading',
+  OK: 'ok',
+  EMPTY: 'empty',
+  UNAVAILABLE: 'unavailable',
+};
+
+/**
+ * Not yet asked. Distinct from `empty` on purpose: initialising state to
+ * `empty()` claims a PROVEN-empty result before any query has run, which
+ * renders "nothing here yet · checked just now" for a surface nobody has
+ * checked. That is the same lie this module exists to kill, just smaller.
+ */
+export function loading() {
+  return { status: STATUS.LOADING, rows: [], checkedAt: null };
+}
 
 export function ok(rows) {
   return { status: STATUS.OK, rows, checkedAt: new Date().toISOString() };
@@ -110,6 +125,11 @@ export function ok(rows) {
 /** A PROVEN empty: the query succeeded and returned nothing. */
 export function empty() {
   return { status: STATUS.EMPTY, rows: [], checkedAt: new Date().toISOString() };
+}
+
+/** True before the first read settles. */
+export function isLoading(result) {
+  return !result || result.status === STATUS.LOADING;
 }
 
 export function unavailable(error, { surface } = {}) {

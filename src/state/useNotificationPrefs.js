@@ -79,7 +79,7 @@ export function useNotificationPrefs(authUser, isPreviewMode, onSaveError) {
       setPrefs(p => ({ ...p, [key]: value }));
       if (!userId || isPreviewMode) return true;
 
-      let error = null;
+      let error;
       try {
         ({ error } = await sb.from("notification_prefs").upsert(
           {
@@ -104,11 +104,14 @@ export function useNotificationPrefs(authUser, isPreviewMode, onSaveError) {
           `[notification_prefs] save failed kind=${c.kind} code=${c.code || "?"}: ${error.message || error}`
         );
         if (onSaveError) {
+          // showToast's second argument is its OPTIONS bag — passing the
+          // classification object here silently produced a plain status toast,
+          // so a permanent save failure looked as gentle as a network blip.
           onSaveError(
             c.permanent
               ? "Couldn’t save that setting — notification preferences aren’t working right now."
               : "Couldn’t save that setting. Check your connection and try again.",
-            c
+            { type: "error", duration: c.permanent ? 8000 : 5000 }
           );
         }
         return false;

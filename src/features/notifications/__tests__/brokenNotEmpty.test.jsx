@@ -4,7 +4,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import NotificationInbox from '../NotificationInbox';
-import { ok, empty, unavailable } from '../../../utils/fetchResult';
+import { ok, empty, unavailable, loading } from '../../../utils/fetchResult';
 
 afterEach(cleanup);
 
@@ -66,6 +66,38 @@ describe('the inbox draws three distinct states', () => {
   it('an empty state carries provenance, so "checked when?" is answerable', () => {
     renderInbox(empty());
     expect(screen.getByText(/^Checked /)).toBeTruthy();
+  });
+
+  it('does NOT claim "nothing here" before the first read settles', () => {
+    // Initialising to empty() would assert a proven-empty result for a query
+    // that has not run — the same lie as an error rendering as empty.
+    renderInbox(loading());
+    expect(screen.getByText(/Checking for alerts/i)).toBeTruthy();
+    expect(screen.queryByText(/No alerts yet/i)).toBeNull();
+    expect(screen.queryByText(/^Checked /)).toBeNull();
+  });
+});
+
+describe('a failed refresh keeps previously-loaded rows visible', () => {
+  const rows = [{
+    id: 7, event_type: 'friend_accepted', payload: { friendName: 'Ayo' },
+    created_at: new Date().toISOString(), read_at: null,
+  }];
+
+  it('renders the broken banner ABOVE the stale list, not instead of it', () => {
+    // The banner used to short-circuit the list, so a failing refresh blanked
+    // the screen — contradicting the hook's deliberate decision to keep items.
+    renderInbox(unavailable({ code: '42P01', message: 'x' }, { surface: 'notifications.inbox' }), rows);
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByText(/accepted your friend request/i)).toBeTruthy();
+    expect(screen.getByText(/loaded earlier and may be out of date/i)).toBeTruthy();
+  });
+
+  it('renders the transient notice above the stale list too', () => {
+    renderInbox(unavailable({ message: 'Failed to fetch' }), rows);
+    expect(screen.getByText(/Can.t reach the server/i)).toBeTruthy();
+    expect(screen.getByText(/accepted your friend request/i)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 

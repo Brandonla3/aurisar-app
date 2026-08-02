@@ -1,17 +1,31 @@
 import React from "react";
 import { sb } from "../../utils/supabase";
 import { formatNotification } from "./notificationTypes";
-import { toResult, unavailable, empty, STATUS } from "../../utils/fetchResult";
+import { toResult, unavailable, loading, empty, STATUS } from "../../utils/fetchResult";
 
 // In-app projection of the public.notifications outbox
 // (scripts/security/17-notifications.sql): loads the recent inbox page,
 // subscribes to realtime INSERTs (RLS scopes rows to the recipient), pops a
 // toast for genuinely-new arrivals, and tracks unread state via read_at.
 //
-// Pre-migration safe: if the table doesn't exist yet the load errors are
-// swallowed and the inbox just stays empty.
+// Reads return a discriminated result (see utils/fetchResult) rather than
+// swallowing errors, so a table this hook cannot read is reported as broken
+// instead of rendering as an empty inbox.
 const PAGE_SIZE = 50;
 const RETRY_MS = 4000;
+
+// The single place the `report` axis is honoured. It is deliberately broader
+// than `permanent`: an UNKNOWN error is worth telling a developer about even
+// though it is too uncertain to shout about on screen, while a transient blip
+// is neither. Today "report" means one structured console line; when a
+// telemetry beacon exists this is the one call site that has to change.
+function reportUnavailable(result) {
+  if (!result || !result.report) return;
+  console.warn(
+    `[schema-health] surface=${result.surface || "?"} kind=${result.kind} ` +
+    `code=${result.code || "none"} permanent=${result.permanent} :: ${result.message}`
+  );
+}
 
 export default function useNotifications({ authUser, isPreviewMode, showToast }) {
   const [items, setItems] = React.useState([]);
@@ -19,7 +33,13 @@ export default function useNotifications({ authUser, isPreviewMode, showToast })
   // the inbox rendered as "no notifications" — indistinguishable from a
   // genuinely empty inbox, which is exactly how this feature could have sat
   // permanently broken without anyone noticing.
-  const [state, setState] = React.useState(empty());
+  // Starts as `loading`, NOT `empty`: initialising to empty would claim a
+  // proven-empty result for a query that has not run yet.
+  const [state, setState] = React.useState(loading());
+  // Monotonic guard so a slow earlier read cannot overwrite a newer one — an
+  // older `unavailable` landing after a fresh `ok` would resurrect the very
+  // false-broken state this hook exists to avoid.
+  const generation = React.useRef(0);
   // Counted server-side, not derived from `items`: the list is capped to the
   // newest PAGE_SIZE rows, so unread rows older than that window would be
   // invisible to a client-side tally and the badge would under-report.
@@ -41,14 +61,22 @@ export default function useNotifications({ authUser, isPreviewMode, showToast })
         .select("id", { count: "exact", head: true })
         .eq("recipient_id", userId)
         .is("read_at", null);
-      if (!error && typeof count === "number") setUnreadCount(count);
+      if (error) {
+        // Same pull-up as the list: a failed count must not silently read as
+        // zero unread, or the badge quietly under-reports while the inbox
+        // shouts.
+        reportUnavailable(unavailable(error, { surface: "notifications.unreadCount" }));
+        return;
+      }
+      if (typeof count === "number") setUnreadCount(count);
     } catch (e) {
-      console.warn("notifications unread count:", e);
+      reportUnavailable(unavailable(e, { surface: "notifications.unreadCount" }));
     }
   }, [active, userId]);
 
   const loadItems = React.useCallback(async () => {
     if (!active) return;
+    const gen = ++generation.current;
     let result;
     try {
       result = toResult(
@@ -64,16 +92,16 @@ export default function useNotifications({ authUser, isPreviewMode, showToast })
       // A thrown error is still a result, not a reason to render nothing.
       result = unavailable(e, { surface: "notifications.inbox" });
     }
+    // A read that has been superseded must not publish its state.
+    if (gen !== generation.current) return;
+
     setState(result);
     if (result.status === STATUS.OK) setItems(result.rows);
     else if (result.status === STATUS.EMPTY) setItems([]);
-    // On `unavailable` the previously-loaded items are deliberately kept:
-    // stale-but-real data plus a visible warning beats blanking the list.
-    if (result.status === STATUS.UNAVAILABLE) {
-      console.warn(
-        `[notifications] inbox unavailable kind=${result.kind} code=${result.code || "?"}`
-      );
-    }
+    // On `unavailable` the previously-loaded items are deliberately KEPT, and
+    // NotificationInbox renders the warning above them — stale-but-real data
+    // plus a visible banner beats blanking the list.
+    if (result.status === STATUS.UNAVAILABLE) reportUnavailable(result);
   }, [active, userId]);
 
   React.useEffect(() => {

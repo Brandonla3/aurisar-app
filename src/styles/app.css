@@ -352,6 +352,9 @@
     /* Notification inbox (bell sheet) */
     .notif-inbox-empty{padding:28px 16px;text-align:center;color:#8a8478;font-size:.78rem;font-style:italic}
     .notif-inbox-checked{font-size:.6rem;color:#5a5650;margin-top:6px;font-style:normal}
+    /* Transient: visible enough not to be skim-missed, calm enough not to read
+       as "this feature is broken". Deliberately distinct from .notif-inbox-empty. */
+    .notif-inbox-stale{padding:10px 12px;margin:4px 0 10px;border-radius:8px;background:rgba(45,42,36,.45);border:1px solid rgba(180,172,158,.16);color:#b4ac9e;font-size:.72rem;line-height:1.4}
     /* The "missing texture" of this app: a broken surface must be impossible to
        read past. Deliberately clashes with the dark/gold palette. */
     .notif-inbox-broken{padding:20px 16px;margin:4px 0 12px;border-radius:10px;background:rgba(122,40,56,.28);border:1px solid rgba(224,85,85,.45)}
