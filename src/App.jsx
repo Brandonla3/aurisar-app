@@ -609,6 +609,11 @@ function App() {
     toggle: toggleNotifPref,
     setPref: setNotifPref
   } = useNotificationPrefs(authUser, isPreviewMode);
+  // Self-service account deletion (Profile → Security → danger zone).
+  const [deleteAcctOpen, setDeleteAcctOpen] = useState(false);
+  const [deleteAcctEmail, setDeleteAcctEmail] = useState("");
+  const [deleteAcctMsg, setDeleteAcctMsg] = useState(null);
+  const [deleteAcctBusy, setDeleteAcctBusy] = useState(false);
   // In-app projection of the notifications outbox: realtime toast + inbox.
   const [notifInboxOpen, setNotifInboxOpen] = useState(false);
   const {
@@ -1068,6 +1073,41 @@ function App() {
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
+  // Invite links (?invite=<token>) are mailed by /api/admin/send-invite but
+  // nothing used to read them — the invite granted nothing. Validate the token
+  // pre-auth, prefill the invited address and switch the form to sign-up. The
+  // token is stripped from the URL so it doesn't linger in history or get
+  // shared in a screenshot; the row is burned server-side on signup.
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("invite");
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await sb.rpc("check_invite_token", { p_token: token });
+        const row = Array.isArray(data) ? data[0] : data;
+        if (cancelled || error || !row?.valid) {
+          if (!cancelled && !row?.valid) {
+            setAuthMsg({ ok: false, text: "That invite link is invalid or has expired." });
+          }
+          return;
+        }
+        setAuthEmail(row.email);
+        setAuthIsNew(true);
+        setAuthMsg({ ok: true, text: "✓ You're invited! Choose a password to forge your profile." });
+      } catch (e) {
+        console.warn("[auth] invite check failed:", e.message);
+      } finally {
+        if (!cancelled) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("invite");
+          window.history.replaceState({}, "", url.toString());
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Toasts now go through the shared queued store (components/toast) —
   // imported as showToast above, so every existing call site and prop
   // pass-through keeps working. 4s default lives in the store.
@@ -1303,18 +1343,24 @@ function App() {
       });
       setAuthLoading(false);
       if (error) {
+        // Generic copy only. This runs pre-auth on the login screen, so the
+        // raw Postgres message would leak RPC names, schema details and
+        // whether the ID exists — the exact disclosure the neighbouring
+        // sign-in/reset flows deliberately avoid.
+        console.warn("[auth] private-id lookup failed:", error.message);
         setForgotLookupResult({
           found: false,
-          error: error.message
+          error: "Couldn't look that up right now. Check the ID and try again."
         });
         return;
       }
       setForgotLookupResult(data);
     } catch (e) {
       setAuthLoading(false);
+      console.warn("[auth] private-id lookup threw:", e.message);
       setForgotLookupResult({
         found: false,
-        error: e.message
+        error: "Couldn't look that up right now. Check the ID and try again."
       });
     }
   }
@@ -2083,6 +2129,53 @@ function App() {
         ok: false,
         text: "Error generating codes: " + e.message
       });
+    }
+  }
+
+  // ── ACCOUNT DELETION ──────────────────────────────────────────
+  // Calls /api/account-delete with the caller's own Bearer token; the server
+  // resolves the identity from that token and re-checks the typed email, so
+  // nothing here can widen the blast radius. On success we sign out locally
+  // (the remote user is already gone) and land back on the login screen.
+  async function deleteAccount() {
+    if (isPreviewMode) {
+      setDeleteAcctMsg("Not available in preview mode.");
+      return;
+    }
+    setDeleteAcctBusy(true);
+    setDeleteAcctMsg(null);
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        setDeleteAcctMsg("Session expired — sign in again.");
+        setDeleteAcctBusy(false);
+        return;
+      }
+      const res = await fetch("/api/account-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ confirmEmail: deleteAcctEmail.trim() })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteAcctMsg(out.error || "Could not delete the account.");
+        setDeleteAcctBusy(false);
+        return;
+      }
+      // Don't flush pending profile writes — the row is gone.
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* private mode */ }
+      await sb.auth.signOut();
+      setDeleteAcctBusy(false);
+      setDeleteAcctOpen(false);
+      setDeleteAcctEmail("");
+      setAuthMsg("Your account has been permanently deleted.");
+      setScreen("login");
+    } catch (e) {
+      setDeleteAcctMsg("Network error — try again.");
+      setDeleteAcctBusy(false);
     }
   }
 
@@ -5499,6 +5592,14 @@ function App() {
             toggleNameVisibility={toggleNameVisibility}
             toggleNotifPref={toggleNotifPref}
             notifPrefs={notifPrefs}
+            deleteAcctOpen={deleteAcctOpen}
+            setDeleteAcctOpen={setDeleteAcctOpen}
+            deleteAcctEmail={deleteAcctEmail}
+            setDeleteAcctEmail={setDeleteAcctEmail}
+            deleteAcctMsg={deleteAcctMsg}
+            setDeleteAcctMsg={setDeleteAcctMsg}
+            deleteAcctBusy={deleteAcctBusy}
+            deleteAccount={deleteAccount}
             profileComplete={profileComplete}
             showToast={showToast}
             doCheckIn={doCheckIn}

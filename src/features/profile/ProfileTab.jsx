@@ -244,6 +244,11 @@ const ProfileTab = memo(function ProfileTab({
   toggleNameVisibility,
   toggleNotifPref,
   notifPrefs,
+  deleteAcctOpen, setDeleteAcctOpen,
+  deleteAcctEmail, setDeleteAcctEmail,
+  deleteAcctMsg, setDeleteAcctMsg,
+  deleteAcctBusy,
+  deleteAccount,
   profileComplete,
   showToast,
   doCheckIn,
@@ -1576,6 +1581,43 @@ return (
           fontSize: FS.fs68, color: "#8a8478", marginBottom: S.s8, fontStyle: "italic"
         }}>{"Permanently erase all XP, log, plans, and workouts. Cannot be undone."}</div>
         <button className={"btn btn-danger"} style={{ width: "100%" }} onClick={resetChar}>{"↺ Wipe & Rebuild"}</button>
+      </div>
+
+      {/* ── DELETE ACCOUNT ── Wipe & Rebuild keeps the account; this removes
+          it entirely. Typing the account email is the deliberate-act guard,
+          matched server-side against the session (never the request body). */}
+      <div style={{ marginBottom: S.s6, paddingTop: S.s10, borderTop: "1px solid rgba(180,172,158,.06)" }}>
+        <div style={{
+          fontSize: FS.fs68, color: "#8a8478", marginBottom: S.s8, fontStyle: "italic"
+        }}>{"Delete your account and everything in it — profile, workouts, friends, and messages. This cannot be undone."}</div>
+        {!deleteAcctOpen ? (
+          <button className={"btn btn-danger"} style={{ width: "100%" }}
+            onClick={() => setDeleteAcctOpen(true)}>{"⚠ Delete Account"}</button>
+        ) : (
+          <div>
+            <div className={"field"} style={{ marginBottom: S.s8 }}>
+              <label>{"Type "}<strong style={{ color: "#d4cec4" }}>{authUser?.email || "your email"}</strong>{" to confirm"}</label>
+              <input className={"inp"} type={"email"} autoComplete={"off"}
+                placeholder={authUser?.email || "your@email.com"}
+                value={deleteAcctEmail}
+                onChange={e => setDeleteAcctEmail(e.target.value)} />
+            </div>
+            {deleteAcctMsg && <div style={{
+              fontSize: FS.lg, color: UI_COLORS.danger, textAlign: "center", marginBottom: S.s8
+            }}>{deleteAcctMsg}</div>}
+            <div style={{ display: "flex", gap: S.s8 }}>
+              <button className={"btn btn-ghost btn-sm"} style={{ flex: 1 }}
+                onClick={() => { setDeleteAcctOpen(false); setDeleteAcctEmail(""); setDeleteAcctMsg(null); }}>
+                {"Cancel"}
+              </button>
+              <button className={"btn btn-danger btn-sm"} style={{ flex: 1 }}
+                disabled={deleteAcctBusy || !deleteAcctEmail.trim()}
+                onClick={deleteAccount}>
+                {deleteAcctBusy ? "Deleting…" : "Delete Forever"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )}
