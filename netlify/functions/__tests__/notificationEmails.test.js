@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { renderNotificationEmail } from '../_lib/notificationEmails.js';
+import { renderNotificationEmail, fromAddressFor } from '../_lib/notificationEmails.js';
 import { renderEmail, cardBody, escapeHtml } from '../_lib/emailTemplate.js';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -83,8 +83,29 @@ describe('renderNotificationEmail', () => {
   });
 });
 
+describe('welcome email has exactly one sender', () => {
+  const app = read('src/App.jsx');
+
+  it('the client never calls a welcome endpoint — the outbox trigger owns it', () => {
+    // Both paths firing sent two emails from two addresses whenever Supabase
+    // email-confirmation was off.
+    expect(app).not.toContain('fetch("/api/send-welcome-email"');
+    expect(app).not.toContain("fetch('/api/send-welcome-email'");
+  });
+
+  it('welcome mail keeps the welcome@ identity; everything else uses notifications@', () => {
+    expect(fromAddressFor('welcome')).toContain('welcome@aurisargames.com');
+    expect(fromAddressFor('friend_level_up')).toContain('notifications@aurisargames.com');
+    expect(fromAddressFor('some_future_event')).toContain('notifications@aurisargames.com');
+  });
+});
+
 describe('drain delivery semantics (source guard)', () => {
   const drain = read('netlify/functions/notifications-drain.js');
+
+  it('picks the sender per event type', () => {
+    expect(drain).toContain('fromAddressFor(row.event_type)');
+  });
 
   it('claims rows atomically rather than plain-selecting them', () => {
     expect(drain).toContain('claim_notification_emails');

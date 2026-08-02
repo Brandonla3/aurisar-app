@@ -15,11 +15,10 @@
  *   - Resend 4xx → 'failed' (won't be retried; needs investigation)
  */
 
-import { renderNotificationEmail } from "./_lib/notificationEmails.js";
+import { renderNotificationEmail, fromAddressFor } from "./_lib/notificationEmails.js";
 
 const BATCH_SIZE = 25;
 const DEFER_GIVE_UP_MS = 7 * 24 * 60 * 60 * 1000;
-const FROM = "Aurisar Fitness <notifications@aurisargames.com>";
 
 function svc() {
   const url = process.env.SUPABASE_URL;
@@ -126,7 +125,7 @@ export default async () => {
           "Idempotency-Key": `notification/${row.id}`,
         },
         body: JSON.stringify({
-          from: FROM,
+          from: fromAddressFor(row.event_type),
           to: [check.email],
           subject: rendered.subject,
           html: rendered.html,

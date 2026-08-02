@@ -10,6 +10,18 @@ import { renderEmail, cardBody, escapeHtml } from "./emailTemplate.js";
 const APP_URL = "https://aurisargames.com";
 const FOOTER = "You can turn these emails off in Profile → Notification Preferences.";
 
+// Per-event sender. Welcome mail keeps the established welcome@ identity it
+// had when it was sent directly, so retiring that path is not a brand or
+// deliverability regression; everything else ships from notifications@.
+const DEFAULT_FROM = "Aurisar Fitness <notifications@aurisargames.com>";
+const FROM_BY_EVENT = {
+  welcome: "Aurisar Fitness <welcome@aurisargames.com>",
+};
+
+export function fromAddressFor(eventType) {
+  return FROM_BY_EVENT[eventType] || DEFAULT_FROM;
+}
+
 const RENDERERS = {
   friend_level_up(p) {
     const name = escapeHtml(p.playerName || "A friend");

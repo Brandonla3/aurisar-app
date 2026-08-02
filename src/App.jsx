@@ -1192,17 +1192,13 @@ function App() {
         const saved = await loadSave(signUpData.session.user.id);
         setAuthUser(signUpData.session.user);
         setAuthLoading(false);
-        // Bearer-auth: the function verifies the email matches the session user.
-        fetch("/api/send-welcome-email", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + signUpData.session.access_token
-          },
-          body: JSON.stringify({
-            email: signUpData.session.user.email
-          })
-        }).catch(() => {});
+        // No welcome-email call here. The auth.users trigger from migration 19
+        // enqueues a 'welcome' outbox row for EVERY signup, and the drain is
+        // the single sender — calling /api/send-welcome-email as well sent two
+        // emails from two different addresses whenever confirmation was off.
+        // Cost of the single path: the welcome lands on the next drain tick
+        // (≤5 min) instead of instantly, and it now also reaches users who
+        // sign up with email confirmation ON, who previously got nothing.
         if (_optionalChain([saved, 'optionalAccess', _33 => _33.chosenClass])) {
           (_s => setProfile({
             ..._s,

@@ -176,12 +176,23 @@ CREATE POLICY recovery_codes_own_read
   TO authenticated
   USING (auth.uid() = user_id AND public.has_required_aal());
 
--- Notifications can name friends and quote security events.
+-- Notifications can name friends and quote security events. Both the read
+-- and the mark-as-read are gated: an aal1 session with a live factor cannot
+-- see these rows, so it has no business flipping read_at on them either
+-- (leaving UPDATE ungated would let it silently clear the owner's unread
+-- state without ever completing MFA).
 DROP POLICY IF EXISTS notifications_select ON public.notifications;
 CREATE POLICY notifications_select
   ON public.notifications FOR SELECT
   TO authenticated
   USING (recipient_id = auth.uid() AND public.has_required_aal());
+
+DROP POLICY IF EXISTS notifications_update_read ON public.notifications;
+CREATE POLICY notifications_update_read
+  ON public.notifications FOR UPDATE
+  TO authenticated
+  USING (recipient_id = auth.uid() AND public.has_required_aal())
+  WITH CHECK (recipient_id = auth.uid() AND public.has_required_aal());
 
 COMMIT;
 
