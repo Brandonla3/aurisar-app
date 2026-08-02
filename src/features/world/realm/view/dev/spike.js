@@ -20,6 +20,7 @@ import { createRealmEngine, bindContextLoss } from '../RealmEngine.js';
 import { createRealmScene, startRenderLoop } from '../RealmScene.js';
 import { createTerrainField } from '../../model/terrainField.js';
 import { TerrainStreamer } from '../terrain/TerrainStreamer.js';
+import { buildTerrainMaterial } from '../materials/terrainNME.js';
 import { createWalkerState, integrateWalker } from '../../model/walker.js';
 import {
   BUTTON, createInputSnapshot, resetInputSnapshot, setButton,
@@ -49,22 +50,33 @@ async function boot() {
     onRestored: () => console.warn('[spike] context restored'),
   });
 
+  // ?syncshaders=1 — automated-verification escape hatch. Babylon finalizes
+  // parallel-compiled shaders on the real rAF frame loop; a hidden tab (or a
+  // driver pumping scene.render() manually) never polls it, so effects stay
+  // "not ready" forever with a perfectly linked program, and meshes silently
+  // skip drawing. Cost: shader compiles block the main thread. Dev page only.
+  if (new URLSearchParams(location.search).has('syncshaders')) {
+    engine.getCaps().parallelShaderCompile = undefined;
+  }
+
   const scene = createRealmScene(engine);
 
   // ── Lights ──────────────────────────────────────────────────────────────────
+  // Tuned for the NodeMaterial's linear albedo*(diffuse+ambient) response —
+  // hotter values (2.4) were Standard-material numbers and pushed every sunlit
+  // fragment past the shade clamp, flattening the terrain to one tone.
   const key = new BABYLON.DirectionalLight('key', new BABYLON.Vector3(-0.55, -1, 0.35), scene);
-  key.intensity = 2.4;
+  key.intensity = 1.25;
   const fill = new BABYLON.HemisphericLight('fill', new BABYLON.Vector3(0, 1, 0), scene);
-  fill.intensity = 0.5;
+  fill.intensity = 0.3;
   fill.groundColor = new BABYLON.Color3(0.16, 0.20, 0.15);
 
   // ── Terrain ─────────────────────────────────────────────────────────────────
+  // P3: the painted NodeMaterial — slope/height splat + noise variation,
+  // authored once in BSL, transpiled to whichever backend this page runs on.
   const field = createTerrainField();
-  const groundMat = new BABYLON.StandardMaterial('spikeGround', scene);
-  groundMat.diffuseColor = new BABYLON.Color3(0.42, 0.47, 0.36); // grey-green placeholder — painted terrain is P3
-  groundMat.specularColor = new BABYLON.Color3(0, 0, 0);
-  groundMat.freeze();
-  const streamer = new TerrainStreamer(scene, field, { radius: 3, subdivisions: 48, material: groundMat });
+  const groundMat = await buildTerrainMaterial(scene);
+  const streamer = new TerrainStreamer(scene, field, { radius: 3, material: groundMat });
 
   // ── Player: a capsule with a nose so facing is visible ─────────────────────
   let walker = createWalkerState(0, 0, field);

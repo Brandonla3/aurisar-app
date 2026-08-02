@@ -1,9 +1,18 @@
+/* global process */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // True exactly when realm-spike.html is emitted (the same CONTEXT check the
+  // rollup input uses below). The World hub gates its dev-only "Realm preview"
+  // tile on this, so the tile and the page it links to cannot disagree: no
+  // production build ever shows a tile pointing at a page that 404s into the
+  // SPA fallback.
+  define: {
+    __REALM_DEV_AVAILABLE__: JSON.stringify(process.env.CONTEXT !== 'production'),
+  },
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
     strictPort: true,
