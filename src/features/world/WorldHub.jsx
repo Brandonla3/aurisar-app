@@ -19,6 +19,7 @@
  * where the state is and leaves this file a presentational shell.
  */
 
+/* global __REALM_DEV_AVAILABLE__ */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ErrorBoundary from '../../components/ErrorBoundary.jsx';
 import GraphicsSettingsPanel from './ui/GraphicsSettingsPanel.jsx';
@@ -32,6 +33,11 @@ import { C, FS, R, S } from '../../utils/tokens.js';
 const WorldOverlay = React.lazy(() => import('./WorldOverlay.jsx'));
 
 const FONT = 'Inter, system-ui, sans-serif';
+
+// Injected by vite `define`, true only on builds that also emit
+// realm-spike.html (dev + deploy previews, never production). The typeof
+// guard keeps node-side tooling that imports this file from throwing.
+const REALM_DEV = typeof __REALM_DEV_AVAILABLE__ !== 'undefined' && __REALM_DEV_AVAILABLE__;
 
 const S_ = {
   root: {
@@ -229,6 +235,17 @@ export default function WorldHub({ onClose, characterSlot = null, guildSlot = nu
                 hint="Quality, shadows, fog and more"
                 onClick={() => setView('settings')}
               />
+              {REALM_DEV && (
+                // Dev/preview builds only — the flag is true exactly when the
+                // page it links to was emitted. A full navigation, not a view:
+                // the Realm preview is a standalone page with its own engine,
+                // and leaving the SPA is the honest description of that.
+                <HubTile
+                  label="🏔 Realm preview"
+                  hint="The new world, in progress (dev build)"
+                  onClick={() => window.location.assign('/realm-spike.html')}
+                />
+              )}
             </div>
           </>
         )}
