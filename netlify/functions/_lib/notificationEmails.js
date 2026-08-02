@@ -22,12 +22,36 @@ export function fromAddressFor(eventType) {
   return FROM_BY_EVENT[eventType] || DEFAULT_FROM;
 }
 
+// Subject headers are plaintext, not HTML, so escapeHtml is the wrong tool —
+// but the values are still user-controlled (`profiles.data->>'playerName'` is
+// free-form and writable over the REST API). Strip CR/LF and other control
+// characters (header-injection surface) and cap the length so a pathological
+// display name can't blow out the Subject line.
+const SUBJECT_NAME_MAX = 40;
+function isControlChar(ch) {
+  const cp = ch.codePointAt(0);
+  return cp < 0x20 || cp === 0x7f;
+}
+export function plainForSubject(value, fallback = "A friend") {
+  // Filtered by code point rather than a control-character regex so no
+  // literal control bytes ever live in this source file.
+  const cleaned = Array.from(String(value ?? ""))
+    .map((ch) => (isControlChar(ch) ? " " : ch))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return fallback;
+  return cleaned.length > SUBJECT_NAME_MAX
+    ? cleaned.slice(0, SUBJECT_NAME_MAX - 1) + "…"
+    : cleaned;
+}
+
 const RENDERERS = {
   friend_level_up(p) {
     const name = escapeHtml(p.playerName || "A friend");
     const lvl = Number(p.newLevel) || "?";
     return {
-      subject: `${p.playerName || "A friend"} reached Level ${lvl} on Aurisar`,
+      subject: `${plainForSubject(p.playerName)} reached Level ${lvl} on Aurisar`,
       html: renderEmail({
         title: "Friend level up",
         bodyHtml: cardBody(
@@ -47,7 +71,7 @@ const RENDERERS = {
   friend_request(p) {
     const name = escapeHtml(p.fromName || "Someone");
     return {
-      subject: `${p.fromName || "Someone"} sent you a friend request on Aurisar`,
+      subject: `${plainForSubject(p.fromName, "Someone")} sent you a friend request on Aurisar`,
       html: renderEmail({
         title: "New friend request",
         bodyHtml: cardBody(`🤝 A challenger approaches`, [
@@ -64,7 +88,7 @@ const RENDERERS = {
   friend_accepted(p) {
     const name = escapeHtml(p.friendName || "Someone");
     return {
-      subject: `${p.friendName || "Someone"} accepted your friend request`,
+      subject: `${plainForSubject(p.friendName, "Someone")} accepted your friend request`,
       html: renderEmail({
         title: "Friend request accepted",
         bodyHtml: cardBody(`✅ Alliance forged`, [
@@ -81,7 +105,7 @@ const RENDERERS = {
     const name = escapeHtml(p.fromName || "A friend");
     const workout = escapeHtml(p.workoutName || "a workout");
     return {
-      subject: `${p.fromName || "A friend"} shared a workout with you`,
+      subject: `${plainForSubject(p.fromName)} shared a workout with you`,
       html: renderEmail({
         title: "Workout shared",
         bodyHtml: cardBody(`📋 A scroll arrives`, [
@@ -98,7 +122,7 @@ const RENDERERS = {
   message_received(p) {
     const name = escapeHtml(p.fromName || "a friend");
     return {
-      subject: `New message from ${p.fromName || "a friend"} on Aurisar`,
+      subject: `New message from ${plainForSubject(p.fromName, "a friend")} on Aurisar`,
       html: renderEmail({
         title: "New message",
         bodyHtml: cardBody(`💬 A raven has arrived`, [

@@ -84,6 +84,10 @@ export function useAuthState() {
   const [mfaChallengeMsg, setMfaChallengeMsg] = useState(null);
   const [mfaChallengeLoading, setMfaChallengeLoading] = useState(false);
   const [mfaChallengeFactorId, setMfaChallengeFactorId] = useState(null);
+  // Which factor type the gate is challenging on: 'totp' can be completed with
+  // the 6-digit code; 'webauthn'/'phone' cannot, so the UI offers passkey
+  // re-sign-in or a recovery code instead.
+  const [mfaChallengeType, setMfaChallengeType] = useState(null);
 
   // ── Passkey management ───────────────────────────────────────────────────
   const [passkeyPanelOpen, setPasskeyPanelOpen] = useState(false);
@@ -127,6 +131,7 @@ export function useAuthState() {
     mfaDisableConfirm, setMfaDisableConfirm, mfaDisableCode, setMfaDisableCode,
     mfaDisableMethod, setMfaDisableMethod, mfaDisableMsg, setMfaDisableMsg,
     // MFA challenge
+    mfaChallengeType, setMfaChallengeType,
     mfaChallengeScreen, setMfaChallengeScreen, mfaChallengeCode, setMfaChallengeCode,
     mfaChallengeMsg, setMfaChallengeMsg, mfaChallengeLoading, setMfaChallengeLoading,
     mfaChallengeFactorId, setMfaChallengeFactorId,

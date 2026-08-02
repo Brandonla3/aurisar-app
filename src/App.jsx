@@ -451,6 +451,8 @@ function App() {
     mfaChallengeLoading,
     setMfaChallengeLoading,
     mfaChallengeFactorId,
+    mfaChallengeType,
+    setMfaChallengeType,
     setMfaChallengeFactorId,
     passkeyPanelOpen,
     setPasskeyPanelOpen,
@@ -766,6 +768,11 @@ function App() {
       if (_event === "PASSWORD_RECOVERY") {
         setIsPreviewMode(false); // arriving via password reset is a real auth — exit preview
         setAuthUser(user);
+        // A reset link must not be a way around MFA. Whoever controls the
+        // inbox lands here with an aal1 session; without this the branch
+        // rendered the full app (only the aal2-gated tables would have
+        // refused, leaving messaging, friends and gameplay data reachable).
+        if (await checkAndHandleMfaChallenge()) return;
         try {
           const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _23a => _23a.id]) || null);
           if (adminFlags.disabled_at) {
@@ -818,6 +825,13 @@ function App() {
         setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
         setIsAdmin(false);
+        // The challenge screen renders ahead of the login screen, so leaving
+        // it set would strand a user on "Verification Required" when the
+        // session dies underneath it (revoked token, disabled account).
+        setMfaChallengeScreen(false);
+        setMfaChallengeFactorId(null);
+        setMfaChallengeType(null);
+        setMfaRecoveryMode(false);
         setScreen("login");
         return;
       }
@@ -1924,10 +1938,11 @@ function App() {
   }
 
   // ── MFA LOGIN CHALLENGE ───────────────────────────────────
-  // THE assurance gate. Must be awaited before any path reaches "main":
-  // password sign-in, the getSession() bootstrap, AND the onAuthStateChange
-  // signed-in branch (which also covers passkeys). Previously only the first
-  // called it, so a page reload walked straight past MFA at aal1.
+  // THE assurance gate. Must be awaited before ANY path reaches "main":
+  // password sign-in, the getSession() bootstrap, the onAuthStateChange
+  // signed-in branch (which also covers passkeys), and PASSWORD_RECOVERY.
+  // Previously only the first called it, so a reload — or a reset link —
+  // walked straight past MFA at aal1.
   // Returns true when it has taken over the screen.
   async function checkAndHandleMfaChallenge() {
     try {
@@ -1939,13 +1954,18 @@ function App() {
       const {
         data: factors
       } = await sb.auth.mfa.listFactors();
-      const { challenge, factorId } = shouldChallengeMfa(data, factors);
+      const { challenge, factorId, factorType } = shouldChallengeMfa(data, factors);
       if (challenge) {
         setMfaChallengeFactorId(factorId);
+        // Only a TOTP factor can be satisfied by the 6-digit code screen. A
+        // passkey/phone-only user must not be waved through (that was the
+        // hole), but the code box is useless to them — flag the type so the
+        // challenge UI offers the passkey re-sign-in / recovery-code route.
+        setMfaChallengeType(factorType);
         setMfaChallengeScreen(true);
         setMfaChallengeCode("");
         setMfaChallengeMsg(null);
-        setMfaRecoveryMode(false);
+        setMfaRecoveryMode(factorType !== "totp");
         setMfaRecoveryInput("");
         return true; // Intercepted — don't proceed to main
       }
@@ -4754,7 +4774,7 @@ function App() {
         color: "#8a8478",
         marginBottom: S.s24,
         textAlign: "center"
-      }}>{"Your account is protected with multi-factor authentication."}</div><div style={{
+      }}>{mfaChallengeType && mfaChallengeType !== "totp" ? (mfaChallengeType === "webauthn" ? "Your account is protected by a passkey. Sign out and choose “Sign in with Passkey”, or use a recovery code below." : "Your account is protected by a phone factor. Sign out and sign in again, or use a recovery code below.") : "Your account is protected with multi-factor authentication."}</div><div style={{
         width: "100%",
         background: "linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.25))",
         border: "1px solid rgba(180,172,158,.06)",
@@ -4762,8 +4782,11 @@ function App() {
         padding: "20px",
         backdropFilter: "blur(14px)",
         WebkitBackdropFilter: "blur(14px)"
-      }}><div style={{
-          display: "flex",
+      }}>{/* The authenticator-code tab is only offered when a verified TOTP
+             factor exists; for a passkey/phone-only account the code box can
+             never succeed, so recovery code is the sole in-place option. */}
+        <div style={{
+          display: mfaChallengeType && mfaChallengeType !== "totp" ? "none" : "flex",
           gap: S.s4,
           marginBottom: S.s16,
           background: "rgba(45,42,36,.25)",
@@ -4877,6 +4900,7 @@ function App() {
           setMfaChallengeScreen(false);
           setMfaChallengeCode("");
           setMfaChallengeMsg(null);
+          setMfaChallengeType(null);
           setMfaRecoveryMode(false);
           setMfaRecoveryInput("");
           setAuthUser(null);

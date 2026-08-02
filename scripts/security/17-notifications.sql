@@ -174,16 +174,47 @@ END $$;
 
 -- Internal enqueue helper for triggers and (Batch D) RPC producers.
 -- Not callable by clients.
+--
+-- The in_app preference is evaluated HERE, at write time, rather than at read
+-- time. The notifications SELECT policy only checks recipient_id, and realtime
+-- republishes every INSERT, so a row that exists is a row the user sees — the
+-- only way an in-app toggle can actually suppress anything is to not write the
+-- row. Email is decided later by the drain, hence the separate channel check.
 CREATE OR REPLACE FUNCTION public.enqueue_notification(
   p_recipient  uuid,
   p_actor      uuid,
   p_event_type text,
   p_payload    jsonb DEFAULT '{}'::jsonb
 ) RETURNS bigint
-LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_id     bigint;
+  v_in_app boolean;
+  v_email  boolean;
+BEGIN
+  v_in_app := public.should_deliver(p_recipient, p_event_type, 'in_app') = 'send';
+  -- 'defer' still means "maybe later" for email, so only a hard 'skip' rules
+  -- the email channel out.
+  v_email  := public.should_deliver(p_recipient, p_event_type, 'email') <> 'skip';
+
+  -- Wanted on neither channel: writing the row would only surface it in the
+  -- inbox the user asked not to see.
+  IF NOT v_in_app AND NOT v_email THEN
+    RETURN NULL;
+  END IF;
+
   INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
   VALUES (p_recipient, p_actor, p_event_type, COALESCE(p_payload, '{}'::jsonb))
-  RETURNING id;
+  RETURNING id INTO v_id;
+
+  -- Wanted by email but not in-app: keep the row for the drain, but pre-mark it
+  -- read so it never lights the bell or the inbox badge.
+  IF NOT v_in_app THEN
+    UPDATE public.notifications SET read_at = now() WHERE id = v_id;
+  END IF;
+
+  RETURN v_id;
+END;
 $$;
 REVOKE ALL ON FUNCTION public.enqueue_notification(uuid, uuid, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.enqueue_notification(uuid, uuid, text, jsonb) TO service_role;
@@ -230,7 +261,14 @@ BEGIN
     END IF;
 
     -- Returns desk: hard-bounced / complained addresses never get mail again.
-    IF EXISTS (SELECT 1 FROM public.notification_suppressions s WHERE s.email = v_email) THEN
+    -- Case-insensitive: auth.users.email is not reliably lowercase (migration
+    -- 12 treats it the same way) while resend-webhook.js always stores the
+    -- suppression lowercased, so an exact match would silently keep mailing a
+    -- bounced Jane.Doe@Example.com forever.
+    IF EXISTS (
+      SELECT 1 FROM public.notification_suppressions s
+      WHERE lower(s.email) = lower(v_email)
+    ) THEN
       RETURN 'skip';
     END IF;
 
@@ -360,8 +398,9 @@ BEGIN
   new_level := public.xp_to_level(new_xp);
   IF new_level <= old_level THEN RETURN NEW; END IF;
 
-  INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
-  SELECT
+  -- Routed through enqueue_notification so each friend's own in-app/email
+  -- preferences decide whether a row is written for them at all.
+  PERFORM public.enqueue_notification(
     CASE WHEN fr.from_user_id = NEW.id THEN fr.to_user_id ELSE fr.from_user_id END,
     NEW.id,
     'friend_level_up',
@@ -369,6 +408,7 @@ BEGIN
       'playerName', COALESCE(NEW.data->>'playerName', 'A friend'),
       'newLevel',   new_level
     )
+  )
   FROM public.friend_requests fr
   WHERE fr.status = 'accepted'
     AND (fr.from_user_id = NEW.id OR fr.to_user_id = NEW.id);
@@ -399,8 +439,7 @@ RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   IF NEW.status = 'pending' THEN
-    INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
-    VALUES (
+    PERFORM public.enqueue_notification(
       NEW.to_user_id, NEW.from_user_id, 'friend_request',
       jsonb_build_object('fromName', public.notif_player_name(NEW.from_user_id))
     );
@@ -419,8 +458,7 @@ RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   IF NEW.status = 'accepted' AND OLD.status IS DISTINCT FROM 'accepted' THEN
-    INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
-    VALUES (
+    PERFORM public.enqueue_notification(
       NEW.from_user_id, NEW.to_user_id, 'friend_accepted',
       jsonb_build_object('friendName', public.notif_player_name(NEW.to_user_id))
     );
@@ -445,8 +483,7 @@ BEGIN
   EXCEPTION WHEN others THEN
     v_item_name := NULL;  -- item_data is client-supplied text; never let a bad blob block the share
   END;
-  INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
-  VALUES (
+  PERFORM public.enqueue_notification(
     NEW.to_user_id, NEW.from_user_id, 'shared_workout',
     jsonb_build_object(
       'fromName',    public.notif_player_name(NEW.from_user_id),
@@ -470,10 +507,10 @@ CREATE OR REPLACE FUNCTION public.notify_message_received()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
-  INSERT INTO public.notifications (recipient_id, actor_id, event_type, payload)
-  SELECT
+  PERFORM public.enqueue_notification(
     cm.user_id, NEW.sender_id, 'message_received',
     jsonb_build_object('fromName', public.notif_player_name(NEW.sender_id))
+  )
   FROM public.channel_members cm
   WHERE cm.channel_id = NEW.channel_id
     AND cm.user_id <> NEW.sender_id
@@ -482,7 +519,11 @@ BEGIN
       WHERE n.recipient_id = cm.user_id
         AND n.actor_id = NEW.sender_id
         AND n.event_type = 'message_received'
-        AND n.read_at IS NULL
+        -- Unread suppresses further rows, as before. The time floor covers
+        -- recipients with in-app OFF, whose rows are enqueued pre-read for the
+        -- drain: without it every single message would clear the unread test
+        -- and earn its own email.
+        AND (n.read_at IS NULL OR n.created_at > now() - interval '1 hour')
     );
   RETURN NEW;
 END;
@@ -510,9 +551,10 @@ DECLARE
 BEGIN
   -- streak_at_risk: streak alive through yesterday, no check-in yet today.
   -- (lastCheckIn older than yesterday = streak already broken, not "at risk".)
-  INSERT INTO public.notifications (recipient_id, event_type, payload)
-  SELECT p.id, 'streak_at_risk',
-         jsonb_build_object('streak', COALESCE((p.data->>'checkInStreak')::int, 0))
+  PERFORM public.enqueue_notification(
+    p.id, NULL, 'streak_at_risk',
+    jsonb_build_object('streak', COALESCE((p.data->>'checkInStreak')::int, 0))
+  )
   FROM public.profiles p
   WHERE p.disabled_at IS NULL
     AND COALESCE((p.data->>'checkInStreak')::int, 0) > 0
@@ -526,9 +568,10 @@ BEGIN
   GET DIAGNOSTICS v_streak = ROW_COUNT;
 
   -- workout_reminder: something scheduled for today, nothing logged today.
-  INSERT INTO public.notifications (recipient_id, event_type, payload)
-  SELECT p.id, 'workout_reminder',
-         jsonb_build_object('text', 'You have training scheduled today. Your quest awaits.')
+  PERFORM public.enqueue_notification(
+    p.id, NULL, 'workout_reminder',
+    jsonb_build_object('text', 'You have training scheduled today. Your quest awaits.')
+  )
   FROM public.profiles p
   WHERE p.disabled_at IS NULL
     AND EXISTS (

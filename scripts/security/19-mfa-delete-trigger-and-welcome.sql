@@ -67,6 +67,16 @@ BEGIN
 END;
 $$;
 
+-- The binding itself has only ever existed untracked in the live database —
+-- no CREATE TRIGGER for it appears anywhere in scripts/security. Bootstrapping
+-- 01…19 on a fresh environment would therefore produce a correct function that
+-- is never invoked, and MFA-removal alerts would silently never fire. Declared
+-- here so the schema is reproducible from the tracked SQL alone.
+DROP TRIGGER IF EXISTS on_mfa_factor_deleted ON auth.mfa_factors;
+CREATE TRIGGER on_mfa_factor_deleted
+  AFTER DELETE ON auth.mfa_factors
+  FOR EACH ROW EXECUTE FUNCTION public.notify_mfa_disabled();
+
 -- ── 2. Welcome row for every new signup ──────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.notify_user_welcome()
 RETURNS trigger

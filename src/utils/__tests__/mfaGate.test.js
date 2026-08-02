@@ -7,11 +7,12 @@ const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const read = p => readFileSync(ROOT + p, 'utf8');
 
 describe('shouldChallengeMfa', () => {
+  const AAL1_PENDING = { currentLevel: 'aal1', nextLevel: 'aal2' };
   const verified = { totp: [{ id: 'f1', status: 'verified' }] };
 
   it('challenges an aal1 session that has a verified factor (the reload bypass)', () => {
-    expect(shouldChallengeMfa({ currentLevel: 'aal1', nextLevel: 'aal2' }, verified))
-      .toEqual({ challenge: true, factorId: 'f1' });
+    expect(shouldChallengeMfa(AAL1_PENDING, verified))
+      .toEqual({ challenge: true, factorId: 'f1', factorType: 'totp' });
   });
 
   it('does not challenge a session that already satisfied MFA', () => {
@@ -26,13 +27,45 @@ describe('shouldChallengeMfa', () => {
 
   it('does not challenge when the only factor is unverified', () => {
     const unverified = { totp: [{ id: 'f2', status: 'unverified' }] };
-    expect(shouldChallengeMfa({ currentLevel: 'aal1', nextLevel: 'aal2' }, unverified).challenge)
-      .toBe(false);
+    expect(shouldChallengeMfa(AAL1_PENDING, unverified).challenge).toBe(false);
   });
 
   it('fails open on missing data rather than locking the user out', () => {
     expect(shouldChallengeMfa(null, null).challenge).toBe(false);
-    expect(shouldChallengeMfa({ currentLevel: 'aal1', nextLevel: 'aal2' }, null).challenge).toBe(false);
+    expect(shouldChallengeMfa(AAL1_PENDING, null).challenge).toBe(false);
+  });
+
+  // Supabase derives AAL from ANY verified factor. Only inspecting `totp` let a
+  // passkey-only user past the gate at aal1 and straight into the aal2 RLS
+  // wall, which presents as a hard lockout rather than a prompt.
+  it('challenges a passkey-only account', () => {
+    const passkeyOnly = { webauthn: [{ id: 'w1', status: 'verified' }] };
+    expect(shouldChallengeMfa(AAL1_PENDING, passkeyOnly))
+      .toEqual({ challenge: true, factorId: 'w1', factorType: 'webauthn' });
+  });
+
+  it('challenges a phone-only account', () => {
+    const phoneOnly = { phone: [{ id: 'p1', status: 'verified' }] };
+    expect(shouldChallengeMfa(AAL1_PENDING, phoneOnly))
+      .toEqual({ challenge: true, factorId: 'p1', factorType: 'phone' });
+  });
+
+  it('prefers TOTP when several factor types are enrolled — the code screen can satisfy it', () => {
+    const mixed = {
+      webauthn: [{ id: 'w1', status: 'verified' }],
+      totp: [{ id: 't1', status: 'verified' }],
+    };
+    expect(shouldChallengeMfa(AAL1_PENDING, mixed))
+      .toEqual({ challenge: true, factorId: 't1', factorType: 'totp' });
+  });
+
+  it('ignores unverified factors across every bucket', () => {
+    const none = {
+      totp: [{ id: 't1', status: 'unverified' }],
+      webauthn: [{ id: 'w1', status: 'unverified' }],
+      phone: [{ id: 'p1', status: 'unverified' }],
+    };
+    expect(shouldChallengeMfa(AAL1_PENDING, none).challenge).toBe(false);
   });
 });
 
@@ -59,8 +92,22 @@ describe('the gate is wired into every entry path (source guard)', () => {
 
   it('still runs on the password sign-in path', () => {
     expect(app).toContain('await checkAndHandleMfaChallenge()');
-    // three call sites: bootstrap, auth-state-change, password
-    expect(app.match(/await checkAndHandleMfaChallenge\(\)/g).length).toBeGreaterThanOrEqual(3);
+    // four call sites: bootstrap, auth-state-change, password, PASSWORD_RECOVERY
+    expect(app.match(/await checkAndHandleMfaChallenge\(\)/g).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('runs on the PASSWORD_RECOVERY path — a reset link is not an MFA bypass', () => {
+    const body = app.slice(app.indexOf('if (_event === "PASSWORD_RECOVERY")'));
+    const handler = body.slice(0, body.indexOf('// Silent background events'));
+    expect(handler).toContain('await checkAndHandleMfaChallenge()');
+    expect(handler.indexOf('await checkAndHandleMfaChallenge()'))
+      .toBeLessThan(handler.indexOf('setScreen("main")'));
+  });
+
+  it('clears challenge state on SIGNED_OUT so a dead session cannot strand the user', () => {
+    const body = app.slice(app.indexOf('if (_event === "SIGNED_OUT")'));
+    const handler = body.slice(0, body.indexOf('return;'));
+    expect(handler).toContain('setMfaChallengeScreen(false)');
   });
 
   it('renders the challenge ahead of the loading screen', () => {
