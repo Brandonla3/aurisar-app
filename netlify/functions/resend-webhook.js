@@ -17,18 +17,34 @@ const SUPPRESS_EVENTS = {
   "email.complained": "complaint",
 };
 
+// Svix retries reuse the ORIGINAL svix-id/timestamp/signature — a retry is a
+// byte-identical redelivery, not a re-signed message. Svix's own backoff runs
+// to hours, so a 5-minute replay window rejects every retry after the first
+// and the event sticks in "Attempting" forever. Replay protection here is
+// cheap anyway: the signature covers id+timestamp+body, and the suppression
+// insert is idempotent (on_conflict merge-duplicates), so replaying a captured
+// event is a no-op. A wide window that lets retries succeed is the right
+// trade.
+const REPLAY_TOLERANCE_S = 60 * 60 * 24;
+
 // Svix signature scheme: HMAC-SHA256 over `${id}.${timestamp}.${payload}`
 // with the base64 secret (after the whsec_ prefix). The svix-signature
 // header carries space-separated `v1,<base64>` entries.
+//
+// Returns a REASON rather than a boolean. Collapsing "no headers", "stale
+// timestamp" and "signature mismatch" into one opaque 401 is exactly the kind
+// of illegible failure that costs hours: the sender's dashboard shows a red
+// 401 and nothing about which check failed.
 function verifySvix(secret, headers, payload) {
   const id = headers.get("svix-id");
   const timestamp = headers.get("svix-timestamp");
   const signatures = headers.get("svix-signature");
-  if (!id || !timestamp || !signatures) return false;
+  if (!id || !timestamp || !signatures) return "missing_svix_headers";
 
-  // Reject stale timestamps (replay defence, 5 min window).
   const ts = Number(timestamp);
-  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
+  if (!Number.isFinite(ts)) return "bad_timestamp";
+  const ageS = Math.abs(Date.now() / 1000 - ts);
+  if (ageS > REPLAY_TOLERANCE_S) return `stale_timestamp_${Math.round(ageS)}s`;
 
   const secretBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
   const expected = crypto
@@ -36,13 +52,15 @@ function verifySvix(secret, headers, payload) {
     .update(`${id}.${timestamp}.${payload}`)
     .digest("base64");
 
-  return signatures.split(" ").some(part => {
+  const matched = signatures.split(" ").some(part => {
     const [version, sig] = part.split(",");
     if (version !== "v1" || !sig) return false;
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   });
+
+  return matched ? null : "signature_mismatch";
 }
 
 export default async (req) => {
@@ -59,8 +77,15 @@ export default async (req) => {
   }
 
   const payload = await req.text();
-  if (!verifySvix(secret, req.headers, payload)) {
-    return new Response("invalid signature", { status: 401 });
+  const failure = verifySvix(secret, req.headers, payload);
+  if (failure) {
+    // The reason goes in the BODY, which the sender's dashboard shows next to
+    // the failed attempt — so "why is this webhook stuck" is answerable from
+    // Resend's UI without access to function logs.
+    console.error(
+      `[resend-webhook] rejected: ${failure} (svix-id=${req.headers.get("svix-id") || "none"})`
+    );
+    return new Response(`invalid signature: ${failure}`, { status: 401 });
   }
 
   let event;
