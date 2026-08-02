@@ -9,3 +9,6 @@ spacetimedb/src/content/** text eol=lf
 # to LF so core.autocrlf=true Windows checkouts don't false-stale the gate.
 public/assets/terrain/manifest.json text eol=lf
 config/terrain-assets.lock.json text eol=lf
+# The generated textures are hashed too; mark them binary explicitly so no
+# client config (e.g. a global `* text=auto`) can ever rewrite their bytes.
+public/assets/terrain/generated/** binary
