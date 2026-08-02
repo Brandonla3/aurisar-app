@@ -64,6 +64,11 @@ export function integrateWalker(state, snapshot, dtMs, field) {
   // Slope gate at the DESTINATION: walking onto a wall is refused, and we try
   // each axis alone so the walker slides along the obstacle instead of sticking
   // to it — the classic collide-and-slide, done against the field.
+  //
+  // Destination-only, not swept: at the fixed 16.7ms step the walker moves
+  // ~0.11m/step, far narrower than any terrain feature, so tunnelling cannot
+  // occur against the field. If thin authored walls (fences, buildings) ever
+  // join the collision set, THIS is the line that needs a swept check.
   if (field.slopeAt(tx, tz) > MAX_WALK_SLOPE) {
     const xOnly = field.slopeAt(tx, state.z) <= MAX_WALK_SLOPE;
     const zOnly = field.slopeAt(state.x, tz) <= MAX_WALK_SLOPE;

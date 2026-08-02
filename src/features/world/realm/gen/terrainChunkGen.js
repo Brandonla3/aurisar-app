@@ -17,7 +17,11 @@
  * edge by construction.
  */
 
-export function generateTerrainChunk(field, { cx, cz, size = 64, subdivisions = 32 }) {
+import { CHUNK_SIZE_M, TERRAIN_SUBDIVISIONS } from '../model/chunkMath.js';
+
+export function generateTerrainChunk(field, {
+  cx, cz, size = CHUNK_SIZE_M, subdivisions = TERRAIN_SUBDIVISIONS,
+}) {
   const verts = subdivisions + 1;
   const positions = new Float32Array(verts * verts * 3);
   const normals = new Float32Array(verts * verts * 3);
@@ -26,7 +30,6 @@ export function generateTerrainChunk(field, { cx, cz, size = 64, subdivisions = 
 
   const originX = cx * size;
   const originZ = cz * size;
-  const step = size / subdivisions;
 
   let minY = Infinity;
   let maxY = -Infinity;
@@ -35,8 +38,13 @@ export function generateTerrainChunk(field, { cx, cz, size = 64, subdivisions = 
   let uv = 0;
   for (let iz = 0; iz < verts; iz++) {
     for (let ix = 0; ix < verts; ix++) {
-      const lx = ix * step;
-      const lz = iz * step;
+      // (ix / subdivisions) * size, NOT ix * (size / subdivisions): at the far
+      // edge this gives (sub/sub) * size = size EXACTLY, for any subdivision
+      // count. The step form relies on sub * (size/sub) landing back on size in
+      // float — true for the configs we happen to use, but the chunk-seam
+      // guarantee should not depend on which divisors are lucky.
+      const lx = (ix / subdivisions) * size;
+      const lz = (iz / subdivisions) * size;
       const wx = originX + lx;
       const wz = originZ + lz;
       const y = field.surfaceY(wx, wz);

@@ -33,6 +33,38 @@ describe('generateTerrainChunk', () => {
     expect(far.positions[1]).toBeCloseTo(field.surfaceY(5 * 64, -3 * 64), 4);
   });
 
+  it('edge vertices land exactly on the chunk boundary, for ANY subdivision count', () => {
+    // The seam guarantee must hold by construction, not by lucky divisors.
+    // lx = (ix/sub)*size gives exactly `size` at the far edge for every sub;
+    // the step form ix*(size/sub) only does when sub*(size/sub) rounds back.
+    // 7 and 13 are deliberately awkward non-power-of-two divisors of nothing.
+    for (const sub of [7, 13, 48]) {
+      const c = generateTerrainChunk(field, { cx: 2, cz: 1, size: 64, subdivisions: sub });
+      const verts = sub + 1;
+      // Far-edge column: local X must be exactly 64.
+      expect(c.positions[(verts - 1) * 3]).toBe(64);
+      // Far-edge row: local Z must be exactly 64.
+      expect(c.positions[((verts - 1) * verts) * 3 + 2]).toBe(64);
+    }
+  });
+
+  it('adjacent chunks agree exactly at the RUNTIME subdivision density', () => {
+    // The original seam test pinned subdivisions: 8 while the streamer ships
+    // 48 — a green test about a configuration nobody runs. This is the real one.
+    const sub = 48;
+    const left = generateTerrainChunk(field, { cx: 0, cz: 0, size: 64, subdivisions: sub });
+    const right = generateTerrainChunk(field, { cx: 1, cz: 0, size: 64, subdivisions: sub });
+    const verts = sub + 1;
+    for (let iz = 0; iz < verts; iz++) {
+      const li = (iz * verts + sub) * 3;
+      const ri = (iz * verts + 0) * 3;
+      expect(right.positions[ri + 1]).toBe(left.positions[li + 1]);
+      expect(right.normals[ri]).toBe(left.normals[li]);
+      expect(right.normals[ri + 1]).toBe(left.normals[li + 1]);
+      expect(right.normals[ri + 2]).toBe(left.normals[li + 2]);
+    }
+  });
+
   it('adjacent chunks agree exactly along their shared edge', () => {
     // The seam test. Chunks tessellate independently; if the shared-edge
     // vertices (or their normals) differed at all, every chunk border would

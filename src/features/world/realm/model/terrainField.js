@@ -18,6 +18,16 @@
  *
  * Every knob lives in DEFAULT_TERRAIN so a zone config can replace the numbers
  * without touching the math.
+ *
+ * A caveat on "agree by construction", recorded for P12: the guarantee is
+ * bit-exact within one JS engine, and near-exact across engines. surfaceY uses
+ * Math.hypot and the noise stack uses only +,*,floor (exact), but IEEE does not
+ * pin transcendental/hypot results across runtimes. The server therefore must
+ * NOT compare positions for equality against its own surfaceY — it validates
+ * with tolerances (the moveRules speed-budget pattern), exactly as the Ashwood
+ * moveGuard did. If bit-exactness ever matters, replace Math.hypot with
+ * sqrt(x*x+z*z) and pin the server runtime; until then, tolerance is the
+ * contract.
  */
 
 import { fbm2, ridged2, warp2 } from './noise.js';

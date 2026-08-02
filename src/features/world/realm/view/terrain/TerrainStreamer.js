@@ -11,14 +11,16 @@
  * ground underfoot always wins the budget.
  */
 
-import { CHUNK_SIZE_M, diffChunks, neededChunksAround, worldToChunk } from '../../model/chunkMath.js';
+import {
+  CHUNK_SIZE_M, TERRAIN_SUBDIVISIONS, diffChunks, neededChunksAround, worldToChunk,
+} from '../../model/chunkMath.js';
 import { generateTerrainChunk } from '../../gen/terrainChunkGen.js';
 import { buildTerrainChunkMesh } from './TerrainChunk.js';
 
 export class TerrainStreamer {
   constructor(scene, field, {
     radius = 3,
-    subdivisions = 48,
+    subdivisions = TERRAIN_SUBDIVISIONS,
     chunkSize = CHUNK_SIZE_M,
     buildBudgetPerTick = 2,
     material = null,
@@ -32,7 +34,6 @@ export class TerrainStreamer {
     this._material = material;
     /** id -> mesh */
     this._resident = new Map();
-    this._lastCenter = null;
   }
 
   /** Call once per sim tick with the player position. */
@@ -60,7 +61,6 @@ export class TerrainStreamer {
       built++;
     }
 
-    this._lastCenter = center;
     return { built, unloaded: toUnload.length, pending: toLoad.length - built };
   }
 

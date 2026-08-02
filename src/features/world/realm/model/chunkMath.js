@@ -7,6 +7,13 @@
 
 export const CHUNK_SIZE_M = 64;
 
+/**
+ * One tessellation density, shared by the generator's default and the
+ * streamer's default. Two independent defaults for the same concept is how a
+ * "quick test at low subdivisions" silently ships to players.
+ */
+export const TERRAIN_SUBDIVISIONS = 48;
+
 /** "cx,cz" — stable, readable, usable as a Map key. */
 export const chunkId = (cx, cz) => `${cx},${cz}`;
 
