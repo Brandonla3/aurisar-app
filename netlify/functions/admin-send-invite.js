@@ -11,6 +11,7 @@
  */
 
 import { requireAdmin, denyOrigin, json } from "./_lib/adminAuth.js";
+import { renderEmail, cardBody, escapeHtml } from "./_lib/emailTemplate.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -53,36 +54,17 @@ export default async (req) => {
     month: "long", day: "numeric", year: "numeric",
   });
 
-  const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>You've been invited to Aurisar Fitness</title></head>
-<body style="background:#0c0c0a;color:#d4cec4;font-family:Arial,sans-serif;margin:0;padding:32px 16px">
-  <div style="max-width:480px;margin:0 auto">
-    <div style="text-align:center;margin-bottom:28px">
-      <h1 style="font-size:2rem;font-weight:900;letter-spacing:.18em;color:#c49428;margin:0">AURISAR</h1>
-      <div style="font-size:.85rem;letter-spacing:.35em;color:#8a8478;text-transform:uppercase;margin-top:4px">Fitness</div>
-    </div>
-    <div style="background:rgba(45,42,36,.4);border:1px solid rgba(180,172,158,.08);border-radius:12px;padding:28px">
-      <h2 style="color:#d4cec4;font-size:1.2rem;margin:0 0 12px">You've been summoned.</h2>
-      <p style="color:#8a8478;font-size:.9rem;line-height:1.6;margin:0 0 16px">
-        An admin has invited you to join <strong style="color:#c49428">Aurisar Fitness</strong> — the RPG fitness tracker where your workouts become your legend.
-      </p>
-      <p style="color:#8a8478;font-size:.9rem;line-height:1.6;margin:0 0 24px">
-        This invite link expires on <strong style="color:#d4cec4">${expiresFormatted}</strong>.
-      </p>
-      <div style="text-align:center;margin-bottom:20px">
-        <a href="${inviteUrl}" style="display:inline-block;padding:12px 32px;background:rgba(196,148,40,.15);color:#c49428;border:1px solid rgba(196,148,40,.25);border-radius:8px;text-decoration:none;font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Accept Your Fate &rarr;</a>
-      </div>
-      <p style="color:#5a5650;font-size:.7rem;margin:0;text-align:center;word-break:break-all">
-        Or paste this link: ${inviteUrl}
-      </p>
-    </div>
-    <div style="text-align:center;margin-top:20px;font-size:.65rem;color:#3a3834">
-      Aurisar Games &middot; This invite was sent on behalf of the Aurisar admin team.
-    </div>
-  </div>
-</body>
-</html>`;
+  const html = renderEmail({
+    title: "You've been invited to Aurisar Fitness",
+    footerNote: "This invite was sent on behalf of the Aurisar admin team.",
+    ctaText: "Accept Your Fate",
+    ctaUrl: inviteUrl,
+    linkFallback: true,
+    bodyHtml: cardBody("You've been summoned.", [
+      `An admin has invited you to join <strong style="color:#c49428">Aurisar Fitness</strong> — the RPG fitness tracker where your workouts become your legend.`,
+      `This invite link expires on <strong style="color:#d4cec4">${escapeHtml(expiresFormatted)}</strong>.`,
+    ]),
+  });
 
   const emailRes = await fetch("https://api.resend.com/emails", {
     method: "POST",

@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   read_at       timestamptz,
   email_status  text NOT NULL DEFAULT 'pending'
                 CHECK (email_status IN ('pending','sending','sent','skipped','failed')),
+  email_claimed_at timestamptz,
   email_sent_at timestamptz
 );
 
@@ -269,6 +270,63 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.should_deliver(uuid, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.should_deliver(uuid, text, text) TO service_role;
+
+-- Email-channel wrapper for the drain: one round-trip returning the verdict
+-- plus the recipient address (only when the verdict is 'send' — the address
+-- never leaves the DB for skipped/deferred rows). auth.users is not exposed
+-- over PostgREST, which is why the drain can't read the email itself.
+CREATE OR REPLACE FUNCTION public.should_deliver_email(
+  p_recipient  uuid,
+  p_event_type text
+) RETURNS TABLE (verdict text, email text)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_verdict text;
+BEGIN
+  v_verdict := public.should_deliver(p_recipient, p_event_type, 'email');
+  IF v_verdict = 'send' THEN
+    RETURN QUERY
+      SELECT v_verdict, u.email::text FROM auth.users u WHERE u.id = p_recipient;
+  ELSE
+    RETURN QUERY SELECT v_verdict, NULL::text;
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.should_deliver_email(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.should_deliver_email(uuid, text) TO service_role;
+
+-- ── 4b. Atomic claim for the email drain ─────────────────────────────────────
+-- FOR UPDATE SKIP LOCKED means two overlapping drain invocations can never
+-- claim the same row — the at-least-once half of the duplicate-send defence
+-- (the Resend idempotency key is the other half). Rows stuck in 'sending'
+-- longer than 15 minutes (a crashed run) are reclaimed first.
+
+CREATE OR REPLACE FUNCTION public.claim_notification_emails(
+  p_batch int DEFAULT 25
+) RETURNS SETOF public.notifications
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  -- Recover rows a crashed run left behind.
+  UPDATE public.notifications
+    SET email_status = 'pending', email_claimed_at = NULL
+    WHERE email_status = 'sending'
+      AND email_claimed_at < now() - interval '15 minutes';
+
+  RETURN QUERY
+  UPDATE public.notifications n
+    SET email_status = 'sending', email_claimed_at = now()
+    WHERE n.id IN (
+      SELECT id FROM public.notifications
+      WHERE email_status = 'pending'
+      ORDER BY created_at
+      LIMIT GREATEST(1, LEAST(p_batch, 100))
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING n.*;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.claim_notification_emails(int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_notification_emails(int) TO service_role;
 
 -- ── 5. notify_friend_level_up — supersedes the migration-14 stub ─────────────
 -- Same trigger, real fan-out: one outbox row per accepted friend. Email
