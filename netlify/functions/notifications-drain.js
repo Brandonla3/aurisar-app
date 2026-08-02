@@ -16,6 +16,7 @@
  */
 
 import { renderNotificationEmail, fromAddressFor } from "./_lib/notificationEmails.js";
+import { pgError } from "./_lib/pgErrors.js";
 
 const BATCH_SIZE = 25;
 const DEFER_GIVE_UP_MS = 7 * 24 * 60 * 60 * 1000;
@@ -27,6 +28,7 @@ function svc() {
   return { url, key };
 }
 
+// db-contract: dynamic(claim_notification_emails, should_deliver_email)
 async function rpc(s, fn, args) {
   const res = await fetch(`${s.url}/rest/v1/rpc/${fn}`, {
     method: "POST",
@@ -38,7 +40,11 @@ async function rpc(s, fn, args) {
     body: JSON.stringify(args),
   });
   if (!res.ok) {
-    throw new Error(`rpc ${fn} failed: ${res.status} ${await res.text().catch(() => "")}`);
+    // Keep the PostgREST body's code/hint on the Error so callers can tell an
+    // unapplied migration apart from a transient blip.
+    const err = pgError(res, await res.text().catch(() => ""), `rpc ${fn}`);
+    err.rpc = fn;
+    throw err;
   }
   return res.json();
 }
@@ -73,7 +79,18 @@ export default async () => {
   try {
     rows = await rpc(s, "claim_notification_emails", { p_batch: BATCH_SIZE });
   } catch (e) {
-    console.error("[notifications-drain] claim failed:", e.message);
+    if (e.schemaDrift) {
+      // Distinct, greppable, and actionable: this is an unapplied migration,
+      // not a blip. It will recur every 5 minutes until someone applies the
+      // SQL, so say exactly what is missing rather than logging a status code.
+      console.error(
+        `[notifications-drain] SCHEMA_DRIFT rpc=${e.rpc} code=${e.code} — ` +
+        `the database is missing an object this deploy requires ` +
+        `(apply scripts/security/17-notifications.sql). ${e.hint || ""}`.trim()
+      );
+      return new Response("schema drift", { status: 503 });
+    }
+    console.error("[notifications-drain] claim failed (transient):", e.message);
     return new Response("claim failed", { status: 500 });
   }
   if (!Array.isArray(rows) || rows.length === 0) {

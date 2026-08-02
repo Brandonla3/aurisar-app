@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "generatedBy": "scripts/check_db_contract.mjs",
+  "note": "Derived from code. Do not hand-edit `tables`/`functions`/`declared*` — run `npm run emit:db-contract`. `knownUndeclared` IS hand-edited: it is the accepted baseline of objects the tracked SQL does not declare (mostly pre-dating scripts/security/). Each entry needs a reason.",
+  "tables": [
+    "feedback",
+    "friend_exercise_events",
+    "friend_requests",
+    "notification_prefs",
+    "notification_suppressions",
+    "notifications",
+    "profiles",
+    "shared_items",
+    "whoop_data",
+    "whoop_tokens"
+  ],
+  "functions": [
+    "admin_list_users",
+    "admin_reset_user_mfa",
+    "check_anon_rate_limit",
+    "check_invite_token",
+    "claim_notification_emails",
+    "count_recovery_codes_remaining",
+    "find_user_for_friend_request",
+    "get_channel_messages",
+    "get_exercise_video_url",
+    "get_friend_profiles_safe",
+    "get_leaderboard",
+    "get_leaderboard_filters",
+    "get_my_conversations",
+    "get_or_create_dm_channel",
+    "get_recent_friend_events",
+    "get_share_sender_profiles",
+    "get_total_unread_count",
+    "get_world_ranks",
+    "has_legacy_mfa_recovery_codes",
+    "lookup_email_by_private_id",
+    "mark_channel_read",
+    "produce_daily_reminders",
+    "send_message",
+    "send_phone_otp",
+    "should_deliver_email",
+    "store_mfa_recovery_codes",
+    "use_mfa_recovery_code",
+    "verify_phone_otp"
+  ],
+  "declaredTables": [
+    "anon_request_counters",
+    "community_leaderboard",
+    "feedback_inbox",
+    "friend_exercise_events",
+    "invites",
+    "leaderboard_full",
+    "notification_prefs",
+    "notification_suppressions",
+    "notifications",
+    "profiles_public"
+  ],
+  "declaredFunctions": [
+    "admin_list_users",
+    "admin_reset_user_mfa",
+    "anon_request_counters_sweep",
+    "backup_profile_on_update",
+    "check_anon_rate_limit",
+    "check_invite_token",
+    "claim_notification_emails",
+    "consume_invite_for_user",
+    "count_recovery_codes_remaining",
+    "default_notification_pref",
+    "disable_mfa_verified",
+    "enqueue_notification",
+    "find_user_for_friend_request",
+    "get_channel_messages",
+    "get_friend_profiles_safe",
+    "get_my_conversations",
+    "get_or_create_dm_channel",
+    "get_recent_friend_events",
+    "get_share_sender_profiles",
+    "get_total_unread_count",
+    "has_legacy_mfa_recovery_codes",
+    "has_required_aal",
+    "mark_channel_read",
+    "notif_player_name",
+    "notify_friend_accepted",
+    "notify_friend_level_up",
+    "notify_friend_request",
+    "notify_message_received",
+    "notify_mfa_disabled",
+    "notify_shared_item",
+    "notify_user_welcome",
+    "produce_daily_reminders",
+    "send_message",
+    "should_deliver",
+    "should_deliver_email",
+    "store_mfa_recovery_codes",
+    "store_mfa_recovery_codes_legacy",
+    "touch_notification_prefs",
+    "update_channel_timestamp",
+    "use_mfa_recovery_code",
+    "xp_to_level"
+  ],
+  "knownUndeclared": {
+    "table:feedback": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:6778"
+      ]
+    },
+    "table:friend_requests": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:2520",
+        "src/App.jsx:2523",
+        "src/App.jsx:2575"
+      ]
+    },
+    "table:profiles": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:2210",
+        "src/utils/storage.js:29",
+        "src/utils/storage.js:87"
+      ]
+    },
+    "table:shared_items": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:2744",
+        "src/App.jsx:2757",
+        "src/App.jsx:2814"
+      ]
+    },
+    "table:whoop_data": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "netlify/functions/whoop-fetch-data.js:241"
+      ]
+    },
+    "table:whoop_tokens": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/features/profile/ProfileTab.jsx:289",
+        "netlify/functions/whoop-fetch-data.js:32",
+        "netlify/functions/whoop-token-exchange.js:97"
+      ]
+    },
+    "function:get_exercise_video_url": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/utils/exerciseLibrary.js:163"
+      ]
+    },
+    "function:get_leaderboard": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:2336"
+      ]
+    },
+    "function:get_leaderboard_filters": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:2368"
+      ]
+    },
+    "function:get_world_ranks": {
+      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "sites": [
+        "src/App.jsx:2355"
+      ]
+    },
+    "function:lookup_email_by_private_id": {
+      "reason": "UNTRACKED, SECURITY-RELEVANT: called PRE-AUTH from the login screen, so it must be granted to `anon` — yet its grants, search_path pinning and rate limiting cannot be reviewed because it is declared in no tracked file. Needs a migration that re-declares it explicitly. Confirmed present in the live DB.",
+      "sites": [
+        "src/App.jsx:1351"
+      ]
+    },
+    "function:send_phone_otp": {
+      "reason": "UNTRACKED, SECURITY-RELEVANT: backs the phone MFA factor. Rate limiting and per-user throttling are unverifiable from the repo because it is declared in no tracked file. Needs a migration that re-declares it.",
+      "sites": [
+        "src/App.jsx:1721",
+        "src/App.jsx:1850"
+      ]
+    },
+    "function:verify_phone_otp": {
+      "reason": "UNTRACKED, SECURITY-RELEVANT: verifies the phone MFA factor. Attempt limiting and expiry are unverifiable from the repo. Pairs with send_phone_otp; needs a migration that re-declares it.",
+      "sites": [
+        "src/App.jsx:1759",
+        "src/App.jsx:1886"
+      ]
+    }
+  }
+}

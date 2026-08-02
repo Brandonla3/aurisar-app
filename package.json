@@ -41,7 +41,9 @@
     "build:gameplay": "node scripts/copy_gameplay_to_public.mjs",
     "bake:tiles": "node scripts/bake_ashwood_tiles.mjs",
     "bake:heightmap": "node scripts/bake_ashwood_heightmap.mjs",
-    "verify:worldgen": "node scripts/verify_worldgen.mjs"
+    "verify:worldgen": "node scripts/verify_worldgen.mjs",
+    "emit:db-contract": "node scripts/check_db_contract.mjs",
+    "emit:db-contract:check": "node scripts/check_db_contract.mjs --check"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",

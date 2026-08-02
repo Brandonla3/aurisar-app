@@ -73,6 +73,18 @@ jobs:
       - name: Worldgen determinism (GOLDEN)
         run: npm run verify:worldgen
 
+      # Every database object the code references (sb.from/sb.rpc + the raw
+      # PostgREST paths the Netlify functions fetch) must be declared by a
+      # tracked file in scripts/security/, or explicitly accepted in
+      # config/db-contract.json's knownUndeclared baseline. Fully offline — no
+      # database, no credentials — so it runs on forks too.
+      #
+      # This is the guard for the failure class that has bitten this repo four
+      # times: code referencing a database object that isn't there. It would
+      # have caught migrations 17-20 shipping ahead of their SQL.
+      - name: DB contract (code ↔ tracked schema)
+        run: npm run emit:db-contract:check
+
       - name: Tests
         run: npm test
 
