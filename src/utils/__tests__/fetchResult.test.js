@@ -4,13 +4,29 @@ import {
   isBroken, isUnreachable, KIND, STATUS,
 } from '../fetchResult';
 
-// navigator.onLine is read at classify time; restore it between cases.
+// navigator.onLine is read at classify time.
+//
+// `globalThis.navigator` exists on Node 21+ but NOT on Node 20, which is what
+// CI runs — so mutating a property on it passes locally and throws
+// "Object.defineProperty called on non-object" in CI. Define the whole object
+// on globalThis instead, and restore the original descriptor afterwards, so
+// this behaves the same on every Node version. (fetchResult.js itself already
+// guards with `typeof navigator !== 'undefined'`; this is purely the harness.)
+const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
 const setOnline = value => {
-  Object.defineProperty(globalThis.navigator, 'onLine', {
-    value, configurable: true, writable: true,
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { onLine: value },
+    configurable: true,
+    writable: true,
   });
 };
-afterEach(() => { setOnline(true); vi.restoreAllMocks(); });
+
+afterEach(() => {
+  if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+  else delete globalThis.navigator;
+  vi.restoreAllMocks();
+});
 
 describe('classifyError', () => {
   it('treats missing schema objects as permanent and reportable', () => {
