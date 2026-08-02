@@ -1,11 +1,13 @@
 {
   "version": 1,
   "generatedBy": "scripts/check_db_contract.mjs",
-  "note": "Derived from code. Do not hand-edit `tables`/`functions`/`declared*` — run `npm run emit:db-contract`. `knownUndeclared` IS hand-edited: it is the accepted baseline of objects the tracked SQL does not declare (mostly pre-dating scripts/security/). Each entry needs a reason.",
+  "note": "Derived from code. Do not hand-edit `tables`/`functions`/`declared*` — run `npm run emit:db-contract`. `knownUndeclared` IS hand-edited: it is the accepted baseline of objects the tracked SQL does not declare (mostly pre-dating scripts/security/). Each entry needs a real reason. Emit will NOT invent entries — a new undeclared object must get a migration or a deliberate hand-written exception.",
   "tables": [
+    "exercises",
     "feedback",
     "friend_exercise_events",
     "friend_requests",
+    "invites",
     "notification_prefs",
     "notification_suppressions",
     "notifications",
@@ -100,6 +102,12 @@
     "xp_to_level"
   ],
   "knownUndeclared": {
+    "table:exercises": {
+      "reason": "BASELINE: exercise catalogue, pre-dates tracking. Read-only from the client via a multiline sb.from('exercises') in src/utils/exerciseLibrary.js.",
+      "sites": [
+        "src/utils/exerciseLibrary.js:30"
+      ]
+    },
     "table:feedback": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
@@ -115,11 +123,11 @@
       ]
     },
     "table:profiles": {
-      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "reason": "BASELINE: the core user table, created before scripts/security/ tracking began. Confirmed present in the live DB.",
       "sites": [
         "src/App.jsx:2210",
-        "src/utils/storage.js:29",
-        "src/utils/storage.js:87"
+        "src/features/avatar/useAvatarConfig.js:25",
+        "src/features/avatar/useAvatarConfig.js:43"
       ]
     },
     "table:shared_items": {
@@ -133,6 +141,7 @@
     "table:whoop_data": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
+        "src/features/profile/ProfileTab.jsx:296",
         "netlify/functions/whoop-fetch-data.js:241"
       ]
     },
@@ -141,7 +150,7 @@
       "sites": [
         "src/features/profile/ProfileTab.jsx:289",
         "netlify/functions/whoop-fetch-data.js:32",
-        "netlify/functions/whoop-token-exchange.js:97"
+        "netlify/functions/whoop-fetch-data.js:142"
       ]
     },
     "function:get_exercise_video_url": {

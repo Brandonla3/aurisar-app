@@ -7,7 +7,8 @@ const resp = (status, ok = false) => ({ status, ok });
 
 describe('isSchemaDriftCode', () => {
   it('recognises the PostgREST and Postgres "object missing" codes', () => {
-    for (const code of ['PGRST202', 'PGRST205', '42883', '42P01', '42703']) {
+    // PGRST204 = column not in the schema cache; it belongs here too.
+    for (const code of ['PGRST202', 'PGRST204', 'PGRST205', '42883', '42P01', '42703']) {
       expect(isSchemaDriftCode(code), code).toBe(true);
     }
   });
@@ -75,6 +76,24 @@ describe('the scheduled functions act on the classification (source guard)', () 
       expect(src.indexOf('SCHEMA_DRIFT')).toBeLessThan(src.indexOf('(transient)'));
     });
   }
+
+  it('the drain handles drift on the per-row RPC too, not just the claim', () => {
+    // should_deliver_email drift is just as permanent as claim drift and hits
+    // every remaining row identically; treating it as an ordinary row error
+    // re-queued the batch and repeated it every 5 minutes with no marker.
+    const src = read('netlify/functions/notifications-drain.js');
+    const rowCatch = src.slice(src.indexOf('} catch (e) {', src.indexOf('for (const row of rows)')));
+    expect(rowCatch).toContain('e.schemaDrift');
+    expect(rowCatch).toContain('driftMessage');
+    expect(rowCatch).toContain('503');
+  });
+
+  it('does not name a specific migration file in the drift message', () => {
+    // The same codes fire for a missing object AND for an argument-name
+    // mismatch against an existing function; pointing at one file misleads.
+    const src = read('netlify/functions/notifications-drain.js');
+    expect(src).not.toContain('apply scripts/security/17-notifications.sql');
+  });
 
   it('both use the shared classifier rather than a local copy of the codes', () => {
     for (const path of [

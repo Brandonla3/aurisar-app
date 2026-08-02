@@ -79,10 +79,14 @@ jobs:
       # config/db-contract.json's knownUndeclared baseline. Fully offline — no
       # database, no credentials — so it runs on forks too.
       #
-      # This is the guard for the failure class that has bitten this repo four
-      # times: code referencing a database object that isn't there. It would
-      # have caught migrations 17-20 shipping ahead of their SQL.
-      - name: DB contract (code ↔ tracked schema)
+      # SCOPE, stated honestly: this compares CODE against TRACKED SQL. It does
+      # NOT prove the SQL was applied to any database — a commit carrying both
+      # the call and its migration passes even if nobody runs it, which is how
+      # migrations 17-20 shipped ahead of the schema. The runtime guard for that
+      # is the SCHEMA_DRIFT classification in netlify/functions/_lib/pgErrors.js.
+      # It also does not validate the bodies of tracked SQL functions, so a
+      # declared function calling a dropped helper still passes here.
+      - name: DB contract (code ↔ tracked schema, offline)
         run: npm run emit:db-contract:check
 
       - name: Tests

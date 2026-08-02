@@ -55,6 +55,10 @@ REVOKE EXECUTE ON FUNCTION public.should_deliver(uuid, text, text)              
 REVOKE EXECUTE ON FUNCTION public.should_deliver_email(uuid, text)               FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.produce_daily_reminders()                      FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.notif_player_name(uuid)                        FROM anon, authenticated;
+-- NOTE: this DELIBERATELY OVERRIDES migration 17, which granted EXECUTE on
+-- default_notification_pref to `authenticated`. Nothing client-side calls it —
+-- it is consulted only from inside should_deliver(), which runs SECURITY
+-- DEFINER as the owner and therefore does not need the caller to hold EXECUTE.
 REVOKE EXECUTE ON FUNCTION public.default_notification_pref(text, text)          FROM anon, authenticated;
 
 -- Trigger functions. PostgREST will not expose a function returning `trigger`,

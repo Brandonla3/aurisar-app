@@ -63,6 +63,61 @@ describe('db-contract artifact', () => {
   });
 });
 
+describe('scanner covers this repo\'s actual call styles', () => {
+  it('sees multiline `await sb\\n  .from(...)` — the dominant style here', () => {
+    // A line-local scan missed EVERY multiline site, including these two, while
+    // reporting success. The negative test that "proved" the guard worked only
+    // covered same-line calls.
+    expect(contract.tables).toContain('exercises');   // src/utils/exerciseLibrary.js
+    expect(contract.tables).toContain('invites');     // netlify/functions/admin-send-invite.js
+    expect(contract.tables).toContain('notification_prefs');
+  });
+
+  it('sees RPCs that pass arguments, not just bare-name calls', () => {
+    // `sb.rpc('fn', { args })` must count; requiring a closing paren right
+    // after the name treated every argument-passing RPC as a dynamic site.
+    for (const fn of ['get_leaderboard', 'send_message', 'get_channel_messages']) {
+      expect(contract.functions, fn).toContain(fn);
+    }
+  });
+
+  it('is not limited to a hardcoded list of client variable names', () => {
+    // adminAuth.js uses `supa`, not `sb`/`supabase`. Anchoring on a fixed list
+    // silently dropped whatever a new alias touched.
+    const src = read('scripts/check_db_contract.mjs');
+    expect(src).toContain('NOT_CLIENTS');
+    expect(src).toMatch(/Array/);
+    expect(src).toMatch(/Buffer/);
+  });
+});
+
+describe('the ratchet cannot be laundered', () => {
+  const src = read('scripts/check_db_contract.mjs');
+
+  it('emit only seeds the baseline on first bootstrap or with --seed-baseline', () => {
+    // The original emit auto-added ANY undeclared object with a generic
+    // "BASELINE" reason. CI said "run emit"; emit absolved the object; the next
+    // run passed. The documented ratchet was a no-op.
+    expect(src).toContain('firstBootstrap');
+    expect(src).toContain('--seed-baseline');
+    expect(src).toMatch(/if\s*\(firstBootstrap\s*\|\|\s*SEED\)/);
+  });
+
+  it('emit itself fails on a new undeclared object', () => {
+    expect(src).toContain('Re-running emit will NOT absolve them');
+  });
+
+  it('applies CREATE and DROP in positional order', () => {
+    // Two passes (all CREATEs, then all DROPs) breaks the standard
+    // `DROP IF EXISTS x; CREATE x;` idiom used throughout scripts/security.
+    expect(src).toContain('events.sort');
+  });
+
+  it('requires a dynamic marker to actually name something', () => {
+    expect(src).toContain('marker names no objects');
+  });
+});
+
 describe('db-contract checker is wired to run', () => {
   it('is a CI step and an npm script, matching the other *:check guards', () => {
     expect(read('package.json')).toContain('emit:db-contract:check');

@@ -10,12 +10,19 @@
  */
 
 //   PGRST202  no function matches the name/arguments in the schema cache
+//   PGRST204  column not found in the schema cache
 //   PGRST205  no table matches
 //   42883     undefined_function
 //   42P01     undefined_table
 //   42703     undefined_column
+//
+// NOTE: these mean "the database does not have what this code asked for". That
+// is USUALLY an unapplied migration, but PGRST202 also fires when the argument
+// NAMES or types don't match an existing function — i.e. a caller bug. Log the
+// code and hint and let a human decide; do not assert a specific migration file.
 export const SCHEMA_DRIFT_CODES = new Set([
   "PGRST202",
+  "PGRST204",
   "PGRST205",
   "42883",
   "42P01",
