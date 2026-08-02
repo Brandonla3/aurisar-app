@@ -1,5 +1,6 @@
 import React from "react";
 import { sb } from "../utils/supabase";
+import { classifyError } from "../utils/fetchResult";
 
 // Maps the app's camelCase pref keys onto typed (event_type, channel) rows in
 // public.notification_prefs (scripts/security/17-notifications.sql). The
@@ -31,7 +32,7 @@ export const DEFAULT_NOTIF_PREFS = {
 
 // Fully-resolved boolean map (defaults merged with the user's saved rows).
 // Preview mode and signed-out sessions get defaults and never write.
-export function useNotificationPrefs(authUser, isPreviewMode) {
+export function useNotificationPrefs(authUser, isPreviewMode, onSaveError) {
   const [prefs, setPrefs] = React.useState(DEFAULT_NOTIF_PREFS);
   const prefsRef = React.useRef(prefs);
   React.useEffect(() => {
@@ -73,11 +74,14 @@ export function useNotificationPrefs(authUser, isPreviewMode) {
   const setPref = React.useCallback(
     async (key, value) => {
       const map = PREF_KEY_MAP[key];
-      if (!map) return;
+      if (!map) return false;
+      const previous = prefsRef.current[key];
       setPrefs(p => ({ ...p, [key]: value }));
-      if (!userId || isPreviewMode) return;
+      if (!userId || isPreviewMode) return true;
+
+      let error;
       try {
-        const { error } = await sb.from("notification_prefs").upsert(
+        ({ error } = await sb.from("notification_prefs").upsert(
           {
             user_id: userId,
             event_type: map.eventType,
@@ -85,13 +89,36 @@ export function useNotificationPrefs(authUser, isPreviewMode) {
             enabled: value,
           },
           { onConflict: "user_id,event_type,channel" }
-        );
-        if (error) console.warn("notification_prefs save:", error.message);
+        ));
       } catch (e) {
-        console.warn("notification_prefs save:", e);
+        error = e;
       }
+
+      if (error) {
+        // Roll the optimistic update BACK. Leaving it applied made the switch
+        // look saved when nothing persisted — the same "looks fine, isn't"
+        // failure as an empty-looking broken inbox, just one toggle wide.
+        const c = classifyError(error);
+        setPrefs(p => ({ ...p, [key]: previous }));
+        console.warn(
+          `[notification_prefs] save failed kind=${c.kind} code=${c.code || "?"}: ${error.message || error}`
+        );
+        if (onSaveError) {
+          // showToast's second argument is its OPTIONS bag — passing the
+          // classification object here silently produced a plain status toast,
+          // so a permanent save failure looked as gentle as a network blip.
+          onSaveError(
+            c.permanent
+              ? "Couldn’t save that setting — notification preferences aren’t working right now."
+              : "Couldn’t save that setting. Check your connection and try again.",
+            { type: "error", duration: c.permanent ? 8000 : 5000 }
+          );
+        }
+        return false;
+      }
+      return true;
     },
-    [userId, isPreviewMode]
+    [userId, isPreviewMode, onSaveError]
   );
 
   const toggle = React.useCallback(

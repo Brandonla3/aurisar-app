@@ -351,6 +351,16 @@
     @keyframes tInStack{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     /* Notification inbox (bell sheet) */
     .notif-inbox-empty{padding:28px 16px;text-align:center;color:#8a8478;font-size:.78rem;font-style:italic}
+    .notif-inbox-checked{font-size:.6rem;color:#5a5650;margin-top:6px;font-style:normal}
+    /* Transient: visible enough not to be skim-missed, calm enough not to read
+       as "this feature is broken". Deliberately distinct from .notif-inbox-empty. */
+    .notif-inbox-stale{padding:10px 12px;margin:4px 0 10px;border-radius:8px;background:rgba(45,42,36,.45);border:1px solid rgba(180,172,158,.16);color:#b4ac9e;font-size:.72rem;line-height:1.4}
+    /* The "missing texture" of this app: a broken surface must be impossible to
+       read past. Deliberately clashes with the dark/gold palette. */
+    .notif-inbox-broken{padding:20px 16px;margin:4px 0 12px;border-radius:10px;background:rgba(122,40,56,.28);border:1px solid rgba(224,85,85,.45)}
+    .notif-inbox-broken-title{font-size:.82rem;font-weight:700;color:#ffb4b4;margin-bottom:6px}
+    .notif-inbox-broken-body{font-size:.74rem;color:#e8c4c4;line-height:1.45}
+    .notif-inbox-broken-code{margin-top:8px;font-family:monospace;font-size:.62rem;color:#e08a8a;word-break:break-all}
     .notif-inbox-list{display:flex;flex-direction:column;gap:8px;padding:4px 0 12px}
     .notif-inbox-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(45,42,36,.25);border:1px solid rgba(180,172,158,.05)}
     .notif-inbox-row-unread{background:rgba(45,42,36,.45);border-color:rgba(212,175,55,.18)}

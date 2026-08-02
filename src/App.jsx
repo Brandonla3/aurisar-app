@@ -610,7 +610,7 @@ function App() {
     prefs: notifPrefs,
     toggle: toggleNotifPref,
     setPref: setNotifPref
-  } = useNotificationPrefs(authUser, isPreviewMode);
+  } = useNotificationPrefs(authUser, isPreviewMode, showToast);
   // Self-service account deletion (Profile → Security → danger zone).
   const [deleteAcctOpen, setDeleteAcctOpen] = useState(false);
   const [deleteAcctEmail, setDeleteAcctEmail] = useState("");
@@ -621,7 +621,8 @@ function App() {
   const {
     items: notifItems,
     unreadCount: notifUnread,
-    markAllRead: markNotifsRead
+    markAllRead: markNotifsRead,
+    state: notifState
   } = useNotifications({ authUser, isPreviewMode, showToast });
   // Personal Bests filter
   const LEADERBOARD_PB_IDS = new Set(["bench", "bench_press", "squat", "barbell_back_squat", "deadlift", "barbell_deadlift", "overhead_press", "ohp", "pull_up", "pullups", "push_up", "pushups", "running", "treadmill_run", "run"]);
@@ -4966,7 +4967,7 @@ function App() {
       "--dly": `${p.delay}s`
     }} />)}{xpFlash && <><div className={"xp-flash"}>{formatXP(xpFlash.amount, {
         signed: true
-      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}<ToastHost /><NotificationInbox open={notifInboxOpen} onClose={() => { setNotifInboxOpen(false); if (notifUnread > 0) markNotifsRead(); }} items={notifItems} unreadCount={notifUnread} onMarkAllRead={markNotifsRead} />{friendExBanner &&<div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
+      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}<ToastHost /><NotificationInbox open={notifInboxOpen} onClose={() => { setNotifInboxOpen(false); if (notifUnread > 0) markNotifsRead(); }} items={notifItems} unreadCount={notifUnread} onMarkAllRead={markNotifsRead} state={notifState} />{friendExBanner &&<div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
 
     /* ══ INTRO ══════════════════════════════════ */}{screen === "intro" && <div className={"screen boot-screen"}><div className={"boot-title"}>{"AURISAR"}<span className={"boot-title-sub"}>{"FITNESS"}</span></div><div className={"boot-log"}><div className={"boot-bar-wrap"}><div className={"boot-bar"} style={{
             width: bootStep >= 4 ? "100%" : bootStep >= 3 ? "58%" : bootStep >= 2 ? "34%" : bootStep >= 1 ? "12%" : "2%"
