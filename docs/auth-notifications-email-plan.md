@@ -105,6 +105,25 @@ Client: replace the jsonb-blob prefs with a small `useNotificationPrefs` hook ba
 - **Passwordless-only login** — keep passkeys as an *option*.
 - **Router / statechart refactor of App.jsx** — only the minimal auth extraction in Batch F.
 
+## ⚠ Deploy gates — do these BEFORE merging
+
+1. **Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Netlify** (production + deploy-preview scopes). `src/utils/supabase.js` now **throws at runtime in production builds** when they are missing, instead of silently falling back to the shared project. Production has been running on that fallback, so if these are not set, the deployed site will white-screen. Local dev is unaffected (it keeps the fallback with a console warning).
+2. **Apply migrations 17, 18, 19 in the Supabase SQL editor, in order** (repo convention — there is no migration tooling). Until then the notification tables/RPCs don't exist; the client is written to degrade quietly (loads fall back to defaults, the inbox stays empty), but nothing is delivered.
+3. **Add the new server env vars**: `RESEND_WEBHOOK_SECRET` (new), and confirm `SUPABASE_SERVICE_ROLE_KEY` / `RESEND_API_KEY` are present — the drain and reminder producer refuse to run without them.
+4. **Register the Resend webhook** at `/api/resend-webhook` for `email.bounced` and `email.complained`, and verify the `notifications@aurisargames.com` sender domain.
+
+## Bugs found while executing this plan
+
+All three were pre-existing, none had a test, and each was found only because the plan sequenced *proving the escape hatch before enforcing the gate*. Verified against the live database.
+
+| # | Bug | Impact | Fixed in |
+|---|---|---|---|
+| 1 | `use_mfa_recovery_code()` calls `auth.mfa_unenroll()`, which **does not exist** (`to_regprocedure` → NULL). PL/pgSQL resolves it at plan time, so every **valid** code raised and rolled back — only invalid codes returned cleanly. | Recovery codes never worked. Enforcing AAL2 first would have permanently locked out every lost-authenticator user. | migration 18 |
+| 2 | `disable_mfa_verified()` had migration-14's bug class: `search_path=''` with an unqualified `mfa_recovery_codes`. | In-app "Disable MFA" always failed. | migration 18 |
+| 3 | `notify_mfa_disabled()` (trigger on `auth.mfa_factors` DELETE) calls `get_resend_key()` **and** `build_aurisar_email()`, both dropped in migration 12. Any factor delete threw. | Blocked **all three** MFA removal paths at once — recovery codes, in-app disable, and the admin break-glass. Once a user enrolled MFA there was no way out, and #1's fix could not work until this was resolved. | migration 19 |
+
+Bugs 1 and 3 compounded: fixing the recovery function alone would still have failed, because its `DELETE FROM auth.mfa_factors` fires the broken trigger. Live DB currently has **0 verified factors and 0 unused recovery codes**, so nothing was affected in flight — pre-launch was the right moment to find this.
+
 ## Risk register
 
 | Risk | Severity | Mitigation |
