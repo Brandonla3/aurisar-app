@@ -1,3 +1,11 @@
+# The build must be self-contained: `prebuild` (terrain sync + content
+# emitters) may NOT fetch from third-party hosts. On 2026-08-02 a deploy of
+# PR #302 failed in "building site" (exit 4) because terrain textures were
+# downloaded from ambientCG.com on every clean checkout and a transient
+# third-party failure killed the deploy. Generated terrain maps are now
+# committed and verified offline against config/terrain-assets.lock.json —
+# see the regression guard in scripts/sync_terrain_assets.mjs before adding
+# anything network-dependent to the build path.
 [build]
   command = "npm run build"
   publish = "build"

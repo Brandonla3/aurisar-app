@@ -2,24 +2,46 @@
 /**
  * sync_terrain_assets.mjs
  *
- * Makes enabled terrain sets reproducible in clean development and CI builds:
- *   1. verify or fetch missing locked source maps;
- *   2. normalize them through build_terrain_assets.mjs;
- *   3. optionally verify the local source/output state without downloading.
+ * Keeps the committed terrain runtime assets (public/assets/terrain/generated
+ * + manifest.json) in sync with config/terrain-assets.json — WITHOUT touching
+ * the network. State is verified against config/terrain-assets.lock.json
+ * (see terrain_sync_state.mjs):
+ *
+ *   - outputs current                        → offline no-op (the normal
+ *     dev / CI / deploy path);
+ *   - outputs stale + local sources present  → rebuild through
+ *     build_terrain_assets.mjs and refresh the lock (still offline);
+ *   - outputs stale + sources missing        → fail with instructions.
+ *     Sources are only ever downloaded by the explicit
+ *     `npm run fetch:terrain-source -- <set-id>`.
+ *
+ * REGRESSION GUARD — do not reintroduce implicit downloads. This script runs
+ * inside `prebuild`/`predev`, i.e. on every Netlify deploy and CI build. On
+ * 2026-08-02 the Netlify deploy of PR #302 failed in "building site" (exit 4)
+ * because the previous version of this script auto-fetched terrain archives
+ * from ambientCG.com on every clean checkout, and a transient third-party
+ * failure killed the deploy — a zero-change retry succeeded. The deploy path
+ * must stay independent of third-party hosts: generated outputs are committed
+ * to git, and this script must remain a pure local verify/rebuild step.
+ * scripts/__tests__/terrain_sync_state.test.mjs enforces this by running the
+ * sync under a kill-net preload.
  *
  * Usage:
- *   npm run sync:terrain-assets
- *   npm run sync:terrain-assets:check
+ *   npm run sync:terrain-assets          # verify; rebuild locally if stale
+ *   npm run sync:terrain-assets:check    # verify only (offline; CI gate)
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { LOCK_RELATIVE_PATH, buildLock, verifyTerrainState } from './terrain_sync_state.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 const configPath = resolve(repoRoot, 'config/terrain-assets.json');
+const lockPath = resolve(repoRoot, LOCK_RELATIVE_PATH);
 const checkOnly = process.argv.includes('--check');
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
@@ -98,26 +120,57 @@ async function main() {
 
   for (const [id, definition] of enabledSets) {
     validateEnabledSet(id, definition);
-    const missing = await missingSourceMaps(definition);
-
-    if (checkOnly) {
-      if (missing.length) {
-        fail(`${id} is missing local source map(s): ${missing.join(', ')}`);
-      }
-      await runNodeScript('fetch_terrain_source_set.mjs', ['--check', id]);
-      continue;
-    }
-
-    if (missing.length) {
-      console.log(`[terrain-sync] ${id}: fetching ${missing.length} missing source map(s)`);
-      await runNodeScript('fetch_terrain_source_set.mjs', [id]);
-    } else {
-      console.log(`[terrain-sync] ${id}: using cached local source maps`);
-    }
   }
 
-  await runNodeScript('build_terrain_assets.mjs', checkOnly ? ['--check'] : []);
-  console.log(`[terrain-sync] ${checkOnly ? 'Verified' : 'Synchronized'} ${enabledSets.length} enabled terrain set(s)`);
+  const lock = await exists(lockPath) ? await readJson(lockPath) : null;
+  const state = await verifyTerrainState({ repoRoot, config, lock });
+
+  if (state.current) {
+    console.log(checkOnly
+      ? `[terrain-sync] OK — committed outputs for ${enabledSets.length} enabled set(s) match ${LOCK_RELATIVE_PATH}`
+      : `[terrain-sync] outputs current for ${enabledSets.length} enabled set(s) — offline no-op (lock verified)`);
+    return;
+  }
+
+  const staleList = state.reasons.map((reason) => `  - ${reason}`).join('\n');
+
+  if (checkOnly) {
+    fail(`committed terrain outputs are stale:\n${staleList}\n` +
+      `Rebuild locally and commit the results: npm run sync:terrain-assets ` +
+      `(fetch sources first if it asks for them).`);
+  }
+
+  // Stale → rebuild from LOCAL sources only. Refusing to download here is the
+  // whole point of the lock: a clean checkout must never need the network.
+  const missingBySet = [];
+  for (const [id, definition] of enabledSets) {
+    const missing = await missingSourceMaps(definition);
+    if (missing.length) missingBySet.push([id, definition, missing]);
+  }
+
+  if (missingBySet.length) {
+    const fetchLines = missingBySet.map(([id, definition, missing]) => {
+      const how = definition.acquisition?.download
+        ? `npm run fetch:terrain-source -- ${id}`
+        : `place the source maps in ${definition.sourceDir} (no locked download for this set)`;
+      return `  - ${id}: missing ${missing.join(', ')} → ${how}`;
+    });
+    fail(
+      `outputs are stale and local source maps are unavailable; refusing to download during a build:\n` +
+      `${staleList}\n` +
+      `To restore the committed state: git checkout -- public/assets/terrain ${LOCK_RELATIVE_PATH}\n` +
+      `To rebuild from sources:\n${fetchLines.join('\n')}\n` +
+      `  then re-run: npm run sync:terrain-assets`,
+    );
+  }
+
+  console.log(`[terrain-sync] outputs stale — rebuilding from local sources:`);
+  for (const reason of state.reasons) console.log(`[terrain-sync]   - ${reason}`);
+
+  await runNodeScript('build_terrain_assets.mjs');
+  const freshLock = await buildLock({ repoRoot, config });
+  await writeFile(lockPath, `${JSON.stringify(freshLock, null, 2)}\n`, 'utf8');
+  console.log(`[terrain-sync] Rebuilt ${enabledSets.length} enabled set(s) and refreshed ${LOCK_RELATIVE_PATH}; commit the updated outputs`);
 }
 
 main().catch((error) => {

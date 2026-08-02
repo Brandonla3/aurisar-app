@@ -3,3 +3,9 @@
 # core.autocrlf=true Windows checkouts don't break the equality test.
 src/features/world/content/** text eol=lf
 spacetimedb/src/content/** text eol=lf
+
+# The terrain offline gate hashes manifest.json byte-for-byte against
+# config/terrain-assets.lock.json (scripts/terrain_sync_state.mjs). Pin both
+# to LF so core.autocrlf=true Windows checkouts don't false-stale the gate.
+public/assets/terrain/manifest.json text eol=lf
+config/terrain-assets.lock.json text eol=lf
