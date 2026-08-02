@@ -180,6 +180,9 @@ async function boot() {
     // nowMs stamps newly-born chunks and ramps every still-fading chunk's
     // visibility (model/chunkFade.js) — structural pop-in concealment.
     streamer.update(walker.x, walker.z, nowMs);
+    // Rings are built at world origin; without this they never move, and
+    // "just beyond the streamed disc" would only be true near spawn.
+    ringKit.recenter(walker.x, walker.z);
   });
 
   // ── GUI (the P0 ADT proof, kept) ───────────────────────────────────────────

@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE_M } from './chunkMath.js';
+import { CHUNK_SIZE_M, DEFAULT_STREAM_RADIUS_CHUNKS } from './chunkMath.js';
 import { GRADIENT_DEF } from './skyModel.js';
 import { RING_TIERS, ringElevation, ringPaintFor, ringsStayBelowZenith } from './horizonRings.js';
 
 describe('ring radii derive from the streamer, not magic numbers', () => {
-  it('every tier radius is an EXACT integer multiple of the streamed radius', () => {
+  it('every tier radius is an EXACT integer multiple of the streamer\'s own default radius', () => {
     // The whole point: if the streaming radius ever changes, the ring kit
-    // moves with it instead of drifting into disagreement. Exact multiple,
-    // not merely "close to" — an earlier draft used decimal factors (3.1,
-    // 4.9, 7.3) chosen to land near a target distance, which this test
-    // correctly rejected: "derived from the streamer" must be a checkable
-    // relationship, not a coincidence.
-    const streamed = 3 * CHUNK_SIZE_M;
+    // moves with it instead of drifting into disagreement. This reads
+    // TerrainStreamer's actual DEFAULT_STREAM_RADIUS_CHUNKS constant (via
+    // chunkMath.js) rather than repeating "3" here — the earlier version of
+    // this test asserted the SAME relationship against a locally re-declared
+    // `3 * CHUNK_SIZE_M`, which would have stayed green even if the two files
+    // silently drifted apart. Reading the shared constant closes that gap.
+    const streamed = DEFAULT_STREAM_RADIUS_CHUNKS * CHUNK_SIZE_M;
     for (const t of RING_TIERS) {
       expect(t.radiusM % streamed).toBe(0);
       expect(t.radiusM).toBeGreaterThan(streamed);

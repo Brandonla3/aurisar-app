@@ -123,6 +123,83 @@ describe('createRingMesh — real depth-writing geometry, opposite of the dome',
       scene.dispose();
     }
   });
+
+  it('has no caps — an open wall, not a lidded can', async () => {
+    // Real bug this pins: CreateCylinder caps both ends by default, and with
+    // BACKSIDE orientation an un-capped top renders as a solid darkened disc
+    // filling the sky, not a silhouette. Verified by exact vertex/index count
+    // against the known capped-vs-open numbers for this tier's tessellation.
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const { material } = await buildRingMaterial(scene, { name: 'r', darken: 0.3 });
+      const tier = RING_TIERS[0];
+      const mesh = createRingMesh(scene, tier, material, 64);
+      const capped = BABYLON.MeshBuilder.CreateCylinder('probe', {
+        diameter: tier.radiusM * 2, height: tier.heightM, tessellation: 64, subdivisions: 1,
+        sideOrientation: BABYLON.Mesh.BACKSIDE,
+      }, scene);
+      expect(mesh.getTotalVertices()).toBeLessThan(capped.getTotalVertices());
+      expect(mesh.getTotalIndices()).toBeLessThan(capped.getTotalIndices());
+      capped.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('the top rim sits at exactly y = heightM, base at y = 0 — matching ringElevation\'s assumption', async () => {
+    // The identity this locks: model/horizonRings.js's ringElevation(radius,
+    // heightM, cameraY) must describe the SAME y the mesh's crest actually
+    // reaches. Centering the cylinder at y=0 (Babylon's default) would put
+    // the top at heightM/2, silently making the pure function's "exact
+    // reference implementation" claim off by a factor of 2.
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const { material } = await buildRingMaterial(scene, { name: 'r', darken: 0.3 });
+      const tier = RING_TIERS[0];
+      const mesh = createRingMesh(scene, tier, material);
+      mesh.computeWorldMatrix(true);
+      const bi = mesh.getBoundingInfo();
+      expect(bi.boundingBox.maximumWorld.y).toBeCloseTo(tier.heightM, 6);
+      expect(bi.boundingBox.minimumWorld.y).toBeCloseTo(0, 6);
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
+describe('buildHorizonRings — recenter (the world-origin-anchoring fix)', () => {
+  it('recenter(x, z) moves every ring mesh, leaving Y untouched', async () => {
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const kit = await buildHorizonRings(scene, RING_TIERS);
+      const originalYs = kit.meshes.map((m) => m.position.y);
+
+      kit.recenter(1234, -567);
+
+      for (const m of kit.meshes) {
+        expect(m.position.x).toBe(1234);
+        expect(m.position.z).toBe(-567);
+      }
+      kit.meshes.forEach((m, i) => expect(m.position.y).toBe(originalYs[i]));
+      kit.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('without recenter, rings stay at world origin forever (documents the bug this fixes)', async () => {
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const kit = await buildHorizonRings(scene, RING_TIERS);
+      for (const m of kit.meshes) {
+        expect(m.position.x).toBe(0);
+        expect(m.position.z).toBe(0);
+      }
+      kit.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
 });
 
 describe('buildHorizonRings — the whole kit as one reader', () => {

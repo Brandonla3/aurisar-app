@@ -14,11 +14,19 @@
  * kit move together if the streaming radius ever changes.
  */
 
-import { CHUNK_SIZE_M } from './chunkMath.js';
+import { CHUNK_SIZE_M, DEFAULT_STREAM_RADIUS_CHUNKS } from './chunkMath.js';
 import { GRADIENT_DEF } from './skyModel.js';
 
-/** Streamed radius today is 3 rings * 64m = 192m; rings start just beyond it. */
-const STREAMED_RADIUS_M = 3 * CHUNK_SIZE_M;
+/**
+ * Streamed radius today is DEFAULT_STREAM_RADIUS_CHUNKS * 64m = 192m; rings
+ * start just beyond it. Reads TerrainStreamer's own default constant rather
+ * than repeating the number `3` — if that default ever changes, this moves
+ * with it instead of silently disagreeing. A streamer built with an explicit
+ * `{ radius }` override is a deliberate, separate divergence (see
+ * chunkMath.js's doc comment on the constant) — this models the streamer's
+ * DEFAULT configuration, which is what the spike and all current tests use.
+ */
+const STREAMED_RADIUS_M = DEFAULT_STREAM_RADIUS_CHUNKS * CHUNK_SIZE_M;
 
 /**
  * Integer multiples of the streamed radius, not independent decimals close to

@@ -20,7 +20,8 @@
  */
 
 import {
-  CHUNK_SIZE_M, TERRAIN_SUBDIVISIONS, diffChunks, neededChunksAround, worldToChunk,
+  CHUNK_SIZE_M, DEFAULT_STREAM_RADIUS_CHUNKS, TERRAIN_SUBDIVISIONS,
+  diffChunks, neededChunksAround, worldToChunk,
 } from '../../model/chunkMath.js';
 import { CHUNK_FADE_MS, chunkFadeVisibility, isFadeComplete } from '../../model/chunkFade.js';
 import { generateTerrainChunk } from '../../gen/terrainChunkGen.js';
@@ -28,7 +29,7 @@ import { buildTerrainChunkMesh } from './TerrainChunk.js';
 
 export class TerrainStreamer {
   constructor(scene, field, {
-    radius = 3,
+    radius = DEFAULT_STREAM_RADIUS_CHUNKS,
     subdivisions = TERRAIN_SUBDIVISIONS,
     chunkSize = CHUNK_SIZE_M,
     buildBudgetPerTick = 2,
@@ -49,8 +50,17 @@ export class TerrainStreamer {
     this._fading = new Map();
   }
 
-  /** Call once per sim tick with the player position and the current time. */
-  update(x, z, nowMs = 0) {
+  /**
+   * Call once per sim tick with the player position and the current time.
+   *
+   * `nowMs` should keep advancing on every call — a caller that omits it (or
+   * passes a constant) leaves newly-built chunks stuck at visibility 0
+   * forever, since birth time and "now" are both pinned to the same value
+   * and the fade ratio never moves. Defaulting to performance.now() (falling
+   * back to 0 outside a browser, e.g. under plain Node in a test) makes the
+   * common case correct without a caller having to know the fade exists.
+   */
+  update(x, z, nowMs = typeof performance !== 'undefined' ? performance.now() : 0) {
     const center = worldToChunk(x, z, this._chunkSize);
     const needed = neededChunksAround(x, z, this._radius, this._chunkSize);
     const { toLoad, toUnload } = diffChunks(new Set(this._resident.keys()), needed, {
@@ -110,5 +120,9 @@ export class TerrainStreamer {
   dispose() {
     for (const mesh of this._resident.values()) mesh.dispose(false, false);
     this._resident.clear();
+    // Without this, residentCount() reads 0 but isSettledVisually() keeps
+    // reporting false forever — the gate would lie until a future update()
+    // happened to self-heal it via the missing-mesh branch in _advanceFades.
+    this._fading.clear();
   }
 }

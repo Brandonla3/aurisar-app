@@ -115,11 +115,26 @@ export function buildRingMaterial(scene, { name, darken, shaderLanguage = null }
 }
 
 /**
- * One ring's geometry: a cylindrical strip at `radiusM`, `heightM/2` above
- * and below y=0, unwrapped over `segments` around the horizon. Real, opaque,
- * depth-writing (no disableDepthWrite — the opposite of the dome), fogless,
- * unpickable, and pinned to RENDERING_GROUP.RINGS so it always draws after
- * the sky.
+ * One ring's geometry: an open cylindrical WALL at `radiusM`, rising from
+ * y=0 to y=heightM (not centered on 0 — its base sits at the ground datum,
+ * its top rim at exactly `heightM`), unwrapped over `segments` around the
+ * horizon. Real, opaque, depth-writing (no disableDepthWrite — the opposite
+ * of the dome), fogless, unpickable, and pinned to RENDERING_GROUP.RINGS so
+ * it always draws after the sky.
+ *
+ * `cap: NO_CAP` is load-bearing, not an optimization: CreateCylinder caps
+ * both ends by default, and with BACKSIDE orientation (needed to see the
+ * wall from inside the vale) an un-capped top would render as a solid
+ * darkened disc filling the sky — a lid, not a silhouette. Verified under
+ * NullEngine: capped 262 verts/768 indices vs open 130/384, a 2x geometry
+ * cost too for a shape nobody should ever see.
+ *
+ * Positioning the base at y=0 (rather than centering at 0, Babylon's
+ * default) is what makes model/horizonRings.js's `ringElevation(radius,
+ * heightM, cameraY)` an EXACT reference implementation of the shader's
+ * per-vertex elevation at the visible top rim — heightM means the same
+ * thing to both the geometry and the pure model, not two different heights
+ * that happen to share a name.
  */
 export function createRingMesh(scene, { id, radiusM, heightM }, material, segments = 64) {
   const mesh = BABYLON.MeshBuilder.CreateCylinder(`horizonRing_${id}`, {
@@ -128,7 +143,11 @@ export function createRingMesh(scene, { id, radiusM, heightM }, material, segmen
     tessellation: segments,
     subdivisions: 1,
     sideOrientation: BABYLON.Mesh.BACKSIDE, // seen from inside the cylinder
+    cap: BABYLON.Mesh.NO_CAP, // an open wall, not a lidded can — see above
   }, scene);
+  // CreateCylinder centers the mesh at local y=0; shift up by half its
+  // height so the BASE sits at y=0 and the TOP rim sits at y=heightM.
+  mesh.position.y = heightM / 2;
   mesh.material = material;
   mesh.isPickable = false;
   mesh.applyFog = false;
@@ -152,6 +171,20 @@ export async function buildHorizonRings(scene, tiers, { shaderLanguage = null } 
 
   return {
     meshes: built.map((b) => b.mesh),
+    /**
+     * Track the camera/player XZ each frame. Rings are built at world origin
+     * (0,0); without this call they stay there forever, so "just beyond the
+     * streamed disc" is only true near spawn — walk 500m and the near ring
+     * (576m radius from ORIGIN, not from the player) is no longer where the
+     * story says it is. World Y is deliberately left untouched: it stays at
+     * each tier's authored datum (base=0, top=heightM — real mountains sit at
+     * a fixed altitude; only the vantage point moves), so walking up a local
+     * slope correctly changes the ring's apparent elevation via the shader's
+     * real worldPos-to-camera math, exactly the way a real distant range would.
+     */
+    recenter(x, z) {
+      for (const b of built) { b.mesh.position.x = x; b.mesh.position.z = z; }
+    },
     applyState(s) {
       for (const b of built) b.applyState(s);
     },

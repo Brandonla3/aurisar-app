@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
 import { CHUNK_FADE_MS } from '../../model/chunkFade.js';
+import { DEFAULT_STREAM_RADIUS_CHUNKS } from '../../model/chunkMath.js';
 
 let TerrainStreamer;
 let engine;
@@ -110,11 +111,37 @@ describe('TerrainStreamer.update — unchanged behaviour', () => {
     }
   });
 
-  it('nowMs defaults to 0 so existing callers without a timestamp still work', () => {
+  it('nowMs defaults to a real clock, not a frozen 0, so fade-in actually completes', () => {
+    // Real bug this pins: `nowMs = 0` as a default meant a caller who never
+    // passes a timestamp leaves every chunk's birth AND every later "now"
+    // pinned to the same value — the fade ratio (now - birth) / fadeMs never
+    // moves, and chunks stay invisible forever. performance.now() as the
+    // default makes the common no-timestamp case actually work.
     const scene = new BABYLON.Scene(engine);
     try {
-      const s = new TerrainStreamer(scene, field, { radius: 0, buildBudgetPerTick: 1 });
-      expect(() => s.update(0, 0)).not.toThrow();
+      const s = new TerrainStreamer(scene, field, { radius: 0, buildBudgetPerTick: 1, fadeMs: 1 });
+      s.update(0, 0); // no nowMs passed
+      const t0 = performance.now();
+      while (performance.now() - t0 < 5) { /* busy-wait past the 1ms fade */ }
+      s.update(0, 0); // no nowMs passed again — must observe real elapsed time
+      expect(s.isSettledVisually()).toBe(true);
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
+describe('TerrainStreamer default radius', () => {
+  it('reads DEFAULT_STREAM_RADIUS_CHUNKS — the same constant horizonRings.js reads', () => {
+    // Not a hardcoded 49: derived from the shared constant, so this test's
+    // own expectation moves if the constant ever does, the same way the ring
+    // radii do.
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const s = new TerrainStreamer(scene, field, { buildBudgetPerTick: 999 }); // no radius override
+      s.update(0, 0, 0);
+      const n = DEFAULT_STREAM_RADIUS_CHUNKS;
+      expect(s.residentCount()).toBe((2 * n + 1) ** 2);
     } finally {
       scene.dispose();
     }

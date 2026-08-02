@@ -14,6 +14,16 @@
 export const CHUNK_FADE_MS = 300;
 
 /**
+ * Accepted tradeoff, not a bug: Babylon's needAlphaBlendingForMesh() treats
+ * any mesh.visibility < 1 as requiring alpha blending, so a fading chunk
+ * leaves the opaque queue for its ~300ms ramp and re-enters it once settled
+ * (visibility === 1). Fine for a short ramp on a few chunks; if a future
+ * change makes many chunks fade at once (e.g. sprinting through the budget,
+ * or a much larger fadeMs), that's real transparent-queue sorting cost, not
+ * a shader bug — look here first.
+ */
+
+/**
  * @returns visibility in [0, 1] for a mesh born at `birthMs`, evaluated at `nowMs`.
  */
 export function chunkFadeVisibility(nowMs, birthMs, fadeMs = CHUNK_FADE_MS) {
