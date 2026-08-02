@@ -10,6 +10,7 @@
  *      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
  */
 
+import crypto from "node:crypto";
 import { Webhook } from "svix";
 
 const SUPPRESS_EVENTS = {
@@ -17,30 +18,74 @@ const SUPPRESS_EVENTS = {
   "email.complained": "complaint",
 };
 
-// Verification is delegated to Svix's OWN library rather than hand-rolled.
+// The CRYPTO comes from Svix's own library; the TIMESTAMP POLICY is ours.
 //
-// The previous implementation was written from memory of the signing scheme
-// and never once verified a real request. Its unit tests signed with the same
-// function they verified with, so they passed regardless of whether the scheme
-// was right — a doorman who only ever proved he could turn away strangers.
-// Meanwhile every genuine Resend delivery was rejected and retried forever.
+// Why not just call `webhook.verify()`: it hardcodes a 5-minute tolerance with
+// no override (`verify()` takes only payload+headers). Delegating wholesale
+// silently reverted the retry fix — measured against svix@1.99, a correctly
+// signed payload 6 minutes old is rejected with "Message timestamp too old".
+// Svix retries are byte-identical redeliveries (same id, timestamp and
+// signature) and its backoff runs to hours, so a 5-minute window rejects every
+// retry after the first and an event can never drain.
 //
-// The library is the executable spec: it accepts BOTH the `svix-*` and the
-// Standard Webhooks `webhook-*` header families (verified locally against
-// svix@1.99 — a hand-rolled reader looking only for `svix-*` fails outright
-// if the sender emits the other set), handles multiple space-separated
-// signatures for key rotation, and does the constant-time compare.
-function verify(secret, headers, payload) {
-  // svix wants a plain object; Headers keys are already lowercased.
+// So `sign()` is used as the canonical signing oracle — the scheme, encoding
+// and `v1,<base64>` framing are the library's, not remembered by hand — while
+// the replay window stays wide enough for retries to land. Replay protection
+// is not weakened much by that: the signature still covers id+timestamp+body,
+// and the suppression insert is idempotent, so a replayed event is a no-op.
+const REPLAY_TOLERANCE_S = 60 * 60 * 24;
+
+// Resend documents `svix-*`. The `webhook-*` family is the Standard Webhooks
+// spec Svix also authored; accepting both is defensive coverage, not a claim
+// about which Resend actually sends.
+const HEADER_FAMILIES = ["svix", "webhook"];
+
+export function verifyWebhook(secret, headers, payload, nowMs = Date.now()) {
   const h = {};
-  for (const [k, v] of headers.entries()) h[k] = v;
-  try {
-    new Webhook(secret).verify(payload, h);
-    return { ok: true, headerNames: Object.keys(h) };
-  } catch (e) {
-    return { ok: false, reason: e.message || String(e), headerNames: Object.keys(h) };
+  for (const [k, v] of headers.entries()) h[k.toLowerCase()] = v;
+  const headerNames = Object.keys(h);
+
+  const family = HEADER_FAMILIES.find(
+    p => h[`${p}-id`] && h[`${p}-timestamp`] && h[`${p}-signature`]
+  );
+  if (!family) return { ok: false, reason: "missing_signing_headers", headerNames };
+
+  const id = h[`${family}-id`];
+  const timestamp = h[`${family}-timestamp`];
+  const signatures = h[`${family}-signature`];
+
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts)) return { ok: false, reason: "bad_timestamp", headerNames, family };
+  const ageS = Math.abs(nowMs / 1000 - ts);
+  if (ageS > REPLAY_TOLERANCE_S) {
+    return { ok: false, reason: `stale_timestamp_${Math.round(ageS)}s`, headerNames, family };
   }
+
+  let expected;
+  try {
+    // Library-computed, so the scheme cannot drift from the spec again.
+    expected = new Webhook(secret).sign(id, new Date(ts * 1000), payload);
+  } catch (e) {
+    // Bad secret shape (wrong padding, stray whitespace from a paste, …).
+    return { ok: false, reason: `bad_secret: ${e.message}`, headerNames, family };
+  }
+  const expectedSig = expected.startsWith("v1,") ? expected.slice(3) : expected;
+
+  // The header may carry several space-separated entries during key rotation.
+  const matched = signatures.split(" ").some(part => {
+    const [version, sig] = part.split(",");
+    if (version !== "v1" || !sig) return false;
+    const a = Buffer.from(sig, "base64");
+    const b = Buffer.from(expectedSig, "base64");
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  });
+
+  return matched
+    ? { ok: true, headerNames, family }
+    : { ok: false, reason: "signature_mismatch", headerNames, family };
 }
+
+const verify = verifyWebhook;
 
 export default async (req) => {
   if (req.method !== "POST") {

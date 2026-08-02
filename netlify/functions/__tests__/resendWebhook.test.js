@@ -3,110 +3,128 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { Webhook } from 'svix';
+import { verifyWebhook } from '../resend-webhook.js';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const src = readFileSync(ROOT + 'netlify/functions/resend-webhook.js', 'utf8');
 
 /**
- * WHY THESE TESTS LOOK LIKE THIS.
+ * These exercise the HANDLER'S OWN verifier against payloads signed by Svix's
+ * library — two different implementations, so a wrong scheme fails.
  *
- * The previous suite signed payloads with the same hand-rolled function it
- * then verified them with. That is self-consistent and therefore worthless: it
- * passed 9/9 while the handler rejected every real Resend delivery, because
- * both sides shared the same wrong assumptions. It could only ever prove we
- * reject forgeries — never that we accept a genuine request.
- *
- * These sign with Svix's OWN implementation, which is the executable spec, and
- * assert the handler's verifier accepts it. A wrong scheme now fails.
+ * The suite this replaced signed with the same hand-rolled function it then
+ * verified with: self-consistent, and green while every real delivery was
+ * rejected. It could only prove we reject forgeries, never that we accept a
+ * genuine request.
  */
 const SECRET = 'whsec_' + crypto.randomBytes(24).toString('base64');
 const BODY = JSON.stringify({
   type: 'email.bounced',
-  // Real Resend shape, including the em dash that a charset bug would mangle.
   data: { to: ['bounced@resend.dev'], subject: 'Webhook e2e — post-fix' },
 });
 
-function signedHeaders(prefix, { id = 'msg_' + crypto.randomUUID(), at = new Date() } = {}) {
-  const sig = new Webhook(SECRET).sign(id, at, BODY);
-  return {
+/** Headers as Svix would send them, `ageS` seconds ago. */
+function signed(prefix, ageS = 0, { body = BODY, secret = SECRET } = {}) {
+  const at = new Date(Date.now() - ageS * 1000);
+  const id = 'msg_' + crypto.randomUUID();
+  const sig = new Webhook(secret).sign(id, at, body);
+  return new Headers({
     [`${prefix}-id`]: id,
     [`${prefix}-timestamp`]: Math.floor(at.getTime() / 1000).toString(),
     [`${prefix}-signature`]: sig,
-  };
+  });
 }
 
-// Mirror of the handler's verify(): svix wants a plain lowercased object.
-function verify(secret, headersObj, payload) {
-  try {
-    new Webhook(secret).verify(payload, headersObj);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
-}
-
-describe('verification accepts a GENUINELY signed request', () => {
-  it('accepts svix-* headers', () => {
-    expect(verify(SECRET, signedHeaders('svix'), BODY).ok).toBe(true);
+describe('accepts a GENUINELY Svix-signed request', () => {
+  it('accepts svix-* headers (the family Resend documents)', () => {
+    expect(verifyWebhook(SECRET, signed('svix'), BODY).ok).toBe(true);
   });
 
-  it('accepts Standard Webhooks webhook-* headers', () => {
-    // The leading suspect for the production failure: a reader looking only
-    // for svix-* returns "no headers at all" when the sender emits this set,
-    // so the signature comparison never even runs.
-    expect(verify(SECRET, signedHeaders('webhook'), BODY).ok).toBe(true);
+  it('accepts Standard Webhooks webhook-* headers as defensive coverage', () => {
+    const r = verifyWebhook(SECRET, signed('webhook'), BODY);
+    expect(r.ok).toBe(true);
+    expect(r.family).toBe('webhook');
   });
 
-  it('accepts a body containing multi-byte characters', () => {
-    // An em dash is exactly the codepoint a charset round-trip would corrupt.
-    expect(BODY).toContain('—');
-    expect(verify(SECRET, signedHeaders('svix'), BODY).ok).toBe(true);
+  it('accepts a body with multi-byte characters', () => {
+    expect(BODY).toContain('—'); // the codepoint a charset bug would mangle
+    expect(verifyWebhook(SECRET, signed('svix'), BODY).ok).toBe(true);
   });
 });
 
-describe('verification still rejects what it should', () => {
+describe('RETRY TOLERANCE — the regression this nearly shipped', () => {
+  // Svix retries are byte-identical redeliveries (same id/timestamp/signature)
+  // and its backoff runs to hours. The stock library hardcodes a 5-minute
+  // window with no override, so delegating verification wholesale silently
+  // reverted #311 and left events unable to ever drain.
+  it('accepts a redelivery 6 minutes old — stock svix.verify() rejects this', () => {
+    expect(verifyWebhook(SECRET, signed('svix', 6 * 60), BODY).ok).toBe(true);
+  });
+
+  it('accepts a redelivery 3 hours old', () => {
+    expect(verifyWebhook(SECRET, signed('svix', 3 * 3600), BODY).ok).toBe(true);
+  });
+
+  it('proves the stock library would have rejected both', () => {
+    for (const ageS of [6 * 60, 3 * 3600]) {
+      const h = signed('svix', ageS);
+      const plain = Object.fromEntries(h.entries());
+      expect(() => new Webhook(SECRET).verify(BODY, plain)).toThrow(/timestamp too old/i);
+    }
+  });
+
+  it('still rejects a genuinely ancient replay', () => {
+    const r = verifyWebhook(SECRET, signed('svix', 60 * 60 * 25), BODY);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/^stale_timestamp_/);
+  });
+});
+
+describe('rejects what it should', () => {
   it('rejects a tampered body', () => {
-    const headers = signedHeaders('svix');
+    const h = signed('svix');
     const tampered = JSON.stringify({ type: 'email.bounced', data: { to: ['attacker@evil.invalid'] } });
-    expect(verify(SECRET, headers, tampered).ok).toBe(false);
+    expect(verifyWebhook(SECRET, h, tampered).reason).toBe('signature_mismatch');
   });
 
   it('rejects a forged signature', () => {
-    const headers = { ...signedHeaders('svix'), 'svix-signature': 'v1,ZmFrZQ==' };
-    expect(verify(SECRET, headers, BODY).ok).toBe(false);
+    const h = signed('svix');
+    h.set('svix-signature', 'v1,ZmFrZQ==');
+    expect(verifyWebhook(SECRET, h, BODY).reason).toBe('signature_mismatch');
   });
 
   it('rejects a different signing secret', () => {
     const other = 'whsec_' + crypto.randomBytes(24).toString('base64');
-    expect(verify(other, signedHeaders('svix'), BODY).ok).toBe(false);
+    expect(verifyWebhook(other, signed('svix'), BODY).reason).toBe('signature_mismatch');
   });
 
-  it('rejects missing signing headers', () => {
-    expect(verify(SECRET, {}, BODY).ok).toBe(false);
+  it('rejects missing signing headers, and says so distinctly', () => {
+    const r = verifyWebhook(SECRET, new Headers({ 'content-type': 'application/json' }), BODY);
+    expect(r.reason).toBe('missing_signing_headers');
+    expect(r.headerNames).toContain('content-type');
+  });
+
+  it('reports a malformed secret rather than throwing', () => {
+    const r = verifyWebhook('not-a-real-secret', signed('svix'), BODY);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/^(bad_secret|signature_mismatch)/);
   });
 });
 
 describe('handler wiring (source guard)', () => {
-  it('delegates to the svix library rather than hand-rolling HMAC', () => {
+  it('uses the library as the signing oracle, not a remembered scheme', () => {
     expect(src).toContain('from "svix"');
-    expect(src).toContain('new Webhook(secret).verify');
-    // The hand-rolled crypto is gone; keeping it around invites divergence
-    // from the spec all over again.
-    expect(src).not.toContain('node:crypto');
-    expect(src).not.toContain('createHmac');
+    expect(src).toContain('new Webhook(secret).sign');
   });
 
-  it('reports which signing headers actually arrived', () => {
-    // Not knowing this is what made the failure take hours: the endpoint could
-    // only say "invalid signature", and no probe from our side could reveal
-    // what the real sender was sending.
+  it('does NOT inherit the library\'s 5-minute window', () => {
+    expect(src).toContain('REPLAY_TOLERANCE_S');
+    expect(src).not.toMatch(/new Webhook\(secret\)\.verify\(/);
+  });
+
+  it('reports which signing headers arrived, names only', () => {
     expect(src).toContain('signing headers');
-    expect(src).toMatch(/startsWith\("svix-"\)\s*\|\|\s*n\.startsWith\("webhook-"\)/);
-  });
-
-  it('never logs or returns header VALUES, only names', () => {
     expect(src).toContain('result.headerNames');
-    expect(src).not.toMatch(/console\.error\([^)]*headers\.get\("svix-signature"\)/);
   });
 
   it('verifies before parsing or acting on the payload', () => {
