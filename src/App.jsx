@@ -19,6 +19,12 @@ import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseL
 import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
+import { useNotificationPrefs } from './state/useNotificationPrefs';
+import { showToast } from './components/toast/toastStore';
+import { shouldChallengeMfa } from './utils/mfaGate';
+import ToastHost from './components/toast/ToastHost';
+import useNotifications from './features/notifications/useNotifications';
+import NotificationInbox from './features/notifications/NotificationInbox';
 import { useExerciseFilters } from './features/exercises/useExerciseFilters';
 import { DEFAULT_DISCOVER_PICKS } from './features/exercises/discoverCategories';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
@@ -338,8 +344,6 @@ function App() {
     setNavMenuOpen,
     showWNMockup,
     setShowWNMockup,
-    toast,
-    setToast,
     friendExBanner,
     setFriendExBanner,
     xpFlash,
@@ -447,6 +451,8 @@ function App() {
     mfaChallengeLoading,
     setMfaChallengeLoading,
     mfaChallengeFactorId,
+    mfaChallengeType,
+    setMfaChallengeType,
     setMfaChallengeFactorId,
     passkeyPanelOpen,
     setPasskeyPanelOpen,
@@ -597,6 +603,26 @@ function App() {
   // Friend exercise banner notification
   const friendBannerTimerRef = React.useRef(null);
   const notifPrefsRef = React.useRef(null);
+  // Typed notification prefs (notification_prefs table) — replaces the old
+  // profiles.data.notificationPrefs jsonb blob so the email drain can read
+  // them server-side. toggleNotifPref keeps its old name for ProfileTab.
+  const {
+    prefs: notifPrefs,
+    toggle: toggleNotifPref,
+    setPref: setNotifPref
+  } = useNotificationPrefs(authUser, isPreviewMode);
+  // Self-service account deletion (Profile → Security → danger zone).
+  const [deleteAcctOpen, setDeleteAcctOpen] = useState(false);
+  const [deleteAcctEmail, setDeleteAcctEmail] = useState("");
+  const [deleteAcctMsg, setDeleteAcctMsg] = useState(null);
+  const [deleteAcctBusy, setDeleteAcctBusy] = useState(false);
+  // In-app projection of the notifications outbox: realtime toast + inbox.
+  const [notifInboxOpen, setNotifInboxOpen] = useState(false);
+  const {
+    items: notifItems,
+    unreadCount: notifUnread,
+    markAllRead: markNotifsRead
+  } = useNotifications({ authUser, isPreviewMode, showToast });
   // Personal Bests filter
   const LEADERBOARD_PB_IDS = new Set(["bench", "bench_press", "squat", "barbell_back_squat", "deadlift", "barbell_deadlift", "overhead_press", "ohp", "pull_up", "pullups", "push_up", "pushups", "running", "treadmill_run", "run"]);
   const [pbFilterOpen, setPbFilterOpen] = useState(false);
@@ -742,6 +768,11 @@ function App() {
       if (_event === "PASSWORD_RECOVERY") {
         setIsPreviewMode(false); // arriving via password reset is a real auth — exit preview
         setAuthUser(user);
+        // A reset link must not be a way around MFA. Whoever controls the
+        // inbox lands here with an aal1 session; without this the branch
+        // rendered the full app (only the aal2-gated tables would have
+        // refused, leaving messaging, friends and gameplay data reachable).
+        if (await checkAndHandleMfaChallenge()) return;
         try {
           const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _23a => _23a.id]) || null);
           if (adminFlags.disabled_at) {
@@ -794,6 +825,13 @@ function App() {
         setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
         setIsAdmin(false);
+        // The challenge screen renders ahead of the login screen, so leaving
+        // it set would strand a user on "Verification Required" when the
+        // session dies underneath it (revoked token, disabled account).
+        setMfaChallengeScreen(false);
+        setMfaChallengeFactorId(null);
+        setMfaChallengeType(null);
+        setMfaRecoveryMode(false);
         setScreen("login");
         return;
       }
@@ -803,6 +841,10 @@ function App() {
       // every workout save until the next page reload.
       setIsPreviewMode(false);
       setAuthUser(user);
+      // Assurance gate — covers passkey sign-in and any other event that
+      // lands here. Runs before the profile load so an aal1 session with a
+      // verified factor never renders the app.
+      if (await checkAndHandleMfaChallenge()) return;
       try {
         const adminFlags = await loadAdminFlags(_optionalChain([user, 'optionalAccess', _25a => _25a.id]) || null);
         if (adminFlags.disabled_at) {
@@ -853,6 +895,10 @@ function App() {
         setIsPreviewMode(false); // a fresh page load with a session is never preview
         setAuthUser(user);
         checkMfaStatus();
+        // THE refresh-bypass fix: without this, reloading the page with a
+        // stolen/valid aal1 token walked straight into "main" despite MFA
+        // being enrolled. checkMfaStatus() above only sets display state.
+        if (await checkAndHandleMfaChallenge()) return;
         try {
           const adminFlags = await loadAdminFlags(user.id);
           if (adminFlags.disabled_at) {
@@ -1041,16 +1087,49 @@ function App() {
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
-  // 4s gives mobile users enough time to read; previously 2.8s was too brief.
-  const showToast = (msg, dur = 4000) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), dur);
-  };
+  // Invite links (?invite=<token>) are mailed by /api/admin/send-invite but
+  // nothing used to read them — the invite granted nothing. Validate the token
+  // pre-auth, prefill the invited address and switch the form to sign-up. The
+  // token is stripped from the URL so it doesn't linger in history or get
+  // shared in a screenshot; the row is burned server-side on signup.
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("invite");
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await sb.rpc("check_invite_token", { p_token: token });
+        const row = Array.isArray(data) ? data[0] : data;
+        if (cancelled || error || !row?.valid) {
+          if (!cancelled && !row?.valid) {
+            setAuthMsg({ ok: false, text: "That invite link is invalid or has expired." });
+          }
+          return;
+        }
+        setAuthEmail(row.email);
+        setAuthIsNew(true);
+        setAuthMsg({ ok: true, text: "✓ You're invited! Choose a password to forge your profile." });
+      } catch (e) {
+        console.warn("[auth] invite check failed:", e.message);
+      } finally {
+        if (!cancelled) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("invite");
+          window.history.replaceState({}, "", url.toString());
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Toasts now go through the shared queued store (components/toast) —
+  // imported as showToast above, so every existing call site and prop
+  // pass-through keeps working. 4s default lives in the store.
 
   // Keep notifPrefsRef in sync so realtime handler avoids stale closure
   useEffect(() => {
-    notifPrefsRef.current = profile.notificationPrefs || {};
-  }, [profile.notificationPrefs]);
+    notifPrefsRef.current = notifPrefs;
+  }, [notifPrefs]);
 
   // Show a friend exercise banner notification (auto-dismiss after 5s)
   function showFriendExBanner(data) {
@@ -1127,17 +1206,13 @@ function App() {
         const saved = await loadSave(signUpData.session.user.id);
         setAuthUser(signUpData.session.user);
         setAuthLoading(false);
-        // Bearer-auth: the function verifies the email matches the session user.
-        fetch("/api/send-welcome-email", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + signUpData.session.access_token
-          },
-          body: JSON.stringify({
-            email: signUpData.session.user.email
-          })
-        }).catch(() => {});
+        // No welcome-email call here. The auth.users trigger from migration 19
+        // enqueues a 'welcome' outbox row for EVERY signup, and the drain is
+        // the single sender — calling /api/send-welcome-email as well sent two
+        // emails from two different addresses whenever confirmation was off.
+        // Cost of the single path: the welcome lands on the next drain tick
+        // (≤5 min) instead of instantly, and it now also reaches users who
+        // sign up with email confirmation ON, who previously got nothing.
         if (_optionalChain([saved, 'optionalAccess', _33 => _33.chosenClass])) {
           (_s => setProfile({
             ..._s,
@@ -1278,18 +1353,24 @@ function App() {
       });
       setAuthLoading(false);
       if (error) {
+        // Generic copy only. This runs pre-auth on the login screen, so the
+        // raw Postgres message would leak RPC names, schema details and
+        // whether the ID exists — the exact disclosure the neighbouring
+        // sign-in/reset flows deliberately avoid.
+        console.warn("[auth] private-id lookup failed:", error.message);
         setForgotLookupResult({
           found: false,
-          error: error.message
+          error: "Couldn't look that up right now. Check the ID and try again."
         });
         return;
       }
       setForgotLookupResult(data);
     } catch (e) {
       setAuthLoading(false);
+      console.warn("[auth] private-id lookup threw:", e.message);
       setForgotLookupResult({
         found: false,
-        error: e.message
+        error: "Couldn't look that up right now. Check the ID and try again."
       });
     }
   }
@@ -1857,6 +1938,12 @@ function App() {
   }
 
   // ── MFA LOGIN CHALLENGE ───────────────────────────────────
+  // THE assurance gate. Must be awaited before ANY path reaches "main":
+  // password sign-in, the getSession() bootstrap, the onAuthStateChange
+  // signed-in branch (which also covers passkeys), and PASSWORD_RECOVERY.
+  // Previously only the first called it, so a reload — or a reset link —
+  // walked straight past MFA at aal1.
+  // Returns true when it has taken over the screen.
   async function checkAndHandleMfaChallenge() {
     try {
       const {
@@ -1864,21 +1951,23 @@ function App() {
         error
       } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
       if (error) return false;
-      if (data.currentLevel === "aal1" && data.nextLevel === "aal2") {
-        // MFA is required — get factor ID
-        const {
-          data: factors
-        } = await sb.auth.mfa.listFactors();
-        const totp = (factors.totp || []).find(f => f.status === "verified");
-        if (totp) {
-          setMfaChallengeFactorId(totp.id);
-          setMfaChallengeScreen(true);
-          setMfaChallengeCode("");
-          setMfaChallengeMsg(null);
-          setMfaRecoveryMode(false);
-          setMfaRecoveryInput("");
-          return true; // Intercepted — don't proceed to main
-        }
+      const {
+        data: factors
+      } = await sb.auth.mfa.listFactors();
+      const { challenge, factorId, factorType } = shouldChallengeMfa(data, factors);
+      if (challenge) {
+        setMfaChallengeFactorId(factorId);
+        // Only a TOTP factor can be satisfied by the 6-digit code screen. A
+        // passkey/phone-only user must not be waved through (that was the
+        // hole), but the code box is useless to them — flag the type so the
+        // challenge UI offers the passkey re-sign-in / recovery-code route.
+        setMfaChallengeType(factorType);
+        setMfaChallengeScreen(true);
+        setMfaChallengeCode("");
+        setMfaChallengeMsg(null);
+        setMfaRecoveryMode(factorType !== "totp");
+        setMfaRecoveryInput("");
+        return true; // Intercepted — don't proceed to main
       }
     } catch (e) {
       console.warn("MFA assurance check:", e);
@@ -2059,16 +2148,56 @@ function App() {
     }
   }
 
-  // ── NOTIFICATION PREFS ────────────────────────────────────────
-  function toggleNotifPref(key) {
-    setProfile(p => ({
-      ...p,
-      notificationPrefs: {
-        ...(p.notificationPrefs || {}),
-        [key]: !(p.notificationPrefs || {})[key]
+  // ── ACCOUNT DELETION ──────────────────────────────────────────
+  // Calls /api/account-delete with the caller's own Bearer token; the server
+  // resolves the identity from that token and re-checks the typed email, so
+  // nothing here can widen the blast radius. On success we sign out locally
+  // (the remote user is already gone) and land back on the login screen.
+  async function deleteAccount() {
+    if (isPreviewMode) {
+      setDeleteAcctMsg("Not available in preview mode.");
+      return;
+    }
+    setDeleteAcctBusy(true);
+    setDeleteAcctMsg(null);
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        setDeleteAcctMsg("Session expired — sign in again.");
+        setDeleteAcctBusy(false);
+        return;
       }
-    }));
+      const res = await fetch("/api/account-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ confirmEmail: deleteAcctEmail.trim() })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteAcctMsg(out.error || "Could not delete the account.");
+        setDeleteAcctBusy(false);
+        return;
+      }
+      // Don't flush pending profile writes — the row is gone.
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* private mode */ }
+      await sb.auth.signOut();
+      setDeleteAcctBusy(false);
+      setDeleteAcctOpen(false);
+      setDeleteAcctEmail("");
+      setAuthMsg("Your account has been permanently deleted.");
+      setScreen("login");
+    } catch (e) {
+      setDeleteAcctMsg("Network error — try again.");
+      setDeleteAcctBusy(false);
+    }
   }
+
+  // ── NOTIFICATION PREFS ────────────────────────────────────────
+  // toggleNotifPref / setNotifPref come from useNotificationPrefs (declared
+  // with notifPrefsRef above) and write typed notification_prefs rows.
 
   // ── RECOVERY CODE NAVIGATION GUARD ────────────────────────
   // Shows a browser confirm dialog if user tries to navigate
@@ -4602,7 +4731,11 @@ function App() {
   }
   if (window.location.pathname === '/privacy') return <PrivacyPolicy />;
 
-  if (screen === "loading") return <div style={{
+  // The MFA challenge outranks the loading screen: the bootstrap assurance
+  // gate fires while `screen` is still "loading" and returns early without
+  // advancing it, so checking loading first would strand an MFA user on
+  // "Loading your legend…" with the challenge never rendered.
+  if (screen === "loading" && !mfaChallengeScreen) return <div style={{
     minHeight: "100vh",
     background: "#0c0c0a",
     display: "flex",
@@ -4641,7 +4774,7 @@ function App() {
         color: "#8a8478",
         marginBottom: S.s24,
         textAlign: "center"
-      }}>{"Your account is protected with multi-factor authentication."}</div><div style={{
+      }}>{mfaChallengeType && mfaChallengeType !== "totp" ? (mfaChallengeType === "webauthn" ? "Your account is protected by a passkey. Sign out and choose “Sign in with Passkey”, or use a recovery code below." : "Your account is protected by a phone factor. Sign out and sign in again, or use a recovery code below.") : "Your account is protected with multi-factor authentication."}</div><div style={{
         width: "100%",
         background: "linear-gradient(145deg,rgba(45,42,36,.4),rgba(32,30,26,.25))",
         border: "1px solid rgba(180,172,158,.06)",
@@ -4649,8 +4782,11 @@ function App() {
         padding: "20px",
         backdropFilter: "blur(14px)",
         WebkitBackdropFilter: "blur(14px)"
-      }}><div style={{
-          display: "flex",
+      }}>{/* The authenticator-code tab is only offered when a verified TOTP
+             factor exists; for a passkey/phone-only account the code box can
+             never succeed, so recovery code is the sole in-place option. */}
+        <div style={{
+          display: mfaChallengeType && mfaChallengeType !== "totp" ? "none" : "flex",
           gap: S.s4,
           marginBottom: S.s16,
           background: "rgba(45,42,36,.25)",
@@ -4764,6 +4900,7 @@ function App() {
           setMfaChallengeScreen(false);
           setMfaChallengeCode("");
           setMfaChallengeMsg(null);
+          setMfaChallengeType(null);
           setMfaRecoveryMode(false);
           setMfaRecoveryInput("");
           setAuthUser(null);
@@ -4829,7 +4966,7 @@ function App() {
       "--dly": `${p.delay}s`
     }} />)}{xpFlash && <><div className={"xp-flash"}>{formatXP(xpFlash.amount, {
         signed: true
-      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}{toast && <div className={"toast"} role={"status"} aria-live={"polite"} aria-atomic={"true"} onClick={() => setToast(null)}>{toast}</div>}{friendExBanner && <div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
+      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}<ToastHost /><NotificationInbox open={notifInboxOpen} onClose={() => { setNotifInboxOpen(false); if (notifUnread > 0) markNotifsRead(); }} items={notifItems} unreadCount={notifUnread} onMarkAllRead={markNotifsRead} />{friendExBanner &&<div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
 
     /* ══ INTRO ══════════════════════════════════ */}{screen === "intro" && <div className={"screen boot-screen"}><div className={"boot-title"}>{"AURISAR"}<span className={"boot-title-sub"}>{"FITNESS"}</span></div><div className={"boot-log"}><div className={"boot-bar-wrap"}><div className={"boot-bar"} style={{
             width: bootStep >= 4 ? "100%" : bootStep >= 3 ? "58%" : bootStep >= 2 ? "34%" : bootStep >= 1 ? "12%" : "2%"
@@ -4976,7 +5113,7 @@ function App() {
       minHeight: 0,
       overflow: "hidden",
       paddingBottom: 0
-    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
+    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} aria-label={"Alerts"} onClick={() => setNotifInboxOpen(true)}>{"🔔"}{notifUnread > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:"#d4af37",border:"1.5px solid #0c0c0a"}} />}</button><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
         /* ══ DROPDOWN MENU — rendered outside hud-top to escape backdrop-filter stacking context ══ */
@@ -5474,6 +5611,15 @@ function App() {
             removePasskey={removePasskey}
             toggleNameVisibility={toggleNameVisibility}
             toggleNotifPref={toggleNotifPref}
+            notifPrefs={notifPrefs}
+            deleteAcctOpen={deleteAcctOpen}
+            setDeleteAcctOpen={setDeleteAcctOpen}
+            deleteAcctEmail={deleteAcctEmail}
+            setDeleteAcctEmail={setDeleteAcctEmail}
+            deleteAcctMsg={deleteAcctMsg}
+            setDeleteAcctMsg={setDeleteAcctMsg}
+            deleteAcctBusy={deleteAcctBusy}
+            deleteAccount={deleteAccount}
             profileComplete={profileComplete}
             showToast={showToast}
             doCheckIn={doCheckIn}
@@ -5924,13 +6070,7 @@ function App() {
         }
       }}>{"← Back"}</button>}
     ><div><div className={"stats-prompt-banner"} onClick={() => {
-            setProfile(p => ({
-              ...p,
-              notificationPrefs: {
-                ...(p.notificationPrefs || {}),
-                reviewBattleStats: false
-              }
-            }));
+            setNotifPref("reviewBattleStats", false);
             statsPromptModal.onConfirm(statsPromptModal.wo);
             setStatsPromptModal(null);
             setSpMakeReusable(false);

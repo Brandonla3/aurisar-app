@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { sb } from '../utils/supabase';
+import { showToast as showGlobalToast } from './toast/toastStore';
+import ToastHost from './toast/ToastHost';
 
 /* ═══════════════════════════════════════════════════════════════
    Aurisar — Admin Panel
@@ -392,7 +394,6 @@ export default function AdminPage({ authUser, onBack }) {
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState(null);
   const [search, setSearch] = useState("");
-  const [toast, setToast] = useState(null); // { msg, isErr }
   const [showInvite, setShowInvite] = useState(false);
   const [token, setToken] = useState(null);
 
@@ -420,10 +421,9 @@ export default function AdminPage({ authUser, onBack }) {
     if (token) loadUsers(token);
   }, [token, loadUsers]);
 
-  const showToast = (msg, isErr = false) => {
-    setToast({ msg, isErr });
-    setTimeout(() => setToast(null), 3500);
-  };
+  // Shared queued toast store; keeps this file's (msg, isErr) signature.
+  const showToast = (msg, isErr = false) =>
+    showGlobalToast(msg, { duration: 3500, type: isErr ? "error" : "status" });
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
@@ -548,25 +548,9 @@ export default function AdminPage({ authUser, onBack }) {
         )}
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: "fixed", bottom: "calc(24px + env(safe-area-inset-bottom,0px))", left: "50%", transform: "translateX(-50%)",
-          zIndex: 3000,
-          background: toast.isErr ? "rgba(122,40,56,.95)" : "rgba(40,60,40,.95)",
-          border: `1px solid ${toast.isErr ? "rgba(196,120,120,.3)" : "rgba(120,176,120,.3)"}`,
-          color: toast.isErr ? "#e8a0a0" : "#a0d0a0",
-          padding: "10px 20px",
-          borderRadius: 8,
-          fontSize: ".8rem",
-          fontWeight: 600,
-          maxWidth: "90vw",
-          textAlign: "center",
-          boxShadow: "0 4px 20px rgba(0,0,0,.5)",
-        }}>
-          {toast.msg}
-        </div>
-      )}
+      {/* Toast host — the admin screen is an early return in App.jsx, so the
+          root-level host never mounts here; the store is shared either way. */}
+      <ToastHost />
 
       {/* Invite modal */}
       {showInvite && (
