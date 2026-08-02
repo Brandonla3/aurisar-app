@@ -1,6 +1,7 @@
 import React from "react";
 import Sheet from "../../components/ui/Sheet";
 import { formatNotification, timeAgo } from "./notificationTypes";
+import { isBroken, isUnreachable } from "../../utils/fetchResult";
 
 // The bell's inbox — a paginated view of the user's notifications outbox
 // rows. Realtime keeps it fresh while open (useNotifications prepends new
@@ -11,6 +12,7 @@ export default function NotificationInbox({
   items,
   unreadCount,
   onMarkAllRead,
+  state,
 }) {
   return (
     <Sheet
@@ -28,9 +30,34 @@ export default function NotificationInbox({
         ) : null
       }
     >
-      {(!items || items.length === 0) ? (
+      {/* Three states, three drawings. "Nothing to show" and "I could not ask"
+          must never be the same pixels — that equivalence is why this very
+          inbox could have stayed permanently broken while looking fine. */}
+      {isBroken(state) ? (
+        <div className={"notif-inbox-broken"} role={"alert"}>
+          <div className={"notif-inbox-broken-title"}>{"⚠ Alerts aren’t working"}</div>
+          <div className={"notif-inbox-broken-body"}>
+            {"This isn’t an empty inbox — the app couldn’t read your alerts at all. "}
+            {"Nothing you do will fix it; it needs a developer."}
+          </div>
+          <div className={"notif-inbox-broken-code"}>
+            {(state.surface || "notifications") + " · " + (state.kind || "error") +
+              (state.code ? " · " + state.code : "")}
+          </div>
+        </div>
+      ) : isUnreachable(state) ? (
+        <div className={"notif-inbox-empty"}>
+          {"Can’t reach the server right now. Your alerts are fine — this should "}
+          {"sort itself out when the connection comes back."}
+        </div>
+      ) : (!items || items.length === 0) ? (
         <div className={"notif-inbox-empty"}>
           {"No alerts yet. Friend activity, level-ups and reminders land here."}
+          {state?.checkedAt && (
+            <div className={"notif-inbox-checked"}>
+              {"Checked " + timeAgo(state.checkedAt)}
+            </div>
+          )}
         </div>
       ) : (
         <div className={"notif-inbox-list"}>

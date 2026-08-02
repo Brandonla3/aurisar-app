@@ -1,6 +1,7 @@
 import React from "react";
 import { sb } from "../../utils/supabase";
 import { formatNotification } from "./notificationTypes";
+import { toResult, unavailable, empty, STATUS } from "../../utils/fetchResult";
 
 // In-app projection of the public.notifications outbox
 // (scripts/security/17-notifications.sql): loads the recent inbox page,
@@ -14,6 +15,11 @@ const RETRY_MS = 4000;
 
 export default function useNotifications({ authUser, isPreviewMode, showToast }) {
   const [items, setItems] = React.useState([]);
+  // The discriminated read state. Previously a failed load was swallowed and
+  // the inbox rendered as "no notifications" — indistinguishable from a
+  // genuinely empty inbox, which is exactly how this feature could have sat
+  // permanently broken without anyone noticing.
+  const [state, setState] = React.useState(empty());
   // Counted server-side, not derived from `items`: the list is capped to the
   // newest PAGE_SIZE rows, so unread rows older than that window would be
   // invisible to a client-side tally and the badge would under-report.
@@ -43,16 +49,30 @@ export default function useNotifications({ authUser, isPreviewMode, showToast })
 
   const loadItems = React.useCallback(async () => {
     if (!active) return;
+    let result;
     try {
-      const { data, error } = await sb
-        .from("notifications")
-        .select("id, actor_id, event_type, payload, created_at, read_at")
-        .eq("recipient_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE);
-      if (!error && data) setItems(data);
+      result = toResult(
+        await sb
+          .from("notifications")
+          .select("id, actor_id, event_type, payload, created_at, read_at")
+          .eq("recipient_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(PAGE_SIZE),
+        { surface: "notifications.inbox" }
+      );
     } catch (e) {
-      console.warn("notifications load:", e);
+      // A thrown error is still a result, not a reason to render nothing.
+      result = unavailable(e, { surface: "notifications.inbox" });
+    }
+    setState(result);
+    if (result.status === STATUS.OK) setItems(result.rows);
+    else if (result.status === STATUS.EMPTY) setItems([]);
+    // On `unavailable` the previously-loaded items are deliberately kept:
+    // stale-but-real data plus a visible warning beats blanking the list.
+    if (result.status === STATUS.UNAVAILABLE) {
+      console.warn(
+        `[notifications] inbox unavailable kind=${result.kind} code=${result.code || "?"}`
+      );
     }
   }, [active, userId]);
 
@@ -60,6 +80,8 @@ export default function useNotifications({ authUser, isPreviewMode, showToast })
     if (!active) {
       setItems([]);
       setUnreadCount(0);
+      // Signed out / preview: a genuinely empty inbox, not a broken one.
+      setState(empty());
       return;
     }
     loadItems();
@@ -163,5 +185,5 @@ export default function useNotifications({ authUser, isPreviewMode, showToast })
     loadUnreadCount();
   }, [active, userId, items, loadUnreadCount]);
 
-  return { items, unreadCount, markAllRead };
+  return { items, unreadCount, markAllRead, state };
 }
