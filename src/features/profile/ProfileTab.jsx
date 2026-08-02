@@ -243,6 +243,7 @@ const ProfileTab = memo(function ProfileTab({
   removePasskey,
   toggleNameVisibility,
   toggleNotifPref,
+  notifPrefs,
   profileComplete,
   showToast,
   doCheckIn,
@@ -1756,7 +1757,9 @@ return (
     marginBottom: S.s14,
     fontStyle: "italic"
   }}>{"Choose which email notifications you’d like to receive from Aurisar."}</div>{(() => {
-    const prefs = profile.notificationPrefs || {};
+    // Resolved booleans (defaults merged) from useNotificationPrefs — backed
+    // by the typed notification_prefs table, not the profile blob.
+    const prefs = notifPrefs || {};
     const items = [{
       key: "sharedWorkout",
       icon: "📋",
@@ -1786,8 +1789,7 @@ return (
       key: "messageReceived",
       icon: "💬",
       label: "New Messages",
-      desc: "Email me when I receive a new direct message",
-      defaultOff: true
+      desc: "Email me when I receive a new direct message"
     }, {
       key: "reviewBattleStats",
       icon: "📊",
@@ -1799,7 +1801,7 @@ return (
       flexDirection: "column",
       gap: S.s8
     }}>{items.map(item => {
-        const isOn = item.defaultOff ? prefs[item.key] === true : prefs[item.key] !== false;
+        const isOn = !!prefs[item.key];
         return <div key={item.key} className={"profile-notif-row"} style={{
           cursor: "pointer",
           borderColor: isOn ? "rgba(46,204,113,.18)" : "rgba(180,172,158,.05)"

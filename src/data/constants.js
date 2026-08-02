@@ -1147,15 +1147,10 @@ const EMPTY_PROFILE = {
   gymKit:null,
   chartOrder:["dow","sets","muscleFreq","volume","consistency","topEx"],
   deletedItems:[], // [{id, type:"workout"|"plan", item, deletedAt (ISO)}]
-  notificationPrefs:{
-    sharedWorkout:true,
-    friendLevelUp:true,
-    friendRequest:true,
-    friendAccepted:true,
-    messageReceived:false,
-    reviewBattleStats:true,
-    friendExercise:true,
-  },
+  // Notification prefs moved to the typed notification_prefs table
+  // (scripts/security/17-notifications.sql) via src/state/useNotificationPrefs.js
+  // so the server-side email drain can read them per-key. Old saves may still
+  // carry a stale notificationPrefs key in the data blob; nothing reads it.
   // Phone number for MFA. Set during phone-OTP enrollment (App.jsx:verifyPhone),
   // cleared by removePhone(). Was previously persisted without being declared
   // in EMPTY_PROFILE; surfaced by the item 5c audit.

@@ -19,6 +19,7 @@ import { _exercisesLoaded, loadExercises, useExercises } from './utils/exerciseL
 import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
+import { useNotificationPrefs } from './state/useNotificationPrefs';
 import { useExerciseFilters } from './features/exercises/useExerciseFilters';
 import { DEFAULT_DISCOVER_PICKS } from './features/exercises/discoverCategories';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
@@ -597,6 +598,14 @@ function App() {
   // Friend exercise banner notification
   const friendBannerTimerRef = React.useRef(null);
   const notifPrefsRef = React.useRef(null);
+  // Typed notification prefs (notification_prefs table) — replaces the old
+  // profiles.data.notificationPrefs jsonb blob so the email drain can read
+  // them server-side. toggleNotifPref keeps its old name for ProfileTab.
+  const {
+    prefs: notifPrefs,
+    toggle: toggleNotifPref,
+    setPref: setNotifPref
+  } = useNotificationPrefs(authUser, isPreviewMode);
   // Personal Bests filter
   const LEADERBOARD_PB_IDS = new Set(["bench", "bench_press", "squat", "barbell_back_squat", "deadlift", "barbell_deadlift", "overhead_press", "ohp", "pull_up", "pullups", "push_up", "pushups", "running", "treadmill_run", "run"]);
   const [pbFilterOpen, setPbFilterOpen] = useState(false);
@@ -1049,8 +1058,8 @@ function App() {
 
   // Keep notifPrefsRef in sync so realtime handler avoids stale closure
   useEffect(() => {
-    notifPrefsRef.current = profile.notificationPrefs || {};
-  }, [profile.notificationPrefs]);
+    notifPrefsRef.current = notifPrefs;
+  }, [notifPrefs]);
 
   // Show a friend exercise banner notification (auto-dismiss after 5s)
   function showFriendExBanner(data) {
@@ -2060,15 +2069,8 @@ function App() {
   }
 
   // ── NOTIFICATION PREFS ────────────────────────────────────────
-  function toggleNotifPref(key) {
-    setProfile(p => ({
-      ...p,
-      notificationPrefs: {
-        ...(p.notificationPrefs || {}),
-        [key]: !(p.notificationPrefs || {})[key]
-      }
-    }));
-  }
+  // toggleNotifPref / setNotifPref come from useNotificationPrefs (declared
+  // with notifPrefsRef above) and write typed notification_prefs rows.
 
   // ── RECOVERY CODE NAVIGATION GUARD ────────────────────────
   // Shows a browser confirm dialog if user tries to navigate
@@ -5474,6 +5476,7 @@ function App() {
             removePasskey={removePasskey}
             toggleNameVisibility={toggleNameVisibility}
             toggleNotifPref={toggleNotifPref}
+            notifPrefs={notifPrefs}
             profileComplete={profileComplete}
             showToast={showToast}
             doCheckIn={doCheckIn}
@@ -5924,13 +5927,7 @@ function App() {
         }
       }}>{"← Back"}</button>}
     ><div><div className={"stats-prompt-banner"} onClick={() => {
-            setProfile(p => ({
-              ...p,
-              notificationPrefs: {
-                ...(p.notificationPrefs || {}),
-                reviewBattleStats: false
-              }
-            }));
+            setNotifPref("reviewBattleStats", false);
             statsPromptModal.onConfirm(statsPromptModal.wo);
             setStatsPromptModal(null);
             setSpMakeReusable(false);
