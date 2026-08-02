@@ -66,3 +66,12 @@ Standard scripts live in `package.json`. Non-obvious notes:
 - `npm run build` can be memory-hungry; CI sets `NODE_OPTIONS=--max-old-space-size=4096`.
 - `.npmrc` sets `legacy-peer-deps=true` (required so `eslint-plugin-jsx-a11y`
   installs against ESLint 10). Keep it; `npm install` relies on it.
+
+### Reviewing pull requests
+
+When asked to review a PR, always **post the review as a comment on that PR**
+(not only as a summary in chat) — this is a required deliverable for every
+review. Verify claims against the actual code before posting: check out the PR
+branch (an isolated `git worktree` avoids disturbing the current branch) and run
+the relevant tests, `eslint` on the changed files, and any behavior-specific
+checks, then include what you verified in the comment.
