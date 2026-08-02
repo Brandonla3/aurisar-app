@@ -57,6 +57,14 @@ jobs:
       - name: Audio SFX fresh
         run: npm run check:audio
 
+      # Terrain runtime maps are committed; this OFFLINE gate fails on drift
+      # between config/terrain-assets.json, config/terrain-assets.lock.json,
+      # and the committed bytes — it never downloads sources. The build path
+      # must stay independent of third-party hosts (ambientCG outage killed a
+      # Netlify deploy on 2026-08-02); see scripts/sync_terrain_assets.mjs.
+      - name: Terrain assets fresh (offline)
+        run: npm run sync:terrain-assets:check
+
       # Determinism gate: the worldgen GOLDEN snapshot (realized plateau
       # heights + site counts + a site-position digest) must match. Any PR
       # that reshuffles the seed-manifest draw order (docs/world-design-plan.md,
@@ -73,14 +81,5 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Upload generated terrain assets
-        uses: actions/upload-artifact@v7
-        with:
-          name: terrain-assets-${{ github.sha }}
-          path: |
-            public/assets/terrain/manifest.json
-            public/assets/terrain/generated/
-            assets-source/terrain/**/ARCHIVE.sha256
-          if-no-files-found: error
-          retention-days: 14
-          compression-level: 0
+      # (The terrain-assets artifact upload is gone: generated outputs are
+      # committed to git now, so the repo itself is the artifact.)

@@ -27,9 +27,10 @@ assets-source/terrain/**
 !assets-source/terrain/README.md
 !assets-source/terrain/.gitkeep
 
-# Runtime terrain maps are deterministic build products. CI publishes them as an
-# artifact and Vite/production builds regenerate them through predev/prebuild.
-public/assets/terrain/generated/**
+# public/assets/terrain/generated/** is COMMITTED (together with
+# config/terrain-assets.lock.json) so Netlify/CI builds never fetch terrain
+# sources from third-party hosts. Do not re-ignore it — see the regression
+# guard in scripts/sync_terrain_assets.mjs.
 
 # Generated world plan vectors (regenerate with `npm run plan`); PNGs are kept.
 docs/world-plans/*.svg

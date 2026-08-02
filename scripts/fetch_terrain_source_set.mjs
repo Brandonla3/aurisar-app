@@ -6,6 +6,10 @@
  * declared by config/terrain-assets.json. This keeps raw texture binaries out of
  * git while still making source acquisition repeatable for approved CC0 sets.
  *
+ * EXPLICIT-ONLY: this is the single place terrain sources are ever downloaded.
+ * It must never be invoked from prebuild/predev/CI — the build path is offline
+ * by design (see the regression guard in sync_terrain_assets.mjs).
+ *
  * Usage:
  *   npm run fetch:terrain-source -- overworld-meadow-grass-01
  *   npm run check:terrain-source -- overworld-meadow-grass-01

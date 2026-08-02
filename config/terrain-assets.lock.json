@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "configDigest": "e872c4ef73c381d7fd70acbfe79290ba0ced970d38915ce6f16bc9b1ca76b6f7",
+  "manifestSha256": "f41b833a3ad7b4ac224cc431c3c871801995705be2859bd84bdaba41a83cad23",
+  "sets": {
+    "overworld-meadow-grass-01": {
+      "files": {
+        "basecolor.jpg": "d4b92b7f3d3f1a692c8d3b4c1f0f93285eaf1e3639d4eecda5422b40f5fc0732",
+        "normal.png": "726c99482313ed502620b424eb5f8d1970d8916b07498ace670f39bb4b12801d",
+        "orm.png": "79242b25faa4674bc85214c5724d40dbdfce6fe570431488a67b89aee3babd5b",
+        "height.png": "828025e118bbbfb0febaae07bd0bf129eb2f778c4db99d7dbe2e338f3af0d22a"
+      }
+    }
+  }
+}

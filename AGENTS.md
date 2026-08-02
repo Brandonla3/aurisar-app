@@ -60,9 +60,15 @@ Standard scripts live in `package.json`. Non-obvious notes:
   **not** run by CI — do not treat a red lint run as a regression you caused.
 - CI (`.github/workflows/ci.yml`) gates on the freshness/determinism checks
   (`sync:content:check`, `emit:*:check`, `check:assets`, `vendor:meshopt:check`,
-  `check:audio`, `verify:worldgen`), then `npm test` (Vitest) and `npm run build`.
-  If you touch world/asset/content generators, run the matching `*:check` script
-  and regenerate committed outputs, or CI will fail on drift.
+  `check:audio`, `sync:terrain-assets:check`, `verify:worldgen`), then `npm test`
+  (Vitest) and `npm run build`. If you touch world/asset/content generators, run
+  the matching `*:check` script and regenerate committed outputs, or CI will
+  fail on drift.
+- The build path is OFFLINE by design: terrain runtime maps are committed and
+  `sync:terrain-assets` only verifies them against
+  `config/terrain-assets.lock.json`. Terrain sources are downloaded solely via
+  the explicit `npm run fetch:terrain-source -- <set-id>` (needed only when
+  changing `config/terrain-assets.json`); commit the regenerated outputs + lock.
 - `npm run build` can be memory-hungry; CI sets `NODE_OPTIONS=--max-old-space-size=4096`.
 - `.npmrc` sets `legacy-peer-deps=true` (required so `eslint-plugin-jsx-a11y`
   installs against ESLint 10). Keep it; `npm install` relies on it.

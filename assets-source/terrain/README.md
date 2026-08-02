@@ -4,25 +4,31 @@ This directory is the local staging area for raw scanned or authored terrain PBR
 maps before they are normalized into `public/assets/terrain/generated/`.
 
 Raw source maps are intentionally ignored by git. Locked sources are reproduced
-from acquisition metadata in `config/terrain-assets.json`; generated runtime maps
-are also ignored and published as CI artifacts.
+from acquisition metadata in `config/terrain-assets.json`. The generated runtime
+maps in `public/assets/terrain/generated/` ARE committed, together with
+`config/terrain-assets.lock.json`, so clean checkouts (Netlify, CI) build fully
+offline — the build path never downloads from third-party hosts (see the
+regression guard in `scripts/sync_terrain_assets.mjs`).
 
 ## Enabled-source workflow
 
-Run:
+`npm run dev` and `npm run build` run `npm run sync:terrain-assets`
+automatically through `predev` and `prebuild`. The sync is offline: it verifies
+the committed outputs against the lockfile and no-ops when they are current.
+
+To change terrain content (edit `config/terrain-assets.json`, enable a set,
+bump a source archive), fetch sources explicitly, rebuild, and commit:
 
 ```bash
+npm run fetch:terrain-source -- <set-id>
 npm run sync:terrain-assets
 ```
 
-The sync command checks every enabled terrain set. Missing locked sources are
-downloaded and extracted; existing local maps are reused. The command then
-normalizes all enabled sets and regenerates the runtime manifest.
+The sync rebuilds from the local sources, refreshes the lockfile, and tells you
+to commit the regenerated outputs. It never downloads — if sources are missing
+it fails with the exact fetch command to run.
 
-`npm run dev` and `npm run build` invoke this automatically through `predev` and
-`prebuild`.
-
-To verify an already synchronized checkout without downloading:
+To verify a checkout (the same offline gate CI runs):
 
 ```bash
 npm run sync:terrain-assets:check

@@ -20,8 +20,12 @@ public/assets/terrain/generated/<set-id>/
 `manifest.json` maps those files to the five terrain slots used by the splat
 shader: `grass`, `dirt`, `sand`, `rock`, and `field`.
 
-Generated texture binaries are deterministic build products and are ignored by
-git. CI publishes the generated terrain package as an artifact for inspection.
+Generated texture binaries are deterministic build products and are COMMITTED
+to git together with `config/terrain-assets.lock.json` (config digest plus
+SHA-256 of the manifest and every output file). Clean checkouts therefore build
+fully offline; a 2026-08-02 Netlify deploy died on a transient ambientCG fetch,
+so the build path must never depend on third-party hosts again (see the
+regression guard in `scripts/sync_terrain_assets.mjs`).
 
 ## Standard commands
 
@@ -35,17 +39,18 @@ npm run build
 `npm run dev` and `npm run build` invoke the terrain sync automatically through
 `predev` and `prebuild`.
 
-The sync step:
+The sync step is offline:
 
 1. reads enabled sets from `config/terrain-assets.json`;
-2. reuses cached local source maps when present;
-3. downloads missing locked source archives;
-4. extracts only the configured PBR maps;
-5. normalizes the maps through `build_terrain_assets.mjs`;
-6. regenerates `public/assets/terrain/manifest.json`.
+2. verifies the committed outputs + manifest against
+   `config/terrain-assets.lock.json`;
+3. when current: no-op (the normal dev/CI/deploy path);
+4. when stale with local sources present: renormalizes through
+   `build_terrain_assets.mjs`, regenerates the manifest, refreshes the lock;
+5. when stale without sources: fails and prints the explicit
+   `npm run fetch:terrain-source -- <set-id>` command — it never downloads.
 
-Use check mode when the sources and generated outputs are expected to already be
-present:
+Check mode is the offline freshness gate CI runs:
 
 ```bash
 npm run sync:terrain-assets:check
