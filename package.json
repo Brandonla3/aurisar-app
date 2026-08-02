@@ -44,13 +44,13 @@
     "verify:worldgen": "node scripts/verify_worldgen.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.8",
+    "@supabase/supabase-js": "^2.111.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "babylonjs": "9.18.0",
-    "babylonjs-gui": "9.18.0",
-    "babylonjs-loaders": "9.18.0",
-    "babylonjs-serializers": "9.18.0",
+    "babylonjs": "9.19.0",
+    "babylonjs-gui": "9.19.0",
+    "babylonjs-loaders": "9.19.0",
+    "babylonjs-serializers": "9.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-is": "^19.2.8",
@@ -68,16 +68,16 @@
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
+    "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^10.8.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
-    "globals": "^17.7.0",
+    "globals": "^17.8.0",
     "jsdom": "^29.1.1",
     "meshoptimizer": "^1.2.0",
     "sharp": "^0.35.3",
-    "vite": "^8.1.5",
+    "vite": "^8.2.0",
     "vitest": "^4.1.10"
   }
 }
