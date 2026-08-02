@@ -3,8 +3,16 @@
  *
  * Dome, sun glow, and stars composite inside a single fragment function —
  * no stacked transparent layers, no blending, so a tile GPU shades each sky
- * pixel exactly once and early-Z kills everything the terrain already won
- * (opaque queue sorts front-to-back; the infinite dome sorts last).
+ * pixel exactly once and early-Z kills everything the terrain already won.
+ *
+ * Draw order is pinned via renderingGroupId (RENDERING_GROUP below), NOT
+ * trusted to Babylon's default opaque distance-sort. That sort would put the
+ * dome (fixed radius 500, disableDepthWrite) BEFORE anything genuinely
+ * farther than 500m — which every horizonRings.js tier now is (576m+) — and
+ * since a depth-write-disabled mesh drawn AFTER a farther depth-writing mesh
+ * still depth-TESTS and can win on a nearer z, the dome could incorrectly
+ * paint over a correctly-drawn distant ring. Explicit rendering groups make
+ * "the dome always draws first" a fact, not a hope about internal sort order.
  *
  * The gradient body comes from model/skyModel.js's emitGradientBsl() — the
  * SAME constants table the CPU FogDriver evaluates. That is the seam
@@ -21,6 +29,7 @@
 
 import { RealmFnBlock } from './bsl/RealmFnBlock.js';
 import { emitGradientBsl } from '../../model/skyModel.js';
+import { buildStandardVertexChain, buildViewDirection } from './bsl/standardVertex.js';
 
 /** One function: gradient + glow + stars. Stars ride the same draw. */
 function createSkyPaintBlock() {
@@ -76,31 +85,11 @@ export function buildSkyDomeMaterial(scene, { name = 'realmSky', shaderLanguage 
   // lighting — its light is painted.
   nm.backFaceCulling = false;
 
-  const position = new BABYLON.InputBlock('position');
-  position.setAsAttribute('position');
-  const world = new BABYLON.InputBlock('world');
-  world.setAsSystemValue(BABYLON.NodeMaterialSystemValues.World);
-  const viewProjection = new BABYLON.InputBlock('viewProjection');
-  viewProjection.setAsSystemValue(BABYLON.NodeMaterialSystemValues.ViewProjection);
-
-  const worldPos = new BABYLON.TransformBlock('worldPos');
-  position.connectTo(worldPos);
-  world.output.connectTo(worldPos.transform);
-  const wvp = new BABYLON.TransformBlock('wvp');
-  worldPos.output.connectTo(wvp.vector);
-  viewProjection.output.connectTo(wvp.transform);
-  const vertexOutput = new BABYLON.VertexOutputBlock('vertexOutput');
-  wvp.output.connectTo(vertexOutput.vector);
-
-  // View direction: worldPos - cameraPos. The dome is camera-centered and
-  // infiniteDistance, so this is numerically stable at any world coordinate.
-  const cameraPosition = new BABYLON.InputBlock('cameraPosition');
-  cameraPosition.setAsSystemValue(BABYLON.NodeMaterialSystemValues.CameraPosition);
-  const posXYZ = new BABYLON.VectorSplitterBlock('posXYZ');
-  worldPos.output.connectTo(posXYZ.xyzw);
-  const dir = new BABYLON.SubtractBlock('dir');
-  posXYZ.xyzOut.connectTo(dir.left);
-  cameraPosition.output.connectTo(dir.right);
+  // Shared with ringNME.js: rings must derive elevation from the IDENTICAL
+  // graph, not a hand-copied one, or the two could silently disagree about
+  // what "view elevation" means at their shared horizon.
+  const { worldPos, vertexOutput } = buildStandardVertexChain();
+  const { dir } = buildViewDirection(worldPos);
 
   const uniform = (uname, value) => {
     const b = new BABYLON.InputBlock(uname);
@@ -149,6 +138,14 @@ export function buildSkyDomeMaterial(scene, { name = 'realmSky', shaderLanguage 
   });
 }
 
+/**
+ * Rendering groups render in strict ascending order (Babylon's
+ * RenderingManager, MAX_RENDERINGGROUPS = 4) — a deterministic mechanism, not
+ * a sort heuristic. The dome owns group 0; horizonRingNME.js's rings claim
+ * group 1 specifically so they always draw after it.
+ */
+export const RENDERING_GROUP = Object.freeze({ SKY: 0, RINGS: 1 });
+
 /** The dome mesh: camera-locked, depth-write off, never pickable. */
 export function createSkyDome(scene, material) {
   const dome = BABYLON.MeshBuilder.CreateSphere('realmSkyDome', {
@@ -158,6 +155,7 @@ export function createSkyDome(scene, material) {
   dome.infiniteDistance = true; // follows the camera, sorts to the far end
   dome.isPickable = false;
   dome.applyFog = false;
+  dome.renderingGroupId = RENDERING_GROUP.SKY;
   // Never write depth: the sky must not occlude anything, ever.
   material.disableDepthWrite = true;
   return dome;

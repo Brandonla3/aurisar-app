@@ -14,6 +14,16 @@ export const CHUNK_SIZE_M = 64;
  */
 export const TERRAIN_SUBDIVISIONS = 48;
 
+/**
+ * The streamed disc's default radius, in chunks. Shared by TerrainStreamer's
+ * constructor default AND model/horizonRings.js's ring-tier radii — so "the
+ * rings are sized relative to the streamer" is a fact both read from the same
+ * constant, not two files whose numbers happen to agree today. A streamer
+ * constructed with an explicit `{ radius }` override intentionally diverges
+ * from the rings, same as it already diverges from this default.
+ */
+export const DEFAULT_STREAM_RADIUS_CHUNKS = 3;
+
 /** "cx,cz" — stable, readable, usable as a Map key. */
 export const chunkId = (cx, cz) => `${cx},${cz}`;
 

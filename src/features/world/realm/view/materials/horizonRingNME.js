@@ -1,0 +1,218 @@
+/**
+ * horizonRingNME — a crag silhouette ring, painted by the sky, not the fog.
+ *
+ * This is the resolution to the fog double-booking conflict: rings never
+ * wire in a FogBlock, so a near-tuned scene.fogDensity — however high, tuned
+ * purely to hide the streamed-chunk edge — cannot wash them out. There was
+ * never a distance-extinction term for it to saturate.
+ *
+ * Each ring tier gets its OWN small NodeMaterial (only 3 tiers exist; sharing
+ * one material the way TerrainStreamer shares one for dozens of chunks buys
+ * nothing here). The vertex/view-direction wiring is the SAME shared graph
+ * skyDomeNME.js uses (bsl/standardVertex.js) — a ring's elevation must mean
+ * exactly what the dome's elevation means, or the horizon where they meet
+ * would visibly disagree. The paint itself calls the identical
+ * realmSkyGradient BSL body the dome calls, so a ring at low elevation reads
+ * the same color the fog washed the world to at h=0.
+ *
+ * Depth handling is the opposite of the dome's: rings are real, finite,
+ * depth-WRITING geometry (default — nothing disabled here), so nearer
+ * terrain correctly occludes a ring, and a ring correctly occludes the sky
+ * dome behind it. The only ordering guarantee needed is that the dome must
+ * draw FIRST — see skyDomeNME.js's RENDERING_GROUP for why and how.
+ *
+ * A second, DIFFERENT depth hazard lives here, not in the dome: Babylon's
+ * RenderingManager auto-clears the depth/stencil buffer before EVERY
+ * rendering group except the first (group 0's clear is a documented no-op —
+ * `_depthStencilBufferAlreadyCleaned` is forced true there because the frame
+ * already cleared once; every later group resets that flag to false and the
+ * clear genuinely executes). Terrain never sets a rendering group and so
+ * shares group 0 with the dome — meaning group 1 (RINGS)'s default auto-clear
+ * would wipe out the depth terrain just wrote, and a ring could then draw
+ * OVER nearer terrain that should have occluded it, because there is no
+ * depth left in the buffer to test against by the time the ring renders.
+ * buildHorizonRings() disables auto-clear specifically for RINGS
+ * (scene.setRenderingAutoClearDepthStencil) so the SAME depth buffer
+ * persists across both groups — draw order is still pinned by the group
+ * index, but nothing gets wiped in between.
+ */
+
+/* global BABYLON */
+
+import { RealmFnBlock } from './bsl/RealmFnBlock.js';
+import { emitGradientBsl } from '../../model/skyModel.js';
+import { buildStandardVertexChain, buildViewDirection } from './bsl/standardVertex.js';
+import { RENDERING_GROUP } from './skyDomeNME.js';
+
+/** Reuses the dome's gradient body verbatim, then blends in an authored, per-tier darken. */
+function createRingPaintBlock(darken) {
+  return new RealmFnBlock('ringPaint', {
+    fnName: 'realmRingPaint',
+    params: [
+      { name: 'dir', type: 'vec3' },
+      { name: 'sunDir', type: 'vec3' },
+      { name: 'horizonC', type: 'vec3' },
+      { name: 'midC', type: 'vec3' },
+      { name: 'zenithC', type: 'vec3' },
+      { name: 'glowC', type: 'vec3' },
+    ],
+    returnType: 'vec3',
+    helpers: `
+vec3 realmSkyGradient(float elev, float sunDot, vec3 horizonC, vec3 midC, vec3 zenithC, vec3 glowC)
+{${emitGradientBsl()}
+}`,
+    body: `
+    vec3 d = normalize(dir);
+    float elev = clamp(d.y, 0.0, 1.0);
+    float sunDot = dot(d, sunDir);
+    vec3 c = realmSkyGradient(elev, sunDot, horizonC, midC, zenithC, glowC);
+    // Darken toward black, not toward a fixed color — keeps the silhouette
+    // legible against every stance's palette without a second authored table.
+    return c * (1.0 - ${darken.toFixed(4)});`,
+  });
+}
+
+/**
+ * @param {number} darken 0..1, authored per RING_TIERS entry
+ * @returns {Promise<{material, applyState}>} applyState mirrors the dome's —
+ *   same fields (minus starVisibility, which no ring needs), same call site.
+ */
+export function buildRingMaterial(scene, { name, darken, shaderLanguage = null }) {
+  const nm = new BABYLON.NodeMaterial(name, scene);
+  if (shaderLanguage !== null) nm.shaderLanguage = shaderLanguage;
+  nm.backFaceCulling = false;
+
+  const { worldPos, vertexOutput } = buildStandardVertexChain();
+  const { dir } = buildViewDirection(worldPos);
+
+  const uniform = (uname, value) => {
+    const b = new BABYLON.InputBlock(uname);
+    b.value = value;
+    return b;
+  };
+  const sunDir = uniform('sunDir', new BABYLON.Vector3(0, 1, 0));
+  const horizonC = uniform('horizonC', new BABYLON.Color3(0.7, 0.8, 0.9));
+  const midC = uniform('midC', new BABYLON.Color3(0.4, 0.6, 0.85));
+  const zenithC = uniform('zenithC', new BABYLON.Color3(0.2, 0.35, 0.65));
+  const glowC = uniform('glowC', new BABYLON.Color3(0.3, 0.25, 0.15));
+
+  const paint = createRingPaintBlock(darken);
+  dir.output.connectTo(paint.input('dir'));
+  sunDir.output.connectTo(paint.input('sunDir'));
+  horizonC.output.connectTo(paint.input('horizonC'));
+  midC.output.connectTo(paint.input('midC'));
+  zenithC.output.connectTo(paint.input('zenithC'));
+  glowC.output.connectTo(paint.input('glowC'));
+
+  const fragmentOutput = new BABYLON.FragmentOutputBlock('fragmentOutput');
+  paint.output.connectTo(fragmentOutput.rgb);
+
+  nm.addOutputNode(vertexOutput);
+  nm.addOutputNode(fragmentOutput);
+
+  return new Promise((resolve, reject) => {
+    nm.onBuildObservable.addOnce(() => {
+      const applyState = (s) => {
+        sunDir.value.copyFromFloats(s.sunDir[0], s.sunDir[1], s.sunDir[2]);
+        horizonC.value.copyFromFloats(...s.stops.horizon);
+        midC.value.copyFromFloats(...s.stops.mid);
+        zenithC.value.copyFromFloats(...s.stops.zenith);
+        glowC.value.copyFromFloats(...s.stops.glow);
+      };
+      resolve({ material: nm, applyState });
+    });
+    nm.onBuildErrorObservable.addOnce((message) => {
+      nm.dispose();
+      reject(new Error(`[horizonRingNME] build failed: ${message}`));
+    });
+    nm.build(false);
+  });
+}
+
+/**
+ * One ring's geometry: an open cylindrical WALL at `radiusM`, rising from
+ * y=0 to y=heightM (not centered on 0 — its base sits at the ground datum,
+ * its top rim at exactly `heightM`), unwrapped over `segments` around the
+ * horizon. Real, opaque, depth-writing (no disableDepthWrite — the opposite
+ * of the dome), fogless, unpickable, and pinned to RENDERING_GROUP.RINGS so
+ * it always draws after the sky.
+ *
+ * `cap: NO_CAP` is load-bearing, not an optimization: CreateCylinder caps
+ * both ends by default, and with BACKSIDE orientation (needed to see the
+ * wall from inside the vale) an un-capped top would render as a solid
+ * darkened disc filling the sky — a lid, not a silhouette. Verified under
+ * NullEngine: capped 262 verts/768 indices vs open 130/384, a 2x geometry
+ * cost too for a shape nobody should ever see.
+ *
+ * Positioning the base at y=0 (rather than centering at 0, Babylon's
+ * default) is what makes model/horizonRings.js's `ringElevation(radius,
+ * heightM, cameraY)` an EXACT reference implementation of the shader's
+ * per-vertex elevation at the visible top rim — heightM means the same
+ * thing to both the geometry and the pure model, not two different heights
+ * that happen to share a name.
+ */
+export function createRingMesh(scene, { id, radiusM, heightM }, material, segments = 64) {
+  const mesh = BABYLON.MeshBuilder.CreateCylinder(`horizonRing_${id}`, {
+    diameter: radiusM * 2,
+    height: heightM,
+    tessellation: segments,
+    subdivisions: 1,
+    sideOrientation: BABYLON.Mesh.BACKSIDE, // seen from inside the cylinder
+    cap: BABYLON.Mesh.NO_CAP, // an open wall, not a lidded can — see above
+  }, scene);
+  // CreateCylinder centers the mesh at local y=0; shift up by half its
+  // height so the BASE sits at y=0 and the TOP rim sits at y=heightM.
+  mesh.position.y = heightM / 2;
+  mesh.material = material;
+  mesh.isPickable = false;
+  mesh.applyFog = false;
+  mesh.renderingGroupId = RENDERING_GROUP.RINGS;
+  return mesh;
+}
+
+/**
+ * Build all three authored ring tiers (model/horizonRings.js RING_TIERS) at
+ * once. Returns one combined applyState so the FogDriver call site treats
+ * "the ring kit" as a single reader, same shape as the dome.
+ */
+export async function buildHorizonRings(scene, tiers, { shaderLanguage = null } = {}) {
+  // See the module doc comment: group 1's default auto-clear would wipe the
+  // depth buffer terrain (group 0) just wrote, letting a ring incorrectly
+  // draw over nearer terrain. `depth: true` on the CALL is what actually
+  // clears; passing `false` there is what stops it — the boolean returned by
+  // getAutoClearDepthStencilSetup is a report of current state, not itself a
+  // toggle, so this must be the 2-arg (autoClear) form, not a depth-only one.
+  scene.setRenderingAutoClearDepthStencil(RENDERING_GROUP.RINGS, false);
+
+  const built = await Promise.all(tiers.map(async (tier) => {
+    const { material, applyState } = await buildRingMaterial(scene, {
+      name: `realmRing_${tier.id}`, darken: tier.darken, shaderLanguage,
+    });
+    const mesh = createRingMesh(scene, tier, material);
+    return { tier, mesh, material, applyState };
+  }));
+
+  return {
+    meshes: built.map((b) => b.mesh),
+    /**
+     * Track the camera/player XZ each frame. Rings are built at world origin
+     * (0,0); without this call they stay there forever, so "just beyond the
+     * streamed disc" is only true near spawn — walk 500m and the near ring
+     * (576m radius from ORIGIN, not from the player) is no longer where the
+     * story says it is. World Y is deliberately left untouched: it stays at
+     * each tier's authored datum (base=0, top=heightM — real mountains sit at
+     * a fixed altitude; only the vantage point moves), so walking up a local
+     * slope correctly changes the ring's apparent elevation via the shader's
+     * real worldPos-to-camera math, exactly the way a real distant range would.
+     */
+    recenter(x, z) {
+      for (const b of built) { b.mesh.position.x = x; b.mesh.position.z = z; }
+    },
+    applyState(s) {
+      for (const b of built) b.applyState(s);
+    },
+    dispose() {
+      for (const b of built) { b.mesh.dispose(); b.material.dispose(); }
+    },
+  };
+}

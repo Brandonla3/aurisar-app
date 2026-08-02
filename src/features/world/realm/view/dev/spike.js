@@ -22,6 +22,8 @@ import { createTerrainField } from '../../model/terrainField.js';
 import { TerrainStreamer } from '../terrain/TerrainStreamer.js';
 import { buildTerrainMaterial } from '../materials/terrainNME.js';
 import { buildSkyDomeMaterial, createSkyDome } from '../materials/skyDomeNME.js';
+import { buildHorizonRings } from '../materials/horizonRingNME.js';
+import { RING_TIERS } from '../../model/horizonRings.js';
 import { FogDriver } from '../atmosphere/FogDriver.js';
 import { createWalkerState, integrateWalker } from '../../model/walker.js';
 import {
@@ -73,15 +75,28 @@ async function boot() {
   fill.intensity = 0.3;
   fill.groundColor = new BABYLON.Color3(0.16, 0.20, 0.15);
 
-  // ── Atmosphere (P4): dome + the single-writer FogDriver ────────────────────
+  // ── Atmosphere (P4a): dome + the single-writer FogDriver ───────────────────
   const { material: skyMat, applyState: applyDomeState } = await buildSkyDomeMaterial(scene);
   createSkyDome(scene, skyMat);
+
+  // ── Horizon rings (P4b): crag silhouettes painted by elevation, not fog ────
+  // Never wired into scene.fogDensity — a near-tuned density (needed to hide
+  // the streamed terrain's edge, in P4a's design) can never wash these out,
+  // because there was never a distance-extinction term for it to saturate.
+  // Chunk pop-in concealment now comes from TerrainStreamer's own fade-in
+  // (model/chunkFade.js) instead, which is what frees fog to be tuned purely
+  // for mood. Both readers — dome and rings — are driven by the SAME
+  // per-frame skyState below; composed here as one applyDomeState closure so
+  // FogDriver stays the single writer with multiple readers, not a second one.
+  const ringKit = await buildHorizonRings(scene, RING_TIERS);
+  const applyAtmosphereState = (s) => { applyDomeState(s); ringKit.applyState(s); };
+
   // ?timewarp=40 compresses the 40-min cycle into one minute for verification.
   const timewarp = Number(new URLSearchParams(location.search).get('timewarp')) || 1;
   const fogDriver = new FogDriver(scene, {
     sunLight: key,
     ambientLight: fill,
-    applyDomeState,
+    applyDomeState: applyAtmosphereState,
   }, { timeScale: timewarp });
 
   // ── Terrain ─────────────────────────────────────────────────────────────────
@@ -162,7 +177,12 @@ async function boot() {
     camera.target.y += (walker.y + 1.4 - camera.target.y) * 0.18;
     camera.target.z += (walker.z - camera.target.z) * 0.18;
 
-    streamer.update(walker.x, walker.z);
+    // nowMs stamps newly-born chunks and ramps every still-fading chunk's
+    // visibility (model/chunkFade.js) — structural pop-in concealment.
+    streamer.update(walker.x, walker.z, nowMs);
+    // Rings are built at world origin; without this they never move, and
+    // "just beyond the streamed disc" would only be true near spawn.
+    ringKit.recenter(walker.x, walker.z);
   });
 
   // ── GUI (the P0 ADT proof, kept) ───────────────────────────────────────────
@@ -194,13 +214,16 @@ async function boot() {
       `renderer  : ${renderer}${degraded ? ' [degraded]' : ''} (${choice.reason})`,
       `pos       : ${walker.x.toFixed(1)}, ${walker.y.toFixed(1)}, ${walker.z.toFixed(1)}`,
       `speed     : ${walker.speedMps.toFixed(1)} m/s`,
-      `chunks    : ${streamer.residentCount()} resident`,
+      `chunks    : ${streamer.residentCount()} resident${streamer.isSettledVisually() ? '' : ' (fading)'}`,
       `sky       : ${fogDriver.state?.fogDensity != null ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
+      `rings     : ${ringKit.meshes.length}`,
       `fps       : ${engine.getFps().toFixed(0)}`,
     ].join('\n');
   }, 250);
 
-  window.__realmSpike = { engine, scene, adt, field, streamer, camera, fogDriver, getWalker: () => walker };
+  window.__realmSpike = {
+    engine, scene, adt, field, streamer, camera, fogDriver, ringKit, getWalker: () => walker,
+  };
 }
 
 boot().catch((err) => {

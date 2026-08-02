@@ -5,12 +5,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
 
-let buildSkyDomeMaterial, createSkyDome, emitGradientBsl;
+let buildSkyDomeMaterial, createSkyDome, emitGradientBsl, RENDERING_GROUP;
 let engine;
 
 beforeAll(async () => {
   globalThis.BABYLON = BABYLON;
-  ({ buildSkyDomeMaterial, createSkyDome } = await import('./skyDomeNME.js'));
+  ({ buildSkyDomeMaterial, createSkyDome, RENDERING_GROUP } = await import('./skyDomeNME.js'));
   ({ emitGradientBsl } = await import('../../model/skyModel.js'));
   engine = new BABYLON.NullEngine();
 });
@@ -86,6 +86,23 @@ describe('createSkyDome', () => {
       expect(dome.applyFog).toBe(false);
       // Depth-write off is what guarantees the sky can never occlude the world.
       expect(material.disableDepthWrite).toBe(true);
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('claims the SKY rendering group explicitly, not implicitly via default 0', async () => {
+    // Real bug this guards: a depth-write-disabled mesh drawn AFTER a
+    // farther, depth-writing mesh (any horizonRings.js ring, all >= 576m,
+    // vs the dome's fixed 500m radius) can win the depth test on its nearer
+    // z and incorrectly paint over it. Explicit group order — not the
+    // default opaque distance-sort — is what rules this out.
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const { material } = await buildSkyDomeMaterial(scene);
+      const dome = createSkyDome(scene, material);
+      expect(dome.renderingGroupId).toBe(RENDERING_GROUP.SKY);
+      expect(RENDERING_GROUP.SKY).toBeLessThan(RENDERING_GROUP.RINGS);
     } finally {
       scene.dispose();
     }
