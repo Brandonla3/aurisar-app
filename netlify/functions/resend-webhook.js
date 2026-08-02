@@ -10,57 +10,36 @@
  *      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
  */
 
-import crypto from "node:crypto";
+import { Webhook } from "svix";
 
 const SUPPRESS_EVENTS = {
   "email.bounced": "bounce",
   "email.complained": "complaint",
 };
 
-// Svix retries reuse the ORIGINAL svix-id/timestamp/signature — a retry is a
-// byte-identical redelivery, not a re-signed message. Svix's own backoff runs
-// to hours, so a 5-minute replay window rejects every retry after the first
-// and the event sticks in "Attempting" forever. Replay protection here is
-// cheap anyway: the signature covers id+timestamp+body, and the suppression
-// insert is idempotent (on_conflict merge-duplicates), so replaying a captured
-// event is a no-op. A wide window that lets retries succeed is the right
-// trade.
-const REPLAY_TOLERANCE_S = 60 * 60 * 24;
-
-// Svix signature scheme: HMAC-SHA256 over `${id}.${timestamp}.${payload}`
-// with the base64 secret (after the whsec_ prefix). The svix-signature
-// header carries space-separated `v1,<base64>` entries.
+// Verification is delegated to Svix's OWN library rather than hand-rolled.
 //
-// Returns a REASON rather than a boolean. Collapsing "no headers", "stale
-// timestamp" and "signature mismatch" into one opaque 401 is exactly the kind
-// of illegible failure that costs hours: the sender's dashboard shows a red
-// 401 and nothing about which check failed.
-function verifySvix(secret, headers, payload) {
-  const id = headers.get("svix-id");
-  const timestamp = headers.get("svix-timestamp");
-  const signatures = headers.get("svix-signature");
-  if (!id || !timestamp || !signatures) return "missing_svix_headers";
-
-  const ts = Number(timestamp);
-  if (!Number.isFinite(ts)) return "bad_timestamp";
-  const ageS = Math.abs(Date.now() / 1000 - ts);
-  if (ageS > REPLAY_TOLERANCE_S) return `stale_timestamp_${Math.round(ageS)}s`;
-
-  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
-  const expected = crypto
-    .createHmac("sha256", secretBytes)
-    .update(`${id}.${timestamp}.${payload}`)
-    .digest("base64");
-
-  const matched = signatures.split(" ").some(part => {
-    const [version, sig] = part.split(",");
-    if (version !== "v1" || !sig) return false;
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
-  });
-
-  return matched ? null : "signature_mismatch";
+// The previous implementation was written from memory of the signing scheme
+// and never once verified a real request. Its unit tests signed with the same
+// function they verified with, so they passed regardless of whether the scheme
+// was right — a doorman who only ever proved he could turn away strangers.
+// Meanwhile every genuine Resend delivery was rejected and retried forever.
+//
+// The library is the executable spec: it accepts BOTH the `svix-*` and the
+// Standard Webhooks `webhook-*` header families (verified locally against
+// svix@1.99 — a hand-rolled reader looking only for `svix-*` fails outright
+// if the sender emits the other set), handles multiple space-separated
+// signatures for key rotation, and does the constant-time compare.
+function verify(secret, headers, payload) {
+  // svix wants a plain object; Headers keys are already lowercased.
+  const h = {};
+  for (const [k, v] of headers.entries()) h[k] = v;
+  try {
+    new Webhook(secret).verify(payload, h);
+    return { ok: true, headerNames: Object.keys(h) };
+  } catch (e) {
+    return { ok: false, reason: e.message || String(e), headerNames: Object.keys(h) };
+  }
 }
 
 export default async (req) => {
@@ -77,15 +56,24 @@ export default async (req) => {
   }
 
   const payload = await req.text();
-  const failure = verifySvix(secret, req.headers, payload);
-  if (failure) {
-    // The reason goes in the BODY, which the sender's dashboard shows next to
-    // the failed attempt — so "why is this webhook stuck" is answerable from
-    // Resend's UI without access to function logs.
+  const result = verify(secret, req.headers, payload);
+  if (!result.ok) {
+    // Log the header NAMES we actually received (never the values). Not
+    // knowing which names arrived is what made this failure take hours to
+    // diagnose: the endpoint could only say "invalid signature", and no probe
+    // from our side could reveal what the real sender was sending.
+    const signingHeaders = result.headerNames
+      .filter(n => n.startsWith("svix-") || n.startsWith("webhook-"))
+      .join(",") || "NONE";
     console.error(
-      `[resend-webhook] rejected: ${failure} (svix-id=${req.headers.get("svix-id") || "none"})`
+      `[resend-webhook] rejected: ${result.reason} | signing headers present: ${signingHeaders}`
     );
-    return new Response(`invalid signature: ${failure}`, { status: 401 });
+    // The reason also goes in the BODY, which the sender's dashboard shows
+    // next to the failed attempt — diagnosable without function-log access.
+    return new Response(
+      `invalid signature: ${result.reason} (signing headers: ${signingHeaders})`,
+      { status: 401 }
+    );
   }
 
   let event;

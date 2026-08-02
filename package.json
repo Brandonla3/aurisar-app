@@ -58,7 +58,8 @@
     "react-is": "^19.2.8",
     "react-window": "^2.3.0",
     "recharts": "^3.10.1",
-    "spacetimedb": "^2.7.0"
+    "spacetimedb": "^2.7.0",
+    "svix": "^1.99.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

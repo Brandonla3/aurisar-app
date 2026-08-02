@@ -2,84 +2,114 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { Webhook } from 'svix';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const src = readFileSync(ROOT + 'netlify/functions/resend-webhook.js', 'utf8');
 
-// Rebuild the handler's verification locally so the retry semantics can be
-// asserted without a network call. Kept deliberately close to the source; the
-// source-guard cases below fail if the two drift apart.
-const TOLERANCE_S = 60 * 60 * 24;
-const SECRET = 'whsec_' + Buffer.from('unit-test-secret-value').toString('base64');
+/**
+ * WHY THESE TESTS LOOK LIKE THIS.
+ *
+ * The previous suite signed payloads with the same hand-rolled function it
+ * then verified them with. That is self-consistent and therefore worthless: it
+ * passed 9/9 while the handler rejected every real Resend delivery, because
+ * both sides shared the same wrong assumptions. It could only ever prove we
+ * reject forgeries — never that we accept a genuine request.
+ *
+ * These sign with Svix's OWN implementation, which is the executable spec, and
+ * assert the handler's verifier accepts it. A wrong scheme now fails.
+ */
+const SECRET = 'whsec_' + crypto.randomBytes(24).toString('base64');
+const BODY = JSON.stringify({
+  type: 'email.bounced',
+  // Real Resend shape, including the em dash that a charset bug would mangle.
+  data: { to: ['bounced@resend.dev'], subject: 'Webhook e2e — post-fix' },
+});
 
-function sign(secret, id, timestamp, payload) {
-  return crypto
-    .createHmac('sha256', Buffer.from(secret.replace(/^whsec_/, ''), 'base64'))
-    .update(`${id}.${timestamp}.${payload}`)
-    .digest('base64');
+function signedHeaders(prefix, { id = 'msg_' + crypto.randomUUID(), at = new Date() } = {}) {
+  const sig = new Webhook(SECRET).sign(id, at, BODY);
+  return {
+    [`${prefix}-id`]: id,
+    [`${prefix}-timestamp`]: Math.floor(at.getTime() / 1000).toString(),
+    [`${prefix}-signature`]: sig,
+  };
 }
 
-function verify(secret, { id, timestamp, signature }, payload, nowS) {
-  if (!id || !timestamp || !signature) return 'missing_svix_headers';
-  const ts = Number(timestamp);
-  if (!Number.isFinite(ts)) return 'bad_timestamp';
-  if (Math.abs(nowS - ts) > TOLERANCE_S) return 'stale_timestamp';
-  return signature === `v1,${sign(secret, id, timestamp, payload)}` ? null : 'signature_mismatch';
+// Mirror of the handler's verify(): svix wants a plain lowercased object.
+function verify(secret, headersObj, payload) {
+  try {
+    new Webhook(secret).verify(payload, headersObj);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
 }
 
-describe('Svix retry semantics', () => {
-  const body = JSON.stringify({ type: 'email.bounced', data: { to: ['x@example.invalid'] } });
-  const id = 'msg_retry';
-  const sentAt = 1_800_000_000;
-  const headers = { id, timestamp: String(sentAt), signature: `v1,${sign(SECRET, id, String(sentAt), body)}` };
-
-  it('accepts the first delivery', () => {
-    expect(verify(SECRET, headers, body, sentAt + 2)).toBeNull();
+describe('verification accepts a GENUINELY signed request', () => {
+  it('accepts svix-* headers', () => {
+    expect(verify(SECRET, signedHeaders('svix'), BODY).ok).toBe(true);
   });
 
-  it('STILL accepts a redelivery half an hour later — the bug that stuck an event in "Attempting"', () => {
-    // Svix retries are byte-identical redeliveries: same id, same timestamp,
-    // same signature. A 5-minute replay window therefore rejects every retry
-    // after the first, and the event can never drain.
-    expect(verify(SECRET, headers, body, sentAt + 1800)).toBeNull();
-    expect(verify(SECRET, headers, body, sentAt + 6 * 3600)).toBeNull();
+  it('accepts Standard Webhooks webhook-* headers', () => {
+    // The leading suspect for the production failure: a reader looking only
+    // for svix-* returns "no headers at all" when the sender emits this set,
+    // so the signature comparison never even runs.
+    expect(verify(SECRET, signedHeaders('webhook'), BODY).ok).toBe(true);
   });
 
-  it('still rejects a genuinely ancient replay', () => {
-    expect(verify(SECRET, headers, body, sentAt + TOLERANCE_S + 60)).toMatch(/stale/);
-  });
-
-  it('rejects a tampered body even with valid-looking headers', () => {
-    const tampered = JSON.stringify({ type: 'email.bounced', data: { to: ['attacker@evil.invalid'] } });
-    expect(verify(SECRET, headers, tampered, sentAt + 2)).toBe('signature_mismatch');
-  });
-
-  it('rejects a forged signature', () => {
-    const forged = { ...headers, signature: 'v1,ZmFrZQ==' };
-    expect(verify(SECRET, forged, body, sentAt + 2)).toBe('signature_mismatch');
-  });
-
-  it('rejects missing headers', () => {
-    expect(verify(SECRET, { id, timestamp: null, signature: null }, body, sentAt)).toBe('missing_svix_headers');
+  it('accepts a body containing multi-byte characters', () => {
+    // An em dash is exactly the codepoint a charset round-trip would corrupt.
+    expect(BODY).toContain('—');
+    expect(verify(SECRET, signedHeaders('svix'), BODY).ok).toBe(true);
   });
 });
 
-describe('the handler reports WHY it rejected (source guard)', () => {
-  it('returns a distinguishable reason rather than one opaque 401', () => {
-    // A bare "invalid signature" made a stuck webhook undiagnosable from the
-    // sender's dashboard, which is the only view available without function logs.
-    expect(src).toContain('invalid signature: ${failure}');
-    for (const reason of ['missing_svix_headers', 'bad_timestamp', 'stale_timestamp_', 'signature_mismatch']) {
-      expect(src, reason).toContain(reason);
-    }
+describe('verification still rejects what it should', () => {
+  it('rejects a tampered body', () => {
+    const headers = signedHeaders('svix');
+    const tampered = JSON.stringify({ type: 'email.bounced', data: { to: ['attacker@evil.invalid'] } });
+    expect(verify(SECRET, headers, tampered).ok).toBe(false);
   });
 
-  it('uses a retry-tolerant replay window, not 5 minutes', () => {
-    expect(src).toContain('REPLAY_TOLERANCE_S');
-    expect(src).not.toMatch(/>\s*300\b/);
+  it('rejects a forged signature', () => {
+    const headers = { ...signedHeaders('svix'), 'svix-signature': 'v1,ZmFrZQ==' };
+    expect(verify(SECRET, headers, BODY).ok).toBe(false);
   });
 
-  it('still verifies before doing anything with the payload', () => {
-    expect(src.indexOf('verifySvix(secret')).toBeLessThan(src.indexOf('JSON.parse(payload)'));
+  it('rejects a different signing secret', () => {
+    const other = 'whsec_' + crypto.randomBytes(24).toString('base64');
+    expect(verify(other, signedHeaders('svix'), BODY).ok).toBe(false);
+  });
+
+  it('rejects missing signing headers', () => {
+    expect(verify(SECRET, {}, BODY).ok).toBe(false);
+  });
+});
+
+describe('handler wiring (source guard)', () => {
+  it('delegates to the svix library rather than hand-rolling HMAC', () => {
+    expect(src).toContain('from "svix"');
+    expect(src).toContain('new Webhook(secret).verify');
+    // The hand-rolled crypto is gone; keeping it around invites divergence
+    // from the spec all over again.
+    expect(src).not.toContain('node:crypto');
+    expect(src).not.toContain('createHmac');
+  });
+
+  it('reports which signing headers actually arrived', () => {
+    // Not knowing this is what made the failure take hours: the endpoint could
+    // only say "invalid signature", and no probe from our side could reveal
+    // what the real sender was sending.
+    expect(src).toContain('signing headers');
+    expect(src).toMatch(/startsWith\("svix-"\)\s*\|\|\s*n\.startsWith\("webhook-"\)/);
+  });
+
+  it('never logs or returns header VALUES, only names', () => {
+    expect(src).toContain('result.headerNames');
+    expect(src).not.toMatch(/console\.error\([^)]*headers\.get\("svix-signature"\)/);
+  });
+
+  it('verifies before parsing or acting on the payload', () => {
+    expect(src.indexOf('verify(secret')).toBeLessThan(src.indexOf('JSON.parse(payload)'));
   });
 });
