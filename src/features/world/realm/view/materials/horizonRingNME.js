@@ -20,6 +20,21 @@
  * terrain correctly occludes a ring, and a ring correctly occludes the sky
  * dome behind it. The only ordering guarantee needed is that the dome must
  * draw FIRST — see skyDomeNME.js's RENDERING_GROUP for why and how.
+ *
+ * A second, DIFFERENT depth hazard lives here, not in the dome: Babylon's
+ * RenderingManager auto-clears the depth/stencil buffer before EVERY
+ * rendering group except the first (group 0's clear is a documented no-op —
+ * `_depthStencilBufferAlreadyCleaned` is forced true there because the frame
+ * already cleared once; every later group resets that flag to false and the
+ * clear genuinely executes). Terrain never sets a rendering group and so
+ * shares group 0 with the dome — meaning group 1 (RINGS)'s default auto-clear
+ * would wipe out the depth terrain just wrote, and a ring could then draw
+ * OVER nearer terrain that should have occluded it, because there is no
+ * depth left in the buffer to test against by the time the ring renders.
+ * buildHorizonRings() disables auto-clear specifically for RINGS
+ * (scene.setRenderingAutoClearDepthStencil) so the SAME depth buffer
+ * persists across both groups — draw order is still pinned by the group
+ * index, but nothing gets wiped in between.
  */
 
 /* global BABYLON */
@@ -161,6 +176,14 @@ export function createRingMesh(scene, { id, radiusM, heightM }, material, segmen
  * "the ring kit" as a single reader, same shape as the dome.
  */
 export async function buildHorizonRings(scene, tiers, { shaderLanguage = null } = {}) {
+  // See the module doc comment: group 1's default auto-clear would wipe the
+  // depth buffer terrain (group 0) just wrote, letting a ring incorrectly
+  // draw over nearer terrain. `depth: true` on the CALL is what actually
+  // clears; passing `false` there is what stops it — the boolean returned by
+  // getAutoClearDepthStencilSetup is a report of current state, not itself a
+  // toggle, so this must be the 2-arg (autoClear) form, not a depth-only one.
+  scene.setRenderingAutoClearDepthStencil(RENDERING_GROUP.RINGS, false);
+
   const built = await Promise.all(tiers.map(async (tier) => {
     const { material, applyState } = await buildRingMaterial(scene, {
       name: `realmRing_${tier.id}`, darken: tier.darken, shaderLanguage,

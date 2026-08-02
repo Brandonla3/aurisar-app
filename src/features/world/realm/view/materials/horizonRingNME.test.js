@@ -167,6 +167,44 @@ describe('createRingMesh — real depth-writing geometry, opposite of the dome',
   });
 });
 
+describe('buildHorizonRings — the depth auto-clear fix', () => {
+  it('Babylon defaults every rendering group to auto-clear depth (the hazard, confirmed)', () => {
+    // Pin the failure mode itself, not just the fix: on a scene nobody has
+    // touched, group 1 (and every group) auto-clears depth by default. If
+    // Babylon ever changes this default, this test goes red and says why
+    // before the fix below silently becomes a no-op.
+    const scene = new BABYLON.Scene(engine);
+    try {
+      expect(scene.getAutoClearDepthStencilSetup(RENDERING_GROUP.RINGS)).toEqual({
+        autoClear: true, depth: true, stencil: true,
+      });
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('buildHorizonRings disables auto-clear for the RINGS group specifically', async () => {
+    // Real bug this closes: terrain never sets a rendering group, so it
+    // shares group 0 with the dome. Group 1's default auto-clear wipes the
+    // depth terrain just wrote, so a ring could draw OVER nearer terrain that
+    // should have occluded it — there is no depth left to test against by the
+    // time the ring renders. Disabling auto-clear on RINGS only (not SKY,
+    // which stays at Babylon's default) lets one depth buffer persist across
+    // both groups while draw order is still pinned by the group index.
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const kit = await buildHorizonRings(scene, RING_TIERS);
+      expect(scene.getAutoClearDepthStencilSetup(RENDERING_GROUP.RINGS).autoClear).toBe(false);
+      // SKY untouched: group 0's clear is already a documented no-op inside
+      // Babylon itself, and changing it here isn't this fix's job.
+      expect(scene.getAutoClearDepthStencilSetup(RENDERING_GROUP.SKY).autoClear).toBe(true);
+      kit.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
 describe('buildHorizonRings — recenter (the world-origin-anchoring fix)', () => {
   it('recenter(x, z) moves every ring mesh, leaving Y untouched', async () => {
     const scene = new BABYLON.Scene(engine);
