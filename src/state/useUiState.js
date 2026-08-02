@@ -101,7 +101,8 @@ export function useUiState() {
   const [showWNMockup, setShowWNMockup] = useState(false);
 
   // ── Notifications / banners ──────────────────────────────────────────────
-  const [toast, setToast] = useState(null);
+  // The single-slot toast moved to components/toast/toastStore (queued,
+  // shared with AdminPage). Only the friend banner + XP flash remain here.
   const [friendExBanner, setFriendExBanner] = useState(null);
   const [xpFlash, setXpFlash] = useState(null);
 
@@ -145,6 +146,6 @@ export function useUiState() {
     mapOpen, setMapOpen, mapTooltip, setMapTooltip, navMenuOpen, setNavMenuOpen,
     showWNMockup, setShowWNMockup,
     // Notifications
-    toast, setToast, friendExBanner, setFriendExBanner, xpFlash, setXpFlash,
+    friendExBanner, setFriendExBanner, xpFlash, setXpFlash,
   };
 }

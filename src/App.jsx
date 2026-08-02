@@ -20,6 +20,10 @@ import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
 import { useNotificationPrefs } from './state/useNotificationPrefs';
+import { showToast } from './components/toast/toastStore';
+import ToastHost from './components/toast/ToastHost';
+import useNotifications from './features/notifications/useNotifications';
+import NotificationInbox from './features/notifications/NotificationInbox';
 import { useExerciseFilters } from './features/exercises/useExerciseFilters';
 import { DEFAULT_DISCOVER_PICKS } from './features/exercises/discoverCategories';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
@@ -339,8 +343,6 @@ function App() {
     setNavMenuOpen,
     showWNMockup,
     setShowWNMockup,
-    toast,
-    setToast,
     friendExBanner,
     setFriendExBanner,
     xpFlash,
@@ -606,6 +608,13 @@ function App() {
     toggle: toggleNotifPref,
     setPref: setNotifPref
   } = useNotificationPrefs(authUser, isPreviewMode);
+  // In-app projection of the notifications outbox: realtime toast + inbox.
+  const [notifInboxOpen, setNotifInboxOpen] = useState(false);
+  const {
+    items: notifItems,
+    unreadCount: notifUnread,
+    markAllRead: markNotifsRead
+  } = useNotifications({ authUser, isPreviewMode, showToast });
   // Personal Bests filter
   const LEADERBOARD_PB_IDS = new Set(["bench", "bench_press", "squat", "barbell_back_squat", "deadlift", "barbell_deadlift", "overhead_press", "ohp", "pull_up", "pullups", "push_up", "pushups", "running", "treadmill_run", "run"]);
   const [pbFilterOpen, setPbFilterOpen] = useState(false);
@@ -1050,11 +1059,9 @@ function App() {
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
-  // 4s gives mobile users enough time to read; previously 2.8s was too brief.
-  const showToast = (msg, dur = 4000) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), dur);
-  };
+  // Toasts now go through the shared queued store (components/toast) —
+  // imported as showToast above, so every existing call site and prop
+  // pass-through keeps working. 4s default lives in the store.
 
   // Keep notifPrefsRef in sync so realtime handler avoids stale closure
   useEffect(() => {
@@ -4831,7 +4838,7 @@ function App() {
       "--dly": `${p.delay}s`
     }} />)}{xpFlash && <><div className={"xp-flash"}>{formatXP(xpFlash.amount, {
         signed: true
-      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}{toast && <div className={"toast"} role={"status"} aria-live={"polite"} aria-atomic={"true"} onClick={() => setToast(null)}>{toast}</div>}{friendExBanner && <div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
+      })}{xpFlash.mult > 1.02 ? " ⚡" : ""}</div><XpBarFlash amount={xpFlash.amount} mult={xpFlash.mult} prevXp={xpFlash.prevXp ?? 0} cls={cls} /></>}<ToastHost /><NotificationInbox open={notifInboxOpen} onClose={() => { setNotifInboxOpen(false); if (notifUnread > 0) markNotifsRead(); }} items={notifItems} unreadCount={notifUnread} onMarkAllRead={markNotifsRead} />{friendExBanner &&<div className={"friend-ex-banner"} key={friendExBanner.key} onClick={() => setFriendExBanner(null)}><div className={"friend-ex-banner-icon"}>{friendExBanner.exerciseIcon || "\uD83D\uDCAA"}</div><div className={"friend-ex-banner-text"}><div className={"friend-ex-banner-title"}>{friendExBanner.friendName}{" completed "}{friendExBanner.exerciseName}{"!"}</div>{friendExBanner.pbInfo && <div className={"friend-ex-banner-pb"}>{formatFriendPB(friendExBanner.pbInfo)}</div>}</div></div>}{showWNMockup && lazyMount(<WorkoutNotificationMockup onClose={() => setShowWNMockup(false)} />)
 
     /* ══ INTRO ══════════════════════════════════ */}{screen === "intro" && <div className={"screen boot-screen"}><div className={"boot-title"}>{"AURISAR"}<span className={"boot-title-sub"}>{"FITNESS"}</span></div><div className={"boot-log"}><div className={"boot-bar-wrap"}><div className={"boot-bar"} style={{
             width: bootStep >= 4 ? "100%" : bootStep >= 3 ? "58%" : bootStep >= 2 ? "34%" : bootStep >= 1 ? "12%" : "2%"
@@ -4978,7 +4985,7 @@ function App() {
       minHeight: 0,
       overflow: "hidden",
       paddingBottom: 0
-    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
+    } : {}}><div className={"hud-top"}><button className={"profile-pill"} onClick={() => guardAll(() => { if (activeTab === "profile") { setActiveTab(prevTab); } else { setPrevTab(activeTab); setActiveTab("profile"); } })}>{activeTab === "profile" ? <div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",color:cls.glow}}>{"←"}</div> : <><div className={"ava"} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center"}}><ClassIcon classKey={profile.chosenClass} size={16} color={cls.glow} /></div><span style={{fontSize:"0.9rem"}}>{"🔥"}</span><span className={"profile-pill-streak"}>{profile.checkInStreak}</span></>}</button><div style={{flex:1}} /><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} aria-label={"Alerts"} onClick={() => setNotifInboxOpen(true)}>{"🔔"}{notifUnread > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:"#d4af37",border:"1.5px solid #0c0c0a"}} />}</button><button className={"btn nav-menu-btn btn-ghost"} style={{position:"relative"}} onClick={() => setNavMenuOpen(v => !v)}>{"☰"}{msgUnreadTotal > 0 && <div style={{position:"absolute",top:1,right:2,width:8,height:8,borderRadius:"50%",background:UI_COLORS.danger,border:"1.5px solid #0c0c0a"}} />}</button></div>
 
       {
         /* ══ DROPDOWN MENU — rendered outside hud-top to escape backdrop-filter stacking context ══ */
