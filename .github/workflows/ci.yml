@@ -73,6 +73,22 @@ jobs:
       - name: Worldgen determinism (GOLDEN)
         run: npm run verify:worldgen
 
+      # Every database object the code references (sb.from/sb.rpc + the raw
+      # PostgREST paths the Netlify functions fetch) must be declared by a
+      # tracked file in scripts/security/, or explicitly accepted in
+      # config/db-contract.json's knownUndeclared baseline. Fully offline — no
+      # database, no credentials — so it runs on forks too.
+      #
+      # SCOPE, stated honestly: this compares CODE against TRACKED SQL. It does
+      # NOT prove the SQL was applied to any database — a commit carrying both
+      # the call and its migration passes even if nobody runs it, which is how
+      # migrations 17-20 shipped ahead of the schema. The runtime guard for that
+      # is the SCHEMA_DRIFT classification in netlify/functions/_lib/pgErrors.js.
+      # It also does not validate the bodies of tracked SQL functions, so a
+      # declared function calling a dropped helper still passes here.
+      - name: DB contract (code ↔ tracked schema, offline)
+        run: npm run emit:db-contract:check
+
       - name: Tests
         run: npm test
 

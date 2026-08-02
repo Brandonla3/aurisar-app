@@ -9,6 +9,8 @@
  * is meaningful, early enough that US users can still act on it.
  */
 
+import { pgError } from "./_lib/pgErrors.js";
+
 export default async () => {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,11 +30,18 @@ export default async () => {
   });
 
   if (!res.ok) {
-    console.error(
-      "[reminders-producer] rpc failed:",
-      res.status,
-      await res.text().catch(() => "")
-    );
+    const raw = await res.text().catch(() => "");
+    const err = pgError(res, raw, "rpc produce_daily_reminders");
+    // Same classification as notifications-drain: an unapplied migration is a
+    // permanent, actionable condition, not a transient blip to retry tomorrow.
+    if (err.schemaDrift) {
+      console.error(
+        `[reminders-producer] SCHEMA_DRIFT rpc=produce_daily_reminders code=${err.code} — ` +
+        `apply scripts/security/17-notifications.sql. ${err.hint || ""}`.trim()
+      );
+      return new Response("schema drift", { status: 503 });
+    }
+    console.error("[reminders-producer] rpc failed (transient):", err.message);
     return new Response("rpc failed", { status: 500 });
   }
 
