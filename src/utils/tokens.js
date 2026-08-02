@@ -216,6 +216,31 @@ const Z = {
   flash:    9600, // XP flash / transient celebration
 };
 
-const TOKENS = { FS, R, S, M, C, Z };
+// ── Forge Glass (redesign surface language) ──────────────────────────────────
+// Values lifted from the approved "Forge Glass" prototype. Gold means earned
+// (XP, PBs, level) and nothing else; teal is the action accent. Glass surfaces
+// need `solidBg` as the background when backdrop-filter is unavailable (the
+// coarse-pointer override in app.css disables blur on phones).
+const FG = {
+  gold:      "#E8B44A", // earned/XP accent
+  goldSoft:  "#F6E3B6", // text on gold surfaces
+  goldGlow:  "#F0C868", // numerals, XP pop
+  teal:      "#8FE3D2", // action accent
+  tealSoft:  "#CFF6EC", // text on teal surfaces
+  ink:       "#E4DED3", // Forge Glass primary text
+  inkTitle:  "#F4EFE6", // headings
+  inkBright: "#F8F4EC", // large numerals
+  glassBg:        "rgba(255,255,255,.05)",
+  glassBgSoft:    "rgba(255,255,255,.035)",
+  glassBorder:    "rgba(255,255,255,.09)",
+  glassBorderMid: "rgba(255,255,255,.12)",
+  solidBg:        "rgba(9,9,13,.62)",  // no-blur fallback / over-video card bg
+  scrim:          "rgba(4,4,6,.62)",
+  fontBody:  "'Barlow','Inter',system-ui,sans-serif",
+  fontCond:  "'Barlow Condensed','Barlow',sans-serif",
+  fontSerif: "'Cinzel',serif",
+};
 
-export { TOKENS, FS, R, S, M, C, Z };
+const TOKENS = { FS, R, S, M, C, Z, FG };
+
+export { TOKENS, FS, R, S, M, C, Z, FG };

@@ -6,7 +6,7 @@ import { EX_BY_ID, CAT_ICON_COLORS, NAME_ICON_MAP, MUSCLE_ICON_MAP, CAT_ICON_FAL
 import { _nullishCoalesce, _optionalChain, uid, clone, todayStr } from './utils/helpers';
 import { loadSave, doSave, flushSave, setPreviewMode, loadAdminFlags } from './utils/storage';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { isMetric, lbsToKg, kgToLbs, miToKm, kmToMi, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
+import { isMetric, lbsToKg, kgToLbs, miToKm, ftInToCm, cmToFtIn, weightLabel, distLabel, displayWt, displayDist, pctToSlider, sliderToPct } from './utils/units';
 import { buildXPTable, XP_TABLE, xpToLevel, xpForLevel, xpForNext, calcBMI, detectClassFromAnswers, detectClass, calcExXP, calcPlanXP, calcDayXP, calcExercisePBs, calcDecisionTreeBonus, calcCharStats, checkQuestCompletion, hrRange, scaleWeight, scaleDur } from './utils/xp';
 import { perkAward, applyStoredPerk } from './utils/gearPerks';
 import { secToHMS, HMSToSec, normalizeHHMM, secToHHMMSplit, HHMMToSec, combineHHMMSec, daysUntil } from './utils/time';
@@ -20,6 +20,7 @@ import { useModalLifecycle } from './utils/useModalLifecycle';
 import { useUiState } from './state/useUiState';
 import { useAuthState } from './state/useAuthState';
 import { useExerciseFilters } from './features/exercises/useExerciseFilters';
+import { DEFAULT_DISCOVER_PICKS } from './features/exercises/discoverCategories';
 import ExerciseLibraryTab from './features/exercises/ExerciseLibraryTab';
 import MyWorkoutsSubTab from './features/exercises/MyWorkoutsSubTab';
 import MessagesTab from './features/social/MessagesTab';
@@ -51,6 +52,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 import TabIcon from './components/TabIcons';
 import Sheet from './components/ui/Sheet';
 import ConfirmSheet from './components/ui/ConfirmSheet';
+import BottomNav from './components/BottomNav';
+import OrbCreateMenu from './components/OrbCreateMenu';
+import StartDock from './components/StartDock';
+import { deriveLastSession } from './utils/repeatLast';
+import { planQuickLogRows } from './utils/quickLogRows';
 
 // ── Debounce utility ──
 function debounce(fn, ms) {
@@ -68,15 +74,12 @@ import { getRegionIdx, getMapPosition, MapSVG } from './components/MapSVG';
 import LoginScreen from './components/LoginScreen';
 import PrivacyPolicy from './components/PrivacyPolicy';
 // Heavy / route-scoped components are lazy-loaded so first paint doesn't pay for
-// recharts (~150KB) or the landing page assets.
+// recharts (~150KB).
 const TrendsTab = lazyWithRetry(() => import('./components/TrendsTab').then(m => ({
   default: m.TrendsTab
 })));
 const PlanWizard = lazyWithRetry(() => import('./components/PlanWizard'));
 const WorkoutNotificationMockup = lazyWithRetry(() => import('./components/WorkoutNotificationMockup'));
-const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({
-  default: m.LandingPage
-})));
 const AdminPage = lazyWithRetry(() => import('./components/AdminPage'));
 // The World tab lands on the hub, not the scene. WorldHub owns entry, the
 // graphics settings (reachable with no engine running) and the error boundary
@@ -566,7 +569,8 @@ function App() {
   const [libEquipFilters, setLibEquipFilters] = useState(() => new Set());
   const [libDetailEx, setLibDetailEx] = useState(null);
   const [libSelectMode, setLibSelectMode] = useState(false);
-  const setGymKit = useCallback(v => setProfile(p => ({ ...p, gymKit: v })), []);
+  const [orbMenuOpen, setOrbMenuOpen] = useState(false);
+  const setLibDiscoverPicks = useCallback(picks => setProfile(p => ({ ...p, libDiscoverPicks: picks })), []);
   // One shared, persisted basket replaces the three throwaway selection Sets
   // the library, favourites list and builder picker each used to keep.
   const {
@@ -649,6 +653,11 @@ function App() {
     try { return JSON.parse(localStorage.getItem('aurisar-live-workout') || 'null'); } catch { return null; }
   });
   const [pendingLiveWorkout, setPendingLiveWorkout] = useState(null);
+  // Set only by Repeat Last just before it opens the replace-confirm, so
+  // confirmReplaceLiveWorkout knows to toast — a plain Start-triggered
+  // replace (Workouts tab, StartDock) has nothing to say beyond the confirm
+  // itself. Ref, not state: it's write-then-read-once, never rendered.
+  const pendingLiveWorkoutToastRef = useRef(null);
   const [pendingSoloRemoveId, setPendingSoloRemoveId] = useState(null); // scheduled solo ex to remove after full-form log
   const [bootStep, setBootStep] = useState(0);
   const workoutsRef = useRef(null);
@@ -769,7 +778,7 @@ function App() {
           });
         } catch (e) {
           console.error("[auth] PASSWORD_RECOVERY handler threw:", e);
-          setScreen("landing");
+          setScreen("login");
         }
         return;
       }
@@ -785,7 +794,7 @@ function App() {
         setIsPreviewMode(false); // belt-and-suspenders: signing out always exits preview
         setAuthUser(null);
         setIsAdmin(false);
-        setScreen("landing");
+        setScreen("login");
         return;
       }
       // Sign-in (or any other auth event with a real user) implicitly exits
@@ -827,7 +836,7 @@ function App() {
         }
       } catch (e) {
         console.error("[auth] onAuthStateChange SIGNED_IN handler threw:", e);
-        setScreen(s => s === "main" ? s : "landing");
+        setScreen(s => s === "main" ? s : "login");
       }
     });
     // Check existing session on mount — handle both cases explicitly
@@ -837,7 +846,7 @@ function App() {
       }
     }) => {
       if (!session) {
-        setScreen("landing");
+        setScreen("login");
       } else {
         // Session exists — load profile directly without waiting for onAuthStateChange
         const user = session.user;
@@ -870,16 +879,18 @@ function App() {
             }));
             setScreen("main");
           } else {
-            setScreen("landing");
+            // Signed in but never finished character creation — matches the
+            // parallel branch in the onAuthStateChange SIGNED_IN handler above.
+            setScreen("intro");
           }
         } catch (e) {
           console.error("loadSave error:", e);
-          setScreen("landing");
+          setScreen("login");
         }
       }
-    }).catch(() => setScreen("landing"));
-    // Safety fallback — if nothing resolves in 5s, go to landing
-    const fallback = setTimeout(() => setScreen(s => s === "loading" ? "landing" : s), 5000);
+    }).catch(() => setScreen("login"));
+    // Safety fallback — if nothing resolves in 5s, go to login
+    const fallback = setTimeout(() => setScreen(s => s === "loading" ? "login" : s), 5000);
     return () => {
       subscription.unsubscribe();
       clearTimeout(fallback);
@@ -2753,7 +2764,7 @@ function App() {
     setEmailPanelOpen(false);
     setEmailMsg(null);
     setNewEmail("");
-    setScreen("landing");
+    setScreen("login");
   }
 
   // ── Legacy class migration — maps old keys to new equivalents ──
@@ -2796,6 +2807,11 @@ function App() {
   // the tray's count, the library's banner and the forged workout all agree.
   const stagedIds = useMemo(() => cartIds.filter(id => allExById[id]), [cartIds, allExById]);
 
+  // The orb's "Repeat Last" — most recent completed session rebuilt from the
+  // log's sourceGroupId batches (no new persisted state; see utils/repeatLast).
+  const repeatLastSession = useMemo(() => deriveLastSession(profile.log), [profile.log]);
+
+
   // Drop the unresolvable ones from storage too, but only once the catalog has
   // actually loaded — the bundled list is merged with Supabase after mount, so
   // pruning earlier would delete IDs that are merely late, not missing.
@@ -2809,22 +2825,20 @@ function App() {
   // allExercises scans off the App-render hot path (Finding #5 + #6 from
   // docs/performance-audit.md).
   const {
-    libKitCount,
     libFiltered,
     libAvailableTypes,
     libTypeCounts,
     libMuscleCounts,
     libEquipCounts,
     libMuscleCardData,
-    libMuscleMapData,
     libDiscoverRows,
+    libDiscoverCategoryCounts,
     libMuscleOpts,
     libEquipOpts,
   } = useExerciseFilters({
     allExercises,
     _exReady,
-    exerciseLog: profile.log,
-    gymKit: profile.gymKit,
+    discoverPicks: profile.libDiscoverPicks || DEFAULT_DISCOVER_PICKS,
     libSearchDebounced, libTypeFilters, libMuscleFilters, libEquipFilters,
   });
 
@@ -3175,20 +3189,25 @@ function App() {
     if (!ex) return;
     const metric = isMetric(profile.units);
     const noSetsEx = NO_SETS_EX_IDS.has(ex.id);
-    const mult = getMult(ex),
-      rv = parseInt(reps) || 0,
-      sv = noSetsEx ? 1 : parseInt(sets) || 0;
-    // Convert weight to lbs for internal storage/XP (weight input already reflects intensity)
-    const rawW = parseFloat(exWeight || 0);
-    const weightInLbs = metric ? parseFloat(kgToLbs(rawW)) : rawW;
-    const effectiveW = weightInLbs;
-    // Convert distance to miles for storage
-    const rawDist = parseFloat(distanceVal || 0);
-    const distMi = rawDist > 0 ? metric ? parseFloat(kmToMi(rawDist)) : rawDist : null;
+    const mult = getMult(ex);
     const isCardioEx = ex.category === "cardio";
     const canHaveZone = isCardioEx;
+    // One planner for the estimate AND the entries (utils/quickLogRows): the
+    // Set Forge's Projected XP and what lands in the log are the same rows —
+    // primary + any progressive extra rows, one entry per row like the
+    // builder's completion path.
+    const plan = planQuickLogRows({
+      exId: ex.id,
+      category: ex.category,
+      noSets: noSetsEx,
+      chosenClass: profile.chosenClass,
+      allExById,
+      sets, reps, exWeight, exHHMM, exSec, distanceVal, quickRows,
+      metric,
+      hrZone: canHaveZone ? hrZone : null,
+    });
+    const { sv, rv, effW: effectiveW, distMi } = plan;
     const runPace = ex.id === RUNNING_EX_ID && distMi && rv ? rv / distMi : null;
-    const earned = calcExXP(ex.id, sv, rv, profile.chosenClass, allExById, distMi || null, effectiveW || null, canHaveZone ? hrZone : null);
     // Apply 10% travel boost if active this week
     const weekStart = () => {
       const d = new Date();
@@ -3202,13 +3221,18 @@ function App() {
     const myRegion = MAP_REGIONS[myRegionIdx];
     const regionBoost = myRegion && (myRegion.boost.muscle === "all" || myRegion.boost.muscle === ex.muscleGroup) ? 1.07 : 1;
     const travelMult = travelActive ? 1.1 : 1;
-    const preGearEarned = Math.round(earned * travelMult * regionBoost);
     // Equipped-gear XP perk (Batch C2): gear boosts real workout XP. Applied
     // here at the logging seam, layered on top of the honest earned figure
     // (class/travel/region already in), never inside calcExXP (also the
-    // estimator). No-op unless perk-bearing gear is equipped.
-    const _award = perkAward(preGearEarned, profile.equipPerks, { exId: ex.id, category: ex.category, muscleGroup: ex.muscleGroup });
-    const finalEarned = _award.xp;
+    // estimator). No-op unless perk-bearing gear is equipped. Travel/region/
+    // gear price each row exactly as the old single-entry path did — with no
+    // extra rows this is the previous math bit-for-bit.
+    const pricedRows = plan.rows.map(r => {
+      const preGear = Math.round(r.xp * travelMult * regionBoost);
+      const award = perkAward(preGear, profile.equipPerks, { exId: ex.id, category: ex.category, muscleGroup: ex.muscleGroup });
+      return { ...r, earned: award.xp, perkMult: award.perkMult, baseXp: award.baseXp };
+    });
+    const finalEarned = pricedRows.reduce((s, r) => s + r.earned, 0);
     // Capture current state values before clearing UI
     const capturedPendingSoloRemoveId = pendingSoloRemoveId;
     const capturedHrZone = canHaveZone && hrZone || null;
@@ -3227,37 +3251,46 @@ function App() {
       const soloExCallback = dateStr => {
         const dateObj = new Date(dateStr + "T12:00:00");
         const displayDate = dateObj.toLocaleDateString();
-        const entry = {
+        // Wall-clock stamp. dateKey alone parses as midnight, which is
+        // useless for anything that reasons about "a moment ago" — the
+        // quick-log carryover window is two minutes.
+        const loggedAtStamp = Date.now();
+        const timeStr = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+        // One completion, one receipt: every row from this Set Forge
+        // submission (primary + progressive extras) shares one id, mirroring
+        // the builder's per-workout batchId. Without this, a multi-row
+        // pyramid had no durable session boundary — History counted each row
+        // as its own session, and ghost/Repeat only ever saw the first row.
+        const sourceGroupId = uid();
+        const entries = pricedRows.map(r => ({
           exercise: ex.name,
           icon: ex.icon,
-          xp: finalEarned,
+          xp: r.earned,
           // Gear XP factor for this row (>1 = boosted); omitted with no perks so
           // it doesn't bloat the persisted log. baseXp is the pre-gear figure so a
           // later server recompute can verify/strip without reconstructing it.
-          ...(_award.perkMult !== 1 ? { perkMult: _award.perkMult, baseXp: _award.baseXp } : {}),
+          ...(r.perkMult !== 1 ? { perkMult: r.perkMult, baseXp: r.baseXp } : {}),
           mult,
-          reps: rv,
-          sets: sv,
-          weightLbs: effectiveW || null,
+          reps: r.reps,
+          sets: r.sets,
+          weightLbs: r.weightLbs,
           weightPct,
           hrZone: capturedHrZone,
-          distanceMi: distMi || null,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit"
-          }),
+          distanceMi: r.distanceMi,
+          time: timeStr,
           date: displayDate,
           dateKey: dateStr,
-          // Wall-clock stamp. dateKey alone parses as midnight, which is
-          // useless for anything that reasons about "a moment ago" — the
-          // quick-log carryover window is two minutes.
-          loggedAt: Date.now(),
+          loggedAt: loggedAtStamp,
+          sourceGroupId,
           exId: ex.id,
           sourceTotalCal: woWithStats.totalCal || null,
           sourceActiveCal: woWithStats.activeCal || null,
           sourceDurationSec: woWithStats.durationMin || null
-        };
-        const newLog = [entry, ...profile.log];
+        }));
+        const newLog = [...entries, ...profile.log];
         const newQuests = {
           ...(profile.quests || {})
         };
@@ -3271,8 +3304,8 @@ function App() {
         let newPB = profile.runningPB || null;
         if (runPace && (!newPB || runPace < newPB)) newPB = runPace;
         const newExPBs = calcExercisePBs(newLog);
-        const oldPB = (profile.exercisePBs || {})[entry.exId];
-        const curPB = newExPBs[entry.exId];
+        const oldPB = (profile.exercisePBs || {})[ex.id];
+        const curPB = newExPBs[ex.id];
         const isNewPB = curPB && (!oldPB || curPB.value !== oldPB.value);
         let _ciResult = {
           checkInApplied: false,
@@ -3630,6 +3663,16 @@ function App() {
         noSets: NO_SETS_EX_IDS.has(ex.exId),
         sets: ex.sets, reps: ex.reps,
         weightLbs: ex.weightLbs || null,
+        // Carried through even though the live banner's UI doesn't surface
+        // them for mid-session editing: useWorkoutCompletion's entry-builder
+        // reads these three fields straight off this object, so passing
+        // them through here is what lets Repeat Last's distance/HR-zone/
+        // duration survive the full round-trip into the finished log,
+        // rather than silently reverting to null the moment a repeated
+        // cardio or timed workout goes live.
+        distanceMi: ex.distanceMi || null,
+        hrZone: ex.hrZone || null,
+        seconds: ex.seconds || null,
         extraRows: ex.extraRows || [],
         setsDesc,
         supersetWith: (typeof ex.supersetWith === 'number' && ex.supersetWith >= 0) ? ex.supersetWith : null,
@@ -3649,6 +3692,12 @@ function App() {
   function confirmReplaceLiveWorkout() {
     setLiveWorkout({ workoutId: pendingLiveWorkout.id, name: pendingLiveWorkout.name, icon: pendingLiveWorkout.icon, startedAt: new Date().toISOString(), exercises: _buildLiveExercises(pendingLiveWorkout), userId: authUser?.id || null });
     setPendingLiveWorkout(null);
+    // Only Repeat Last's replace-confirm stamps this — a plain "Start"
+    // replace (Workouts tab, StartDock) confirms silently, same as before.
+    if (pendingLiveWorkoutToastRef.current) {
+      showToast(pendingLiveWorkoutToastRef.current);
+      pendingLiveWorkoutToastRef.current = null;
+    }
   }
 
   function handleToggleLiveEx(i) {
@@ -3659,7 +3708,15 @@ function App() {
     if (!liveWorkout || exercises.length === 0) { setLiveWorkout(null); return; }
     const filteredWo = {
       id: liveWorkout.workoutId, name: liveWorkout.name, icon: liveWorkout.icon,
-      exercises: exercises.map(ex => ({ exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null, extraRows: ex.extraRows || [] })),
+      // Mirrors exactly the fields _buildLiveExercises puts on a live exercise
+      // — this used to drop distanceMi/hrZone/seconds even though the live
+      // object carried them, so finishing a cardio/timed Repeat Last session
+      // silently logged blank distance/zone/duration.
+      exercises: exercises.map(ex => ({
+        exId: ex.exId, sets: ex.sets, reps: ex.reps, weightLbs: ex.weightLbs || null,
+        distanceMi: ex.distanceMi || null, hrZone: ex.hrZone || null, seconds: ex.seconds || null,
+        extraRows: ex.extraRows || [],
+      })),
       durationMin: null, activeCal: null, totalCal: null,
     };
     openStatsPromptIfNeeded(filteredWo, (woWithStats, _sr) => {
@@ -4710,7 +4767,7 @@ function App() {
           setMfaRecoveryMode(false);
           setMfaRecoveryInput("");
           setAuthUser(null);
-          setScreen("landing");
+          setScreen("login");
         }}>{"← Back to Sign In"}</span><div style={{
           fontSize: FS.fs56,
           color: "#8a8478",
@@ -4725,14 +4782,6 @@ function App() {
     <AdminPage authUser={authUser} onBack={() => setScreen("main")} />
   );
 
-  /* ══ LANDING PAGE ═══════════════════════════════════════════ */
-  if (screen === "landing") return lazyMount(<LandingPage onLogin={() => {
-    setAuthIsNew(false);
-    setScreen("login");
-  }} onSignUp={() => {
-    setAuthIsNew(true);
-    setScreen("login");
-  }} />);
   if (screen === "login") return (
     <LoginScreen
       authEmail={authEmail}
@@ -4767,7 +4816,6 @@ function App() {
       PREVIEW_PIN={PREVIEW_PIN}
       launchPreviewMode={launchPreviewMode}
       onSubmit={handleAuthSubmit}
-      onBack={() => setScreen("landing")}
       sendPasswordReset={sendPasswordReset}
       lookupByPrivateId={lookupByPrivateId}
     />
@@ -4791,7 +4839,7 @@ function App() {
         setAuthIsNew(false);
         setAuthEmail("");
         setAuthPassword("");
-        setScreen("landing");
+        setScreen("login");
       }}>{"← Cancel"}</button>{obDraft && <div className={"boot-resume-card boot-line-in"}><div className={"boot-resume-label"}>{"⟳ Resume where you left off?"}</div><div className={"boot-resume-step"}>{`Step ${obDraft.obStep} of 6${obDraft.obFirstName ? " · " + obDraft.obFirstName : ""}`}</div><div style={{
           display: "flex",
           gap: S.s8,
@@ -4981,6 +5029,18 @@ function App() {
             setNavMenuOpen(false);
           }),
           badge: pendingQuestCount
+        }, {
+          // World left the bottom nav for the Forge Glass orb — tucked here
+          // for alpha (same guarded action, so the Babylon lifecycle,
+          // Character slot and Graphics Settings stay reachable).
+          icon: "🌍",
+          label: "World",
+          action: () => guardAll(() => {
+            setPrevTab(activeTab);
+            setActiveTab("world");
+            setNavMenuOpen(false);
+          }),
+          live: true
         },
         // Map feature hidden — re-enable when ready
         // {icon:"🗺", label:"Map",         action:()=>{setMapOpen(true);setNavMenuOpen(false);}},
@@ -5018,7 +5078,7 @@ function App() {
           label: "Exit Preview",
           action: () => {
             setIsPreviewMode(false); // exit preview mode so future saves persist
-            setScreen("landing");
+            setScreen("login");
             setProfile(EMPTY_PROFILE);
             setNavMenuOpen(false);
           },
@@ -5026,22 +5086,62 @@ function App() {
         }].filter(Boolean).map(item => <button key={item.label} className={"nav-menu-item"} style={item.danger ? {
           color: "#7A2838",
           borderTop: "1px solid rgba(180,172,158,.04)"
-        } : {}} onClick={item.action}>{item.icon}{" "}{item.label}{item.badge > 0 && <span className={"nav-menu-badge"} style={item.badgeDanger ? {
+        } : {}} onClick={item.action}>{item.icon}{" "}{item.label}{item.live && <span style={{width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80",display:"inline-block",marginLeft:6,verticalAlign:"middle"}} />}{item.badge > 0 && <span className={"nav-menu-badge"} style={item.badgeDanger ? {
             background: UI_COLORS.danger,
             color: "#fff"
           } : {}}>{item.badge}</span>}</button>)}</div>
 
-      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<div className={"hud-nav-panel"} style={activeTab === "messages" && msgView === "chat" ? { display: "none" } : undefined}><div className={"tabs"}>{[["workout", "Exercises"], ["workouts", "Workouts"], ["calendar", "Calendar"], ["social", "Guild"]].map(([t, l]) => {
-            const isOn = activeTab === t;
-            return <button key={t} className={`tab ${isOn ? "on" : ""}`} onClick={() => guardAll(() => {
-              setActiveTab(t);
-              if (t === "workouts") workoutsRef.current?.showList();
-              if (t === "social" && authUser) {
-                loadSocialData();
-                loadIncomingShares();
-              }
-            })}><span className={"tab-icon"}><TabIcon name={t} size={22} /></span><span className={"tab-label"}>{l}</span>{t === "social" && friendRequests.length + incomingShares.length > 0 && <span className={"tab-badge"}>{friendRequests.length + incomingShares.length}</span>}</button>;
-          })}<button key="world" className={`tab ${activeTab === "world" ? "on" : ""}`} title="Enter Aurisar World" onClick={() => guardAll(() => { setPrevTab(activeTab); setActiveTab("world"); })} style={{position:"relative"}}><span className={"tab-icon"}><TabIcon name="world" size={22} /></span><span className={"tab-label"}>{"World"}</span><span style={{position:"absolute",top:4,right:6,width:6,height:6,borderRadius:"50%",background:"#4ade80",boxShadow:"0 0 4px #4ade80"}} /></button></div></div>{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
+      /* ══ BOTTOM TAB BAR — fixed iOS material ══ */}<BottomNav hidden={activeTab === "messages" && msgView === "chat"} activeTab={activeTab} socialBadge={friendRequests.length + incomingShares.length} orbOpen={orbMenuOpen} onOrbToggle={() => setOrbMenuOpen(v => !v)} onSelectTab={t => guardAll(() => {
+        setActiveTab(t);
+        if (t === "workouts") workoutsRef.current?.showList();
+        if (t === "social" && authUser) {
+          loadSocialData();
+          loadIncomingShares();
+        }
+      })} /><OrbCreateMenu open={orbMenuOpen} onClose={() => setOrbMenuOpen(false)} activeTab={activeTab} log={profile.log} allExercises={allExercises} onPickExercise={exId => {
+        setOrbMenuOpen(false);
+        openQuickLog(exId, { origin: { type: "orb" } });
+      }} onBuildWorkout={() => {
+        setOrbMenuOpen(false);
+        guardAll(() => {
+          setActiveTab("workouts");
+          setTimeout(() => workoutsRef.current?.openBuilderWithExercises([]), 0);
+        });
+      }} workouts={(profile.workouts || []).filter(w => !w.oneOff)} onPickWorkout={wo => {
+        setOrbMenuOpen(false);
+        guardAll(() => {
+          // Same protection as Repeat Last below: any active session must go
+          // through the explicit replace-confirm, same-id workout or not,
+          // rather than startLiveWorkout's default id-mismatch-only check
+          // silently discarding in-progress sets.
+          if (liveWorkout) setPendingLiveWorkout(wo);
+          else startLiveWorkout(wo);
+        });
+      }} repeatLast={repeatLastSession ? {
+        sub: `Clone ${repeatLastSession.workout.name} as a live session`,
+        run: () => {
+          setOrbMenuOpen(false);
+          guardAll(() => {
+            const repeatToast = `↺ Repeating ${repeatLastSession.workout.icon} ${repeatLastSession.workout.name} — discard it from the banner anytime`;
+            if (liveWorkout) {
+              // startLiveWorkout only opens its replace-confirm when the ids
+              // differ — Repeat Last targeting the SAME workout you're mid-
+              // way through matched that id and skipped straight to
+              // overwriting it, silently discarding checked-off progress.
+              // Any active session, same id or not, must go through the
+              // explicit confirm.
+              pendingLiveWorkoutToastRef.current = repeatToast;
+              setPendingLiveWorkout(repeatLastSession.workout);
+            } else {
+              startLiveWorkout(repeatLastSession.workout);
+              showToast(repeatToast);
+            }
+          });
+        }
+      } : null} /><StartDock profile={profile} allExById={allExById} liveWorkout={liveWorkout} stagedCount={stagedIds.length} onStartWorkout={startLiveWorkout} onQuickLogSolo={quickLogSoloEx} onSeeAll={() => guardAll(() => {
+        setActiveTab("workouts");
+        workoutsRef.current?.showSubTab("oneoff");
+      })} />{liveWorkout && <LiveWorkoutBanner liveWorkout={liveWorkout} onToggleExercise={handleToggleLiveEx} onFinish={handleFinishLiveWorkout} onDiscard={() => setLiveWorkout(null)} onUpdateExercise={handleUpdateLiveEx} onRemoveExercise={handleRemoveLiveEx} onAddExercise={handleAddLiveEx} allExercises={allExercises} units={profile.units} />}{pendingLiveWorkout && <ConfirmSheet
         open
         icon={"⚡"}
         title={"Replace Active Workout?"}
@@ -5049,7 +5149,10 @@ function App() {
         confirmLabel={`Discard & Track ${pendingLiveWorkout.icon}`}
         cancelLabel={"Keep Current"}
         onConfirm={confirmReplaceLiveWorkout}
-        onCancel={() => setPendingLiveWorkout(null)}
+        onCancel={() => {
+          setPendingLiveWorkout(null);
+          pendingLiveWorkoutToastRef.current = null;
+        }}
       />}<div className={"scroll-area"} style={activeTab === "messages" && msgView === "chat" ? {
         overflowY: "hidden",
         display: "flex",
@@ -5067,18 +5170,16 @@ function App() {
 
           {/* ══ LIBRARY SUB-TAB ══ */}{exSubTab === "library" && <ExerciseLibraryTab
             libFiltered={libFiltered}
-            gymKit={profile.gymKit}
-            setGymKit={setGymKit}
-            libKitCount={libKitCount}
-            kitTotalAll={allExercises.length}
+            libDiscoverPicks={profile.libDiscoverPicks || DEFAULT_DISCOVER_PICKS}
+            setLibDiscoverPicks={setLibDiscoverPicks}
             _exReady={_exReady}
             _exLoadError={_exLoadError}
             libTypeCounts={libTypeCounts}
             libMuscleCounts={libMuscleCounts}
             libEquipCounts={libEquipCounts}
             libMuscleCardData={libMuscleCardData}
-            libMuscleMapData={libMuscleMapData}
             libDiscoverRows={libDiscoverRows}
+            libDiscoverCategoryCounts={libDiscoverCategoryCounts}
             libMuscleOpts={libMuscleOpts}
             libEquipOpts={libEquipOpts}
             setLibSearchDebounced={setLibSearchDebounced}

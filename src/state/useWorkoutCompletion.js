@@ -84,14 +84,32 @@ export function useWorkoutCompletion({
         if (!exData) return [];
         const isC = exData.category === "cardio";
         const isF = exData.category === "flexibility";
-        const allRows = [{
-          sets: ex.sets || 3,
-          reps: ex.reps || 10,
-          weightLbs: ex.weightLbs || null
-        }, ...(ex.extraRows || [])];
+        const timed = isC || isF;
+        // Extra rows carry their own distanceMi/hrZone/seconds when they came
+        // from a Repeat Last clone (repeatLast.js's buildFromRows stamps each
+        // row individually) — falling straight to the exercise-level value
+        // for every row used to silently collapse a multi-row cardio/timed
+        // session onto the primary row's single duration/distance/zone.
+        // Builder-created extraRows (strength progressive-weight rows) never
+        // carry these keys, so they fall through to the exercise-level value
+        // unchanged from before.
+        const allRows = [
+          { sets: ex.sets || 3, reps: ex.reps, weightLbs: ex.weightLbs || null, distanceMi: ex.distanceMi ?? null, hrZone: ex.hrZone ?? null, seconds: ex.seconds ?? null },
+          ...(ex.extraRows || []).map(r => ({
+            sets: r.sets, reps: r.reps, weightLbs: r.weightLbs,
+            distanceMi: r.distanceMi ?? ex.distanceMi ?? null,
+            hrZone: r.hrZone ?? ex.hrZone ?? null,
+            seconds: r.seconds ?? ex.seconds ?? null,
+          })),
+        ];
         const extraCount = (ex.extraRows || []).length;
         return allRows.map(row => {
-          const preGearXp = calcExXP(ex.exId, row.sets || 3, row.reps || 10, profile.chosenClass, allExById, null, null, null, extraCount);
+          // Repeat Last rows for cardio/timed exercises intentionally leave
+          // reps blank and carry duration in seconds instead — the old bare
+          // `|| 10` fallback (meant for untouched strength sets/reps) would
+          // silently overwrite a real duration with a meaningless rep count.
+          const rr = parseInt(row.reps) || (timed && row.seconds ? Math.max(1, Math.floor(row.seconds / 60)) : 0) || 10;
+          const preGearXp = calcExXP(ex.exId, row.sets || 3, rr, profile.chosenClass, allExById, null, null, null, extraCount);
           const award = perkAward(preGearXp, equipPerks, { exId: ex.exId, category: exData.category, muscleGroup: exData.muscleGroup });
           return {
             exId: ex.exId,
@@ -105,12 +123,12 @@ export function useWorkoutCompletion({
             ...(award.perkMult !== 1 ? { perkMult: award.perkMult, baseXp: award.baseXp } : {}),
             mult: getMult(exData),
             sets: parseInt(row.sets) || 3,
-            reps: parseInt(row.reps) || 10,
+            reps: rr,
             weightLbs: !isC && !isF ? row.weightLbs || null : null,
             weightPct: 100,
-            hrZone: ex.hrZone || null,
-            distanceMi: ex.distanceMi || null,
-            seconds: ex.seconds || null,
+            hrZone: row.hrZone || null,
+            distanceMi: row.distanceMi || null,
+            seconds: row.seconds || null,
             time: now,
             date: displayDate,
             dateKey: dateStr,

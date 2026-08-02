@@ -51,9 +51,16 @@
       --z-detail:9400;
       --z-confirm:9500;
       --z-flash:9600;
+
+      /* Forge Glass font stacks (Barlow ships via index.html; Cinzel via the
+         @import above). Referenced by redesigned rules; legacy rules keep
+         their literals until they are migrated. */
+      --font-body:'Barlow','Inter',system-ui,sans-serif;
+      --font-cond:'Barlow Condensed','Barlow',sans-serif;
+      --font-serif:'Cinzel',serif;
     }
     html{font-size:17.333px}
-    .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:'Inter',sans-serif;position:relative;overflow-x:hidden}
+    .root{min-height:100vh;background:#0c0c0a;color:#d4cec4;font-family:var(--font-body);position:relative;overflow-x:hidden}
     .bg{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 60% at 30% 20%,rgba(45,42,36,.3) 0%,transparent 65%),radial-gradient(ellipse 50% 45% at 70% 75%,rgba(32,30,26,.18) 0%,transparent 55%),#0c0c0a}.bg::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 45%,transparent 40%,rgba(0,0,0,.2) 100%);z-index:0}
     .pt{position:fixed;border-radius:50%;background:var(--cls-color);opacity:.13;animation:flt var(--dur) var(--dly) infinite ease-in-out alternate;pointer-events:none;z-index:1;filter:blur(1px)}
     @keyframes flt{from{transform:translateY(0) scaleX(1);opacity:.1}to{transform:translateY(-12px) scaleX(2);opacity:.3}}
@@ -82,7 +89,7 @@
          btn-danger      destructive
        Sizes: btn-sm / btn-xs (both get a 44px touch extension on coarse
        pointers, below). For bare glyph actions use .icon-btn instead. */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font-body);font-size:.68rem;font-weight:700;letter-spacing:.07em;transition:all .2s;text-transform:uppercase;white-space:nowrap}
     .btn-gold-solid{background:linear-gradient(135deg,#8B7425,#A89030);color:#d4cec4;border:1px solid rgba(196,160,68,.35);box-shadow:0 2px 14px rgba(140,116,37,.28);text-shadow:0 1px 2px rgba(0,0,0,.35)}
     .btn-gold-solid:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(140,116,37,.4)}
     .btn-gold{background:linear-gradient(135deg,rgba(45,42,36,.5),rgba(45,42,36,.35));color:#d4cec4;box-shadow:none;border:1px solid rgba(180,172,158,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
@@ -410,7 +417,8 @@
     .lib-hscroll-wrap::after{right:0;background:linear-gradient(to left,rgba(10,10,8,1) 0%,transparent 100%);opacity:1}
     .lib-hscroll-wrap.fade-left::before{opacity:1}
     .lib-hscroll-wrap.fade-right-off::after{opacity:0}
-    .lib-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent;scroll-snap-type:x mandatory;scroll-padding-left:2px}
+    .lib-hscroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(180,172,158,.25) transparent;scroll-snap-type:x mandatory;scroll-padding-left:2px}
+    .lib-home-section--compact .lib-section-hdr{font-size:.7rem}
     .lib-hscroll::-webkit-scrollbar{height:6px}
     .lib-hscroll::-webkit-scrollbar-track{background:rgba(45,42,36,.15);border-radius:3px}
     .lib-hscroll::-webkit-scrollbar-thumb{background:rgba(180,172,158,.25);border-radius:3px}
@@ -467,6 +475,8 @@
        vocabulary lifted from the live tracker's .lw-ex-edit-* family. */
     .se{display:flex;flex-direction:column}
     .se-row{display:flex;align-items:flex-end;gap:6px;padding:5px 0;border-bottom:1px solid rgba(45,42,36,.18)}
+    /* Set Forge: the claimed row (weight-chip target) — tap anywhere to claim */
+    .se-row--active{background:rgba(232,180,74,.07);box-shadow:inset 0 0 0 1px rgba(232,180,74,.32);border-radius:8px;border-bottom-color:transparent;padding-left:6px;padding-right:6px}
     .se-row:last-of-type{border-bottom:none}
     .se-row-lbl{font-family:'Cinzel',serif;font-size:.54rem;color:#8a8478;letter-spacing:.06em;min-width:18px;flex-shrink:0;align-self:center}
     .se-cell{display:flex;flex-direction:column;flex:1;min-width:0}
@@ -585,171 +595,39 @@
     .lib-hero-card:hover,.lib-hero-card:active{filter:none}
     .lib-hero-when{font-size:.48rem;color:#8a8478;letter-spacing:.03em;line-height:1}
 
-    /* ── Body map ────────────────────────────────────────────────────────
-       Training heat drawn on a stylised figure. Recency drives how lit a
-       plate is; --volume (0..1, relative to the busiest group) drives how
-       filled it looks, so a hot-but-light week reads differently from a
-       hot-and-heavy one. */
-    .mm-wrap{display:flex;align-items:center;gap:14px;justify-content:center}
-    .mm-svg{width:min(200px,52vw);height:auto;flex-shrink:0;overflow:visible}
-
-    .mm-frame{fill:rgba(45,42,36,.34);stroke:rgba(180,172,158,.07);stroke-width:1}
-
-    .mm-region rect{
-      fill:color-mix(in srgb,var(--mg-color) calc(14% + var(--volume,0) * 46%),rgba(28,26,22,.75));
-      stroke:color-mix(in srgb,var(--mg-color) 42%,transparent);
-      stroke-width:1.2;
-      transition:fill var(--dur-slow) var(--ease-standard),
-                 stroke var(--dur-slow) var(--ease-standard)
-    }
-    .mm-region g{cursor:pointer;outline:none}
-    .mm-region g:focus-visible rect{stroke:var(--cls-color,#c49428);stroke-width:2.4}
-    .mm-region g:hover rect{stroke-width:2}
-
-    /* Recency. Cold is the fog: displaced, blurred and desaturated, so an
-       untrained region reads as unknown territory rather than a dead control. */
-    .mm-hot rect{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--mg-color) 60%,transparent))}
-    .mm-warm rect{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 34%,transparent))}
-    .mm-fading rect{opacity:.72;filter:grayscale(.4)}
-    .mm-cold rect{opacity:.5;filter:grayscale(.85) url(#mm-fog)}
-
-    /* Groups with no place on a body (cardio). Without these the map would be
-       a strictly worse navigator than the strip. */
-    .mm-offbody{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
-    .mm-chip{
-      display:flex;align-items:center;gap:5px;
-      padding:4px 11px;border-radius:12px;cursor:pointer;
-      background:color-mix(in srgb,var(--mg-color) calc(10% + var(--volume,0) * 26%),rgba(45,42,36,.3));
-      border:1px solid color-mix(in srgb,var(--mg-color) 30%,transparent);
-      color:#b4ac9e;font-size:.6rem;font-family:'Inter',sans-serif;
-      transition:all var(--dur-fast) var(--ease-standard);
+    /* ── Discover carousel customize menu ────────────────────────────────
+       Nested/cascading pick-3 for the Library home's discover rows. Reuses
+       .myex-accordion for the group disclosure; the option rows below are
+       deliberately not checkboxes — see DiscoverCustomizeMenu.jsx. */
+    .lib-discover-cust-trigger{
+      background:rgba(45,42,36,.22);border:1px solid rgba(180,172,158,.1);
+      border-radius:8px;padding:5px 11px;color:#8a8478;font-size:.62rem;
+      font-family:'Inter',sans-serif;cursor:pointer;
       -webkit-tap-highlight-color:transparent
     }
-    .mm-chip:active{transform:scale(.96)}
-    .mm-chip.mm-hot{box-shadow:0 0 8px color-mix(in srgb,var(--mg-color) 34%,transparent)}
-    .mm-chip.mm-fading{opacity:.75}
-    .mm-chip.mm-cold{opacity:.55;filter:grayscale(.8)}
-
-    .mm-hdr-controls{display:flex;align-items:center;gap:6px;margin-left:auto}
-    .mm-hdr-controls .mm-viewtoggle{margin-left:0}
-    .mm-viewtoggle{display:flex;gap:2px;margin-left:auto}
-    .mm-viewtoggle button{
-      background:rgba(45,42,36,.3);border:1px solid rgba(180,172,158,.07);
-      color:#8a8478;font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:.1em;
-      text-transform:uppercase;padding:3px 9px;cursor:pointer;
-      transition:all var(--dur-fast) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .mm-viewtoggle button:first-child{border-radius:6px 0 0 6px}
-    .mm-viewtoggle button:last-child{border-radius:0 6px 6px 0}
-    .mm-viewtoggle button.on{background:rgba(196,148,40,.16);border-color:rgba(196,148,40,.36);color:#c4a044}
-
-    .mm-legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
-    .mm-legend li{display:flex;align-items:center;gap:6px;font-size:.55rem;color:#8a8478;white-space:nowrap}
-    .mm-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;background:#8a8478;border:1px solid rgba(180,172,158,.2)}
-    .mm-swatch.mm-hot{background:#c49428;box-shadow:0 0 5px rgba(196,148,40,.6)}
-    .mm-swatch.mm-warm{background:rgba(196,148,40,.55)}
-    .mm-swatch.mm-fading{background:rgba(138,132,120,.55)}
-    .mm-swatch.mm-cold{background:rgba(60,58,52,.8)}
-
-    /* The fog displacement is a continuous filter; drop it when motion is
-       reduced and lean on opacity alone. */
-    @media (prefers-reduced-motion: reduce){
-      .mm-cold rect{filter:grayscale(.85)}
-    }
-
-    /* ── Gym kit filter ──────────────────────────────────────────────────
-       Persistent "equipment I have" filter. Quiet when off, clearly marked
-       when on — it hides a large share of the catalog, so it must never be
-       something you forget is active. */
-    .gymkit{margin-bottom:10px}
-    .gymkit-row{display:flex;align-items:center;gap:6px}
-    .gymkit-toggle{
-      flex:1;display:flex;align-items:center;gap:7px;
-      padding:6px 10px;border-radius:8px;cursor:pointer;text-align:left;
+    .lib-discover-cust-trigger:hover{color:#b4ac9e;border-color:rgba(180,172,158,.22)}
+    .discover-cust-hint{font-size:.66rem;color:#8a8478;line-height:1.5;margin:0 0 14px}
+    .discover-cust-empty{color:#c4a044;margin-top:-8px}
+    .discover-cust-opts{display:flex;flex-direction:column;gap:5px}
+    .discover-cust-opt{
+      display:flex;align-items:center;justify-content:space-between;gap:8px;
+      min-height:40px;padding:0 12px;border-radius:9px;text-align:left;cursor:pointer;
       background:rgba(45,42,36,.22);border:1px solid rgba(180,172,158,.07);
-      color:#8a8478;font-size:.66rem;font-family:'Inter',sans-serif;
+      color:#b4ac9e;font-size:.68rem;font-family:'Inter',sans-serif;
       transition:all var(--dur-fast) var(--ease-standard);
       -webkit-tap-highlight-color:transparent
     }
-    .gymkit-toggle:hover{border-color:rgba(180,172,158,.16);color:#b4ac9e}
-    .gymkit-on .gymkit-toggle{
-      background:rgba(196,148,40,.1);border-color:rgba(196,148,40,.32);color:#c4a044
+    .discover-cust-opt:hover:not(:disabled){border-color:rgba(180,172,158,.2)}
+    .discover-cust-opt:disabled{opacity:.35;cursor:default}
+    .discover-cust-opt.on{
+      background:rgba(196,148,40,.14);border-color:rgba(196,148,40,.4);color:#e8d08a
     }
-    .gymkit-count{
-      margin-left:auto;font-variant-numeric:tabular-nums;font-size:.58rem;color:#6f6a62
+    .discover-cust-opt-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .discover-cust-opt-count{font-variant-numeric:tabular-nums;font-size:.6rem;color:#6f6a62;flex-shrink:0}
+    .discover-cust-opt-tag{
+      flex-shrink:0;font-size:.56rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:#c4a044
     }
-    .gymkit-on .gymkit-count{color:#c4a044}
-    .gymkit-chev{font-size:.6rem;flex-shrink:0}
-    .gymkit-clear{
-      flex-shrink:0;background:transparent;border:1px solid rgba(180,172,158,.1);
-      border-radius:7px;padding:6px 9px;color:#8a8478;font-size:.6rem;cursor:pointer;
-      -webkit-tap-highlight-color:transparent
-    }
-    .gymkit-clear:hover{color:#d4cec4;border-color:rgba(180,172,158,.24)}
-    .gymkit-panel{
-      margin-top:6px;padding:9px 10px;border-radius:8px;
-      background:rgba(20,19,15,.6);border:1px solid rgba(180,172,158,.07)
-    }
-    .gymkit-hint{font-size:.58rem;color:#6f6a62;margin:0 0 7px;line-height:1.45}
-    .gymkit-warn{color:#c4a044;margin:7px 0 0}
-    .gymkit-opts{display:flex;flex-wrap:wrap;gap:5px}
-    /* Sized for a thumb on a gym floor, not a mouse: the 24px-tall chips this
-       started as were too small to hit reliably mid-session. */
-    .gymkit-opt{
-      min-height:36px;display:inline-flex;align-items:center;
-      padding:0 14px;border-radius:18px;cursor:pointer;
-      background:rgba(45,42,36,.28);border:1px solid rgba(180,172,158,.08);
-      color:#8a8478;font-size:.66rem;font-family:'Inter',sans-serif;
-      transition:all var(--dur-fast) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .gymkit-opt:hover{color:#b4ac9e;border-color:rgba(180,172,158,.2)}
-    .gymkit-opt.on{
-      background:rgba(196,148,40,.16);border-color:rgba(196,148,40,.42);color:#e8d08a
-    }
-    .gymkit-opt:active{transform:scale(.96)}
-
-    /* ── Training heat torches ───────────────────────────────────────────
-       One torch per muscle group, coldest first. Brightness carries recency
-       and --volume carries how hard the group was worked, so the row reads
-       as a gauge rather than a list. Horizontally scrollable: 11 groups do
-       not fit a 375px screen, and wrapping would bury the cold end. */
-    .torch-strip{
-      display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0;
-      list-style:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch
-    }
-    .torch-slot{flex:0 0 auto;scroll-snap-align:start;display:flex}
-    .torch-strip::-webkit-scrollbar{height:2px}
-    .torch-strip::-webkit-scrollbar-thumb{background:rgba(180,172,158,.2);border-radius:2px}
-    .torch{
-      flex:0 0 auto;scroll-snap-align:start;
-      display:flex;flex-direction:column;align-items:center;gap:2px;
-      min-width:60px;padding:8px 6px 6px;border-radius:9px;cursor:pointer;
-      background:linear-gradient(180deg,
-        color-mix(in srgb,var(--mg-color) calc(var(--volume,0) * 16%),rgba(45,42,36,.3)),
-        rgba(25,23,20,.35));
-      border:1px solid color-mix(in srgb,var(--mg-color) 18%,transparent);
-      transition:all var(--dur-base) var(--ease-standard);
-      -webkit-tap-highlight-color:transparent
-    }
-    .torch:active{transform:scale(.96)}
-    .torch-flame{font-size:1.05rem;line-height:1;transition:filter var(--dur-base) var(--ease-standard)}
-    .torch-name{font-size:.5rem;color:#b4ac9e;letter-spacing:.02em;white-space:nowrap}
-    .torch-when{font-size:.46rem;color:#6f6a62;font-variant-numeric:tabular-nums}
-
-    /* Recency drives how lit the torch is. Cold groups are the fog: legible,
-       but plainly unlit. */
-    .torch-hot{border-color:color-mix(in srgb,var(--mg-color) 45%,transparent);
-      box-shadow:0 0 12px color-mix(in srgb,var(--mg-color) 22%,transparent)}
-    .torch-hot .torch-flame{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--mg-color) 70%,transparent))}
-    .torch-warm{border-color:color-mix(in srgb,var(--mg-color) 30%,transparent)}
-    .torch-warm .torch-flame{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--mg-color) 45%,transparent))}
-    .torch-fading .torch-flame{filter:grayscale(.45) brightness(.82)}
-    .torch-fading .torch-name{color:#8a8478}
-    .torch-cold{background:rgba(20,19,16,.42);border-color:rgba(180,172,158,.05)}
-    .torch-cold .torch-flame{filter:grayscale(.9) brightness(.5)}
-    .torch-cold .torch-name,.torch-cold .torch-when{color:#5f5a52}
 
     /* ── Staging tray ────────────────────────────────────────────────────
        The cart's one visible home, docked above the bottom nav so a selection
@@ -943,7 +821,7 @@
       font:inherit;color:inherit;text-align:left;width:100%;appearance:none
     }
     .lib-hero-card{text-align:center}
-    .lib-discover-card{text-align:center;width:125px}
+    .lib-discover-card{text-align:center;width:100px}
 
     /* Stretched primary action. The row is a layout container; the button
        wrapping the exercise name owns the whole row's hit area via an
@@ -991,9 +869,9 @@
 
     /* ── LIBRARY HOME: Discover Cards ── */
     .lib-discover-card{
-      position:relative;min-width:125px;max-width:125px;flex-shrink:0;border-radius:11px;
-      padding:12px 8px 10px;cursor:pointer;text-align:center;
-      display:flex;flex-direction:column;align-items:center;gap:6px;overflow:hidden;
+      position:relative;min-width:100px;max-width:100px;flex-shrink:0;border-radius:10px;
+      padding:9px 6px 8px;cursor:pointer;text-align:center;
+      display:flex;flex-direction:column;align-items:center;gap:4px;overflow:hidden;
       background:linear-gradient(160deg,color-mix(in srgb,var(--mg-color) 6%,rgba(45,42,36,.32)),rgba(32,30,26,.18));
       border:1px solid color-mix(in srgb,var(--mg-color) 12%,transparent);
       box-shadow:0 2px 10px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.03);
@@ -1007,12 +885,12 @@
     .lib-discover-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--mg-color) 20%,transparent);box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px color-mix(in srgb,var(--mg-color) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
     .lib-discover-card:hover::before{opacity:.5}
     .lib-discover-orb{
-      width:40px;height:40px;border-radius:10px;flex-shrink:0;
+      width:32px;height:32px;border-radius:9px;flex-shrink:0;
       display:flex;align-items:center;justify-content:center;
       background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--mg-color) 22%,rgba(45,42,36,.5)),color-mix(in srgb,var(--mg-color) 8%,rgba(25,23,18,.6)));
       box-shadow:0 2px 10px rgba(0,0,0,.45),inset 0 0 6px rgba(0,0,0,.35)
     }
-    .lib-discover-name{font-size:.65rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
+    .lib-discover-name{font-size:.6rem;color:#d4cec4;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%}
     .lib-diff-badge{padding:1px 6px;border-radius:8px;font-size:.5rem;font-weight:700;letter-spacing:.02em;text-transform:capitalize}
     .lib-diff-beginner{background:rgba(90,138,88,.12);color:#6aaa68;border:1px solid rgba(90,138,88,.2)}
     .lib-diff-intermediate{background:rgba(168,132,60,.12);color:#c4a044;border:1px solid rgba(168,132,60,.2)}
@@ -1058,6 +936,25 @@
     .custom-ex-badge{font-size:.52rem;background:rgba(45,42,36,.22);color:#b4ac9e;border:1px solid rgba(180,172,158,.07);border-radius:3px;padding:1px 4px;margin-left:4px;font-family:'Inter',sans-serif;letter-spacing:.03em;vertical-align:middle}
     .ex-edit-btn{position:absolute;top:7px;left:7px;font-size:.58rem;color:#8a8478;cursor:pointer;width:18px;height:18px;border-radius:50%;background:rgba(45,42,36,.15);display:flex;align-items:center;justify-content:center;transition:all .2s}
     .ex-edit-btn:hover{color:#b4ac9e;background:rgba(45,42,36,.22)}
+
+    /* ── My Exercises accordion (Favorites / Custom / Recent) ────────────
+       Single-open-or-none. The track is a 1-row CSS grid animated between
+       0fr and 1fr, so height always matches real content — a list that
+       grows after opening (Favorites' "Show more") is never clipped by a
+       stale measured max-height. Padding lives on .myex-accordion-inner,
+       never on the animated .myex-accordion-body itself, or some browsers
+       leave a residual gap at 0fr. */
+    .myex-accordion{border-radius:12px;overflow:hidden;margin-bottom:10px;background:rgba(45,42,36,.14);border:1px solid rgba(180,172,158,.06)}
+    .myex-accordion-hdr{width:100%;display:flex;align-items:center;gap:8px;padding:13px 14px;background:transparent;border:none;cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent}
+    .myex-accordion-hdr-icon{font-size:.85rem;opacity:.75;flex-shrink:0}
+    .myex-accordion-hdr-title{font-family:'Cinzel',serif;font-size:.72rem;font-weight:600;color:#d4cec4;letter-spacing:.08em;text-transform:uppercase}
+    .myex-accordion-hdr-meta{flex:1;min-width:0;text-align:right;font-size:.62rem;color:#8a8478;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .myex-accordion-chevron{flex-shrink:0;font-size:.7rem;color:#8a8478;transition:transform var(--dur-base) var(--ease-standard)}
+    .myex-accordion-chevron.open{transform:rotate(180deg)}
+    .myex-accordion-track{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dur-slow) var(--ease-out)}
+    .myex-accordion-track.open{grid-template-rows:1fr}
+    .myex-accordion-body{overflow:hidden;min-height:0}
+    .myex-accordion-inner{padding:2px 14px 14px}
     /* SAVE-AS-PLAN WIZARD */
     .spw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:var(--z-wizard);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--bottom-nav-h)}
     .spw-sheet{background:linear-gradient(160deg,#12120e,#0c0c0a);border:1px solid rgba(180,172,158,.07);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:calc(90vh - var(--bottom-nav-h));overflow-y:auto}
@@ -1473,6 +1370,41 @@
     .tab.on .tab-icon{transform:translateY(-1px)}
     .tab:active .tab-icon{transform:scale(.88)}
 
+    /* ── Create orb (Forge Glass nav) ────────────────────────────────────
+       Docks between the two tab pairs; the crown rides 22px above the bar
+       (--bottom-nav-h is untouched — consumers keep their offsets). */
+    .orb-slot{flex:none;width:64px;display:flex;justify-content:center;align-items:flex-start}
+    .orb-btn{width:56px;height:56px;margin-top:-22px;border-radius:50%;cursor:pointer;border:1px solid rgba(232,180,74,.55);background:radial-gradient(circle at 36% 30%,#F2CE7A,#C08C20);color:#171106;font-family:var(--font-cond);font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 8px 26px rgba(232,180,74,.35),inset 0 1px 2px rgba(255,255,255,.5);transition:transform var(--dur-base) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+    .orb-btn.open{transform:rotate(90deg)}
+    .orb-btn:active{transform:scale(.94)}
+    @keyframes orbRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    @keyframes orbFade{from{opacity:0}to{opacity:1}}
+
+    /* ── Set Forge (Forge Glass quick log) ───────────────────────────────
+       Gold = earned: the Projected-XP card is the one gold surface in the
+       sheet. The ruler is a native horizontal scroller (see WeightRuler). */
+    .sf-xp-card{position:relative;overflow:hidden;border-radius:16px;padding:11px 13px;margin-bottom:10px;background:linear-gradient(150deg,rgba(232,180,74,.16),rgba(232,180,74,.04) 70%);border:1px solid rgba(232,180,74,.28)}
+    .sf-xp-sweep{position:absolute;top:0;bottom:0;left:0;width:38%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:sfSweep 3.4s var(--ease-out) infinite;pointer-events:none}
+    @keyframes sfSweep{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
+    .sf-chip{padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--font-cond);font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(228,222,211,.75);background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.12);transition:transform var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+    .sf-chip:active{transform:scale(.94);background:rgba(232,180,74,.16);border-color:rgba(232,180,74,.4)}
+    /* touch-action:pan-x alone claims vertical panning too (it opts this
+       element OUT of native y-panning rather than leaving it unclaimed), so
+       a swipe that starts on this 38px strip couldn't fall through to the
+       sheet's own vertical scroll. pan-x pan-y hands vertical intent to the
+       nearest scrollable ancestor, same as the default, while still keeping
+       this the element that natively handles horizontal drag. */
+    .sf-ruler{position:relative;height:38px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;overscroll-behavior-x:contain;scrollbar-width:none;padding:0 50%;cursor:ew-resize}
+    .sf-ruler::-webkit-scrollbar{display:none}
+    .sf-ruler-strip{height:100%;background:repeating-linear-gradient(90deg,rgba(240,200,104,.5) 0 1.5px,transparent 1.5px 45px),repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 1px,transparent 1px 9px);background-position:0 6px,0 12px;background-size:auto 20px,auto 10px;background-repeat:repeat-x}
+    .sf-ruler-fade{position:absolute;top:0;height:38px;width:56px;pointer-events:none;z-index:1}
+    .sf-ruler-fade--l{left:0;background:linear-gradient(90deg,rgba(20,18,14,.95),transparent)}
+    .sf-ruler-fade--r{right:0;background:linear-gradient(270deg,rgba(20,18,14,.95),transparent)}
+    .sf-ruler-needle{position:absolute;left:50%;top:2px;height:28px;width:2px;transform:translateX(-50%);background:#8FE3D2;box-shadow:0 0 14px rgba(143,227,210,.75);pointer-events:none;z-index:2}
+    /* Screen-reader/keyboard twin of the ruler — revealed on keyboard focus */
+    .sf-ruler-a11y{position:absolute;width:1px;height:1px;opacity:.01;overflow:hidden;left:0;top:0;margin:0;pointer-events:none}
+    .sf-ruler-a11y:focus-visible{position:relative;width:100%;height:14px;opacity:1;pointer-events:auto}
+
     /* ── Workout cards (Forge tab) — themed via --mg-color ── */
     .workout-card{
       --mg-color:#B0A090;
@@ -1766,72 +1698,6 @@
     .disc-tab.disc-flexibility.on{background:rgba(142,68,173,.14);border-color:rgba(142,68,173,.4)}.disc-tab.disc-flexibility.on .disc-tab-label{color:#9b59b6}
     .disc-tab.disc-endurance.on{background:rgba(52,152,219,.14);border-color:rgba(52,152,219,.4)}.disc-tab.disc-endurance.on .disc-tab-label{color:#3498db}
 
-    /* ══ Homepage / Landing Page ══ */
-    /* Gold glow pulse for CTA buttons */
-    @keyframes goldPulse{0%,100%{box-shadow:0 4px 24px rgba(196,148,40,.25)}50%{box-shadow:0 4px 32px rgba(196,148,40,.45),0 0 48px rgba(196,148,40,.15)}}
-
-    /* Nav — matches login-screen glassmorphism */
-    .hp-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(180,172,158,.07)}
-    .hp-nav-logo{display:flex;align-items:center;gap:10px}
-    .hp-nav-wordmark{font-family:'Cinzel',serif;font-size:1.1rem;font-weight:400;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.25em}
-    .hp-nav-fitness{font-family:'Cinzel',serif;font-size:.55rem;font-weight:600;letter-spacing:.35em;background:linear-gradient(135deg,#b4ac9e,#8a8478);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;align-self:flex-end;padding-bottom:1px}
-    .hp-nav-btns{display:flex;gap:8px}
-    .hp-btn-login{background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:none;color:#b4ac9e;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-    .hp-btn-login:hover{background:rgba(45,42,36,.45);color:#d4cec4}
-    .hp-btn-signup{background:linear-gradient(135deg,#c49428,#8a6010);color:#0c0c0a;padding:7px 18px;border-radius:7px;font-family:'Cinzel',serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:none;transition:all .2s}
-    .hp-btn-signup:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(196,148,40,.3)}
-
-    /* Glass nav links — borderless, semi-transparent */
-    .hp-glass-links{display:flex;justify-content:center;gap:6px;padding:56px 20px 0;flex-wrap:wrap}
-    .hp-glass-link{background:linear-gradient(145deg,rgba(45,42,36,.3),rgba(32,30,26,.18));border:none;color:#b4ac9e;padding:8px 18px;border-radius:8px;font-family:'Inter',sans-serif;font-size:.65rem;font-weight:500;letter-spacing:.06em;cursor:pointer;transition:all .2s;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-    .hp-glass-link:hover{background:rgba(45,42,36,.45);color:#d4cec4;transform:translateY(-1px)}
-
-    /* Hero */
-    .hp-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px 24px 60px;position:relative}
-    .hp-hero-banner{width:100%;max-width:520px;height:auto;border-radius:16px;margin-bottom:28px;box-shadow:0 12px 48px rgba(0,0,0,.6),0 0 60px rgba(196,148,40,.12)}
-    .hp-hero-title{font-family:'Cinzel',serif;font-size:clamp(1.6rem,5vw,2.8rem);font-weight:700;background:linear-gradient(135deg,#c49428 0%,#f0d060 45%,#c49428 70%,#8a6010 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.15em;line-height:1.15;margin-bottom:14px}
-    .hp-hero-sub{font-size:clamp(.82rem,2.2vw,1.05rem);color:#8a8478;font-style:italic;letter-spacing:.06em;max-width:420px;line-height:1.65;margin-bottom:10px}
-    .hp-orn{font-size:.85rem;color:rgba(180,172,158,.12);letter-spacing:.2em;margin-bottom:24px}
-    .hp-hero-cta{background:linear-gradient(135deg,#c49428,#8a6010);color:#0c0c0a;padding:12px 32px;border-radius:9px;font-family:'Cinzel',serif;font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border:none;transition:all .25s;animation:goldPulse 3s ease-in-out infinite}
-    .hp-hero-cta:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(196,148,40,.5),0 0 48px rgba(196,148,40,.2);animation:none}
-    .hp-hero-signin{font-size:.72rem;color:#8a8478;margin-top:14px}
-    .hp-hero-signin span{color:#b4ac9e;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-    .hp-hero-signin span:hover{color:#d4cec4}
-
-    /* Sections — glass card treatment matching login auth card */
-    .hp-section{padding:48px 24px;max-width:520px;margin:0 auto}
-    .hp-section-title{font-family:'Cinzel',serif;font-size:clamp(1.1rem,3.5vw,1.6rem);font-weight:600;background:linear-gradient(135deg,#c49428 0%,#f0d060 50%,#c49428 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;letter-spacing:.15em;margin-bottom:14px}
-    .hp-section-body{font-size:.78rem;color:#8a8478;line-height:1.7;text-align:center;max-width:440px;margin:0 auto}
-
-    /* Feature cards — glass panels */
-    .hp-features{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 24px 48px;max-width:520px;margin:0 auto}
-    @media(max-width:420px){.hp-features{grid-template-columns:1fr}}
-    .hp-feat-card{background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:1px solid rgba(180,172,158,.07);border-radius:12px;padding:16px 14px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);text-align:center;transition:all .2s;box-shadow:0 4px 20px rgba(0,0,0,.3)}
-    .hp-feat-card:hover{border-color:rgba(196,148,40,.15);transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,0,0,.4),0 0 20px rgba(196,148,40,.1)}
-    .hp-feat-icon{font-size:1.4rem;margin-bottom:6px;display:block}
-    .hp-feat-title{font-family:'Cinzel',serif;font-size:.65rem;font-weight:600;color:#d4cec4;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
-    .hp-feat-desc{font-size:.66rem;color:#8a8478;line-height:1.5}
-
-    /* Class pills — glass style */
-    .hp-classes{display:flex;gap:10px;overflow-x:auto;padding:0 24px 48px;max-width:520px;margin:0 auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-    .hp-classes::-webkit-scrollbar{display:none}
-    .hp-class-pill{flex-shrink:0;background:linear-gradient(145deg,rgba(45,42,36,.38),rgba(32,30,26,.22));border:1px solid rgba(180,172,158,.07);border-radius:10px;padding:14px 18px;text-align:center;min-width:120px;transition:all .2s;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
-    .hp-class-pill:hover{transform:translateY(-2px);box-shadow:0 0 20px color-mix(in srgb,var(--pill-color,#8a8478) 30%,transparent)}
-    .hp-class-emoji{font-size:1.5rem;display:block;margin-bottom:6px}
-    .hp-class-name{font-family:'Cinzel',serif;font-size:.65rem;font-weight:600;color:#d4cec4;letter-spacing:.06em;text-transform:uppercase}
-    .hp-class-tag{font-size:.55rem;color:#8a8478;margin-top:3px}
-
-    /* Bottom CTA — glass panel */
-    .hp-cta{padding:48px 24px;text-align:center;margin:0 auto;max-width:520px}
-    .hp-cta-title{font-family:'Cinzel',serif;font-size:clamp(1.1rem,3.5vw,1.6rem);font-weight:600;background:linear-gradient(135deg,#c49428 0%,#f0d060 50%,#c49428 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.15em;margin-bottom:10px}
-    .hp-cta-sub{font-size:.78rem;color:#8a8478;font-style:italic;letter-spacing:.06em;margin-bottom:24px}
-
-    /* Footer */
-    .hp-footer{padding:20px;text-align:center;border-top:1px solid rgba(180,172,158,.04)}
-    .hp-footer-text{font-size:.55rem;color:#8a8478;letter-spacing:.06em}
-    .hp-footer-text a{color:#8a8478;text-decoration:none}
-    .hp-footer-text a:hover{color:#8a8478}
-
     /* Preview PIN */
     .preview-pin-wrap{display:flex;align-items:center;gap:6px;justify-content:center;margin-top:6px}
     .preview-pin-inp{width:80px;background:rgba(32,30,26,.5);border:1px solid rgba(180,172,158,.1);border-radius:6px;padding:6px 8px;color:#d4cec4;font-family:monospace;font-size:.72rem;text-align:center;outline:none;letter-spacing:.12em}
@@ -2052,13 +1918,25 @@
       --au-accent-soft:oklch(0.74 0.11 var(--au-accent-h) / 0.18);
       --au-accent-glow:oklch(0.74 0.11 var(--au-accent-h) / 0.32);
       --au-accent-deep:oklch(0.55 0.09 var(--au-accent-h));
-      --au-bg:oklch(0.13 0.006 60);
-      --au-bg-deep:oklch(0.09 0.005 60);
-      --au-hairline:oklch(0.28 0.012 70 / 0.5);
-      --au-hairline-strong:oklch(0.4 0.02 75 / 0.6);
-      --au-text:oklch(0.92 0.01 80);
-      --au-text-dim:oklch(0.7 0.012 75);
-      --au-text-faint:oklch(0.52 0.01 70);
+      /* Sampled from login-backdrop-poster.jpg (fog mid-tone regions cluster
+         oklch hue 183-196; deep shadow 220-249) — 200 sits between the two
+         so the card's neutrals read as "in this room's teal light" rather
+         than the old warm-amber (hue 60-80) leftover from the pre-video
+         background. --au-accent-h stayed at 75 deliberately: the video's
+         actual gold-beam pixels sample to oklch hue 75-76, an exact match. */
+      --au-env-h:200;
+      --au-bg:oklch(0.13 0.01 var(--au-env-h));
+      --au-bg-deep:oklch(0.09 0.012 var(--au-env-h));
+      --au-hairline:oklch(0.28 0.025 var(--au-env-h) / 0.5);
+      --au-hairline-strong:oklch(0.4 0.035 var(--au-env-h) / 0.6);
+      --au-text:oklch(0.92 0.006 var(--au-env-h));
+      --au-text-dim:oklch(0.7 0.025 var(--au-env-h));
+      /* L bumped from the pre-existing 0.52 to 0.58 — measured against the
+         card background, 0.52 sat at ~3.55:1 (fails WCAG AA's 4.5:1 for
+         this size of text; true before this retint too, at ~3.52:1). 0.58
+         clears it at ~4.59:1 without reading as a lightness change on
+         screen, since it's still the dimmest text on the card. */
+      --au-text-faint:oklch(0.58 0.022 var(--au-env-h));
       --au-danger:oklch(0.62 0.16 28);
       --au-danger-soft:oklch(0.62 0.16 28 / 0.14);
       --au-font-display:'Cinzel','Trajan Pro','Times New Roman',serif;
@@ -2077,9 +1955,15 @@
     .au-mote{position:absolute;width:2px;height:2px;border-radius:50%;background:var(--au-accent);filter:blur(0.5px);opacity:0;animation:au-mote-rise linear infinite}
     @keyframes au-mote-rise{0%{opacity:0;transform:translateY(0) translateX(0) scale(0.6)}10%{opacity:0.8}90%{opacity:0.6}100%{opacity:0;transform:translateY(-120vh) translateX(var(--mote-drift,20px)) scale(1)}}
 
-    /* Faceted card */
-    .au-card{position:relative;background:linear-gradient(180deg,oklch(0.18 0.008 60 / 0.85),oklch(0.14 0.006 60 / 0.92));border:1px solid var(--au-hairline);clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px);backdrop-filter:blur(6px)}
-    .au-card::before{content:"";position:absolute;inset:0;background:linear-gradient(140deg,var(--au-accent-glow),transparent 35%,transparent 65%,var(--au-accent-glow));opacity:0.25;pointer-events:none;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
+    /* Faceted card. The video's one light source comes from the upper right
+       ("Beam from upper-right" div in LoginScreen.jsx) — the card reads as
+       an object it actually touches, not a decal, via three cues keyed to
+       that same corner: the ::before glow now lives ONLY at top-right
+       (previously a symmetric two-corner sheen with no relationship to the
+       footage), the drop-shadow below leans away from it, and the near
+       corner is the one spot on the card that gets a hint of warm bounce. */
+    .au-card{position:relative;background:linear-gradient(180deg,oklch(0.18 0.012 var(--au-env-h) / 0.85),oklch(0.14 0.01 var(--au-env-h) / 0.92));border:1px solid var(--au-hairline);clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px);backdrop-filter:blur(6px);box-shadow:-14px 22px 40px -14px oklch(0.05 0.02 var(--au-env-h) / 0.55),6px -4px 20px -12px var(--au-accent-glow)}
+    .au-card::before{content:"";position:absolute;inset:0;background:linear-gradient(to bottom left,var(--au-accent-glow),transparent 45%);opacity:0.3;pointer-events:none;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
 
     /* Typography */
     .au-eyebrow{font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.32em;text-transform:uppercase;color:var(--au-accent);margin-bottom:14px}
@@ -2087,10 +1971,12 @@
     .au-creed{font-family:var(--au-font-body);font-style:italic;font-size:14px;line-height:1.55;color:var(--au-text-dim);margin:0 0 26px;max-width:36ch}
     .au-label{display:block;font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--au-text-faint);margin-bottom:8px}
 
-    /* Input */
-    .au-input{width:100%;background:oklch(0.1 0.005 60);border:1px solid var(--au-hairline);color:var(--au-text);font:400 15px/1.4 var(--au-font-body);padding:13px 14px;border-radius:2px;outline:none;transition:border-color 0.18s,box-shadow 0.18s,background 0.18s}
+    /* Input — recessed like a carved-out cutout rather than a flat swatch;
+       gold only shows up on focus (the one moment this element "catches
+       the light"), matching the beam being the scene's single accent. */
+    .au-input{width:100%;background:oklch(0.1 0.008 var(--au-env-h));border:1px solid var(--au-hairline);color:var(--au-text);font:400 15px/1.4 var(--au-font-body);padding:13px 14px;border-radius:2px;outline:none;box-shadow:inset 0 1px 3px oklch(0.02 0.01 var(--au-env-h) / 0.6);transition:border-color 0.18s,box-shadow 0.18s,background 0.18s}
     .au-input::placeholder{color:var(--au-text-faint)}
-    .au-input:focus{border-color:var(--au-accent);box-shadow:0 0 0 3px var(--au-accent-soft),inset 0 0 24px oklch(0.74 0.11 75 / 0.04);background:oklch(0.12 0.006 60)}
+    .au-input:focus{border-color:var(--au-accent);box-shadow:inset 0 1px 3px oklch(0.02 0.01 var(--au-env-h) / 0.6),0 0 0 3px var(--au-accent-soft),inset 0 0 24px oklch(0.74 0.11 75 / 0.04);background:oklch(0.12 0.01 var(--au-env-h))}
     .au-input-wrap{position:relative}
     .au-input-action{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--au-text-dim);font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;padding:6px 8px;transition:color .15s}
     .au-input-action:hover{color:var(--au-accent)}
@@ -2135,10 +2021,6 @@
     /* Spinner */
     .au-spin{width:14px;height:14px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:au-spin-anim 0.7s linear infinite;flex-shrink:0}
     @keyframes au-spin-anim{to{transform:rotate(360deg)}}
-
-    /* Back link */
-    .au-back-link{background:none;border:0;padding:0;color:var(--au-text-faint);font-family:var(--au-font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;transition:color .15s;display:inline-flex;align-items:center;gap:6px}
-    .au-back-link:hover{color:var(--au-text)}
 
     /* Two-column login layout */
     .au-login-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;width:100%;max-width:1280px;margin:0 auto;align-items:center}
@@ -2189,11 +2071,11 @@
          left stranded mid-keyframe once that animation is neutralised. */
       .scroll-reveal { opacity: 1; transform: none; }
       .sheet-slide-up, .sheet-enter-left, .sheet-enter-right,
-      .ui-sheet-pop, .lib-home-section {
+      .ui-sheet-pop, .lib-home-section, .orb-action {
         animation: none; opacity: 1; transform: none;
       }
       /* Purely decorative loops — stop outright rather than run 500×/s. */
-      .lib-hero-orb, .lw-dot { animation: none; }
+      .lib-hero-orb, .lw-dot, .sf-xp-sweep { animation: none; }
       .pt { display: none; }
       /* Hover/press displacement reads as motion too. */
       .lib-hero-card:hover, .lib-muscle-tile:hover, .lib-discover-card:hover,

@@ -3,6 +3,7 @@ import { MUSCLE_META } from '../../data/constants';
 import { getMuscleColor } from '../../utils/xp';
 import { MUSCLE_OPTS, EQUIP_OPTS } from './exerciseFilterOptions';
 import { matchesFacets, matchesAll, facetCounts, muscleKeys, typeKeys, equipKeys, NO_FACET } from './matchesFacets';
+import { DISCOVER_CATEGORY_GROUPS, DISCOVER_CATEGORIES_BY_KEY } from './discoverCategories';
 
 /**
  * Memoized derivations for the exercise library tab.
@@ -26,38 +27,15 @@ import { matchesFacets, matchesAll, facetCounts, muscleKeys, typeKeys, equipKeys
 export const LIB_ALL_MUSCLE_OPTS = MUSCLE_OPTS;
 export const LIB_ALL_EQUIP_OPTS = EQUIP_OPTS;
 
-// Training recency buckets, in days since the muscle group was last worked.
-// "cold" is the fog: never trained, or long enough ago that it no longer
-// counts toward anything.
-const MUSCLE_HEAT = [
-  { state: 'hot', maxDays: 3 },
-  { state: 'warm', maxDays: 7 },
-  { state: 'fading', maxDays: 14 },
-];
-const MUSCLE_VOLUME_WINDOW_DAYS = 14;
-
 export function useExerciseFilters({
-  allExercises: rawExercises,
+  allExercises,
   _exReady,
-  exerciseLog,
-  gymKit,
+  discoverPicks,
   libSearchDebounced,
   libTypeFilters,
   libMuscleFilters,
   libEquipFilters,
 }) {
-  // Gym kit — the equipment the user actually has. Applied once here as a
-  // pre-filter rather than threaded through each derivation, so the list, the
-  // faceted counts, the muscle tiles and the discover rows all agree without
-  // any of them having to know the setting exists.
-  //
-  // null means unset: show everything. Bodyweight is always available, so it
-  // is never gated — otherwise an empty kit would empty the catalog.
-  const allExercises = useMemo(() => {
-    if (!Array.isArray(gymKit)) return rawExercises;
-    const owned = new Set([...gymKit, "bodyweight"]);
-    return rawExercises.filter(ex => owned.has((ex.equipment || "bodyweight").toLowerCase().trim()));
-  }, [rawExercises, gymKit]);
 
   // Single-pass per-muscle count index. Replaces the 12 separate
   // allExercises.filter passes the old MUSCLE_CARD_DATA did per render.
@@ -139,73 +117,42 @@ export function useExerciseFilters({
     [libAvailableEquip, libEquipFilters]
   );
 
-  // Per-muscle training heat — how recently and how hard each group was
-  // worked. "What should I train today?" is currently a question you answer
-  // from memory; this turns it into something the tab can show. Consumed by
-  // the torch strip on the home view, and the data layer an anatomy map
-  // would sit on.
-  const libMuscleMapData = useMemo(() => {
-    const now = Date.now();
-    const byGroup = new Map(); // mg -> { lastMs, sets }
-    const windowMs = MUSCLE_VOLUME_WINDOW_DAYS * 86400000;
-
-    for (const entry of exerciseLog || []) {
-      // Deliberately the unfiltered list: you may have logged something with
-      // equipment you no longer own, and that history still counts toward
-      // whether the muscle has been trained.
-      const ex = rawExercises.find(e => e.id === entry.exId);
-      const mg = (ex && ex.muscleGroup || '').toLowerCase().trim();
-      if (!mg) continue;
-      const t = entry.dateKey ? new Date(entry.dateKey).getTime() : NaN;
-      if (!Number.isFinite(t)) continue;
-      const rec = byGroup.get(mg) || { lastMs: 0, sets: 0 };
-      if (t > rec.lastMs) rec.lastMs = t;
-      if (now - t <= windowMs) rec.sets += parseInt(entry.sets) || 1;
-      byGroup.set(mg, rec);
-    }
-
-    const peak = Math.max(1, ...[...byGroup.values()].map(v => v.sets));
-
-    return LIB_ALL_MUSCLE_OPTS.filter(m => m !== 'full_body').map(mg => {
-      const meta = MUSCLE_META[mg] || { emoji: '💪', label: mg.charAt(0).toUpperCase() + mg.slice(1) };
-      const rec = byGroup.get(mg);
-      const days = rec ? Math.max(0, Math.floor((now - rec.lastMs) / 86400000)) : null;
-      const bucket = days == null ? null : MUSCLE_HEAT.find(b => days <= b.maxDays);
-      return {
-        mg,
-        label: meta.label,
-        emoji: meta.emoji,
-        color: getMuscleColor(mg),
-        daysSinceTrained: days,
-        // 0..1, relative to the busiest group — an absolute set count means
-        // nothing without knowing the rest of the week.
-        volume: rec ? Math.min(1, rec.sets / peak) : 0,
-        state: bucket ? bucket.state : 'cold',
-      };
-    // Coldest first: the whole point is surfacing what you have been avoiding.
-    }).sort((a, b) => (b.daysSinceTrained ?? Infinity) - (a.daysSinceTrained ?? Infinity));
-  }, [exerciseLog, rawExercises]);
-
-  // Library home view — discover rows. Each row was an independent
-  // allExercises.filter() pass per render; now they're cached together.
+  // Library home view — discover rows, driven by the user's 3 picked
+  // categories (profile.libDiscoverPicks) rather than a hardcoded list, so
+  // the customize menu can swap what shows without touching this hook.
+  // Equipment/muscle categories need the Supabase merge to have landed
+  // (_exReady) before their counts mean anything; a pick made before then
+  // just yields an empty row, same as the old gated rows did.
   const libDiscoverRows = useMemo(() => {
-    const rows = [
-      { label: "Beginner Friendly", exercises: allExercises.filter(ex => (ex.baseXP || 0) < 45).slice(0, 15) },
-      { label: "Advanced Challenges", exercises: allExercises.filter(ex => (ex.baseXP || 0) >= 60).slice(0, 15) },
-    ];
-    if (_exReady) {
-      rows.push(
-        { label: "Bodyweight Only", exercises: allExercises.filter(ex => (ex.equipment || "bodyweight").toLowerCase() === "bodyweight").slice(0, 15) },
-        { label: "Dumbbell Exercises", exercises: allExercises.filter(ex => (ex.equipment || "").toLowerCase() === "dumbbell").slice(0, 15) },
-        { label: "Barbell Essentials", exercises: allExercises.filter(ex => (ex.equipment || "").toLowerCase() === "barbell").slice(0, 15) },
-      );
+    if (!_exReady) return [];
+    return (discoverPicks || [])
+      .map(key => DISCOVER_CATEGORIES_BY_KEY[key])
+      .filter(Boolean)
+      .map(cat => ({
+        key: cat.key,
+        label: cat.label,
+        seeAll: cat.seeAll || null,
+        exercises: allExercises.filter(cat.match).slice(0, 15),
+      }));
+  }, [allExercises, _exReady, discoverPicks]);
+
+  // Every candidate category's count against the current catalog, for the
+  // customize menu to show alongside each option — computed once per
+  // catalog change rather than per dropdown open.
+  const libDiscoverCategoryCounts = useMemo(() => {
+    const counts = new Map();
+    if (!_exReady) return counts;
+    for (const group of DISCOVER_CATEGORY_GROUPS) {
+      for (const cat of group.categories) {
+        let n = 0;
+        for (const ex of allExercises) if (cat.match(ex)) n++;
+        counts.set(cat.key, n);
+      }
     }
-    return rows;
+    return counts;
   }, [allExercises, _exReady]);
 
   return {
-    // How many exercises the gym-kit filter leaves, for the UI to report.
-    libKitCount: allExercises.length,
     libFiltered,
     libAvailableMuscles,
     libAvailableEquip,
@@ -215,8 +162,8 @@ export function useExerciseFilters({
     libTypeCounts,
     libMuscleCountsByGroup,
     libMuscleCardData,
-    libMuscleMapData,
     libDiscoverRows,
+    libDiscoverCategoryCounts,
     libMuscleOpts,
     libEquipOpts,
   };
