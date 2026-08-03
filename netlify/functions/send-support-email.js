@@ -1,5 +1,6 @@
 import { verifyTurnstile } from "./_lib/turnstile.js";
 import { renderEmail, escapeHtml } from "./_lib/emailTemplate.js";
+import { checkRateLimit } from "./_lib/rateLimit.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_TYPES = new Set(["bug", "idea", "help"]);
@@ -20,32 +21,6 @@ function denyOrigin(origin) {
   return !ALLOWED_ORIGINS.has(origin);
 }
 
-async function checkRateLimit(ip) {
-  // Calls the SECURITY DEFINER RPC `check_anon_rate_limit` defined in
-  // scripts/security/05-anon-rate-limit.sql. Default policy: 5 requests per
-  // 15 minutes per (kind, ip). Failing open (returning true) on transport
-  // errors keeps support-email working if Supabase is briefly unreachable.
-  const url  = process.env.SUPABASE_URL;
-  const anon = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anon) return true;
-  try {
-    const res = await fetch(`${url}/rest/v1/rpc/check_anon_rate_limit`, {
-      method: "POST",
-      headers: {
-        apikey: anon,
-        Authorization: `Bearer ${anon}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ p_kind: "support_email", p_ip: ip || "" }),
-    });
-    if (!res.ok) return true;
-    const ok = await res.json();
-    return Boolean(ok);
-  } catch {
-    return true;
-  }
-}
-
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -58,7 +33,7 @@ export default async (req) => {
   const ip = req.headers.get("x-nf-client-connection-ip")
           || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
           || "";
-  if (!(await checkRateLimit(ip))) {
+  if (!(await checkRateLimit(ip, "support_email"))) {
     return new Response(JSON.stringify({ error: "Too many requests" }), {
       status: 429, headers: { "Content-Type": "application/json" },
     });

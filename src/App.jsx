@@ -6774,18 +6774,24 @@ function App() {
               setFeedbackSent(true);
               if (type === "help") setHelpConfirmShown(true);
               setFeedbackText("");
-              // Store in Supabase
+              // Store via the server (Turnstile + rate-limit + validation —
+              // the RLS policy that allowed a direct client insert is gone).
               try {
-                await sb.from("feedback").insert({
-                  user_id: _optionalChain([authUser, 'optionalAccess', _193 => _193.id]) || null,
-                  email: email || "anonymous",
-                  type,
-                  message: msg,
-                  account_id: acctId || null,
-                  created_at: new Date().toISOString()
+                await fetch("/api/submit-feedback", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    type,
+                    message: msg,
+                    email,
+                    userId: _optionalChain([authUser, 'optionalAccess', _193 => _193.id]) || null,
+                    turnstileToken: tsToken
+                  })
                 });
               } catch (e) {
-                console.log("Supabase feedback insert failed:", e);
+                console.log("Feedback store failed:", e);
               }
               // Send email to support@aurisargames.com for all types
               try {
