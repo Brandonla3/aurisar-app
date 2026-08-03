@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { FogDriver } from './FogDriver.js';
 import { playlistStateAt } from '../../model/skyPlaylist.js';
 import { skyStateFrom } from '../../model/skyModel.js';
+import { cloudFactorAt, applyCloudDimming } from '../../model/cloudShadow.js';
 
 const colorSlot = () => ({
   r: 0, g: 0, b: 0, a: 1,
@@ -81,13 +82,37 @@ describe('FogDriver.update', () => {
     expect(domeState).toBe(s); // identity, not a copy — one evaluation, all consumers
   });
 
-  it('matches the pure pipeline exactly — the driver adds no opinion', () => {
+  it('matches the pure pipeline exactly — playlist, then cloud dimming, no third opinion', () => {
     const scene = fakeScene();
     const d = new FogDriver(scene, {}, { epochMs: 1_000, timeScale: 2 });
     const s = d.update(4_321);
-    const expected = skyStateFrom(playlistStateAt(4_321 * 2, 1_000));
+    const rawExpected = skyStateFrom(playlistStateAt(4_321 * 2, 1_000));
+    // Cloud time is nowMs itself, NOT timeScale'd or epoch'd — see FogDriver's
+    // update(): weather drifts on its own clock, independent of the dev-only
+    // timewarp lens that compresses day/night.
+    const expected = applyCloudDimming(rawExpected, cloudFactorAt(4_321));
     expect(s.fogColor).toEqual(expected.fogColor);
     expect(s.fogDensity).toBe(expected.fogDensity);
+    expect(s.sunIntensity).toBe(expected.sunIntensity);
+  });
+
+  it('exposes the evaluated cloud factor alongside state', () => {
+    const scene = fakeScene();
+    const d = new FogDriver(scene);
+    expect(d.cloudFactor).toBeNull();
+    d.update(4_321);
+    expect(d.cloudFactor).toBe(cloudFactorAt(4_321));
+  });
+
+  it('cloud dimming actually reaches the scene — sun intensity is the dimmed value, not the raw stance one', () => {
+    // Pins that update() writes the CLOUD-DIMMED state, not skyStateFrom's
+    // direct output — the P4c behavior change this file's header documents.
+    const scene = fakeScene();
+    const sun = fakeLight();
+    const d = new FogDriver(scene, { sunLight: sun });
+    d.update(4_321);
+    const rawExpected = skyStateFrom(playlistStateAt(4_321));
+    expect(sun.intensity).toBeCloseTo(rawExpected.sunIntensity * cloudFactorAt(4_321), 10);
   });
 
   it('exposes the last state for mood-bus readers, null before first tick', () => {

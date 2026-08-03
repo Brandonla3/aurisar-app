@@ -10,6 +10,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
+import { selfShadowStrength } from '../../model/selfShadow.js';
 
 let buildTerrainMaterial, RealmFnBlock, createFbmBlock, createTerrainPaintBlock, TERRAIN_PALETTE;
 let engine;
@@ -56,8 +57,8 @@ describe('buildTerrainMaterial — the dual-backend proof', () => {
   it('builds under GLSL (WebGL2)', async () => {
     const scene = newScene();
     try {
-      const nm = await buildTerrainMaterial(scene, { shaderLanguage: BABYLON.ShaderLanguage.GLSL });
-      expect(nm.getClassName()).toBe('NodeMaterial');
+      const { material } = await buildTerrainMaterial(scene, { shaderLanguage: BABYLON.ShaderLanguage.GLSL });
+      expect(material.getClassName()).toBe('NodeMaterial');
     } finally {
       scene.dispose();
     }
@@ -69,8 +70,8 @@ describe('buildTerrainMaterial — the dual-backend proof', () => {
     // error rejects in CI.
     const scene = newScene();
     try {
-      const nm = await buildTerrainMaterial(scene, { shaderLanguage: BABYLON.ShaderLanguage.WGSL });
-      expect(nm.getClassName()).toBe('NodeMaterial');
+      const { material } = await buildTerrainMaterial(scene, { shaderLanguage: BABYLON.ShaderLanguage.WGSL });
+      expect(material.getClassName()).toBe('NodeMaterial');
     } finally {
       scene.dispose();
     }
@@ -83,9 +84,9 @@ describe('buildTerrainMaterial — the dual-backend proof', () => {
     const sceneB = newScene();
     try {
       const a = await buildTerrainMaterial(sceneA, { shaderLanguage: BABYLON.ShaderLanguage.GLSL, name: 'a' });
-      const glslPaint = a.attachedBlocks.find((b) => b.getClassName() === 'RealmFnBlock');
+      const glslPaint = a.material.attachedBlocks.find((b) => b.getClassName() === 'RealmFnBlock');
       const b = await buildTerrainMaterial(sceneB, { shaderLanguage: BABYLON.ShaderLanguage.WGSL, name: 'b' });
-      const wgslPaint = b.attachedBlocks.find((x) => x.getClassName() === 'RealmFnBlock');
+      const wgslPaint = b.material.attachedBlocks.find((x) => x.getClassName() === 'RealmFnBlock');
 
       expect(glslPaint._lastEmittedSource).toContain('vec3 realmTerrainPaint(');
       expect(wgslPaint._lastEmittedSource).toContain('fn realmTerrainPaint(');
@@ -99,10 +100,100 @@ describe('buildTerrainMaterial — the dual-backend proof', () => {
   it('participates in scene fog and lighting', async () => {
     const scene = newScene();
     try {
-      const nm = await buildTerrainMaterial(scene);
-      const classes = nm.attachedBlocks.map((b) => b.getClassName());
+      const { material } = await buildTerrainMaterial(scene);
+      const classes = material.attachedBlocks.map((b) => b.getClassName());
       expect(classes).toContain('FogBlock');
       expect(classes).toContain('LightBlock');
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('wires LightBlock.shadow into diffuse — NOT left as a dangling, silently-ignored output', async () => {
+    // Real bug this pins: LightBlock.diffuseOutput does NOT include shadow
+    // attenuation on its own (verified against the generated GLSL — the
+    // compiled main() computes `diffuseOutput * shadow` explicitly). A
+    // material that only reads diffuseOutput builds and runs with zero
+    // errors, `mesh.receiveShadows` reads true, and cast shadows simply never
+    // appear — a silent gap that only shows up as a missing shadow in the
+    // browser, never in a test that only checks "did it build".
+    const scene = newScene();
+    try {
+      const { material } = await buildTerrainMaterial(scene);
+      const lights = material.attachedBlocks.find((b) => b.getClassName() === 'LightBlock');
+      expect(lights.shadow.isConnected).toBe(true);
+      const consumer = lights.shadow.endpoints[0].ownerBlock;
+      expect(consumer.getClassName()).toBe('MultiplyBlock');
+      // And that multiply's output must reach `shade` (ambient + diffuse),
+      // not dead-end in an unused block.
+      expect(consumer.output.endpoints.length).toBeGreaterThan(0);
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('builds fine in a scene with no active ShadowGenerator — shadow wiring has no hard dependency', async () => {
+    // newScene() above never creates a ShadowGenerator; every other test in
+    // this file already builds successfully against it post-wiring, but this
+    // pins the property explicitly rather than leaving it implicit.
+    const scene = newScene();
+    try {
+      const { material } = await buildTerrainMaterial(scene);
+      expect(material.getClassName()).toBe('NodeMaterial');
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
+describe('buildTerrainMaterial — self-shadow wiring', () => {
+  it('reads a vertex color attribute, not a second RealmFnBlock', async () => {
+    // The self-shadow multiply is built from stock NME blocks (Multiply,
+    // Subtract, VectorSplitter) on purpose — terrainShaderLib.js's paint BSL
+    // is untouched, so this feature carries none of the dual-backend-BSL risk.
+    const scene = newScene();
+    try {
+      const { material } = await buildTerrainMaterial(scene);
+      const colorInput = material.attachedBlocks.find(
+        (b) => b.getClassName() === 'InputBlock' && b.name === 'color',
+      );
+      expect(colorInput).toBeTruthy();
+      expect(colorInput.isAttribute).toBe(true);
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('applyState sets the selfShadowStrength uniform from sunDir[1], via the real curve', async () => {
+    const scene = newScene();
+    try {
+      const { material, applyState } = await buildTerrainMaterial(scene);
+      const strengthInput = material.attachedBlocks.find(
+        (b) => b.getClassName() === 'InputBlock' && b.name === 'selfShadowStrength',
+      );
+      applyState({ sunDir: [0, 0.95, 0] }); // near-overhead sun -> weak self-shadow
+      const overhead = strengthInput.value;
+      applyState({ sunDir: [0, 0.1, 0] }); // grazing sun -> strong self-shadow
+      const grazing = strengthInput.value;
+
+      expect(grazing).toBeGreaterThan(overhead);
+      expect(grazing).toBeCloseTo(selfShadowStrength(0.1), 10);
+      expect(overhead).toBeCloseTo(selfShadowStrength(0.95), 10);
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('the shadow multiply sits between `lit` and `fog`, not upstream of the paint block', async () => {
+    // Pins the deliberate ordering: self-shadow darkens the FULLY-LIT result,
+    // not the raw albedo — so it never fights the diffuse/ambient blend.
+    const scene = newScene();
+    try {
+      const { material } = await buildTerrainMaterial(scene);
+      const fog = material.attachedBlocks.find((b) => b.getClassName() === 'FogBlock');
+      const litShadowed = material.attachedBlocks.find((b) => b.name === 'litShadowed');
+      expect(litShadowed).toBeTruthy();
+      expect(fog.input.connectedPoint.ownerBlock).toBe(litShadowed);
     } finally {
       scene.dispose();
     }

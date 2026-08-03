@@ -67,23 +67,23 @@ const smoothstep = (e0, e1, x) => {
 export function createTerrainField(config = DEFAULT_TERRAIN) {
   const c = { ...DEFAULT_TERRAIN, ...config };
 
-  function surfaceY(x, z) {
+  /**
+   * The three shared layer scalars, computed once so surfaceY and
+   * shadeProxyAt (below) never evaluate the same noise twice. `mountainMask`
+   * and `channel` are also the exact terms surfaceY already blended with —
+   * shadeProxyAt reads the SAME values surfaceY produced this call, not a
+   * second, possibly-drifted sample of "the same" noise.
+   */
+  function computeLayers(x, z) {
     const r = Math.hypot(x, z);
 
-    // Base rolling hills.
-    let y = fbm2(x * c.baseFrequency, z * c.baseFrequency, {
-      octaves: c.baseOctaves, seed: c.seed,
-    }) * c.baseAmplitudeM;
-
-    // Mountains: ridged noise on a warped domain, fading in with distance so
-    // the world reads as "vale ringed by crags" — dramatic horizon, safe center.
     const mountainMask = smoothstep(c.mountainStartM, c.mountainFullM, r);
+    let ridge = 0;
     if (mountainMask > 0) {
       const w = warp2(x, z, { seed: c.seed + 101, amplitude: c.mountainWarpM, frequency: c.mountainFrequency });
-      const ridge = ridged2(w.x * c.mountainFrequency, w.z * c.mountainFrequency, {
+      ridge = ridged2(w.x * c.mountainFrequency, w.z * c.mountainFrequency, {
         octaves: c.mountainOctaves, seed: c.seed + 211,
       });
-      y += ridge * c.mountainAmplitudeM * mountainMask;
     }
 
     // Ravines: a warped channel where noise crosses zero. |n| < width means
@@ -93,15 +93,67 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
       octaves: 3, seed: c.seed + 401,
     });
     const channel = 1 - smoothstep(0, c.ravineWidth, Math.abs(rn));
+
+    // Spawn vale: how strongly (x, z) sits in the flattened arrival ground.
+    // Shared because shadeProxyAt needs to know "no ravine cut reads here"
+    // for exactly the same footprint surfaceY flattens, not a second guess.
+    const valeMask = 1 - smoothstep(c.valeRadiusM, c.valeRadiusM + c.valeFalloffM, r);
+
+    return {
+      r, mountainMask, ridge, channel, valeMask,
+    };
+  }
+
+  function surfaceY(x, z) {
+    const {
+      mountainMask, ridge, channel, valeMask,
+    } = computeLayers(x, z);
+
+    // Base rolling hills.
+    let y = fbm2(x * c.baseFrequency, z * c.baseFrequency, {
+      octaves: c.baseOctaves, seed: c.seed,
+    }) * c.baseAmplitudeM;
+
+    // Mountains: ridged noise on a warped domain, fading in with distance so
+    // the world reads as "vale ringed by crags" — dramatic horizon, safe center.
+    y += ridge * c.mountainAmplitudeM * mountainMask;
+
     // Ravines do not cut the spawn vale or the high crags (rivers do not run
     // along ridgelines); mask by the inverse of the mountain mask.
     y -= channel * c.ravineDepthM * (1 - mountainMask);
 
     // Spawn vale: pull toward 0 near origin so arrival ground is gentle.
-    const valeMask = 1 - smoothstep(c.valeRadiusM, c.valeRadiusM + c.valeFalloffM, r);
     y *= 1 - valeMask * 0.85;
 
     return y;
+  }
+
+  /**
+   * A direction-agnostic "how structurally recessed is this patch" proxy in
+   * [0, 1], baked once per vertex at chunk-gen time and painted as a self-
+   * shadow tint. This is NOT occlusion: it has no idea what geometry sits
+   * between (x, z) and the sun, so it cannot tell you a specific valley is in
+   * a specific mountain's shadow right now. What it can do cheaply (zero new
+   * noise evaluations — `computeLayers` is shared with surfaceY) is darken
+   * the two kinds of terrain that read as "recessed" at any sun angle: ravine
+   * floors (`channel`) and the lee troughs between ridge crests
+   * (`1 - ridge`, masked to the mountain band so open rolling hills are never
+   * darkened by a term that only means something in the crags). Ridge crests
+   * themselves (`ridge` near 1) stay bright — exposed rock, not a cavity.
+   *
+   * `channel` is masked by `(1 - valeMask)` for the same reason surfaceY's
+   * OWN height never shows a ravine cut in the spawn vale: without it, a
+   * point could have a numerically high channel value — suppressed from
+   * affecting HEIGHT by the vale multiplier, so no cut is visible there —
+   * while still painting a dark, unexplained ravine tint right at spawn.
+   */
+  function shadeProxyAt(x, z) {
+    const {
+      mountainMask, ridge, channel, valeMask,
+    } = computeLayers(x, z);
+    const ridgeLee = (1 - ridge) * mountainMask;
+    const channelRecess = channel * (1 - mountainMask) * (1 - valeMask);
+    return Math.min(Math.max(channelRecess * 0.7 + ridgeLee * 0.6, 0), 1);
   }
 
   /**
@@ -126,5 +178,7 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
     return 1 - normalAt(x, z).y;
   }
 
-  return { surfaceY, normalAt, slopeAt, config: c };
+  return {
+    surfaceY, normalAt, slopeAt, shadeProxyAt, config: c,
+  };
 }

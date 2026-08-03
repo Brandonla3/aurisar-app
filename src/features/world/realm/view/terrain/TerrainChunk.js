@@ -24,6 +24,7 @@ export function buildTerrainChunkMesh(scene, payload, material) {
   vd.positions = payload.positions;
   vd.normals = payload.normals;
   vd.uvs = payload.uvs;
+  vd.colors = payload.colors; // baked self-shadow proxy — see terrainChunkGen.js
   vd.indices = payload.indices;
   vd.applyToMesh(mesh, false); // not updatable — terrain never morphs
 

@@ -142,9 +142,12 @@ export function buildSkyDomeMaterial(scene, { name = 'realmSky', shaderLanguage 
  * Rendering groups render in strict ascending order (Babylon's
  * RenderingManager, MAX_RENDERINGGROUPS = 4) — a deterministic mechanism, not
  * a sort heuristic. The dome owns group 0; horizonRingNME.js's rings claim
- * group 1 specifically so they always draw after it.
+ * group 1 so they always draw after it; cloudPuffs.js's puffs claim group 2
+ * for the same reason — real, finite, depth-writing geometry floating well
+ * above the ring band, drawn last so a nearer ring or terrain crest can still
+ * correctly occlude a puff behind it.
  */
-export const RENDERING_GROUP = Object.freeze({ SKY: 0, RINGS: 1 });
+export const RENDERING_GROUP = Object.freeze({ SKY: 0, RINGS: 1, CLOUDS: 2 });
 
 /** The dome mesh: camera-locked, depth-write off, never pickable. */
 export function createSkyDome(scene, material) {

@@ -131,6 +131,22 @@ describe('TerrainStreamer.update — unchanged behaviour', () => {
   });
 });
 
+describe('TerrainStreamer — self-shadow vertex colors reach the real mesh', () => {
+  it('a built chunk carries the baked color buffer, not just positions/normals', () => {
+    const scene = new BABYLON.Scene(engine);
+    try {
+      const s = new TerrainStreamer(scene, field, { radius: 0, buildBudgetPerTick: 1 });
+      s.update(0, 0, 0);
+      const mesh = [...scene.meshes].find((m) => m.name.startsWith('terrain_'));
+      const colors = mesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+      expect(colors).toBeTruthy();
+      expect(colors.length).toBeGreaterThan(0);
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
 describe('TerrainStreamer default radius', () => {
   it('reads DEFAULT_STREAM_RADIUS_CHUNKS — the same constant horizonRings.js reads', () => {
     // Not a hardcoded 49: derived from the shared constant, so this test's

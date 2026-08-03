@@ -114,3 +114,41 @@ describe('createTerrainField', () => {
     expect(flat.config.seed).toBe(DEFAULT_TERRAIN.seed);
   });
 });
+
+describe('shadeProxyAt — the self-shadow bake input', () => {
+  const field = createTerrainField();
+
+  it('is deterministic and stays within [0, 1]', () => {
+    for (const [x, z] of [[0, 0], [50, 0], [0, 120], [300, 300], [-400, 200], [640, -640]]) {
+      const v = field.shadeProxyAt(x, z);
+      expect(v).toBe(field.shadeProxyAt(x, z));
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('open rolling ground well inside the mountain band reads near zero', () => {
+    // Flat vale ground (already asserted gentle by the spawn-vale test above):
+    // no ravine channel, no mountain mask, so both recess terms are ~0.
+    for (let a = 0; a < 8; a++) {
+      const x = Math.cos((a / 8) * Math.PI * 2) * 25;
+      const z = Math.sin((a / 8) * Math.PI * 2) * 25;
+      expect(field.shadeProxyAt(x, z)).toBeLessThan(0.15);
+    }
+  });
+
+  it('reads darker on average out in the mountain band than in the open vale', () => {
+    // Not every mountain-band sample is a lee trough (some sit near a ridge
+    // crest, which reads bright by design) — assert the AVERAGE, matching how
+    // the existing "mountains rise" test compares regions rather than points.
+    let valeSum = 0;
+    let ringSum = 0;
+    const n = 32;
+    for (let a = 0; a < n; a++) {
+      const t = (a / n) * Math.PI * 2;
+      valeSum += field.shadeProxyAt(Math.cos(t) * 25, Math.sin(t) * 25);
+      ringSum += field.shadeProxyAt(Math.cos(t) * 500, Math.sin(t) * 500);
+    }
+    expect(ringSum / n).toBeGreaterThan(valeSum / n);
+  });
+});
