@@ -15,6 +15,14 @@
  * triangle normals would disagree along shared edges and draw a visible seam
  * down every chunk border. Field normals are identical on both sides of an
  * edge by construction.
+ *
+ * Vertex colors carry field.sampleSurface's baked self-shadow recess proxy
+ * (model/terrainField.js), one scalar replicated across r/g/b (alpha 1) so a
+ * raw unlit read of the color channel is a legible debug view of the proxy
+ * on its own. terrainNME.js reads only the red channel at render time.
+ * `sampleSurface`, not separate `surfaceY`+`shadeProxyAt` calls: both read
+ * the SAME computeLayers() result for a given (x, z), so this loop pays for
+ * that shared computation exactly once per vertex, not twice.
  */
 
 import { CHUNK_SIZE_M, TERRAIN_SUBDIVISIONS } from '../model/chunkMath.js';
@@ -26,6 +34,7 @@ export function generateTerrainChunk(field, {
   const positions = new Float32Array(verts * verts * 3);
   const normals = new Float32Array(verts * verts * 3);
   const uvs = new Float32Array(verts * verts * 2);
+  const colors = new Float32Array(verts * verts * 4);
   const indices = new Uint32Array(subdivisions * subdivisions * 6);
 
   const originX = cx * size;
@@ -36,6 +45,7 @@ export function generateTerrainChunk(field, {
 
   let p = 0;
   let uv = 0;
+  let col = 0;
   for (let iz = 0; iz < verts; iz++) {
     for (let ix = 0; ix < verts; ix++) {
       // (ix / subdivisions) * size, NOT ix * (size / subdivisions): at the far
@@ -47,7 +57,7 @@ export function generateTerrainChunk(field, {
       const lz = (iz / subdivisions) * size;
       const wx = originX + lx;
       const wz = originZ + lz;
-      const y = field.surfaceY(wx, wz);
+      const { y, shade } = field.sampleSurface(wx, wz);
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
 
@@ -64,6 +74,12 @@ export function generateTerrainChunk(field, {
       uvs[uv] = ix / subdivisions;
       uvs[uv + 1] = iz / subdivisions;
       uv += 2;
+
+      colors[col] = shade;
+      colors[col + 1] = shade;
+      colors[col + 2] = shade;
+      colors[col + 3] = 1;
+      col += 4;
     }
   }
 
@@ -83,7 +99,7 @@ export function generateTerrainChunk(field, {
 
   return {
     cx, cz, size, subdivisions,
-    positions, normals, uvs, indices,
+    positions, normals, uvs, indices, colors,
     /** For bounding info + streamer debug; world-space Y range of this chunk. */
     minY, maxY,
     originX, originZ,

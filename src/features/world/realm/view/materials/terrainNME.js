@@ -18,14 +18,18 @@
 /* global BABYLON */
 
 import { createTerrainPaintBlock } from './bsl/terrainShaderLib.js';
+import { selfShadowStrength } from '../../model/selfShadow.js';
 
 /**
- * @returns {Promise<object>} resolves with the material once its build has
- *   actually completed. `NodeMaterial.build()` is ASYNC in Babylon 9.18 — it
- *   returns immediately and finishes on a later task (discovered the hard way:
- *   a sync read after build() sees half-initialised state). Awaiting
- *   onBuildObservable is the only honest completion signal, and
- *   onBuildErrorObservable is the only place a bad shader graph reports.
+ * @returns {Promise<{material: object, applyState: (s) => void}>} resolves
+ *   once the material's build has actually completed. `NodeMaterial.build()`
+ *   is ASYNC in Babylon 9.18 — it returns immediately and finishes on a later
+ *   task (discovered the hard way: a sync read after build() sees half-
+ *   initialised state). Awaiting onBuildObservable is the only honest
+ *   completion signal, and onBuildErrorObservable is the only place a bad
+ *   shader graph reports. `applyState` mirrors the dome's and rings' shape —
+ *   same skyState-derived call site, so FogDriver's single evaluation drives
+ *   terrain's self-shadow strength alongside fog, sky and lights.
  */
 export function buildTerrainMaterial(scene, {
   name = 'realmTerrain',
@@ -84,8 +88,24 @@ export function buildTerrainMaterial(scene, {
   worldNormal.output.connectTo(lights.worldNormal);
   cameraPosition.output.connectTo(lights.cameraPosition);
 
-  // shade = ambient + diffuse; lit = albedo * shade. Specular is deliberately
-  // absent — matte painted ground, and one less thing to differ per backend.
+  // Cast-shadow attenuation needs NO extra wiring here — a real mistake in
+  // an earlier version of this file added one. Babylon's own `lightFragment`
+  // shader include (BABYLON.ShaderStore.IncludesShadersStore.lightFragment)
+  // already computes `diffuseBase += info.diffuse * shadow` PER LIGHT, and
+  // `LightBlock.diffuseOutput` IS that accumulated `diffuseBase` — cast
+  // shadows are already folded in before this graph ever sees the value.
+  // The earlier version multiplied `diffuseOutput` by `lights.shadow`
+  // (Babylon's separate `aggShadow` output) a SECOND time, roughly squaring
+  // the attenuation and making cast shadows read far darker than intended.
+  // The "silent gap" this file used to describe never existed for
+  // LightBlock; the actual pre-P4c gap was simply "no ShadowGenerator
+  // existed yet" (ActorShadowRig now provides one) — nothing about this
+  // material's own wiring was ever missing. Caught in PR review, not by any
+  // test written for the wrong fix (see terrainNME.test.js).
+  //
+  // shade = ambient + diffuse (already shadow-attenuated); lit = albedo *
+  // shade. Specular is deliberately absent — matte painted ground, and one
+  // less thing to differ per backend.
   const ambientColor = new BABYLON.InputBlock('ambientColor');
   ambientColor.value = new BABYLON.Color3(ambient.r, ambient.g, ambient.b);
   const shade = new BABYLON.AddBlock('shade');
@@ -103,6 +123,35 @@ export function buildTerrainMaterial(scene, {
   paint.output.connectTo(lit.left);
   shadeClamped.output.connectTo(lit.right);
 
+  // ── Self-shadow: a baked-at-gen-time recess proxy, scaled by how strongly
+  // the CURRENT sun elevation should read it (model/terrainField.js's
+  // shadeProxyAt and model/selfShadow.js's selfShadowStrength). The proxy
+  // lives in vertex color (red channel only — g/b mirror it for a legible
+  // raw-color debug read, see terrainChunkGen.js); strength arrives as a
+  // per-frame uniform via applyState, below. Multiplying AFTER `lit` (not
+  // into `paint`) means self-shadow darkens the fully-lit result rather than
+  // fighting the diffuse/ambient blend upstream of it.
+  const vColor = new BABYLON.InputBlock('color');
+  vColor.setAsAttribute('color');
+  const vColorSplit = new BABYLON.VectorSplitterBlock('vColorSplit');
+  vColor.output.connectTo(vColorSplit.xyzw);
+
+  const shadowStrength = new BABYLON.InputBlock('selfShadowStrength');
+  shadowStrength.value = selfShadowStrength(1); // a reasonable default before the first applyState call
+  const shadowAmount = new BABYLON.MultiplyBlock('shadowAmount');
+  vColorSplit.x.connectTo(shadowAmount.left);
+  shadowStrength.output.connectTo(shadowAmount.right);
+
+  const one = new BABYLON.InputBlock('one');
+  one.value = 1;
+  const shadowFactor = new BABYLON.SubtractBlock('shadowFactor');
+  one.output.connectTo(shadowFactor.left);
+  shadowAmount.output.connectTo(shadowFactor.right);
+
+  const litShadowed = new BABYLON.MultiplyBlock('litShadowed');
+  lit.output.connectTo(litShadowed.left);
+  shadowFactor.output.connectTo(litShadowed.right);
+
   // Scene fog — the EXP2 depth cue is core to the look, so the material must
   // participate or terrain pops against everything else that fogs.
   const view = new BABYLON.InputBlock('view');
@@ -112,7 +161,7 @@ export function buildTerrainMaterial(scene, {
   const fog = new BABYLON.FogBlock('fog');
   worldPos.output.connectTo(fog.worldPosition);
   view.output.connectTo(fog.view);
-  lit.output.connectTo(fog.input);
+  litShadowed.output.connectTo(fog.input);
   fogColor.output.connectTo(fog.fogColor);
 
   const fragmentOutput = new BABYLON.FragmentOutputBlock('fragmentOutput');
@@ -122,7 +171,12 @@ export function buildTerrainMaterial(scene, {
   nm.addOutputNode(fragmentOutput);
 
   return new Promise((resolve, reject) => {
-    nm.onBuildObservable.addOnce(() => resolve(nm));
+    nm.onBuildObservable.addOnce(() => {
+      const applyState = (s) => {
+        shadowStrength.value = selfShadowStrength(s.sunDir[1]);
+      };
+      resolve({ material: nm, applyState });
+    });
     nm.onBuildErrorObservable.addOnce((message) => {
       nm.dispose();
       reject(new Error(`[terrainNME] build failed: ${message}`));

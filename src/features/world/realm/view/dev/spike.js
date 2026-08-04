@@ -25,6 +25,8 @@ import { buildSkyDomeMaterial, createSkyDome } from '../materials/skyDomeNME.js'
 import { buildHorizonRings } from '../materials/horizonRingNME.js';
 import { RING_TIERS } from '../../model/horizonRings.js';
 import { FogDriver } from '../atmosphere/FogDriver.js';
+import { buildCloudPuffs } from '../atmosphere/cloudPuffs.js';
+import { ActorShadowRig } from '../lighting/ActorShadowRig.js';
 import { createWalkerState, integrateWalker } from '../../model/walker.js';
 import {
   BUTTON, createInputSnapshot, resetInputSnapshot, setButton,
@@ -89,7 +91,24 @@ async function boot() {
   // per-frame skyState below; composed here as one applyDomeState closure so
   // FogDriver stays the single writer with multiple readers, not a second one.
   const ringKit = await buildHorizonRings(scene, RING_TIERS);
-  const applyAtmosphereState = (s) => { applyDomeState(s); ringKit.applyState(s); };
+
+  // ── Clouds (P4c): no cloud renderer, just a light-level dip + a handful of
+  // cheap visible puffs riding the near ring's own radius ─────────────────────
+  const cloudKit = buildCloudPuffs(scene);
+
+  // ── Terrain ─────────────────────────────────────────────────────────────────
+  // P3: the painted NodeMaterial — slope/height splat + noise variation,
+  // authored once in BSL, transpiled to whichever backend this page runs on.
+  const field = createTerrainField();
+  // P4c: applyState carries selfShadowStrength — the CURRENT sun elevation
+  // scaling how strongly terrainChunkGen.js's baked recess proxy reads.
+  const { material: groundMat, applyState: applyGroundState } = await buildTerrainMaterial(scene);
+  const streamer = new TerrainStreamer(scene, field, { radius: 3, material: groundMat });
+
+  // One closure composing every skyState reader — dome, rings, and now
+  // terrain's self-shadow uniform — so FogDriver stays the single writer
+  // with multiple readers, not a second one.
+  const applyAtmosphereState = (s) => { applyDomeState(s); ringKit.applyState(s); applyGroundState(s); };
 
   // ?timewarp=40 compresses the 40-min cycle into one minute for verification.
   const timewarp = Number(new URLSearchParams(location.search).get('timewarp')) || 1;
@@ -98,13 +117,6 @@ async function boot() {
     ambientLight: fill,
     applyDomeState: applyAtmosphereState,
   }, { timeScale: timewarp });
-
-  // ── Terrain ─────────────────────────────────────────────────────────────────
-  // P3: the painted NodeMaterial — slope/height splat + noise variation,
-  // authored once in BSL, transpiled to whichever backend this page runs on.
-  const field = createTerrainField();
-  const groundMat = await buildTerrainMaterial(scene);
-  const streamer = new TerrainStreamer(scene, field, { radius: 3, material: groundMat });
 
   // ── Player: a capsule with a nose so facing is visible ─────────────────────
   let walker = createWalkerState(0, 0, field);
@@ -121,6 +133,32 @@ async function boot() {
   nose.position.set(0, 1.4, 0.5);
   nose.rotation.x = Math.PI / 2;
   nose.material = bodyMat;
+
+  // ── Actor shadows (P4c): a real-time shadow for whatever is near the player,
+  // none at all for whatever is far ────────────────────────────────────────
+  // The player capsule is registered unpinned — at a chase-camera distance of
+  // a couple meters from its own focus point, it always classifies 'near' by
+  // ordinary distance anyway; pin: true exists for a FUTURE combat-target
+  // override, not the local player.
+  const actorShadowRig = new ActorShadowRig(scene, key);
+  actorShadowRig.addCaster(body);
+
+  // TEMPORARY stand-ins, not real actors: P6-P9 (rigging, skinning, actor
+  // hierarchy) haven't landed, so there is nothing else in the Realm yet to
+  // exercise the far bucket with. Both static: walk close to one and its
+  // bucket flips to 'near' with a real cast shadow; walk away and it goes
+  // dark again. Delete both the moment a real distant actor exists.
+  const sentinelMat = new BABYLON.StandardMaterial('sentinelMat', scene);
+  sentinelMat.diffuseColor = new BABYLON.Color3(0.55, 0.25, 0.25);
+  const sentinelAt = (name, x, z) => {
+    const m = BABYLON.MeshBuilder.CreateBox(name, { size: 2 }, scene);
+    m.position.set(x, field.surfaceY(x, z) + 1, z);
+    m.material = sentinelMat;
+    actorShadowRig.addCaster(m);
+    return m;
+  };
+  const sentinelA = sentinelAt('sentinelA', 150, 0);
+  const sentinelB = sentinelAt('sentinelB', -200, 150);
 
   // ── Chase camera ────────────────────────────────────────────────────────────
   const camera = new BABYLON.ArcRotateCamera('chase', -Math.PI / 2, Math.PI / 3.1, 11,
@@ -183,6 +221,13 @@ async function boot() {
     // Rings are built at world origin; without this they never move, and
     // "just beyond the streamed disc" would only be true near spawn.
     ringKit.recenter(walker.x, walker.z);
+    // Puffs drift and wrap relative to wherever the player IS, same reason.
+    cloudKit.update(walker.x, walker.z, nowMs);
+
+    // Bucket every registered caster by distance from the camera's FOCUS
+    // point (not the camera itself — an orbiting chase camera changing
+    // radius must not flip every actor's bucket on its own).
+    actorShadowRig.update(camera.target);
   });
 
   // ── GUI (the P0 ADT proof, kept) ───────────────────────────────────────────
@@ -217,12 +262,14 @@ async function boot() {
       `chunks    : ${streamer.residentCount()} resident${streamer.isSettledVisually() ? '' : ' (fading)'}`,
       `sky       : ${fogDriver.state?.fogDensity != null ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
       `rings     : ${ringKit.meshes.length}`,
+      `clouds    : ${cloudKit.meshes.length} puffs, factor ${fogDriver.cloudFactor != null ? fogDriver.cloudFactor.toFixed(2) : '?'}`,
+      `shadows   : player=${actorShadowRig.bucketOf(body)} sentinelA=${actorShadowRig.bucketOf(sentinelA)} sentinelB=${actorShadowRig.bucketOf(sentinelB)}`,
       `fps       : ${engine.getFps().toFixed(0)}`,
     ].join('\n');
   }, 250);
 
   window.__realmSpike = {
-    engine, scene, adt, field, streamer, camera, fogDriver, ringKit, getWalker: () => walker,
+    engine, scene, adt, field, streamer, camera, fogDriver, ringKit, cloudKit, actorShadowRig, getWalker: () => walker,
   };
 }
 

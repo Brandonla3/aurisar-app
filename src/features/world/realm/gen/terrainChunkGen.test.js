@@ -12,7 +12,17 @@ describe('generateTerrainChunk', () => {
     expect(chunk.positions).toHaveLength(verts * 3);
     expect(chunk.normals).toHaveLength(verts * 3);
     expect(chunk.uvs).toHaveLength(verts * 2);
+    expect(chunk.colors).toHaveLength(verts * 4);
     expect(chunk.indices).toHaveLength(8 * 8 * 6);
+  });
+
+  it('colors carry field.shadeProxyAt, replicated across r/g/b with alpha 1', () => {
+    // Vertex 0 is local (0,0) at this chunk's origin (0,0) -> world (0,0).
+    const shade = field.shadeProxyAt(0, 0);
+    expect(chunk.colors[0]).toBeCloseTo(shade, 6); // r
+    expect(chunk.colors[1]).toBeCloseTo(shade, 6); // g
+    expect(chunk.colors[2]).toBeCloseTo(shade, 6); // b
+    expect(chunk.colors[3]).toBe(1); // a
   });
 
   it('every index is a valid vertex', () => {

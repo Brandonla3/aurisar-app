@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { valueNoise2, fbm2, ridged2, hash2 } from './noise.js';
 import { createTerrainField, DEFAULT_TERRAIN } from './terrainField.js';
 
@@ -112,5 +112,88 @@ describe('createTerrainField', () => {
     const flat = createTerrainField({ baseAmplitudeM: 0, mountainAmplitudeM: 0, ravineDepthM: 0 });
     expect(flat.surfaceY(123, 456)).toBe(0);
     expect(flat.config.seed).toBe(DEFAULT_TERRAIN.seed);
+  });
+});
+
+describe('shadeProxyAt — the self-shadow bake input', () => {
+  const field = createTerrainField();
+
+  it('is deterministic and stays within [0, 1]', () => {
+    for (const [x, z] of [[0, 0], [50, 0], [0, 120], [300, 300], [-400, 200], [640, -640]]) {
+      const v = field.shadeProxyAt(x, z);
+      expect(v).toBe(field.shadeProxyAt(x, z));
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('open rolling ground well inside the mountain band reads near zero', () => {
+    // Flat vale ground (already asserted gentle by the spawn-vale test above):
+    // no ravine channel, no mountain mask, so both recess terms are ~0.
+    for (let a = 0; a < 8; a++) {
+      const x = Math.cos((a / 8) * Math.PI * 2) * 25;
+      const z = Math.sin((a / 8) * Math.PI * 2) * 25;
+      expect(field.shadeProxyAt(x, z)).toBeLessThan(0.15);
+    }
+  });
+
+  it('reads darker on average out in the mountain band than in the open vale', () => {
+    // Not every mountain-band sample is a lee trough (some sit near a ridge
+    // crest, which reads bright by design) — assert the AVERAGE, matching how
+    // the existing "mountains rise" test compares regions rather than points.
+    let valeSum = 0;
+    let ringSum = 0;
+    const n = 32;
+    for (let a = 0; a < n; a++) {
+      const t = (a / n) * Math.PI * 2;
+      valeSum += field.shadeProxyAt(Math.cos(t) * 25, Math.sin(t) * 25);
+      ringSum += field.shadeProxyAt(Math.cos(t) * 500, Math.sin(t) * 500);
+    }
+    expect(ringSum / n).toBeGreaterThan(valeSum / n);
+  });
+});
+
+describe('sampleSurface — the shared gen-time entry point', () => {
+  const field = createTerrainField();
+
+  it('agrees exactly with calling surfaceY and shadeProxyAt separately', () => {
+    // The two must never disagree — sampleSurface exists to share ONE
+    // computeLayers() call, not to compute a different answer.
+    for (const [x, z] of [[0, 0], [50, 0], [0, 120], [300, 300], [-400, 200], [640, -640]]) {
+      const { y, shade } = field.sampleSurface(x, z);
+      expect(y).toBe(field.surfaceY(x, z));
+      expect(shade).toBe(field.shadeProxyAt(x, z));
+    }
+  });
+
+  it('actually shares ONE computeLayers call — not just numerically equal outputs', () => {
+    // The previous test alone is too weak: a naive re-split (sampleSurface
+    // internally calling surfaceY then shadeProxyAt as two independent
+    // computeLayers evaluations) would still pass it, since the OUTPUT is
+    // identical either way — that was the exact shape of the bug PR review
+    // caught. computeLayers calls Math.hypot(x, z) exactly ONCE, and nothing
+    // downstream of it (heightFromLayers, shadeFromLayers) calls Math.hypot
+    // again — so counting real Math.hypot calls is a genuine, dependency-free
+    // proxy for "how many times did computeLayers actually run", independent
+    // of ESM import-binding spy subtleties a noise.js mock would carry.
+    const hypotSpy = vi.spyOn(Math, 'hypot');
+    try {
+      hypotSpy.mockClear();
+      field.sampleSurface(200, 300);
+      expect(hypotSpy).toHaveBeenCalledTimes(1);
+
+      hypotSpy.mockClear();
+      field.surfaceY(200, 300);
+      field.shadeProxyAt(200, 300);
+      expect(hypotSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      hypotSpy.mockRestore();
+    }
+  });
+
+  it('is deterministic', () => {
+    const a = field.sampleSurface(123.4, -56.7);
+    const b = field.sampleSurface(123.4, -56.7);
+    expect(a).toEqual(b);
   });
 });
