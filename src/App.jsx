@@ -6770,26 +6770,15 @@ function App() {
               const email = feedbackEmail.trim();
               const acctId = feedbackAccountId.trim();
               const tsToken = turnstileToken;
-              // Show success immediately (optimistic UI)
-              setFeedbackSent(true);
-              if (type === "help") setHelpConfirmShown(true);
-              setFeedbackText("");
-              // Store in Supabase
+              // One call does the store, the support email, and (for bug/
+              // idea) the GitHub issue. This used to be three separate
+              // fetches sharing one Cloudflare Turnstile token — tokens are
+              // single-use, so once TURNSTILE_SECRET_KEY is live the first
+              // to verify would consume it and the other two would 403.
+              // Success is real now too: it waits on the response instead
+              // of assuming the fetch that follows will work.
               try {
-                await sb.from("feedback").insert({
-                  user_id: _optionalChain([authUser, 'optionalAccess', _193 => _193.id]) || null,
-                  email: email || "anonymous",
-                  type,
-                  message: msg,
-                  account_id: acctId || null,
-                  created_at: new Date().toISOString()
-                });
-              } catch (e) {
-                console.log("Supabase feedback insert failed:", e);
-              }
-              // Send email to support@aurisargames.com for all types
-              try {
-                await fetch("/api/send-support-email", {
+                const res = await fetch("/api/submit-feedback", {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json"
@@ -6799,31 +6788,19 @@ function App() {
                     message: msg,
                     email,
                     accountId: acctId,
+                    userId: _optionalChain([authUser, 'optionalAccess', _193 => _193.id]) || null,
                     turnstileToken: tsToken
                   })
                 });
-              } catch (e) {
-                console.log("Support email failed:", e);
-              }
-              // For Idea/Bug, also create a GitHub issue
-              if (type === "idea" || type === "bug") {
-                try {
-                  await fetch("/api/create-github-issue", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                      type,
-                      message: msg,
-                      email,
-                      accountId: acctId,
-                      turnstileToken: tsToken
-                    })
-                  });
-                } catch (e) {
-                  console.log("GitHub issue creation failed:", e);
+                if (res.ok) {
+                  setFeedbackSent(true);
+                  if (type === "help") setHelpConfirmShown(true);
+                  setFeedbackText("");
+                } else {
+                  console.log("Feedback submission failed:", res.status);
                 }
+              } catch (e) {
+                console.log("Feedback submission failed:", e);
               }
             }}>{"Submit"}</button></>}</div></div></div>, document.body)}</div>;
 }

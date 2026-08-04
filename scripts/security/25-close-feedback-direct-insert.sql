@@ -1,0 +1,25 @@
+-- =============================================================================
+-- 25 — Close the feedback table's direct-insert hole
+-- =============================================================================
+-- Found via the Supabase security advisors (rls_policy_always_true): the
+-- `feedback` table's INSERT policy was `WITH CHECK (true)` for `public`,
+-- meaning anyone with the anon key could write directly to Postgres,
+-- bypassing every defence — Turnstile, origin pinning, per-IP rate limiting,
+-- field validation — that the two sibling anonymous endpoints
+-- (send-support-email, create-github-issue) already apply to the exact same
+-- form submission.
+--
+-- Tracing the call site also found a second, unrelated bug: the client
+-- insert sent an `account_id` field the `feedback` table has never had a
+-- column for. PostgREST rejects unknown columns, so the insert has been
+-- failing on every submission — silently, caught by a bare try/catch. (7
+-- rows total, none since 2026-03-27, confirmed against production.)
+--
+-- Fix: netlify/functions/submit-feedback.js is now the only write path —
+-- same Turnstile + rate-limit + validation pattern as its siblings, correct
+-- columns, using the service role. This migration removes the policy that
+-- made the direct path possible. `feedback_service_all` (cmd=ALL, scoped to
+-- service_role) already covers the new function's inserts; `feedback_read_own`
+-- is untouched.
+
+DROP POLICY IF EXISTS "Anyone can submit feedback" ON public.feedback;
