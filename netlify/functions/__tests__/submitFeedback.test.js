@@ -42,6 +42,11 @@ beforeEach(() => {
   process.env.SUPABASE_ANON_KEY = 'anon-key';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
   delete process.env.TURNSTILE_SECRET_KEY;
+  // Absent by default so email/issue side effects short-circuit to
+  // "misconfigured" without touching the network — deterministic regardless
+  // of what the host shell happens to have set.
+  delete process.env.RESEND_API_KEY;
+  delete process.env.GITHUB_TOKEN;
 });
 
 afterEach(() => {
@@ -164,6 +169,77 @@ describe('the actual bugs this PR fixes', () => {
   });
 });
 
+describe('single-verification orchestration — the Bugbot follow-up on #314', () => {
+  // Cloudflare Turnstile tokens are single-use. The client used to fire this
+  // insert, send-support-email, and create-github-issue as three separate
+  // requests sharing one token — invisible with TURNSTILE_SECRET_KEY unset
+  // (verifyTurnstile fails open), but the moment it's live the first to
+  // verify would consume the token and the other two would 403. Fix: this
+  // function verifies once and triggers both side effects in-process.
+
+  it('triggers the support email and (for bug/idea) the GitHub issue after one store', async () => {
+    process.env.RESEND_API_KEY = 'resend-key';
+    process.env.GITHUB_TOKEN = 'gh-token';
+    vi.stubGlobal('fetch', routeFetch({
+      ...RATE_LIMIT_OK,
+      '/rest/v1/feedback': async () => okJson({}, 201),
+      'api.resend.com': async () => okJson({ id: 'email_1' }, 200),
+      'api.github.com': async () => okJson({ id: 1 }, 201),
+    }));
+    const res = await handler(req({ type: 'bug', message: 'x' }));
+    const parsed = JSON.parse(await res.text());
+    expect(res.status).toBe(200);
+    expect(parsed).toEqual({ ok: true, email: true, issue: true });
+  });
+
+  it('never attempts a GitHub issue for type=help — issue stays null, not false', async () => {
+    process.env.RESEND_API_KEY = 'resend-key';
+    vi.stubGlobal('fetch', routeFetch({
+      ...RATE_LIMIT_OK,
+      '/rest/v1/feedback': async () => okJson({}, 201),
+      'api.resend.com': async () => okJson({ id: 'email_1' }, 200),
+      'api.github.com': async () => { throw new Error('must not be called for help'); },
+    }));
+    const res = await handler(req({ type: 'help', message: 'how do I log a run?' }));
+    const parsed = JSON.parse(await res.text());
+    expect(parsed.issue).toBeNull();
+  });
+
+  it('a failed support email does not fail the request — the feedback is already durably stored', async () => {
+    process.env.RESEND_API_KEY = 'resend-key';
+    vi.stubGlobal('fetch', routeFetch({
+      ...RATE_LIMIT_OK,
+      '/rest/v1/feedback': async () => okJson({}, 201),
+      'api.resend.com': async () => ({ ok: false, status: 500, text: async () => 'resend down' }),
+    }));
+    const res = await handler(req({ type: 'idea', message: 'x' }));
+    const parsed = JSON.parse(await res.text());
+    expect(res.status).toBe(200);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.email).toBe(false);
+  });
+
+  it('one Turnstile verification covers the store AND both side effects — not three', async () => {
+    process.env.TURNSTILE_SECRET_KEY = 'ts-secret';
+    process.env.RESEND_API_KEY = 'resend-key';
+    process.env.GITHUB_TOKEN = 'gh-token';
+    let siteverifyCalls = 0;
+    vi.stubGlobal('fetch', routeFetch({
+      ...RATE_LIMIT_OK,
+      'challenges.cloudflare.com': async () => { siteverifyCalls++; return okJson({ success: true }); },
+      '/rest/v1/feedback': async () => okJson({}, 201),
+      'api.resend.com': async () => okJson({ id: 'email_1' }, 200),
+      'api.github.com': async () => okJson({ id: 1 }, 201),
+    }));
+    const res = await handler(req({ type: 'bug', message: 'x', turnstileToken: 'one-token' }));
+    expect(res.status).toBe(200);
+    // The real bug: reusing the same token 3x would 403 legs 2-3 once this
+    // secret is live (Cloudflare tokens are single-use). Proving it here
+    // means siteverify is called exactly once for one submission.
+    expect(siteverifyCalls).toBe(1);
+  });
+});
+
 describe('regression guards (source)', () => {
   it('never sends account_id as a field — the key that was never a real column', () => {
     // The doc comment above names the historical bug on purpose; only a `key:`
@@ -171,11 +247,29 @@ describe('regression guards (source)', () => {
     expect(src).not.toMatch(/account_id\s*:/);
   });
 
-  it('the two sibling endpoints use the extracted helper, not a re-duplicated copy', () => {
+  it('the two sibling endpoints use the extracted rate-limit helper, not a re-duplicated copy', () => {
     for (const file of ['send-support-email.js', 'create-github-issue.js']) {
       const s = readFileSync(ROOT + 'netlify/functions/' + file, 'utf8');
       expect(s, file).toContain('from "./_lib/rateLimit.js"');
       expect(s, file).not.toMatch(/async function checkRateLimit/);
     }
+  });
+
+  it('this function is the single orchestrator — imports both side-effect helpers', () => {
+    expect(src).toContain('from "./_lib/supportEmail.js"');
+    expect(src).toContain('from "./_lib/githubIssue.js"');
+  });
+
+  it('the client no longer fires three separate requests sharing one Turnstile token', () => {
+    const appSrc = readFileSync(ROOT + 'src/App.jsx', 'utf8');
+    expect(appSrc).not.toContain('/api/send-support-email');
+    expect(appSrc).not.toContain('/api/create-github-issue');
+    expect(appSrc).toContain('/api/submit-feedback');
+  });
+
+  it('the client only claims success after the response resolves, not before the fetch', () => {
+    const appSrc = readFileSync(ROOT + 'src/App.jsx', 'utf8');
+    const submitBlock = appSrc.slice(appSrc.indexOf('/api/submit-feedback') - 400, appSrc.indexOf('/api/submit-feedback') + 800);
+    expect(submitBlock).toMatch(/if\s*\(res\.ok\)/);
   });
 });

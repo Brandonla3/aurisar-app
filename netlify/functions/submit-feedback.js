@@ -14,15 +14,30 @@
  * every insert has been failing — silently, since the call was wrapped in a
  * bare try/catch. This function uses the table's real columns only.
  *
+ * This is also the ONLY call the feedback widget makes — it used to fire
+ * this insert, send-support-email, AND create-github-issue as three separate
+ * requests sharing one Cloudflare Turnstile token. Turnstile tokens are
+ * single-use; once TURNSTILE_SECRET_KEY is live, the first of the three to
+ * verify would consume it and the other two would 403. So this function does
+ * the store, then triggers the email and (for bug/idea) the GitHub issue
+ * in-process — one verification, no re-submission of a spent token. The two
+ * sibling endpoints stay independently callable (same perimeter, unchanged)
+ * for any future direct caller; they just aren't used by this flow anymore.
+ *
  * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY (rate
- *      limit RPC), TURNSTILE_SECRET_KEY (optional, see _lib/turnstile.js).
+ *      limit RPC), TURNSTILE_SECRET_KEY (optional, see _lib/turnstile.js),
+ *      RESEND_API_KEY, GITHUB_TOKEN (both optional — a missing one just
+ *      skips that side effect; the feedback row is still stored).
  */
 
 import { verifyTurnstile } from "./_lib/turnstile.js";
 import { checkRateLimit } from "./_lib/rateLimit.js";
+import { sendSupportEmail } from "./_lib/supportEmail.js";
+import { createGithubIssue } from "./_lib/githubIssue.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_TYPES = new Set(["bug", "idea", "help"]);
+const ISSUE_TYPES = new Set(["bug", "idea"]);
 const MAX_MESSAGE_LEN = 4000;
 const MAX_FIELD_LEN = 200;
 const ALLOWED_ORIGINS = new Set([
@@ -61,7 +76,7 @@ export default async (req) => {
       status: 400, headers: { "Content-Type": "application/json" },
     });
   }
-  const { type, message, email, userId, turnstileToken } = body || {};
+  const { type, message, email, accountId, userId, turnstileToken } = body || {};
 
   const ts = await verifyTurnstile(turnstileToken, ip);
   if (!ts.ok) {
@@ -81,6 +96,7 @@ export default async (req) => {
     });
   }
   const cleanEmail = typeof email === "string" ? email.trim().slice(0, MAX_FIELD_LEN) : "";
+  const cleanAcct  = typeof accountId === "string" ? accountId.trim().slice(0, MAX_FIELD_LEN) : "";
   if (cleanEmail && !EMAIL_RE.test(cleanEmail)) {
     return new Response(JSON.stringify({ error: "Invalid email" }), {
       status: 400, headers: { "Content-Type": "application/json" },
@@ -127,7 +143,24 @@ export default async (req) => {
     });
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
+  // Best-effort side effects, same tolerance the old three-separate-fetches
+  // client code had — a support-email or GitHub outage doesn't fail the
+  // user's feedback submission, which is already durably stored above. The
+  // difference is the client now finds out, instead of assuming success.
+  const emailResult = await sendSupportEmail({ type, message, cleanEmail, cleanAcct });
+  if (!emailResult.ok) console.error("[submit-feedback] support email failed:", emailResult.error);
+
+  let issueResult = null;
+  if (ISSUE_TYPES.has(type)) {
+    issueResult = await createGithubIssue({ type, message, cleanAcct });
+    if (!issueResult.ok) console.error("[submit-feedback] github issue failed:", issueResult.error);
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    email: emailResult.ok,
+    issue: issueResult === null ? null : issueResult.ok,
+  }), {
     status: 200, headers: { "Content-Type": "application/json" },
   });
 };
