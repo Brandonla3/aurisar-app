@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { valueNoise2, fbm2, ridged2, hash2 } from './noise.js';
 import { createTerrainField, DEFAULT_TERRAIN } from './terrainField.js';
 
@@ -163,6 +163,31 @@ describe('sampleSurface — the shared gen-time entry point', () => {
       const { y, shade } = field.sampleSurface(x, z);
       expect(y).toBe(field.surfaceY(x, z));
       expect(shade).toBe(field.shadeProxyAt(x, z));
+    }
+  });
+
+  it('actually shares ONE computeLayers call — not just numerically equal outputs', () => {
+    // The previous test alone is too weak: a naive re-split (sampleSurface
+    // internally calling surfaceY then shadeProxyAt as two independent
+    // computeLayers evaluations) would still pass it, since the OUTPUT is
+    // identical either way — that was the exact shape of the bug PR review
+    // caught. computeLayers calls Math.hypot(x, z) exactly ONCE, and nothing
+    // downstream of it (heightFromLayers, shadeFromLayers) calls Math.hypot
+    // again — so counting real Math.hypot calls is a genuine, dependency-free
+    // proxy for "how many times did computeLayers actually run", independent
+    // of ESM import-binding spy subtleties a noise.js mock would carry.
+    const hypotSpy = vi.spyOn(Math, 'hypot');
+    try {
+      hypotSpy.mockClear();
+      field.sampleSurface(200, 300);
+      expect(hypotSpy).toHaveBeenCalledTimes(1);
+
+      hypotSpy.mockClear();
+      field.surfaceY(200, 300);
+      field.shadeProxyAt(200, 300);
+      expect(hypotSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      hypotSpy.mockRestore();
     }
   });
 

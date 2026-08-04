@@ -95,7 +95,11 @@ export class ActorShadowRig {
       const targetBucket = entry.pinned ? 'near' : this._classify(mesh, entry.bucket, focusPos);
       if (targetBucket !== entry.bucket) {
         if (targetBucket === 'near') this._generator.addShadowCaster(mesh);
-        else this._generator.removeShadowCaster(mesh);
+        // Only remove if it was actually registered — a fresh caster's first
+        // classification (prevBucket null) going straight to 'far' has never
+        // been added to the generator. Babylon's removeShadowCaster is a
+        // harmless no-op either way, but calling it with no reason to is not.
+        else if (entry.bucket === 'near') this._generator.removeShadowCaster(mesh);
         entry.bucket = targetBucket;
       }
     }
