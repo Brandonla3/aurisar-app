@@ -134,7 +134,8 @@ async function boot() {
   nose.rotation.x = Math.PI / 2;
   nose.material = bodyMat;
 
-  // ── Actor shadows (P4c): near/far cadence, not a cascade split ─────────────
+  // ── Actor shadows (P4c): a real-time shadow for whatever is near the player,
+  // none at all for whatever is far ────────────────────────────────────────
   // The player capsule is registered unpinned — at a chase-camera distance of
   // a couple meters from its own focus point, it always classifies 'near' by
   // ordinary distance anyway; pin: true exists for a FUTURE combat-target
@@ -143,11 +144,10 @@ async function boot() {
   actorShadowRig.addCaster(body);
 
   // TEMPORARY stand-ins, not real actors: P6-P9 (rigging, skinning, actor
-  // hierarchy) haven't landed, so there is nothing else in the Realm yet that
-  // casts a dynamic shadow far from the player. These two boxes exist only to
-  // prove the far-bucket generator genuinely keeps updating (throttled, not
-  // frozen) — sentinelB orbits slowly so its shadow's staleness is visually
-  // checkable; delete both the moment a real distant actor exists.
+  // hierarchy) haven't landed, so there is nothing else in the Realm yet to
+  // exercise the far bucket with. Both static: walk close to one and its
+  // bucket flips to 'near' with a real cast shadow; walk away and it goes
+  // dark again. Delete both the moment a real distant actor exists.
   const sentinelMat = new BABYLON.StandardMaterial('sentinelMat', scene);
   sentinelMat.diffuseColor = new BABYLON.Color3(0.55, 0.25, 0.25);
   const sentinelAt = (name, x, z) => {
@@ -157,9 +157,8 @@ async function boot() {
     actorShadowRig.addCaster(m);
     return m;
   };
-  const sentinelA = sentinelAt('sentinelA', 150, 0); // static — proves the far bucket settles, not just moves
+  const sentinelA = sentinelAt('sentinelA', 150, 0);
   const sentinelB = sentinelAt('sentinelB', -200, 150);
-  const sentinelBOrbitCenter = { x: -200, z: 150 };
 
   // ── Chase camera ────────────────────────────────────────────────────────────
   const camera = new BABYLON.ArcRotateCamera('chase', -Math.PI / 2, Math.PI / 3.1, 11,
@@ -224,14 +223,6 @@ async function boot() {
     ringKit.recenter(walker.x, walker.z);
     // Puffs drift and wrap relative to wherever the player IS, same reason.
     cloudKit.update(walker.x, walker.z, nowMs);
-
-    // Temporary sentinel motion (see the addCaster block above) — a slow
-    // 40m-radius circle, purely so the far-bucket shadow generator has
-    // something to visibly keep pace with at its throttled cadence.
-    const orbitAngle = nowMs / 4000;
-    sentinelB.position.x = sentinelBOrbitCenter.x + Math.cos(orbitAngle) * 40;
-    sentinelB.position.z = sentinelBOrbitCenter.z + Math.sin(orbitAngle) * 40;
-    sentinelB.position.y = field.surfaceY(sentinelB.position.x, sentinelB.position.z) + 1;
 
     // Bucket every registered caster by distance from the camera's FOCUS
     // point (not the camera itself — an orbiting chase camera changing

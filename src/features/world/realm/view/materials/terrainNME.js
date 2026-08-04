@@ -88,27 +88,28 @@ export function buildTerrainMaterial(scene, {
   worldNormal.output.connectTo(lights.worldNormal);
   cameraPosition.output.connectTo(lights.cameraPosition);
 
-  // Cast-shadow attenuation: LightBlock's `shadow` output is a SEPARATE port
-  // from `diffuseOutput` — verified against the generated GLSL (the compiled
-  // main() computes `diffuseOutput * shadow` explicitly; diffuseOutput alone
-  // never includes it. Skipping this wire is silent: the graph still builds,
-  // scene.receiveShadows still reads true, and terrain simply never darkens
-  // under ANY cast shadow, from ActorShadowRig or anything else. Multiplied
-  // into diffuse BEFORE ambient — real shadow maps attenuate direct light
-  // only; ambient represents indirect/sky light a shadow map has no opinion
-  // about, the same reason a real overcast day still has visible ambient
-  // fill in a shadowed doorway.
-  const shadowedDiffuse = new BABYLON.MultiplyBlock('shadowedDiffuse');
-  lights.diffuseOutput.connectTo(shadowedDiffuse.left);
-  lights.shadow.connectTo(shadowedDiffuse.right);
-
-  // shade = ambient + shadowed diffuse; lit = albedo * shade. Specular is
-  // deliberately absent — matte painted ground, and one less thing to differ
-  // per backend.
+  // Cast-shadow attenuation needs NO extra wiring here — a real mistake in
+  // an earlier version of this file added one. Babylon's own `lightFragment`
+  // shader include (BABYLON.ShaderStore.IncludesShadersStore.lightFragment)
+  // already computes `diffuseBase += info.diffuse * shadow` PER LIGHT, and
+  // `LightBlock.diffuseOutput` IS that accumulated `diffuseBase` — cast
+  // shadows are already folded in before this graph ever sees the value.
+  // The earlier version multiplied `diffuseOutput` by `lights.shadow`
+  // (Babylon's separate `aggShadow` output) a SECOND time, roughly squaring
+  // the attenuation and making cast shadows read far darker than intended.
+  // The "silent gap" this file used to describe never existed for
+  // LightBlock; the actual pre-P4c gap was simply "no ShadowGenerator
+  // existed yet" (ActorShadowRig now provides one) — nothing about this
+  // material's own wiring was ever missing. Caught in PR review, not by any
+  // test written for the wrong fix (see terrainNME.test.js).
+  //
+  // shade = ambient + diffuse (already shadow-attenuated); lit = albedo *
+  // shade. Specular is deliberately absent — matte painted ground, and one
+  // less thing to differ per backend.
   const ambientColor = new BABYLON.InputBlock('ambientColor');
   ambientColor.value = new BABYLON.Color3(ambient.r, ambient.g, ambient.b);
   const shade = new BABYLON.AddBlock('shade');
-  shadowedDiffuse.output.connectTo(shade.left);
+  lights.diffuseOutput.connectTo(shade.left);
   ambientColor.output.connectTo(shade.right);
   // Clamp the shade term: scene lights are tuned for StandardMaterial's own
   // response curve, and summed diffuse+ambient easily exceeds 1 (the first

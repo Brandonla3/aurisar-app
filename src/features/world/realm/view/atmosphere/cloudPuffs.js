@@ -32,9 +32,10 @@ import { cloudFactorAt, MIN_FACTOR, MAX_FACTOR } from '../../model/cloudShadow.j
 import { RENDERING_GROUP } from '../materials/skyDomeNME.js';
 import { RING_TIERS } from '../../model/horizonRings.js';
 
-/** Puffs wrap well inside the near ring, not out at the horizon — "overhead
- *  weather", not "distant crags". Reusing horizonRings.js's own tier means
- *  this radius moves with the streaming radius exactly the way the rings do. */
+/** Puffs wrap AT the near ring's own radius — well inside the mid/far tiers
+ *  out at the horizon, so this reads as "overhead weather", not "distant
+ *  crags". Reusing horizonRings.js's own tier means this radius moves with
+ *  the streaming radius exactly the way the rings do. */
 export const WRAP_RADIUS_M = RING_TIERS[0].radiusM;
 
 /** Above every ring tier's crest (tallest authored tier is 300m) — clouds

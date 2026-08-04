@@ -16,10 +16,13 @@
  * down every chunk border. Field normals are identical on both sides of an
  * edge by construction.
  *
- * Vertex colors carry field.shadeProxyAt's baked self-shadow recess proxy
+ * Vertex colors carry field.sampleSurface's baked self-shadow recess proxy
  * (model/terrainField.js), one scalar replicated across r/g/b (alpha 1) so a
  * raw unlit read of the color channel is a legible debug view of the proxy
  * on its own. terrainNME.js reads only the red channel at render time.
+ * `sampleSurface`, not separate `surfaceY`+`shadeProxyAt` calls: both read
+ * the SAME computeLayers() result for a given (x, z), so this loop pays for
+ * that shared computation exactly once per vertex, not twice.
  */
 
 import { CHUNK_SIZE_M, TERRAIN_SUBDIVISIONS } from '../model/chunkMath.js';
@@ -54,7 +57,7 @@ export function generateTerrainChunk(field, {
       const lz = (iz / subdivisions) * size;
       const wx = originX + lx;
       const wz = originZ + lz;
-      const y = field.surfaceY(wx, wz);
+      const { y, shade } = field.sampleSurface(wx, wz);
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
 
@@ -72,7 +75,6 @@ export function generateTerrainChunk(field, {
       uvs[uv + 1] = iz / subdivisions;
       uv += 2;
 
-      const shade = field.shadeProxyAt(wx, wz);
       colors[col] = shade;
       colors[col + 1] = shade;
       colors[col + 2] = shade;

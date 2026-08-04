@@ -152,3 +152,23 @@ describe('shadeProxyAt — the self-shadow bake input', () => {
     expect(ringSum / n).toBeGreaterThan(valeSum / n);
   });
 });
+
+describe('sampleSurface — the shared gen-time entry point', () => {
+  const field = createTerrainField();
+
+  it('agrees exactly with calling surfaceY and shadeProxyAt separately', () => {
+    // The two must never disagree — sampleSurface exists to share ONE
+    // computeLayers() call, not to compute a different answer.
+    for (const [x, z] of [[0, 0], [50, 0], [0, 120], [300, 300], [-400, 200], [640, -640]]) {
+      const { y, shade } = field.sampleSurface(x, z);
+      expect(y).toBe(field.surfaceY(x, z));
+      expect(shade).toBe(field.shadeProxyAt(x, z));
+    }
+  });
+
+  it('is deterministic', () => {
+    const a = field.sampleSurface(123.4, -56.7);
+    const b = field.sampleSurface(123.4, -56.7);
+    expect(a).toEqual(b);
+  });
+});

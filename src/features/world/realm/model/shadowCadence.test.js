@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  classifyShadowCadence, refreshRateForBucket,
-  DEFAULT_NEAR_RADIUS_M, DEFAULT_HYSTERESIS_M, NEAR_REFRESH_RATE, FAR_REFRESH_RATE,
+  classifyShadowCadence, DEFAULT_NEAR_RADIUS_M, DEFAULT_HYSTERESIS_M,
 } from './shadowCadence.js';
 
 describe('classifyShadowCadence — no prior bucket', () => {
@@ -59,14 +58,5 @@ describe('classifyShadowCadence — hysteresis', () => {
     expect(classifyShadowCadence(45, null, { nearRadiusM: 50 })).toBe('near');
     expect(classifyShadowCadence(52, 'near', { nearRadiusM: 50, hysteresisM: 1 })).toBe('far');
     expect(classifyShadowCadence(52, 'near', { nearRadiusM: 50, hysteresisM: 10 })).toBe('near');
-  });
-});
-
-describe('refreshRateForBucket', () => {
-  it('near is always-fresh (Babylon\'s own default), far is throttled', () => {
-    expect(refreshRateForBucket('near')).toBe(NEAR_REFRESH_RATE);
-    expect(refreshRateForBucket('far')).toBe(FAR_REFRESH_RATE);
-    expect(NEAR_REFRESH_RATE).toBe(1);
-    expect(FAR_REFRESH_RATE).toBeGreaterThan(1);
   });
 });

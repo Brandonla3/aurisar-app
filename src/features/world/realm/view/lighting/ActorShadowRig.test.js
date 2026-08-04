@@ -1,14 +1,14 @@
 /**
- * ActorShadowRig.test.js — the bucketing/refreshRate/hysteresis contract,
- * headless (NullEngine). Only one real dynamic caster exists anywhere in the
- * Realm today (the spike's player capsule), so the 'far' path is proven here
- * with synthetic multi-distance meshes rather than by eye — the live spike
- * exercises 'near' for real and the far bucket via clearly-marked placeholder
- * "sentinel" meshes, but the actual throttle/hysteresis LOGIC is pinned here.
+ * ActorShadowRig.test.js — the bucketing/hysteresis contract, headless
+ * (NullEngine). Only one real dynamic caster exists anywhere in the Realm
+ * today (the spike's player capsule), so the 'far' path is proven here with
+ * synthetic multi-distance meshes rather than by eye — the live spike
+ * exercises 'near' for real and 'far' via clearly-marked placeholder
+ * "sentinel" meshes, but the actual bucketing LOGIC is pinned here.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
-import { DEFAULT_NEAR_RADIUS_M, NEAR_REFRESH_RATE, FAR_REFRESH_RATE } from '../../model/shadowCadence.js';
+import { DEFAULT_NEAR_RADIUS_M } from '../../model/shadowCadence.js';
 
 let ActorShadowRig;
 let engine;
@@ -34,26 +34,15 @@ const boxAt = (scene, name, x, y, z) => {
 };
 
 describe('ActorShadowRig — construction', () => {
-  it('creates a shadow-only far light: zero intensity, cloned from the real sun\'s direction', () => {
+  it('creates exactly one ShadowGenerator, on the REAL sun light — no second light', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
-      expect(rig._farLight.intensity).toBe(0);
-      expect(rig._farLight.direction.x).toBeCloseTo(sun.direction.x, 10);
-      expect(rig._farLight.direction.y).toBeCloseTo(sun.direction.y, 10);
-      expect(rig._farLight.direction.z).toBeCloseTo(sun.direction.z, 10);
-      rig.dispose();
-    } finally {
-      scene.dispose();
-    }
-  });
-
-  it('sets each generator\'s refreshRate exactly once, matching the cadence policy constants', () => {
-    const { scene, sun } = newScene();
-    try {
-      const rig = new ActorShadowRig(scene, sun);
-      expect(rig._nearGen.getShadowMap().refreshRate).toBe(NEAR_REFRESH_RATE);
-      expect(rig._farGen.getShadowMap().refreshRate).toBe(FAR_REFRESH_RATE);
+      expect(rig._generator.getClassName()).toBe('ShadowGenerator');
+      expect(rig._generator.getLight()).toBe(sun);
+      // No second light: the reverted two-light design is gone for good, not
+      // just unused — this is what the finding-2 fix actually removed.
+      expect(scene.lights).toHaveLength(1);
       rig.dispose();
     } finally {
       scene.dispose();
@@ -62,7 +51,7 @@ describe('ActorShadowRig — construction', () => {
 });
 
 describe('ActorShadowRig — bucketing', () => {
-  it('a caster inside the near radius goes on the near generator, not the far one', () => {
+  it('a caster inside the near radius is added to the shadow map', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
@@ -71,15 +60,14 @@ describe('ActorShadowRig — bucketing', () => {
       rig.update({ x: 0, y: 0, z: 0 });
 
       expect(rig.bucketOf(mesh)).toBe('near');
-      expect(rig._nearGen.getShadowMap().renderList).toContain(mesh);
-      expect(rig._farGen.getShadowMap().renderList ?? []).not.toContain(mesh);
+      expect(rig._generator.getShadowMap().renderList).toContain(mesh);
       rig.dispose();
     } finally {
       scene.dispose();
     }
   });
 
-  it('a caster well beyond the near radius goes on the far generator', () => {
+  it('a caster well beyond the near radius casts NO shadow at all — not a stale one', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
@@ -88,28 +76,31 @@ describe('ActorShadowRig — bucketing', () => {
       rig.update({ x: 0, y: 0, z: 0 });
 
       expect(rig.bucketOf(mesh)).toBe('far');
-      expect(rig._farGen.getShadowMap().renderList).toContain(mesh);
+      expect(rig._generator.getShadowMap().renderList).not.toContain(mesh);
       rig.dispose();
     } finally {
       scene.dispose();
     }
   });
 
-  it('moving a caster from near to far re-parents it: removed from near, added to far', () => {
+  it('moving a caster from near to far removes it from the shadow map, and back adds it again', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
       const mesh = boxAt(scene, 'mover', 3, 0, 0);
       rig.addCaster(mesh);
       rig.update({ x: 0, y: 0, z: 0 });
-      expect(rig.bucketOf(mesh)).toBe('near');
+      expect(rig._generator.getShadowMap().renderList).toContain(mesh);
 
       mesh.position.set(500, 0, 0);
       rig.update({ x: 0, y: 0, z: 0 });
-
       expect(rig.bucketOf(mesh)).toBe('far');
-      expect(rig._nearGen.getShadowMap().renderList).not.toContain(mesh);
-      expect(rig._farGen.getShadowMap().renderList).toContain(mesh);
+      expect(rig._generator.getShadowMap().renderList).not.toContain(mesh);
+
+      mesh.position.set(3, 0, 0);
+      rig.update({ x: 0, y: 0, z: 0 });
+      expect(rig.bucketOf(mesh)).toBe('near');
+      expect(rig._generator.getShadowMap().renderList).toContain(mesh);
       rig.dispose();
     } finally {
       scene.dispose();
@@ -136,7 +127,7 @@ describe('ActorShadowRig — bucketing', () => {
     }
   });
 
-  it('a pinned caster stays near regardless of distance', () => {
+  it('a pinned caster stays near (a real, always-fresh shadow) regardless of distance', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
@@ -145,7 +136,7 @@ describe('ActorShadowRig — bucketing', () => {
       rig.update({ x: 0, y: 0, z: 0 });
 
       expect(rig.bucketOf(mesh)).toBe('near');
-      expect(rig._nearGen.getShadowMap().renderList).toContain(mesh);
+      expect(rig._generator.getShadowMap().renderList).toContain(mesh);
       rig.dispose();
     } finally {
       scene.dispose();
@@ -195,17 +186,34 @@ describe('ActorShadowRig — bucketing', () => {
 });
 
 describe('ActorShadowRig — removeCaster', () => {
-  it('removes a bucketed caster from whichever generator currently holds it', () => {
+  it('removes a near-bucketed caster from the shadow map', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
       const mesh = boxAt(scene, 'removable', 3, 0, 0);
       rig.addCaster(mesh);
       rig.update({ x: 0, y: 0, z: 0 });
-      expect(rig._nearGen.getShadowMap().renderList).toContain(mesh);
+      expect(rig._generator.getShadowMap().renderList).toContain(mesh);
 
       rig.removeCaster(mesh);
-      expect(rig._nearGen.getShadowMap().renderList).not.toContain(mesh);
+      expect(rig._generator.getShadowMap().renderList).not.toContain(mesh);
+      expect(rig.bucketOf(mesh)).toBeNull();
+      rig.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('does not throw removing a far-bucketed caster (never registered on the generator)', () => {
+    const { scene, sun } = newScene();
+    try {
+      const rig = new ActorShadowRig(scene, sun);
+      const mesh = boxAt(scene, 'farRemovable', 500, 0, 0);
+      rig.addCaster(mesh);
+      rig.update({ x: 0, y: 0, z: 0 });
+      expect(rig.bucketOf(mesh)).toBe('far');
+
+      expect(() => rig.removeCaster(mesh)).not.toThrow();
       expect(rig.bucketOf(mesh)).toBeNull();
       rig.dispose();
     } finally {
@@ -227,7 +235,7 @@ describe('ActorShadowRig — removeCaster', () => {
 });
 
 describe('ActorShadowRig — dispose', () => {
-  it('disposes both generators and the far light without throwing', () => {
+  it('disposes the generator without throwing', () => {
     const { scene, sun } = newScene();
     try {
       const rig = new ActorShadowRig(scene, sun);
@@ -235,7 +243,6 @@ describe('ActorShadowRig — dispose', () => {
       rig.addCaster(mesh);
       rig.update({ x: 0, y: 0, z: 0 });
       expect(() => rig.dispose()).not.toThrow();
-      expect(rig._farLight.isDisposed()).toBe(true);
     } finally {
       scene.dispose();
     }

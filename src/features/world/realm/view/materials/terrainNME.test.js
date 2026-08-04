@@ -109,37 +109,27 @@ describe('buildTerrainMaterial — the dual-backend proof', () => {
     }
   });
 
-  it('wires LightBlock.shadow into diffuse — NOT left as a dangling, silently-ignored output', async () => {
-    // Real bug this pins: LightBlock.diffuseOutput does NOT include shadow
-    // attenuation on its own (verified against the generated GLSL — the
-    // compiled main() computes `diffuseOutput * shadow` explicitly). A
-    // material that only reads diffuseOutput builds and runs with zero
-    // errors, `mesh.receiveShadows` reads true, and cast shadows simply never
-    // appear — a silent gap that only shows up as a missing shadow in the
-    // browser, never in a test that only checks "did it build".
+  it('never wires LightBlock.shadow — diffuseOutput ALREADY includes cast-shadow attenuation', async () => {
+    // Real bug this pins, found in PR review: an earlier version of this file
+    // multiplied diffuseOutput by lights.shadow (Babylon's separate aggShadow
+    // output), on the theory that diffuseOutput excluded shadow attenuation.
+    // Verified false straight from BABYLON.ShaderStore.IncludesShadersStore
+    // .lightFragment — the actual per-light shader include Babylon compiles
+    // in: `diffuseBase += info.diffuse * shadow;` runs BEFORE `diffuseOutput
+    // = diffuseBase`, so shadow is already folded in. The extra multiply
+    // roughly squared the attenuation, making cast shadows read far darker
+    // than intended. Asserting `.shadow` is simply never connected is the
+    // correct regression guard — connecting it to anything downstream of
+    // diffuseOutput reintroduces the double-multiply.
     const scene = newScene();
     try {
       const { material } = await buildTerrainMaterial(scene);
       const lights = material.attachedBlocks.find((b) => b.getClassName() === 'LightBlock');
-      expect(lights.shadow.isConnected).toBe(true);
-      const consumer = lights.shadow.endpoints[0].ownerBlock;
-      expect(consumer.getClassName()).toBe('MultiplyBlock');
-      // And that multiply's output must reach `shade` (ambient + diffuse),
-      // not dead-end in an unused block.
-      expect(consumer.output.endpoints.length).toBeGreaterThan(0);
-    } finally {
-      scene.dispose();
-    }
-  });
-
-  it('builds fine in a scene with no active ShadowGenerator — shadow wiring has no hard dependency', async () => {
-    // newScene() above never creates a ShadowGenerator; every other test in
-    // this file already builds successfully against it post-wiring, but this
-    // pins the property explicitly rather than leaving it implicit.
-    const scene = newScene();
-    try {
-      const { material } = await buildTerrainMaterial(scene);
-      expect(material.getClassName()).toBe('NodeMaterial');
+      expect(lights.shadow.isConnected).toBe(false);
+      // And diffuseOutput must reach `shade` DIRECTLY — no MultiplyBlock
+      // sitting between it and ambient.
+      const shade = material.attachedBlocks.find((b) => b.name === 'shade');
+      expect(shade.left.connectedPoint.ownerBlock).toBe(lights);
     } finally {
       scene.dispose();
     }

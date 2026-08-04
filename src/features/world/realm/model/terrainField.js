@@ -68,11 +68,16 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
   const c = { ...DEFAULT_TERRAIN, ...config };
 
   /**
-   * The three shared layer scalars, computed once so surfaceY and
-   * shadeProxyAt (below) never evaluate the same noise twice. `mountainMask`
-   * and `channel` are also the exact terms surfaceY already blended with —
-   * shadeProxyAt reads the SAME values surfaceY produced this call, not a
-   * second, possibly-drifted sample of "the same" noise.
+   * The four shared layer scalars `heightFromLayers` and `shadeFromLayers`
+   * (below) are both computed from. Calling `computeLayers` once and passing
+   * the result to both is what actually shares work — calling `surfaceY(x,z)`
+   * and then separately `shadeProxyAt(x,z)` for the SAME (x,z) does NOT share
+   * anything; each call runs its own independent `computeLayers`. Gen-time
+   * code that needs both at once should call `sampleSurface(x,z)`, which is
+   * the only call site that genuinely reuses one `computeLayers` result for
+   * both — a distinction an earlier version of this comment blurred, caught
+   * in PR review by checking terrainChunkGen.js's actual call sites rather
+   * than trusting this file's own claim about them.
    */
   function computeLayers(x, z) {
     const r = Math.hypot(x, z);
@@ -104,10 +109,12 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
     };
   }
 
-  function surfaceY(x, z) {
-    const {
-      mountainMask, ridge, channel, valeMask,
-    } = computeLayers(x, z);
+  /** The height formula, given (x, z) AND an already-computed layers object
+   *  for that same (x, z) — the base rolling-hills term still needs raw x/z
+   *  directly (it is not part of computeLayers), everything else reads
+   *  `layers`. Never called with a mismatched (x, z) / layers pair. */
+  function heightFromLayers(x, z, layers) {
+    const { mountainMask, ridge, channel, valeMask } = layers;
 
     // Base rolling hills.
     let y = fbm2(x * c.baseFrequency, z * c.baseFrequency, {
@@ -128,18 +135,22 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
     return y;
   }
 
+  function surfaceY(x, z) {
+    return heightFromLayers(x, z, computeLayers(x, z));
+  }
+
   /**
+   * The self-shadow proxy formula, given an already-computed layers object.
    * A direction-agnostic "how structurally recessed is this patch" proxy in
    * [0, 1], baked once per vertex at chunk-gen time and painted as a self-
    * shadow tint. This is NOT occlusion: it has no idea what geometry sits
    * between (x, z) and the sun, so it cannot tell you a specific valley is in
-   * a specific mountain's shadow right now. What it can do cheaply (zero new
-   * noise evaluations — `computeLayers` is shared with surfaceY) is darken
-   * the two kinds of terrain that read as "recessed" at any sun angle: ravine
-   * floors (`channel`) and the lee troughs between ridge crests
-   * (`1 - ridge`, masked to the mountain band so open rolling hills are never
-   * darkened by a term that only means something in the crags). Ridge crests
-   * themselves (`ridge` near 1) stay bright — exposed rock, not a cavity.
+   * a specific mountain's shadow right now. What it darkens is the two kinds
+   * of terrain that read as "recessed" at any sun angle: ravine floors
+   * (`channel`) and the lee troughs between ridge crests (`1 - ridge`, masked
+   * to the mountain band so open rolling hills are never darkened by a term
+   * that only means something in the crags). Ridge crests themselves (`ridge`
+   * near 1) stay bright — exposed rock, not a cavity.
    *
    * `channel` is masked by `(1 - valeMask)` for the same reason surfaceY's
    * OWN height never shows a ravine cut in the spawn vale: without it, a
@@ -147,13 +158,28 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
    * affecting HEIGHT by the vale multiplier, so no cut is visible there —
    * while still painting a dark, unexplained ravine tint right at spawn.
    */
-  function shadeProxyAt(x, z) {
-    const {
-      mountainMask, ridge, channel, valeMask,
-    } = computeLayers(x, z);
+  function shadeFromLayers(layers) {
+    const { mountainMask, ridge, channel, valeMask } = layers;
     const ridgeLee = (1 - ridge) * mountainMask;
     const channelRecess = channel * (1 - mountainMask) * (1 - valeMask);
     return Math.min(Math.max(channelRecess * 0.7 + ridgeLee * 0.6, 0), 1);
+  }
+
+  function shadeProxyAt(x, z) {
+    return shadeFromLayers(computeLayers(x, z));
+  }
+
+  /**
+   * Height AND shade proxy from ONE `computeLayers` call — the actual fix
+   * for the "zero new noise evaluations" claim this file used to make and
+   * not deliver: calling `surfaceY(x, z)` then `shadeProxyAt(x, z)`
+   * separately (as terrainChunkGen.js originally did) runs `computeLayers`
+   * twice for the same point. Gen-time code needing both should call this
+   * instead.
+   */
+  function sampleSurface(x, z) {
+    const layers = computeLayers(x, z);
+    return { y: heightFromLayers(x, z, layers), shade: shadeFromLayers(layers) };
   }
 
   /**
@@ -179,6 +205,6 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
   }
 
   return {
-    surfaceY, normalAt, slopeAt, shadeProxyAt, config: c,
+    surfaceY, normalAt, slopeAt, shadeProxyAt, sampleSurface, config: c,
   };
 }
