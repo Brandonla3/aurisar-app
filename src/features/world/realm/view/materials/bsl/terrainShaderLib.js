@@ -102,13 +102,16 @@ export function createTerrainPaintBlock(name = 'realmPaint', palette = TERRAIN_P
   // color — a palette retune moves the far forest with it.
   //
   // The handoff is a BAND, not a line (review catch): instance culling is
-  // per-CHUNK-CENTER while this tint is per-PIXEL radial distance, so a FAR
-  // chunk's nearest corner sits ~45m closer than its center. Starting the
-  // tint at midMaxM left that corner band with neither instances nor tint.
-  // Starting ~40m early instead overlaps some MID-chunk pixels with faint
-  // tint UNDER real trees — the cheaper artifact by far (reads as ground
-  // darkening beneath a canopy, vs. a visibly bald ring).
-  const FAR_START = TIER_BANDS_M.midMaxM - 40;
+  // per-CHUNK-CENTER while this tint is per-PIXEL radial distance. The
+  // start offset is pinned to the chunk HALF-DIAGONAL (32·√2 ≈ 45.3m,
+  // rounded up to 48) because that is the exact worst case: a cold-start
+  // FAR chunk at center distance midMaxM+ε has its nearest pixel at
+  // midMaxM − 45.3m, and any smaller offset leaves that sliver with
+  // neither instances nor tint (a 40m first draft still had a ~5m bald
+  // ring there — Bugbot's geometry was right). The cost is faint tint on
+  // some MID-chunk pixels UNDER real trees — smoothstep keeps it ~0-4% in
+  // the overlap zone, reading as ground shade beneath a canopy.
+  const FAR_START = TIER_BANDS_M.midMaxM - 48;
   const FAR_FULL = TIER_BANDS_M.midMaxM + 90;
   return new RealmFnBlock(name, {
     fnName: 'realmTerrainPaint',
