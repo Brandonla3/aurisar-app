@@ -245,8 +245,9 @@ export default function PrivacyPolicy() {
               OAuth consent screen where you explicitly authorise us to read specific data.
               We request access to recovery scores, sleep metrics, workout summaries, and
               heart rate data. This data is stored in your account so Aurisar can
-              display your stats and power in-game mechanics. You can disconnect WHOOP and
-              request deletion of this data at any time by contacting us.
+              display your stats and power in-game mechanics. You can disconnect WHOOP at
+              any time from your profile, and choose whether to delete the data already
+              stored when you do.
             </P>
 
             <div style={{ ...S.h2, fontSize: 11.5, marginTop: 18 }}>2d. Support &amp; Feedback Submissions</div>

@@ -257,6 +257,7 @@ const ProfileTab = memo(function ProfileTab({
 }) {
   const [whoopLinked, setWhoopLinked] = useState(null); // null=loading, true/false
   const [whoopSyncing, setWhoopSyncing] = useState(false);
+  const [whoopDisconnecting, setWhoopDisconnecting] = useState(false);
   const [whoopMsg, setWhoopMsg] = useState('');
   const [whoopJustConnected, setWhoopJustConnected] = useState(() => {
     try {
@@ -286,10 +287,58 @@ const ProfileTab = memo(function ProfileTab({
 
   useEffect(() => {
     if (!authUser?.id) return;
-    sb.from('whoop_tokens').select('user_id').eq('user_id', authUser.id).maybeSingle()
-      .then(({ data, error }) => setWhoopLinked(!error && !!data))
+    // whoop_connection_status() instead of reading whoop_tokens directly:
+    // migration 28 revoked client access to that table because it holds
+    // plaintext OAuth tokens. The RPC returns connection metadata only.
+    sb.rpc('whoop_connection_status')
+      .then(({ data, error }) => setWhoopLinked(!error && data?.connected === true))
       .catch(() => setWhoopLinked(false));
   }, [authUser?.id]);
+
+  // Withdraw WHOOP consent — the control the privacy policy has been
+  // promising ("disconnect at any time from your profile") while the UI
+  // offered only Sync. Data deletion is opt-in and asked separately, since
+  // disconnecting should not silently destroy months of history.
+  async function handleDisconnectWhoop() {
+    const purge = window.confirm(
+      "Disconnect WHOOP?\n\n" +
+      "This deletes Aurisar's access token, so no further data is imported.\n\n" +
+      "OK  — also delete the WHOOP data already stored\n" +
+      "Cancel — keep the stored data (you stay disconnected either way)"
+    );
+    setWhoopDisconnecting(true);
+    setWhoopMsg(null);
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { setWhoopMsg("Please sign in again."); return; }
+      const res = await fetch("/api/whoop-disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ deleteData: purge }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setWhoopMsg(out.error || "Couldn't disconnect. Try again.");
+        return;
+      }
+      setWhoopLinked(false);
+      setWhoopData({}); // matches the initial shape; consumers index into it
+      setWhoopMsg(
+        out.dataDeleteFailed
+          ? "Disconnected, but the stored data couldn't be deleted — contact support."
+          : purge
+            ? `Disconnected. ${out.dataDeleted || 0} stored record(s) deleted.`
+            : "Disconnected. Your stored data was kept."
+      );
+    } catch (e) {
+      setWhoopMsg("Couldn't disconnect: " + e.message);
+    } finally {
+      setWhoopDisconnecting(false);
+    }
+  }
 
   async function loadWhoopData() {
     if (!authUser?.id) return;
@@ -837,10 +886,18 @@ return (
               {whoopMsg ? <div style={{ fontSize: FS.fs58, color: whoopMsg.startsWith("Synced") || whoopMsg.startsWith("Backfill") ? "#2ecc71" : "#e74c3c", marginTop: S.s4 }}>{whoopMsg}</div> : null}
             </div>
             {whoopLinked ? (
-              <button className={"btn btn-ghost btn-sm"} style={{ fontSize: FS.fs58, flexShrink: 0 }}
-                disabled={whoopSyncing} onClick={handleSyncWhoop}>
-                {whoopSyncing ? "Syncing…" : "↻ Sync"}
-              </button>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button className={"btn btn-ghost btn-sm"} style={{ fontSize: FS.fs58 }}
+                  disabled={whoopSyncing || whoopDisconnecting} onClick={handleSyncWhoop}>
+                  {whoopSyncing ? "Syncing…" : "↻ Sync"}
+                </button>
+                {/* The privacy policy promises this control ("disconnect at
+                    any time from your profile"); until now it did not exist. */}
+                <button className={"btn btn-ghost btn-sm"} style={{ fontSize: FS.fs58, color: "#e0a0a0" }}
+                  disabled={whoopSyncing || whoopDisconnecting} onClick={handleDisconnectWhoop}>
+                  {whoopDisconnecting ? "Disconnecting…" : "Disconnect"}
+                </button>
+              </div>
             ) : whoopLinked === false ? (
               <button className={"btn btn-ghost btn-sm"} style={{ fontSize: FS.fs58, flexShrink: 0 }}
                 onClick={handleConnectWhoop}>{"Connect"}</button>
