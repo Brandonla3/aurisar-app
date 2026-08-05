@@ -15,6 +15,8 @@
  */
 
 import { RealmFnBlock } from './RealmFnBlock.js';
+import { emitCanopyDensityBsl } from '../../../model/vegDensity.js';
+import { TIER_BANDS_M } from '../../../model/propLod.js';
 
 /** Shared value-noise helpers: hash → bilinear value noise, quintic fade. */
 const NOISE_HELPERS = `
@@ -92,14 +94,37 @@ export function createMacroVariationBlock(name = 'realmMacro') {
  */
 export function createTerrainPaintBlock(name = 'realmPaint', palette = TERRAIN_PALETTE) {
   const v3 = (c) => `vec3(${c.map((n) => n.toFixed(4)).join(', ')})`;
+  // The drop-shipped far tier: beyond the mid LOD band no tree INSTANCES
+  // exist at all — distant forest is painted INTO the terrain from the same
+  // vegDensity curve the placer reads (band constants shared byte-for-byte;
+  // see model/vegDensity.js for the honest scope of that identity). Canopy
+  // tint derives from the palette (deep-shadowed grassLow), not a free new
+  // color — a palette retune moves the far forest with it.
+  //
+  // The handoff is a BAND, not a line (review catch): instance culling is
+  // per-CHUNK-CENTER while this tint is per-PIXEL radial distance. The
+  // start offset is pinned to the chunk HALF-DIAGONAL (32·√2 ≈ 45.3m,
+  // rounded up to 48) because that is the exact worst case: a cold-start
+  // FAR chunk at center distance midMaxM+ε has its nearest pixel at
+  // midMaxM − 45.3m, and any smaller offset leaves that sliver with
+  // neither instances nor tint (a 40m first draft still had a ~5m bald
+  // ring there — Bugbot's geometry was right). The cost is faint tint on
+  // some MID-chunk pixels UNDER real trees — smoothstep keeps it ~0-4% in
+  // the overlap zone, reading as ground shade beneath a canopy.
+  const FAR_START = TIER_BANDS_M.midMaxM - 48;
+  const FAR_FULL = TIER_BANDS_M.midMaxM + 90;
   return new RealmFnBlock(name, {
     fnName: 'realmTerrainPaint',
     params: [
       { name: 'wpos', type: 'vec3' },
       { name: 'wnrm', type: 'vec3' },
+      { name: 'campos', type: 'vec3' },
     ],
     returnType: 'vec3',
-    helpers: NOISE_HELPERS,
+    helpers: `${NOISE_HELPERS}
+float realmCanopyDensity(vec2 xz, float slopeApprox)
+{${emitCanopyDensityBsl()}
+}`,
     body: `
     vec2 xz = wpos.xz;
     float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);
@@ -124,6 +149,11 @@ export function createTerrainPaintBlock(name = 'realmPaint', palette = TERRAIN_P
     vec3 c = mix(grass, dirt, smoothstep(0.30, 0.62, detail) * 0.55);
     c = mix(c, rock, smoothstep(0.22, 0.42, slope));
     c = mix(c, snow, smoothstep(30.0, 40.0, height) * (1.0 - smoothstep(0.45, 0.7, slope)));
+
+    float farBand = smoothstep(${FAR_START.toFixed(1)}, ${FAR_FULL.toFixed(1)}, length(xz - campos.xz));
+    float veg = realmCanopyDensity(xz, slope);
+    vec3 canopyTint = ${v3(palette.grassLow)} * 0.55;
+    c = mix(c, canopyTint, farBand * veg * 0.6);
 
     float tonal = 0.88 + detail * 0.24;
     return c * tonal;`,

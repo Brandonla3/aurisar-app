@@ -75,14 +75,16 @@ export function buildTerrainMaterial(scene, {
   const nrmUnit = new BABYLON.NormalizeBlock('nrmUnit');
   nrmXYZ.xyzOut.connectTo(nrmUnit.input);
 
-  // The painting — one BSL function, transpiled per backend.
-  const paint = createTerrainPaintBlock('paint');
-  posXYZ.xyzOut.connectTo(paint.input('wpos'));
-  nrmUnit.output.connectTo(paint.input('wnrm'));
-
   // Scene lights (the spike's directional key + hemi fill both feed this).
   const cameraPosition = new BABYLON.InputBlock('cameraPosition');
   cameraPosition.setAsSystemValue(BABYLON.NodeMaterialSystemValues.CameraPosition);
+
+  // The painting — one BSL function, transpiled per backend. Camera position
+  // feeds the far-tier vegetation tint (distance band + canopy density).
+  const paint = createTerrainPaintBlock('paint');
+  posXYZ.xyzOut.connectTo(paint.input('wpos'));
+  nrmUnit.output.connectTo(paint.input('wnrm'));
+  cameraPosition.output.connectTo(paint.input('campos'));
   const lights = new BABYLON.LightBlock('lights');
   worldPos.output.connectTo(lights.worldPosition);
   worldNormal.output.connectTo(lights.worldNormal);

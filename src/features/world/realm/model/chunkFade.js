@@ -14,6 +14,17 @@
 export const CHUNK_FADE_MS = 300;
 
 /**
+ * Prop sprout duration — props GROW from the ground (a vertex-stage scale
+ * ramp reading a per-instance birth attribute) instead of alpha-fading like
+ * terrain, so a sprouting chunk's props never leave the opaque queue: zero
+ * alpha-blend cost at exactly the streamer's busiest moment, and Apple TBDR
+ * hidden-surface removal stays intact (the #1 flagged mobile risk). Longer
+ * than the terrain fade on purpose: ground first, then growth reads as a
+ * consequence, not a glitch.
+ */
+export const PROP_SPROUT_MS = 450;
+
+/**
  * Accepted tradeoff, not a bug: Babylon's needAlphaBlendingForMesh() treats
  * any mesh.visibility < 1 as requiring alpha blending, so a fading chunk
  * leaves the opaque queue for its ~300ms ramp and re-enters it once settled

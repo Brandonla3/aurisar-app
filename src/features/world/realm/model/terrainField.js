@@ -183,6 +183,39 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
   }
 
   /**
+   * The two radial masks alone — CLOSED FORM, zero noise evaluations (two
+   * hypot-smoothsteps). Prop placement screens thousands of candidates per
+   * chunk against these before paying for any noise; exposing them cheaply
+   * is what keeps the placement pass inside the chunk-build budget.
+   */
+  function radialMasksAt(x, z) {
+    const r = Math.hypot(x, z);
+    return {
+      mountainMask: smoothstep(c.mountainStartM, c.mountainFullM, r),
+      valeMask: 1 - smoothstep(c.valeRadiusM, c.valeRadiusM + c.valeFalloffM, r),
+    };
+  }
+
+  /**
+   * The full per-point dossier for a placement-ACCEPTED candidate: height,
+   * shade proxy, slope, and every layer scalar, from one computeLayers plus
+   * one normalAt. Deliberately separate from sampleSurface (whose {y,shade}
+   * contract chunk-gen depends on): accepted props are few hundred per
+   * chunk, so the extra normalAt cost lands only where it buys something.
+   */
+  function probeAt(x, z) {
+    const layers = computeLayers(x, z);
+    return {
+      y: heightFromLayers(x, z, layers),
+      shade: shadeFromLayers(layers),
+      slope: slopeAt(x, z),
+      mountainMask: layers.mountainMask,
+      channel: layers.channel,
+      valeMask: layers.valeMask,
+    };
+  }
+
+  /**
    * Analytic-by-differencing normal. `eps` at 0.35m matches the finest mesh
    * step closely enough that lighting agrees with silhouette.
    */
@@ -205,6 +238,6 @@ export function createTerrainField(config = DEFAULT_TERRAIN) {
   }
 
   return {
-    surfaceY, normalAt, slopeAt, shadeProxyAt, sampleSurface, config: c,
+    surfaceY, normalAt, slopeAt, shadeProxyAt, sampleSurface, radialMasksAt, probeAt, config: c,
   };
 }
