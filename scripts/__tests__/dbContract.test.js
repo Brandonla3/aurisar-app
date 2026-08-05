@@ -34,17 +34,17 @@ describe('db-contract artifact', () => {
     );
   });
 
-  it('records the untracked security-relevant RPCs rather than hiding them', () => {
-    // Each of these is reachable from the app but declared in no tracked file,
-    // so its grants and rate limiting cannot be reviewed from the repo.
-    for (const key of [
-      'function:lookup_email_by_private_id',
-      'function:send_phone_otp',
-      'function:verify_phone_otp',
-    ]) {
-      expect(contract.knownUndeclared, key).toHaveProperty(key);
-      expect(contract.knownUndeclared[key].reason).toMatch(/UNTRACKED, SECURITY-RELEVANT/);
+  it('the once-untracked security RPCs are now declared, and stay that way', () => {
+    // These spent months live-but-untracked (carried in knownUndeclared with
+    // reasons demanding a migration). Migration 26 is that migration; the
+    // ratchet must never accept them as undeclared again.
+    for (const fn of ['lookup_email_by_private_id', 'send_phone_otp', 'verify_phone_otp']) {
+      expect(contract.functions, fn).toContain(fn);
+      expect(contract.knownUndeclared, fn).not.toHaveProperty(`function:${fn}`);
     }
+    // declaredTables, not tables: only the SECURITY DEFINER functions touch
+    // this table — no client code references it, and none should.
+    expect(contract.declaredTables).toContain('phone_verification_codes');
   });
 
   it('every accepted-undeclared entry carries a reason', () => {
