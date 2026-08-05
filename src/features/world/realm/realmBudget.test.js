@@ -34,23 +34,21 @@ function placementOf(cx, cz) {
   return placements.get(id);
 }
 
-/** The highest point the field grows within playable range — the widest
- *  sightline camera. Coarse scan; determinism makes it stable. */
-function findRidge() {
-  let best = { x: 0, z: 0, y: -Infinity };
-  for (let a = 0; a < 48; a++) {
-    const t = (a / 48) * Math.PI * 2;
-    for (const r of [280, 340, 400, 460]) {
-      const x = Math.cos(t) * r;
-      const z = Math.sin(t) * r;
-      const y = field.surfaceY(x, z);
-      if (y > best.y) best = { x, z, y };
-    }
-  }
-  return best;
-}
-
-/** Census one camera position: live prop buckets, triangles, fill. */
+/**
+ * Census one camera position: live prop buckets, triangles, fill.
+ *
+ * Two model-vs-renderer mismatches caught in PR review, both fixed here:
+ *  - Tiers are classified with prev = NEAR (maximum hysteresis stickiness),
+ *    not the cold-start `null` branch. The streamer feeds previous tiers
+ *    back through the Schmitt trigger, so on any outward walk a chunk stays
+ *    NEAR to nearMaxM + HYST and MID to midMaxM + HYST — the cold-start
+ *    census billed stage-1 costs for chunks the renderer draws at stage 0.
+ *    Sticky-NEAR is the reachable worst case, so the census now bounds it.
+ *  - The fill proxy uses the SHIPPING camera's field of view. spike.js
+ *    never sets fov, so Babylon's default 0.8 rad vertical applies — the
+ *    previous 60-degree assumption under-billed fill by 1.87x.
+ */
+const CAMERA_FOV_RAD = 0.8; // Babylon default; spike.js never overrides it
 function census(camX, camZ) {
   const cell = cameraCellOf(camX, camZ);
   const resident = neededChunksAround(camX, camZ, DEFAULT_STREAM_RADIUS_CHUNKS);
@@ -58,15 +56,13 @@ function census(camX, camZ) {
   let triangles = 0;
   let fillScreens = 0;
   for (const ch of resident) {
-    const tier = tierForChunk(cell, ch.cx, ch.cz, null);
+    const tier = tierForChunk(cell, ch.cx, ch.cz, PROP_TIER.NEAR);
     if (tier === PROP_TIER.FAR) continue;
     const placed = placementOf(ch.cx, ch.cz);
     const centerX = (ch.cx + 0.5) * CHUNK_SIZE_M;
     const centerZ = (ch.cz + 0.5) * CHUNK_SIZE_M;
     const dist = Math.max(8, Math.hypot(centerX - camX, centerZ - camZ));
-    // Screen area at this distance for a 60-degree vertical FOV, 16:9 —
-    // the analytic fill proxy the fillScreens ceiling is denominated in.
-    const screenM2 = (2 * dist * Math.tan(Math.PI / 6)) ** 2 * (16 / 9);
+    const screenM2 = (2 * dist * Math.tan(CAMERA_FOV_RAD / 2)) ** 2 * (16 / 9);
     for (const [protoId, bucket] of Object.entries(placed.instances)) {
       const proto = PROTOTYPES.find((p) => p.id === protoId);
       const manifest = PROP_MANIFEST[protoId];
@@ -81,16 +77,21 @@ function census(camX, camZ) {
 }
 
 describe('the P5 budget census — adversarial cameras, hard ceilings', () => {
-  const ridge = findRidge();
+  // Chunk CENTERS maximize the resident-in-band count under Chebyshev
+  // streaming (a 4-corner camera is actually the LOW-count configuration —
+  // another review catch); corners still sampled for bucket diversity. The
+  // former "highest ridge" camera is gone: census math never reads camera
+  // Y, so it sampled nothing the others didn't.
   const cameras = [
-    [32, 32, 'spawn'],
+    [32, 32, 'spawn center'],
     [0, 0, 'origin 4-corner'],
+    [96, 96, 'meadow chunk-center'],
+    [160, 160, 'belt chunk-center'],
+    [224, 224, 'crag chunk-center'],
     [128, 128, 'belt 4-corner'],
     [192, 192, 'belt 4-corner deep'],
-    [256, 256, 'crag 4-corner'],
-    [192, 64, 'belt corner asym'],
+    [224, 96, 'belt center asym'],
     [256, 0, 'crag axis corner'],
-    [ridge.x, ridge.z, 'highest ridge'],
   ];
 
   it('every camera stays under every ceiling (and logs the actuals)', () => {
@@ -117,8 +118,11 @@ describe('the P5 budget census — adversarial cameras, hard ceilings', () => {
     let prevTiers = new Map();
     let maxChanges = 0;
     for (let step = 0; step < 30; step++) {
+      // Diagonal march: an 8m cell step diagonally moves 11.3m per crossing
+      // — the worst adjacent-cell displacement, not the axis-aligned 8m
+      // (review catch: the axis walk under-measured crossings).
       const x = 96 + step * CAMERA_CELL_M;
-      const z = 128;
+      const z = 96 + step * CAMERA_CELL_M;
       const resident = neededChunksAround(x, z, DEFAULT_STREAM_RADIUS_CHUNKS);
       const { next, changes } = diffTiers(prevTiers, resident, cameraCellOf(x, z));
       // Convert chunk-tier changes into carrier rebuilds: a change rebuilds

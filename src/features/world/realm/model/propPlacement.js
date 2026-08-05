@@ -19,9 +19,21 @@
  * suppresses grass on both sides identically because both sides compute
  * the same canopy.
  *
- * Determinism detail: every accept/reject hashes integer lattice indices
- * (exact by construction) — float positions only feed field evaluations
- * and transforms, never threshold comparisons against hashes.
+ * Determinism, scoped precisely (the first draft of this header overclaimed
+ * "byte-identical on every client"): hash KEYS are exact integers and the
+ * pass order is fixed, so placement is byte-identical across runs of the
+ * SAME JS engine. Accept thresholds and geometry flow through Math.hypot/
+ * cos/sin/fbm2, which ECMAScript lets engines approximate — cross-ENGINE
+ * identity is near-exact, not guaranteed, the same tolerance contract
+ * terrainField.js documents for surfaceY. Nothing gameplay-authoritative
+ * may compare placements for equality across runtimes.
+ *
+ * Chunk-independence, also scoped precisely: the tree pass READS the grid
+ * it STAMPS mid-pass, so strict independence needs the transitive closure
+ * of influence (~4.25m/hop), which the 8m apron bounds for one hop but not
+ * arbitrarily many. In practice the process is subcritical (order-
+ * independence probes pass; suppression discs don't chain at these
+ * densities) — chunk-independent by measurement, not by construction.
  */
 
 import { CHUNK_SIZE_M } from './chunkMath.js';
@@ -29,6 +41,7 @@ import { hash2 } from './noise.js';
 import { canopyDensityJs, CANOPY_DENSITY_DEF } from './vegDensity.js';
 import { stressTierAt } from './propGenomes.js';
 import { writeInstanceMatrix } from './instanceMatrix.js';
+import { ribbonWear } from './desireLines.js';
 
 export const OCCUPANCY_CELL_M = 0.5;
 export const APRON_M = 8;
@@ -42,70 +55,6 @@ const GRID_N = (CHUNK_SIZE_M + 2 * APRON_M) / OCCUPANCY_CELL_M; // 160
  */
 const scratch = new Uint8Array(GRID_N * GRID_N);
 
-/**
- * Authored desire lines — polylines walked outward from spawn. Placement
- * multiplies density DOWN along them, so wayfinding reads as "follow where
- * the props aren't": worn ribbons through grass, thinned trees. The first
- * runs toward dawnfire's sunrise azimuth; the second toward the southwest
- * meadow. Future consumers (terrain wear tint, NPC pathing) should read
- * THESE lines, not redraw their own.
- */
-export const DESIRE_LINES = Object.freeze([
-  Object.freeze({ points: [[0, 0], [34, 6], [78, 14], [150, 34], [260, 62]] }),
-  Object.freeze({ points: [[0, 0], [-22, -18], [-60, -52], [-120, -110], [-210, -190]] }),
-]);
-const RIBBON_CORE_M = 2.5;
-const RIBBON_FADE_M = 6;
-
-/**
- * Per-line bounding boxes (± fade), computed once. ribbonWear runs for
- * EVERY grass candidate — ~4k per chunk — and without this early-out the
- * segment-distance loop was ~33k hypots per chunk, the single biggest cost
- * in the whole placement pass (measured: it dominated a 17ms chunk).
- * Most chunks are nowhere near a desire line and now pay two compares.
- */
-const LINE_BOUNDS = DESIRE_LINES.map((line) => {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
-  for (const [px, pz] of line.points) {
-    minX = Math.min(minX, px); maxX = Math.max(maxX, px);
-    minZ = Math.min(minZ, pz); maxZ = Math.max(maxZ, pz);
-  }
-  return {
-    minX: minX - RIBBON_FADE_M,
-    maxX: maxX + RIBBON_FADE_M,
-    minZ: minZ - RIBBON_FADE_M,
-    maxZ: maxZ + RIBBON_FADE_M,
-  };
-});
-
-/** 1 on the path center → 0 beyond the fade. */
-export function ribbonWear(x, z) {
-  let best = Infinity;
-  for (let li = 0; li < DESIRE_LINES.length; li++) {
-    const bb = LINE_BOUNDS[li];
-    if (x < bb.minX || x > bb.maxX || z < bb.minZ || z > bb.maxZ) continue;
-    const line = DESIRE_LINES[li];
-    const pts = line.points;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const [ax, az] = pts[i];
-      const [bx, bz] = pts[i + 1];
-      const dx = bx - ax;
-      const dz = bz - az;
-      const len2 = dx * dx + dz * dz;
-      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / len2));
-      const px = ax + dx * t - x;
-      const pz = az + dz * t - z;
-      const d = Math.hypot(px, pz);
-      if (d < best) best = d;
-    }
-  }
-  if (best >= RIBBON_FADE_M) return 0;
-  if (best <= RIBBON_CORE_M) return 1;
-  return 1 - (best - RIBBON_CORE_M) / (RIBBON_FADE_M - RIBBON_CORE_M);
-}
 
 /**
  * Order-independent per-edge bias between two chunks: both sides hash the
@@ -121,18 +70,32 @@ export function edgeBias(cxA, czA, cxB, czB, seed) {
 
 const EDGE_FALLOFF_M = 24;
 
-/** Density multiplier from the four edge-neighbor handshakes. */
-function neighborBiasFactor(lx, lz, cx, cz, seed) {
+/**
+ * Density multiplier from the four edge-neighbor handshakes, derived from
+ * the candidate's OWNING chunk — computed from its world position, never
+ * from the chunk whose pass happens to be evaluating it. The first version
+ * took the GENERATING chunk's frame: an apron candidate then measured
+ * negative edge distances and read a different chunk's edges entirely, so
+ * the apron recompute and the owner disagreed about the same tree's bias
+ * (measured in PR review at up to 2x at corners). Owning-chunk framing
+ * makes the value a pure function of world position, which is the only
+ * thing that makes "the neighbor recomputes my decisions exactly" true.
+ */
+function neighborBiasFactor(x, z, seed) {
+  const ocx = Math.floor(x / CHUNK_SIZE_M);
+  const ocz = Math.floor(z / CHUNK_SIZE_M);
+  const lx = x - ocx * CHUNK_SIZE_M;
+  const lz = z - ocz * CHUNK_SIZE_M;
   let f = 1;
   const edges = [
-    [cx - 1, cz, lx], // west edge: distance = lx
-    [cx + 1, cz, CHUNK_SIZE_M - lx],
-    [cx, cz - 1, lz],
-    [cx, cz + 1, CHUNK_SIZE_M - lz],
+    [ocx - 1, ocz, lx], // west edge: distance = lx, always in [0, 64)
+    [ocx + 1, ocz, CHUNK_SIZE_M - lx],
+    [ocx, ocz - 1, lz],
+    [ocx, ocz + 1, CHUNK_SIZE_M - lz],
   ];
   for (const [nx, nz, dist] of edges) {
     if (dist < EDGE_FALLOFF_M) {
-      const bias = edgeBias(cx, cz, nx, nz, seed);
+      const bias = edgeBias(ocx, ocz, nx, nz, seed);
       f *= 1 + bias * 0.5 * (1 - dist / EDGE_FALLOFF_M);
     }
   }
@@ -168,12 +131,19 @@ function stampRing(lx, lz, r0, r1, delta) {
   const c1x = Math.min(GRID_N - 1, cellOf(lx + r1));
   const c0z = Math.max(0, cellOf(lz - r1));
   const c1z = Math.min(GRID_N - 1, cellOf(lz + r1));
+  const r0sq = r0 * r0;
+  const r1sq = r1 * r1;
   for (let gz = c0z; gz <= c1z; gz++) {
     const wz = (gz + 0.5) * OCCUPANCY_CELL_M - APRON_M;
     for (let gx = c0x; gx <= c1x; gx++) {
       const wx = (gx + 0.5) * OCCUPANCY_CELL_M - APRON_M;
-      const d = Math.hypot(wx - lx, wz - lz);
-      if (d >= r0 && d <= r1) {
+      // Squared-distance membership like stampDisc — Math.hypot is
+      // implementation-approximated, and one ULP at a ring edge would flip
+      // a whole ±35 cell between engines (review catch).
+      const dx = wx - lx;
+      const dz = wz - lz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= r0sq && d2 <= r1sq) {
         const i = gz * GRID_N + gx;
         scratch[i] = Math.max(0, Math.min(255, scratch[i] + delta));
       }
@@ -247,7 +217,11 @@ export function placeChunkProps(field, {
     const x = ix * 4 + jx;
     const z = iz * 4 + jz;
     const { mountainMask, valeMask } = field.radialMasksAt(x, z);
-    const density = (0.02 + mountainMask * 0.10) * (1 - valeMask * 0.9);
+    let density = (0.02 + mountainMask * 0.10) * (1 - valeMask * 0.9);
+    // Boulders respect the desire lines HARDEST — the one species that
+    // physically blocks a walker must never sit in an authored path
+    // (review catch: every species thinned on ribbons except this one).
+    density *= 1 - 0.95 * ribbonWear(x, z);
     if (hash2(ix, iz, seed + 17) >= density) return;
     const probe = field.probeAt(x, z);
     if (probe.slope > 0.75) return;
@@ -273,7 +247,7 @@ export function placeChunkProps(field, {
     const masks = field.radialMasksAt(x, z);
     let density = canopyDensityJs(x, z, masks, seed) * 0.16;
     density *= 1 - 0.85 * ribbonWear(x, z);
-    density *= neighborBiasFactor(lx, lz, cx, cz, seed);
+    density *= neighborBiasFactor(x, z, seed);
     density *= occupancyAt(lx, lz);
     if (hash2(ix, iz, seed + 47) >= density) return;
     const probe = field.probeAt(x, z);

@@ -44,6 +44,30 @@ describe('buildPropMaterial — dual backend', () => {
       }
     });
 
+    it(`${label}: the graph reads per-instance world matrices — world0..3 declared, InstancesBlock wired`, async () => {
+      // THE render-critical finding from PR review: without an
+      // InstancesBlock, the graph wires the World system value straight
+      // into its transforms, never reads world0..3, and every thin
+      // instance draws at the carrier's identity matrix — a prop pile at
+      // world origin that every source-text assertion in this file happily
+      // ignored. This pins both the block AND the generated declarations.
+      const scene = newScene();
+      try {
+        const { material } = await buildPropMaterial(scene, { name: `pi${label}`, shaderLanguage: lang });
+        const classes = material.attachedBlocks.map((b) => b.getClassName());
+        expect(classes).toContain('InstancesBlock');
+        const vs = vertexSource(material);
+        for (const a of ['world0', 'world1', 'world2', 'world3']) expect(vs).toContain(a);
+        // And BOTH transforms must read the instances output, not raw world:
+        const instancesBlock = material.attachedBlocks.find((b) => b.getClassName() === 'InstancesBlock');
+        const consumers = instancesBlock.output.endpoints.map((e) => e.ownerBlock.name);
+        expect(consumers).toContain('worldPos');
+        expect(consumers).toContain('worldNormal');
+      } finally {
+        scene.dispose();
+      }
+    });
+
     it(`${label}: the compiled fragment contains no discard — opaque-only holds`, async () => {
       const scene = newScene();
       try {
@@ -66,15 +90,19 @@ describe('buildPropMaterial — dual backend', () => {
     }
   });
 
-  it('emits the fail-open sprout contract into the shader source', async () => {
-    // birth <= 0 must mean FULLY GROWN in the actual compiled code — a
-    // misbound attribute reads 0.0, and the worst silent failure has to be
-    // "props skip their animation", never "props are invisible".
+  it('emits the DOUBLE fail-open sprout contract — attribute AND clock guarded', async () => {
+    // birth <= 0 OR now <= 0 must mean FULLY GROWN in the compiled code.
+    // The first version guarded only the attribute; PR review showed a
+    // never-advanced clock (uNowMs defaults to 0) made freshly streamed
+    // chunks compute scale 0 — permanently invisible props, the exact
+    // failure mode the contract exists to exclude.
     const scene = newScene();
     try {
       const { material } = await buildPropMaterial(scene);
       const sprout = material.attachedBlocks.find((b) => b.getClassName() === 'RealmFnBlock');
-      expect(sprout._lastEmittedSource).toMatch(/birth\s*<=\s*0\.0/);
+      expect(sprout._lastEmittedSource).toMatch(/step\s*\(\s*0\.0001\s*,\s*birth\s*\)/);
+      expect(sprout._lastEmittedSource).toMatch(/step\s*\(\s*0\.0001\s*,\s*now\s*\)/);
+      expect(sprout._lastEmittedSource).toContain('mix(1.0, eased, animating)');
     } finally {
       scene.dispose();
     }

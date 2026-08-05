@@ -171,7 +171,16 @@ export function addBlob(acc, center, radius, level, color, {
       // Cheap fake occlusion that keeps flat-colored blobs from reading as
       // balloons — the only texture-free tool available for volume.
       const shade = shadeFloor + (1 - shadeFloor) * (d[1] * 0.5 + 0.5);
-      vi.push(pushV(acc, px, py, pz, d[0], d[1] * squashY, d[2], [color[0] * shade, color[1] * shade, color[2] * shade]));
+      // Ellipsoid normal: for a surface scaled by s in Y, the normal's Y
+      // component DIVIDES by s — n ∝ (d0, d1/s, d2), the gradient of
+      // x²+ (y/s)² + z². The first version MULTIPLIED (n ∝ (d0, d1·s, d2)),
+      // shading every squashed disc as its reciprocal shape — measured in
+      // PR review at 47.5° of angular error on conifer tiers, which are
+      // ~98% of the world's trees. Normalized here so the shader's
+      // interpolated normals start unit-length.
+      const ny = d[1] / Math.max(squashY, 0.05);
+      const il = 1 / Math.hypot(d[0], ny, d[2]);
+      vi.push(pushV(acc, px, py, pz, d[0] * il, ny * il, d[2] * il, [color[0] * shade, color[1] * shade, color[2] * shade]));
     }
     acc.idx.push(vi[0], vi[1], vi[2]);
   }

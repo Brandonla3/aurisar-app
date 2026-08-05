@@ -14,23 +14,26 @@ import { PROTOTYPES } from '../model/propGenomes.js';
 import { silhouetteStats } from '../model/silhouette.js';
 
 /**
- * Gate calibration — measured, not aspirational. At 32x32 mask resolution
- * (matching a tree's real on-screen height near the LOD switch distance),
- * the theoretically CLEANEST possible developmental pair — subset-vertex
- * tessellations of an identical envelope, area-compensated — plateaus at
- * meanIoU 0.82-0.85, purely from boundary-cell rasterization noise between
- * different tessellations. Genuinely different shapes measure far lower:
- * a half-width box pair ~0.6, an octahedron-vs-sphere ~0.72, a lens'
- * diamond profile 0.67. The gate sits at 0.80: above everything broken,
- * below everything honest, with the width gate as the sharper pop detector
- * (it caught every real envelope drift during tuning at 0.10-0.15 while
- * IoU still read plausibly). The 0.85 first draft predated measurement and
- * failed the best-possible case — a gate the cleanest geometry cannot pass
- * is miscalibrated, not strict. See "the gate has teeth" below for the
- * discrimination proof.
+ * Gate calibration — measured, re-measured after a rasterizer fix, and the
+ * history kept because it explains the number. At 32x32 mask resolution
+ * (matching a tree's real on-screen height near the LOD switch distance):
+ *
+ *  - With the ORIGINAL rasterizer (which splatted every triangle's vertex
+ *    cells unconditionally), honest pairs plateaued at 0.82-0.85 and the
+ *    gate was calibrated to 0.80. PR review then showed the splat inflated
+ *    every mask with cells whose centers lie OUTSIDE the shape.
+ *  - Removing it (splat now only for degenerate triangles) RAISED honest
+ *    pairs to 0.87-0.90 — the splat cells differed between tessellations
+ *    and were pure measurement noise dragging IoU down. Genuinely
+ *    different shapes still measure far lower (half-width box ~0.6,
+ *    octahedron-vs-sphere ~0.72), so the gate tightens to 0.85 with the
+ *    same discrimination margin the 0.80 gate had. minIoU (worst single
+ *    yaw) is asserted too — a crown collapsing at ONE camera angle must
+ *    not hide inside a healthy mean (also a review catch).
  */
-const IOU_ADJACENT_MIN = 0.80; // L0 vs L1 — the only rendered pair; beyond
+const IOU_ADJACENT_MIN = 0.85; // L0 vs L1 — the only rendered pair; beyond
 // mid distance the far tier is drop-shipped (no instances), so no L2 exists.
+const IOU_WORST_YAW_MIN = 0.82;
 const WIDTH_DELTA_MAX = 0.10;
 
 describe('payload validity — every prototype, every stage', () => {
@@ -72,11 +75,12 @@ describe('the developmental-LOD contract — silhouettes must match across stage
   const multiStage = PROTOTYPES.filter((p) => p.stages >= 2);
 
   for (const proto of multiStage) {
-    it(`${proto.id}: adjacent stages stay above IoU ${IOU_ADJACENT_MIN}`, () => {
+    it(`${proto.id}: adjacent stages stay above IoU ${IOU_ADJACENT_MIN} at EVERY yaw`, () => {
       const l0 = buildPrototypePayload(proto.id, 0);
       const l1 = buildPrototypePayload(proto.id, 1);
       const s = silhouetteStats(l0, l1);
       expect(s.meanIoU, `${proto.id} L0-L1 meanIoU=${s.meanIoU.toFixed(3)}`).toBeGreaterThanOrEqual(IOU_ADJACENT_MIN);
+      expect(s.minIoU, `${proto.id} L0-L1 minIoU=${s.minIoU.toFixed(3)}`).toBeGreaterThanOrEqual(IOU_WORST_YAW_MIN);
       expect(s.widthDeltaFrac, `${proto.id} L0-L1 width`).toBeLessThanOrEqual(WIDTH_DELTA_MAX);
     });
   }
@@ -106,12 +110,28 @@ describe('the developmental-LOD contract — silhouettes must match across stage
 
 describe('the gate has teeth — genuinely different shapes score BELOW it', () => {
   it('two different species at the same stage fail the same-shape bar', () => {
-    // Discrimination proof for the calibrated 0.80 gate: if valeoak-vs-
-    // cragpine (a broadleaf blob crown vs a conifer disc stack) ever scores
-    // ABOVE the gate, the gate has gone blind and passing it means nothing.
+    // Discrimination proof: if valeoak-vs-cragpine (a broadleaf blob crown
+    // vs a conifer disc stack) ever scores ABOVE the gate, the gate has
+    // gone blind and passing it means nothing.
     const oak = buildPrototypePayload('valeoak', 0);
     const pine = buildPrototypePayload('cragpine', 0);
     expect(silhouetteStats(oak, pine).meanIoU).toBeLessThan(IOU_ADJACENT_MIN);
+  });
+
+  it('a MUTATED stage fails the gate — perturbation proof, not just cross-species', () => {
+    // PR review pointed out the cross-species test alone doesn't prove the
+    // gate detects the failure it exists for (a stage drifting from its own
+    // sibling). Mutate L1 the way a careless genome edit would — narrow the
+    // crown by scaling X by 0.6 — and the gate MUST go red on both axes.
+    const l0 = buildPrototypePayload('valeoak', 0);
+    const l1 = buildPrototypePayload('valeoak', 1);
+    const narrowed = {
+      positions: l1.positions.map((v, i) => (i % 3 === 0 ? v * 0.6 : v)),
+      indices: l1.indices,
+    };
+    const s = silhouetteStats(l0, narrowed);
+    expect(s.widthDeltaFrac).toBeGreaterThan(WIDTH_DELTA_MAX);
+    expect(s.meanIoU).toBeLessThan(IOU_ADJACENT_MIN);
   });
 });
 

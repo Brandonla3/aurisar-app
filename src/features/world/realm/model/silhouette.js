@@ -74,19 +74,25 @@ export function rasterizeMask(payload, yawRad, bounds, res = 32) {
     const bx = px(indices[t + 1]); const by = py(indices[t + 1]);
     const cx = px(indices[t + 2]); const cy = py(indices[t + 2]);
 
-    // Guarantee thin/degenerate triangles still land their vertex cells.
-    mask[clampCell(Math.floor(ay)) * res + clampCell(Math.floor(ax))] = 1;
-    mask[clampCell(Math.floor(by)) * res + clampCell(Math.floor(bx))] = 1;
-    mask[clampCell(Math.floor(cy)) * res + clampCell(Math.floor(cx))] = 1;
-
     const minCx = clampCell(Math.floor(Math.min(ax, bx, cx)));
     const maxCx = clampCell(Math.ceil(Math.max(ax, bx, cx)));
     const minCy = clampCell(Math.floor(Math.min(ay, by, cy)));
     const maxCy = clampCell(Math.ceil(Math.max(ay, by, cy)));
 
     // Signed-area barycentric fill over the bbox, orientation-agnostic.
+    // Vertex cells are splatted ONLY for degenerate triangles: the first
+    // version splatted every triangle's vertices unconditionally, which
+    // marked cells whose CENTERS lie outside the shape and inflated every
+    // mask by ~a boundary cell — IoU and silhouetteM2 both read slightly
+    // high (caught in PR review; relevant because one prototype passed its
+    // gate by 1.5%). The fill rule alone is the honest measurement.
     const area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-    if (Math.abs(area) < 1e-12) continue; // degenerate: vertex cells above suffice
+    if (Math.abs(area) < 1e-12) {
+      mask[clampCell(Math.floor(ay)) * res + clampCell(Math.floor(ax))] = 1;
+      mask[clampCell(Math.floor(by)) * res + clampCell(Math.floor(bx))] = 1;
+      mask[clampCell(Math.floor(cy)) * res + clampCell(Math.floor(cx))] = 1;
+      continue;
+    }
     for (let gy = minCy; gy <= maxCy; gy++) {
       const sy = gy + 0.5;
       for (let gx = minCx; gx <= maxCx; gx++) {

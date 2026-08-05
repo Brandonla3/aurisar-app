@@ -97,13 +97,19 @@ export function createTerrainPaintBlock(name = 'realmPaint', palette = TERRAIN_P
   // The drop-shipped far tier: beyond the mid LOD band no tree INSTANCES
   // exist at all — distant forest is painted INTO the terrain from the same
   // vegDensity curve the placer reads (band constants shared byte-for-byte;
-  // see model/vegDensity.js for the honest scope of that identity). The
-  // band start is pinned to the prop tiers' own midMaxM, so tint begins
-  // exactly where instances end. Canopy tint derives from the palette
-  // (deep-shadowed grassLow), not a free new color — a palette retune moves
-  // the far forest with it.
-  const FAR_START = TIER_BANDS_M.midMaxM;
-  const FAR_FULL = TIER_BANDS_M.midMaxM + 100;
+  // see model/vegDensity.js for the honest scope of that identity). Canopy
+  // tint derives from the palette (deep-shadowed grassLow), not a free new
+  // color — a palette retune moves the far forest with it.
+  //
+  // The handoff is a BAND, not a line (review catch): instance culling is
+  // per-CHUNK-CENTER while this tint is per-PIXEL radial distance, so a FAR
+  // chunk's nearest corner sits ~45m closer than its center. Starting the
+  // tint at midMaxM left that corner band with neither instances nor tint.
+  // Starting ~40m early instead overlaps some MID-chunk pixels with faint
+  // tint UNDER real trees — the cheaper artifact by far (reads as ground
+  // darkening beneath a canopy, vs. a visibly bald ring).
+  const FAR_START = TIER_BANDS_M.midMaxM - 40;
+  const FAR_FULL = TIER_BANDS_M.midMaxM + 90;
   return new RealmFnBlock(name, {
     fnName: 'realmTerrainPaint',
     params: [

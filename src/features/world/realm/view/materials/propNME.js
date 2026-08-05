@@ -33,7 +33,17 @@
 import { RealmFnBlock } from './bsl/RealmFnBlock.js';
 import { PROP_SPROUT_MS } from '../../model/chunkFade.js';
 
-/** The sprout curve: fail-open on birth<=0, else an eased 0→1 growth. */
+/**
+ * The sprout curve, fail-open on BOTH inputs: a missing/zeroed birth
+ * attribute AND a never-advanced clock uniform each read as "fully grown".
+ * PR review caught that the first version guarded only the attribute —
+ * with uNowMs defaulting to 0 and birth stamped positive, a missed
+ * applySproutClock call made fresh chunks compute scale 0: permanently
+ * invisible, the exact failure the contract exists to exclude. `step`
+ * products instead of ternaries: no BSL bracket syntax to mis-transpile,
+ * and NaN in either input falls through to the grown branch (step(edge,
+ * NaN) is 0), so garbage degrades to "no animation", never "no props".
+ */
 function createSproutScaleBlock() {
   return new RealmFnBlock('sproutScale', {
     fnName: 'realmSproutScale',
@@ -45,7 +55,8 @@ function createSproutScaleBlock() {
     body: `
     float t = clamp((now - birth) / ${PROP_SPROUT_MS.toFixed(1)}, 0.0, 1.0);
     float eased = t * t * (3.0 - 2.0 * t);
-    return [birth <= 0.0 ? 1.0 : eased];`,
+    float animating = step(0.0001, birth) * step(0.0001, now);
+    return mix(1.0, eased, animating);`,
   });
 }
 
@@ -77,6 +88,30 @@ export function buildPropMaterial(scene, { name = 'realmProps', shaderLanguage =
   const viewProjection = new BABYLON.InputBlock('viewProjection');
   viewProjection.setAsSystemValue(BABYLON.NodeMaterialSystemValues.ViewProjection);
 
+  // THE INSTANCES BLOCK — load-bearing, caught missing in PR review. An NME
+  // graph that wires the World system value straight into its transforms
+  // never reads the per-instance world0..world3 attributes thin instances
+  // provide: every instance renders with the carrier's own (identity)
+  // matrix, collapsing the entire prop field to a pile at world origin.
+  // No headless test could see it — the graph builds, isReady passes, the
+  // buffers bind; only the drawn POSITIONS are wrong. InstancesBlock emits
+  // the `mat4(world0..world3)` path under instancing and falls back to
+  // `world` for non-instanced draws.
+  const world0 = new BABYLON.InputBlock('world0');
+  world0.setAsAttribute('world0');
+  const world1 = new BABYLON.InputBlock('world1');
+  world1.setAsAttribute('world1');
+  const world2 = new BABYLON.InputBlock('world2');
+  world2.setAsAttribute('world2');
+  const world3 = new BABYLON.InputBlock('world3');
+  world3.setAsAttribute('world3');
+  const instances = new BABYLON.InstancesBlock('instances');
+  world0.output.connectTo(instances.world0);
+  world1.output.connectTo(instances.world1);
+  world2.output.connectTo(instances.world2);
+  world3.output.connectTo(instances.world3);
+  world.output.connectTo(instances.world);
+
   const uNowMs = new BABYLON.InputBlock('uNowMs');
   uNowMs.value = 0;
 
@@ -92,13 +127,13 @@ export function buildPropMaterial(scene, { name = 'realmProps', shaderLanguage =
 
   const worldPos = new BABYLON.TransformBlock('worldPos');
   grown.output.connectTo(worldPos.vector);
-  world.output.connectTo(worldPos.transform);
+  instances.output.connectTo(worldPos.transform);
 
   // w = 0: rotate with the (per-instance) world matrix, never translate.
   const worldNormal = new BABYLON.TransformBlock('worldNormal');
   worldNormal.complementW = 0;
   normal.connectTo(worldNormal);
-  world.output.connectTo(worldNormal.transform);
+  instances.output.connectTo(worldNormal.transform);
 
   const wvp = new BABYLON.TransformBlock('wvp');
   worldPos.output.connectTo(wvp.vector);

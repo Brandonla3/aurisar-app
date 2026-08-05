@@ -125,7 +125,53 @@ describe('tier semantics', () => {
       const before = [...s._built.values()].flatMap((b) => b.carriers);
       s.update(34.5, 33.9, 16); // still inside the same 8m camera cell
       const after = [...s._built.values()].flatMap((b) => b.carriers);
-      expect(after).toEqual(before); // same mesh OBJECTS — nothing rebuilt
+      // Same mesh OBJECTS, identity-compared per element — toEqual would
+      // deep-compare and pass even for rebuilt equivalent meshes (review
+      // catch: the assertion must match what the comment claims).
+      expect(after.length).toBe(before.length);
+      after.forEach((mesh, i) => expect(mesh).toBe(before[i]));
+      s.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
+describe('carrier buffer isolation — the shared-geometry clobber cannot return', () => {
+  it('two carriers of the SAME prototype own distinct geometries with their own instance data', async () => {
+    // PR-review critical, and the same trap the old world documented in
+    // streaming/ashwoodPropMeshes.js: thinInstanceSetBuffer stores world0-3
+    // in the GEOMETRY, and clone() shares geometry — without
+    // makeGeometryUnique, every carrier of a prototype fights over one
+    // buffer set and the last-built chunk's instances render everywhere.
+    // Behavioral assertion on real buffers, not source text.
+    const { scene, prototypes } = await rig();
+    try {
+      const s = new PropStreamer(scene, field, prototypes, { radius: 1, buildBudgetPerTick: 64 });
+      s.update(32, 32, 1000);
+      // Find two carriers of the same prototype from different chunks.
+      const byProto = new Map();
+      for (const b of s._built.values()) {
+        for (const c of b.carriers) {
+          const proto = c.name.split('_')[1];
+          if (!byProto.has(proto)) byProto.set(proto, []);
+          byProto.get(proto).push(c);
+        }
+      }
+      const pair = [...byProto.values()].find((list) => list.length >= 2);
+      expect(pair, 'need one prototype present in 2+ chunks').toBeTruthy();
+      const [a, b] = pair;
+      // Distinct geometry objects = distinct world0-3 buffer registrations
+      // (the buffers live ON the geometry — that's the whole bug).
+      expect(a.geometry).not.toBe(b.geometry);
+      // And each carrier's actual instance storage holds ITS chunk's
+      // transforms (getVerticesData read-back trips a NullEngine DataView
+      // quirk; the thin-instance storage array is the same data pre-upload).
+      const ma = a._thinInstanceDataStorage.matrixData;
+      const mb = b._thinInstanceDataStorage.matrixData;
+      expect(ma).toBeTruthy();
+      expect(mb).toBeTruthy();
+      expect(Array.from(ma.slice(12, 15))).not.toEqual(Array.from(mb.slice(12, 15)));
       s.dispose();
     } finally {
       scene.dispose();

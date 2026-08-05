@@ -22,6 +22,20 @@
 export const STRESS = Object.freeze({ LUSH: 0, HARDY: 1, KRUMMHOLZ: 2 });
 
 /**
+ * Object.freeze is SHALLOW, and deriveStressed spreads — so without this,
+ * every stress variant of a genome ALIASES the base genome's stage arrays
+ * (ringSegments, blobLevel, tierRadii...) and one stray write retunes
+ * three prototypes at once (review catch). Freezing the nested arrays
+ * makes any such write throw in strict mode instead.
+ */
+function freezeGenome(g) {
+  for (const v of Object.values(g)) {
+    if (Array.isArray(v)) Object.freeze(v);
+  }
+  return Object.freeze(g);
+}
+
+/**
  * Every multi-stage prototype renders exactly TWO stages: 0 = near (full
  * detail), 1 = mid (coarser). There is deliberately no third stage —
  * beyond the mid ring the far tier is drop-shipped (zero instances; the
@@ -31,7 +45,7 @@ export const STRESS = Object.freeze({ LUSH: 0, HARDY: 1, KRUMMHOLZ: 2 });
 export const RENDERED_STAGES = 2;
 
 export const GENOMES = Object.freeze({
-  valeoak: Object.freeze({
+  valeoak: freezeGenome({
     id: 'valeoak',
     seed: 511,
     trunkH: 3.4,
@@ -57,7 +71,7 @@ export const GENOMES = Object.freeze({
     barkRGB: [0.33, 0.25, 0.18],
     leafRGB: [0.30, 0.44, 0.22],
   }),
-  cragpine: Object.freeze({
+  cragpine: freezeGenome({
     id: 'cragpine',
     seed: 733,
     trunkH: 5.2,
@@ -77,7 +91,7 @@ export const GENOMES = Object.freeze({
     barkRGB: [0.30, 0.22, 0.16],
     leafRGB: [0.16, 0.30, 0.20],
   }),
-  boulder: Object.freeze({
+  boulder: freezeGenome({
     id: 'boulder',
     seed: 911,
     radius: 0.9,
@@ -94,7 +108,7 @@ export const GENOMES = Object.freeze({
     rockRGB: [0.38, 0.37, 0.39],
     lichenRGB: [0.34, 0.40, 0.28],
   }),
-  bramble: Object.freeze({
+  bramble: freezeGenome({
     id: 'bramble',
     seed: 1277,
     trunkH: 0.5,
@@ -114,7 +128,7 @@ export const GENOMES = Object.freeze({
     barkRGB: [0.28, 0.22, 0.17],
     leafRGB: [0.27, 0.38, 0.20],
   }),
-  tuft: Object.freeze({
+  tuft: freezeGenome({
     id: 'tuft',
     seed: 1553,
     blades: 4,
@@ -152,7 +166,7 @@ export function deriveStressed(genome, stressTier) {
     out.tierHeights = genome.tierHeights.map((h) => h * k.h);
     out.tierRadii = genome.tierRadii.map((r) => r * k.r);
   }
-  return Object.freeze(out);
+  return freezeGenome(out);
 }
 
 /**

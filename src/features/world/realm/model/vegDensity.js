@@ -86,9 +86,15 @@ const f = (n) => n.toFixed(4);
  * normal — a soft fade toward slopeMax, not the placement pass's hard
  * reject, because a fragment can't reject, only dim.
  */
-export function emitCanopyDensityBsl() {
+export function emitCanopyDensityBsl(terrainConfig = DEFAULT_TERRAIN) {
+  // Takes the terrain config as a parameter (review catch): baking
+  // DEFAULT_TERRAIN unconditionally meant the first zone config overriding
+  // mountainStartM would silently desynchronize the far tint from actual
+  // tree placement — the exact identity this module exists to guarantee.
+  // Today's one caller passes nothing (the spike world IS default terrain);
+  // a zone system must thread its config through.
   const d = CANOPY_DENSITY_DEF;
-  const t = DEFAULT_TERRAIN;
+  const t = terrainConfig;
   return `
     float r = length(xz);
     float mountainMask = smoothstep(${f(t.mountainStartM)}, ${f(t.mountainFullM)}, r);

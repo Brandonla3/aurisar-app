@@ -4,9 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createTerrainField } from './terrainField.js';
-import {
-  DESIRE_LINES, edgeBias, placeChunkProps, ribbonWear,
-} from './propPlacement.js';
+import { edgeBias, placeChunkProps } from './propPlacement.js';
+import { DESIRE_LINES, ribbonWear } from './desireLines.js';
 
 const field = createTerrainField();
 

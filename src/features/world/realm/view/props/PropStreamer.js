@@ -53,6 +53,7 @@ export class PropStreamer {
   }
 
   update(x, z, nowMs = typeof performance !== 'undefined' ? performance.now() : 0) {
+    if (this._disposed) return { placed: 0, pending: 0 };
     const center = worldToChunk(x, z);
     const needed = neededChunksAround(x, z, this._radius);
     const { toLoad, toUnload } = diffChunks(new Set(this._fields.keys()), needed, {
@@ -104,6 +105,15 @@ export class PropStreamer {
     for (const [protoId, bucket] of Object.entries(field.instances)) {
       const master = this._prototypes.masterFor(protoId, tier);
       const carrier = master.clone(`prop_${protoId}_${id}`);
+      // CRITICAL, caught in PR review and already documented once in this
+      // repo (streaming/ashwoodPropMeshes.js): thinInstanceSetBuffer stores
+      // world0-3 (and every custom instanced buffer) in the GEOMETRY, and
+      // clone() SHARES geometry with its source — so without this, every
+      // carrier of a given prototype fights over one buffer set and the
+      // last-built chunk's instances render for all of them. The "clone
+      // shares geometry for free" economy in PropPrototypes' doc applies to
+      // the base vertex data only; instanced buffers must be per-carrier.
+      carrier.makeGeometryUnique();
       carrier.setEnabled(true);
       carrier.isPickable = false;
       carrier.receiveShadows = true;
@@ -113,9 +123,11 @@ export class PropStreamer {
       const births = new Float32Array(bucket.count);
       if (birthBaseMs > 0) {
         for (let i = 0; i < bucket.count; i++) {
-          // Deterministic ripple: primes fold the index into a 0..150ms
-          // stagger so a chunk's props rise in a wave, not one block.
-          births[i] = birthBaseMs + ((i * 2654435761) % 997) / 997 * 150;
+          // Deterministic scramble: Math.imul + unsigned shift, NOT plain
+          // multiply — (i * 2654435761) % 997 collapses to (i * 30) % 997
+          // in float arithmetic (review catch), a 4.5ms sawtooth that
+          // banded instead of rippling. imul keeps the full 32-bit mix.
+          births[i] = birthBaseMs + ((Math.imul(i, 2654435761) >>> 0) % 997) / 997 * 150;
         }
       }
       carrier.thinInstanceSetBuffer('sproutBirth', births, 1, true);
@@ -159,5 +171,11 @@ export class PropStreamer {
     for (const id of [...this._built.keys()]) this._disposeCarriers(id);
     this._fields.clear();
     this._tiers.clear();
+    // Guard against the render-loop-outlives-streamer ordering: an
+    // update() after dispose() would otherwise rebuild carriers onto a
+    // torn-down scene (review catch — the spike registers an observable it
+    // never removes).
+    this._lastCell = null;
+    this._disposed = true;
   }
 }
