@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CAMERA_CELL_M, PROP_TIER, TIER_BANDS_M, TIER_HYST_M,
-  cameraCellOf, cellCenter, diffTiers, tierForChunk,
+  cameraCellOf, diffTiers, tierForChunk,
 } from './propLod.js';
 
 describe('cameraCellOf', () => {

@@ -21,6 +21,9 @@ import { createRealmScene, startRenderLoop } from '../RealmScene.js';
 import { createTerrainField } from '../../model/terrainField.js';
 import { TerrainStreamer } from '../terrain/TerrainStreamer.js';
 import { buildTerrainMaterial } from '../materials/terrainNME.js';
+import { buildPropMaterial } from '../materials/propNME.js';
+import { PropPrototypes } from '../props/PropPrototypes.js';
+import { PropStreamer } from '../props/PropStreamer.js';
 import { buildSkyDomeMaterial, createSkyDome } from '../materials/skyDomeNME.js';
 import { buildHorizonRings } from '../materials/horizonRingNME.js';
 import { RING_TIERS } from '../../model/horizonRings.js';
@@ -104,6 +107,16 @@ async function boot() {
   // scaling how strongly terrainChunkGen.js's baked recess proxy reads.
   const { material: groundMat, applyState: applyGroundState } = await buildTerrainMaterial(scene);
   const streamer = new TerrainStreamer(scene, field, { radius: 3, material: groundMat });
+
+  // ── Props (P5): genome prototypes, ecological placement, camera-cell LOD ──
+  // One material for every prop; masters built once at boot; the streamer
+  // places 1 chunk/tick TRAILING terrain's 2, so ground appears first and
+  // props sprout out of it a tick later (per-instance birth attribute — see
+  // propNME.js's fail-open contract). Beyond the mid ring nothing renders:
+  // the terrain paint's far vegetation tint covers the drop-shipped tier.
+  const { material: propMat, applySproutClock } = await buildPropMaterial(scene);
+  const propProtos = new PropPrototypes(scene, propMat);
+  const propStreamer = new PropStreamer(scene, field, propProtos);
 
   // One closure composing every skyState reader — dome, rings, and now
   // terrain's self-shadow uniform — so FogDriver stays the single writer
@@ -218,6 +231,10 @@ async function boot() {
     // nowMs stamps newly-born chunks and ramps every still-fading chunk's
     // visibility (model/chunkFade.js) — structural pop-in concealment.
     streamer.update(walker.x, walker.z, nowMs);
+    // Props: place fields (budgeted), tier by camera cell, advance the one
+    // sprout clock every material-sharing carrier reads.
+    propStreamer.update(walker.x, walker.z, nowMs);
+    applySproutClock(nowMs);
     // Rings are built at world origin; without this they never move, and
     // "just beyond the streamed disc" would only be true near spawn.
     ringKit.recenter(walker.x, walker.z);
@@ -260,6 +277,7 @@ async function boot() {
       `pos       : ${walker.x.toFixed(1)}, ${walker.y.toFixed(1)}, ${walker.z.toFixed(1)}`,
       `speed     : ${walker.speedMps.toFixed(1)} m/s`,
       `chunks    : ${streamer.residentCount()} resident${streamer.isSettledVisually() ? '' : ' (fading)'}`,
+      `props     : ${propStreamer.carrierCount()} carriers, ${propStreamer.instanceCount()} instances`,
       `sky       : ${fogDriver.state?.fogDensity != null ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
       `rings     : ${ringKit.meshes.length}`,
       `clouds    : ${cloudKit.meshes.length} puffs, factor ${fogDriver.cloudFactor != null ? fogDriver.cloudFactor.toFixed(2) : '?'}`,
@@ -269,7 +287,7 @@ async function boot() {
   }, 250);
 
   window.__realmSpike = {
-    engine, scene, adt, field, streamer, camera, fogDriver, ringKit, cloudKit, actorShadowRig, getWalker: () => walker,
+    engine, scene, adt, field, streamer, propStreamer, camera, fogDriver, ringKit, cloudKit, actorShadowRig, getWalker: () => walker,
   };
 }
 

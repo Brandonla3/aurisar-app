@@ -21,8 +21,6 @@
  * never replay the growth animation.
  */
 
-/* global BABYLON */
-
 import {
   DEFAULT_STREAM_RADIUS_CHUNKS, chunkId, diffChunks, neededChunksAround, worldToChunk,
 } from '../../model/chunkMath.js';

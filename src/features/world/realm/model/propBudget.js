@@ -48,18 +48,25 @@ export const PROP_MANIFEST = Object.freeze({
 });
 
 /**
- * The world ceilings the census asserts. Set from the measured worst case
- * plus ~25% headroom (realmBudget.test.js logs the actuals it found), so a
- * regression has to be REAL to trip them, and a deliberate content
- * expansion has to raise them consciously in review.
+ * The world ceilings the census asserts, set from the measured worst case
+ * plus ~30% headroom — so a regression has to be REAL to trip them, and a
+ * deliberate content expansion has to raise them consciously, in review.
+ *
+ * Measured actuals (realmBudget.test.js's adversarial camera sweep,
+ * 2026-08-04): drawCalls worst 91 (crag/belt 4-corner cameras), triangles
+ * worst 356,916 (spawn — grass-heavy), fillScreens worst 0.71 (spawn),
+ * rebuilds-per-crossing worst 19 (a belt march). First drafts of these
+ * ceilings predated the census and were 3-50x too loose — a ceiling nobody
+ * can hit is not a budget, it's a decoration.
  */
 export const BUDGET_CEILINGS = Object.freeze({
   /** Live (prototype, chunk) thin-instance draw calls, worst camera. */
-  drawCalls: 320,
+  drawCalls: 120,
   /** Summed instance-count x per-stage tris, worst camera. */
-  triangles: 900_000,
+  triangles: 480_000,
   /** Carriers rebuilt by one worst-case camera-cell crossing. */
-  rebuildsPerCrossing: 260,
-  /** Screens of opaque prop pixels at the worst sightline (see census). */
-  fillScreens: 40,
+  rebuildsPerCrossing: 30,
+  /** Screens of opaque prop pixels at the worst sightline (see the census's
+   *  screenM2 formula: 60-degree vertical FOV at chunk-center distance). */
+  fillScreens: 1.2,
 });
