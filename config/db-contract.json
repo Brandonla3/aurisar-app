@@ -56,6 +56,7 @@
     "notification_prefs",
     "notification_suppressions",
     "notifications",
+    "phone_verification_codes",
     "profiles_public"
   ],
   "declaredFunctions": [
@@ -81,6 +82,7 @@
     "get_total_unread_count",
     "has_legacy_mfa_recovery_codes",
     "has_required_aal",
+    "lookup_email_by_private_id",
     "mark_channel_read",
     "notif_player_name",
     "notify_friend_accepted",
@@ -92,6 +94,7 @@
     "notify_user_welcome",
     "produce_daily_reminders",
     "send_message",
+    "send_phone_otp",
     "should_deliver",
     "should_deliver_email",
     "store_mfa_recovery_codes",
@@ -99,6 +102,7 @@
     "touch_notification_prefs",
     "update_channel_timestamp",
     "use_mfa_recovery_code",
+    "verify_phone_otp",
     "xp_to_level"
   ],
   "knownUndeclared": {
@@ -175,26 +179,6 @@
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
         "src/App.jsx:2355"
-      ]
-    },
-    "function:lookup_email_by_private_id": {
-      "reason": "UNTRACKED, SECURITY-RELEVANT: called PRE-AUTH from the login screen, so it must be granted to `anon` — yet its grants, search_path pinning and rate limiting cannot be reviewed because it is declared in no tracked file. Needs a migration that re-declares it explicitly. Confirmed present in the live DB.",
-      "sites": [
-        "src/App.jsx:1351"
-      ]
-    },
-    "function:send_phone_otp": {
-      "reason": "UNTRACKED, SECURITY-RELEVANT: backs the phone MFA factor. Rate limiting and per-user throttling are unverifiable from the repo because it is declared in no tracked file. Needs a migration that re-declares it.",
-      "sites": [
-        "src/App.jsx:1721",
-        "src/App.jsx:1850"
-      ]
-    },
-    "function:verify_phone_otp": {
-      "reason": "UNTRACKED, SECURITY-RELEVANT: verifies the phone MFA factor. Attempt limiting and expiry are unverifiable from the repo. Pairs with send_phone_otp; needs a migration that re-declares it.",
-      "sites": [
-        "src/App.jsx:1759",
-        "src/App.jsx:1886"
       ]
     }
   }
