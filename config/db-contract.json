@@ -93,6 +93,7 @@
     "notify_shared_item",
     "notify_user_welcome",
     "produce_daily_reminders",
+    "request_client_ip",
     "send_message",
     "send_phone_otp",
     "should_deliver",
