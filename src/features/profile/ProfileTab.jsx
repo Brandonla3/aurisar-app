@@ -287,9 +287,9 @@ const ProfileTab = memo(function ProfileTab({
 
   useEffect(() => {
     if (!authUser?.id) return;
-    // whoop_connection_status() instead of reading whoop_tokens directly:
-    // migration 28 revoked client access to that table because it holds
-    // plaintext OAuth tokens. The RPC returns connection metadata only.
+    // whoop_connection_status() instead of reading the token table directly:
+    // migration 28 revoked client access to it because it holds plaintext
+    // OAuth credentials. The RPC returns connection metadata only.
     sb.rpc('whoop_connection_status')
       .then(({ data, error }) => setWhoopLinked(!error && data?.connected === true))
       .catch(() => setWhoopLinked(false));
@@ -300,11 +300,21 @@ const ProfileTab = memo(function ProfileTab({
   // offered only Sync. Data deletion is opt-in and asked separately, since
   // disconnecting should not silently destroy months of history.
   async function handleDisconnectWhoop() {
-    const purge = window.confirm(
+    // Two prompts, deliberately. A single confirm where Cancel meant "keep my
+    // data" still disconnected anyone who hit Cancel or Escape meaning "never
+    // mind" — the destructive reading of the button most people expect to be
+    // the safe one. The first prompt is the abort; only then is the data
+    // question asked.
+    if (!window.confirm(
       "Disconnect WHOOP?\n\n" +
-      "This deletes Aurisar's access token, so no further data is imported.\n\n" +
-      "OK  — also delete the WHOOP data already stored\n" +
-      "Cancel — keep the stored data (you stay disconnected either way)"
+      "Aurisar's access token is deleted, so no further data is imported.\n" +
+      "You can reconnect at any time."
+    )) return;
+
+    const purge = window.confirm(
+      "Also delete the WHOOP data already stored?\n\n" +
+      "OK — delete the stored recovery, sleep and strain history\n" +
+      "Cancel — keep it (you are disconnected either way)"
     );
     setWhoopDisconnecting(true);
     setWhoopMsg(null);

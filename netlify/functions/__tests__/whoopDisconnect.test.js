@@ -13,7 +13,7 @@ const ORIGIN = 'https://aurisargames.com';
 
 // One chainable stub standing in for the supabase-js query builder, recording
 // what the handler asked for so the assertions can be about behaviour.
-function makeSupabase({ tokenRow = { refresh_token: 'rt_live' }, deleteCount = 7, dataErr = null } = {}) {
+function makeSupabase({ tokenRow = { refresh_token: 'rt_live' }, deleteCount = 7, dataErr = null, readErr = null } = {}) {
   const calls = { deleted: [], selected: [] };
   const client = {
     from(table) {
@@ -22,7 +22,7 @@ function makeSupabase({ tokenRow = { refresh_token: 'rt_live' }, deleteCount = 7
         select(cols) { calls.selected.push({ table, cols }); return q; },
         delete() { calls.deleted.push(table); q._isDelete = true; return q; },
         eq() { return q; },
-        maybeSingle: async () => ({ data: tokenRow, error: null }),
+        maybeSingle: async () => ({ data: readErr ? null : tokenRow, error: readErr }),
         then(resolve) {
           // Awaiting a delete chain resolves here.
           if (table === 'whoop_data') return resolve({ count: deleteCount, error: dataErr });
@@ -131,10 +131,38 @@ describe('disconnecting', () => {
   it('is idempotent when already disconnected', async () => {
     supabaseStub = makeSupabase({ tokenRow: null });
     vi.stubGlobal('fetch', authOk());
+    const res = await (await handler())(req({}));
+    const out = JSON.parse(await res.text());
+    expect(res.status).toBe(200);
+    expect(out.alreadyDisconnected).toBe(true);
+    expect(supabaseStub.calls.deleted).not.toContain('whoop_tokens');
+  });
+
+  it('still purges when asked, even if the token row is already gone', async () => {
+    // The previous version returned early on a missing token row, so "delete
+    // my data" after an earlier keep-the-data disconnect silently did nothing
+    // and reported success. The earlier test asserted that behaviour, which
+    // pinned the bug rather than the requirement.
+    supabaseStub = makeSupabase({ tokenRow: null, deleteCount: 12 });
+    vi.stubGlobal('fetch', authOk());
     const res = await (await handler())(req({ deleteData: true }));
     const out = JSON.parse(await res.text());
     expect(res.status).toBe(200);
     expect(out.alreadyDisconnected).toBe(true);
+    expect(supabaseStub.calls.deleted).toContain('whoop_data');
+    expect(out.dataDeleted).toBe(12);
+  });
+
+  it('a token-lookup ERROR is never reported as "already disconnected"', async () => {
+    // Reading only `data` made a query failure indistinguishable from "no
+    // row", so the API answered 200 while the credential was still live.
+    supabaseStub = makeSupabase({ tokenRow: null, readErr: { message: 'connection reset' } });
+    vi.stubGlobal('fetch', authOk());
+    const res = await (await handler())(req({}));
+    const out = JSON.parse(await res.text());
+    expect(res.status).toBe(500);
+    expect(out.ok).toBeUndefined();
+    expect(out.alreadyDisconnected).toBeUndefined();
     expect(supabaseStub.calls.deleted).not.toContain('whoop_data');
   });
 
@@ -178,6 +206,35 @@ describe('source guards', () => {
 
   it('data deletion is opt-in, not the default', () => {
     expect(src).toMatch(/body\.deleteData === true/);
+  });
+
+  it('checks the token-lookup error rather than reading only data', () => {
+    expect(src).toMatch(/const \{ data: row, error: readErr \}/);
+    expect(src).not.toMatch(/const \{ data: row \} = await/);
+  });
+
+  it('the purge is not nested behind the token-row branch', () => {
+    // If `if (deleteData)` sits inside `if (row)`, the "delete on request"
+    // path silently no-ops once the token is already gone.
+    const rowBranch = src.slice(src.indexOf('if (row) {'), src.indexOf('let dataDeleted'));
+    expect(rowBranch).not.toContain('deleteData');
+  });
+
+  it('the confirm aborts before it asks about data', () => {
+    const tab = readFileSync(ROOT + 'src/features/profile/ProfileTab.jsx', 'utf8');
+    const fn = tab.slice(tab.indexOf('async function handleDisconnectWhoop'));
+    // A bare `if (!window.confirm(...)) return;` must come before the
+    // purge question, so Cancel/Escape means "never mind", not "disconnect
+    // me but keep the data".
+    const abortIdx = fn.indexOf('if (!window.confirm(');
+    const purgeIdx = fn.indexOf('const purge = window.confirm(');
+    expect(abortIdx).toBeGreaterThan(-1);
+    expect(abortIdx).toBeLessThan(purgeIdx);
+  });
+
+  it('the migration grants only the user_id column, never the tokens', () => {
+    expect(migration).toMatch(/GRANT SELECT \(user_id\) ON public\.whoop_tokens TO authenticated/);
+    expect(migration).not.toMatch(/GRANT SELECT[^(]*ON public\.whoop_tokens TO authenticated/);
   });
 
   it('the migration takes the token table away from the client roles', () => {

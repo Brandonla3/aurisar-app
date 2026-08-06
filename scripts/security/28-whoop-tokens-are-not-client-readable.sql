@@ -41,10 +41,28 @@ REVOKE ALL ON TABLE public.whoop_tokens FROM PUBLIC, anon, authenticated;
 
 ALTER TABLE public.whoop_tokens ENABLE ROW LEVEL SECURITY;
 
--- The policy only ever granted client access to token material. Dropping it
--- leaves the table in the same shape as notification_suppressions and
--- phone_verification_codes: RLS on, no client policy, definer/service only.
+-- The old policy granted the client every column, token material included.
 DROP POLICY IF EXISTS "own tokens only" ON public.whoop_tokens;
+
+-- Hand back EXACTLY the presence check the profile performs — one column,
+-- own row — and nothing else. `select access_token` is refused at the column
+-- grant regardless of the policy.
+--
+-- This is not just tidiness. Revoking the table wholesale broke the shipped
+-- frontend the moment this migration was applied: its connected/not-connected
+-- check is `select('user_id')`, which started returning `permission denied`,
+-- so a linked account rendered as "Not connected" until the matching frontend
+-- deployed. Verified against production. Scoping the grant to `user_id`
+-- removes the deploy-ordering hazard entirely — the old client and the new
+-- whoop_connection_status() client both work, in either order.
+GRANT SELECT (user_id) ON public.whoop_tokens TO authenticated;
+
+DROP POLICY IF EXISTS whoop_tokens_own_row_presence ON public.whoop_tokens;
+CREATE POLICY whoop_tokens_own_row_presence
+  ON public.whoop_tokens
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
 
 -- -----------------------------------------------------------------------------
 -- 2. Give the UI the one fact it actually wanted

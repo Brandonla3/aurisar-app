@@ -250,6 +250,16 @@ if (!CHECK) {
       }
     }
   }
+  // Refresh `sites` on entries that already exist. They were only ever set at
+  // creation, so an accepted-undeclared object kept citing wherever it was
+  // first seen — an audit of PR #319 chased a ProfileTab read of whoop_tokens
+  // that the same PR had removed. `reason` is hand-written and never touched
+  // here; only the mechanically-derived call sites are updated.
+  for (const u of undeclared) {
+    const entry = contract.knownUndeclared[`${u.kind}:${u.name}`];
+    if (entry) entry.sites = sitesFor(u);
+  }
+
   pruneStaleBaseline(contract.knownUndeclared);
   writeFileSync(OUT_PATH, JSON.stringify(contract, null, 2) + '\n');
 

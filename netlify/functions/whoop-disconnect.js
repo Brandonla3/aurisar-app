@@ -81,49 +81,69 @@ export default async (req) => {
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
 
   // Read the refresh token solely to revoke it upstream; it is never returned.
-  const { data: row } = await supabase
+  //
+  // `error` is destructured deliberately. Reading only `data` meant a database
+  // or query failure produced null — indistinguishable from "no row" — and the
+  // handler answered `200 alreadyDisconnected` while the credential was still
+  // live and syncing. Failure must not wear success's clothes, least of all on
+  // the endpoint whose entire job is revoking access.
+  const { data: row, error: readErr } = await supabase
     .from("whoop_tokens")
     .select("refresh_token")
     .eq("user_id", user.id)
     .maybeSingle();
-
-  if (!row) {
-    // Already disconnected. Idempotent: the end state the caller wanted.
-    return json({ ok: true, alreadyDisconnected: true, dataDeleted: 0 });
-  }
-
-  const revoked = await revokeUpstream(row.refresh_token);
-
-  const { error: delErr } = await supabase
-    .from("whoop_tokens")
-    .delete()
-    .eq("user_id", user.id);
-  if (delErr) {
-    console.error("[whoop-disconnect] token delete failed:", delErr.message);
+  if (readErr) {
+    console.error("[whoop-disconnect] token lookup failed:", readErr.message);
     return json({ error: "Could not disconnect. Try again." }, 500);
   }
 
+  let revoked = { attempted: false };
+  if (row) {
+    revoked = await revokeUpstream(row.refresh_token);
+
+    const { error: delErr } = await supabase
+      .from("whoop_tokens")
+      .delete()
+      .eq("user_id", user.id);
+    if (delErr) {
+      console.error("[whoop-disconnect] token delete failed:", delErr.message);
+      return json({ error: "Could not disconnect. Try again." }, 500);
+    }
+  }
+
+  // Runs whether or not a token row existed. The purge used to sit behind an
+  // early return, so "delete my data" after a previous keep-the-data
+  // disconnect silently did nothing and still reported success — the exact
+  // "deleted on request" promise this endpoint exists to honour.
   let dataDeleted = 0;
+  let dataDeleteFailed = false;
   if (deleteData) {
     const { count, error: dataErr } = await supabase
       .from("whoop_data")
       .delete({ count: "exact" })
       .eq("user_id", user.id);
     if (dataErr) {
-      // The credential is already gone — the disconnect succeeded. Report the
-      // partial outcome rather than a blanket failure the user can't act on.
+      // The credential is already gone — the disconnect itself succeeded.
+      // Report the partial outcome rather than a blanket failure.
       console.error("[whoop-disconnect] data delete failed:", dataErr.message);
-      return json({ ok: true, dataDeleted: 0, dataDeleteFailed: true });
+      dataDeleteFailed = true;
+    } else {
+      dataDeleted = count ?? 0;
     }
-    dataDeleted = count ?? 0;
   }
 
   console.log(
     `[whoop-disconnect] user ${user.id} disconnected` +
-    ` (upstream revoke: ${revoked.attempted ? (revoked.ok ? "ok" : "failed") : "skipped"},` +
+    ` (token row: ${row ? "deleted" : "none"},` +
+    ` upstream revoke: ${revoked.attempted ? (revoked.ok ? "ok" : "failed") : "skipped"},` +
     ` rows deleted: ${dataDeleted})`
   );
-  return json({ ok: true, dataDeleted });
+  return json({
+    ok: true,
+    alreadyDisconnected: !row,
+    dataDeleted,
+    ...(dataDeleteFailed ? { dataDeleteFailed: true } : {}),
+  });
 };
 
 export const config = { path: "/api/whoop-disconnect" };
