@@ -15,7 +15,7 @@
  *                        a margin over every impostor. The literal exit bar.
  *   5. ABLATION        — proof 3 and 4 are earned by mass allocation, not by
  *                        proportion knobs; and proof the gate can go red.
- *   6. BAND OCCUPANCY  — the leading indicator authors actually edit against.
+ *   6. BAND OCCUPANCY  — where the mass sits, which is what an author edits.
  *   7. COLOUR CONTROL  — the gate cannot be satisfied by tint.
  *
  * ORDER MATTERS. Group 1 runs first because `canonicalStats` and
@@ -37,6 +37,14 @@
  * way realmBudget.test.js and propGen.test.js log their actuals — a human
  * reading CI output should be able to see the roster's health at a glance,
  * and a future retune should read numbers instead of folklore.
+ *
+ * 51 GATES AND 4 REPORTERS, not 55 tests. The four whose names begin
+ * `report:` exist to LOG the tables above; they assert nothing and cannot go
+ * red. That is the same deal realmBudget.test.js's `[census]` logging makes
+ * and it is worth keeping, but this project has now caught four separate
+ * tests that executed code without being able to fail, so the distinction is
+ * named here rather than left for a future reader to discover by counting.
+ * A `report:` test is documentation that runs; every other test is a gate.
  */
 import { describe, expect, it } from 'vitest';
 import { buildActorPayload } from './actorGen.js';
@@ -104,20 +112,46 @@ const BAND_TOLERANCE = 0.06;
 const ORGHON_ABOVE_SHOULDER_MAX = 0.02;
 
 /**
- * Floor on the L1 distance between any two archetypes' band histograms — the
- * LEADING indicator, asserted in its own right rather than only through the
- * pairwise IoU it predicts. Measured range: 0.324 (magistari x orghon, the
- * roster's structural weak spot — the two bottom-heavy bodies) up to 0.829
- * (legion x orghon, the histogram opposites). 0.25 sits 23% below the worst
- * measured pair, so the gate trips when a NEW archetype lands on top of an
- * existing one in band space — which is how the roster degrades — long
- * before the lagging IoU gate would notice.
+ * Floor on the L1 distance between any two archetypes' band histograms —
+ * asserted in its own right rather than only through the pairwise IoU it
+ * often precedes. Measured range: 0.324 (magistari x orghon, the roster's
+ * structural weak spot — the two bottom-heavy bodies) up to 0.829 (legion x
+ * orghon, the histogram opposites). 0.25 sits 23% below the worst measured
+ * pair, so the gate trips when a NEW archetype lands on top of an existing
+ * one in band space, which is one of the two ways the roster degrades (the
+ * other — chassis convergence without a band shift — is what the pairwise
+ * gate and ABLATED_WORST_MAX catch).
  */
 const BAND_L1_MIN = 0.25;
 
 /** Minimum IoU that removing an archetype's faction-defining masses must add
- *  to a pair's score. See the group 5 header for the derivation. */
+ *  to a pair's score. Applied to ONE named pair (unbound x legion), never
+ *  across pairs — see the group 5 header. Measured 0.203-0.209. */
 const HERALD_CONTRIBUTION_MIN = 0.15;
+
+/**
+ * Ceiling on the herald-ablated roster's WORST pair — the chassis-only
+ * headroom, defended as an absolute rather than as a difference.
+ *
+ * This is the roster's real safety margin: strip every faction organ and
+ * unbound x legion measures 0.692 near / 0.689 far against the 0.72
+ * distinctness gate. 4% of headroom, not 40%. Held at 0.70 so a chassis
+ * convergence has to be tiny to pass and obvious to fail.
+ *
+ * A FIXED ceiling, deliberately, replacing a floating `worstAblated -
+ * worstReal >= 0.15` this file shipped first. That form took a max over
+ * pairs on each side INDEPENDENTLY, so its two operands were routinely
+ * different pairs (real worst = magistari x orghon, ablated worst = unbound x
+ * legion) — a coherent roster-health scalar, but one whose red pointed an
+ * author at heralds when the edit might have been anywhere. Demonstrated in
+ * review: retuning magistari's hem radius 0.42 -> 0.32 left every readability
+ * gate green (pairwise 0.542, band 0.055, identification >= 0.41) and turned
+ * only that test red, at 0.1493 against its 0.15 floor. Worse, the floating
+ * form is blind in the direction that matters: narrowing unbound's torso
+ * toward legion's (0.20/0.23 -> 0.14/0.17) drives the ablated pair to 0.738,
+ * past this ceiling, while the floating delta RISES to 0.239 and stays green.
+ */
+const ABLATED_WORST_MAX = 0.70;
 
 // ── payload bank ────────────────────────────────────────────────────────────
 // Built once. Every archetype at both stages is used by nearly every group,
@@ -198,7 +232,7 @@ describe('2. LOD fidelity — the far stage is the same body, only coarser', () 
     });
   }
 
-  it('logs the LOD table', () => {
+  it('report: the LOD table (no assertion — see the file header)', () => {
     log(`LOD fidelity (silhouetteStats, union window, ${YAWS} yaws, res 32)`);
     log(`  gates: mean >= ${ACTOR_LOD_IOU_MIN}  worst-yaw >= ${ACTOR_LOD_WORST_YAW_MIN}  width <= ${ACTOR_LOD_WIDTH_DELTA_MAX}`);
     for (const id of IDS) {
@@ -248,13 +282,27 @@ describe('3. pairwise distinctness — four factions, four silhouettes', () => {
     // near / 0.501 far against a 0.72 gate). Any future bottom-heavy
     // archetype lands on top of these two first, so this pair is where the
     // roster degrades before anywhere else.
+    //
+    // CARRY-FORWARD, the above-shoulder band. Orghon is separated from
+    // magistari by a STRUCTURAL ZERO — it has no above-shoulder occupancy at
+    // all (0.001), which is why ORGHON_ABOVE_SHOULDER_MAX exists and is the
+    // strongest single separator in the roster. Legion and magistari have no
+    // such luxury: both HAVE above-shoulder mass (0.415 and 0.163) and are
+    // told apart by its SHAPE, not by its presence — a face-plate-and-crest
+    // bar versus a cowl-and-spine. That is a weaker kind of separation, and
+    // there is deliberately no legion/magistari equivalent of the orghon
+    // gate because no such structural claim is true. Benign today (0.417
+    // near / 0.411 far, band L1 0.582), but the above-shoulder band is
+    // already the crowded one: a FIFTH archetype whose herald also lives up
+    // there arrives into two occupants rather than the empty band orghon
+    // enjoys, and it will land on this pair, not on magistari x orghon.
     for (const stage of STAGES) {
       const s = pairIoU(PAYLOAD[stage].magistari, PAYLOAD[stage].orghon);
       expect(s.meanIoU, `magistari x orghon s${stage} = ${f3(s.meanIoU)}`).toBeLessThanOrEqual(ACTOR_PAIR_IOU_MAX);
     }
   });
 
-  it('logs the full pairwise matrix', () => {
+  it('logs the full pairwise matrix AND gates its argmax', () => {
     log(`pairwise canonical meanIoU (fixed ACTOR_WINDOW, pitch ${f3(GATE_PITCH_RAD)} rad, res ${GATE_RES}, ${YAWS} yaws)`);
     log(`  gate: <= ${ACTOR_PAIR_IOU_MAX}   props across species measure 0.200; the rejected proportion roster measured 0.941`);
     log(`  ${pad('pair', 24)} ${pad('near mean', 11)}${pad('near worst', 12)}${pad('far mean', 10)}far worst`);
@@ -300,7 +348,7 @@ describe('4. identification margin — the exit bar, stated mechanically', () =>
     });
   }
 
-  it('logs the identification table', () => {
+  it('report: the identification table (no assertion — see the file header)', () => {
     log(`identification margin (near stage vs every far effigy), floor > ${ACTOR_ID_MARGIN_MIN}`);
     for (const id of IDS) {
       const ranked = IDS
@@ -362,9 +410,12 @@ describe('5. ablation — the gate is earned by mass allocation, and it can go r
   //     chassis: real 0.483 near / 0.486 far, ablated 0.692 / 0.689. The
   //     graft arm and the mask stack are carrying ~0.21 of IoU separation
   //     between them, and without them the pair sits 0.03 under the gate.
-  //     That number is the roster's actual safety margin on its closest pair,
-  //     and this assertion is what stops a future edit quietly moving
-  //     unbound and legion apart with radius multipliers instead.
+  //     Two assertions come out of that, and they are different claims: an
+  //     ABSOLUTE ceiling on the ablated roster's worst pair (the chassis
+  //     headroom itself, ABLATED_WORST_MAX) and a SAME-PAIR delta on unbound
+  //     x legion (the heralds must still be doing the separating). Together
+  //     they are what stops a future edit quietly moving unbound and legion
+  //     apart with radius multipliers instead of mass.
   //
   // (b) PROPORTION ROSTER answers "can this gate ever fail?". Removal alone
   //     cannot answer it — measured, the worst ablated pair reaches 0.692,
@@ -374,27 +425,40 @@ describe('5. ablation — the gate is earned by mass allocation, and it can go r
   //     proportion multiplier each. Every pair of that roster measures
   //     0.819-0.932 near / 0.821-0.929 far, i.e. the gate rejects all six —
   //     matching the probe's 0.941 finding that proportions are not identity.
+  //
+  //     KNOW ITS BOUND. Because the fixture's WEAKEST pair is 0.819, this
+  //     test only defends ACTOR_PAIR_IOU_MAX above ~0.819: loosening the gate
+  //     from 0.72 to 0.81 would leave it green. (It does bite hard where it
+  //     was aimed — review confirmed that moving the gate to 0.95, which
+  //     makes group 3 pass silently, turns this red.) Pinning the 0.72 value
+  //     itself is group 3's job against the real roster's 0.506; this one
+  //     pins that the gate still rejects proportion-only identity at all.
 
   for (const stage of STAGES) {
-    it(`${STAGE_NAME[stage]}: stripping every faction organ tightens the roster's WORST pair`, () => {
-      // Roster-level, deliberately not per-pair. Per-pair monotonicity ("no
-      // herald ever makes a pair more distinct") is measurably FALSE, and
-      // the exception is instructive rather than a bug: legion x magistari
-      // reads 0.417 real and 0.408 ablated, because BOTH of their heralds
-      // (the mask stack, the cowl and spine) live above the shoulders, so
-      // removing both removes shared area from the same band. What is true,
-      // and what this asserts, is that the roster's tightest pair gets
-      // tighter — measured worst real 0.506 near / 0.501 far vs worst
-      // ablated 0.692 / 0.689, a jump of ~0.19 straight at the gate.
+    it(`${STAGE_NAME[stage]}: the herald-ablated roster's worst pair stays under ${ABLATED_WORST_MAX}`, () => {
+      // The chassis-only headroom, as an absolute. See ABLATED_WORST_MAX for
+      // why this is a fixed ceiling and not the cross-pair difference this
+      // file shipped first.
+      //
+      // Note what is NOT asserted: per-pair monotonicity ("no herald ever
+      // makes a pair more distinct") is measurably FALSE, and the exception
+      // is instructive rather than a bug — legion x magistari reads 0.417
+      // real and 0.408 ablated, because BOTH of their heralds (the mask
+      // stack; the cowl and spine) live above the shoulders, so removing
+      // both deletes shared area from the same band.
       const ablated = Object.fromEntries(IDS.map((id) => [id, buildFromMasses(ablatedChassis(id), stage)]));
-      const worstOf = (pick) => Math.max(...PAIRS.map(([a, b]) => pairIoU(pick(a), pick(b)).meanIoU));
-      const real = worstOf((id) => PAYLOAD[stage][id]);
-      const abl = worstOf((id) => ablated[id]);
+      let worst = { iou: -1, pair: '' };
+      for (const [a, b] of PAIRS) {
+        const iou = pairIoU(ablated[a], ablated[b]).meanIoU;
+        if (iou > worst.iou) worst = { iou, pair: `${a} x ${b}` };
+      }
       expect(
-        abl - real,
-        `s${stage}: worst real pair ${f3(real)}, worst herald-ablated pair ${f3(abl)} — the faction organs are `
-        + 'no longer what holds the roster apart at its tightest point',
-      ).toBeGreaterThanOrEqual(HERALD_CONTRIBUTION_MIN);
+        worst.iou,
+        `s${stage}: with every faction organ removed, ${worst.pair} scores ${f3(worst.iou)} against the `
+        + `${ACTOR_PAIR_IOU_MAX} distinctness gate — that PAIR is the one that moved, and its chassis alone is `
+        + 'now doing so little of the separating that its faction organ is all that keeps it legible. '
+        + 'Reallocate mass in one of those two bodies; do not raise this ceiling.',
+      ).toBeLessThanOrEqual(ABLATED_WORST_MAX);
     });
   }
 
@@ -437,7 +501,7 @@ describe('5. ablation — the gate is earned by mass allocation, and it can go r
     });
   }
 
-  it('logs the ablation comparison', () => {
+  it('report: the ablation comparison (no assertion — see the file header)', () => {
     log('ablation: real vs herald-ablated (heraldScale = 0), far stage');
     const ablated = Object.fromEntries(IDS.map((id) => [id, buildFromMasses(ablatedChassis(id), 1)]));
     for (const [a, b] of PAIRS) {
@@ -450,13 +514,20 @@ describe('5. ablation — the gate is earned by mass allocation, and it can go r
 
 // ── 6. BAND OCCUPANCY ───────────────────────────────────────────────────────
 
-describe('6. band occupancy — the leading indicator, held to its declared table', () => {
-  // Pairwise IoU is the LAGGING indicator: by the time it moves, the roster
-  // is already wrong and it is not obvious which mass to edit. The band
-  // histogram is the leading one — [below-waist, torso, above-shoulder]
-  // fractions of filled silhouette area — and it is what an author actually
-  // edits against, which is why every archetype declares its measured values
-  // as `bandTargets`.
+describe('6. band occupancy — the authoring-side indicator, held to its declared table', () => {
+  // The band histogram — [below-waist, torso, above-shoulder] fractions of
+  // filled silhouette area — is what an author can actually EDIT against,
+  // which is why every archetype declares its measured values as
+  // `bandTargets`. Pairwise IoU tells you a pair has converged; the histogram
+  // tells you where.
+  //
+  // COMPLEMENTARY, not strictly leading-and-lagging. Either can fire first
+  // depending on the edit, and both directions have been observed: raising
+  // orghon's head above SHOULDER_Y collapses band L1 to 0.077 while pairwise
+  // IoU stays green, and narrowing legion's chassis pushes pairwise to 0.733
+  // (past 0.72) while band L1 sits comfortably at 0.359. A roster can
+  // converge in silhouette without moving its band budget and vice versa, so
+  // both gates ship.
   //
   // bandOccupancy is defined at pitch 0 ONLY (see its own doc: under pitch a
   // mask row stops mapping to a single world-Y, so the metric would return
@@ -512,7 +583,7 @@ describe('6. band occupancy — the leading indicator, held to its declared tabl
     }
   });
 
-  it('logs the band histogram and the L1 matrix', () => {
+  it('report: the band histogram and L1 matrix (no assertion — see the file header)', () => {
     log(`band histogram [below-waist, torso, above-shoulder], edges WAIST_Y=${WAIST_Y} SHOULDER_Y=${SHOULDER_Y}, res ${GATE_RES}, pitch 0`);
     for (const id of IDS) {
       const near = bandOccupancy(PAYLOAD[0][id], BAND_OPTS);
