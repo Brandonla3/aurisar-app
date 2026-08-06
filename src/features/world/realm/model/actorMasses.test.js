@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ARCHETYPES, CAP_LEVEL, FAR_COMP, PIVOT_EPS, SEG, archetypeById, pivotsOf,
+  ARCHETYPES, CAP_LEVEL, FAR_COMP, PIVOT_EPS, SEG, archetypeById, pivotsOf, pivotsOfMasses,
 } from './actorMasses.js';
 
 const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'actorMasses.js'), 'utf8');
@@ -64,8 +64,12 @@ describe('roster shape', () => {
           expect(c).toBeLessThanOrEqual(1);
         }
         // A zero-length axis makes basisFor's segment direction degenerate.
+        // Floor is a literal 2 cm, NOT PIVOT_EPS: keying it to the joint
+        // tolerance meant a mutation setting PIVOT_EPS to 0 silently
+        // downgraded this to `len > 0`, and two constants that can quietly
+        // cross are two constants that eventually do.
         const len = Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1], m.b[2] - m.a[2]);
-        expect(len, `${where} has zero length`).toBeGreaterThan(PIVOT_EPS);
+        expect(len, `${where} has a degenerate axis`).toBeGreaterThan(0.02);
       }
     }
   });
@@ -109,13 +113,34 @@ describe('the table is DEEP frozen', () => {
     // The specific bug this guards: a spread-derived archetype shares the
     // base's [x, y, z] arrays, so one write here would move a joint on every
     // archetype derived from this one.
+    //
+    // BOTH endpoints, deliberately. An earlier version of this test nudged
+    // only `a`, and deleting `Object.freeze(m.b)` alone left the whole suite
+    // green — half of every joint coordinate unguarded, which is exactly the
+    // aliasing case the header describes.
     const m = archetypeById('unbound').masses.find((x) => x.id === 'fist');
     const beforeA = [...m.a];
+    const beforeB = [...m.b];
     const beforeColor = [...m.color];
     mutate(() => { m.a[1] = 42; });
+    mutate(() => { m.b[1] = 42; });
     mutate(() => { m.color[0] = 42; });
     expect([...m.a]).toEqual(beforeA);
+    expect([...m.b]).toEqual(beforeB);
     expect([...m.color]).toEqual(beforeColor);
+  });
+
+  it('freezes both endpoints of EVERY mass, not just the ones spot-checked', () => {
+    for (const arch of ARCHETYPES) {
+      for (const m of arch.masses) {
+        expect(Object.isFrozen(m.a), `${arch.id}.${m.id}.a`).toBe(true);
+        expect(Object.isFrozen(m.b), `${arch.id}.${m.id}.b`).toBe(true);
+        expect(Object.isFrozen(m.color), `${arch.id}.${m.id}.color`).toBe(true);
+        expect(Object.isFrozen(m), `${arch.id}.${m.id}`).toBe(true);
+      }
+      expect(Object.isFrozen(arch.masses), arch.id).toBe(true);
+      expect(Object.isFrozen(arch.bandTargets), arch.id).toBe(true);
+    }
   });
 
   it('bandTargets cannot be edited to match a drifted measurement', () => {
@@ -150,11 +175,15 @@ describe('stage constants', () => {
     expect(SEG.length).toBe(CAP_LEVEL.length);
   });
 
-  it('far segments can hold a width envelope at all', () => {
-    // A 4-gon's projected width swings between sqrt(2)·r and 2·r, so no single
-    // scalar FAR_COMP can hold both ends against a 10% width gate — measured,
-    // and the reason SEG[1] is 6 rather than the plan's 4. Five is the
-    // arithmetic floor where the swing (2 - 2cos(pi/5) = 0.38·r) is under it.
+  it('far segments can hold a width envelope with margin', () => {
+    // A ring's projected width varies with yaw, and widthDeltaFrac is a MAX
+    // over yaws, so the swing is what a single scalar FAR_COMP has to absorb.
+    // For even n the extremes are 2r·cos(pi/n) and 2r; for odd n they are
+    // r(1 + cos(pi/n)) and 2r·cos(pi/2n), a much smaller spread —
+    // n=4 swings 1.414r-2.000r (29%), n=5 only 1.809r-1.902r (4.9%), n=6
+    // 1.732r-2.000r (13.4%). n=4 is the outlier, and measured it passes all
+    // three LOD gates only for comp in 1.0875-1.0975, at 98-99% of the width
+    // gate. Five is the floor where a workable margin exists at all.
     expect(SEG[SEG.length - 1]).toBeGreaterThanOrEqual(5);
   });
 
@@ -273,5 +302,99 @@ describe('pivotsOf', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * PIVOT_EPS is the one constant the shipped data cannot exercise: every joint
+ * in the table is authored EXACTLY equal, so the tolerance never decides
+ * anything and a mutation could set it to 0 (exact equality) or to 0.05
+ * (500x, welding unrelated masses) with the rest of this file still green.
+ * These fixtures pin it from both sides — which is the whole reason
+ * pivotsOfMasses is exported separately from pivotsOf.
+ */
+describe('PIVOT_EPS tolerance, pinned with fixtures', () => {
+  const mass = (id, a, b) => ({ id, a, b, r0: 0.1, r1: 0.1, color: [0, 0, 0], capA: false, capB: false });
+
+  it('joins endpoints inside the tolerance', () => {
+    const under = PIVOT_EPS / 2; // 5e-5
+    const pivots = pivotsOfMasses([
+      mass('parent', [0, 0, 0], [0, 1, 0]),
+      mass('child', [0, 1 + under, 0], [0.5, 1.5, 0]),
+    ], 'fx');
+    expect(pivots.length).toBe(1);
+    expect([...pivots[0].massIds].sort()).toEqual(['child', 'parent']);
+    // ...at the first authored coordinate, not the midpoint of the two.
+    expect(pivots[0].at).toEqual([0, 1, 0]);
+  });
+
+  it('does NOT join endpoints outside the tolerance', () => {
+    const over = PIVOT_EPS * 2; // 2e-4
+    const pivots = pivotsOfMasses([
+      mass('parent', [0, 0, 0], [0, 1, 0]),
+      mass('child', [0, 1 + over, 0], [0.5, 1.5, 0]),
+    ], 'fx');
+    expect(pivots).toEqual([]);
+  });
+
+  it('groups transitively — an A-B-C chain is ONE joint, not two', () => {
+    // Greedy first-match clustering compares each endpoint only against the
+    // first-seen member of a cluster, so a chain where A~B and B~C but A!~C
+    // splits one physical joint in two, depending on table order. Invisible
+    // while every coordinate is typed by hand; a real bug the moment one is
+    // computed. Spacing: each step is 0.7*EPS, so A-C is 1.4*EPS apart.
+    const step = PIVOT_EPS * 0.7;
+    const pivots = pivotsOfMasses([
+      mass('a', [0, 0, 0], [0, 1, 0]),
+      mass('b', [0, 1 + step, 0], [1, 2, 0]),
+      mass('c', [0, 1 + 2 * step, 0], [-1, 2, 0]),
+    ], 'fx');
+    expect(Math.hypot(0, 2 * step, 0)).toBeGreaterThan(PIVOT_EPS); // a and c are NOT direct neighbours
+    expect(pivots.length, 'a-b-c is one physical joint').toBe(1);
+    expect([...pivots[0].massIds].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('is small enough to never weld two genuinely different joints', () => {
+    // Guards the other direction of the same mutation: the closest pair of
+    // DISTINCT joints anywhere in the shipped roster must stay far outside
+    // the tolerance, or PIVOT_EPS is silently fusing the skeleton.
+    let closest = Infinity;
+    for (const a of ARCHETYPES) {
+      const pivots = pivotsOf(a.id);
+      for (let i = 0; i < pivots.length; i++) {
+        for (let j = i + 1; j < pivots.length; j++) {
+          const [p, q] = [pivots[i].at, pivots[j].at];
+          closest = Math.min(closest, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+        }
+      }
+    }
+    // Measured: the closest distinct joints in the roster are 0.12 m apart,
+    // 1200x the tolerance. The floor here is 100x, which leaves room for a
+    // denser future skeleton without leaving room for a silent weld.
+    expect(closest).toBeGreaterThan(PIVOT_EPS * 100);
+  });
+});
+
+describe('bandTargets actually separate the roster', () => {
+  it('no two archetypes declare a confusable band histogram', () => {
+    // bandTargets is called the LEADING indicator of roster separation, but
+    // nothing else in this file would notice if all four declared
+    // [0.33, 0.33, 0.34]. Task 5 gates the measured values against these
+    // declarations; this gates the declarations against EACH OTHER, so the
+    // file is self-guarding rather than trusting a downstream suite.
+    let worst = Infinity;
+    let worstPair = '';
+    for (let i = 0; i < ARCHETYPES.length; i++) {
+      for (let j = i + 1; j < ARCHETYPES.length; j++) {
+        const [x, y] = [ARCHETYPES[i], ARCHETYPES[j]];
+        const l1 = x.bandTargets.reduce((s, v, k) => s + Math.abs(v - y.bandTargets[k]), 0);
+        if (l1 < worst) { worst = l1; worstPair = `${x.id}/${y.id}`; }
+      }
+    }
+    // Measured worst pair is magistari/orghon, the roster's two bottom-heavy
+    // bodies. Floor is 0.25 — comfortably above 2x the +/-0.06 per-band
+    // tolerance Task 5 asserts with, and well under the measured value, so
+    // this fails on a real regression rather than on normal retuning.
+    expect(worst, `closest band histograms: ${worstPair}`).toBeGreaterThan(0.25);
   });
 });

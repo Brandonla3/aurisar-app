@@ -26,25 +26,23 @@
  *
  * What THIS table measures, against ACTOR_WINDOW at GATE_PITCH_RAD and
  * GATE_RES: worst pair 0.506 near / 0.501 far (Magistari vs Orghon, the two
- * bottom-heavy bodies), best-separated pair 0.269 (Legion vs Orghon, the
+ * bottom-heavy bodies), best-separated pair 0.270 (Legion vs Orghon, the
  * roster's two histogram opposites). The gate is 0.72 and the probe's
  * demonstrated benchmark was 0.678, so the roster clears the bar by
  * reallocating mass further than the probe did, not by relaxing anything.
  * gen/actorSilhouette.test.js is what keeps that true.
  *
  * NO SQUASH PARAMETER, deliberately. Flattened organs (Legion's face-plate,
- * Orghon's hip slab) are authored as SHORT WIDE CAPSULES — a horizontal axis
- * with a large radius — not as a sphere plus a squash multiplier. The mass
- * schema above is the whole vocabulary, and a capped mass' extent is
- * |b - a| + r0 + r1 along its axis and 2·max(r) across it, so "squashed"
- * is expressible as geometry. Adding a squash field would put the same
- * shape in two places and hand a future edit a proportion knob to reach for.
+ * Orghon's hip slab) are SHORT WIDE CAPSULES — a horizontal axis with a large
+ * radius — not a sphere plus a squash multiplier. A capped mass' extent is
+ * |b - a| + r0 + r1 along its axis and 2·max(r) across it, so "squashed" is
+ * expressible as geometry; a squash field would put the same shape in two
+ * places and hand a future edit a proportion knob to reach for.
  *
  * Object.freeze is SHALLOW — see freezeArchetype. Without the deep freeze,
- * any spread-based derivation of an archetype aliases the base's mass array
- * AND every [x, y, z] inside it, so one stray write retunes several
- * archetypes at once. propGenomes.js needs the identical discipline for the
- * identical reason (caught there in review).
+ * any spread-based derivation aliases the base's mass array AND every
+ * [x, y, z] inside it, so one stray write retunes several archetypes at once.
+ * propGenomes.js needs the identical discipline for the identical reason.
  */
 
 /**
@@ -53,16 +51,28 @@
  * beyond the mid ring actors are culled outright, so a third stage would be
  * geometry generated for nobody.
  *
- * The far stage is 6, NOT 4. Four was the plan's figure and it is structurally
- * incapable of holding a width envelope: a square cross-section's projected
- * width swings between 1.414r (flat-on) and 2r (corner-on), so no single
- * scalar FAR_COMP can hit both ends. Swept across FAR_COMP from 1.00 to 1.20,
- * a 4-segment far stage never got Magistari's widthDeltaFrac below 0.132
- * against a 0.10 gate, while pushing the other three archetypes past 0.10 in
- * the opposite direction. A hexagon swings 1.732r-2r and clears the gate over
- * a wide comp band. The cost of the fix is 68 triangles across the whole
- * roster (1310 -> 1380 far-stage tris): rounded caps dominate a far actor's
- * budget, not the ring, so buying tube segments here is nearly free.
+ * The far stage is 6, NOT the plan's 4 — and the reason is MARGIN, not
+ * impossibility. Swept at 0.0025 granularity, a 4-segment far stage does pass
+ * all three LOD gates, but only for FAR_COMP in 1.0875-1.0975: a window 0.01
+ * wide, inside which Magistari's widthDeltaFrac sits at 0.098-0.100 against a
+ * 0.100 gate and its worst-yaw IoU at 0.828 against a 0.820 floor. Two gates
+ * at 98-99% of limit, with Legion joining Magistari in failing the moment
+ * comp reaches 1.100 — the same coin-flip-dressed-as-a-pass FAR_COMP refuses
+ * twelve lines below, reached from the other direction.
+ *
+ * The cause is the cross-section: a square's projected width swings 1.414r
+ * (flat-on) to 2.000r (corner-on), a 29% range a single scalar comp can
+ * centre but never remove, and widthDeltaFrac is a max over yaws. A hexagon
+ * swings 1.732r-2.000r and passes across the whole range 1.00-1.095, worst
+ * gate at 37% of limit at the shipped comp.
+ *
+ * Five ALSO works (width 0.068, worst-yaw 0.903 at comp 1.03) and costs 90
+ * fewer triangles — this is a choice between working options, not a rescue.
+ * Six wins on the wider passing band, on left-right symmetry (an odd ring
+ * makes a limb read subtly lopsided), and on matching the ring count the
+ * props already use at their NEAR stage. Cost over the plan's 4 is 180
+ * triangles across the whole roster (1220 -> 1400 far tris): caps dominate a
+ * far actor's budget, not rings, so ring segments here are nearly free.
  */
 export const SEG = Object.freeze([8, 6]);
 
@@ -86,7 +96,7 @@ export const CAP_LEVEL = Object.freeze([2, 1]);
  * read 1.949r and 6 read 1.910r — a 2.05% narrowing before the caps drop
  * from 80 faces to 20. Measured, the minimax over the roster lands at
  * 1.02-1.03, agreeing with that derivation; 1.03 is where all four
- * archetypes' widthDeltaFrac sit closest together (0.020-0.030), which is
+ * archetypes' widthDeltaFrac sit closest together (0.020-0.037), which is
  * what "one constant serves the whole roster" looks like when it is true.
  *
  * Not tuned to sit ON the gate, and the trap is real here, not hypothetical:
@@ -198,11 +208,11 @@ export const ARCHETYPES = Object.freeze([
     factionId: 'legion',
     displayName: 'Legion of Masks',
     stages: 2,
-    bandTargets: [0.245, 0.338, 0.417],
+    bandTargets: [0.248, 0.337, 0.415],
     masses: [
       { id: 'torso', a: [0, 0.86, 0], b: [0, 1.42, 0], r0: 0.12, r1: 0.15, color: LEGION_LACQUER, capA: true, capB: true },
-      { id: 'legL', a: [0, 0.86, 0], b: [-0.11, 0.07, 0], r0: 0.10, r1: 0.06, color: LEGION_LACQUER, capA: false, capB: true },
-      { id: 'legR', a: [0, 0.86, 0], b: [0.11, 0.07, 0], r0: 0.10, r1: 0.06, color: LEGION_LACQUER, capA: false, capB: true },
+      { id: 'legL', a: [0, 0.86, 0], b: [-0.11, 0.055, 0], r0: 0.10, r1: 0.06, color: LEGION_LACQUER, capA: false, capB: true },
+      { id: 'legR', a: [0, 0.86, 0], b: [0.11, 0.055, 0], r0: 0.10, r1: 0.06, color: LEGION_LACQUER, capA: false, capB: true },
       { id: 'yokeL', a: [0, 1.42, 0], b: [-0.28, 1.48, 0], r0: 0.12, r1: 0.12, color: LEGION_LACQUER, capA: false, capB: true },
       { id: 'yokeR', a: [0, 1.42, 0], b: [0.28, 1.48, 0], r0: 0.12, r1: 0.12, color: LEGION_LACQUER, capA: false, capB: true },
       { id: 'armL', a: [-0.28, 1.48, 0], b: [-0.34, 0.88, 0.02], r0: 0.055, r1: 0.045, color: LEGION_LACQUER, capA: false, capB: true },
@@ -236,10 +246,13 @@ export const ARCHETYPES = Object.freeze([
     stages: 2,
     bandTargets: [0.538, 0.298, 0.163],
     masses: [
-      // capA false on purpose: a rounded cap at the hem would bulge to
-      // y = -0.46 and clip ACTOR_WINDOW's minY at pitch 0 — a silently
-      // under-reported measurement, not a visible bug. The hem is buried in
-      // the ground, exactly like a prop trunk's open base.
+      // capA false on purpose. A rounded cap at the hem bottoms out at
+      // y = -0.42, which does NOT clip ACTOR_WINDOW's minY of -0.45 — it does
+      // something quieter and worse: it collapses Magistari's window margin
+      // from 0.079 to 0.010 at pitch 0 and 0.006 at gate pitch, against a
+      // 0.05 target. A margin that thin is a clip waiting for the next
+      // half-centimetre of retune, and it buys a cap nobody can see. The hem
+      // is buried in the ground, exactly like a prop trunk's open base.
       { id: 'robeLower', a: [0, 0, 0], b: [0, 1.14, 0], r0: 0.42, r1: 0.20, color: MAGISTARI_ROBE, capA: false, capB: false },
       { id: 'robeUpper', a: [0, 1.14, 0], b: [0, 1.40, 0], r0: 0.20, r1: 0.17, color: MAGISTARI_ROBE, capA: false, capB: false },
       { id: 'sleeveL', a: [0, 1.40, 0], b: [-0.40, 1.10, 0.02], r0: 0.13, r1: 0.09, color: MAGISTARI_TRIM, capA: false, capB: true },
@@ -296,10 +309,69 @@ const ARCHETYPE_BY_ID = new Map(ARCHETYPES.map((a) => [a.id, a]));
 /** @returns the archetype, or undefined — same contract as prototypeById. */
 export const archetypeById = (id) => ARCHETYPE_BY_ID.get(id);
 
-/** Endpoints closer than this are the same joint. Authored coordinates are
- *  written to be exactly equal at joints; the tolerance exists so a future
- *  derived/scaled table does not silently lose a pivot to float drift. */
+/** Endpoints closer than this are the same joint. Every joint in the table
+ *  above is authored EXACTLY equal, so today the tolerance is never the
+ *  deciding factor; it exists so a future derived or scaled table does not
+ *  silently lose a pivot to float drift. Because nothing in the shipped data
+ *  exercises it, actorMasses.test.js pins it from both sides with a synthetic
+ *  fixture — an unexercised constant is one a mutation can set to anything. */
 export const PIVOT_EPS = 1e-4;
+
+/**
+ * Group a mass list's coincident endpoints into joints. Exported separately
+ * from pivotsOf ONLY so PIVOT_EPS is testable: the shipped archetypes all
+ * meet exactly, so a fixture is the only way to prove 5e-5 joins and 2e-4
+ * does not, and an untestable constant is the kind that drifts.
+ *
+ * Grouping is TRANSITIVE (union-find), not greedy first-match. The greedy
+ * version compared each endpoint against the first-seen member of a cluster,
+ * so an A-B-C chain with A~B and B~C but A!~C split one physical joint into
+ * two depending on table order — invisible while every coordinate is typed
+ * exactly, and a mysteriously disconnected limb the moment one is computed,
+ * which is precisely what a derived roster does. Verified behaviour-identical
+ * to the greedy version on all four shipped archetypes.
+ *
+ * `at` is the first endpoint of the group in table order, never the cluster
+ * average: averaging would move the pivot off the authored coordinate the
+ * geometry actually meets at.
+ */
+export function pivotsOfMasses(masses, pivotIdPrefix) {
+  const pts = [];
+  for (const m of masses) pts.push({ at: m.a, id: m.id }, { at: m.b, id: m.id });
+
+  const parent = pts.map((_, i) => i);
+  const find = (i) => {
+    let r = i;
+    while (parent[r] !== r) r = parent[r];
+    while (parent[i] !== r) { const next = parent[i]; parent[i] = r; i = next; }
+    return r;
+  };
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const d = Math.hypot(
+        pts[i].at[0] - pts[j].at[0], pts[i].at[1] - pts[j].at[1], pts[i].at[2] - pts[j].at[2],
+      );
+      if (d > PIVOT_EPS) continue;
+      const a = find(i);
+      const b = find(j);
+      if (a !== b) parent[a] = b;
+    }
+  }
+
+  const groups = new Map();
+  for (let i = 0; i < pts.length; i++) {
+    const root = find(i);
+    let g = groups.get(root);
+    if (!g) {
+      g = { at: [pts[i].at[0], pts[i].at[1], pts[i].at[2]], massIds: [] };
+      groups.set(root, g);
+    }
+    if (!g.massIds.includes(pts[i].id)) g.massIds.push(pts[i].id);
+  }
+  return [...groups.values()]
+    .filter((g) => g.massIds.length > 1)
+    .map((g, i) => ({ pivotId: `${pivotIdPrefix}.p${i}`, at: g.at, massIds: g.massIds }));
+}
 
 /**
  * The joint table, derived from COINCIDENT MASS ENDPOINTS — masses whose a
@@ -318,23 +390,5 @@ export const PIVOT_EPS = 1e-4;
 export function pivotsOf(archetypeId) {
   const arch = archetypeById(archetypeId);
   if (!arch) throw new Error(`[actorMasses] unknown archetype "${archetypeId}"`);
-  const clusters = [];
-  for (const m of arch.masses) {
-    for (const at of [m.a, m.b]) {
-      // `at` is the FIRST endpoint seen at this joint, never an average:
-      // averaging would move the pivot off the authored coordinate that the
-      // mass geometry actually meets at.
-      let cluster = clusters.find(
-        (c) => Math.hypot(c.at[0] - at[0], c.at[1] - at[1], c.at[2] - at[2]) <= PIVOT_EPS,
-      );
-      if (!cluster) {
-        cluster = { at: [at[0], at[1], at[2]], massIds: [] };
-        clusters.push(cluster);
-      }
-      if (!cluster.massIds.includes(m.id)) cluster.massIds.push(m.id);
-    }
-  }
-  return clusters
-    .filter((c) => c.massIds.length > 1)
-    .map((c, i) => ({ pivotId: `${archetypeId}.p${i}`, at: c.at, massIds: c.massIds }));
+  return pivotsOfMasses(arch.masses, archetypeId);
 }
