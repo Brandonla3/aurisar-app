@@ -7,19 +7,21 @@
  * phase's task-6 brief. This is that sibling, for actors.
  *
  * DRAW-CALL MODEL, stated explicitly because it is the whole arithmetic
- * below: actors are meant to be ORDINARY MOVING MESHES, never thin
- * instances. This is a claim about Tasks 7 and 8's BRIEFS, not about shipped
- * code — view/materials/actorNME.js and view/actor/ActorRig.js do not exist
- * yet as of this task; they are the next work in this phase. Task 7's brief
- * explicitly forbids reusing propNME's instanced `instTint` attribute (it
- * reads 0 and renders black on a mesh with no buffer bound), and Task 8's
- * brief specifies ActorRig's live actors use ordinary world transforms — no
- * `freezeWorldMatrix()` the way PropStreamer's carriers use. If either task's
- * implementation diverges from its brief (an actor ends up thin-instanced or
- * batched some other way), this arithmetic goes stale with nothing in this
- * file able to catch it — there is no test here that could detect a future
- * ActorRig doing something its brief did not describe. Revisit this comment
- * and the `* 1` below once Tasks 7-8 ship.
+ * below: actors are ORDINARY MOVING MESHES, never thin instances. This is now
+ * a claim about SHIPPED code, not a brief — view/materials/actorNME.js and
+ * view/actor/{ActorPrototypes,ActorRig}.js landed in Tasks 7-8. actorNME.js
+ * never reuses propNME's instanced `instTint` attribute (an unbound instanced
+ * attribute reads 0 and renders black on a mesh with no buffer bound — its
+ * own header calls this the black-actor trap); ActorRig's live actors use
+ * ordinary world transforms and NEVER call `freezeWorldMatrix()` the way
+ * PropStreamer's carriers do. Both are pinned by test, not just prose:
+ * ActorRig.test.js proves the live-world-matrix contract behaviourally (move
+ * the root, read absolutePosition back — a frozen mesh would pass every
+ * structural check and reveal nothing short of that), and
+ * ActorPrototypes.test.js proves each master is a single mesh with no
+ * per-mass children to multiply draw calls. If a future change ever thin-
+ * instances or batches actors some other way, THOSE tests are what would
+ * need to change first — and this comment, and the `* 1` below, with them.
  *
  * Given that model, the arithmetic is exactly 1 draw call per visible actor
  * mesh, regardless of archetype or stage — a disabled (archetype, stage)

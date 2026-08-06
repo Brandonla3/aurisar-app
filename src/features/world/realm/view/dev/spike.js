@@ -30,6 +30,8 @@ import { RING_TIERS } from '../../model/horizonRings.js';
 import { FogDriver } from '../atmosphere/FogDriver.js';
 import { buildCloudPuffs } from '../atmosphere/cloudPuffs.js';
 import { ActorShadowRig } from '../lighting/ActorShadowRig.js';
+import { buildActorMaterial } from '../materials/actorNME.js';
+import { ActorCast } from '../actor/ActorCast.js';
 import { createWalkerState, integrateWalker } from '../../model/walker.js';
 import {
   BUTTON, createInputSnapshot, resetInputSnapshot, setButton,
@@ -131,47 +133,27 @@ async function boot() {
     applyDomeState: applyAtmosphereState,
   }, { timeScale: timewarp });
 
-  // ── Player: a capsule with a nose so facing is visible ─────────────────────
+  // ── Player state (pure walker) ─────────────────────────────────────────────
   let walker = createWalkerState(0, 0, field);
-  const playerRoot = new BABYLON.TransformNode('playerRoot', scene);
-  const body = BABYLON.MeshBuilder.CreateCapsule('playerBody', { height: 1.8, radius: 0.38 }, scene);
-  body.parent = playerRoot;
-  body.position.y = 0.9;
-  const bodyMat = new BABYLON.StandardMaterial('playerMat', scene);
-  bodyMat.diffuseColor = new BABYLON.Color3(0.78, 0.63, 0.29);
-  bodyMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-  body.material = bodyMat;
-  const nose = BABYLON.MeshBuilder.CreateCylinder('playerNose', { height: 0.45, diameterTop: 0, diameterBottom: 0.3, tessellation: 8 }, scene);
-  nose.parent = playerRoot;
-  nose.position.set(0, 1.4, 0.5);
-  nose.rotation.x = Math.PI / 2;
-  nose.material = bodyMat;
 
   // ── Actor shadows (P4c): a real-time shadow for whatever is near the player,
   // none at all for whatever is far ────────────────────────────────────────
-  // The player capsule is registered unpinned — at a chase-camera distance of
-  // a couple meters from its own focus point, it always classifies 'near' by
-  // ordinary distance anyway; pin: true exists for a FUTURE combat-target
-  // override, not the local player.
+  // Built before the cast below so every ActorRig can register itself
+  // through its own `shadowRig` option at construction, rather than a
+  // second addCaster call per actor.
   const actorShadowRig = new ActorShadowRig(scene, key);
-  actorShadowRig.addCaster(body);
 
-  // TEMPORARY stand-ins, not real actors: P6-P9 (rigging, skinning, actor
-  // hierarchy) haven't landed, so there is nothing else in the Realm yet to
-  // exercise the far bucket with. Both static: walk close to one and its
-  // bucket flips to 'near' with a real cast shadow; walk away and it goes
-  // dark again. Delete both the moment a real distant actor exists.
-  const sentinelMat = new BABYLON.StandardMaterial('sentinelMat', scene);
-  sentinelMat.diffuseColor = new BABYLON.Color3(0.55, 0.25, 0.25);
-  const sentinelAt = (name, x, z) => {
-    const m = BABYLON.MeshBuilder.CreateBox(name, { size: 2 }, scene);
-    m.position.set(x, field.surfaceY(x, z) + 1, z);
-    m.material = sentinelMat;
-    actorShadowRig.addCaster(m);
-    return m;
-  };
-  const sentinelA = sentinelAt('sentinelA', 150, 0);
-  const sentinelB = sentinelAt('sentinelB', -200, 150);
+  // ── Actors (P6): real rigs, not placeholders ────────────────────────────────
+  // The player is driven every frame by integrateWalker below. Two static
+  // actors of DIFFERENT archetypes stand where the temporary sentinel boxes
+  // used to: walk close to one and its LOD tier AND its real shadow both
+  // switch on; walk away and both switch off. That deleted comment said
+  // "delete both the moment a real distant actor exists" — this is that
+  // moment. Construction and per-frame driving both live in ActorCast
+  // (view/actor/ActorCast.js): spike.js is line-capped and has no room left
+  // to build a shared material and four actors inline.
+  const { material: actorMat } = await buildActorMaterial(scene, { name: 'realmActor' });
+  const actorCast = new ActorCast(scene, { material: actorMat, field, shadowRig: actorShadowRig });
 
   // ── Chase camera ────────────────────────────────────────────────────────────
   const camera = new BABYLON.ArcRotateCamera('chase', -Math.PI / 2, Math.PI / 3.1, 11,
@@ -221,12 +203,15 @@ async function boot() {
     // One skyState per frame drives fog + clear + dome + lights, atomically.
     fogDriver.update(nowMs);
 
-    playerRoot.position.set(walker.x, walker.y, walker.z);
-    playerRoot.rotation.y = walker.yaw;
     // Chase: ease the camera target to the player's head.
     camera.target.x += (walker.x - camera.target.x) * 0.18;
     camera.target.y += (walker.y + 1.4 - camera.target.y) * 0.18;
     camera.target.z += (walker.z - camera.target.z) * 0.18;
+
+    // Seat/face the player from the walker, then re-tier every actor
+    // (player and the two static demo actors alike) against the SAME focus
+    // point the shadow bucketing below uses.
+    actorCast.update(walker, camera.target);
 
     // nowMs stamps newly-born chunks and ramps every still-fading chunk's
     // visibility (model/chunkFade.js) — structural pop-in concealment.
@@ -281,13 +266,16 @@ async function boot() {
       `sky       : ${fogDriver.state?.fogDensity != null ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
       `rings     : ${ringKit.meshes.length}`,
       `clouds    : ${cloudKit.meshes.length} puffs, factor ${fogDriver.cloudFactor != null ? fogDriver.cloudFactor.toFixed(2) : '?'}`,
-      `shadows   : player=${actorShadowRig.bucketOf(body)} sentinelA=${actorShadowRig.bucketOf(sentinelA)} sentinelB=${actorShadowRig.bucketOf(sentinelB)}`,
+      `shadows   : player=${actorShadowRig.bucketOf(actorCast.player.mesh)} `
+        + `demoA=${actorShadowRig.bucketOf(actorCast.demoActors[0].mesh)} `
+        + `demoB=${actorShadowRig.bucketOf(actorCast.demoActors[1].mesh)}`,
       `fps       : ${engine.getFps().toFixed(0)}`,
     ].join('\n');
   }, 250);
 
   window.__realmSpike = {
-    engine, scene, adt, field, streamer, propStreamer, camera, fogDriver, ringKit, cloudKit, actorShadowRig, getWalker: () => walker,
+    engine, scene, adt, field, streamer, propStreamer, camera, fogDriver, ringKit, cloudKit,
+    actorShadowRig, actorCast, getWalker: () => walker,
   };
 }
 
