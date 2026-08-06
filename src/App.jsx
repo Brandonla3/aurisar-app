@@ -93,6 +93,9 @@ const AdminPage = lazyWithRetry(() => import('./components/AdminPage'));
 const WorldHub = lazyWithRetry(() => import('./features/world/WorldHub.jsx'));
 import PlansTabContainer from './components/PlansTabContainer';
 import LiveWorkoutBanner from './components/LiveWorkoutBanner';
+// Password policy + HIBP breach check. Extracted so the breach logic is
+// testable; see src/utils/passwordPolicy.js.
+import { validatePasswordPolicy } from './utils/passwordPolicy';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
 // import the TrendsTab module (which would drag recharts into the main chunk)
 // just to read this constant. Keep in sync with TrendsTab.js.
@@ -144,46 +147,6 @@ function getResetRedirect() {
   return "https://aurisargames.com"; // canonical fallback
 }
 
-// Password policy. 8+ chars (NIST SP 800-63B rev.4 minimum) plus a 3-of-4
-// composition rule (lower / upper / digit / symbol) and a HIBP k-anonymity
-// breached-password check. Industry parity with MyFitnessPal / Peloton.
-const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_MAX_LENGTH = 72; // Supabase / bcrypt limit
-const PASSWORD_REQUIRED_CLASSES = 3; // out of 4
-
-function _passwordCharClassesPresent(pw) {
-  let n = 0;
-  if (/[a-z]/.test(pw)) n++;
-  if (/[A-Z]/.test(pw)) n++;
-  if (/[0-9]/.test(pw)) n++;
-  if (/[^A-Za-z0-9]/.test(pw)) n++;
-  return n;
-}
-async function _sha1Hex(input) {
-  const buf = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-1", buf);
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-}
-async function isPasswordBreached(password) {
-  // Send only the first 5 chars of the SHA-1 prefix; HIBP returns all matching
-  // suffixes. The full hash never leaves the browser.
-  try {
-    const sha1 = await _sha1Hex(password);
-    const prefix = sha1.slice(0, 5);
-    const suffix = sha1.slice(5);
-    const res = await fetch("https://api.pwnedpasswords.com/range/" + prefix, {
-      headers: {
-        "Add-Padding": "true"
-      }
-    });
-    if (!res.ok) return false; // fail-open if HIBP is unreachable
-    const text = await res.text();
-    return text.split("\n").some(line => line.split(":")[0].trim() === suffix);
-  } catch {
-    return false;
-  }
-}
-
 // MFA recovery code helpers. Codes are 80 bits of CSPRNG entropy encoded in
 // Crockford-style base32 (no I/L/O/U to avoid confusion). Hashing happens
 // server-side via the `store_mfa_recovery_codes` RPC, which is responsible
@@ -210,35 +173,6 @@ function generateRecoveryCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(10));
   const enc = _base32Encode(bytes);
   return enc.slice(0, 4) + "-" + enc.slice(4, 8) + "-" + enc.slice(8, 12) + "-" + enc.slice(12, 16);
-}
-async function validatePasswordPolicy(password) {
-  if (!password || password.length < PASSWORD_MIN_LENGTH) {
-    return {
-      ok: false,
-      msg: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
-    };
-  }
-  if (password.length > PASSWORD_MAX_LENGTH) {
-    return {
-      ok: false,
-      msg: `Password is too long (max ${PASSWORD_MAX_LENGTH} characters).`
-    };
-  }
-  if (_passwordCharClassesPresent(password) < PASSWORD_REQUIRED_CLASSES) {
-    return {
-      ok: false,
-      msg: "Password must include at least 3 of: lowercase, uppercase, number, symbol."
-    };
-  }
-  if (await isPasswordBreached(password)) {
-    return {
-      ok: false,
-      msg: "That password has appeared in a public data breach. Please choose a different one."
-    };
-  }
-  return {
-    ok: true
-  };
 }
 function App() {
   // ── Modal / dialog UI state — extracted to ./state/useUiState (item 5a)
