@@ -52,16 +52,26 @@ export const SHOULDER_Y = 1.45;
  *  this angle, which is also why ACTOR_WINDOW's minY has to clear the
  *  resulting depth term.
  *
- *  Derived, not measured-and-hardcoded, and deliberately so: the shipping
- *  chase camera (an ArcRotateCamera built in view/dev/spike.js — the ONE
- *  layer allowed to name the render engine, this file stays engine-free by
- *  only naming its angle constant) is constructed with beta = Math.PI /
- *  3.1. That camera type's beta is measured from +Y (directly overhead is
- *  beta=0; level with the target is beta=PI/2), so its downward declination
- *  from the horizon is PI/2 - beta. Computing it from that same PI/3.1
- *  constant means this gate and the shipping camera cannot silently drift
- *  apart if the rig is ever retuned — a hardcoded literal here would rot
- *  the moment someone changed spike.js without knowing this file existed.
+ *  Derived, not measured-and-hardcoded, and deliberately so — but derived
+ *  from the DEV SPIKE's chase camera (an ArcRotateCamera built in
+ *  view/dev/spike.js — the ONE layer allowed to name the render engine,
+ *  this file stays engine-free by only naming its angle constant), which is
+ *  explicitly "a scaffold, not architecture" per that file's own header,
+ *  dev/preview only, never production. It is used here as a STAND-IN
+ *  because it is the only chase-camera geometry that exists in the repo
+ *  today, not because it is the final gameplay camera. It is constructed
+ *  with beta = Math.PI / 3.1; that camera type's beta is measured from +Y
+ *  (directly overhead is beta=0; level with the target is beta=PI/2), so
+ *  its downward declination from the horizon is PI/2 - beta. Computing it
+ *  from that same PI/3.1 constant means this gate and the spike camera
+ *  cannot silently drift apart from EACH OTHER while both exist.
+ *
+ *  Consequence for later work: when RealmWorld's real gameplay camera lands
+ *  (the P13 switchover, per the spike's own header), THIS constant must be
+ *  re-derived from that camera's actual beta — carrying spike.js's PI/3.1
+ *  forward unexamined past that point means the actor silhouette gates
+ *  would keep measuring an eye the shipped game no longer uses.
+ *
  *  Measured value: PI/2 - PI/3.1 ≈ 0.5574 rad ≈ 31.9° above horizontal. */
 export const GATE_PITCH_RAD = Math.PI / 2 - Math.PI / 3.1;
 

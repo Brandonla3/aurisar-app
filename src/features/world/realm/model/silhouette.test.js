@@ -153,6 +153,40 @@ describe('canonicalStats — the same per-yaw comparison, against a FIXED window
     const s = canonicalStats(wide, narrow, { bounds });
     expect(s.meanIoU).toBeLessThan(1);
   });
+
+  it('regression guard: actually uses the CALLER\'S bounds, not a silent fallback to the per-pair union window', () => {
+    // The two tests above would both still pass unchanged if canonicalStats
+    // quietly ignored `bounds` and recomputed a per-pair union instead — that
+    // is exactly what silhouetteStats already does, so a copy-paste-shaped
+    // regression here would be invisible to them. This test can only pass if
+    // `bounds` is genuinely threaded into the rasterizer for EVERY call.
+    //
+    // `narrow` sits fully nested inside `wide` on every axis. `noClip` is
+    // sized to exactly `wide`'s own extent — the pair's real union, so a
+    // broken "always union" implementation would reproduce this number too.
+    // `clipsWide` is narrower than `wide` in X (so `wide` gets genuinely
+    // clipped by the window) while still comfortably containing `narrow` —
+    // a result only a real fixed-window rasterization can produce, and one
+    // that a per-pair union window (which never clips either payload) can
+    // never reach. Values below are the actual measured output, not a hand
+    // derivation — box payloads carry degenerate-triangle vertex splats at
+    // their edges (see rasterizeMask's doc comment) that perturb a naive
+    // continuous-geometry fraction by a fractional cell, so this asserts
+    // what the harness truly computes, verified by running it.
+    const wide = boxPayload(4, 2); // x in [-2, 2], y in [0, 2]
+    const narrow = boxPayload(2, 2); // x in [-1, 1], y in [0, 2] — nested in `wide`
+    const noClip = { minX: -2, maxX: 2, minY: 0, maxY: 2 };
+    const clipsWide = { minX: -1.5, maxX: 1.5, minY: -1, maxY: 3 };
+
+    const withNoClip = canonicalStats(wide, narrow, { bounds: noClip, yawCount: 1 });
+    const withClip = canonicalStats(wide, narrow, { bounds: clipsWide, yawCount: 1 });
+
+    expect(withNoClip.meanIoU).toBeCloseTo(0.500868, 6);
+    expect(withClip.meanIoU).toBeCloseTo(0.665225, 6);
+    // Belt and suspenders: the two calls must disagree at all, regardless
+    // of whether the exact figures above ever need retuning.
+    expect(withClip.meanIoU).not.toBeCloseTo(withNoClip.meanIoU, 2);
+  });
 });
 
 describe('fitsWindow — the silent-clip guard', () => {
