@@ -51,18 +51,25 @@ export function buildPasswordUpdate({ password, currentPassword, nonce }) {
 // Matched against BOTH error.code and error.message. The code names are
 // GoTrue's; the message fragments are the belt to that braces, because a
 // misclassification here is what turns a fixable prompt into a dead end.
+//
+// ORDER MATTERS for the message pass: `bad_nonce` comes first because its
+// patterns are strictly narrower than `reauth_required`'s. A real
+// invalid-nonce error reads "Nonce has expired", which contains "nonce" and
+// would otherwise be swallowed by the broader rule — leaving the stale nonce
+// in place and telling the user a fresh code was sent when the problem was
+// the one they already had.
 const SIGNATURES = [
+  {
+    kind: "bad_nonce",
+    codes: ["reauthentication_not_valid", "invalid_nonce"],
+    patterns: [/nonce.*(invalid|expired|incorrect|not valid)/i, /(invalid|expired|incorrect).*nonce/i],
+    msg: "That code wasn't right, or it expired. Send a new one and try again.",
+  },
   {
     kind: "reauth_required",
     codes: ["reauthentication_needed", "reauthentication_required"],
     patterns: [/nonce/i, /reauthenticat/i],
     msg: "For your security, confirm it's you. We've emailed you a 6-digit code — enter it below and save again.",
-  },
-  {
-    kind: "bad_nonce",
-    codes: ["reauthentication_not_valid", "invalid_nonce"],
-    patterns: [/nonce.*(invalid|expired|incorrect)/i, /(invalid|expired).*nonce/i],
-    msg: "That code wasn't right, or it expired. Send a new one and try again.",
   },
   {
     kind: "wrong_current_password",
@@ -98,8 +105,15 @@ export function classifyPasswordUpdateError(error) {
   const code = String(error.code ?? "").toLowerCase();
   const message = String(error.message ?? "");
 
+  // Two passes, not one interleaved loop. Interleaving let an earlier
+  // signature's broad MESSAGE pattern beat a later signature's exact CODE
+  // match: `{code:"reauthentication_not_valid", message:"Nonce has expired"}`
+  // classified as reauth_required rather than bad_nonce. An exact code is the
+  // strongest signal available and must win over any message heuristic.
   for (const sig of SIGNATURES) {
     if (code && sig.codes.includes(code)) return { kind: sig.kind, msg: sig.msg };
+  }
+  for (const sig of SIGNATURES) {
     if (sig.patterns.some(p => p.test(message))) return { kind: sig.kind, msg: sig.msg };
   }
 

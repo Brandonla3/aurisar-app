@@ -81,6 +81,43 @@ describe('classifyPasswordUpdateError drives what the UI does next', () => {
     expect(r.msg).toMatch(/send a new one/i);
   });
 
+  it('an exact code beats any message heuristic', () => {
+    // The original walked signatures once, checking code THEN patterns per
+    // signature — so an earlier signature's broad message pattern (/nonce/i)
+    // beat a later signature's exact code match. A real expired-nonce error
+    // carries both, and was classified reauth_required: the stale nonce was
+    // left in place and the user was told a fresh code had been sent.
+    expect(classifyPasswordUpdateError({
+      code: 'reauthentication_not_valid',
+      message: 'Nonce has expired',
+    }).kind).toBe('bad_nonce');
+  });
+
+  it("a signature's message pattern never overrides a DIFFERENT signature's exact code", () => {
+    // The mirror of the case above, and the one that reordering alone does
+    // not fix: bad_nonce's narrow pattern matches this message, but the code
+    // says a nonce is being demanded, not rejected. Only checking every code
+    // before any pattern gets this right — which is why the two passes exist
+    // rather than just a reordered list.
+    expect(classifyPasswordUpdateError({
+      code: 'reauthentication_needed',
+      message: 'Nonce has expired; reauthentication needed',
+    }).kind).toBe('reauth_required');
+  });
+
+  it('classifies an invalid-nonce MESSAGE as bad_nonce, not reauth_required', () => {
+    for (const message of ['Invalid nonce', 'Nonce has expired', 'The nonce is not valid']) {
+      expect(classifyPasswordUpdateError({ message }).kind, message).toBe('bad_nonce');
+    }
+  });
+
+  it('still treats a bare nonce demand as reauth_required', () => {
+    // The narrower bad_nonce rule must not swallow the "you need a nonce" case.
+    for (const message of ['A nonce is required to update the password', 'Reauthentication required']) {
+      expect(classifyPasswordUpdateError({ message }).kind, message).toBe('reauth_required');
+    }
+  });
+
   it('recognises a wrong current password', () => {
     expect(classifyPasswordUpdateError({ message: 'Current password is incorrect' }).kind)
       .toBe('wrong_current_password');
@@ -131,6 +168,32 @@ describe('the wiring that makes the two Supabase settings satisfiable', () => {
     const tab = read('src/features/profile/ProfileTab.jsx');
     expect(tab).toMatch(/onClick=\{\(\) => sendPasswordReauthCode\(\)\}/);
     expect(tab).toMatch(/Email me a code/);
+  });
+
+  it('does not claim a code was emailed when sending it failed', () => {
+    // sendPasswordReauthCode sets the real reason on failure; overwriting it
+    // with "we've emailed you a code" promises an email that never went, and
+    // points at a field that stays hidden because pwReauthSent is still false.
+    const branch = app.slice(
+      app.indexOf('verdict.kind === "reauth_required"'),
+      app.indexOf('if (verdict.kind === "bad_nonce")')
+    );
+    expect(branch).toMatch(/const sent = await sendPasswordReauthCode/);
+    expect(branch).toMatch(/if \(!sent\) \{[\s\S]*?return;/);
+  });
+
+  it('the recovery exemption cannot outlive its session', () => {
+    // Set on PASSWORD_RECOVERY and previously cleared only on a SUCCESSFUL
+    // change, so signing out and logging in normally in the same SPA session
+    // still hid the current-password field and omitted current_password.
+    const signedOut = app.slice(app.indexOf('_event === "SIGNED_OUT"'), app.indexOf('_event === "SIGNED_OUT"') + 1200);
+    expect(signedOut).toContain('setPwRecoveryMode(false)');
+    // And again at the unambiguous fresh-login point, independent of the
+    // order auth events happen to arrive in.
+    const signInIdx = app.indexOf('signInWithPassword');
+    expect(signInIdx).toBeGreaterThan(-1);
+    expect(app.slice(Math.max(0, signInIdx - 400), signInIdx))
+      .toContain('setPwRecoveryMode(false)');
   });
 
   it('clears the proof fields once the change succeeds', () => {

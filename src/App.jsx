@@ -774,6 +774,15 @@ function App() {
         setMfaChallengeFactorId(null);
         setMfaChallengeType(null);
         setMfaRecoveryMode(false);
+        // The recovery exemption is scoped to the session that arrived via the
+        // reset link. Left set, a normal login later in the same SPA session
+        // would still hide the current-password field and omit
+        // current_password — silently downgrading the proof on a change that
+        // is not a recovery at all.
+        setPwRecoveryMode(false);
+        setPwCurrent("");
+        setPwNonce("");
+        setPwReauthSent(false);
         setScreen("login");
         return;
       }
@@ -1183,6 +1192,9 @@ function App() {
         setAuthIsNew(false);
       }
     } else {
+      // An ordinary sign-in is unambiguously not a recovery, whatever order
+      // auth events arrive in. Belt to the SIGNED_OUT braces.
+      setPwRecoveryMode(false);
       const {
         error
       } = await sb.auth.signInWithPassword({
@@ -1366,7 +1378,14 @@ function App() {
       // Send one immediately rather than telling the user to go find it — the
       // old code returned a generic failure here that never resolved.
       if (verdict.kind === "reauth_required" && !pwReauthSent) {
-        await sendPasswordReauthCode({ silent: true });
+        const sent = await sendPasswordReauthCode({ silent: true });
+        if (!sent) {
+          // sendPasswordReauthCode already set the real reason. Overwriting it
+          // with "we've emailed you a code" would promise an email that was
+          // never sent, and the code field stays hidden, so the message would
+          // point at a field the user cannot see.
+          return;
+        }
       }
       if (verdict.kind === "bad_nonce") setPwNonce("");
       setPwMsg({
