@@ -9,6 +9,10 @@
  * the table is genuinely immutable, every archetype is fully populated, the
  * banned tessellation level stays banned, lookup is Map-backed, and the
  * joint table pivotsOf derives is the one the masses were authored to have.
+ *
+ * Covers BOTH halves of the split (actorMasses.js + actorArchetypes.js) from
+ * one file, and imports through actorMasses.js exactly as Tasks 4-6 are told
+ * to — so this suite exercises the public surface rather than a shortcut.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -17,8 +21,11 @@ import { fileURLToPath } from 'node:url';
 import {
   ARCHETYPES, CAP_LEVEL, FAR_COMP, PIVOT_EPS, SEG, archetypeById, pivotsOf, pivotsOfMasses,
 } from './actorMasses.js';
+import { ARCHETYPES as ARCHETYPES_DIRECT } from './actorArchetypes.js';
 
-const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'actorMasses.js'), 'utf8');
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SOURCE = readFileSync(join(HERE, 'actorMasses.js'), 'utf8');
+const TABLE_SOURCE = readFileSync(join(HERE, 'actorArchetypes.js'), 'utf8');
 
 const FACTION_IDS = ['unbound', 'legion', 'magistari', 'orghon'];
 
@@ -216,10 +223,50 @@ describe('archetypeById', () => {
     // Structural, because the reason is scale, not behaviour: a roster
     // spanning species x class x faction outgrows the props' 7-entry scan,
     // and the lookup sits on the per-actor spawn path. Behaviour alone cannot
-    // distinguish the two implementations at four entries.
+    // distinguish the two implementations at four entries. Both halves of the
+    // split are scanned — a linear lookup could be reintroduced in either.
     expect(SOURCE).toMatch(/new Map\(/);
     expect(SOURCE).not.toMatch(/ARCHETYPES\.find\(/);
+    expect(TABLE_SOURCE).not.toMatch(/ARCHETYPES\.find\(/);
     expect(archetypeById.toString()).toMatch(/\.get\(/);
+  });
+});
+
+/**
+ * The tables were split into actorArchetypes.js when the combined file hit
+ * 394 lines against a 400 ceiling. These pin the properties that split relies
+ * on, so a later edit cannot quietly undo them.
+ */
+describe('the actorMasses / actorArchetypes split', () => {
+  it('re-exports the SAME frozen objects, not a copy', () => {
+    // Downstream is told to import everything from actorMasses.js. If the
+    // re-export ever became a clone, identity comparisons (archetypeById(id)
+    // === ARCHETYPES[i]) would silently start failing for direct importers.
+    expect(ARCHETYPES).toBe(ARCHETYPES_DIRECT);
+    for (const a of ARCHETYPES_DIRECT) expect(archetypeById(a.id)).toBe(a);
+  });
+
+  it('keeps actorArchetypes.js a ZERO-IMPORT leaf', () => {
+    // This is the whole reason freezeArchetype lives beside the tables rather
+    // than with the rest of the vocabulary. Helper in actorMasses.js + tables
+    // here is a real ESM cycle, and its failure is order-dependent: importing
+    // actorMasses.js first happens to work (hoisted function declaration),
+    // while importing actorArchetypes.js first throws "Cannot access
+    // 'ARCHETYPES' before initialization" as actorMasses builds its Map.
+    // Verified against a reproduction, not theorised. A leaf cannot have that
+    // problem in either order — so it has to stay a leaf.
+    expect(TABLE_SOURCE).not.toMatch(/^\s*import\s/m);
+    expect(TABLE_SOURCE).not.toMatch(/\bfrom\s*['"]/);
+  });
+
+  it('still applies the deep freeze wherever the helper now lives', () => {
+    expect(TABLE_SOURCE).toMatch(/function freezeArchetype/);
+    // Belt and braces with the freeze block above: the tables must be frozen
+    // as seen through BOTH import paths, since they are the same objects.
+    for (const a of ARCHETYPES_DIRECT) {
+      expect(Object.isFrozen(a), a.id).toBe(true);
+      expect(Object.isFrozen(a.masses), a.id).toBe(true);
+    }
   });
 });
 
