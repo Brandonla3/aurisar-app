@@ -22,6 +22,12 @@
  * mutation (wire the tint as an attribute -> the assertion fails naming
  * `instTint`) rather than assumed.
  *
+ * The mirror case is a mesh with no vertex colours at all, since albedo IS the
+ * vertex colour and Babylon emits `color` unguarded. That one is closed in the
+ * material by MeshAttributeExistsBlock and pinned here by watching Babylon's own
+ * VERTEXCOLOR_NME define flip as the fixture gains and loses its colour buffer —
+ * likewise verified by mutation (delete the guard -> the assertions fail).
+ *
  * Everything is built under BOTH shader languages, because CustomBlock-class
  * mistakes and WGSL-only emit errors compile fine on the machine that wrote
  * them and fail only on a player's WebGPU browser.
@@ -64,17 +70,24 @@ const endpointNames = (point) => point.endpoints.map((e) => e.ownerBlock.name);
  */
 const ACTOR_MESH_KINDS = Object.freeze(['position', 'normal', 'color']);
 
-function makeActorMesh(scene, material) {
+function makeActorMesh(scene, material, { colors = true } = {}) {
   const payload = buildActorPayload('unbound', 0);
   const mesh = new BABYLON.Mesh('actor', scene);
   const vd = new BABYLON.VertexData();
   vd.positions = payload.positions;
   vd.normals = payload.normals;
-  vd.colors = payload.colors;
+  if (colors) vd.colors = payload.colors;
   vd.indices = payload.indices;
   vd.applyToMesh(mesh, false);
   mesh.material = material;
   return mesh;
+}
+
+/** Forces effect compilation for `mesh` and hands back {ready, effect}. */
+function compileAgainst(material, mesh) {
+  const sub = mesh.subMeshes[0];
+  const ready = material.isReadyForSubMesh(mesh, sub);
+  return { ready, effect: sub.effect };
 }
 
 const LANGUAGES = [
@@ -125,6 +138,102 @@ describe('buildActorMaterial — dual backend', () => {
         // (3) And no instancing machinery smuggled the matrices in as vertex
         // data either — that is the other half of propNME's attribute surface.
         expect(classesOf(material)).not.toContain('InstancesBlock');
+      } finally {
+        scene.dispose();
+      }
+    });
+
+    it(`${label}: the COMPILED EFFECT demands no attribute a real actor mesh lacks`, async () => {
+      // The end-to-end form of the attribute guard, and the one that would still
+      // catch a stray attribute pushed by something other than an InputBlock:
+      // compile against the real generator's payload and ask the effect itself
+      // what it needs, then ask the mesh what it has.
+      const scene = newScene();
+      try {
+        const { material } = await buildActorMaterial(scene, { name: `ae${label}`, shaderLanguage: lang });
+        const mesh = makeActorMesh(scene, material);
+        expect(mesh.subMeshes.length).toBe(1);
+        const { ready, effect } = compileAgainst(material, mesh);
+
+        // NullEngine reaches isReady only under GLSL, and the reason is narrow:
+        // the `babylonjs` UMD bundle registers 145 WGSL includes against 173
+        // GLSL ones, and `lightFragmentDeclaration` is one of the 30 with no
+        // WGSL twin. Babylon therefore tries to LOAD it as a file and dies on
+        // `XMLHttpRequest is not defined` in node. It is specific to the
+        // LightBlock path — a WGSL graph without one readies fine — and it is a
+        // bundle-packaging gap, not a defect in this graph or in WGSL support.
+        // getAttributesNames() is populated either way, so the check below runs
+        // under BOTH languages regardless; only the readiness claim is scoped.
+        if (lang === BABYLON.ShaderLanguage.GLSL) expect(ready).toBe(true);
+        expect(effect).toBeTruthy();
+
+        const required = effect.getAttributesNames();
+        const unprovided = required.filter((a) => !mesh.isVerticesDataPresent(a));
+        expect(
+          unprovided,
+          'The compiled effect requires these vertex attributes, but a mesh built\n' +
+            'from buildActorPayload does not have them. At draw time they read\n' +
+            '(0,0,0,1) — a zero multiplied into albedo is a BLACK ACTOR.',
+        ).toEqual([]);
+
+        // Guard against a vacuous pass: the fixture must really carry all three,
+        // and the effect must really be reading them rather than none of them.
+        for (const kind of ACTOR_MESH_KINDS) {
+          expect(mesh.isVerticesDataPresent(kind), `fixture is missing ${kind}`).toBe(true);
+        }
+        expect([...required].sort()).toEqual([...ACTOR_MESH_KINDS].sort());
+      } finally {
+        scene.dispose();
+      }
+    });
+
+    it(`${label}: a mesh with NO vertex colours takes the fallback branch, not black`, async () => {
+      // The other unguarded-attribute direction. Babylon wraps `normal` in
+      // `#ifdef NORMAL … #else vec3 normal = vec3(0.);` but emits `color` bare,
+      // so without MeshAttributeExistsBlock a colourless mesh would multiply
+      // albedo by an unbound (0,0,0,1) and render black.
+      const scene = newScene();
+      try {
+        const { material } = await buildActorMaterial(scene, { name: `ac${label}`, shaderLanguage: lang });
+
+        // Structure: the guarded value — not the raw attribute — is what
+        // reaches albedo, and the fallback it selects is a non-zero uniform.
+        const guard = blockOfClass(material, 'MeshAttributeExistsBlock');
+        expect(guard, 'no vertex-colour existence guard in the graph').toBeTruthy();
+        expect(guard.attributeType).toBe(BABYLON.MeshAttributeExistsBlockTypes.VertexColor);
+        expect(guard.input.connectedPoint.ownerBlock.name).toBe('color');
+        expect(endpointNames(guard.output)).toContain('colorSplit');
+        const fallback = guard.fallback.connectedPoint.ownerBlock;
+        expect(fallback.isUniform).toBe(true);
+        expect(fallback.isAttribute).toBe(false);
+        expect([fallback.value.r, fallback.value.g, fallback.value.b]).toEqual([1, 1, 1]);
+        // ...and colorSplit must read the GUARD, never the attribute directly.
+        expect(endpointNames(blockNamed(material, 'color').output)).toEqual(['safeColor']);
+
+        // Behaviour: Babylon computes VERTEXCOLOR_NME itself, from
+        // `mesh.useVertexColors && mesh.isVerticesDataPresent(ColorKind)`. So
+        // the define flipping with the mesh IS the branch selection, observed
+        // rather than assumed — both halves of the contract, held by the engine.
+        const withColors = makeActorMesh(scene, material, { colors: true });
+        expect(withColors.useVertexColors).toBe(true);
+        expect(compileAgainst(material, withColors).effect.defines)
+          .toMatch(/#define VERTEXCOLOR_NME/);
+
+        const bare = makeActorMesh(scene, material, { colors: false });
+        expect(bare.isVerticesDataPresent('color')).toBe(false);
+        const bareEffect = compileAgainst(material, bare).effect;
+        expect(bareEffect.defines).not.toMatch(/#define VERTEXCOLOR_NME/);
+
+        // The define only means something if the #else exists and reads the
+        // fallback uniform — this is the one place the emitted branch itself is
+        // the evidence, so it is checked rather than trusted.
+        const fs = fragmentSource(material);
+        expect(fs).toMatch(/#ifdef VERTEXCOLOR_NME[\s\S]*?#else[\s\S]*?uAlbedoFallback[\s\S]*?#endif/);
+
+        // HONEST SCOPE: this closes the BLACK outcome, not the attribute-list
+        // proxy. `color` is still a required attribute on a colourless mesh —
+        // the shader simply stops reading it. White is the failure mode now.
+        expect(bareEffect.getAttributesNames()).toContain('color');
       } finally {
         scene.dispose();
       }
@@ -191,51 +300,6 @@ describe('buildActorMaterial — dual backend', () => {
     });
   }
 
-  it('the COMPILED EFFECT demands no attribute a real actor mesh lacks', async () => {
-    // The end-to-end form of the attribute guard, and the one that would still
-    // catch a stray attribute pushed by something other than an InputBlock:
-    // compile against the real generator's payload and ask the effect itself
-    // what it needs, then ask the mesh what it has.
-    //
-    // GLSL only, and not by preference: NullEngine can GENERATE WGSL source
-    // (covered above, per language) but cannot COMPILE a WGSL effect — the UMD
-    // bundle registers no WGSL shader includes, so Babylon falls back to
-    // fetching `lightFragment` over XMLHttpRequest and dies in node. The
-    // property being checked is language-independent anyway: the emitted
-    // attribute list is asserted identical under both languages above.
-    const scene = newScene();
-    try {
-      const { material } = await buildActorMaterial(scene, {
-        name: 'aeffect',
-        shaderLanguage: BABYLON.ShaderLanguage.GLSL,
-      });
-      const mesh = makeActorMesh(scene, material);
-
-      expect(mesh.subMeshes.length).toBe(1);
-      expect(material.isReadyForSubMesh(mesh, mesh.subMeshes[0])).toBe(true);
-
-      const effect = mesh.subMeshes[0].effect;
-      expect(effect).toBeTruthy();
-      const required = effect.getAttributesNames();
-      const unprovided = required.filter((a) => !mesh.isVerticesDataPresent(a));
-      expect(
-        unprovided,
-        'The compiled effect requires these vertex attributes, but a mesh built\n' +
-          'from buildActorPayload does not have them. At draw time they read\n' +
-          '(0,0,0,1) — a zero multiplied into albedo is a BLACK ACTOR.',
-      ).toEqual([]);
-
-      // Guard against a vacuous pass: the fixture must really carry all three,
-      // and the effect must really be reading them rather than none of them.
-      for (const kind of ACTOR_MESH_KINDS) {
-        expect(mesh.isVerticesDataPresent(kind), `fixture is missing ${kind}`).toBe(true);
-      }
-      expect([...required].sort()).toEqual([...ACTOR_MESH_KINDS].sort());
-    } finally {
-      scene.dispose();
-    }
-  });
-
   it('never requires alpha blending or alpha testing', async () => {
     const scene = newScene();
     try {
@@ -280,17 +344,41 @@ describe('buildActorMaterial — dual backend', () => {
     }
   });
 
-  it('normalizes the world normal before lighting it', async () => {
+  it('rescales the world normal for lighting WITHOUT a NaN-producing normalize', async () => {
     // Deviation from terrainNME/propNME, deliberate: actors are the only realm
     // meshes that live under a parent transform and may be scaled, and Babylon's
     // LightBlock uses its worldNormal input verbatim (`vec3 normalW = ...xyz;`).
+    //
+    // But a bare NormalizeBlock is NOT safe here, which PR review caught: the
+    // `normal` attribute carries Babylon's `#else vec3 normal = vec3(0.);`
+    // fallback, so a mesh with no normal buffer feeds in a zero vector and
+    // `normalize(vec3(0))` is `0 * inversesqrt(0)` = NaN, straight out to the
+    // fragment. The attribute guard cannot catch that case, because with NORMAL
+    // undefined `normal` is not a required attribute at all. Dividing by
+    // max(length, eps) rescales unit and short normals identically but sends a
+    // zero normal to zero — ambient-only, dark but visible, which is exactly how
+    // the raw (pre-deviation) version degraded.
     const scene = newScene();
     try {
       const { material } = await buildActorMaterial(scene);
+      expect(
+        classesOf(material),
+        'A bare normalize() of the zero-normal fallback is NaN. Divide by\n' +
+          'max(length(n), eps) instead.',
+      ).not.toContain('NormalizeBlock');
+
       const lights = blockOfClass(material, 'LightBlock');
-      expect(lights.worldNormal.connectedPoint.ownerBlock.getClassName()).toBe('NormalizeBlock');
-      const norm = blockOfClass(material, 'NormalizeBlock');
-      expect(norm.input.connectedPoint.ownerBlock.name).toBe('worldNormal');
+      const divide = lights.worldNormal.connectedPoint.ownerBlock;
+      expect(divide.getClassName()).toBe('DivideBlock');
+      expect(divide.left.connectedPoint.ownerBlock.name).toBe('worldNormal');
+
+      const max = divide.right.connectedPoint.ownerBlock;
+      expect(max.getClassName()).toBe('MaxBlock');
+      expect(max.left.connectedPoint.ownerBlock.getClassName()).toBe('LengthBlock');
+      const eps = max.right.connectedPoint.ownerBlock;
+      expect(eps.value, 'the epsilon floor must be strictly positive').toBeGreaterThan(0);
+      expect(max.left.connectedPoint.ownerBlock.value.connectedPoint.ownerBlock.name)
+        .toBe('worldNormal');
     } finally {
       scene.dispose();
     }
@@ -314,17 +402,15 @@ describe('buildActorMaterial — dual backend', () => {
     }
   });
 
-  it('applyTint writes the shared tint uniform', async () => {
+  it('resolves ONLY the material — no speculative setters on the payload', async () => {
+    // The brief's contract is Promise<{material}>. A tint setter existed here
+    // briefly with zero callers anywhere in src/; the UNIFORM is the safety
+    // property and stays, the setter was speculation and went. Pinned so it
+    // does not drift back in without a real caller to justify it.
     const scene = newScene();
     try {
-      const { material, applyTint } = await buildActorMaterial(scene);
-      const tint = material.getInputBlocks().find((b) => /tint/i.test(b.name));
-      expect([tint.value.r, tint.value.g, tint.value.b]).toEqual([1, 1, 1]);
-      applyTint({ r: 0.8, g: 0.6, b: 0.4 });
-      expect([tint.value.r, tint.value.g, tint.value.b]).toEqual([0.8, 0.6, 0.4]);
-      // Still a uniform afterwards — a setter must not change the input's mode.
-      expect(tint.isUniform).toBe(true);
-      expect(tint.isAttribute).toBe(false);
+      const built = await buildActorMaterial(scene);
+      expect(Object.keys(built)).toEqual(['material']);
     } finally {
       scene.dispose();
     }
