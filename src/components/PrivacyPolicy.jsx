@@ -245,8 +245,9 @@ export default function PrivacyPolicy() {
               OAuth consent screen where you explicitly authorise us to read specific data.
               We request access to recovery scores, sleep metrics, workout summaries, and
               heart rate data. This data is stored in your account so Aurisar can
-              display your stats and power in-game mechanics. You can disconnect WHOOP and
-              request deletion of this data at any time by contacting us.
+              display your stats and power in-game mechanics. You can disconnect WHOOP at
+              any time from your profile, and choose whether to delete the data already
+              stored when you do.
             </P>
 
             <div style={{ ...S.h2, fontSize: 11.5, marginTop: 18 }}>2d. Support &amp; Feedback Submissions</div>
@@ -350,7 +351,7 @@ export default function PrivacyPolicy() {
               provide the Service. Specific retention rules:</P>
             <UL items={[
               'Account and profile data — retained while your account is active. Deleted within 30 days of a verified account deletion request.',
-              'WHOOP fitness data — retained while you have WHOOP connected. You can disconnect at any time from your profile; data is deleted on request.',
+              'WHOOP fitness data — retained while you have WHOOP connected. You can disconnect at any time from your profile, and when you do you choose whether to delete the data already stored or keep it; if you keep it, it stays until you ask us to remove it or delete your account.',
               'Multiplayer session data — not retained beyond your active session.',
               'Support emails and feedback — retained for up to 24 months for operational purposes (bug tracking, follow-up).',
               'Server access logs (Netlify) — retained per Netlify\'s standard log retention policy (typically 30 days).',

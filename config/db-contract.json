@@ -44,7 +44,8 @@
     "should_deliver_email",
     "store_mfa_recovery_codes",
     "use_mfa_recovery_code",
-    "verify_phone_otp"
+    "verify_phone_otp",
+    "whoop_connection_status"
   ],
   "declaredTables": [
     "anon_request_counters",
@@ -104,6 +105,7 @@
     "update_channel_timestamp",
     "use_mfa_recovery_code",
     "verify_phone_otp",
+    "whoop_connection_status",
     "xp_to_level"
   ],
   "knownUndeclared": {
@@ -116,21 +118,21 @@
     "table:feedback": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:6778"
+        "netlify/functions/submit-feedback.js:122"
       ]
     },
     "table:friend_requests": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2520",
-        "src/App.jsx:2523",
-        "src/App.jsx:2575"
+        "src/App.jsx:2521",
+        "src/App.jsx:2524",
+        "src/App.jsx:2576"
       ]
     },
     "table:profiles": {
       "reason": "BASELINE: the core user table, created before scripts/security/ tracking began. Confirmed present in the live DB.",
       "sites": [
-        "src/App.jsx:2210",
+        "src/App.jsx:2211",
         "src/features/avatar/useAvatarConfig.js:25",
         "src/features/avatar/useAvatarConfig.js:43"
       ]
@@ -138,24 +140,25 @@
     "table:shared_items": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2744",
-        "src/App.jsx:2757",
-        "src/App.jsx:2814"
+        "src/App.jsx:2745",
+        "src/App.jsx:2758",
+        "src/App.jsx:2815"
       ]
     },
     "table:whoop_data": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/features/profile/ProfileTab.jsx:296",
+        "src/features/profile/ProfileTab.jsx:355",
+        "netlify/functions/whoop-disconnect.js:121",
         "netlify/functions/whoop-fetch-data.js:241"
       ]
     },
     "table:whoop_tokens": {
-      "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
+      "reason": "BASELINE: pre-dates scripts/security tracking. Migration 28 revoked the client roles and left only a column-scoped SELECT(user_id) presence grant; the OAuth token columns are service-role/definer only. Read/written exclusively by netlify/functions/whoop-*.js via the service role.",
       "sites": [
-        "src/features/profile/ProfileTab.jsx:289",
-        "netlify/functions/whoop-fetch-data.js:32",
-        "netlify/functions/whoop-fetch-data.js:142"
+        "netlify/functions/whoop-disconnect.js:90",
+        "netlify/functions/whoop-disconnect.js:104",
+        "netlify/functions/whoop-fetch-data.js:32"
       ]
     },
     "function:get_exercise_video_url": {
@@ -167,19 +170,19 @@
     "function:get_leaderboard": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2336"
+        "src/App.jsx:2337"
       ]
     },
     "function:get_leaderboard_filters": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2368"
+        "src/App.jsx:2369"
       ]
     },
     "function:get_world_ranks": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2355"
+        "src/App.jsx:2356"
       ]
     }
   }
