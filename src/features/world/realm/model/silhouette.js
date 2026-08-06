@@ -280,17 +280,27 @@ export function fitsWindow(payload, { bounds, yawCount = 8, pitchRad = 0 } = {})
 /**
  * Fraction of a payload's filled silhouette cells that fall in each
  * vertical world-Y band, averaged over `yawCount` yaws (so the returned
- * array always sums to ~1). Bands are `bandEdgesY` (interior boundaries
- * only, ascending) plus the window's own minY/maxY as the implicit outer
- * edges — e.g. `[WAIST_Y, SHOULDER_Y]` yields 3 bands: legs, torso, head.
+ * array always sums to ~1).
+ *
+ * `bandEdgesY` is a list of N INTERIOR boundaries only, ascending, in world
+ * metres — NOT the full edge list. The window's own `bounds.minY`/`maxY`
+ * are the implicit outermost edges, so N interior edges always produce
+ * N+1 bands. Concretely: `bandEdgesY: [WAIST_Y, SHOULDER_Y]` (2 edges) MUST
+ * yield exactly 3 bands — [minY..WAIST_Y) = legs, [WAIST_Y..SHOULDER_Y) =
+ * torso, [SHOULDER_Y..maxY] = head/shoulders — which is the contract later
+ * archetype-comparison tasks are written against.
  *
  * Defined at pitch 0 ONLY, and does not accept a pitchRad — this is
- * deliberate, not an oversight. With a horizontal eye and a fixed window,
- * mask row index maps LINEARLY to world Y, so a band edge in world-Y
- * converts exactly to a row index once. Under pitch, a mask row mixes Y and
- * depth (see projectedBounds), so the same row no longer corresponds to one
- * world-Y value across the mask's width and the metric would be quietly
- * measuring the wrong thing while still returning plausible-looking numbers.
+ * deliberate, not an oversight, and not something to "complete" later by
+ * adding the parameter. With a horizontal eye and a fixed window, mask row
+ * index maps LINEARLY to world Y, so a band edge in world-Y converts
+ * exactly to a row index once, up front. Under pitch, a mask row mixes Y
+ * and depth (see projectedBounds's `sy` formula), so the SAME row no longer
+ * corresponds to one world-Y value across the mask's width — the metric
+ * would be quietly measuring the wrong thing while still returning
+ * plausible-looking numbers that sum to 1 either way. If actor bands under
+ * pitch are ever needed, that is a different function, not this one with a
+ * parameter bolted on.
  */
 export function bandOccupancy(payload, {
   bounds, bandEdgesY, yawCount = 8, res = 48,

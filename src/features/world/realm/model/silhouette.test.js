@@ -176,6 +176,12 @@ describe('fitsWindow — the silent-clip guard', () => {
 describe('bandOccupancy — per-band fraction of the filled silhouette', () => {
   const bounds = { minX: -1.5, maxX: 1.5, minY: 0, maxY: 3 };
 
+  it('N interior edges produce N+1 bands — 2 edges (waist/shoulder-shaped) give exactly 3', () => {
+    const box = boxPayload(2, 3);
+    const bands = bandOccupancy(box, { bounds, bandEdgesY: [1, 2] });
+    expect(bands.length).toBe(3);
+  });
+
   it('sums to 1 across bands', () => {
     const box = boxPayload(2, 3);
     const bands = bandOccupancy(box, { bounds, bandEdgesY: [1, 2] });
@@ -185,6 +191,7 @@ describe('bandOccupancy — per-band fraction of the filled silhouette', () => {
   it('a box confined to the lowest band reads [1, 0, 0]', () => {
     const low = boxPayload(2, 0.9); // comfortably under the band-1 edge at y=1
     const bands = bandOccupancy(low, { bounds, bandEdgesY: [1, 2] });
+    expect(bands.length).toBe(3);
     expect(bands[0]).toBeCloseTo(1, 6);
     expect(bands[1]).toBeCloseTo(0, 6);
     expect(bands[2]).toBeCloseTo(0, 6);

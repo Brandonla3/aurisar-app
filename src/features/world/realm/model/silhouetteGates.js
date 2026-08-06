@@ -47,11 +47,23 @@ export const WAIST_Y = 0.85;
 export const SHOULDER_Y = 1.45;
 
 /** Pitch, in radians, the actor gates render silhouettes at — the chase
- *  camera's eye: PI/2 - PI/3.1. A camera looking level (pitch 0) is not the
- *  view players actually judge an actor's silhouette from; the chase rig
- *  looks down at this angle, which is also why ACTOR_WINDOW's minY has to
- *  clear the resulting depth term. */
-export const GATE_PITCH_RAD = 0.571;
+ *  camera's eye. A camera looking level (pitch 0) is not the view players
+ *  actually judge an actor's silhouette from; the chase rig looks down at
+ *  this angle, which is also why ACTOR_WINDOW's minY has to clear the
+ *  resulting depth term.
+ *
+ *  Derived, not measured-and-hardcoded, and deliberately so: the shipping
+ *  chase camera (an ArcRotateCamera built in view/dev/spike.js — the ONE
+ *  layer allowed to name the render engine, this file stays engine-free by
+ *  only naming its angle constant) is constructed with beta = Math.PI /
+ *  3.1. That camera type's beta is measured from +Y (directly overhead is
+ *  beta=0; level with the target is beta=PI/2), so its downward declination
+ *  from the horizon is PI/2 - beta. Computing it from that same PI/3.1
+ *  constant means this gate and the shipping camera cannot silently drift
+ *  apart if the rig is ever retuned — a hardcoded literal here would rot
+ *  the moment someone changed spike.js without knowing this file existed.
+ *  Measured value: PI/2 - PI/3.1 ≈ 0.5574 rad ≈ 31.9° above horizontal. */
+export const GATE_PITCH_RAD = Math.PI / 2 - Math.PI / 3.1;
 
 /** Mask resolution the actor gates rasterize at. Actors read roughly 38
  *  cells tall at ACTOR_WINDOW's span — comparable to their on-screen pixel
