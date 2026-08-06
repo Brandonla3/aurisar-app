@@ -8,10 +8,10 @@
  * (`worstPropCensus`), not here. It moved out in P6 Task 6 so
  * realmActorBudget.test.js (the actor half of the same scene budget) could
  * import the SAME computation instead of hand-copying its output: a
- * hardcoded snapshot had already drifted once (model/propBudget.js's own
- * header comment says triangles worst 567,602; this computation measures
- * 567,286) — proof a hand-copied number is exactly what "budgets are tests,
- * not comments" forbids. This file is now the thin caller that asserts the
+ * hardcoded snapshot had already drifted once (model/propBudget.js's header
+ * said triangles worst 567,602 against a computed 567,286, corrected in the
+ * P6 final review) — proof a hand-copied number is exactly what "budgets are
+ * tests, not comments" forbids. This file is now the thin caller that asserts the
  * result against BUDGET_CEILINGS and keeps the `[census]` log output; see
  * propCensus.js for the sweep itself and its own header for why the nine
  * cameras are the ones they are.

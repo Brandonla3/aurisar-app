@@ -303,12 +303,26 @@ describe('ActorPrototypes — dispose', () => {
   });
 
   it('does not dispose the shared material out from under anything else', () => {
+    // `expect(material.isDisposed).not.toBe(true)` used to be the headline
+    // assertion here, and it could not fail in either direction: Babylon's
+    // Material has no `isDisposed` member at all (`'isDisposed' in material`
+    // is false, before and after dispose()), so it read
+    // `expect(undefined).not.toBe(true)`. It looked like correct API use
+    // because `Node.isDisposed()` — the real method, used correctly twenty
+    // lines above — does exist. Replaced with a signal that genuinely fires:
+    // Material's own dispose observable.
     const scene = newScene();
     try {
       const material = standIn(scene);
+      let disposeFired = false;
+      material.onDisposeObservable.add(() => { disposeFired = true; });
       const protos = new ActorPrototypes(scene, material);
       protos.dispose();
-      expect(material.isDisposed).not.toBe(true);
+      expect(
+        disposeFired,
+        'ActorPrototypes.dispose() disposed the material it was HANDED — it owns its masters, not the '
+        + 'shared material, which the spike also gives to anything else that needs it',
+      ).toBe(false);
       expect(scene.getMaterialByName('actorStandIn')).toBe(material);
     } finally {
       scene.dispose();

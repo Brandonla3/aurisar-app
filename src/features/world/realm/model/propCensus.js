@@ -7,11 +7,14 @@
  * SAME worst-case numbers to check the actor budget against the SAME scene
  * ceiling (realmActorBudget.test.js), the only options were re-deriving them
  * by hand or making this the one place that computes them — hand-copying was
- * rejected because it had ALREADY drifted once: model/propBudget.js's own
- * header comment says triangles worst 567,602, while this computation
- * measures 567,286. A hand-copied snapshot silently decoupling from the
- * computation it was copied from is exactly what "budgets are tests, not
- * comments" exists to prevent. One computation, every consumer imports it.
+ * rejected because it had ALREADY drifted once: model/propBudget.js's header
+ * said triangles worst 567,602 while this computation measured 567,286, a
+ * 316-triangle decoupling nobody noticed for a phase. (That stale decimal was
+ * corrected in the P6 final review; the drift it evidences is why this file
+ * exists, and the header still carries the story.) A hand-copied snapshot
+ * silently decoupling from the computation it was copied from is exactly what
+ * "budgets are tests, not comments" exists to prevent. One computation, every
+ * consumer imports it.
  *
  * PURE. The census math is unchanged from realmBudget.test.js's original
  * `census()`/sweep — sticky-NEAR hysteresis tier billing (the streamer feeds

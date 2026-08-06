@@ -3,6 +3,7 @@ import {
   ACTOR_WINDOW, bandOccupancy, canonicalStats, fitsWindow, maskIoU, projectedBounds,
   rasterizeMask, silhouetteAreaM2, silhouetteStats,
 } from './silhouette.js';
+import { GATE_PITCH_RAD, GATE_RES } from './silhouetteGates.js';
 
 /** A unit box payload centered on the Y axis: [-w/2, w/2] x [0, h] x [-w/2, w/2]. */
 function boxPayload(w, h) {
@@ -122,6 +123,78 @@ describe('pitchRad — additive to projectedBounds and rasterizeMask', () => {
     const omitted = rasterizeMask(box, 0.83, bounds, 32);
     const explicit = rasterizeMask(box, 0.83, bounds, 32, 0);
     expect(explicit).toEqual(omitted);
+  });
+
+  /**
+   * Two identical plates that differ ONLY in depth. At yaw 0 a level eye
+   * cannot tell them apart at all; a pitched one separates them by
+   * |dz|·sin(pitch). That makes them the sharpest possible probe of whether
+   * the depth-tilt term survives into the rasterizer.
+   */
+  const plateAtZ = (z) => ({
+    positions: new Float32Array([-0.4, 0, z, 0.4, 0, z, 0.4, 1.6, z, -0.4, 1.6, z]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  });
+  const NEAR_PLATE = plateAtZ(-0.6);
+  const FAR_PLATE = plateAtZ(0.6);
+
+  it('regression guard: rasterizeMask actually HONOURS a non-zero pitch', () => {
+    // The sibling of the canonicalStats bounds guard below, and it was missing
+    // until the P6 final review. `rasterizeMask`'s `py()` is a DUPLICATED copy
+    // of projectedBounds' `sy` math, not a shared helper, so the passing "a
+    // pitched box projects shorter" test above gives the rasterizer zero
+    // coverage. Measured: `py = (vi) => toCellY(positions[vi*3+1])` — pitch
+    // dropped entirely — left the whole realm suite green, which means
+    // GATE_PITCH_RAD was unverified at the one place it is actually spent.
+    //
+    // Two plates identical except in Z. A level eye at yaw 0 sees one shape;
+    // a pitched eye sees them at different heights.
+    const level = [
+      rasterizeMask(NEAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, 0),
+      rasterizeMask(FAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, 0),
+    ];
+    expect(level[0], 'at pitch 0 two plates differing only in depth must rasterize identically').toEqual(level[1]);
+
+    const pitched = [
+      rasterizeMask(NEAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, GATE_PITCH_RAD),
+      rasterizeMask(FAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, GATE_PITCH_RAD),
+    ];
+    let differing = 0;
+    for (let i = 0; i < pitched[0].length; i++) if (pitched[0][i] !== pitched[1][i]) differing++;
+    expect(
+      differing,
+      'at GATE_PITCH_RAD the two plates must land on DIFFERENT rows — if this is 0, rasterizeMask is '
+      + 'ignoring pitchRad and every actor gate is silently measuring a level eye',
+    ).toBe(336);
+
+    // And the direction is right: the nearer plate (z = -0.6) tilts UP the
+    // mask under a downward-looking eye, because sy = y·cos(p) - depth·sin(p).
+    const firstRow = (m) => {
+      for (let r = 0; r < GATE_RES; r++) {
+        for (let c = 0; c < GATE_RES; c++) if (m[r * GATE_RES + c]) return r;
+      }
+      return -1;
+    };
+    expect(firstRow(pitched[0])).toBe(13); // near plate, rows 13..34
+    expect(firstRow(pitched[1])).toBe(2); // far plate, rows 2..24
+    expect(firstRow(level[0])).toBe(7); // both, unpitched
+  });
+
+  it('regression guard: canonicalStats THREADS pitchRad through to the comparison', () => {
+    // The other half of the same seam. canonicalStats resolves its window as
+    // `() => bounds` and discards boundsA/boundsB, so a caller (or a refactor)
+    // dropping the 5th argument of compareAtYaw would be invisible to every
+    // other test in this file. Measured: changing `compareAtYaw(..., res,
+    // pitchRad)` to `..., res, 0)` left the full realm suite green.
+    const opts = { bounds: ACTOR_WINDOW, yawCount: 1, res: GATE_RES };
+    const level = canonicalStats(NEAR_PLATE, FAR_PLATE, { ...opts, pitchRad: 0 });
+    const pitched = canonicalStats(NEAR_PLATE, FAR_PLATE, { ...opts, pitchRad: GATE_PITCH_RAD });
+    expect(level.meanIoU, 'a level eye cannot separate two depth-offset plates').toBe(1);
+    expect(
+      pitched.meanIoU,
+      `at GATE_PITCH_RAD the same pair scores ${pitched.meanIoU} — if it is 1, pitchRad is not reaching the `
+      + 'rasterizer and the actor gates are measuring the wrong camera',
+    ).toBeCloseTo(0.363636, 6);
   });
 
   it('a pitched box projects shorter than an unpitched one', () => {

@@ -11,6 +11,27 @@
  * stylized flat-colored props the difference is invisible. The boulder is
  * the one exception (see propGen.js) because displacement changes its
  * surface directions for real.
+ *
+ * WINDING, and why every index push below looks "backwards". Under this
+ * repo's render state (scene.useRightHandedSystem false, material
+ * sideOrientation null so the mesh's default 1/CounterClockWise applies,
+ * backFaceCulling true) Babylon's FRONT face is the one whose right-handed
+ * cross product (v1-v0)x(v2-v0) points AWAY from the viewer — i.e.
+ * ANTI-PARALLEL to the surface's authored outward normal. That is not a
+ * remembered convention: it is measured, in gen/winding.test.js, off
+ * Babylon's own CreateGround/CreateSphere/CreateBox/CreateCylinder/
+ * CreateIcoSphere, all five of which are 100% anti-parallel.
+ *
+ * This file shipped the opposite for `addBlob` and `addBladeFan` from P5
+ * until the P6 final review: their RH cross was PARALLEL to the authored
+ * normal, so every blob triangle and every grass blade was a back face and
+ * got culled. Because `addMass` (gen/actorPrimitives.js) builds an actor as
+ * one tube plus up to two blob caps, that made 76-85% of every near-stage
+ * actor's triangles back-facing, and the identical error in
+ * gen/terrainChunkGen.js made the world's ground invisible. Nothing caught
+ * it because the silhouette harness rasterizes orientation-agnostically
+ * (model/silhouette.js:123) and a closed body covers the same screen pixels
+ * either way. gen/winding.test.js is the gate that now cannot miss it.
  */
 
 import { hash2 } from '../model/noise.js';
@@ -96,7 +117,10 @@ export function addTube(acc, a, b, radiusA, radiusB, segments, color) {
   }
   for (let s = 0; s < segments; s++) {
     const s2 = (s + 1) % segments;
-    // Wound so faces look OUTWARD (counter-clockwise seen from outside).
+    // Wound so faces look OUTWARD: the RH cross of each triple is
+    // anti-parallel to the ring's radial normal, which is Babylon's front
+    // face here (see the file header). This pair was already correct when
+    // the P6 review found the blob and terrain ones were not.
     acc.idx.push(ringStart[s], ringEnd[s], ringEnd[s2]);
     acc.idx.push(ringStart[s], ringEnd[s2], ringStart[s2]);
   }
@@ -182,7 +206,13 @@ export function addBlob(acc, center, radius, level, color, {
       const il = 1 / Math.hypot(d[0], ny, d[2]);
       vi.push(pushV(acc, px, py, pz, d[0] * il, ny * il, d[2] * il, [color[0] * shade, color[1] * shade, color[2] * shade]));
     }
-    acc.idx.push(vi[0], vi[1], vi[2]);
+    // REVERSED against ICO_F/OCT_F's table order, deliberately. Those tables
+    // list each face counter-clockwise seen from OUTSIDE, whose RH cross is
+    // parallel to the outward radial normal — the BACK face here. Emitting
+    // the table order directly is the P5 bug the P6 review caught: every blob
+    // triangle culled, and with it 76-85% of every actor. Do not "tidy" this
+    // back to (0, 1, 2); gen/winding.test.js will go red if you do.
+    acc.idx.push(vi[0], vi[2], vi[1]);
   }
 }
 
@@ -193,6 +223,14 @@ export function addBlob(acc, center, radius, level, color, {
  * grass at an 8-triangle budget (4 blades). No double-sided duplication:
  * that would double the tuft's cost across thousands of instances for a
  * back face nobody can distinguish.
+ *
+ * SINGLE-SIDED IS DELIBERATE; WHICH SIDE WAS NOT. Until the P6 final review
+ * these two pushes were (a,b,c)/(a,c,d), whose RH cross is PARALLEL to the
+ * authored (cx, 0, sx) radial normal — the back face. So the surviving half
+ * of each tuft was the blades pointing AWAY from the eye, lit by a normal
+ * facing away from it: the exact inverse of the sentence above. The
+ * single-sided budget decision is unchanged and still right; only the choice
+ * of which side survives culling is corrected.
  */
 export function addBladeFan(acc, blades, width, height, color, seed) {
   for (let k = 0; k < blades; k++) {
@@ -211,7 +249,7 @@ export function addBladeFan(acc, blades, width, height, color, seed) {
     const b = pushV(acc, sx * w0, 0, -cx * w0, cx, 0, sx, base);
     const c = pushV(acc, sx * w1 + hx, h, -cx * w1 + hz, cx, 0.2, sx, color);
     const d = pushV(acc, -sx * w1 + hx, h, cx * w1 + hz, cx, 0.2, sx, color);
-    acc.idx.push(a, b, c);
-    acc.idx.push(a, c, d);
+    acc.idx.push(a, c, b);
+    acc.idx.push(a, d, c);
   }
 }

@@ -232,17 +232,36 @@ export function canonicalStats(payloadA, payloadB, {
 /**
  * Canonical fixed projection window for actors. A fixed window (rather than
  * silhouetteStats's per-pair union) is what makes Jaccard distance a true
- * metric, so roster comparisons compose — see the file header. It must be
- * snug: an over-generous window wastes mask resolution and degrades the
- * measurement. Derivation:
- *  - X half-span 1.15: the widest archetype (`unbound`'s hypertrophied arm
- *    plus its fist mass) reaches ≈1.06 in projection, and under yaw |sx|
- *    approaches sqrt(x² + z²) — the span has to clear the diagonal case too.
- *  - maxY 2.45 clears the tallest spine (≈2.25 m).
- *  - minY -0.45 clears the depth term at GATE_PITCH_RAD
- *    (-|d|·sin(p) ≈ -0.27) below the ground the actor stands on.
- * At res = 48 this gives ≈4.8cm cells: an actor reads ≈12-19 cells wide
- * and ≈38 tall.
+ * metric, so roster comparisons compose — see the file header.
+ *
+ * The values below are the ones authored in Task 1, before any archetype
+ * existed; the paragraph justifying them was a PREDICTION and stayed
+ * un-remeasured until the P6 final review. These are the measurements, taken
+ * against the shipped roster through projectedBounds/rasterizeMask at the 8
+ * gate yaws:
+ *  - X half-span 1.15 vs a roster max |sx| of 0.880 (unbound, its graft arm
+ *    and fist). 0.880 is not a sampling artefact of the 8 yaws — a dense
+ *    3600-yaw sweep gives 0.8857, which is exactly unbound's payload
+ *    radiusM and therefore the hard ceiling no yaw can exceed. The block
+ *    previously claimed ≈1.06, which is unreachable.
+ *  - maxY 2.45 vs the tallest payload at heightM 2.220 (magistari).
+ *  - minY -0.45 vs the deepest gate-pitch minY anywhere in the roster,
+ *    -0.229 (magistari far, its hem ring at r=0.42). The depth term is
+ *    -|d|·sin(p) as stated; the magnitude is 0.23, not 0.27.
+ *  - res 48 gives cells of 4.79 cm in X but 6.04 cm in Y — the grid is NOT
+ *    square, because the window is 2.3 m wide and 2.9 m tall.
+ *  - Actors read (min-max over yaw) 11-27 cells wide for unbound, 8-18 for
+ *    legion, 18-22 for magistari, 16-24 for orghon; and 29-30, 36-37, 37-38,
+ *    24-25 cells tall respectively.
+ *
+ * SO THE WINDOW IS NOT SNUG — roughly a third of the grid is unreachable by
+ * any roster member — and the header's "must be snug" is a tension with the
+ * shipped value, not a description of it. Left alone deliberately: maskIoU
+ * counts only cells where a|b, so untouched cells enter neither intersection
+ * nor union and bias no shipped number; the cost is effective resolution
+ * only. Re-tightening would move every figure in gen/actorSilhouette.test.js
+ * and every declared bandTarget at once, so it is a deliberate re-measure,
+ * not a drive-by. What is fixed here is the prose claiming it was tight.
  */
 export const ACTOR_WINDOW = Object.freeze({
   minX: -1.15, maxX: 1.15, minY: -0.45, maxY: 2.45,

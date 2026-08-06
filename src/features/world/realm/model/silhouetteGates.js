@@ -28,8 +28,19 @@ export const ACTOR_LOD_WIDTH_DELTA_MAX = 0.10;
 
 /** Ceiling on canonicalStats meanIoU between any two DIFFERENT archetypes —
  *  the four factions must read as different silhouettes, not just different
- *  textures. Measured worst pair 0.678 (closest two of the four); this gate
- *  sits at that plus headroom, so a regression has to be real to trip it. */
+ *  textures.
+ *
+ *  CALIBRATED at 0.678 + 0.042 headroom, which is how the 0.72 was arrived
+ *  at in Task 1 — but 0.678 is the OUT-OF-TREE probe's mass-reallocated
+ *  benchmark, authored before any archetype in this repo existed, and this
+ *  comment called it "measured worst pair (closest two of the four)" until
+ *  the P6 final review. The shipped roster's worst pair is magistari x orghon
+ *  at 0.506 near / 0.501 far, so the real headroom is 0.214, not 0.042.
+ *  Anyone reading this before moving the constant should read that number:
+ *  the roster is nowhere near this gate, and tightening toward 0.68 on the
+ *  belief that it is would be tightening against a number no test in this
+ *  repo computes. gen/actorSilhouette.test.js logs the live worst pair and
+ *  its live headroom on every CI run. */
 export const ACTOR_PAIR_IOU_MAX = 0.72;
 
 /** An archetype's self-match (same archetype, compared to itself or its own
@@ -62,9 +73,20 @@ export const SHOULDER_Y = 1.45;
  *  today, not because it is the final gameplay camera. It is constructed
  *  with beta = Math.PI / 3.1; that camera type's beta is measured from +Y
  *  (directly overhead is beta=0; level with the target is beta=PI/2), so
- *  its downward declination from the horizon is PI/2 - beta. Computing it
- *  from that same PI/3.1 constant means this gate and the spike camera
- *  cannot silently drift apart from EACH OTHER while both exist.
+ *  its downward declination from the horizon is PI/2 - beta.
+ *
+ *  THE PI/3.1 BELOW IS A DUPLICATED LITERAL, NOT A SHARED CONSTANT. It
+ *  cannot be shared: model/ may not import view/ (boundary.test.js), and
+ *  spike.js cannot be imported at all without the engine global. This
+ *  comment used to claim the two "cannot silently drift apart from EACH
+ *  OTHER while both exist", which was simply false — they were two magic
+ *  numbers with nothing between them, and retuning the spike's beta left
+ *  every gate green while the phrase kept promising otherwise. The link is
+ *  now real but it is a SOURCE SCAN, not an import:
+ *  model/silhouetteGates.test.js reads view/dev/spike.js's text and fails if
+ *  its beta literal stops matching the one below. Retuning the camera is
+ *  therefore allowed and loud, which is the behaviour the sentence was
+ *  reaching for.
  *
  *  Consequence for later work: when RealmWorld's real gameplay camera lands
  *  (the P13 switchover, per the spike's own header), THIS constant must be

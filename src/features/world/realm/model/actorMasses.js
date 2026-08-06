@@ -40,9 +40,23 @@ export { ARCHETYPES };
 
 /**
  * Per-stage tube tessellation: radial segments around each mass. Stage 0 is
- * near (full), stage 1 is far. Two stages only, matching RENDERED_STAGES —
- * beyond the mid ring actors are culled outright, so a third stage would be
- * geometry generated for nobody.
+ * near (full), stage 1 is far. Two stages only, matching RENDERED_STAGES: a
+ * third stage would be geometry nothing could ever select, because
+ * `tierForDistance` (view/actor/ActorRig.js) only ever returns NEAR or MID
+ * and `ActorPrototypes.stageFor` clamps anything beyond the archetype's last
+ * stage.
+ *
+ * NOTHING CULLS ACTORS BY DISTANCE, and this comment said otherwise until the
+ * P6 final review. The sentence it carried ("beyond the mid ring actors are
+ * culled outright") is propGenomes.js's justification for PROPS, where FAR
+ * genuinely drop-ships to zero instances. Actors have no such branch: there
+ * is no setEnabled(false), no maxRenderDistance and no cull radius anywhere
+ * in view/actor/, ActorRig._applyTier unconditionally enables its mesh, and
+ * ActorRig.test.js pins `tierForDistance(5000) === MID` — an actor 5 km away
+ * still draws its full MID mesh. The two-stage decision is right; the
+ * mechanism cited for it was invented, and a later phase deciding whether
+ * actors need an impostor stage or a cull radius must not read this and
+ * believe the engine already stops drawing them.
  *
  * The far stage is 6, NOT the plan's 4 — and the reason is MARGIN, not
  * impossibility. Swept at 0.0025 granularity, a 4-segment far stage does pass
@@ -70,12 +84,39 @@ export { ARCHETYPES };
 export const SEG = Object.freeze([8, 6]);
 
 /**
- * Per-stage rounded-cap tessellation, as sphereFaces levels. NEVER 0: an
- * octahedron's filled projection is a diamond at ~64% of the equivalent
- * sphere's area — measured, and fatal to anything silhouette-gated, because
- * a cap that loses a third of its area at range moves the outline. Level 1
- * (icosahedron) is the coarse floor, the same floor cragpine's blobLevel
- * uses.
+ * Per-stage rounded-cap tessellation, as sphereFaces levels. NEVER 0 — but
+ * for a reason that has to be scoped honestly, because the version of this
+ * comment that shipped through P6 over-generalised it.
+ *
+ * The area loss is real and reproduces: an octahedron's axis projection is a
+ * square of 2r² against the sphere's pi*r², = 63.66%, and measured through
+ * `sphereFaces` a free-standing blob's silhouetteAreaM2 goes 0.728 m² (level
+ * 2) -> 0.453 m² (level 0), = 62.3%.
+ *
+ * FATAL WHERE THE BLOB IS THE OUTLINE. A free-standing blob at level 0
+ * against its own level 2 measures meanIoU 0.610, worst-yaw 0.492, width
+ * delta 0.273 — annihilated by the 0.85/0.82/0.10 trio. That is the case
+ * propGenomes.js's cragpine `blobLevel` comment is about, and where "fatal"
+ * is literally true.
+ *
+ * NOT FATAL FOR AN END CAP, which is what this constant governs. Most of a
+ * cap is interior to its own tube's outline, so the loss dilutes: rebuilding
+ * every far stage at capLevel 0 measures unbound 0.906/0.876/0.032, legion
+ * 0.908/0.877/0.085, magistari 0.948/0.890/0.030, orghon 0.888/0.866/0.073 —
+ * mean down ~0.04, width up to 3.6x, and every one of them still GREEN
+ * against the LOD gates. So do not read this constant as "the silhouette
+ * gates will catch a cap regression". They will register it (orghon's width
+ * goes 0.020 -> 0.073) without rejecting it.
+ *
+ * What actually holds the ban is a constant guard, which is the correct shape
+ * for a plan-level banned value (task-2-brief.md: "`CAP_LEVEL` must never be
+ * 0"): actorMasses.test.js's `expect(CAP_LEVEL).not.toContain(0)`, its
+ * monotone-coarsening assertion, and all four ACTOR_MANIFEST triangle-count
+ * audits, which move 372->228, 448->280, 228->156 and 352->220. Six tests,
+ * none of them a silhouette gate.
+ *
+ * Level 1 (icosahedron) is the coarse floor, the same floor cragpine's
+ * blobLevel uses.
  */
 export const CAP_LEVEL = Object.freeze([2, 1]);
 
@@ -86,16 +127,28 @@ export const CAP_LEVEL = Object.freeze([2, 1]);
  *
  * The loss is Cauchy-predictable for the tubes: an n-gon inscribed in a
  * circle of radius r has mean projected width perimeter/pi, so 8 segments
- * read 1.949r and 6 read 1.910r — a 2.05% narrowing before the caps drop
+ * read 1.949r and 6 read 1.910r — a 2.01% narrowing before the caps drop
  * from 80 faces to 20. Measured, the minimax over the roster lands at
- * 1.02-1.03, agreeing with that derivation; 1.03 is where all four
- * archetypes' widthDeltaFrac sit closest together (0.020-0.037), which is
- * what "one constant serves the whole roster" looks like when it is true.
+ * 1.03-1.035 (max widthDeltaFrac 0.0371 at 1.030, 0.0359 at 1.035, rising
+ * again to 0.0400 by 1.040), agreeing with that derivation to well inside
+ * the flatness of the curve.
+ *
+ * WHAT 1.03 IS NOT. It is not where the four archetypes cluster most tightly
+ * — measured, the spread across the roster is 0.0176 at 1.030 and 0.0149 at
+ * 1.000, so comp actually SPREADS them slightly on the way to its minimax.
+ * That claim was in this comment until the P6 final review and does not
+ * reproduce. What 1.03 is, is the near-minimum of the WORST archetype, which
+ * is the statistic the gate reads.
  *
  * Not tuned to sit ON the gate, and the trap is real here, not hypothetical:
  * FAR_COMP = 1.10 measures widthDeltaFrac 0.100 against a 0.10 gate —
  * literally the gate, the same coin-flip-dressed-as-a-pass propGen documents
- * for its own area-exact 1.146 (0.10000002). 1.03 measures 0.030, 30% of it.
+ * for its own area-exact 1.146 (0.10000002). 1.03 measures 0.037, 37% of it,
+ * on LEGION — legion, not magistari, is what binds at the shipped comp, and
+ * the per-archetype figures are [unbound 0.025, legion 0.037, magistari
+ * 0.030, orghon 0.020]. The advertised headroom is therefore 0.063, not the
+ * 0.070 a "30%" reading suggests: a retune to 1.06 already puts legion and
+ * magistari at 0.060, and 1.08 puts both at 0.080.
  */
 export const FAR_COMP = 1.03;
 

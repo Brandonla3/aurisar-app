@@ -18,6 +18,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
 import { ARCHETYPES } from '../../model/actorMasses.js';
+import { PROP_TIER, TIER_BANDS_M } from '../../model/propLod.js';
 
 let ActorCast;
 let ActorShadowRig;
@@ -129,18 +130,75 @@ describe('ActorCast — per-frame update', () => {
   });
 
   it('leaves the demo actors` own position untouched, but still re-tiers them against a moving focus', () => {
+    // BOTH halves of this title are asserted, which they were not until the
+    // P6 final review: the body used to check only `absolutePosition`, which
+    // is unchanged whether or not update() is ever forwarded to the rigs. The
+    // whole LOD-tiering half of ActorCast.update() was deletable with the
+    // realm suite green — including this test, the one named for it. `tier`
+    // and `swapCount` are the two observable consequences of the forwarding,
+    // so they are what gets read.
     const { scene, material, field, shadowRig } = newWorld();
     try {
       const cast = new ActorCast(scene, { material, field, shadowRig });
       const [demo] = cast.demoActors;
       demo.root.computeWorldMatrix(true);
       const before = demo.root.absolutePosition.clone();
+      // ActorRig's constructor default; the cast passes no tier.
+      expect(demo.tier, 'a fresh rig starts NEAR').toBe(PROP_TIER.NEAR);
+      expect(demo.swapCount).toBe(0);
 
-      // Focus far from every demo actor: none of this should move demo's OWN
-      // seat, only (possibly) its LOD tier.
+      // Focus far from every demo actor: this must not move demo's OWN seat,
+      // and must step it down to MID.
       cast.update({ x: 0, y: 0, z: 0, yaw: 0 }, { x: -5000, y: 0, z: 5000 });
       demo.root.computeWorldMatrix(true);
       expect(demo.root.absolutePosition.equals(before)).toBe(true);
+      expect(
+        demo.tier,
+        'the demo actor never left NEAR against a focus 5 km away — is update() still forwarded to the rigs?',
+      ).toBe(PROP_TIER.MID);
+      expect(demo.swapCount, 'a tier change must rebuild the mesh exactly once').toBe(1);
+
+      // ...and back, when the focus walks onto it. This is the round trip the
+      // header sells as the phase's live demonstration.
+      const seat = demo.root.absolutePosition;
+      cast.update({ x: 0, y: 0, z: 0, yaw: 0 }, { x: seat.x, y: seat.y, z: seat.z });
+      demo.root.computeWorldMatrix(true);
+      expect(demo.root.absolutePosition.equals(before), 'the round trip must not move its seat').toBe(true);
+      expect(demo.tier, 'walking the focus onto the demo actor must step it back to NEAR').toBe(PROP_TIER.NEAR);
+      expect(demo.swapCount).toBe(2);
+
+      cast.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('re-tiers the PLAYER against the focus too, not just the demo actors', () => {
+    // The player's own update() call is a separate line from the demo loop and
+    // was separately deletable with the suite green. It is close to inert in
+    // the spike (camera.target eases toward the walker, so the distance is
+    // ~0 and the player resolves NEAR essentially always) — which is exactly
+    // why nothing would have noticed it going missing.
+    const { scene, material, field, shadowRig } = newWorld();
+    try {
+      const cast = new ActorCast(scene, { material, field, shadowRig });
+      const walker = { x: 0, y: 0, z: 0, yaw: 0 };
+      const far = TIER_BANDS_M.nearMaxM * 10;
+
+      cast.update(walker, { x: 0, y: 0, z: 0 });
+      expect(cast.player.tier).toBe(PROP_TIER.NEAR);
+      expect(cast.player.swapCount).toBe(0);
+
+      cast.update(walker, { x: far, y: 0, z: 0 });
+      expect(
+        cast.player.tier,
+        `the player stayed NEAR with the focus ${far} m away — is this.player.update(focusPos) still called?`,
+      ).toBe(PROP_TIER.MID);
+      expect(cast.player.swapCount).toBe(1);
+
+      cast.update(walker, { x: 0, y: 0, z: 0 });
+      expect(cast.player.tier).toBe(PROP_TIER.NEAR);
+      expect(cast.player.swapCount).toBe(2);
 
       cast.dispose();
     } finally {

@@ -34,10 +34,11 @@
  * Props' own worst-case is computed by `worstPropCensus()`
  * (model/propCensus.js) — the SAME function realmBudget.test.js calls, not a
  * hand-copied snapshot of its output. A hardcoded copy was tried first and
- * rejected: model/propBudget.js's own header comment already says triangles
- * worst 567,602 while the live computation measures 567,286 — the snapshot
- * had already drifted once, which is exactly what "budgets are tests, not
- * comments" forbids. Importing the function instead means a future props
+ * rejected: model/propBudget.js's header had already drifted once, saying
+ * triangles worst 567,602 while the live computation measured 567,286 (the
+ * header was corrected in the P6 final review and now records the episode).
+ * A snapshot that decouples from its computation is exactly what "budgets are
+ * tests, not comments" forbids. Importing the function instead means a future props
  * change that raises the real worst case is seen here automatically, on the
  * next test run, with no re-paste step to forget.
  *
