@@ -124,15 +124,15 @@
     "table:friend_requests": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2521",
-        "src/App.jsx:2524",
-        "src/App.jsx:2576"
+        "src/App.jsx:2512",
+        "src/App.jsx:2515",
+        "src/App.jsx:2567"
       ]
     },
     "table:profiles": {
       "reason": "BASELINE: the core user table, created before scripts/security/ tracking began. Confirmed present in the live DB.",
       "sites": [
-        "src/App.jsx:2211",
+        "src/App.jsx:2202",
         "src/features/avatar/useAvatarConfig.js:25",
         "src/features/avatar/useAvatarConfig.js:43"
       ]
@@ -140,15 +140,15 @@
     "table:shared_items": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2745",
-        "src/App.jsx:2758",
-        "src/App.jsx:2815"
+        "src/App.jsx:2736",
+        "src/App.jsx:2749",
+        "src/App.jsx:2806"
       ]
     },
     "table:whoop_data": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/features/profile/ProfileTab.jsx:355",
+        "src/features/profile/ProfileTab.jsx:359",
         "netlify/functions/whoop-disconnect.js:121",
         "netlify/functions/whoop-fetch-data.js:241"
       ]
@@ -170,19 +170,19 @@
     "function:get_leaderboard": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2337"
+        "src/App.jsx:2328"
       ]
     },
     "function:get_leaderboard_filters": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2369"
+        "src/App.jsx:2360"
       ]
     },
     "function:get_world_ranks": {
       "reason": "BASELINE: pre-dates scripts/security tracking; verify it exists in the live DB.",
       "sites": [
-        "src/App.jsx:2356"
+        "src/App.jsx:2347"
       ]
     }
   }

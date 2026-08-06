@@ -46,6 +46,14 @@ export function useAuthState() {
   const [pwNew, setPwNew] = useState("");
   const [pwConfirm, setPwConfirm] = useState("");
   const [pwMsg, setPwMsg] = useState(null);
+  // Proof-of-identity for a password change. `pwCurrent` satisfies Supabase's
+  // "require current password"; `pwNonce` satisfies "secure password change".
+  // `pwRecoveryMode` marks a session that arrived via a reset link — that user
+  // cannot know their current password, so we must never ask for it.
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNonce, setPwNonce] = useState("");
+  const [pwReauthSent, setPwReauthSent] = useState(false);
+  const [pwRecoveryMode, setPwRecoveryMode] = useState(false);
 
   // ── Email change panel ───────────────────────────────────────────────────
   const [emailPanelOpen, setEmailPanelOpen] = useState(false);
@@ -116,6 +124,8 @@ export function useAuthState() {
     // Password panel
     showPwProfile, setShowPwProfile, pwPanelOpen, setPwPanelOpen,
     pwNew, setPwNew, pwConfirm, setPwConfirm, pwMsg, setPwMsg,
+    pwCurrent, setPwCurrent, pwNonce, setPwNonce,
+    pwReauthSent, setPwReauthSent, pwRecoveryMode, setPwRecoveryMode,
     // Email panel
     emailPanelOpen, setEmailPanelOpen, newEmail, setNewEmail, emailMsg, setEmailMsg,
     showEmail, setShowEmail,
