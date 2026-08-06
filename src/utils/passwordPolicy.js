@@ -32,6 +32,28 @@ async function sha1Hex(input) {
     .toUpperCase();
 }
 
+// A HIBP range line is "<35 hex chars>:<count>" — SHA-1 is 40 chars and the
+// 5-char prefix is stripped. Anything else is not a HIBP response.
+const HIBP_LINE_RE = /^([0-9A-Fa-f]{35}):(\d+)$/;
+
+// Without a timeout a hung connection stalls the signup form indefinitely.
+// Failing closed makes that worse, not better: the user would sit on
+// "Checking password…" with no way forward. Bounded wait, then "unknown".
+const HIBP_TIMEOUT_MS = 6000;
+
+function timeoutSignal(ms) {
+  // AbortSignal.timeout is widely supported but guard rather than throw on
+  // an environment that lacks it — losing the timeout is better than losing
+  // the check.
+  try {
+    return typeof AbortSignal !== "undefined" && AbortSignal.timeout
+      ? AbortSignal.timeout(ms)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Returns "breached" | "clean" | "unknown".
  *
@@ -55,14 +77,30 @@ export async function isPasswordBreached(password) {
     try {
       const res = await fetch("https://api.pwnedpasswords.com/range/" + prefix, {
         headers: { "Add-Padding": "true" },
+        signal: timeoutSignal(HIBP_TIMEOUT_MS),
       });
       if (!res.ok) continue;
       const text = await res.text();
-      return text.split("\n").some(line => line.split(":")[0].trim() === suffix)
-        ? "breached"
-        : "clean";
+
+      // A 200 is not proof we reached HIBP. A captive portal or intercepting
+      // proxy happily returns 200 with an HTML body, and the old
+      // `.some(...)` read that as "no match" — i.e. "clean". That is the same
+      // fail-open this function exists to prevent, so require the body to
+      // actually look like a HIBP range response before trusting a negative.
+      let sawWellFormedLine = false;
+      let matched = false;
+      for (const raw of text.split("\n")) {
+        const m = HIBP_LINE_RE.exec(raw.trim());
+        if (!m) continue;
+        sawWellFormedLine = true;
+        // Uppercase both sides: a lowercase response would otherwise miss a
+        // real match and report "clean".
+        if (m[1].toUpperCase() === suffix) { matched = true; break; }
+      }
+      if (!sawWellFormedLine) continue; // unparseable body — retry, then unknown
+      return matched ? "breached" : "clean";
     } catch {
-      // network error — fall through to the retry
+      // network error, abort/timeout — fall through to the retry
     }
   }
   return "unknown";
