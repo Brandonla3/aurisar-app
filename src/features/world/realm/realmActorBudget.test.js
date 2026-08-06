@@ -7,51 +7,57 @@
  * phase's task-6 brief. This is that sibling, for actors.
  *
  * DRAW-CALL MODEL, stated explicitly because it is the whole arithmetic
- * below: actors are ORDINARY MOVING MESHES, never thin instances.
- * view/materials/actorNME.js's brief explicitly forbids reusing propNME's
- * instanced `instTint` attribute (it reads 0 and renders black on a mesh
- * with no buffer bound), and ActorRig's live actors use ordinary world
- * transforms — no `freezeWorldMatrix()` the way PropStreamer's carriers use.
- * Nothing in this codebase updates a thin-instance matrix for an actor after
- * build, so there is no batching to reason about: ONE draw call per visible
- * actor mesh, full stop. This holds regardless of archetype or stage — a
- * disabled (archetype, stage) master (ActorPrototypes, Task 8) is a template
- * nothing renders directly; every LIVE actor clones/instantiates from one and
- * is its own draw call.
+ * below: actors are meant to be ORDINARY MOVING MESHES, never thin
+ * instances. This is a claim about Tasks 7 and 8's BRIEFS, not about shipped
+ * code — view/materials/actorNME.js and view/actor/ActorRig.js do not exist
+ * yet as of this task; they are the next work in this phase. Task 7's brief
+ * explicitly forbids reusing propNME's instanced `instTint` attribute (it
+ * reads 0 and renders black on a mesh with no buffer bound), and Task 8's
+ * brief specifies ActorRig's live actors use ordinary world transforms — no
+ * `freezeWorldMatrix()` the way PropStreamer's carriers use. If either task's
+ * implementation diverges from its brief (an actor ends up thin-instanced or
+ * batched some other way), this arithmetic goes stale with nothing in this
+ * file able to catch it — there is no test here that could detect a future
+ * ActorRig doing something its brief did not describe. Revisit this comment
+ * and the `* 1` below once Tasks 7-8 ship.
+ *
+ * Given that model, the arithmetic is exactly 1 draw call per visible actor
+ * mesh, regardless of archetype or stage — a disabled (archetype, stage)
+ * master (ActorPrototypes, Task 8) is a template nothing renders directly;
+ * every LIVE actor clones/instantiates from one and is its own draw call.
  *
  * REMAINING HEADROOM, NOT THE FULL CEILING. BUDGET_CEILINGS
  * (model/propBudget.js, never edited here) is a WHOLE-SCENE ceiling — props
- * and actors spend out of the same 150 draw calls / 740,000 triangles. Props'
- * own worst-case census already measures 117 draw calls / 567,286 triangles
- * at its worst camera (belt 4-corner deep / belt 4-corner respectively;
- * `npx vitest run src/features/world/realm/realmBudget.test.js
- * --reporter=verbose`, reproduced 2026-08-06 — see PROPS_WORST_* below). That
- * leaves actors 33 draw calls and 172,714 triangles of headroom. Checking a
- * declared actor cost against the FULL 150/740,000 would silently double-book
- * the room props already spent, so every assertion here is
- * `PROPS_WORST + actorWorst <= BUDGET_CEILINGS`, never `actorWorst <=
+ * and actors spend out of the same 150 draw calls / 740,000 triangles.
+ * Props' own worst-case is computed by `worstPropCensus()`
+ * (model/propCensus.js) — the SAME function realmBudget.test.js calls, not a
+ * hand-copied snapshot of its output. A hardcoded copy was tried first and
+ * rejected: model/propBudget.js's own header comment already says triangles
+ * worst 567,602 while the live computation measures 567,286 — the snapshot
+ * had already drifted once, which is exactly what "budgets are tests, not
+ * comments" forbids. Importing the function instead means a future props
+ * change that raises the real worst case is seen here automatically, on the
+ * next test run, with no re-paste step to forget.
+ *
+ * Checking a declared actor cost against the FULL 150/740,000 would silently
+ * double-book the room props already spent, so every assertion here is
+ * `propsWorst + actorWorst <= BUDGET_CEILINGS`, never `actorWorst <=
  * BUDGET_CEILINGS` alone.
  */
 import { describe, expect, it } from 'vitest';
 import { ARCHETYPES } from './model/actorMasses.js';
 import { ACTOR_MANIFEST, ACTOR_CEILINGS } from './model/actorBudget.js';
 import { BUDGET_CEILINGS } from './model/propBudget.js';
-
-/**
- * Props' own measured worst case. Declared here rather than imported because
- * realmBudget.test.js's camera sweep (`census()`) is a private closure with
- * nothing exported — the same paperwork discipline BUDGET_CEILINGS's own
- * header comment uses for ITS measured actuals. Re-paste both numbers if a
- * future props change moves realmBudget.test.js's own logged
- * `[census] worst:` line.
- */
-const PROPS_WORST_DRAW_CALLS = 117;
-const PROPS_WORST_TRIANGLES = 567_286;
+import { worstPropCensus } from './model/propCensus.js';
 
 describe('the P6 actor budget census — declared worst case vs remaining headroom', () => {
   it('ACTOR_CEILINGS.maxSimultaneousActors fits what props leave behind under BUDGET_CEILINGS', () => {
     const { maxSimultaneousActors } = ACTOR_CEILINGS;
     expect(maxSimultaneousActors, 'ACTOR_CEILINGS.maxSimultaneousActors must be declared').toBeGreaterThan(0);
+
+    // Props' own worst case, LIVE — the same computation realmBudget.test.js
+    // asserts against, not a copy of a number it once printed.
+    const propsWorst = worstPropCensus();
 
     // Worst-case PER-ACTOR draw-call cost is exactly 1 (see file header).
     // Worst-case PER-ACTOR triangle cost is the single priciest
@@ -67,8 +73,8 @@ describe('the P6 actor budget census — declared worst case vs remaining headro
     const actorDrawCalls = maxSimultaneousActors * 1;
     const actorTriangles = maxSimultaneousActors * worstTrisPerActor;
 
-    const totalDrawCalls = PROPS_WORST_DRAW_CALLS + actorDrawCalls;
-    const totalTriangles = PROPS_WORST_TRIANGLES + actorTriangles;
+    const totalDrawCalls = propsWorst.drawCalls + actorDrawCalls;
+    const totalTriangles = propsWorst.triangles + actorTriangles;
 
     // The evidence this ceiling was checked against — keep logging so a
     // future retune reads numbers, not folklore (realmBudget.test.js's own
@@ -78,8 +84,8 @@ describe('the P6 actor budget census — declared worst case vs remaining headro
       worstTrisPerActor,
       actorDrawCalls,
       actorTriangles,
-      propsWorstDrawCalls: PROPS_WORST_DRAW_CALLS,
-      propsWorstTriangles: PROPS_WORST_TRIANGLES,
+      propsWorstDrawCalls: propsWorst.drawCalls,
+      propsWorstTriangles: propsWorst.triangles,
       totalDrawCalls,
       totalTriangles,
       drawCallHeadroomLeft: BUDGET_CEILINGS.drawCalls - totalDrawCalls,
@@ -89,13 +95,13 @@ describe('the P6 actor budget census — declared worst case vs remaining headro
     expect(
       totalDrawCalls,
       `${maxSimultaneousActors} actors cost ${actorDrawCalls} draw calls on top of props' measured `
-      + `${PROPS_WORST_DRAW_CALLS} = ${totalDrawCalls}, over the ${BUDGET_CEILINGS.drawCalls} scene ceiling`,
+      + `${propsWorst.drawCalls} = ${totalDrawCalls}, over the ${BUDGET_CEILINGS.drawCalls} scene ceiling`,
     ).toBeLessThanOrEqual(BUDGET_CEILINGS.drawCalls);
 
     expect(
       totalTriangles,
       `${maxSimultaneousActors} actors at worst ${worstTrisPerActor} tris each cost ${actorTriangles} triangles on `
-      + `top of props' measured ${PROPS_WORST_TRIANGLES} = ${totalTriangles}, over the ${BUDGET_CEILINGS.triangles} `
+      + `top of props' measured ${propsWorst.triangles} = ${totalTriangles}, over the ${BUDGET_CEILINGS.triangles} `
       + 'scene ceiling',
     ).toBeLessThanOrEqual(BUDGET_CEILINGS.triangles);
   });
