@@ -118,6 +118,18 @@ describe('addMass — per-vertex well-formedness', () => {
     for (const v of p.positions) expect(Number.isFinite(v)).toBe(true);
     for (const n of p.normals) expect(Number.isFinite(n)).toBe(true);
   });
+
+  it('every position and normal component is finite at the DEFAULT comp too (omitted, not just 1.03)', () => {
+    // The test above only ever exercised comp as an explicit 1.03 — the near
+    // stage never passes comp at all and relies on addMass's default. Cheap
+    // to close: a future default-value regression (e.g. `comp = 0` typo)
+    // would otherwise slip past every test in this file.
+    const acc = newAccumulator();
+    addMass(acc, mass({ capA: true, capB: true }), { segments: 8, capLevel: 2 });
+    const p = finalize(acc);
+    for (const v of p.positions) expect(Number.isFinite(v)).toBe(true);
+    for (const n of p.normals) expect(Number.isFinite(n)).toBe(true);
+  });
 });
 
 describe('addMass — comp scales radii only, never length', () => {
@@ -153,23 +165,58 @@ describe('addMass — comp scales radii only, never length', () => {
     expect(e2.maxR / e1.maxR).toBeCloseTo(2, 5);
   });
 
-  it('comp also scales the cap sphere, not just the tube ring', () => {
-    // capA's blob is centered at mass.a = the origin, and r0 === r1, so both
-    // the tube's start ring and the cap sphere have every vertex at exactly
-    // radius r0*comp from the Y axis (ring) or the origin (cap) — a fixed
-    // unit direction times a scalar radius. finalize's radiusM (max distance
-    // from the Y axis) is therefore EXACTLY linear in comp, not approximately.
+  it("comp scales the cap sphere itself — measured on the cap's OWN vertices, in isolation", () => {
+    // A global finalize().radiusM comparison CANNOT catch a cap that ignores
+    // comp, and this is not hypothetical — a reviewer mutated addBlob's capA
+    // call to receive `mass.r0` instead of `radiusA` (comp dropped) and the
+    // previous version of this test, which compared whole-payload radiusM,
+    // stayed green: identical ratio, 1.4999999904456425, correct or broken.
+    // The reason is structural, not a fluke. addMass computes ONE number,
+    // `radiusA = mass.r0 * comp`, and hands it to BOTH addTube (the ring at
+    // mass.a) and addBlob (capA) — so a correctly-scaled ring and a
+    // comp-ignoring cap at the SAME endpoint are never in competition: every
+    // tube ring vertex sits at EXACTLY radiusA from the axis (it's a true
+    // circle, not a polygon inscribed inside one), while sphereFaces' vertex
+    // tables include an EQUATORIAL (y=0) direction at both level 1 and level
+    // 2, so the cap's best vertex reaches AT MOST radiusA — tying the ring,
+    // never beating it. A broken cap (radius unscaled, hence smaller when
+    // comp > 1) is invisible behind the ring's own correct vertex. No radius
+    // relationship between a mass's ring and its own colocated cap can avoid
+    // this tie, because both derive from the identical scalar — so isolating
+    // the cap's vertices is the only fix, not picking different radii.
+    //
+    // addMass's OWN contract makes that isolation cheap: it appends
+    // tube-then-capA-then-capB contiguously (the {firstVertex, vertexCount}
+    // guarantee this file's last describe block covers), so the cap's
+    // vertices are exactly the range starting at `segments*2`.
+    const segments = 8;
+    const capLevel = 2;
+    const r0 = 0.2;
     const m = mass({
-      a: [0, 0, 0], b: [0, 0.5, 0], r0: 0.2, r1: 0.2, capA: true, capB: false,
+      a: [0, 0, 0], b: [0, 0.5, 0], r0, r1: r0, capA: true, capB: false,
     });
-    const buildAt = (comp) => {
+
+    // The cap's direction table is public (sphereFaces), so the expected
+    // horizontal reach is an EXACT computed number, not a same-vs-same ratio
+    // that a differently-broken implementation could also satisfy by luck.
+    const maxHorizontalUnit = Math.max(
+      ...sphereFaces(capLevel).flat().map((d) => Math.hypot(d[0], d[2])),
+    );
+    expect(maxHorizontalUnit).toBeCloseTo(1, 10); // the equatorial vertex, confirmed live
+
+    const capOwnMaxRadius = (comp) => {
       const acc = newAccumulator();
-      addMass(acc, m, { segments: 8, capLevel: 2, comp });
-      return finalize(acc);
+      const { vertexCount } = addMass(acc, m, { segments, capLevel, comp });
+      let maxR = 0;
+      for (let v = segments * 2; v < vertexCount; v++) { // capA's range only — skip the ring
+        const r = Math.hypot(acc.pos[v * 3], acc.pos[v * 3 + 2]);
+        if (r > maxR) maxR = r;
+      }
+      return maxR;
     };
-    const p1 = buildAt(1);
-    const p2 = buildAt(1.5);
-    expect(p2.radiusM / p1.radiusM).toBeCloseTo(1.5, 5);
+
+    expect(capOwnMaxRadius(1)).toBeCloseTo(maxHorizontalUnit * r0 * 1, 10);
+    expect(capOwnMaxRadius(1.5)).toBeCloseTo(maxHorizontalUnit * r0 * 1.5, 10);
   });
 });
 

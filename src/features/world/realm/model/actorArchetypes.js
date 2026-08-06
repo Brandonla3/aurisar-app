@@ -158,7 +158,17 @@ export const ARCHETYPES = Object.freeze([
       { id: 'neck', a: [0, 1.42, 0], b: [0, 1.74, 0.04], r0: 0.09, r1: 0.10, color: LEGION_LACQUER, capA: false, capB: false },
       // The face-plate is TWO half masses meeting at the mask's centre ring,
       // not one bar: the shared centre is what makes it a pivot, and two
-      // opposed tubes on a common ring close each other with no cap.
+      // opposed tubes on a common ring close each other with no cap. Legion
+      // is the ROSTER'S ONLY archetype built this way — every other joint
+      // uses a cap, not a mutual ring closure. The closure is EXACT (not
+      // merely close enough to look right), and specifically because SEG
+      // (gen/actorPrimitives.js's addMass tessellation) is even at both
+      // stages, [8, 6]: an even-n ring's vertex directions are symmetric
+      // under 180-degree rotation about the shared axis, so faceL's end ring
+      // and faceR's end ring land on IDENTICAL vertex positions. An odd SEG
+      // value would visibly crack this seam open — the one archetype it
+      // would break silently, since nothing else in the roster depends on
+      // ring parity at all.
       { id: 'faceL', a: [0, 1.74, 0.04], b: [-0.17, 1.74, 0.04], r0: 0.20, r1: 0.18, color: LEGION_BONE, capA: false, capB: true },
       { id: 'faceR', a: [0, 1.74, 0.04], b: [0.17, 1.74, 0.04], r0: 0.20, r1: 0.18, color: LEGION_BONE, capA: false, capB: true },
       { id: 'crown', a: [0, 1.74, 0.04], b: [0, 1.96, 0.01], r0: 0.13, r1: 0.07, color: LEGION_LACQUER, capA: false, capB: false },
