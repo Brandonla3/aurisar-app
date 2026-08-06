@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  maskIoU, projectedBounds, rasterizeMask, silhouetteAreaM2, silhouetteStats,
+  ACTOR_WINDOW, bandOccupancy, canonicalStats, fitsWindow, maskIoU, projectedBounds,
+  rasterizeMask, silhouetteAreaM2, silhouetteStats,
 } from './silhouette.js';
 
 /** A unit box payload centered on the Y axis: [-w/2, w/2] x [0, h] x [-w/2, w/2]. */
@@ -104,5 +105,97 @@ describe('silhouetteAreaM2', () => {
   it('is deterministic', () => {
     const box = boxPayload(2, 3);
     expect(silhouetteAreaM2(box)).toBe(silhouetteAreaM2(box));
+  });
+});
+
+describe('pitchRad — additive to projectedBounds and rasterizeMask', () => {
+  it('projectedBounds: pitchRad=0 explicit matches pitchRad omitted, bit for bit', () => {
+    const box = boxPayload(2, 3);
+    const omitted = projectedBounds(box.positions, 0.83);
+    const explicit = projectedBounds(box.positions, 0.83, 0);
+    expect(explicit).toEqual(omitted);
+  });
+
+  it('rasterizeMask: pitchRad=0 explicit matches pitchRad omitted, bit for bit', () => {
+    const box = boxPayload(2, 3);
+    const bounds = projectedBounds(box.positions, 0.83);
+    const omitted = rasterizeMask(box, 0.83, bounds, 32);
+    const explicit = rasterizeMask(box, 0.83, bounds, 32, 0);
+    expect(explicit).toEqual(omitted);
+  });
+
+  it('a pitched box projects shorter than an unpitched one', () => {
+    // A THIN box: negligible horizontal footprint, so the height axis's own
+    // cos(pitch) foreshortening is what dominates the span, instead of
+    // getting swamped by depth-parallax spread from a wide footprint (a
+    // wide box's depth extent can make a pitched span LONGER, not shorter —
+    // this is why the test picks a shape, not just any box).
+    const thin = boxPayload(0.01, 3);
+    const level = projectedBounds(thin.positions, 0);
+    const pitched = projectedBounds(thin.positions, 0, 0.5);
+    expect(pitched.maxY - pitched.minY).toBeLessThan(level.maxY - level.minY);
+  });
+});
+
+describe('canonicalStats — the same per-yaw comparison, against a FIXED window', () => {
+  it('a payload against itself scores a perfect match inside a window that contains it', () => {
+    const box = boxPayload(2, 3);
+    const bounds = { minX: -2, maxX: 2, minY: -1, maxY: 4 };
+    const s = canonicalStats(box, box, { bounds });
+    expect(s.meanIoU).toBe(1);
+    expect(s.minIoU).toBe(1);
+  });
+
+  it('scores the true size difference — no per-pair union window to hide behind', () => {
+    const wide = boxPayload(3, 2);
+    const narrow = boxPayload(1, 2);
+    const bounds = { minX: -2, maxX: 2, minY: -1, maxY: 3 };
+    const s = canonicalStats(wide, narrow, { bounds });
+    expect(s.meanIoU).toBeLessThan(1);
+  });
+});
+
+describe('fitsWindow — the silent-clip guard', () => {
+  it('a payload larger than the window does not fit, and the margin says so', () => {
+    const big = boxPayload(4, 3);
+    const tooSmall = { minX: -1, maxX: 1, minY: 0, maxY: 2 };
+    const result = fitsWindow(big, { bounds: tooSmall });
+    expect(result.fits).toBe(false);
+    expect(result.worstMarginFrac).toBeLessThan(0);
+  });
+
+  it('a payload comfortably inside the window fits, with positive margin', () => {
+    const small = boxPayload(1, 1);
+    const roomy = { minX: -2, maxX: 2, minY: -1, maxY: 3 };
+    const result = fitsWindow(small, { bounds: roomy });
+    expect(result.fits).toBe(true);
+    expect(result.worstMarginFrac).toBeGreaterThan(0);
+  });
+});
+
+describe('bandOccupancy — per-band fraction of the filled silhouette', () => {
+  const bounds = { minX: -1.5, maxX: 1.5, minY: 0, maxY: 3 };
+
+  it('sums to 1 across bands', () => {
+    const box = boxPayload(2, 3);
+    const bands = bandOccupancy(box, { bounds, bandEdgesY: [1, 2] });
+    expect(bands.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 6);
+  });
+
+  it('a box confined to the lowest band reads [1, 0, 0]', () => {
+    const low = boxPayload(2, 0.9); // comfortably under the band-1 edge at y=1
+    const bands = bandOccupancy(low, { bounds, bandEdgesY: [1, 2] });
+    expect(bands[0]).toBeCloseTo(1, 6);
+    expect(bands[1]).toBeCloseTo(0, 6);
+    expect(bands[2]).toBeCloseTo(0, 6);
+  });
+});
+
+describe('ACTOR_WINDOW', () => {
+  it('is the derived, snug, frozen span', () => {
+    expect(ACTOR_WINDOW).toEqual({
+      minX: -1.15, maxX: 1.15, minY: -0.45, maxY: 2.45,
+    });
+    expect(Object.isFrozen(ACTOR_WINDOW)).toBe(true);
   });
 });
