@@ -162,15 +162,27 @@ describe('ActorRig — the skeleton it owns', () => {
 
   it('Mesh.clone() copies numBoneInfluencers but NOT a skeleton — both engine facts', () => {
     // The two Babylon behaviours the wiring rests on, asserted as live facts
-    // rather than recited. The first makes `_applyTier`'s influence line
-    // defence-in-depth today; the second makes its skeleton line the one that
-    // actually keeps a swapped actor deforming.
+    // rather than recited, because the two lines they sit under look identical
+    // and are not: one is load-bearing and one is not.
+    //
+    // THIS TEST IS THE TRIPWIRE FOR THE ONE THAT IS NOT. Measured: deleting
+    // `mesh.numBoneInfluencers = 1` from `_applyTier` leaves the whole realm
+    // suite GREEN, because the clone inherits 1 from the master. That line is
+    // therefore defence-in-depth against the assertion below, and this is the
+    // test that goes red the day the defence starts being needed. (Deleting
+    // the master's write instead turns 2 red; deleting BOTH turns 5 red — so
+    // the pair is covered, the individual redundant line is not.)
     const { scene, protos } = newWorld();
     try {
       const master = protos.masterFor(DEEP, PROP_TIER.NEAR);
       const clone = master.clone('probe');
       expect(master.numBoneInfluencers).toBe(1);
-      expect(clone.numBoneInfluencers).toBe(1);
+      expect(
+        clone.numBoneInfluencers,
+        'Clones stopped inheriting the influence count. `_applyTier`s own write is now the\n' +
+          'ONLY thing keeping actors off Babylon`s default 4 — four bone blends per vertex\n' +
+          'to reach the answer one gives. It is no longer redundant; do not delete it.',
+      ).toBe(1);
       expect(
         clone.skeleton,
         'If clones ever start arriving WITH a skeleton, re-read ActorPrototypes` header:\n' +

@@ -263,12 +263,15 @@ export class ActorRig {
     // The skeleton object itself is untouched by the swap, which is what
     // carries the POSE across it (see the header).
     mesh.skeleton = this._skin.skeleton;
-    // Written again here, though `Mesh.clone()` copies it from the master
-    // (measured; the engine fact is pinned in ActorRigSkin.test.js). The
-    // skeleton and the influence count are ONE decision — a skinned mesh at
-    // Babylon's default 4 blends four bone matrices per vertex to reach the
-    // answer one gives — so they are set together, and this line stops a
-    // change in clone semantics from quietly quadrupling the vertex cost.
+    // REDUNDANT TODAY, AND SAID SO OUT LOUD: `Mesh.clone()` copies the
+    // influence count from the master, which ActorPrototypes already sets to
+    // 1, so deleting this line leaves the whole realm suite green (measured,
+    // not assumed). It stays for two reasons — the skeleton and the influence
+    // count are ONE decision and are set in one place, and a skinned mesh left
+    // at Babylon's default 4 blends four bone matrices per vertex to reach the
+    // answer one gives, which is a silent 4x on vertex cost rather than a
+    // visible fault. The clone-copy behaviour it defends against is asserted
+    // in ActorRigSkin.test.js, which is the tripwire if it ever changes.
     mesh.numBoneInfluencers = 1;
     // Nothing in the Realm picks yet. Explicit rather than inherited so the
     // day something does, this line is the one to flip.
