@@ -62,9 +62,28 @@
  * against 67) and so overstated the case; these are the same-multiset numbers.
  *
  * Unbound's 0.572 m is the fist, four joints down the graft chain (11+17+23+29
- * degrees of compounding), and it is the number Task 3's posed seal gate will
- * bind on first. If that gate fails, SHRINK THE ANGLE — never skip the joint,
- * because a skipped joint is exactly the vacuity this table exists to stop.
+ * degrees of compounding). This comment used to predict that Task 3's posed
+ * seal gate would bind on it first, and to prescribe "if it fails, shrink the
+ * angle." Task 3 MEASURED that prediction and found it false: the posed
+ * seal's two-sided ray criterion never fires, even scaled far past what
+ * ships (every joint swept to 179 degrees alone, and the whole pose scaled
+ * 10x). Every joint in this roster closes by a mechanism that is pose-
+ * invariant at ANY angle — a cap pivot's sphere is rotation-invariant about
+ * its own centre, and a ring pivot's two masses are always fused onto the
+ * SAME bone by buildActorRigOfMasses (model/actorRig.js's header) rather than
+ * ever sitting on opposite sides of a rotation — so "shrink the angle" was
+ * never an available response to that particular gate failing, for any
+ * angle in this table.
+ *
+ * What DOES validate a ring weld against tearing is a structural fact, not
+ * an angle: whether that fusion still holds. gen/actorSealPose.test.js's
+ * one-sided-escape baseline and its direct ring-weld coincidence gate check
+ * this directly (a torn weld is provably a ONE-SIDED aperture, which the
+ * two-sided criterion is blind to by construction — see that file), and a
+ * regression here should be diagnosed against THOSE gates, not against this
+ * table's angle sizes. The travel-floor envelope (`TRAVEL`, in
+ * actorCanary.test.js) is a separate, still-valid concern keyed on angle
+ * magnitude; this correction does not touch it.
  */
 
 import { ARCHETYPES, archetypeById } from './actorMasses.js';

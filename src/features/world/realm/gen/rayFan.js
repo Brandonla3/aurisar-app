@@ -8,9 +8,17 @@
  * grid the P6 review tuned against real leaks (magistari's shoulder annulus,
  * orghon's throat slit) — a hand-copied second implementation could silently
  * drift an epsilon and either gate would then measure a different geometry
- * question without anyone deciding that on purpose. Every function here is
- * byte-for-byte the body that used to live in actorSeal.test.js; only the
- * `export` keywords and this header are new.
+ * question without anyone deciding that on purpose. Every function BODY here
+ * — the actual executable statements of `crossings`, `basisFor`, `unitAxis`
+ * and `interiorPoints`, and every numeric constant — is byte-for-byte what
+ * used to live in actorSeal.test.js; nothing about how a ray is cast or a
+ * point sampled changed. What IS new, beyond the `export` keywords and this
+ * header: a few inline doc comments that named "this file" or pointed at
+ * "below" were reworded to stay true once read from a second file (e.g.
+ * `basisFor`'s comment now names actorSeal.test.js's ring-vertices group by
+ * file instead of saying "below", and `interiorPoints`' comment gained a
+ * sentence on the rest-frame/posed-frame contract that only matters now that
+ * a second, posed caller exists) — prose accuracy fixes, not logic changes.
  *
  * `crossings` and `interiorPoints` do not know or care whether the payload
  * they are handed is the rest-pose mesh or a posed one — they only read
