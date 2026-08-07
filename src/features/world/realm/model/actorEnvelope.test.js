@@ -93,26 +93,49 @@ describe('declared envelope equals measured envelope', () => {
 describe('the margin covers the envelope', () => {
   const all = PAIRS.map(({ id, stage }) => ({ id, stage, ...POSE_ENVELOPE_MANIFEST[id][stage] }));
 
-  it('is at least the roster-wide worst TRAVEL, not merely the worst overhang', () => {
-    // The headroom argument in actorEnvelope.js's header, as an assertion:
-    // overhang can never exceed travel, so a margin >= worst travel covers any
-    // re-aiming of a pose this size. Sizing it off the overhang alone would
-    // bake the canary's particular aim into the culler.
-    const worstTravel = Math.max(...all.map((e) => e.travelM));
+  it('covers the roster-wide worst OVERHANG, with headroom', () => {
+    // The basis, as an assertion. OVERHANG is the quantity both consumers need
+    // — culling asks "does the box contain every posed vertex", the
+    // auto-extended shadow ortho asks "does it cover the posed shadow extent";
+    // both are envelope questions.
     const worstOverhang = Math.max(...all.map((e) => e.overhangM));
-    expect(worstTravel).toBeGreaterThan(worstOverhang);
     expect(
       ACTOR_POSE_MARGIN_M,
-      `margin ${ACTOR_POSE_MARGIN_M} m no longer covers the roster's worst posed-vertex travel `
-      + `(${worstTravel} m). See actorEnvelope.js's REVISIT TRIGGER: raise the constant to the `
-      + 'new worst travel, do not switch to per-archetype margins without re-arguing aim-independence.',
-    ).toBeGreaterThanOrEqual(worstTravel);
+      `margin ${ACTOR_POSE_MARGIN_M} m no longer covers the roster's worst posed OVERHANG `
+      + `(${worstOverhang} m). See actorEnvelope.js's REVISIT TRIGGER: raise the constant, and `
+      + 'price BOTH consumers when you do — the frustum culler (cheap, linear) and '
+      + "DirectionalLight's auto-extended shadow ortho (quadratic in this number: 0.40 already "
+      + "costs 3.28x the shadow area of no margin at all, i.e. 70% of the character's texel "
+      + 'density on a fixed 1024-square map).',
+    ).toBeGreaterThan(worstOverhang);
+    // Headroom, so the constant is not sitting on the measurement.
+    expect(ACTOR_POSE_MARGIN_M / worstOverhang, 'headroom over the measured worst overhang').toBeGreaterThan(1.2);
+  });
+
+  it('is deliberately BELOW the worst TRAVEL — the basis that was rejected', () => {
+    // An INVERTED pin, and it is the point of this test rather than a
+    // curiosity. `travelM` is the tight aim-independent ceiling on overhang
+    // (a vertex starts inside the box, so overhang <= travel), and an earlier
+    // version of this file sized the margin at 0.85 m on exactly that
+    // argument. It is the ceiling of the WRONG QUANTITY: it prices a re-aiming
+    // no pose in the roster performs against a cost function that is quadratic
+    // in the margin, and pays 7.39x shadow area for it against 0.40's 3.28x.
+    // Anyone "restoring" the travel basis raises the constant past this line,
+    // and this is where they find out what it costs.
+    const worstTravel = Math.max(...all.map((e) => e.travelM));
+    const worstOverhang = Math.max(...all.map((e) => e.overhangM));
+    expect(worstTravel, 'travel must still exceed overhang, or the algebra above is wrong').toBeGreaterThan(worstOverhang);
+    expect(
+      ACTOR_POSE_MARGIN_M,
+      `margin ${ACTOR_POSE_MARGIN_M} m has reached the worst posed-vertex TRAVEL (${worstTravel} m). `
+      + 'If that is deliberate, re-read actorEnvelope.js on the second consumer first: sizing on '
+      + "travel measured 7.39x the shadow ortho area and 86% of the character's texel density.",
+    ).toBeLessThan(worstTravel);
   });
 
   it('covers every single master with room to spare', () => {
     for (const e of all) {
       expect(e.overhangM, `${e.id}[${e.stage}] overhangs the margin`).toBeLessThan(ACTOR_POSE_MARGIN_M);
-      expect(e.travelM, `${e.id}[${e.stage}] travels past the margin`).toBeLessThanOrEqual(ACTOR_POSE_MARGIN_M);
     }
   });
 
