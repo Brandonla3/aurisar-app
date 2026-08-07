@@ -108,12 +108,20 @@ export class ActorPrototypes {
         vd.normals = payload.normals;
         vd.colors = payload.colors;
         vd.indices = payload.indices;
-        // The rigid single influence, composed here and nowhere else. Slots
-        // 1..3 stay (bone 0, weight 0): a zero weight contributes nothing
-        // whatever bone it names, so the extra slots are inert — but they are
-        // written explicitly rather than left to Float32Array's zero fill,
-        // because `numBoneInfluencers = 1` below is a PERFORMANCE decision and
-        // the buffers must still be correct if anything ever raises it.
+        // The rigid single influence, composed here and nowhere else. ONLY
+        // SLOT 0 IS WRITTEN; slots 1..3 are Float32Array's zero fill, and that
+        // is load-bearing rather than incidental — a zero weight contributes
+        // nothing whatever bone it names, so `[bone, 0, 0, 0]` / `[1, 0, 0, 0]`
+        // is a correct 4-influence buffer and stays correct if anything ever
+        // raises `numBoneInfluencers` above the 1 set below (which is a
+        // PERFORMANCE decision, not a correctness one).
+        //
+        // The dependency on the fill is therefore REAL: allocate these from a
+        // pool, or reuse a buffer across masters, and the stale tail becomes
+        // three phantom influences at weight 0 — inert until someone raises
+        // the influence count, then wrong. Zero the slots explicitly if these
+        // ever stop being fresh allocations. The census in
+        // ActorPrototypes.test.js pins all four slots byte for byte either way.
         const boneIndices = new Float32Array(payload.vertCount * 4);
         const boneWeights = new Float32Array(payload.vertCount * 4);
         for (let v = 0; v < payload.vertCount; v++) {

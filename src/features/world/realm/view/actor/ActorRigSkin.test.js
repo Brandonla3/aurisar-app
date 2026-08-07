@@ -163,15 +163,14 @@ describe('ActorRig — the skeleton it owns', () => {
   it('Mesh.clone() copies numBoneInfluencers but NOT a skeleton — both engine facts', () => {
     // The two Babylon behaviours the wiring rests on, asserted as live facts
     // rather than recited, because the two lines they sit under look identical
-    // and are not: one is load-bearing and one is not.
+    // and are not: one defends the boot value, one defends the live mesh.
     //
-    // THIS TEST IS THE TRIPWIRE FOR THE ONE THAT IS NOT. Measured: deleting
-    // `mesh.numBoneInfluencers = 1` from `_applyTier` leaves the whole realm
-    // suite GREEN, because the clone inherits 1 from the master. That line is
-    // therefore defence-in-depth against the assertion below, and this is the
-    // test that goes red the day the defence starts being needed. (Deleting
-    // the master's write instead turns 2 red; deleting BOTH turns 5 red — so
-    // the pair is covered, the individual redundant line is not.)
+    // The copy is a SNAPSHOT, not a live delegation — whatever the master holds
+    // AT CLONE TIME is what the clone gets and keeps, for any value, not just
+    // 1. That is the fact the perturbation test below turns into teeth, and
+    // this is the tripwire if it ever changes: a clone that stopped inheriting
+    // would make `_applyTier`s write the only thing standing between the
+    // roster and Babylon's default 4.
     const { scene, protos } = newWorld();
     try {
       const master = protos.masterFor(DEEP, PROP_TIER.NEAR);
@@ -181,14 +180,60 @@ describe('ActorRig — the skeleton it owns', () => {
         clone.numBoneInfluencers,
         'Clones stopped inheriting the influence count. `_applyTier`s own write is now the\n' +
           'ONLY thing keeping actors off Babylon`s default 4 — four bone blends per vertex\n' +
-          'to reach the answer one gives. It is no longer redundant; do not delete it.',
+          'to reach the answer one gives.',
       ).toBe(1);
       expect(
         clone.skeleton,
         'If clones ever start arriving WITH a skeleton, re-read ActorPrototypes` header:\n' +
           'the reference is shared, so it would have to be the same one for every actor.',
       ).toBeNull();
+
+      // Snapshot, for an arbitrary value — so "the clone inherits 1" is not a
+      // coincidence of 1 being the default of something else.
+      master.numBoneInfluencers = 3;
+      const odd = master.clone('probe3');
+      expect(odd.numBoneInfluencers).toBe(3);
+
+      odd.dispose(false, false);
       clone.dispose(false, false);
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('the live mesh reads ONE influence even when the MASTER says four', () => {
+    // THE TEETH for `_applyTier`s own influence write, and the reason it is
+    // not merely redundant with ActorPrototypes'.
+    //
+    // Nothing else in this file can see that line. The master pin reads the
+    // master; the clone-copy fact above clones a master that is still correct.
+    // Both stay green with `_applyTier`s write deleted. Perturbing the master
+    // AFTER boot is the one shape that separates them — and it is the real
+    // fault, because the copy is a snapshot: a master whose influence count
+    // drifts (a future pooled prototype table, a diagnostics toggle, a Task 6
+    // define-prep path that writes it back) hands every actor cloned after the
+    // drift four bone-matrix blends per vertex, silently and forever.
+    const { scene, protos } = newWorld();
+    try {
+      const master = protos.masterFor(DEEP, PROP_TIER.NEAR);
+      master.numBoneInfluencers = 4; // Babylon's default, back again
+
+      const rig = new ActorRig(scene, protos, DEEP);
+      expect(
+        rig.mesh.numBoneInfluencers,
+        'The live actor took its influence count from the master and inherited 4 — four\n' +
+          'bone-matrix blends per vertex to reach the answer one gives. _applyTier must\n' +
+          'STATE it on the clone, not trust whatever the master happens to be holding.',
+      ).toBe(1);
+
+      // Anti-vacuity: the perturbation must really have taken, or the assertion
+      // above passes against a master that was still at 1.
+      const bare = master.clone('unmanaged');
+      expect(bare.numBoneInfluencers, 'the perturbation did not take — this test proves nothing').toBe(4);
+
+      bare.dispose(false, false);
+      rig.dispose();
       protos.dispose();
     } finally {
       scene.dispose();
@@ -263,6 +308,10 @@ describe('ActorRig — the skeleton survives a tier swap', () => {
       rig.setPose(CANARY_POSE.orghon);
       const skeleton = rig.skeleton;
       const posed = paletteOf(skeleton);
+      // Same anti-vacuity guard as the NEAR->MID case above: an unposed actor
+      // would satisfy the byte-for-byte comparison below by agreeing with
+      // itself about nothing.
+      expect(identityMismatches(posed).length).toBeGreaterThan(0);
 
       rig.seatOn(0, 0, 0);
       expect(rig.update({ x: 0, y: 0, z: 0 })).toBe(PROP_TIER.NEAR);
