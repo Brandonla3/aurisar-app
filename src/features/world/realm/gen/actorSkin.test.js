@@ -402,31 +402,53 @@ describe('skinPayload — fp32 rounding discipline is falsifiable', () => {
         // sized around — a silently mis-sized tolerance is worse than a
         // loud test failure here.
         //
-        // Two independent references, two assertions, both required to
-        // hold on the SAME component: `applyAffine` (float64, no rounding
-        // anywhere) and `applyAffineFp32` (fround after every individual
-        // step, written fresh rather than calling into `dotColumn`). The
-        // real teeth is the second: it disagrees with `applyAffine`
-        // precisely where the PLACEMENT of rounding matters, which a
-        // once-at-the-end rounding would not reproduce.
+        // A FIRST DRAFT OF THIS TEST WAS ITSELF VACUOUS, and the fix is
+        // worth recording: comparing `skinPayload`'s output against
+        // `applyAffineFp32` (rounds every step) and separately against
+        // `applyAffine` (rounds never) is not enough, because `positions`
+        // is a `Float32Array` — ANY value written to it is rounded to fp32
+        // ONCE at the point of assignment, regardless of what happens
+        // inside `dotColumn`. Under the fr=identity mutation, `dotColumn`
+        // still computes the same float64 chain in the same order as
+        // `applyAffine`, so the STORED value is exactly
+        // `Math.fround(applyAffine(...))` — round-once, not "no rounding at
+        // all" — which still legitimately differs from the float64
+        // reference at nearly every component. A "differs from float64 AND
+        // matches the fp32 chain" test therefore found a match constantly
+        // even under the mutation, because round-once and round-every-step
+        // AGREE on the ~72% of components where rounding order does not
+        // change the bits. The fix: only look at components where the two
+        // STRATEGIES genuinely disagree (`roundOnce !== fp32Chain`, using
+        // `Math.fround` on the float64 reference to build `roundOnce`), and
+        // require the actual output to match the per-step chain there. That
+        // is where the mutation is actually observable, and it is where it
+        // is caught: verified empirically before shipping that the correct
+        // implementation matches `fp32Chain` at 100% of these divergent
+        // points (89 to 3251 of them per archetype/stage) while the
+        // fr=identity mutant matches at 0% of them, every case.
         const rig = buildActorRig(id);
         const palette = evaluatePose(rig, CANARY_POSE[id]);
         const payload = buildActorPayload(id, stage);
         const { positions } = skinPayload(payload, rig, palette);
+        let divergentPoints = 0;
         let found = false;
-        for (let v = 0; v < payload.massIndex.length && !found; v++) {
+        for (let v = 0; v < payload.massIndex.length; v++) {
           const bone = rig.boneOfMass[payload.massIndex[v]];
           const p = [payload.positions[v * 3], payload.positions[v * 3 + 1], payload.positions[v * 3 + 2]];
           const float64Ref = applyAffine(palette, bone, p);
           const fp32Ref = applyAffineFp32(palette, bone, p);
           const i = v * 3;
           for (let k = 0; k < 3; k++) {
-            const differsFromFloat64 = !Object.is(positions[i + k], float64Ref[k]);
-            const matchesFp32Chain = Object.is(positions[i + k], fp32Ref[k]);
-            if (differsFromFloat64 && matchesFp32Chain) { found = true; break; }
+            const roundOnce = Math.fround(float64Ref[k]);
+            if (Object.is(roundOnce, fp32Ref[k])) continue; // not a divergence point
+            divergentPoints++;
+            if (Object.is(positions[i + k], fp32Ref[k])) found = true;
           }
         }
-        expect(found, `${id} stage ${stage}: no component both differed from the float64 chain and matched the independent per-step fp32 chain — rounding discipline is unfalsified`).toBe(true);
+        // Anti-vacuity: there must actually BE points where the two
+        // rounding strategies disagree, or "found" would be checking nothing.
+        expect(divergentPoints, `${id} stage ${stage}: round-once and round-every-step never disagree, so this gate cannot see the difference`).toBeGreaterThan(0);
+        expect(found, `${id} stage ${stage}: at every point where round-once and round-every-step disagree, the actual output matched round-once instead — rounding discipline is unfalsified`).toBe(true);
       });
     }
   }
