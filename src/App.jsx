@@ -326,6 +326,14 @@ function App() {
     setPwNew,
     pwConfirm,
     setPwConfirm,
+    pwCurrent,
+    setPwCurrent,
+    pwNonce,
+    setPwNonce,
+    pwReauthSent,
+    setPwReauthSent,
+    pwRecoveryMode,
+    setPwRecoveryMode,
     pwMsg,
     setPwMsg,
     emailPanelOpen,
@@ -5603,6 +5611,7 @@ function App() {
             saveEdit={saveEdit}
             openEdit={openEdit}
             changePassword={changePassword}
+            removePhone={removePhone}
             pwCurrent={pwCurrent}
             setPwCurrent={setPwCurrent}
             pwNonce={pwNonce}
