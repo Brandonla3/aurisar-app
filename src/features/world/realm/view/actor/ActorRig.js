@@ -263,15 +263,22 @@ export class ActorRig {
     // The skeleton object itself is untouched by the swap, which is what
     // carries the POSE across it (see the header).
     mesh.skeleton = this._skin.skeleton;
-    // REDUNDANT TODAY, AND SAID SO OUT LOUD: `Mesh.clone()` copies the
-    // influence count from the master, which ActorPrototypes already sets to
-    // 1, so deleting this line leaves the whole realm suite green (measured,
-    // not assumed). It stays for two reasons — the skeleton and the influence
-    // count are ONE decision and are set in one place, and a skinned mesh left
-    // at Babylon's default 4 blends four bone matrices per vertex to reach the
-    // answer one gives, which is a silent 4x on vertex cost rather than a
-    // visible fault. The clone-copy behaviour it defends against is asserted
-    // in ActorRigSkin.test.js, which is the tripwire if it ever changes.
+    // STATED, NOT INHERITED, and the difference is one engine detail wide.
+    // `Mesh.clone()` copies the influence count from the master as a SNAPSHOT
+    // — whatever the master holds AT CLONE TIME is what this mesh gets and
+    // keeps, for any value (measured: 1 -> 1, 3 -> 3, 4 -> 4). So the master's
+    // own `= 1` covers this line only for as long as the master still holds 1,
+    // and a master whose count ever drifts — a pooled prototype table, a
+    // diagnostics toggle, a Task 6 define-prep path that writes the field back
+    // — would hand every actor cloned AFTERWARDS four bone-matrix blends per
+    // vertex to reach the answer one gives. Silent 4x on vertex cost, no
+    // visible fault, forever.
+    //
+    // Deleting this line turns ActorRigSkin.test.js's `the live mesh reads ONE
+    // influence even when the MASTER says four` red, and nothing else — that
+    // test perturbs the master after boot precisely so this line is killable
+    // rather than merely correct. It also keeps the skeleton and the influence
+    // count as ONE decision written in ONE place, which is the line above.
     mesh.numBoneInfluencers = 1;
     // Nothing in the Realm picks yet. Explicit rather than inherited so the
     // day something does, this line is the one to flip.
