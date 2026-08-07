@@ -19,7 +19,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ARCHETYPES, CAP_LEVEL, FAR_COMP, PIVOT_EPS, SEG, archetypeById, pivotsOf, pivotsOfMasses,
+  ARCHETYPES, CAP_LEVEL, FAR_COMP, PIVOT_EPS, SEG, archetypeById, closureAt, pivotsOf,
+  pivotsOfMasses,
 } from './actorMasses.js';
 import { ARCHETYPES as ARCHETYPES_DIRECT } from './actorArchetypes.js';
 
@@ -438,6 +439,90 @@ describe('PIVOT_EPS tolerance, pinned with fixtures', () => {
     // 1200x the tolerance. The floor here is 100x, which leaves room for a
     // denser future skeleton without leaving room for a silent weld.
     expect(closest).toBeGreaterThan(PIVOT_EPS * 100);
+  });
+});
+
+/**
+ * EVERY JOINT IS HELD SHUT BY SOMETHING NAMEABLE.
+ *
+ * Until the P6 review nothing checked this, and gen/actorPrimitives.js's
+ * header promised — unconditionally — that a cap sat at every shared
+ * endpoint. Five of the 22 joints had no cap, and two of those five were
+ * genuinely open surface: magistari's shoulder was a see-through hole (a ray
+ * straight down at (0, +/-0.165) crossed ZERO triangles) and orghon's throat
+ * carried a 24 mm slit. Both are closed now, both by making radii equal
+ * rather than by adding a cap, because a cap of radius R does not cover a
+ * ring of radius R (see closureAt's doc and model/actorArchetypes.js).
+ *
+ * This gate says only "one of the two mechanisms applies". It deliberately
+ * does NOT try to be the seal test — whether the surface is actually
+ * continuous is measured against real triangles in gen/actorSeal.test.js.
+ * What it defends is the DATA-LEVEL invariant a future archetype can break
+ * without any geometry existing yet: an author adding a fifth faction whose
+ * limbs meet at unequal radii with no cap gets a red test naming the joint,
+ * in the file where they are typing.
+ */
+describe('joint closure — every pivot is held by a cap or a ring weld', () => {
+  it('no joint is left to chance, and each is named with its mechanism', () => {
+    const tally = { cap: 0, ring: 0 };
+    for (const arch of ARCHETYPES) {
+      for (const p of pivotsOf(arch.id)) {
+        expect(
+          p.closure,
+          `${p.pivotId} at [${p.at.join(', ')}] (masses ${p.massIds.join(', ')}) is held by NEITHER a cap `
+          + 'nor an exact ring weld, so the surface there is open. Either give the WIDEST mass meeting '
+          + 'this joint a cap (and check the narrower neighbours are under 0.7947 of its radius — see '
+          + 'closureAt), or make two of them share a radius on one axis line so their rings weld.',
+        ).not.toBeNull();
+        tally[p.closure] += 1;
+      }
+    }
+    // Measured 2026-08-06, after the P6 review closed magistari's shoulder
+    // and orghon's throat. Pinned rather than merely summed so a future edit
+    // that converts a cap joint into a pose-locked ring weld — which P7
+    // cannot animate — has to say so here.
+    expect(tally).toEqual({ cap: 17, ring: 5 });
+  });
+
+  it('classifies a cap joint, a parallel weld and an opposed weld by hand', () => {
+    // Three named joints rather than only the roster tally, so the tally
+    // above cannot drift into agreement with a broken classifier.
+    const at = (id, y) => pivotsOf(id).find((p) => Math.abs(p.at[1] - y) < 1e-9);
+    expect(at('unbound', 0.88).closure).toBe('cap');       // torso.capA
+    expect(at('magistari', 1.40).closure).toBe('ring');    // robeUpper/cowlStem, parallel
+    expect(at('legion', 1.74).closure).toBe('ring');       // faceL/faceR, opposed
+  });
+
+  it('rejects the three ways a joint can be open, with fixtures', () => {
+    // The shipped roster has no unheld joint, so without fixtures this
+    // classifier could return 'ring' for everything and stay green.
+    const m = (id, a, b, r0, r1, caps = {}) => ({
+      id, a, b, r0, r1, color: [0, 0, 0], capA: false, capB: false, ...caps,
+    });
+    const J = [0, 1, 0];
+
+    // (a) coaxial, UNEQUAL radius, no cap — magistari's old shoulder.
+    expect(closureAt([m('lo', [0, 0, 0], J, 0.2, 0.17), m('hi', J, [0, 2, 0], 0.16, 0.1)], J)).toBeNull();
+    // (b) equal radius, axes NOT collinear — orghon's old throat.
+    expect(closureAt([m('lo', [0, 0, 0], J, 0.2, 0.17), m('hi', J, [0.5, 2, 0], 0.17, 0.1)], J)).toBeNull();
+    // (c) both of the above, but one end capped — a cap always wins.
+    expect(closureAt([m('lo', [0, 0, 0], J, 0.2, 0.17, { capB: true }), m('hi', J, [0.5, 2, 0], 0.16, 0.1)], J))
+      .toBe('cap');
+    // ...and the positive controls, so (a) and (b) are not failing for some
+    // third reason: fix only the radius, then only the axis.
+    expect(closureAt([m('lo', [0, 0, 0], J, 0.2, 0.17), m('hi', J, [0, 2, 0], 0.17, 0.1)], J)).toBe('ring');
+    expect(closureAt([m('lo', [0, 0, 0], J, 0.2, 0.17), m('hi', J, [0, -2, 0], 0.17, 0.1)], J)).toBe('ring');
+  });
+
+  it('a mass cannot weld to ITSELF', () => {
+    // A single mass whose a and b both land on the joint would otherwise pair
+    // with itself: equal-ish radius, exactly antiparallel by construction.
+    // model/actorMasses.test.js's degenerate-axis check keeps that out of the
+    // shipped table, but closureAt is called on derived lists too.
+    const solo = {
+      id: 'solo', a: [0, 1, 0], b: [0, 1, 0], r0: 0.2, r1: 0.2, color: [0, 0, 0], capA: false, capB: false,
+    };
+    expect(closureAt([solo], [0, 1, 0])).toBeNull();
   });
 });
 

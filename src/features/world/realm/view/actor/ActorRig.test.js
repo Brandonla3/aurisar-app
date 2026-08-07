@@ -293,6 +293,40 @@ describe('ActorRig — LOD swaps', () => {
     }
   });
 
+  it('a FAR-constructed rig does NOT rebuild when it resolves to MID', () => {
+    // FAR and MID both clamp to stage 1 on a two-stage archetype, so a rig
+    // built at FAR is already rendering the geometry MID asks for. update()
+    // compared TIERS until the P6 review, so its first call paid a clone +
+    // shadow re-registration + dispose to swap a mesh for an identical one.
+    // Constructing at a non-NEAR tier is explicitly legal (`opts.tier`), and
+    // props' FAR is a value ActorRig's own doc says can arrive from
+    // anywhere, so this is a real path and not a contrived one.
+    const { scene, protos } = newWorld();
+    try {
+      const rig = new ActorRig(scene, protos, 'orghon', { tier: PROP_TIER.FAR });
+      const builtMesh = rig.mesh;
+      expect(protos.stageFor('orghon', PROP_TIER.FAR)).toBe(protos.stageFor('orghon', PROP_TIER.MID));
+
+      rig.seatOn(0, 0, 500);
+      expect(rig.update({ x: 0, y: 0, z: 0 })).toBe(PROP_TIER.MID);
+      expect(rig.swapCount, 'the rig rebuilt a mesh it was already rendering').toBe(0);
+      expect(rig.mesh, 'same mesh object, not a fresh clone').toBe(builtMesh);
+      expect(builtMesh.isDisposed()).toBe(false);
+      expect(scene.meshes.length).toBe(MASTER_COUNT + 1);
+
+      // ...and it still swaps for a REAL stage change afterwards, so the
+      // early-out did not simply disable tiering.
+      rig.seatOn(0, 0, 0);
+      expect(rig.update({ x: 0, y: 0, z: 0 })).toBe(PROP_TIER.NEAR);
+      expect(rig.swapCount).toBe(1);
+      expect(rig.mesh).not.toBe(builtMesh);
+      rig.dispose();
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
   it('measures from the focus point, not world origin', () => {
     const { scene, protos } = newWorld();
     try {

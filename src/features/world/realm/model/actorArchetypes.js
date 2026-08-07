@@ -34,7 +34,7 @@
  *
  * What THESE tables measure, against ACTOR_WINDOW at GATE_PITCH_RAD and
  * GATE_RES: worst pair 0.506 near / 0.501 far (Magistari vs Orghon, the two
- * bottom-heavy bodies), best-separated pair 0.270 (Legion vs Orghon, the
+ * bottom-heavy bodies), best-separated pair 0.271 (Legion vs Orghon, the
  * roster's two histogram opposites). The gate is 0.72 and the probe's
  * demonstrated benchmark was 0.678, so the roster clears the bar by
  * reallocating mass further than the probe did, not by relaxing anything.
@@ -98,11 +98,37 @@ function freezeArchetype(a) {
  * and 1 for Magistari — the "P7 topology for free" claim was false, and the
  * caps had nothing to nest inside either. Both problems have the same fix.
  *
- * CAPS: one per joint, carried by the WIDEST mass meeting there (the
- * narrower neighbours' open rings end up buried inside that sphere), plus
- * every terminal end — feet, hands, head, crest tips. Two tubes meeting at a
- * shared ring of equal radius and opposite axis (Legion's face-plate halves)
- * close each other and need no cap at all.
+ * CLOSING A JOINT — TWO MECHANISMS, AND THE LIMIT ON THE FIRST ONE. Every
+ * mass is an OPEN tube (gen/propPrimitives.js's addTube emits side faces
+ * only), so a joint leaves its neighbours' end rings exposed unless
+ * something closes them. Exactly two things do:
+ *
+ *   CAP — the WIDEST mass meeting there carries a rounded cap and the
+ *     narrower neighbours' rings end up buried inside that sphere. This
+ *     only works while the neighbour is genuinely NARROWER, by a margin
+ *     that is a measured constant rather than a matter of taste: addBlob
+ *     INSCRIBES its polyhedron in the requested radius, so a cap of radius
+ *     R reaches only inradiusRatio·R in its worst direction — 0.9342 at
+ *     CAP_LEVEL 2 (near) and 0.7947 at CAP_LEVEL 1 (far), both measured off
+ *     sphereFaces in gen/actorSeal.test.js. A neighbouring ring of radius R
+ *     at a cap of radius R is therefore NOT buried at all: the ring's
+ *     vertices sit exactly ON the circumsphere while the cap's faces are
+ *     chords inside it, and the annulus between them is open surface.
+ *
+ *   RING — two masses meeting at a shared point with the SAME radius and
+ *     the same axis LINE generate IDENTICAL ring vertices and weld shut
+ *     with no cap at all. Parallel axes (magistari's robe stack, orghon's
+ *     throat) weld at any SEG; OPPOSITE axes (legion's face-plate halves,
+ *     magistari's cowl bar) additionally need SEG even, which
+ *     model/actorMasses.test.js pins.
+ *
+ * ...plus a cap at every terminal end — feet, hands, head, crest tips.
+ *
+ * model/actorMasses.js's `pivotsOf` reports which mechanism holds each
+ * joint as `closure: 'cap' | 'ring'`, and actorMasses.test.js fails any
+ * joint that has neither. That matters to P7 and not only to P6: see
+ * gen/actorPrimitives.js's header on why a ring-closed joint is
+ * POSE-LOCKED.
  */
 export const ARCHETYPES = Object.freeze([
   /**
@@ -112,7 +138,7 @@ export const ARCHETYPES = Object.freeze([
    * height. It is the only archetype whose silhouette is not left-right
    * symmetric, so its outline changes with yaw while the other three barely
    * do — a signature the band histogram cannot even see, which is why it also
-   * carries the roster's highest torso band (0.484, next highest 0.343).
+   * carries the roster's highest torso band (0.484, next highest 0.342).
    */
   freezeArchetype({
     id: 'unbound',
@@ -158,17 +184,22 @@ export const ARCHETYPES = Object.freeze([
       { id: 'neck', a: [0, 1.42, 0], b: [0, 1.74, 0.04], r0: 0.09, r1: 0.10, color: LEGION_LACQUER, capA: false, capB: false },
       // The face-plate is TWO half masses meeting at the mask's centre ring,
       // not one bar: the shared centre is what makes it a pivot, and two
-      // opposed tubes on a common ring close each other with no cap. Legion
-      // is the ROSTER'S ONLY archetype built this way — every other joint
-      // uses a cap, not a mutual ring closure. The closure is EXACT (not
-      // merely close enough to look right), and specifically because SEG
-      // (gen/actorPrimitives.js's addMass tessellation) is even at both
+      // opposed tubes on a common ring close each other with no cap. Five of
+      // the roster's 22 joints are held this way, not one — this comment
+      // claimed Legion was "the ROSTER'S ONLY archetype built this way"
+      // until the P6 review counted them: magistari's robeLower/robeUpper
+      // (r 0.20), robeUpper/cowlStem (r 0.17) and cowlL/cowlR (r 0.15), and
+      // orghon's neck/head (r 0.17) are the others. What IS specific to
+      // legion and magistari's cowl bar is OPPOSED axes, and that is the
+      // half of the mechanism with a parity condition. The closure is EXACT
+      // (not merely close enough to look right), and specifically because
+      // SEG (gen/actorPrimitives.js's addMass tessellation) is even at both
       // stages, [8, 6]: an even-n ring's vertex directions are symmetric
       // under 180-degree rotation about the shared axis, so faceL's end ring
       // and faceR's end ring land on IDENTICAL vertex positions. An odd SEG
-      // value would visibly crack this seam open — the one archetype it
-      // would break silently, since nothing else in the roster depends on
-      // ring parity at all.
+      // value would visibly crack this seam open — and it would crack the
+      // cowl bar with it, while leaving the three PARALLEL-axis welds
+      // (which need no parity at all) perfectly closed.
       { id: 'faceL', a: [0, 1.74, 0.04], b: [-0.17, 1.74, 0.04], r0: 0.20, r1: 0.18, color: LEGION_BONE, capA: false, capB: true },
       { id: 'faceR', a: [0, 1.74, 0.04], b: [0.17, 1.74, 0.04], r0: 0.20, r1: 0.18, color: LEGION_BONE, capA: false, capB: true },
       { id: 'crown', a: [0, 1.74, 0.04], b: [0, 1.96, 0.01], r0: 0.13, r1: 0.07, color: LEGION_LACQUER, capA: false, capB: false },
@@ -184,7 +215,7 @@ export const ARCHETYPES = Object.freeze([
    * and a spine carrying the outline to 2.22 m. No legs at all: the negative
    * space between two legs is a large share of a biped's projected outline at
    * range, so removing it is a bigger silhouette move than any amount of limb
-   * re-proportioning. Bottom-heavy like Orghon (0.538 vs 0.655 below the
+   * re-proportioning. Bottom-heavy like Orghon (0.538 vs 0.656 below the
    * waist) but with a real above-shoulder band where Orghon has none.
    */
   freezeArchetype({
@@ -199,13 +230,45 @@ export const ARCHETYPES = Object.freeze([
       // something quieter and worse: it collapses Magistari's window margin
       // from 0.079 to 0.010 at pitch 0 and 0.006 at gate pitch, against a
       // 0.05 target. A margin that thin is a clip waiting for the next
-      // half-centimetre of retune, and it buys a cap nobody can see. The hem
-      // is buried in the ground, exactly like a prop trunk's open base.
+      // half-centimetre of retune, and it buys a cap nobody can see.
+      //
+      // THE HEM IS TANGENT, NOT BURIED, and this comment claimed the second
+      // one until the P6 review measured it: the payload's minY is exactly
+      // 0.0000, so the open ring sits ON the ground plane rather than under
+      // it, and ActorRig seats by that same minY (view/actor/ActorRig.js) —
+      // there is no mechanism anywhere that sinks it. On flat ground the
+      // hem's own ring hides the opening; on ANY downhill slope the terrain
+      // falls away from it and daylight opens under the robe. That is
+      // accepted, and it is the same deal P5's prop trunks take (their open
+      // bases are equally tangent). What is not accepted is believing a
+      // burial mechanism exists: a future edit that raises the hem, or a
+      // seating change that stops using minY, has nothing to fall back on.
       { id: 'robeLower', a: [0, 0, 0], b: [0, 1.14, 0], r0: 0.42, r1: 0.20, color: MAGISTARI_ROBE, capA: false, capB: false },
       { id: 'robeUpper', a: [0, 1.14, 0], b: [0, 1.40, 0], r0: 0.20, r1: 0.17, color: MAGISTARI_ROBE, capA: false, capB: false },
       { id: 'sleeveL', a: [0, 1.40, 0], b: [-0.40, 1.10, 0.02], r0: 0.13, r1: 0.09, color: MAGISTARI_TRIM, capA: false, capB: true },
       { id: 'sleeveR', a: [0, 1.40, 0], b: [0.40, 1.10, 0.02], r0: 0.13, r1: 0.09, color: MAGISTARI_TRIM, capA: false, capB: true },
-      { id: 'cowlStem', a: [0, 1.40, 0], b: [0, 1.56, 0], r0: 0.16, r1: 0.14, color: MAGISTARI_ROBE, capA: false, capB: false },
+      // cowlStem's r0 is 0.17 to MATCH robeUpper's r1, not because the cowl
+      // wants to be a centimetre thicker. It was 0.16 and the shoulder was
+      // the roster's one genuine SEE-THROUGH HOLE: two coaxial octagons of
+      // radius 0.17 and 0.16 in the same plane at y=1.40, an open ~9 mm
+      // annulus that the sleeves miss (they leave along +/-x, the leak is at
+      // +/-z). Measured, a ray straight down at (0, +/-0.165) passed through
+      // the ENTIRE actor with ZERO triangle hits — in through the annulus,
+      // out through the open hem.
+      //
+      // A CAP CANNOT FIX THIS, which is the part worth writing down. Giving
+      // robeUpper capB: true seals the NEAR stage and leaves the FAR one
+      // open, because addBlob inscribes: the cap reaches 0.9342*R at
+      // CAP_LEVEL 2 but only 0.7947*R at CAP_LEVEL 1, and the annulus it has
+      // to cover lives at R exactly. Measured on a 64-azimuth downward
+      // sweep: baseline 32 leaking rays near / 18 far; with capB 0 near /
+      // 18 far; with this equal radius 0 and 0. Sealing a COAXIAL annulus by
+      // cap would need r1 >= 0.17/0.7947 = 0.214, a visible ball joint wider
+      // than the head. Equal radii weld the two rings vertex-for-vertex
+      // instead, at every stage and every SEG — the same mechanism legion's
+      // face-plate uses, minus the parity condition (these axes are
+      // parallel, not opposed). Cost: zero triangles.
+      { id: 'cowlStem', a: [0, 1.40, 0], b: [0, 1.56, 0], r0: 0.17, r1: 0.14, color: MAGISTARI_ROBE, capA: false, capB: false },
       // The cowl is mass MOVED above the shoulders, not an ornament: without
       // it Magistari's band histogram sat within a hair of Orghon's in two of
       // three bands (both are bottom-heavy), and the band histogram is the
@@ -230,7 +293,11 @@ export const ARCHETYPES = Object.freeze([
     factionId: 'orghon',
     displayName: 'Orghon',
     stages: 2,
-    bandTargets: [0.655, 0.343, 0.001],
+    // Re-measured after the throat weld (head's axis made collinear with the
+    // neck's, below): [0.655, 0.343, 0.001] -> [0.656, 0.342, 0.001]. The
+    // head's 2 cm of forward reach moves that much area from the torso band
+    // into the below-waist one at GATE_RES. Measured near-stage, 2026-08-06.
+    bandTargets: [0.656, 0.342, 0.001],
     masses: [
       { id: 'hipL', a: [0, 0.80, 0], b: [-0.22, 0.76, 0], r0: 0.30, r1: 0.28, color: ORGHON_PLATE, capA: true, capB: true },
       { id: 'hipR', a: [0, 0.80, 0], b: [0.22, 0.76, 0], r0: 0.30, r1: 0.28, color: ORGHON_PLATE, capA: false, capB: true },
@@ -242,7 +309,28 @@ export const ARCHETYPES = Object.freeze([
       { id: 'armLFore', a: [-0.44, 0.62, 0.10], b: [-0.46, 0.26, 0.14], r0: 0.11, r1: 0.10, color: ORGHON_HIDE, capA: false, capB: true },
       { id: 'armRFore', a: [0.44, 0.62, 0.10], b: [0.46, 0.26, 0.14], r0: 0.11, r1: 0.10, color: ORGHON_HIDE, capA: false, capB: true },
       { id: 'neck', a: [0, 1.06, 0.12], b: [0, 1.20, 0.26], r0: 0.20, r1: 0.17, color: ORGHON_HIDE, capA: false, capB: false },
-      { id: 'head', a: [0, 1.20, 0.26], b: [0, 1.28, 0.32], r0: 0.17, r1: 0.16, color: ORGHON_HEAD, capA: false, capB: true },
+      // head's axis delta is (0, +0.08, +0.08) so it is COLLINEAR with the
+      // neck's (0, +0.14, +0.14). It was (0, +0.08, +0.06) — 8.13 degrees
+      // off — and with both radii at 0.17 that misalignment opened a lens
+      // between the two end rings 24 mm wide at its widest, a slit you could
+      // see the actor's dark interior through, on an archetype that is in
+      // the SHIPPED demo cast. Collinear + equal radius makes the two rings
+      // the same vertices, so the throat welds shut at every stage and every
+      // SEG. Measured on a 1652-direction sweep from provably-interior
+      // points: 4760 rays reached open surface at this joint before, 104
+      // after (near stage).
+      //
+      // A CAP CANNOT FIX THIS EITHER, and here not even partly: the gap sits
+      // at radius 0.17 and the only cap available is radius 0.17, whose
+      // faces are chords inside that. Measured, neck capB: true changes the
+      // count by nothing at all.
+      //
+      // b's Y is deliberately UNCHANGED at 1.28, so the cap on top still
+      // tops orghon out at exactly 1.44 m and its above-shoulder band stays
+      // structurally empty against SHOULDER_Y = 1.45. Only z moves, 0.32 ->
+      // 0.34: the head juts 2 cm further forward, which is the direction the
+      // hunch was already going.
+      { id: 'head', a: [0, 1.20, 0.26], b: [0, 1.28, 0.34], r0: 0.17, r1: 0.16, color: ORGHON_HEAD, capA: false, capB: true },
     ],
   }),
 ]);

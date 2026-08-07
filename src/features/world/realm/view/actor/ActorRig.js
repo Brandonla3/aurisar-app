@@ -98,6 +98,7 @@ export class ActorRig {
     this._pinShadow = pinShadow;
     this._name = name;
     this._swaps = 0;
+    this._stage = -1;
     this._disposed = false;
 
     this.archetypeId = archetypeId;
@@ -156,7 +157,22 @@ export class ActorRig {
     const p = this._root.absolutePosition;
     const distanceM = Math.hypot(p.x - focusPos.x, p.y - focusPos.y, p.z - focusPos.z);
     const next = tierForDistance(distanceM, this._tier);
-    if (next !== this._tier) this._applyTier(next);
+    // COMPARE THE RESOLVED STAGE, NOT THE TIER. These are not the same
+    // question: `stageFor` clamps a tier to the archetype's last stage, and
+    // with two stages both NEAR (0) and MID (1) already map onto themselves
+    // — but the constructor accepts ANY tier (`opts.tier`, documented as
+    // legal and used for a rig built far away), and props' FAR (2) clamps to
+    // stage 1 exactly as MID does. So a rig constructed at FAR and first
+    // updated at MID used to see `2 !== 1`, and pay a full clone + shadow
+    // re-registration + dispose to arrive at the geometry it was already
+    // rendering. Comparing stages makes that a no-op, and makes the swap
+    // counter mean "the mesh really changed" — which is what
+    // ActorRig.test.js reads it as.
+    if (next !== this._tier) {
+      const nextStage = this._protos.stageFor(this.archetypeId, next);
+      if (nextStage === this._stage) this._tier = next;
+      else this._applyTier(next);
+    }
     return this._tier;
   }
 
@@ -190,6 +206,7 @@ export class ActorRig {
     this._mesh = mesh;
     this._meta = meta;
     this._tier = tier;
+    this._stage = meta.stage;
     if (previous) this._swaps++;
 
     if (this._shadowRig) {

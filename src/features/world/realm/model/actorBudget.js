@@ -59,6 +59,27 @@ export const ACTOR_MANIFEST = Object.freeze({
  * worst); see that file for the arithmetic and the draw-call model
  * (actors are ordinary moving meshes, never thin-instanced, so cost is
  * exactly 1 draw call per actor).
+ *
+ * WHAT THE CENSUS DOES NOT BILL, named here so nobody reads "24 actors" as
+ * the whole invoice:
+ *
+ *  - SHADOWS. Every ActorRig registers its mesh with ActorShadowRig
+ *    (view/lighting/ActorShadowRig.js) at construction, into a 1024-square
+ *    map whose NEAR bucket has no cap on membership. A shadow map render is
+ *    a second rasterization of the same triangles from the light's view, so
+ *    the 24-actor worst case implies up to 24 further draw calls and up to
+ *    a second pass over the same 27k triangles that the "1 draw call per
+ *    actor" model above says nothing about. Whether that fits is a real
+ *    question for a later phase; it is simply not one this file's arithmetic
+ *    has ever asked.
+ *  - MATERIAL/OVERDRAW cost of any kind, same as propBudget.js.
+ *
+ * AND NOTHING AT RUNTIME READS EITHER NUMBER. `maxSimultaneousActors` is
+ * spent only by realmActorBudget.test.js; nothing spawns, counts, or refuses
+ * an actor against it. `silhouetteM2` is likewise read only by
+ * actorBudget.test.js's audit — no LOD, culling or impostor decision
+ * consumes it. Both are CEILINGS THAT TESTS DEFEND, not runtime limits, and
+ * a future phase that wants either enforced has to write the enforcement.
  */
 export const ACTOR_CEILINGS = Object.freeze({
   maxSimultaneousActors: 24,

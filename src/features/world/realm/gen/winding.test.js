@@ -178,7 +178,29 @@ describe('1. front-face convention, derived from the engine rather than asserted
       'view/materials/horizonRingNME.js', // CreateCylinder BACKSIDE — viewed from inside
       'view/atmosphere/cloudPuffs.js',  // backFaceCulling false — double-sided puffs
     ]);
-    const FLIPPERS = /\bsideOrientation\b|\bbackFaceCulling\s*=\s*false|\bflipFaces\b|\buseRightHandedSystem\b/;
+    // Three verified bypasses closed in the P6 review round, all of which
+    // this scan used to wave through:
+    //   cullBackFaces = false   — Babylon's own alias for backFaceCulling,
+    //     asserted twenty lines above as part of the pinned render state, and
+    //     absent from this pattern entirely.
+    //   overrideMaterialSideOrientation — the SCENE-level override, which
+    //     flips every material at once. `\bsideOrientation\b` is case
+    //     sensitive and there is no word boundary before a capital S inside
+    //     an identifier, so the widest hammer in the engine was the one
+    //     spelling the scan could not see.
+    //   backFaceCulling: false  — the object-literal form. Every Babylon
+    //     material and mesh builder takes an options bag, so `=` alone
+    //     covered one of the two ways to write the same thing.
+    // FLIPPER_BYPASSES below holds each of these as a literal and asserts it
+    // matches, so the pattern is checked against the strings it exists to
+    // catch instead of being read for plausibility.
+    const FLIPPERS = new RegExp([
+      '[sS]ideOrientation',
+      'backFaceCulling\\s*[=:]\\s*false',
+      'cullBackFaces\\s*[=:]\\s*false',
+      '\\bflipFaces\\b',
+      '\\buseRightHandedSystem\\b',
+    ].join('|'));
     // Comments are stripped for the same reason boundary.test.js strips them:
     // the generators DISCUSS these flags at length (they are the escape
     // hatches this file exists to keep shut) and prose must not count as use.
@@ -202,6 +224,148 @@ describe('1. front-face convention, derived from the engine rather than asserted
       + 'fix the GEOMETRY: a material flag cannot correct one emitter without inverting every other.',
     ).toEqual([]);
     expect(ALLOWED.size, 'the allowlist must not be able to swallow the whole tree').toBeLessThan(5);
+
+    // The scan is only worth its ALLOWED list if it can actually see the
+    // spellings someone reaches for. Each of these is a real, working way to
+    // invert or disable culling in Babylon; the last three are the ones this
+    // pattern let through until the P6 review.
+    for (const bypass of [
+      'material.sideOrientation = BABYLON.Material.ClockWiseSideOrientation;',
+      'vertexData.flipFaces();',
+      'scene.useRightHandedSystem = true;',
+      'material.backFaceCulling = false;',
+      'mesh.cullBackFaces = false;',
+      'scene.overrideMaterialSideOrientation = BABYLON.Material.ClockWiseSideOrientation;',
+      'new BABYLON.StandardMaterial("m", scene, { backFaceCulling: false })',
+      'CreateSphere("s", { diameter: 2, sideOrientation: BABYLON.Mesh.BACKSIDE }, scene)',
+    ]) {
+      expect(FLIPPERS.test(bypass), `FLIPPERS does not see: ${bypass}`).toBe(true);
+    }
+    // ...and does not fire on the harmless neighbours of those spellings,
+    // which is what keeps the allowlist from having to absorb false hits.
+    for (const innocent of [
+      'material.backFaceCulling = true;',
+      'mesh.cullBackFaces = true;',
+      'const sideLength = 3;',
+      'const orientation = "north";',
+    ]) {
+      expect(FLIPPERS.test(innocent), `FLIPPERS falsely fires on: ${innocent}`).toBe(false);
+    }
+  });
+
+  it('front-face-out is anchored to GEOMETRY, not only to self-consistency', () => {
+    // windingCensus pins indices against the AUTHORED NORMALS, which makes
+    // every assertion in group 2 a MUTUAL-consistency check: invert a
+    // generator's index order AND negate the normals it writes, and the
+    // census still reads 100% anti-parallel while every surface faces inward
+    // on a real GPU. Terrain has an independent anchor (its normals are
+    // derived from the height field, so they cannot be negated without the
+    // lighting going obviously wrong), props and actors did not.
+    //
+    // Signed volume is that anchor. For a closed mesh
+    // V = (1/6) * sum over triangles of det[v0, v1, v2] about an interior
+    // point; reversing a triangle negates its determinant, so reversing every
+    // triangle negates V, while negating the normals does not touch it. So a
+    // double inversion — invisible to the census — flips this sign.
+    //
+    // The reference sign is TAKEN FROM BABYLON, the same way group 1 takes
+    // the winding convention rather than remembering it.
+    const signedVolume = ({ positions, indices }) => {
+      let cx = 0;
+      let cy = 0;
+      let cz = 0;
+      const n = positions.length / 3;
+      for (let i = 0; i < positions.length; i += 3) {
+        cx += positions[i]; cy += positions[i + 1]; cz += positions[i + 2];
+      }
+      cx /= n; cy /= n; cz /= n;
+      let vol = 0;
+      let area = 0;
+      for (let t = 0; t < indices.length; t += 3) {
+        const i0 = indices[t] * 3;
+        const i1 = indices[t + 1] * 3;
+        const i2 = indices[t + 2] * 3;
+        const ax = positions[i0] - cx;
+        const ay = positions[i0 + 1] - cy;
+        const az = positions[i0 + 2] - cz;
+        const bx = positions[i1] - cx;
+        const by = positions[i1 + 1] - cy;
+        const bz = positions[i1 + 2] - cz;
+        const gx = positions[i2] - cx;
+        const gy = positions[i2 + 1] - cy;
+        const gz = positions[i2 + 2] - cz;
+        vol += ax * (by * gz - bz * gy) - ay * (bx * gz - bz * gx) + az * (bx * gy - by * gx);
+        const ux = bx - ax;
+        const uy = by - ay;
+        const uz = bz - az;
+        const vx = gx - ax;
+        const vy = gy - ay;
+        const vz = gz - az;
+        area += 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+      }
+      // Normalized by area^1.5 so the floor below is scale-free: a 2 m tree
+      // and a 0.2 m blob are held to the same shape criterion.
+      return { vol: vol / 6, shape: (vol / 6) / (area ** 1.5) };
+    };
+
+    const reference = {
+      CreateSphere: BABYLON.CreateSphereVertexData({ diameter: 2, segments: 8 }),
+      CreateBox: BABYLON.CreateBoxVertexData({ size: 1 }),
+      CreateCylinder: BABYLON.CreateCylinderVertexData({ height: 2, diameter: 1, tessellation: 12 }),
+      CreateIcoSphere: BABYLON.CreateIcoSphereVertexData({ radius: 1, subdivisions: 1 }),
+    };
+    const signs = Object.entries(reference).map(([name, vd]) => [name, Math.sign(signedVolume(vd).vol)]);
+    for (const [name, sign] of signs) {
+      expect(sign, `${name} has no signed volume to take a sign from`).not.toBe(0);
+    }
+    const OUTWARD = signs[0][1];
+    for (const [name, sign] of signs) {
+      expect(sign, `${name} disagrees with ${signs[0][0]} about which sign is outward`).toBe(OUTWARD);
+    }
+    // Measured on babylonjs 9.19.0: all four are NEGATIVE (sphere -4.019,
+    // box -1.000, cylinder -1.500, icosphere -2.536), which is the same
+    // statement as group 1's "RH cross anti-parallel to the outward normal",
+    // arrived at without reading a single normal.
+    expect(OUTWARD).toBe(-1);
+
+    // Two families, and only two. Terrain chunks are an open SHEET, whose
+    // signed volume about its own centroid measures whatever the height
+    // field happens to do (+602 and +3699 for the two shipped densities) and
+    // says nothing about facing; addBladeFan is single-sided quads, which are
+    // not a volume at all (+7.6e-4). Both are excluded on that ground, not
+    // because they are inconvenient — and terrain keeps its own anchor.
+    const SHAPE_MIN = 0.005;
+    const bodies = [
+      ['addTube', (() => { const a = newAccumulator(); addTube(a, [0, 0, 0], [0, 1, 0], 0.3, 0.2, 8, [1, 1, 1]); return finalize(a); })()],
+      ...[0, 1, 2].map((level) => [`addBlob level ${level}`, (() => {
+        const a = newAccumulator(); addBlob(a, [0, 0, 0], 0.4, level, [1, 1, 1]); return finalize(a);
+      })()]),
+      ...PROTOTYPES.flatMap((p) => Array.from(
+        { length: p.stages }, (_, s) => [`prop ${p.id} s${s}`, buildPrototypePayload(p.id, s)],
+      )),
+      ...ARCHETYPES.flatMap((a) => Array.from(
+        { length: a.stages }, (_, s) => [`actor ${a.id} s${s}`, buildActorPayload(a.id, s)],
+      )),
+    ];
+    expect(bodies.length, 'the sweep must cover both generator families').toBe(23);
+    for (const [label, payload] of bodies) {
+      const { vol, shape } = signedVolume(payload);
+      expect(
+        Math.sign(vol),
+        `${label}: signed volume ${vol.toExponential(3)} has the sign of an INSIDE-OUT body. Every one of `
+        + 'its triangles is wound backwards. The winding census cannot see this if the normals were '
+        + 'negated to match — that is exactly what this assertion is for. Fix the index order.',
+      ).toBe(OUTWARD);
+      expect(
+        Math.abs(shape),
+        `${label}: |signed volume| / area^1.5 is ${Math.abs(shape).toFixed(5)}, near enough to zero that its `
+        + 'sign is noise rather than evidence — this body no longer encloses anything, so the assertion '
+        + 'above just passed without measuring',
+      ).toBeGreaterThan(SHAPE_MIN);
+    }
+    // Measured range at 2026-08-06: props -0.0111 (tuft) to -0.0879
+    // (boulder), actors -0.0177 (legion far) to -0.0225 (orghon near),
+    // primitives -0.0618 to -0.0918. The floor sits at 45% of the tightest.
   });
 });
 

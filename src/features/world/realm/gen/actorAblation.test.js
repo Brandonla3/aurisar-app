@@ -27,12 +27,27 @@
  *
  * (b) PROPORTION ROSTER answers "can this gate ever fail?". Removal alone
  *     cannot answer it — measured, the worst ablated pair reaches 0.692,
- *     which still PASSES 0.72. So the fixture goes the whole way and rebuilds
- *     the design model/actorArchetypes.js's header documents rejecting: one
- *     chassis, four "factions" separated only by a single proportion
- *     multiplier each. Every pair of that roster measures 0.819-0.932 near /
- *     0.821-0.929 far, i.e. the gate rejects all six — matching the probe's
- *     0.941 finding that proportions are not identity.
+ *     which still PASSES 0.72 (headroom 0.008 against ABLATED_WORST_MAX's
+ *     0.70; that number lives here as well as on its constant because a
+ *     0.008 margin is the single most useful fact about this suite and it
+ *     should not only exist in a review thread). So the fixture goes the
+ *     whole way and rebuilds the design model/actorArchetypes.js's header
+ *     documents rejecting: one chassis, four "factions" separated only by a
+ *     single proportion multiplier each. Every pair of that roster measures
+ *     0.819-0.932 near / 0.821-0.929 far, i.e. the gate rejects all six —
+ *     matching the probe's 0.941 finding that proportions are not identity.
+ *
+ *     WHAT IT ACTUALLY CLAIMS, scoped. It claims the gate rejects MILD
+ *     proportion-tweaking, and mild is exactly what PROPORTION_ROSTER holds:
+ *     +12% on one axis at a time. It does NOT claim "no proportion change
+ *     can ever pass", and that stronger reading is false — measured, the
+ *     large multipliers you have to reach for before the fixture stops
+ *     fitting ACTOR_WINDOW (legLen 1.4, girth 1.6-2.5) score 0.22-0.67 and
+ *     sail UNDER the gate. That is not a hole. Scaling a body by 60-150% IS
+ *     a large reallocation of mass across the world-Y bands the roster is
+ *     authored in, so those fixtures pass for the same reason the real
+ *     roster does; the +12% regime is where "same character, different
+ *     dial" lives, and that is the regime worth gating.
  *
  *     KNOW ITS BOUND. Because the fixture's WEAKEST pair is 0.819, this test
  *     only defends ACTOR_PAIR_IOU_MAX above ~0.819: loosening the gate from
@@ -102,6 +117,19 @@ const pad = (s, n) => String(s).padEnd(n);
  * The masses that carry each faction's identity — the organ that would sit
  * behind a `heraldScale` knob if this roster had one. Everything NOT listed
  * here is the shared bipedal (or, for magistari, robed) chassis.
+ *
+ * NEVER MOVE A CHASSIS MASS INTO THIS TABLE to make a red test go green.
+ * Both assertions this fixture feeds weaken in the PASSING direction when it
+ * grows: ABLATED_WORST_MAX measures what is LEFT after ablation, so listing
+ * more masses as heralds strips more body and drives the ablated pair score
+ * DOWN, under the ceiling; and HERALD_CONTRIBUTION_MIN measures ablated
+ * minus real, so the same edit drives that difference UP, over the floor.
+ * There is no direction in which over-listing here fails. The declarations
+ * are therefore a claim about the DESIGN — "this mass is the faction organ"
+ * — and adding e.g. unbound's `yokeR` or orghon's `thighL` would be
+ * relabelling a shared chassis part as a herald in order to be told what you
+ * wanted to hear. Group 0's fixture-validity checks catch a herald that
+ * names NOTHING; nothing can catch a herald that names too much.
  */
 const HERALD_MASSES = {
   unbound: ['graftUpper', 'graftFore', 'fist'],
@@ -157,6 +185,17 @@ function proportionTweak(masses, { legLen = 1, torsoLen = 1, girth = 1 }) {
   }));
 }
 
+/**
+ * +12% on ONE axis each, and the size of that number is the claim. See the
+ * file header: this fixture defends the gate against MILD proportion
+ * tweaking — the "same character, different dial" regime — not against every
+ * conceivable rescale. Multipliers big enough to still fit ACTOR_WINDOW at
+ * the top end (legLen 1.4, girth 1.6-2.5) measure 0.22-0.67 and pass the
+ * gate legitimately, because at that size a proportion multiplier IS a mass
+ * reallocation. Raising these values would quietly convert this test from
+ * "the gate rejects proportion-only identity" into "the gate rejects
+ * anything", which is a claim it cannot support.
+ */
 const PROPORTION_ROSTER = {
   'baseline': {},
   'legs +12%': { legLen: 1.12 },

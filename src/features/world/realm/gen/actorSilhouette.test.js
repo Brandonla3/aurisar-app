@@ -62,7 +62,8 @@ import {
   ARCHETYPES, CAP_LEVEL, FAR_COMP, SEG, archetypeById,
 } from '../model/actorMasses.js';
 import {
-  ACTOR_WINDOW, bandOccupancy, canonicalStats, fitsWindow, silhouetteStats,
+  ACTOR_WINDOW, bandOccupancy, canonicalStats, fitsWindow, maskIoU, rasterizeMask,
+  silhouetteStats,
 } from '../model/silhouette.js';
 import {
   ACTOR_ID_MARGIN_MIN, ACTOR_LOD_IOU_MIN, ACTOR_LOD_WIDTH_DELTA_MAX,
@@ -73,6 +74,30 @@ import {
 const IDS = ARCHETYPES.map((a) => a.id);
 const STAGES = [0, 1];
 const STAGE_NAME = ['near', 'far'];
+
+/**
+ * Yaws every sweep below takes, evenly spaced over a full turn.
+ *
+ * EIGHT YAWS ARE NOT EIGHT VIEWS, and how far short they fall is per
+ * archetype. A yaw and its opposite differ only by the body's front-back
+ * asymmetry, and legion and magistari have almost none: their only depth
+ * terms are legion's face-plate at z = 0.04 with its crown and crest tips,
+ * and magistari's spine at z = -0.02. Measured at GATE_RES and gate pitch,
+ * mask IoU between a yaw and its opposite:
+ *
+ *   magistari  0.974 - 0.981   effectively 4 distinct views
+ *   legion     0.857 - 0.986   4 to 5
+ *   orghon     0.654 - 0.811   the hunch is a real front-back signature
+ *   unbound    0.506 - 0.757   the roster's only doubly-asymmetric body
+ *
+ * So `minIoU`/`maxIoU` over 8 yaws is a min/max over 4-5 independent samples
+ * for the top two. That weakens nothing here — every gate reads the same
+ * sweep and the roster sits far from its thresholds — but it does mean
+ * raising YAWS is not the lever it looks like for legion and magistari:
+ * their next genuinely new view comes from breaking a symmetry, not from
+ * sampling one more angle of one they already have. The numbers above are
+ * asserted, not narrated, by the last test in group 3.
+ */
 const YAWS = 8;
 
 /** The one options bag every roster-wide comparison uses. Fixed window, gate
@@ -197,8 +222,8 @@ describe('2. LOD fidelity — the far stage is the same body, only coarser', () 
   // Measured through the real generator, res 32:
   //   unbound   mean 0.947  min 0.918  width 0.025
   //   legion    mean 0.950  min 0.927  width 0.037
-  //   magistari mean 0.963  min 0.919  width 0.030
-  //   orghon    mean 0.944  min 0.936  width 0.020
+  //   magistari mean 0.964  min 0.919  width 0.030
+  //   orghon    mean 0.948  min 0.939  width 0.020
   // (At res 48 the same pairs read 0.941-0.958 mean, 0.901-0.920 min — the
   // gates hold at both, so the choice of 32 is about matching the props'
   // calibration, not about needing the easier number.)
@@ -282,20 +307,74 @@ describe('3. pairwise distinctness — four factions, four silhouettes', () => {
   });
 
   it('logs the full pairwise matrix AND gates its argmax', () => {
-    log(`pairwise canonical meanIoU (fixed ACTOR_WINDOW, pitch ${f3(GATE_PITCH_RAD)} rad, res ${GATE_RES}, ${YAWS} yaws)`);
-    log(`  gate: <= ${ACTOR_PAIR_IOU_MAX}   props across species measure 0.200; the rejected proportion roster measured 0.941`);
-    log(`  ${pad('pair', 24)} ${pad('near mean', 11)}${pad('near worst', 12)}${pad('far mean', 10)}far worst`);
+    // THE COLUMNS SAY WHAT THEY MEAN. This table printed `minIoU` under a
+    // "worst" heading until the P6 review, which had it exactly backwards:
+    // distinctness is a CEILING, so a pair's worst yaw is the one where the
+    // two archetypes look MOST alike — maxIoU. minIoU is the angle they are
+    // best separated at, i.e. the flattering number. A reader scanning the
+    // "worst" column for trouble was reading the column that cannot show it.
+    log(`pairwise canonical IoU (fixed ACTOR_WINDOW, pitch ${f3(GATE_PITCH_RAD)} rad, res ${GATE_RES}, ${YAWS} yaws)`);
+    log(`  gate: mean <= ${ACTOR_PAIR_IOU_MAX}   props across species measure 0.200; the rejected proportion roster measured 0.941`);
+    log('  max = the yaw where the pair looks MOST alike (the worst case for a ceiling gate)');
+    log(`  ${pad('pair', 24)} ${pad('near mean', 11)}${pad('near max', 11)}${pad('far mean', 10)}far max`);
     let worst = { iou: -1, label: '' };
     for (const [a, b] of PAIRS) {
       const n = pairIoU(PAYLOAD[0][a], PAYLOAD[0][b]);
       const f = pairIoU(PAYLOAD[1][a], PAYLOAD[1][b]);
-      log(`  ${pad(`${a} x ${b}`, 24)} ${pad(f3(n.meanIoU), 11)}${pad(f3(n.minIoU), 12)}${pad(f3(f.meanIoU), 10)}${f3(f.minIoU)}`);
+      log(`  ${pad(`${a} x ${b}`, 24)} ${pad(f3(n.meanIoU), 11)}${pad(f3(n.maxIoU), 11)}${pad(f3(f.meanIoU), 10)}${f3(f.maxIoU)}`);
       for (const [iou, tag] of [[n.meanIoU, 'near'], [f.meanIoU, 'far']]) {
         if (iou > worst.iou) worst = { iou, label: `${a} x ${b} (${tag})` };
       }
     }
-    log(`  worst pair: ${worst.label} = ${f3(worst.iou)}  (headroom ${f3(ACTOR_PAIR_IOU_MAX - worst.iou)})`);
+    log(`  worst pair by mean: ${worst.label} = ${f3(worst.iou)}  (headroom ${f3(ACTOR_PAIR_IOU_MAX - worst.iou)})`);
     expect(worst.iou).toBeLessThanOrEqual(ACTOR_PAIR_IOU_MAX);
+  });
+
+  it('the max column really is the worse one — it is not a relabelled min', () => {
+    // Cheap guard on the correction above: if maxIoU were wired to the same
+    // number as minIoU, or the log went back to printing min under a "max"
+    // heading, this notices. Measured spread on the shipped roster: every
+    // pair's max exceeds its min, by 0.031 (magistari x orghon) to 0.124
+    // (unbound x orghon).
+    for (const [a, b] of PAIRS) {
+      const s = pairIoU(PAYLOAD[0][a], PAYLOAD[0][b]);
+      expect(s.maxIoU, `${a} x ${b}`).toBeGreaterThan(s.minIoU);
+      expect(s.maxIoU, `${a} x ${b}`).toBeGreaterThanOrEqual(s.meanIoU);
+      expect(s.minIoU, `${a} x ${b}`).toBeLessThanOrEqual(s.meanIoU);
+    }
+  });
+
+  it('how much front-back symmetry the yaw sweep is spending yaws on', () => {
+    // Backs the YAWS comment with the measurement instead of a claim. Also a
+    // real gate on unbound's stated signature: its own archetype comment
+    // calls it "the only archetype whose silhouette is not left-right
+    // symmetric... a signature the band histogram cannot even see", and
+    // nothing else in this suite checks that the asymmetry survives a retune.
+    const worstSelfPair = (id) => {
+      const p = PAYLOAD[0][id];
+      const mask = (yaw) => rasterizeMask(p, yaw, ACTOR_WINDOW, GATE_RES, GATE_PITCH_RAD);
+      let worst = 0;
+      for (let k = 0; k < YAWS / 2; k++) {
+        const yaw = (k / YAWS) * Math.PI * 2;
+        worst = Math.max(worst, maskIoU(mask(yaw), mask(yaw + Math.PI)));
+      }
+      return worst;
+    };
+    const measured = Object.fromEntries(IDS.map((id) => [id, worstSelfPair(id)]));
+    log(`front-back self-similarity, worst (highest) opposite-yaw IoU, res ${GATE_RES}`);
+    for (const id of IDS) log(`  ${pad(id, 10)} ${f3(measured[id])}`);
+    // Measured 0.757; the floor is well below it because the claim being
+    // defended is "clearly asymmetric", not a tuned value.
+    expect(
+      measured.unbound,
+      `unbound's silhouette is now ${f3(measured.unbound)} self-similar front-to-back. It is the roster's `
+      + 'ONLY asymmetric body and that is the signature the band histogram cannot see — if the graft arm '
+      + 'stopped breaking symmetry, the distinctness gates lost a separator they are not measuring',
+    ).toBeLessThan(0.85);
+    // ...and the two symmetric ones really are, which is the fact the YAWS
+    // comment is warning a future author about.
+    expect(measured.magistari).toBeGreaterThan(0.90);
+    expect(measured.legion).toBeGreaterThan(0.90);
   });
 });
 
@@ -310,8 +389,8 @@ describe('4. identification margin — the exit bar, stated mechanically', () =>
   // about which archetype is closest), and it does not scale with the roster
   // the way a margin does.
   //
-  // Measured margins: unbound 0.475, legion 0.474, magistari 0.456,
-  // orghon 0.440 — against a 0.15 floor. Self-match runs 0.946-0.960; the
+  // Measured margins: unbound 0.473, legion 0.474, magistari 0.454,
+  // orghon 0.440 — against a 0.15 floor. Self-match runs 0.947-0.960; the
   // best impostor never beats 0.507.
   for (const id of IDS) {
     it(`${id}: its own far stage is the nearest match, by more than ${ACTOR_ID_MARGIN_MIN}`, () => {

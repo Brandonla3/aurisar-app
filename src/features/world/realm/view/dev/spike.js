@@ -255,6 +255,11 @@ async function boot() {
   window.addEventListener('resize', () => engine.resize());
 
   // ── Diag readout ────────────────────────────────────────────────────────────
+  // demoActors is ActorCast's own array and the readout indexes into it. If a
+  // future cast ships one demo actor (or none), `demoActors[1].mesh` throws
+  // INSIDE a setInterval — an exception nothing catches, on a timer, so the
+  // whole readout silently stops updating and the page still looks fine.
+  const bucketOf = (rig) => (rig ? actorShadowRig.bucketOf(rig.mesh) : '-');
   setInterval(() => {
     if (!diag) return;
     diag.textContent = [
@@ -266,9 +271,9 @@ async function boot() {
       `sky       : ${fogDriver.state?.fogDensity != null ? fogDriver.state.fogDensity.toFixed(4) : '?'} fog`,
       `rings     : ${ringKit.meshes.length}`,
       `clouds    : ${cloudKit.meshes.length} puffs, factor ${fogDriver.cloudFactor != null ? fogDriver.cloudFactor.toFixed(2) : '?'}`,
-      `shadows   : player=${actorShadowRig.bucketOf(actorCast.player.mesh)} `
-        + `demoA=${actorShadowRig.bucketOf(actorCast.demoActors[0].mesh)} `
-        + `demoB=${actorShadowRig.bucketOf(actorCast.demoActors[1].mesh)}`,
+      `shadows   : player=${bucketOf(actorCast.player)} `
+        + `demoA=${bucketOf(actorCast.demoActors[0])} `
+        + `demoB=${bucketOf(actorCast.demoActors[1])}`,
       `fps       : ${engine.getFps().toFixed(0)}`,
     ].join('\n');
   }, 250);

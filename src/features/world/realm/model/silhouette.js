@@ -212,21 +212,32 @@ export function silhouetteStats(payloadA, payloadB, { yawCount = 8, res = 32 } =
  * with `fitsWindow` on both payloads first: a window that clips silently
  * under-reports IoU instead of failing loudly.
  *
- * @returns {{meanIoU, minIoU}} no widthDeltaFrac — width delta is only a
- *   meaningful "pop" measure against a per-pair union window.
+ * @returns {{meanIoU, minIoU, maxIoU}} no widthDeltaFrac — width delta is
+ *   only a meaningful "pop" measure against a per-pair union window.
+ *
+ *   BOTH EXTREMES, because which one is "worst" depends on the direction of
+ *   the gate reading them, and this is the one shape in the harness where
+ *   the two callers disagree. silhouetteStats measures LOD FIDELITY, a floor
+ *   — there minIoU is the worst yaw. canonicalStats' actor callers measure
+ *   DISTINCTNESS, a ceiling — there the worst yaw is the one where two
+ *   archetypes look MOST alike, i.e. maxIoU, and minIoU is the angle they
+ *   are best told apart from. gen/actorSilhouette.test.js's pairwise matrix
+ *   printed minIoU under a "worst" heading until the P6 review.
  */
 export function canonicalStats(payloadA, payloadB, {
   bounds, yawCount = 8, res = 48, pitchRad = 0,
 } = {}) {
   let sum = 0;
   let min = Infinity;
+  let max = -Infinity;
   for (let y = 0; y < yawCount; y++) {
     const yaw = (y / yawCount) * Math.PI * 2;
     const { iou } = compareAtYaw(payloadA, payloadB, yaw, () => bounds, res, pitchRad);
     sum += iou;
     if (iou < min) min = iou;
+    if (iou > max) max = iou;
   }
-  return { meanIoU: sum / yawCount, minIoU: min };
+  return { meanIoU: sum / yawCount, minIoU: min, maxIoU: max };
 }
 
 /**

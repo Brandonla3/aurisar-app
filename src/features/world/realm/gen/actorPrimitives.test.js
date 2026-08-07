@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import { addMass } from './actorPrimitives.js';
 import {
-  finalize, newAccumulator, sphereFaces,
+  addTube, finalize, newAccumulator, sphereFaces,
 } from './propPrimitives.js';
 import { archetypeById, CAP_LEVEL, SEG } from '../model/actorMasses.js';
 
@@ -82,6 +82,46 @@ describe('addMass — composition matches the closed form', () => {
     const p = finalize(acc);
     expect(p.indices.length).toBe(p.triCount * 3);
     for (const i of p.indices) expect(i).toBeLessThan(p.vertCount);
+  });
+});
+
+describe('addMass — a zero-length mass fails loudly instead of emitting NaN', () => {
+  // The fail-loudly contract, closed at the primitive rather than only in the
+  // shipped table. addTube guards its own division with `|| 1`, so a
+  // zero-length mass does not throw there — it normalizes a ZERO vector,
+  // basisFor's cross products all come out zero, its reciprocal length is
+  // Infinity, and every position and normal emitted is NaN. That payload has
+  // a full triangle count of nothing: it renders as absence, silhouetteAreaM2
+  // returns NaN, and `NaN <= threshold` is false, so an IoU gate reading it
+  // does not go red, it goes quiet. model/actorMasses.test.js rejects a
+  // degenerate axis in the SHIPPED table; every DERIVED mass list — the
+  // ablation chassis, the proportion roster, whatever P7 builds — bypasses
+  // that check entirely.
+  it('throws, and the message names the mass', () => {
+    const acc = newAccumulator();
+    expect(() => addMass(acc, mass({ id: 'collapsed', a: [1, 2, 3], b: [1, 2, 3] }), { segments: 8, capLevel: 1 }))
+      .toThrow(/\[actorPrimitives\] mass "collapsed" has zero length/);
+    expect(acc.pos.length, 'it must throw BEFORE appending a partial mass').toBe(0);
+  });
+
+  it('and would have produced all-NaN geometry — the thing being prevented', () => {
+    // Proves the guard is worth having by reproducing the failure it blocks,
+    // straight from addTube, which is what addMass called before the check.
+    const acc = newAccumulator();
+    addTube(acc, [1, 2, 3], [1, 2, 3], 0.2, 0.2, 8, COLOR);
+    expect(acc.pos.length).toBeGreaterThan(0);
+    expect(acc.pos.every((v) => Number.isNaN(v)), 'every position should be NaN').toBe(true);
+    expect(acc.nrm.every((v) => Number.isNaN(v)), 'every normal should be NaN').toBe(true);
+  });
+
+  it('a merely SHORT mass is still allowed — the guard is about NaN, not proportions', () => {
+    // The floor is 1e-9, not the 2 cm model/actorMasses.test.js holds the
+    // shipped table to. This primitive has no business legislating anatomy
+    // for mass lists it has never seen; it only refuses the ones that cannot
+    // produce a number.
+    const acc = newAccumulator();
+    const p = finalize((addMass(acc, mass({ a: [0, 0, 0], b: [0, 1e-6, 0] }), { segments: 6, capLevel: 1 }), acc));
+    expect(p.positions.every((v) => Number.isFinite(v))).toBe(true);
   });
 });
 
