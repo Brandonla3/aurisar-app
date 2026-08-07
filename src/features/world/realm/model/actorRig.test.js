@@ -1,24 +1,29 @@
 /**
- * actorRig.test.js — the rig derivation, held to the numbers the plan names.
+ * actorRig.test.js — the rig derivation and the palette, held to the numbers
+ * the plan names. The canary pose has its own file, actorCanary.test.js.
  *
- * Two kinds of assertion live here and they are not interchangeable.
+ * Three kinds of assertion live here and they are not interchangeable.
  *
  * PINS re-state a decision as a number: 8/6/2/5 bones, four named roots, 45
  * masses each owned exactly once. They exist so a refactor that quietly
  * re-derives a different skeleton has to argue with a diff.
  *
  * ANTI-VACUITY assertions exist because this project has shipped eight tests
- * that executed without being able to fail. Every structural claim below is
- * paired with proof that the thing it polices is actually present: the
- * "no ring pivot is a bone" test first asserts the roster HAS five ring
- * pivots, the canary tests assert every non-root bone's palette is not the
- * identity AND that its own masses actually move, and the identity-palette
- * test uses `toBe` on every one of the sixteen floats rather than a
+ * that executed without being able to fail. Every structural claim is paired
+ * with proof that the thing it polices is present: the "no ring pivot is a
+ * bone" test first asserts the roster HAS five ring pivots, and the
+ * identity-palette test uses `toEqual` on all sixteen floats rather than a
  * tolerance that would pass on 0.9999997 as readily as on 1.
+ *
+ * FIXTURE-REACHED GUARDS are the reason `buildActorRigOfMasses` is exported.
+ * Every error branch in the derivation is unreachable from the four shipped
+ * archetypes, because they are healthy; a guard no test can reach is one that
+ * can be deleted or inverted in silence. The `describe('rejects a malformed
+ * genome')` block below hands it deliberately broken mass/pivot tables.
  */
 import { describe, expect, it } from 'vitest';
 import { ARCHETYPES, archetypeById, pivotsOf } from './actorMasses.js';
-import { buildActorRig, CANARY_LADDER_DEG, CANARY_POSE, evaluatePose } from './actorRig.js';
+import { buildActorRig, buildActorRigOfMasses, evaluatePose } from './actorRig.js';
 
 const IDS = ['unbound', 'legion', 'magistari', 'orghon'];
 
@@ -222,74 +227,87 @@ describe('buildActorRig — topology', () => {
   });
 });
 
-describe('CANARY_POSE', () => {
-  it('is a table per archetype, frozen all the way down', () => {
-    expect(Object.keys(CANARY_POSE).sort()).toEqual([...IDS].sort());
-    expect(Object.isFrozen(CANARY_POSE)).toBe(true);
+/**
+ * The malformed-genome fixtures. None of these shapes exists in the shipped
+ * roster — that is the point: `pivotsOfMasses` makes no tree-ness promise for
+ * a derived or computed mass list, and these guards are the only thing between
+ * such a list and a skeleton with two parents for one mass.
+ */
+describe('buildActorRigOfMasses — rejects a malformed genome', () => {
+  const mass = (id, a, b, over = {}) => ({ id, a, b, r0: 0.1, r1: 0.1, color: [1, 1, 1], capA: false, capB: false, ...over });
+  const pivot = (pivotId, at, massIds, closure = 'cap') => ({ pivotId, at, massIds, closure });
+
+  /** A minimal HEALTHY fixture, so the failures below are the only difference. */
+  const healthyMasses = [mass('a', [0, 0, 0], [0, 1, 0]), mass('b', [0, 1, 0], [0, 2, 0])];
+  const healthyPivots = [pivot('t.p0', [0, 1, 0], ['a', 'b'])];
+
+  it('builds the healthy fixture, so the rejections below mean something', () => {
+    const rig = buildActorRigOfMasses(healthyMasses, healthyPivots, 't');
+    expect(rig.bones.map((b) => b.boneId)).toEqual(['t.root', 't.p0']);
+    expect(rig.bones.map((b) => b.massIds)).toEqual([['a'], ['b']]);
+    expect(Array.from(rig.boneOfMass)).toEqual([0, 1]);
+  });
+
+  it('a pivot naming a mass that does not exist', () => {
+    expect(() => buildActorRigOfMasses(
+      healthyMasses,
+      [pivot('t.p0', [0, 1, 0], ['a', 'ghost'])],
+      't',
+    )).toThrow(/pivot t\.p0 names unknown mass "ghost"/);
+  });
+
+  it('a cycle — two pivots joining the same two masses', () => {
+    expect(() => buildActorRigOfMasses(
+      healthyMasses,
+      [pivot('t.p0', [0, 1, 0], ['a', 'b']), pivot('t.p1', [0, 1, 0], ['a', 'b'])],
+      't',
+    )).toThrow(/is not a tree: 4 incidences across 4 nodes, a tree needs 3.*cycle/s);
+  });
+
+  it('a forest — a mass joined to nothing', () => {
+    expect(() => buildActorRigOfMasses(healthyMasses, [], 't'))
+      .toThrow(/is not a tree: 0 incidences across 2 nodes, a tree needs 1.*forest/s);
+  });
+
+  it('a joint held shut by neither mechanism', () => {
+    // `closureAt` returns null when a joint is neither capped nor ring-welded.
+    // Rotating one is not merely risky, it is undefined: there is nothing to
+    // decide whether the bone may exist.
+    expect(() => buildActorRigOfMasses(
+      healthyMasses,
+      [pivot('t.p0', [0, 1, 0], ['a', 'b'], null)],
+      't',
+    )).toThrow(/pivot t\.p0 has closure null: neither mechanism holds it shut/);
+  });
+
+  it('a disconnected graph that still has the right edge count', () => {
+    // The edge count alone cannot see this: 6 incidences across 7 nodes is
+    // exactly nodes-1, but it is a tree PLUS a separate cycle, so the connected
+    // half of the proof has to be the BFS itself.
+    const masses = [
+      mass('a', [0, 0, 0], [0, 1, 0], { r0: 0.5, r1: 0.5 }), // heaviest -> root
+      mass('b', [0, 1, 0], [0, 2, 0]),
+      mass('c', [1, 0, 0], [1, 1, 0]),
+      mass('d', [1, 1, 0], [1, 2, 0]),
+    ];
+    const pivots = [
+      pivot('t.p0', [0, 1, 0], ['a', 'b']),
+      pivot('t.p1', [1, 1, 0], ['c', 'd']),
+      pivot('t.p2', [1, 1, 0], ['c', 'd']),
+    ];
+    expect(pivots.reduce((n, p) => n + p.massIds.length, 0)).toBe(masses.length + pivots.length - 1);
+    expect(() => buildActorRigOfMasses(masses, pivots, 't'))
+      .toThrow(/is disconnected: masses \[c,d\] and pivots \[t\.p1,t\.p2\] are unreachable from root "a"/);
+  });
+
+  it('derives the shipped rigs identically through the seam', () => {
+    // The wrapper must add nothing but genome lookup.
     for (const id of IDS) {
-      expect(Object.isFrozen(CANARY_POSE[id]), id).toBe(true);
-      for (const e of Object.values(CANARY_POSE[id])) {
-        expect(Object.isFrozen(e)).toBe(true);
-        expect(Object.isFrozen(e.axis)).toBe(true);
-        expect(() => { e.axis[0] = 99; }).toThrow();
-      }
+      const direct = buildActorRigOfMasses(archetypeById(id).masses, pivotsOf(id), id);
+      const wrapped = buildActorRig(id);
+      expect(direct.bones, id).toEqual(wrapped.bones);
+      expect(Array.from(direct.boneOfMass), id).toEqual(Array.from(wrapped.boneOfMass));
     }
-  });
-
-  it.each(IDS)('%s poses every non-root bone and only those', (id) => {
-    const { bones } = buildActorRig(id);
-    const keys = Object.keys(CANARY_POSE[id]).map(Number).sort((x, y) => x - y);
-    const expected = bones.map((_, i) => i).slice(1);
-    expect(keys).toEqual(expected);
-    expect(keys.length).toBe(EXPECTED_BONES[id] - 1);
-  });
-
-  it.each(IDS)('%s angles are pairwise distinct, small, and off the prime ladder', (id) => {
-    const entries = Object.values(CANARY_POSE[id]);
-    const degrees = entries.map((e) => (e.angleRad * 180) / Math.PI);
-    expect(new Set(degrees.map((d) => d.toFixed(9))).size).toBe(entries.length);
-    for (const d of degrees) {
-      // Rounded because the value round-trips through radians.
-      expect(CANARY_LADDER_DEG, `${d} deg`).toContain(Math.round(d));
-      expect(d).toBeGreaterThan(0);
-      expect(d).toBeLessThanOrEqual(30);
-    }
-    // No angle is an integer multiple of another: doubling or halving one
-    // joint has to change the palette, not alias onto a sibling.
-    for (const p of degrees) {
-      for (const q of degrees) {
-        if (p === q) continue;
-        expect(Math.abs((Math.max(p, q) / Math.min(p, q)) % 1), `${p}/${q}`).toBeGreaterThan(1e-6);
-      }
-    }
-  });
-
-  it.each(IDS)('%s axes are unit, and every mass they turn actually turns', (id) => {
-    // The axis-picking rule (orthogonal to the bone's limb direction) exists to
-    // stop a rotation that spins a capsule on its own centreline and moves
-    // nothing. Asserting the rule's INTERNAL arithmetic would just restate the
-    // implementation; asserting the OUTCOME is the property that matters, so
-    // this measures displacement per owned mass. An endpoint sitting exactly on
-    // the pivot legitimately does not move (unbound's legs share the hip
-    // coordinate), so the mass qualifies if either end does.
-    const rig = buildActorRig(id);
-    const byId = new Map(archetypeById(id).masses.map((m) => [m.id, m]));
-    const palette = evaluatePose(rig, CANARY_POSE[id]);
-    for (const [i, e] of Object.entries(CANARY_POSE[id])) {
-      expect(Math.hypot(...e.axis), `bone ${i}`).toBeCloseTo(1, 12);
-      for (const mid of rig.bones[i].massIds) {
-        const m = byId.get(mid);
-        const moved = Math.max(dist(apply(palette, i, m.a), m.a), dist(apply(palette, i, m.b), m.b));
-        expect(moved, `${id} bone ${i} left ${mid} where it was`).toBeGreaterThan(0.002);
-      }
-    }
-  });
-
-  it('the ladder holds enough distinct primes for the deepest rig', () => {
-    const deepest = Math.max(...IDS.map((id) => buildActorRig(id).bones.length - 1));
-    expect(deepest).toBe(7);
-    expect(CANARY_LADDER_DEG.length).toBeGreaterThanOrEqual(deepest);
-    expect(new Set(CANARY_LADDER_DEG).size).toBe(CANARY_LADDER_DEG.length);
   });
 });
 
@@ -300,7 +318,7 @@ describe('evaluatePose — the palette', () => {
     expect(palette).toBeInstanceOf(Float32Array);
     expect(palette).toHaveLength(rig.bones.length * 16);
     for (let i = 0; i < rig.bones.length; i++) {
-      // `toBe`, never `toBeCloseTo`: the whole point is that no rounding
+      // `toEqual`, never `toBeCloseTo`: the whole point is that no rounding
       // happened. 0.9999999403953552 would satisfy a tolerance and would mean
       // the pivot conjugation was composed numerically instead of as at-at·R.
       expect(matAt(palette, i), `${id} bone ${i} (${rig.bones[i].boneId})`).toEqual(IDENTITY_16);
@@ -308,81 +326,39 @@ describe('evaluatePose — the palette', () => {
   });
 
   it.each(IDS)('%s rest palette is identity for an explicit zero-angle pose too', (id) => {
+    // The axis has a ZERO COMPONENT on purpose. `at - at·R` then produces
+    // genuine -0 entries, and `toEqual` uses Object.is, so this assertion only
+    // holds because evaluatePose canonicalises negative zero on the way out.
+    // Without that, the rest palette compares unequal to the identity it
+    // numerically IS — the exact trap Task 4's element-wise oracle would hit.
     const rig = buildActorRig(id);
-    const zero = Object.fromEntries(rig.bones.map((_, i) => [i, { axis: [0.6, 0.8, 0], angleRad: 0 }]));
+    const zero = Object.fromEntries(rig.bones.map((_, i) => [i, { axis: [0.6, 0, -0.8], angleRad: 0 }]));
     const palette = evaluatePose(rig, zero);
     for (let i = 0; i < rig.bones.length; i++) {
       expect(matAt(palette, i), `${id} bone ${i}`).toEqual(IDENTITY_16);
+      for (const v of matAt(palette, i)) expect(Object.is(v, -0), `${id} bone ${i} kept a -0`).toBe(false);
     }
   });
 
-  it.each(IDS)('%s canary palette moves every non-root bone, and none identically', (id) => {
-    const rig = buildActorRig(id);
-    const palette = evaluatePose(rig, CANARY_POSE[id]);
-    expect(matAt(palette, 0)).toEqual(IDENTITY_16);
-    const seen = new Set();
-    for (let i = 0; i < rig.bones.length; i++) {
-      const key = matAt(palette, i).join(',');
-      expect(seen.has(key), `${id} bones ${i} and an earlier one share a matrix`).toBe(false);
-      seen.add(key);
-      if (i > 0) expect(matAt(palette, i), `${id} bone ${i} did not move`).not.toEqual(IDENTITY_16);
-    }
-  });
-
-  it.each(IDS)('%s canary actually displaces the geometry of every posed bone', (id) => {
-    // The matrix differing from identity is necessary, not sufficient: a bone
-    // whose masses all sit at its own pivot would have a non-identity matrix
-    // and move nothing visible. Measure the real endpoints.
-    const rig = buildActorRig(id);
-    const byId = new Map(archetypeById(id).masses.map((m) => [m.id, m]));
-    const palette = evaluatePose(rig, CANARY_POSE[id]);
-    let worst = 0;
-    for (let i = 1; i < rig.bones.length; i++) {
-      let moved = 0;
-      for (const mid of rig.bones[i].massIds) {
-        const m = byId.get(mid);
-        moved = Math.max(moved, dist(apply(palette, i, m.a), m.a), dist(apply(palette, i, m.b), m.b));
-      }
-      expect(moved, `${id} bone ${i} (${rig.bones[i].boneId})`).toBeGreaterThan(0.005);
-      worst = Math.max(worst, moved);
-    }
-    // Small enough to stay inside the sealed envelope Task 3 gates. Unbound's
-    // 0.572 m fist (four compounding joints down the graft chain) is the
-    // roster maximum; if that gate ever fails, shrink the angle.
-    expect(worst, `${id} worst displacement`).toBeLessThan(0.60);
-  });
-
-  it.each(IDS)('%s canary palette entries are rigid motions', (id) => {
-    // Rotation about a pivot is length-preserving. A palette row that lost
-    // orthonormality would shear the mesh and no bone-count pin would notice.
-    const rig = buildActorRig(id);
-    const palette = evaluatePose(rig, CANARY_POSE[id]);
-    for (let i = 0; i < rig.bones.length; i++) {
-      const p = apply(palette, i, [0.3, -0.7, 0.2]);
-      const q = apply(palette, i, [-0.4, 0.1, 0.9]);
-      expect(dist(p, q), `${id} bone ${i}`).toBeCloseTo(dist([0.3, -0.7, 0.2], [-0.4, 0.1, 0.9]), 6);
-    }
-  });
-
-  it.each(IDS)('%s canary palette leaves each bone\'s own pivot fixed', (id) => {
-    const rig = buildActorRig(id);
-    const palette = evaluatePose(rig, CANARY_POSE[id]);
-    // Bone 1's pivot lies inside its parent (the root, unrotated), so bone 1's
-    // own pivot is a genuine fixed point. Deeper bones inherit their parents'
-    // motion, so only the root-child case is checked here.
-    const moved = dist(apply(palette, 1, rig.bones[1].at), rig.bones[1].at);
-    expect(moved, `${id} bone 1 pivot drifted`).toBeLessThan(1e-6);
+  it('canonicalises negative zero in a posed palette too', () => {
+    // Anti-vacuity for the clause above: a pose that WOULD emit -0 without it.
+    const bones = [{ boneId: 'root', at: [0, 1, 0], parentIndex: -1, massIds: [] }];
+    const palette = evaluatePose({ bones }, { 0: { axis: [0, 1, 0], angleRad: Math.PI } });
+    expect(Array.from(palette).some((v) => Object.is(v, -0))).toBe(false);
+    // ...and the rotation itself is still real: 180 degrees about +Y flips x.
+    expect(apply(palette, 0, [1, 1, 0])[0]).toBeCloseTo(-1, 6);
   });
 
   it.each(IDS)('%s evaluatePose is deterministic and uncached', (id) => {
     const rig = buildActorRig(id);
-    const a = evaluatePose(rig, CANARY_POSE[id]);
-    const b = evaluatePose(rig, CANARY_POSE[id]);
+    const pose = { 1: { axis: [1, 0, 0], angleRad: 0.2 } };
+    const a = evaluatePose(rig, pose);
+    const b = evaluatePose(rig, pose);
     expect(Array.from(a)).toEqual(Array.from(b));
     expect(a).not.toBe(b);
     // Scribbling on one palette cannot reach the next: there is no cache.
     a[0] = 42;
-    expect(Array.from(evaluatePose(rig, CANARY_POSE[id]))).toEqual(Array.from(b));
+    expect(Array.from(evaluatePose(rig, pose))).toEqual(Array.from(b));
   });
 
   it('refuses a forward parent reference', () => {
@@ -391,6 +367,32 @@ describe('evaluatePose — the palette', () => {
       { boneId: 'b', at: [0, 1, 0], parentIndex: -1, massIds: [] },
     ];
     expect(() => evaluatePose({ bones }, {})).toThrow(/requires parent < index/);
+  });
+
+  it('refuses a non-unit rotation axis, naming the bone', () => {
+    // Rodrigues assumes |axis| = 1. A scaled axis returns a matrix that scales
+    // and shears instead of rotating, and every downstream gate would then
+    // measure the wrong body without anything failing.
+    const bones = [{ boneId: 'solo', at: [0, 1, 0], parentIndex: -1, massIds: [] }];
+    expect(() => evaluatePose({ bones }, { 0: { axis: [0, 2, 0], angleRad: 0.3 } }))
+      .toThrow(/bone 0 \(solo\) has a non-unit pose axis, \|axis\| = 2/);
+    expect(() => evaluatePose({ bones }, { 0: { axis: [0, 0, 0], angleRad: 0.3 } }))
+      .toThrow(/non-unit pose axis/);
+    // A unit axis passes, so the guard is not simply rejecting everything.
+    expect(() => evaluatePose({ bones }, { 0: { axis: [0, 1, 0], angleRad: 0.3 } })).not.toThrow();
+  });
+
+  it.each(IDS)('%s palette entries stay rigid under an arbitrary pose', () => {
+    // Rotation about a pivot is length-preserving. A palette row that lost
+    // orthonormality would shear the mesh and no bone-count pin would notice.
+    const rig = buildActorRig(IDS[0]);
+    const pose = Object.fromEntries(rig.bones.map((_, i) => [i, { axis: [0, 0, 1], angleRad: 0.11 * (i + 1) }]));
+    const palette = evaluatePose(rig, pose);
+    for (let i = 0; i < rig.bones.length; i++) {
+      const p = apply(palette, i, [0.3, -0.7, 0.2]);
+      const q = apply(palette, i, [-0.4, 0.1, 0.9]);
+      expect(dist(p, q), `bone ${i}`).toBeCloseTo(dist([0.3, -0.7, 0.2], [-0.4, 0.1, 0.9]), 6);
+    }
   });
 });
 
@@ -491,5 +493,9 @@ describe('evaluatePose — hand-computed fixtures', () => {
     expect(palette[12]).toBeCloseTo(0, 12);
     expect(palette[13]).toBeCloseTo(3, 12);
     expect(palette[14]).toBeCloseTo(-3, 12);
+    // ...and the rotation is NOT its own transpose here, so a transposed store
+    // would move element 1 and element 4 into each other's slots.
+    expect(palette[6]).toBeCloseTo(1, 12);
+    expect(palette[9]).toBeCloseTo(-1, 12);
   });
 });
