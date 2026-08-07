@@ -1,9 +1,11 @@
 /**
- * actorSkin.test.js — the CPU skinning twin, held to five things it has to be
- * true about: an exact no-op at rest, genuine motion under the canary pose
- * (and ONLY where a bone says motion belongs), a fingerprint that names the
- * bone a vertex actually moved with, unit-length normals, and a promise that
- * none of this reads by mutating what it was handed.
+ * actorSkin.test.js — the CPU skinning twin, held to seven things it has to
+ * be true about: an exact no-op at rest, genuine motion under the canary
+ * pose (and ONLY where a bone says motion belongs), a fingerprint that names
+ * the bone a vertex actually moved with, positions and normals that agree
+ * with two INDEPENDENTLY written reference formulas, unit-length normals,
+ * genuine per-step fp32 rounding (not none, not once at the end), and a
+ * promise that none of this reads by mutating what it was handed.
  *
  * NONE OF THESE ARE VACUOUS BY ACCIDENT. The identity gate is not "nothing
  * happened, so nothing failed" — the roster's own near/far payloads carry 134
@@ -18,6 +20,23 @@
  * moved" either: it is checked against EVERY bone in the rig, not just the
  * true one, so a vertex that happens to move under its own bone's matrix
  * AND under some other bone's matrix would still be caught.
+ *
+ * REVIEW ROUND 1 FOUND A GAP THIS LIST DID NOT COVER: nothing here checked
+ * WHERE a vertex moved to, only THAT it moved. A translation-offset mutation
+ * (reading elements 3/7/11 instead of 12/13/14 — the exact row/column
+ * confusion the palette layout convention exists to prevent) passed all 58
+ * tests that existed at the time, with a measured worst error of 1.6892 m —
+ * roughly a body length. The `skinPayload — positions` block below closes
+ * that hole with `applyAffine`, an independently written full-affine
+ * reference (copied verbatim from model/actorRig.test.js and
+ * model/actorCanary.test.js, never imported from actorSkin.js). The same
+ * round found that replacing every `Math.fround` with the identity function
+ * — deleting the module's entire reason to exist as an "emulated-fp32
+ * golden model" — also passed all 58 tests, silently mis-sizing exactly the
+ * tolerance Task 4's oracle is supposed to be built around. The `skinPayload
+ * — fp32 rounding discipline is falsifiable` block closes that hole with a
+ * second independent reference, `applyAffineFp32`, that rounds after every
+ * step rather than never or once at the end.
  */
 import { describe, expect, it } from 'vitest';
 import { ARCHETYPES, archetypeById } from '../model/actorMasses.js';
@@ -93,6 +112,44 @@ function applyRotationOnly(M, o, n) {
   ];
 }
 
+/**
+ * Independent reference for the FULL AFFINE transform (rotation +
+ * translation), copied VERBATIM from model/actorRig.test.js:57-62 and
+ * model/actorCanary.test.js:56-62 (both files carry this identical helper
+ * under the name `apply`) rather than imported from actorSkin.js, so
+ * agreement between the two is evidence about the module, not a restatement
+ * of it. Float64 throughout, no fround, no zero-skipping. Row-vector
+ * convention: p' = p·M, translation in elements 12..14.
+ */
+function applyAffine(palette, i, p) {
+  const o = i * 16;
+  return [
+    p[0] * palette[o] + p[1] * palette[o + 4] + p[2] * palette[o + 8] + palette[o + 12],
+    p[0] * palette[o + 1] + p[1] * palette[o + 5] + p[2] * palette[o + 9] + palette[o + 13],
+    p[0] * palette[o + 2] + p[1] * palette[o + 6] + p[2] * palette[o + 10] + palette[o + 14],
+  ];
+}
+
+/**
+ * Independent PER-STEP-fp32 reference for the same affine transform —
+ * `Math.fround` after every individual multiply and every individual
+ * running-sum add, mirroring actorSkin.js's OWN documented discipline but
+ * written fresh here (never calling into `dotColumn`), so exact agreement
+ * is evidence the module actually follows the rounding discipline its
+ * header claims, rather than merely landing on the same final Float32Array
+ * bits some other way (e.g. rounding once at the very end).
+ */
+function applyAffineFp32(palette, i, p) {
+  const o = i * 16;
+  const column = (col) => {
+    const a = Math.fround(p[0] * palette[o + col]);
+    const ab = Math.fround(a + Math.fround(p[1] * palette[o + 4 + col]));
+    const abc = Math.fround(ab + Math.fround(p[2] * palette[o + 8 + col]));
+    return Math.fround(abc + palette[o + 12 + col]);
+  };
+  return [column(0), column(1), column(2)];
+}
+
 const dist3 = (ax, ay, az, bx, by, bz) => Math.hypot(ax - bx, ay - by, az - bz);
 
 describe('actorSkin — test roster', () => {
@@ -113,6 +170,37 @@ describe('skinPayload — identity palette is a bit-exact Float32 no-op', () => 
       }
     }
     expect(negZero).toBeGreaterThan(0);
+  });
+
+  it('a synthetic negative-zero POSITION component also round-trips exactly (the roster authors none today)', () => {
+    // FIX (review round 1, minor): the `extra !== 0` skip in `dotColumn`
+    // protects a genuine -0 surviving component from being sign-flipped by
+    // an added +0 translation — the same mechanism the 134 real -0 NORMAL
+    // components above prove for the `cy`/`cz` skips. But the roster's own
+    // payload authors zero -0 POSITION components (measured, all four
+    // archetypes, both stages: see actorSkin.js's header), so nothing in
+    // this file's real-data tests would fail if that specific skip were
+    // removed. Constructed by hand instead, so the branch is load-bearing
+    // rather than merely reachable.
+    const rig = { boneOfMass: new Uint16Array([0]) };
+    // Literal identity, 16 floats, translation exactly +0 — the same shape
+    // evaluatePose(rig, {}) produces, spelled out here so this fixture does
+    // not depend on evaluatePose to exist correctly.
+    const palette = new Float32Array([
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ]);
+    const payload = {
+      positions: new Float32Array([-0, 2.5, -3.25]),
+      normals: new Float32Array([1, 0, 0]),
+      massIndex: new Uint16Array([0]),
+    };
+    const { positions } = skinPayload(payload, rig, palette);
+    expect(Object.is(positions[0], -0), `expected -0, got ${positions[0]}`).toBe(true);
+    expect(positions[1]).toBe(2.5);
+    expect(positions[2]).toBe(-3.25);
   });
 
   for (const id of IDS) {
@@ -251,6 +339,94 @@ describe('skinPayload — fingerprint (a mass moves ONLY as its own bone would m
         // Anti-vacuity: this loop must actually have exercised more than one
         // candidate bone per mass, or "iff" collapses to a single check.
         expect(pairsChecked).toBeGreaterThan(massCount);
+      });
+    }
+  }
+});
+
+describe('skinPayload — positions', () => {
+  for (const id of IDS) {
+    for (const stage of STAGES) {
+      it(`${id} stage ${stage}: canary positions equal the bone-transformed authored positions`, () => {
+        // CRITICAL FIX (review round 1). Before this block existed, a
+        // mutation that swapped the translation read from elements
+        // 12/13/14 to 3/7/11 — the exact row/column confusion the palette
+        // layout convention exists to prevent — passed all 58 tests then in
+        // the file. It hid behind three facts landing at once: the identity
+        // palette has zeros at both locations, so the identity gate stayed
+        // green; evaluatePose always zeroes elements 3/7/11 (the top-right
+        // block of an affine matrix's homogeneous row), so the mutant
+        // degraded to "rotate about the origin" rather than something
+        // NaN-shaped, and rotation-about-origin still moves most vertices,
+        // so canary-motion and the per-mass surface floor stayed green too;
+        // and the fingerprint test compares skinPayload's output to
+        // skinPayload's own output on a mini-payload, so a CONSISTENTLY
+        // wrong translation read is invisible to a test built entirely out
+        // of self-comparison. Measured worst error under that mutation:
+        // 1.6892 m (unbound stage 0 vertex 2402) — roughly a body length.
+        // This test closes the hole with a genuinely independent formula
+        // (`applyAffine`, above) that reads the translation from the
+        // correct offsets on its own, and as a side effect gives the 3x3
+        // rotation read a second point of independence beyond the normals
+        // test below (retiring the single-point-of-failure the transpose
+        // mutation exposed in review).
+        const rig = buildActorRig(id);
+        const palette = evaluatePose(rig, CANARY_POSE[id]);
+        const payload = buildActorPayload(id, stage);
+        const { positions } = skinPayload(payload, rig, palette);
+        for (let v = 0; v < payload.massIndex.length; v++) {
+          const bone = rig.boneOfMass[payload.massIndex[v]];
+          const i = v * 3;
+          const ref = applyAffine(palette, bone, [payload.positions[i], payload.positions[i + 1], payload.positions[i + 2]]);
+          for (let k = 0; k < 3; k++) {
+            expect(positions[i + k], `${id} stage ${stage} vertex ${v} axis ${k}`).toBeCloseTo(ref[k], 5);
+          }
+        }
+      });
+    }
+  }
+});
+
+describe('skinPayload — fp32 rounding discipline is falsifiable', () => {
+  for (const id of IDS) {
+    for (const stage of STAGES) {
+      it(`${id} stage ${stage}: at least one position component proves per-step fp32 rounding, not none or once-at-the-end`, () => {
+        // IMPORTANT FIX (review round 1). Replacing every Math.fround in
+        // actorSkin.js with the identity function — deleting the module's
+        // entire reason to call itself an "emulated-fp32 golden model" —
+        // passed all 58 tests that existed before this block. Measured:
+        // 28.31% of position components changed bitwise under that
+        // mutation, max delta 2.384e-7 m. Nothing asserted that per-step
+        // rounding was actually happening, which is exactly the number
+        // actorSkin.js's own header says Task 4's oracle tolerance must be
+        // sized around — a silently mis-sized tolerance is worse than a
+        // loud test failure here.
+        //
+        // Two independent references, two assertions, both required to
+        // hold on the SAME component: `applyAffine` (float64, no rounding
+        // anywhere) and `applyAffineFp32` (fround after every individual
+        // step, written fresh rather than calling into `dotColumn`). The
+        // real teeth is the second: it disagrees with `applyAffine`
+        // precisely where the PLACEMENT of rounding matters, which a
+        // once-at-the-end rounding would not reproduce.
+        const rig = buildActorRig(id);
+        const palette = evaluatePose(rig, CANARY_POSE[id]);
+        const payload = buildActorPayload(id, stage);
+        const { positions } = skinPayload(payload, rig, palette);
+        let found = false;
+        for (let v = 0; v < payload.massIndex.length && !found; v++) {
+          const bone = rig.boneOfMass[payload.massIndex[v]];
+          const p = [payload.positions[v * 3], payload.positions[v * 3 + 1], payload.positions[v * 3 + 2]];
+          const float64Ref = applyAffine(palette, bone, p);
+          const fp32Ref = applyAffineFp32(palette, bone, p);
+          const i = v * 3;
+          for (let k = 0; k < 3; k++) {
+            const differsFromFloat64 = !Object.is(positions[i + k], float64Ref[k]);
+            const matchesFp32Chain = Object.is(positions[i + k], fp32Ref[k]);
+            if (differsFromFloat64 && matchesFp32Chain) { found = true; break; }
+          }
+        }
+        expect(found, `${id} stage ${stage}: no component both differed from the float64 chain and matched the independent per-step fp32 chain — rounding discipline is unfalsified`).toBe(true);
       });
     }
   }

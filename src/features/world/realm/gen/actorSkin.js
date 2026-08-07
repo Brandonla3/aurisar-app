@@ -124,7 +124,13 @@ function dotColumn(vx, vy, vz, M, o, col, extra) {
     has = true;
   }
   if (extra !== undefined && extra !== 0) {
-    sum = has ? fr(sum + extra) : extra;
+    // `fr(extra)` rather than bare `extra`: unreachable under the
+    // Float32Array contract this function is always called with (`extra` is
+    // already an exact fp32 value read straight out of a Float32Array, so
+    // `fr` is a no-op here), but this is the one place "fround every
+    // intermediate" would otherwise rely on the caller's typed-array
+    // discipline instead of its own.
+    sum = has ? fr(sum + extra) : fr(extra);
     has = true;
   }
   return has ? sum : 0;
