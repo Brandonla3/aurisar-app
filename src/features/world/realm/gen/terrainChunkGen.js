@@ -83,8 +83,20 @@ export function generateTerrainChunk(field, {
     }
   }
 
-  // Two triangles per cell, counter-clockwise as seen from +Y so the ground
-  // faces up under Babylon's default backface culling.
+  // Two triangles per cell, wound so the UP-facing side is Babylon's FRONT
+  // face — i.e. each triple's right-handed cross product (v1-v0)x(v2-v0)
+  // points DOWN (-Y), anti-parallel to the field normal. That reads
+  // backwards and is not: with useRightHandedSystem false and the mesh's
+  // default CounterClockWise side orientation, Babylon's own
+  // CreateGroundVertexData emits exactly this order for the same quad, and
+  // gen/winding.test.js measures the convention off five Babylon primitives
+  // rather than asserting it from memory.
+  //
+  // This shipped as (a, c, b) / (b, c, d) from P2 until the P6 final review.
+  // That is the +Y cross, the BACK face, so every up-facing triangle in the
+  // world was culled and the spike rendered sky where the ground should be
+  // (measured on a real GPU: 21-45 lit pixels out of 921,600 looking straight
+  // down; 912,656 after reversing the winding in place).
   let t = 0;
   for (let iz = 0; iz < subdivisions; iz++) {
     for (let ix = 0; ix < subdivisions; ix++) {
@@ -92,8 +104,8 @@ export function generateTerrainChunk(field, {
       const b = a + 1;
       const c = a + verts;
       const d = c + 1;
-      indices[t++] = a; indices[t++] = c; indices[t++] = b;
-      indices[t++] = b; indices[t++] = c; indices[t++] = d;
+      indices[t++] = a; indices[t++] = b; indices[t++] = c;
+      indices[t++] = b; indices[t++] = d; indices[t++] = c;
     }
   }
 

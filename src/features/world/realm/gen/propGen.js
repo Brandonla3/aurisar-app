@@ -187,6 +187,16 @@ function growBoulder(genome, stage) {
     shadeFloor: 0.85,
   });
   // Flat-shade + lichen pass over what addBlob just wrote.
+  //
+  // NEGATED, and that is the whole point. The face normal wanted here is the
+  // OUTWARD one — it feeds shading and the `ny > 0.45` up-face lichen mask.
+  // Under this repo's front-face convention (see propPrimitives.js's header)
+  // a correctly wound triangle's right-handed cross (v1-v0)x(v2-v0) points
+  // INWARD, so taking it unnegated would light every boulder from inside the
+  // rock and grow its lichen on the undersides. Before the P6 winding fix the
+  // two errors cancelled: the blob was wound backwards, so the un-negated
+  // cross happened to come out outward. Fixing the winding alone would have
+  // left the boulder shaded inside-out — this negation is the other half.
   const { pos, nrm, col, idx } = acc;
   for (let t = 0; t < idx.length; t += 3) {
     const [a, b, c] = [idx[t] * 3, idx[t + 1] * 3, idx[t + 2] * 3];
@@ -196,9 +206,9 @@ function growBoulder(genome, stage) {
     const vx = pos[c] - pos[a];
     const vy = pos[c + 1] - pos[a + 1];
     const vz = pos[c + 2] - pos[a + 2];
-    let nx = uy * vz - uz * vy;
-    let ny = uz * vx - ux * vz;
-    let nz = ux * vy - uy * vx;
+    let nx = uz * vy - uy * vz;
+    let ny = ux * vz - uz * vx;
+    let nz = uy * vx - ux * vy;
     const il = 1 / (Math.hypot(nx, ny, nz) || 1);
     nx *= il; ny *= il; nz *= il;
     const lichen = Math.max(0, ny - 0.45) * 1.4; // up-faces grow lichen

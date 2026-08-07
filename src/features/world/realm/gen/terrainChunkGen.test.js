@@ -95,16 +95,27 @@ describe('generateTerrainChunk', () => {
   });
 
   it('triangles face up', () => {
-    // First cell, first triangle (a, c, b): its winding must produce a +Y
-    // face normal or the entire ground is invisible under backface culling.
-    const [a, c, b] = [chunk.indices[0], chunk.indices[1], chunk.indices[2]];
+    // The claim this test has always MEANT to make: the up-facing side of the
+    // ground must be Babylon's FRONT face, or the entire ground is invisible
+    // under backface culling. What it asserted until the P6 final review was
+    // the opposite sign — and the ground was in fact invisible on hardware.
+    //
+    // Front face here = right-handed cross (v1-v0)x(v2-v0) pointing AWAY from
+    // the viewer, so for a ground plane seen from above it points DOWN.
+    // gen/winding.test.js is where that convention is measured off Babylon's
+    // own primitives; this test just pins the first cell of the first chunk so
+    // a reversal shows up in the file that emits it, not only in the sweep.
     const P = chunk.positions;
-    const ax = P[a * 3], az = P[a * 3 + 2];
-    const bx = P[b * 3], bz = P[b * 3 + 2];
-    const cx_ = P[c * 3], cz_ = P[c * 3 + 2];
-    // (c-a) x (b-a) . +Y
-    const crossY = (cz_ - az) * (bx - ax) - (cx_ - ax) * (bz - az);
-    expect(crossY).toBeGreaterThan(0);
+    const y = (i) => [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]];
+    for (const t of [0, 3]) {
+      const [v0, v1, v2] = [y(chunk.indices[t]), y(chunk.indices[t + 1]), y(chunk.indices[t + 2])];
+      const ux = v1[0] - v0[0], uz = v1[2] - v0[2];
+      const vx = v2[0] - v0[0], vz = v2[2] - v0[2];
+      // ((v1-v0) x (v2-v0)).y
+      const crossY = uz * vx - ux * vz;
+      expect(crossY, `triangle ${t / 3} of the first cell is wound with its RH cross UP, which is the BACK `
+        + 'face — the ground would be culled away entirely').toBeLessThan(0);
+    }
   });
 
   it('tracks its own height range for bounds', () => {

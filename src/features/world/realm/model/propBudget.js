@@ -57,7 +57,7 @@ export const PROP_MANIFEST = Object.freeze({
  * shipping camera's real 0.8 rad FOV instead of an assumed 60 degrees,
  * chunk-CENTER cameras added since corners are the LOW-resident config
  * under Chebyshev streaming, and a diagonal rebuild march): drawCalls
- * worst 117 (belt 4-corner deep), triangles worst 567,602 (belt corner),
+ * worst 117 (belt 4-corner deep), triangles worst 567,286 (belt corner),
  * fillScreens worst 6.6 (crag chunk-center — the underfoot chunk bills its
  * whole prop field at the 8m distance floor with no frustum culling, which
  * biases HIGH: acceptable for a regression ceiling, unusable as a
@@ -65,6 +65,15 @@ export const PROP_MANIFEST = Object.freeze({
  * prior generation of these numbers (91/357k/0.71/19) measured a camera
  * state the renderer never occupies; before that, hand-guessed ceilings
  * were 3-50x too loose. Each retune has been evidence replacing folklore.
+ *
+ * The triangle figure above read 567,602 from P5 until the P6 final review —
+ * a hand-transcribed snapshot that had drifted 316 triangles from the
+ * computation it was copied from. That drift is the reason
+ * `worstPropCensus()` (model/propCensus.js) exists as an importable pure
+ * function that both budget tests call: this line is now provenance for the
+ * ceiling below and nothing computes from it, so if it drifts again, the
+ * function is the truth and this is the copy. Re-read it from the `[census]`
+ * line realmBudget.test.js logs on every run.
  */
 export const BUDGET_CEILINGS = Object.freeze({
   /** Live (prototype, chunk) thin-instance draw calls, worst camera. */

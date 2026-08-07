@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  maskIoU, projectedBounds, rasterizeMask, silhouetteAreaM2, silhouetteStats,
+  ACTOR_WINDOW, bandOccupancy, canonicalStats, fitsWindow, maskIoU, projectedBounds,
+  rasterizeMask, silhouetteAreaM2, silhouetteStats,
 } from './silhouette.js';
+import { GATE_PITCH_RAD, GATE_RES } from './silhouetteGates.js';
 
 /** A unit box payload centered on the Y axis: [-w/2, w/2] x [0, h] x [-w/2, w/2]. */
 function boxPayload(w, h) {
@@ -104,5 +106,210 @@ describe('silhouetteAreaM2', () => {
   it('is deterministic', () => {
     const box = boxPayload(2, 3);
     expect(silhouetteAreaM2(box)).toBe(silhouetteAreaM2(box));
+  });
+});
+
+describe('pitchRad — additive to projectedBounds and rasterizeMask', () => {
+  it('projectedBounds: pitchRad=0 explicit matches pitchRad omitted, bit for bit', () => {
+    const box = boxPayload(2, 3);
+    const omitted = projectedBounds(box.positions, 0.83);
+    const explicit = projectedBounds(box.positions, 0.83, 0);
+    expect(explicit).toEqual(omitted);
+  });
+
+  it('rasterizeMask: pitchRad=0 explicit matches pitchRad omitted, bit for bit', () => {
+    const box = boxPayload(2, 3);
+    const bounds = projectedBounds(box.positions, 0.83);
+    const omitted = rasterizeMask(box, 0.83, bounds, 32);
+    const explicit = rasterizeMask(box, 0.83, bounds, 32, 0);
+    expect(explicit).toEqual(omitted);
+  });
+
+  /**
+   * Two identical plates that differ ONLY in depth. At yaw 0 a level eye
+   * cannot tell them apart at all; a pitched one separates them by
+   * |dz|·sin(pitch). That makes them the sharpest possible probe of whether
+   * the depth-tilt term survives into the rasterizer.
+   */
+  const plateAtZ = (z) => ({
+    positions: new Float32Array([-0.4, 0, z, 0.4, 0, z, 0.4, 1.6, z, -0.4, 1.6, z]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  });
+  const NEAR_PLATE = plateAtZ(-0.6);
+  const FAR_PLATE = plateAtZ(0.6);
+
+  it('regression guard: rasterizeMask actually HONOURS a non-zero pitch', () => {
+    // The sibling of the canonicalStats bounds guard below, and it was missing
+    // until the P6 final review. `rasterizeMask`'s `py()` is a DUPLICATED copy
+    // of projectedBounds' `sy` math, not a shared helper, so the passing "a
+    // pitched box projects shorter" test above gives the rasterizer zero
+    // coverage. Measured: `py = (vi) => toCellY(positions[vi*3+1])` — pitch
+    // dropped entirely — left the whole realm suite green, which means
+    // GATE_PITCH_RAD was unverified at the one place it is actually spent.
+    //
+    // Two plates identical except in Z. A level eye at yaw 0 sees one shape;
+    // a pitched eye sees them at different heights.
+    const level = [
+      rasterizeMask(NEAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, 0),
+      rasterizeMask(FAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, 0),
+    ];
+    expect(level[0], 'at pitch 0 two plates differing only in depth must rasterize identically').toEqual(level[1]);
+
+    const pitched = [
+      rasterizeMask(NEAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, GATE_PITCH_RAD),
+      rasterizeMask(FAR_PLATE, 0, ACTOR_WINDOW, GATE_RES, GATE_PITCH_RAD),
+    ];
+    let differing = 0;
+    for (let i = 0; i < pitched[0].length; i++) if (pitched[0][i] !== pitched[1][i]) differing++;
+    expect(
+      differing,
+      'at GATE_PITCH_RAD the two plates must land on DIFFERENT rows — if this is 0, rasterizeMask is '
+      + 'ignoring pitchRad and every actor gate is silently measuring a level eye',
+    ).toBe(336);
+
+    // And the direction is right: the nearer plate (z = -0.6) tilts UP the
+    // mask under a downward-looking eye, because sy = y·cos(p) - depth·sin(p).
+    const firstRow = (m) => {
+      for (let r = 0; r < GATE_RES; r++) {
+        for (let c = 0; c < GATE_RES; c++) if (m[r * GATE_RES + c]) return r;
+      }
+      return -1;
+    };
+    expect(firstRow(pitched[0])).toBe(13); // near plate, rows 13..34
+    expect(firstRow(pitched[1])).toBe(2); // far plate, rows 2..24
+    expect(firstRow(level[0])).toBe(7); // both, unpitched
+  });
+
+  it('regression guard: canonicalStats THREADS pitchRad through to the comparison', () => {
+    // The other half of the same seam. canonicalStats resolves its window as
+    // `() => bounds` and discards boundsA/boundsB, so a caller (or a refactor)
+    // dropping the 5th argument of compareAtYaw would be invisible to every
+    // other test in this file. Measured: changing `compareAtYaw(..., res,
+    // pitchRad)` to `..., res, 0)` left the full realm suite green.
+    const opts = { bounds: ACTOR_WINDOW, yawCount: 1, res: GATE_RES };
+    const level = canonicalStats(NEAR_PLATE, FAR_PLATE, { ...opts, pitchRad: 0 });
+    const pitched = canonicalStats(NEAR_PLATE, FAR_PLATE, { ...opts, pitchRad: GATE_PITCH_RAD });
+    expect(level.meanIoU, 'a level eye cannot separate two depth-offset plates').toBe(1);
+    expect(
+      pitched.meanIoU,
+      `at GATE_PITCH_RAD the same pair scores ${pitched.meanIoU} — if it is 1, pitchRad is not reaching the `
+      + 'rasterizer and the actor gates are measuring the wrong camera',
+    ).toBeCloseTo(0.363636, 6);
+  });
+
+  it('a pitched box projects shorter than an unpitched one', () => {
+    // A THIN box: negligible horizontal footprint, so the height axis's own
+    // cos(pitch) foreshortening is what dominates the span, instead of
+    // getting swamped by depth-parallax spread from a wide footprint (a
+    // wide box's depth extent can make a pitched span LONGER, not shorter —
+    // this is why the test picks a shape, not just any box).
+    const thin = boxPayload(0.01, 3);
+    const level = projectedBounds(thin.positions, 0);
+    const pitched = projectedBounds(thin.positions, 0, 0.5);
+    expect(pitched.maxY - pitched.minY).toBeLessThan(level.maxY - level.minY);
+  });
+});
+
+describe('canonicalStats — the same per-yaw comparison, against a FIXED window', () => {
+  it('a payload against itself scores a perfect match inside a window that contains it', () => {
+    const box = boxPayload(2, 3);
+    const bounds = { minX: -2, maxX: 2, minY: -1, maxY: 4 };
+    const s = canonicalStats(box, box, { bounds });
+    expect(s.meanIoU).toBe(1);
+    expect(s.minIoU).toBe(1);
+  });
+
+  it('scores the true size difference — no per-pair union window to hide behind', () => {
+    const wide = boxPayload(3, 2);
+    const narrow = boxPayload(1, 2);
+    const bounds = { minX: -2, maxX: 2, minY: -1, maxY: 3 };
+    const s = canonicalStats(wide, narrow, { bounds });
+    expect(s.meanIoU).toBeLessThan(1);
+  });
+
+  it('regression guard: actually uses the CALLER\'S bounds, not a silent fallback to the per-pair union window', () => {
+    // The two tests above would both still pass unchanged if canonicalStats
+    // quietly ignored `bounds` and recomputed a per-pair union instead — that
+    // is exactly what silhouetteStats already does, so a copy-paste-shaped
+    // regression here would be invisible to them. This test can only pass if
+    // `bounds` is genuinely threaded into the rasterizer for EVERY call.
+    //
+    // `narrow` sits fully nested inside `wide` on every axis. `noClip` is
+    // sized to exactly `wide`'s own extent — the pair's real union, so a
+    // broken "always union" implementation would reproduce this number too.
+    // `clipsWide` is narrower than `wide` in X (so `wide` gets genuinely
+    // clipped by the window) while still comfortably containing `narrow` —
+    // a result only a real fixed-window rasterization can produce, and one
+    // that a per-pair union window (which never clips either payload) can
+    // never reach. Values below are the actual measured output, not a hand
+    // derivation — box payloads carry degenerate-triangle vertex splats at
+    // their edges (see rasterizeMask's doc comment) that perturb a naive
+    // continuous-geometry fraction by a fractional cell, so this asserts
+    // what the harness truly computes, verified by running it.
+    const wide = boxPayload(4, 2); // x in [-2, 2], y in [0, 2]
+    const narrow = boxPayload(2, 2); // x in [-1, 1], y in [0, 2] — nested in `wide`
+    const noClip = { minX: -2, maxX: 2, minY: 0, maxY: 2 };
+    const clipsWide = { minX: -1.5, maxX: 1.5, minY: -1, maxY: 3 };
+
+    const withNoClip = canonicalStats(wide, narrow, { bounds: noClip, yawCount: 1 });
+    const withClip = canonicalStats(wide, narrow, { bounds: clipsWide, yawCount: 1 });
+
+    expect(withNoClip.meanIoU).toBeCloseTo(0.500868, 6);
+    expect(withClip.meanIoU).toBeCloseTo(0.665225, 6);
+    // Belt and suspenders: the two calls must disagree at all, regardless
+    // of whether the exact figures above ever need retuning.
+    expect(withClip.meanIoU).not.toBeCloseTo(withNoClip.meanIoU, 2);
+  });
+});
+
+describe('fitsWindow — the silent-clip guard', () => {
+  it('a payload larger than the window does not fit, and the margin says so', () => {
+    const big = boxPayload(4, 3);
+    const tooSmall = { minX: -1, maxX: 1, minY: 0, maxY: 2 };
+    const result = fitsWindow(big, { bounds: tooSmall });
+    expect(result.fits).toBe(false);
+    expect(result.worstMarginFrac).toBeLessThan(0);
+  });
+
+  it('a payload comfortably inside the window fits, with positive margin', () => {
+    const small = boxPayload(1, 1);
+    const roomy = { minX: -2, maxX: 2, minY: -1, maxY: 3 };
+    const result = fitsWindow(small, { bounds: roomy });
+    expect(result.fits).toBe(true);
+    expect(result.worstMarginFrac).toBeGreaterThan(0);
+  });
+});
+
+describe('bandOccupancy — per-band fraction of the filled silhouette', () => {
+  const bounds = { minX: -1.5, maxX: 1.5, minY: 0, maxY: 3 };
+
+  it('N interior edges produce N+1 bands — 2 edges (waist/shoulder-shaped) give exactly 3', () => {
+    const box = boxPayload(2, 3);
+    const bands = bandOccupancy(box, { bounds, bandEdgesY: [1, 2] });
+    expect(bands.length).toBe(3);
+  });
+
+  it('sums to 1 across bands', () => {
+    const box = boxPayload(2, 3);
+    const bands = bandOccupancy(box, { bounds, bandEdgesY: [1, 2] });
+    expect(bands.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 6);
+  });
+
+  it('a box confined to the lowest band reads [1, 0, 0]', () => {
+    const low = boxPayload(2, 0.9); // comfortably under the band-1 edge at y=1
+    const bands = bandOccupancy(low, { bounds, bandEdgesY: [1, 2] });
+    expect(bands.length).toBe(3);
+    expect(bands[0]).toBeCloseTo(1, 6);
+    expect(bands[1]).toBeCloseTo(0, 6);
+    expect(bands[2]).toBeCloseTo(0, 6);
+  });
+});
+
+describe('ACTOR_WINDOW', () => {
+  it('is frozen at its measured span — not snug, see the file header', () => {
+    expect(ACTOR_WINDOW).toEqual({
+      minX: -1.15, maxX: 1.15, minY: -0.45, maxY: 2.45,
+    });
+    expect(Object.isFrozen(ACTOR_WINDOW)).toBe(true);
   });
 });
