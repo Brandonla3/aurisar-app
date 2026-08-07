@@ -15,6 +15,7 @@ import { addMass } from './actorPrimitives.js';
 import {
   finalize, newAccumulator, sphereFaces,
 } from './propPrimitives.js';
+import { archetypeById, CAP_LEVEL, SEG } from '../model/actorMasses.js';
 
 const COLOR = [0.4, 0.5, 0.6];
 
@@ -248,5 +249,67 @@ describe('addMass — the returned range exactly brackets what was appended', ()
     // The two ranges partition [0, totalVertCount) with no gap and no overlap.
     expect(rangeA.firstVertex + rangeA.vertexCount).toBe(rangeB.firstVertex);
     expect(rangeB.firstVertex + rangeB.vertexCount).toBe(acc.pos.length / 3);
+  });
+});
+
+/**
+ * Legion face-plate seam — the property model/actorMasses.test.js's SEG
+ * parity gate is a PROXY for, tested here directly against the real
+ * `addMass` output instead of trusted from a comment.
+ *
+ * model/actorArchetypes.js's legion.faceL and legion.faceR share endpoint
+ * `a` (the mask's centre) with capA: false on BOTH — so the only thing
+ * closing that seam is the two tube rings addTube emits at that shared
+ * point landing on identical vertex positions. addTube interleaves each
+ * ring pair as it builds (ringStart[s] then ringEnd[s] per segment s — see
+ * propPrimitives.js), so the ring at the capA-less end `a` is exactly the
+ * vertices at index 2*s for s in [0, segments): even indices, untouched by
+ * whichever cap vertices (if any) get appended after the tube.
+ */
+describe('addMass — Legion face-plate seam (faceL/faceR ring closure)', () => {
+  const legion = archetypeById('legion');
+  const faceL = legion.masses.find((m) => m.id === 'faceL');
+  const faceR = legion.masses.find((m) => m.id === 'faceR');
+
+  /** The ring of vertices addTube built at `mass.a` — see the block comment above. */
+  const aRingPoints = (mass, segments, capLevel) => {
+    const acc = newAccumulator();
+    addMass(acc, mass, { segments, capLevel });
+    const p = finalize(acc);
+    const pts = [];
+    for (let s = 0; s < segments; s++) {
+      const vi = 2 * s;
+      pts.push([p.positions[vi * 3], p.positions[vi * 3 + 1], p.positions[vi * 3 + 2]]);
+    }
+    return pts;
+  };
+
+  const countCoincident = (ptsA, ptsB, eps = 1e-4) => ptsA.filter(
+    (a) => ptsB.some((b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < eps),
+  ).length;
+
+  it('SHIPPED near stage (SEG[0]): every faceL centre-ring vertex has a faceR twin', () => {
+    const segments = SEG[0];
+    const l = aRingPoints(faceL, segments, CAP_LEVEL[0]);
+    const r = aRingPoints(faceR, segments, CAP_LEVEL[0]);
+    expect(countCoincident(l, r)).toBe(segments);
+  });
+
+  it('SHIPPED far stage (SEG[1]): every faceL centre-ring vertex has a faceR twin', () => {
+    const segments = SEG[1];
+    const l = aRingPoints(faceL, segments, CAP_LEVEL[1]);
+    const r = aRingPoints(faceR, segments, CAP_LEVEL[1]);
+    expect(countCoincident(l, r)).toBe(segments);
+  });
+
+  it('mechanism check, NOT a shipped value: an odd segment count opens the seam completely', () => {
+    // Proves the closure above is really earned by parity, and not some
+    // coincidence of these two masses' geometry that would hold regardless
+    // of segments — the exact gap the SEG-parity gate in
+    // model/actorMasses.test.js exists to close off.
+    const segments = 7;
+    const l = aRingPoints(faceL, segments, 1);
+    const r = aRingPoints(faceR, segments, 1);
+    expect(countCoincident(l, r)).toBe(0);
   });
 });

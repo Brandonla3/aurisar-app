@@ -306,7 +306,7 @@ describe('bandOccupancy — per-band fraction of the filled silhouette', () => {
 });
 
 describe('ACTOR_WINDOW', () => {
-  it('is the derived, snug, frozen span', () => {
+  it('is frozen at its measured span — not snug, see the file header', () => {
     expect(ACTOR_WINDOW).toEqual({
       minX: -1.15, maxX: 1.15, minY: -0.45, maxY: 2.45,
     });

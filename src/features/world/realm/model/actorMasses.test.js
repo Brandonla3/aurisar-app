@@ -194,6 +194,25 @@ describe('stage constants', () => {
     expect(SEG[SEG.length - 1]).toBeGreaterThanOrEqual(5);
   });
 
+  it('every SEG value is even — Legion\'s face-plate seam depends on it', () => {
+    // actorArchetypes.js's legion.faceL and legion.faceR meet at a shared
+    // centre point with NO cap on either side (capA: false on both) — the
+    // two tube rings addTube generates at that shared point are the ENTIRE
+    // seam. That closure is not automatic: it holds only because an even-n
+    // ring's vertex directions are symmetric under the 180-degree axis flip
+    // between faceL's and faceR's opposite directions, landing every vertex
+    // of one ring exactly on a vertex of the other. An odd SEG value breaks
+    // it completely, not partially — verified by construction (0 of
+    // `segments` vertices coincide) in gen/actorPrimitives.test.js's
+    // "Legion face-plate seam" group, which builds the real geometry rather
+    // than trusting this comment. SEG=[8,5] would satisfy every other
+    // assertion in this file while silently cracking Legion open.
+    expect(
+      SEG.every((n) => n % 2 === 0),
+      'SEG must stay all-even: an odd stage cracks open Legion\'s face-plate seam (actorArchetypes.js legion.faceL/faceR)',
+    ).toBe(true);
+  });
+
   it('FAR_COMP compensates without inflating', () => {
     // It must widen the far stage (a coarser ring inscribes a smaller shape)
     // but a large value overshoots the near stage's envelope in the other
