@@ -11,6 +11,39 @@
  * pins: `Number(silhouetteAreaM2(payload).toFixed(2))`, so the audit's
  * `toEqual` is stable across runs.
  *
+ * ── SKINNING'S COST MODEL, AND WHY THE MANIFEST BELOW DID NOT MOVE ─────────
+ *
+ * SKINNING ADDS ZERO DRAW CALLS. P7 gave every archetype a per-vertex bone
+ * palette (matricesIndices/matricesWeights, spliced into actorNME.js's
+ * BonesBlock) but never split a payload's geometry into more meshes —
+ * view/actor/ActorRig.js's header is where "one mesh per actor" is pinned as
+ * the load-bearing draw-call commitment this file's audit, and
+ * realmActorBudget.test.js's `* 1` per actor, both rest on. That commitment
+ * is unchanged.
+ *
+ * WHAT P7 DOES ADD, per VISIBLE actor per frame, is a uniform upload, not a
+ * draw call: Babylon's `mBones[BonesPerMesh]` path — the ONLY path, by
+ * view/actor/ActorSkeleton.js's pin (`useTextureToStoreBoneMatrices = false`,
+ * permanent until that file's own re-decision trigger fires), so there is no
+ * bone TEXTURE for this budget to ever have to price instead. `BonesPerMesh`
+ * is `bones + 1` mat4s (Babylon appends one identity pad slot past the last
+ * real bone), each mat4 sixteen floats, so the upload is
+ * `(bones + 1) * 16` floats. At worst — unbound, the roster's deepest rig at
+ * 8 bones (6/2/5 for legion/magistari/orghon) — that is `(8 + 1) * 16 = 144`
+ * floats, i.e. AT MOST 144 floats of uniform traffic per visible actor per
+ * frame. Nothing in this file counts that against ACTOR_CEILINGS: a uniform
+ * upload is neither a draw call nor a triangle, and this file's arithmetic
+ * has never billed for either kind of cost before.
+ *
+ * THE MANIFEST NUMBERS DID NOT MOVE, AND THAT IS A MEASURED FACT, NOT AN
+ * ASSUMPTION: P7 changed no geometry — matricesIndices/matricesWeights are
+ * extra per-vertex ATTRIBUTES, not new vertices, triangles, or silhouette
+ * pixels — and actorBudget.test.js's audit re-derives every (archetype,
+ * stage) payload from `buildActorPayload` and diffs it against
+ * ACTOR_MANIFEST below byte-for-byte. Run it after any P7 change and it is
+ * still green, which is this paragraph's claim measured rather than merely
+ * argued.
+ *
  * ACTOR_CEILINGS is declared SEPARATELY from propBudget.js's BUDGET_CEILINGS
  * (that file is never edited here) because actors do not get their own scene
  * ceiling — they spend out of whatever props leave behind. props+chunks and

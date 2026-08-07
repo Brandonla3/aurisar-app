@@ -31,10 +31,19 @@
  * Everything is built under BOTH shader languages, because CustomBlock-class
  * mistakes and WGSL-only emit errors compile fine on the machine that wrote
  * them and fail only on a player's WebGPU browser.
+ *
+ * ITS SIBLING IS `actorNMEBones.test.js`, which owns the P7 skinning splice:
+ * that the BonesBlock sits between `world` and BOTH transforms, what the
+ * generated source says about the bone path, and what a real skinned mesh
+ * compiles to. It is split out because it needs the whole actor stack (rig,
+ * skeleton, posed palette) where this file needs only a payload. THIS file
+ * still owns the ATTRIBUTE SURFACE, which the splice widened by two kinds —
+ * see ACTOR_MESH_KINDS below.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
 import { buildActorPayload } from '../../gen/actorGen.js';
+import { buildActorRig } from '../../model/actorRig.js';
 
 let buildActorMaterial;
 let engine;
@@ -62,14 +71,35 @@ const blockOfClass = (m, cls) => m.attachedBlocks.find((b) => b.getClassName() =
 const endpointNames = (point) => point.endpoints.map((e) => e.ownerBlock.name);
 
 /**
- * EXACTLY what an ordinary actor mesh provides: the real generator's payload
- * applied to a plain Mesh, the same three buffers ActorPrototypes will bind
- * (Task 8). No thin instances, no custom vertex buffers, nothing else. If
- * actorGen ever stops emitting one of these, this fixture stops providing it
- * and the attribute guard below reports the gap instead of hiding it.
+ * EXACTLY what an actor master provides — this list is `REQUIRED_KINDS` in
+ * ActorPrototypes.js, which throws at boot if a master lacks any of them. No
+ * thin instances, no custom vertex buffers, nothing else.
+ *
+ * IT GREW BY TWO IN P7, and the growth is the point rather than an exception
+ * to the rule. Splicing a BonesBlock makes the compiled effect demand
+ * `matricesIndices`/`matricesWeights` UNCONDITIONALLY — measured: it lists them
+ * even for a mesh with no skeleton, where `NUM_BONE_INFLUENCERS` is 0 and
+ * nothing reads them. So the guard below would have started failing on the old
+ * three-kind fixture, and the honest repair is the one made here: the fixture
+ * now carries what a real actor carries. The guard's MEANING is unchanged —
+ * the effect may demand nothing an actor mesh does not supply — and it still
+ * catches the propNME `instTint` trap, because a sixth kind would not be here.
  */
-const ACTOR_MESH_KINDS = Object.freeze(['position', 'normal', 'color']);
+const ACTOR_MESH_KINDS = Object.freeze([
+  'position', 'normal', 'color', 'matricesIndices', 'matricesWeights',
+]);
 
+/** The bone tree the skinning buffers below are composed against. */
+const RIG = buildActorRig('unbound');
+
+/**
+ * NO SKELETON, deliberately: an ActorPrototypes MASTER carries the five
+ * buffers and no skeleton (ActorRig attaches one to the clone), so this is the
+ * faithful fixture. It also keeps the `bones stored as vertex uniforms`
+ * warning — which fires once per SKELETON on the material define path — out of
+ * this file entirely. actorNMEBones.test.js owns the skinned case and asserts
+ * that warning explicitly.
+ */
 function makeActorMesh(scene, material, { colors = true } = {}) {
   const payload = buildActorPayload('unbound', 0);
   const mesh = new BABYLON.Mesh('actor', scene);
@@ -78,7 +108,18 @@ function makeActorMesh(scene, material, { colors = true } = {}) {
   vd.normals = payload.normals;
   if (colors) vd.colors = payload.colors;
   vd.indices = payload.indices;
+  // The rigid single influence, exactly as ActorPrototypes.js composes it:
+  // slot 0 carries the mass's bone at weight 1, slots 1..3 stay zero-filled.
+  const boneIndices = new Float32Array(payload.vertCount * 4);
+  const boneWeights = new Float32Array(payload.vertCount * 4);
+  for (let v = 0; v < payload.vertCount; v++) {
+    boneIndices[v * 4] = RIG.boneOfMass[payload.massIndex[v]];
+    boneWeights[v * 4] = 1;
+  }
+  vd.matricesIndices = boneIndices;
+  vd.matricesWeights = boneWeights;
   vd.applyToMesh(mesh, false);
+  mesh.numBoneInfluencers = 1;
   mesh.material = material;
   return mesh;
 }
@@ -113,7 +154,7 @@ describe('buildActorMaterial — dual backend', () => {
     });
 
     // ── THE BLACK-ACTOR GUARD ────────────────────────────────────────────────
-    it(`${label}: demands NO vertex attribute beyond position/normal/color`, async () => {
+    it(`${label}: demands NO vertex attribute beyond an actor master's five kinds`, async () => {
       const scene = newScene();
       try {
         const { material } = await buildActorMaterial(scene, { name: `at${label}`, shaderLanguage: lang });
@@ -125,10 +166,12 @@ describe('buildActorMaterial — dual backend', () => {
           .sort();
         expect(
           attributeInputs,
-          'An actor is an ORDINARY MESH with no thin-instance buffers. Any extra\n' +
-            'vertex attribute here is unbound at draw time, reads (0,0,0,1), and — if\n' +
-            'it touches albedo — renders every character in the game black. This is\n' +
-            'the propNME `instTint` trap; make it a uniform instead.',
+          'An actor is an ORDINARY MESH with no thin-instance buffers. Any vertex\n' +
+            'attribute beyond the five an actor master carries is unbound at draw\n' +
+            'time, reads (0,0,0,1), and — if it touches albedo — renders every\n' +
+            'character in the game black. This is the propNME `instTint` trap; make\n' +
+            'it a uniform instead. (If a SIXTH kind is legitimately needed, it must\n' +
+            'be added to ActorPrototypes.js`s REQUIRED_KINDS in the same change.)',
         ).toEqual([...ACTOR_MESH_KINDS].sort());
 
         // (2) Emit level: the attributes the vertex program actually declares.
@@ -176,8 +219,9 @@ describe('buildActorMaterial — dual backend', () => {
             '(0,0,0,1) — a zero multiplied into albedo is a BLACK ACTOR.',
         ).toEqual([]);
 
-        // Guard against a vacuous pass: the fixture must really carry all three,
-        // and the effect must really be reading them rather than none of them.
+        // Guard against a vacuous pass: the fixture must really carry every one
+        // of the five kinds, and the effect must really be asking for them
+        // rather than for none of them.
         for (const kind of ACTOR_MESH_KINDS) {
           expect(mesh.isVerticesDataPresent(kind), `fixture is missing ${kind}`).toBe(true);
         }
@@ -387,16 +431,28 @@ describe('buildActorMaterial — dual backend', () => {
   it('transforms with the ordinary world matrix — actors move every frame', async () => {
     // The mirror image of propNME's InstancesBlock test. A thin-instance path
     // here would need world0..3 attributes (caught by the attribute guard); the
-    // positive form is that BOTH transforms read the `world` system value.
+    // positive form is that the transform chain is driven by the `world` system
+    // value Babylon binds per draw.
+    //
+    // CONSCIOUSLY UPDATED IN P7. This used to assert that `world` feeds BOTH
+    // transforms directly. It no longer does and must not: the BonesBlock sits
+    // between them, so `world` has exactly ONE consumer now and any second one
+    // is a transform that skipped the bone palette. The positive half — that
+    // `bones.output` reaches both transforms — is in actorNMEBones.test.js,
+    // which is where the mis-splice is actually fatal.
     const scene = newScene();
     try {
       const { material } = await buildActorMaterial(scene);
       const world = material.getInputBlocks().find((b) => b.name === 'world');
       expect(world.isSystemValue).toBe(true);
       expect(world.systemValue).toBe(BABYLON.NodeMaterialSystemValues.World);
-      const consumers = endpointNames(world.output);
-      expect(consumers).toContain('worldPos');
-      expect(consumers).toContain('worldNormal');
+      expect(
+        endpointNames(world.output),
+        'The raw world matrix must reach the transforms ONLY through the\n' +
+          'BonesBlock. A transform reading `world` directly is unskinned: on\n' +
+          'worldPos the actor never bends, on worldNormal it bends but is lit as\n' +
+          'if it had not — and NO matrix test in this phase can see either.',
+      ).toEqual(['bones']);
     } finally {
       scene.dispose();
     }

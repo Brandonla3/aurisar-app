@@ -15,6 +15,44 @@
  * LOD tier steps up to NEAR and a real shadow switches on; walk away and
  * both switch off.
  *
+ * ── TASK 7: A POSED ACTOR, LIVE ─────────────────────────────────────────────
+ *
+ * `demoActors[POSED_DEMO_INDEX]` (legion) is bent into `CANARY_POSE.legion`
+ * ONCE, HERE, AT CONSTRUCTION — never per frame. This phase ships static
+ * poses only; a clock driving the bones is P9's (ActorRig.js's `setPose`
+ * doc says the same). The player and the OTHER demo actor (orghon) are left
+ * at rest deliberately: nothing anywhere calls their skeleton's `setPose`,
+ * so their palettes stay bit-identical to `rest()`, and it is the CONTRAST
+ * — one archetype standing bent next to two standing straight — that is the
+ * live demonstration a real GPU can skin a mesh at all.
+ *
+ * AND IT IS NOT A WALK, because no rig in this roster can express one. The
+ * derivation is `model/actorRig.js`'s header, under "ONE BONE PER CAP PIVOT":
+ * a pivot joining N masses spawns exactly ONE bone owning every mass beyond
+ * it, "so legs move as a pair". Both unbound and legion put `{legL, legR}` on
+ * a single bone (bone 1 on each, re-derived from `buildActorRig` rather than
+ * taken on trust), which makes independent legs a GENOME change and a P9
+ * carry-forward, not a P7 omission. A CANARY_POSE-derived stance sidesteps it
+ * entirely: the canary poses every non-root bone by construction and asks
+ * nothing of leg independence.
+ *
+ * Legion, not orghon, is the one posed: `DEMO_POSITIONS[0]` (150, 0) is
+ * closer to spawn than `DEMO_POSITIONS[1]` (-200, 150) — `hypot(150,0) = 150`
+ * vs `hypot(200,150) = 250` — so it is the demo actor a fresh session walks
+ * up to FIRST, and Task 8's GPU verification wants the posed actor to be the
+ * one already in frame, not the second one a tester has to go find.
+ *
+ * The pose used is `CANARY_POSE.legion` UNSCALED, not a hand-tuned or scaled
+ * variant, on purpose: it is the exact table `ActorSkeleton.test.js`,
+ * `ActorRigSkin.test.js` and `gen/actorSealPose.test.js` already measure
+ * against, so a real GPU rendering it correctly corroborates the SAME
+ * numbers those headless gates already trust, rather than putting an
+ * unvetted pose on screen for the first time here. `model/actorCanary.js`'s
+ * header documents its own floor for whether this reads at all — every mass
+ * has a surface vertex moving at least 0.0288 m, legion's own worst (yokeL)
+ * at 0.0340 m — which is plenty at the NEAR-tier range this actor is built
+ * to be walked up to.
+ *
  * Deliberately free of the BABYLON global itself — it only calls methods on
  * ActorPrototypes/ActorRig, which are the layer that actually touches the
  * engine.
@@ -22,6 +60,7 @@
 
 import { ActorPrototypes } from './ActorPrototypes.js';
 import { ActorRig } from './ActorRig.js';
+import { CANARY_POSE } from '../../model/actorCanary.js';
 
 /** Distinct from each other and from PLAYER_ARCHETYPE — see the header. */
 const PLAYER_ARCHETYPE = 'unbound';
@@ -32,6 +71,13 @@ const DEMO_POSITIONS = Object.freeze([
   { x: 150, z: 0 },
   { x: -200, z: 150 },
 ]);
+
+/**
+ * Index into `demoActors`/`DEMO_ARCHETYPES` of the one demo actor posed at
+ * construction — see the header's "TASK 7" section for which archetype this
+ * resolves to today (legion) and why.
+ */
+const POSED_DEMO_INDEX = 0;
 
 export class ActorCast {
   /**
@@ -63,9 +109,24 @@ export class ActorCast {
       });
       const { x, z } = DEMO_POSITIONS[i];
       rig.seatOn(x, field.surfaceY(x, z), z);
+      // POSED ONCE, HERE, AT CONSTRUCTION — see the header's "TASK 7"
+      // section for which index this is and why. Every other rig (the
+      // player, and this loop's other iteration) is left untouched, so its
+      // skeleton stays at the rest palette `buildActorSkeleton` starts it at.
+      if (i === POSED_DEMO_INDEX) rig.setPose(CANARY_POSE[archetypeId]);
       return rig;
     });
   }
+
+  /**
+   * The one demo actor posed into a static bent stance at construction —
+   * see the header. Exposed as its own getter (rather than making callers
+   * index `demoActors[0]`) so Task 8's GPU verification, and anything typed
+   * at `window.__realmSpike.actorCast` in a browser console, can reach the
+   * posed rig, its `.skeleton`, and its `.setPose()`/`.rest()` without first
+   * having to know which index this file currently picks.
+   */
+  get posedDemo() { return this.demoActors[POSED_DEMO_INDEX]; }
 
   /**
    * One call per rendered frame: seat and face the player from the walker's

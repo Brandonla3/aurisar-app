@@ -14,10 +14,24 @@
  * silently loses its colour buffer does not crash — it renders the whole
  * roster white (actorNME.js's MeshAttributeExistsBlock fallback), which is the
  * kind of wrong that ships.
+ *
+ * ── THE CENSUS GATE ────────────────────────────────────────────────────────
+ *
+ * The skinning buffers get the same treatment, one level deeper. `max index <
+ * bone count` and `every bone is used` are the assertions that come to mind
+ * first, and BOTH survive a buffer shifted by one vertex, a buffer whose runs
+ * are permuted, and a buffer built from a different stage's massIndex — the
+ * whole family of faults that produce a character with one limb welded to the
+ * wrong joint. So `skinCensus` compares the shipped buffer BYTE FOR BYTE
+ * against the run-length image that `buildActorPayload` and `buildActorRig`
+ * independently imply, and names the first disagreements down to the vertex,
+ * the mass ordinal and the bone. Its teeth are a one-vertex shift, injected at
+ * the same VertexData seam.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
 import { ARCHETYPES } from '../../model/actorMasses.js';
+import { buildActorRig } from '../../model/actorRig.js';
 import { buildActorPayload } from '../../gen/actorGen.js';
 
 let ActorPrototypes;
@@ -48,6 +62,80 @@ const standIn = (scene) => new BABYLON.StandardMaterial('actorStandIn', scene);
 const PAIRS = ARCHETYPES.flatMap((a) => (
   Array.from({ length: a.stages }, (_, stage) => ({ id: a.id, stage }))
 ));
+
+const INDICES_KIND = BABYLON.VertexBuffer.MatricesIndicesKind;
+const WEIGHTS_KIND = BABYLON.VertexBuffer.MatricesWeightsKind;
+
+/** Enough named complaints to diagnose; not one per vertex of a shifted buffer. */
+const MAX_COMPLAINTS = 8;
+
+/**
+ * Every way a master's skinning buffers differ from the run-length image the
+ * PAYLOAD and the RIG independently imply — named down to the vertex, the mass
+ * ordinal and the bone. Empty means byte-exact.
+ *
+ * Re-derived from `buildActorPayload` + `buildActorRig`, deliberately NOT from
+ * `metaFor`: comparing a module's output against the copy of its own input
+ * that the same module carried forward is a self-consistency check, and this
+ * project has already retired twelve tests that could not fail for that shape
+ * of reason.
+ */
+function skinCensus(master, id, stage) {
+  const payload = buildActorPayload(id, stage);
+  const { boneOfMass, bones } = buildActorRig(id);
+  const idx = master.getVerticesData(INDICES_KIND);
+  const wts = master.getVerticesData(WEIGHTS_KIND);
+  const verts = payload.vertCount;
+  const out = [];
+  const say = (m) => { if (out.length < MAX_COMPLAINTS) out.push(`${id}:${stage} ${m}`); };
+
+  const want = verts * 4;
+  if (!idx || idx.length !== want) return [`${id}:${stage} matricesIndices is ${idx ? idx.length : 'absent'}, want ${want}`];
+  if (!wts || wts.length !== want) return [`${id}:${stage} matricesWeights is ${wts ? wts.length : 'absent'}, want ${want}`];
+
+  // THE RUNS, read off massIndex. gen/actorGen.js appends mass by mass and
+  // fills each range in one go, so a healthy stream is exactly one contiguous
+  // run per mass, in mass-ordinal order. Splitting or permuting them is how a
+  // vertex stream gets reordered under a buffer that still passes every
+  // summary check below.
+  const runs = [];
+  for (let v = 0; v < verts; v++) {
+    const mass = payload.massIndex[v];
+    const last = runs[runs.length - 1];
+    if (!last || last.mass !== mass) runs.push({ mass, first: v, count: 1 });
+    else last.count++;
+  }
+  const massCount = ARCHETYPES.find((a) => a.id === id).masses.length;
+  if (runs.length !== massCount) say(`massIndex forms ${runs.length} runs across ${massCount} masses — a mass whose vertices are not contiguous`);
+  runs.forEach((r, i) => {
+    if (r.mass !== i) say(`run ${i} carries mass ordinal ${r.mass} — the ranges are permuted`);
+  });
+
+  // The summary checks run BEFORE the per-vertex sweep so a flood of vertex
+  // complaints can never crowd them out of the failure message.
+  const used = new Set();
+  let maxBone = -1;
+  for (let v = 0; v < verts; v++) {
+    used.add(idx[v * 4]);
+    if (idx[v * 4] > maxBone) maxBone = idx[v * 4];
+  }
+  if (maxBone !== bones.length - 1) say(`highest bone index is ${maxBone}, but the rig has ${bones.length} bones (0..${bones.length - 1})`);
+  if (used.size !== bones.length) say(`only ${used.size} of ${bones.length} bones are bound — a roster welded to too few bones deforms as a rigid lump`);
+
+  for (const run of runs) {
+    const bone = boneOfMass[run.mass];
+    for (let v = run.first; v < run.first + run.count; v++) {
+      const o = v * 4;
+      if (idx[o] !== bone) say(`vertex ${v} (mass ordinal ${run.mass}) binds bone ${idx[o]}, not ${bone}`);
+      if (wts[o] !== 1) say(`vertex ${v} (mass ordinal ${run.mass}) has weight ${wts[o]}, not 1`);
+      for (let k = 1; k < 4; k++) {
+        if (idx[o + k] !== 0) say(`vertex ${v} influence ${k} names bone ${idx[o + k]}, not 0`);
+        if (wts[o + k] !== 0) say(`vertex ${v} influence ${k} has weight ${wts[o + k]}, not 0`);
+      }
+    }
+  }
+  return out;
+}
 
 describe('ActorPrototypes — the master table', () => {
   it('builds exactly one master per (archetype, stage), each a distinct mesh', () => {
@@ -143,6 +231,109 @@ describe('ActorPrototypes — the master table', () => {
     try {
       expect(() => new ActorPrototypes(scene, standIn(scene)))
         .toThrow(/\[ActorPrototypes\].*has no normal data/);
+    } finally {
+      BABYLON.VertexData.prototype.applyToMesh = realApply;
+      scene.dispose();
+    }
+  });
+
+  it('refuses to build a master whose bone-index buffer went missing', () => {
+    // The quietest of the five. An absent vertex attribute reads as
+    // (0,0,0,1) in the shader, so a lost matricesIndices welds every vertex
+    // to bone 0: a character that follows its root perfectly and never bends.
+    const scene = newScene();
+    const realApply = BABYLON.VertexData.prototype.applyToMesh;
+    BABYLON.VertexData.prototype.applyToMesh = function applyToMesh(mesh, updatable) {
+      this.matricesIndices = null;
+      return realApply.call(this, mesh, updatable);
+    };
+    try {
+      expect(() => new ActorPrototypes(scene, standIn(scene)))
+        .toThrow(/\[ActorPrototypes\].*has no matricesIndices data/);
+    } finally {
+      BABYLON.VertexData.prototype.applyToMesh = realApply;
+      scene.dispose();
+    }
+  });
+});
+
+describe('ActorPrototypes — THE CENSUS: skinning buffers', () => {
+  it('every master carries both skinning buffers, non-updatable, at ONE influence', () => {
+    const scene = newScene();
+    try {
+      const protos = new ActorPrototypes(scene, standIn(scene));
+      let checked = 0;
+      for (const { id, stage } of PAIRS) {
+        const m = protos.masterFor(id, stage);
+        expect(m.isVerticesDataPresent(INDICES_KIND), `${id}:${stage} matricesIndices`).toBe(true);
+        expect(m.isVerticesDataPresent(WEIGHTS_KIND), `${id}:${stage} matricesWeights`).toBe(true);
+        // NOT updatable: GPU skinning deforms in the vertex shader, so these
+        // are written once at boot. An updatable buffer would also be one that
+        // Mesh.applySkeleton could write through — into geometry every actor
+        // of this archetype shares.
+        expect(m.geometry.getVertexBuffer(INDICES_KIND).isUpdatable()).toBe(false);
+        expect(m.geometry.getVertexBuffer(WEIGHTS_KIND).isUpdatable()).toBe(false);
+        expect(m.numBoneInfluencers, `${id}:${stage} influence count`).toBe(1);
+        // ...and the masters still carry no skeleton. One here would be
+        // shared by every clone, and the whole archetype would pose in lockstep.
+        expect(m.skeleton, `${id}:${stage} master must own no skeleton`).toBeNull();
+        checked++;
+      }
+      expect(checked).toBe(PAIRS.length);
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('matricesIndices is a BYTE-EXACT run-length image of massIndex composed with boneOfMass', () => {
+    const scene = newScene();
+    try {
+      const protos = new ActorPrototypes(scene, standIn(scene));
+      const complaints = PAIRS.flatMap(({ id, stage }) => (
+        skinCensus(protos.masterFor(id, stage), id, stage)
+      ));
+      expect(
+        complaints,
+        'The shipped buffer disagrees with the run-length image buildActorPayload and\n' +
+          'buildActorRig imply. Contiguous per mass, in mass-ordinal order, one influence\n' +
+          'per vertex at weight 1 — anything else deforms a limb about the wrong joint.',
+      ).toEqual([]);
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('the census has TEETH: a ONE-VERTEX shift is caught, and named', () => {
+    // The fault every summary check survives. Shifting the stream by one
+    // vertex leaves the value set, the maximum and the per-mass counts
+    // untouched; only the vertices at a run boundary change bone, and only a
+    // byte-exact comparison sees them.
+    const scene = newScene();
+    const realApply = BABYLON.VertexData.prototype.applyToMesh;
+    BABYLON.VertexData.prototype.applyToMesh = function applyToMesh(mesh, updatable) {
+      const src = this.matricesIndices;
+      if (src) {
+        const shifted = new Float32Array(src.length);
+        shifted.set(src.subarray(4)); // every vertex takes its neighbour's bone
+        shifted.set(src.subarray(src.length - 4), src.length - 4); // the last keeps its own
+        this.matricesIndices = shifted;
+      }
+      return realApply.call(this, mesh, updatable);
+    };
+    try {
+      const protos = new ActorPrototypes(scene, standIn(scene));
+      const complaints = PAIRS.flatMap(({ id, stage }) => (
+        skinCensus(protos.masterFor(id, stage), id, stage)
+      ));
+      expect(
+        complaints.length,
+        'A one-vertex shift left the census green, so it is not reading the buffer\n' +
+          'byte for byte — which is the only way this class of fault is visible.',
+      ).toBeGreaterThan(0);
+      expect(complaints[0]).toMatch(/vertex \d+ \(mass ordinal \d+\) binds bone \d+, not \d+/);
+      protos.dispose();
     } finally {
       BABYLON.VertexData.prototype.applyToMesh = realApply;
       scene.dispose();
@@ -250,6 +441,38 @@ describe('ActorPrototypes — metaFor', () => {
           expect(p.pivotId.startsWith(`${id}.p`)).toBe(true);
           expect(p.massIds.length).toBeGreaterThan(1);
         }
+      }
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('carries the RIG, and it is the SAME rig object at every stage', () => {
+    // Load-bearing for ActorRig: its skeleton is built once, from whichever
+    // stage it happened to start at, and then re-attached to the OTHER
+    // stage's clone on every LOD swap. If the two stages carried different
+    // rigs, "bone 3" could mean a different joint after a swap and the actor
+    // would deform correctly-looking nonsense at 96 m.
+    const scene = newScene();
+    try {
+      const protos = new ActorPrototypes(scene, standIn(scene));
+      for (const arch of ARCHETYPES) {
+        const rig = protos.metaFor(arch.id, 0).rig;
+        expect(rig.archetypeId).toBe(arch.id);
+        expect(rig.bones.length).toBe(buildActorRig(arch.id).bones.length);
+        expect([...rig.boneOfMass]).toEqual([...buildActorRig(arch.id).boneOfMass]);
+        expect(rig.boneOfMass.length).toBe(arch.masses.length);
+        for (let stage = 1; stage < arch.stages; stage++) {
+          expect(
+            protos.metaFor(arch.id, stage).rig,
+            `${arch.id} stage ${stage} carries a DIFFERENT rig object than stage 0`,
+          ).toBe(rig);
+        }
+        // Frozen, so nothing downstream can retune a skeleton several
+        // prototypes share.
+        expect(Object.isFrozen(rig)).toBe(true);
+        expect(Object.isFrozen(rig.bones)).toBe(true);
       }
       protos.dispose();
     } finally {

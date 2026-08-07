@@ -56,8 +56,16 @@ const SQL_DIR = join(repoRoot, 'scripts/security');
 // never match `.from(`.)
 const NOT_CLIENTS = new Set([
   'Array', 'Buffer', 'String', 'Object', 'Number', 'Math', 'JSON', 'Promise',
-  'Date', 'Set', 'Map', 'WeakMap', 'WeakSet', 'Uint8Array', 'Int8Array',
-  'Float32Array', 'Float64Array', 'BigInt', 'Symbol', 'Reflect',
+  'Date', 'Set', 'Map', 'WeakMap', 'WeakSet', 'BigInt', 'Symbol', 'Reflect',
+  // The COMPLETE TypedArray family, not just the ones already in use: the
+  // original list carried Uint8/Int8/Float32/Float64 only, and the first
+  // `Uint16Array.from(...)` in the tree (realm P7's actorSkin.test.js copying
+  // a massIndex buffer) was flagged as an unmarked dynamic Supabase call.
+  // Every constructor here exposes the same static `.from(iterable)`.
+  'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
+  'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
+  'Float16Array', 'Float32Array', 'Float64Array',
+  'BigInt64Array', 'BigUint64Array',
 ]);
 
 // Receiver and method may be separated by newlines — `await sb\n  .from('x')`

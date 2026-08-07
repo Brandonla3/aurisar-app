@@ -20,10 +20,11 @@
  * never an attribute. White is multiplicatively neutral, so an actor drawn by
  * a material nobody ever configured renders exactly its baked vertex colours.
  * actorNME.test.js enforces this MECHANICALLY rather than by inspection: it
- * compiles the material against a mesh carrying only what gen/actorGen.js
- * produces (position/normal/color) and asserts the resulting effect demands no
- * attribute that mesh does not supply. Re-wiring the tint as an attribute makes
- * that assertion fail — verified by mutation, not assumed.
+ * compiles the material against a mesh carrying exactly what an actor master
+ * carries (ActorPrototypes.js's REQUIRED_KINDS — position/normal/color plus the
+ * two skinning kinds) and asserts the resulting effect demands no attribute
+ * that mesh does not supply. Re-wiring the tint as an attribute makes that
+ * assertion fail — verified by mutation, not assumed.
  *
  * THE OTHER HALF: albedo IS the vertex colour, and `color` is emitted BARE.
  * Babylon guards `normal` (`#ifdef NORMAL … #else vec3 normal = vec3(0.);`) but
@@ -36,6 +37,36 @@
  * the attribute-list proxy — the guarded variant still LISTS `color` as a
  * required attribute, it simply stops READING it, and a colourless actor
  * renders white instead of black. Loud and wrong beats invisible and wrong.
+ *
+ * THE SKINNING SEAM (P7, and the one splice no matrix test can see). A
+ * `BonesBlock` now sits between the `world` system value and the transform
+ * chain: it emits Babylon's own `bonesDeclaration` + `bonesVertex` includes,
+ * accumulates `influence` from `matricesIndices`/`matricesWeights`, and outputs
+ * `world * influence` — the matrix BOTH transforms must consume. The whole
+ * P7 oracle chain (ActorSkeleton.test.js: the fp32 twin agrees with Babylon's
+ * `applySkeleton` to 2^-22) proves the MATRIX PIPELINE and can say nothing at
+ * all about this file's wiring, because it never compiles a shader. So the
+ * failure mode this graph must foreclose by assertion is precise:
+ *
+ *   `worldPos.transform` reads `bones.output` but `worldNormal.transform` is
+ *   left on the raw `world` uniform.
+ *
+ * Every skinned actor would then be lit by the normals of its BIND POSE — a
+ * character whose geometry bends correctly while its shading stays rigid, which
+ * on a moving mob at gameplay distance reads as "the lighting looks a bit off"
+ * and never as a bug. No palette test, no vertex oracle and no attribute list
+ * can see it; `actorNMEBones.test.js` asserts the endpoint set of
+ * `bones.output` is EXACTLY {worldPos, worldNormal}, and that assertion is the
+ * only headless defence there is until the GPU pass.
+ *
+ * NUM_BONE_INFLUENCERS = 0 IS A SAFE STATE, deliberately not guarded against.
+ * Babylon defines it per mesh from `mesh.numBoneInfluencers`, and BonesBlock
+ * emits `#if NUM_BONE_INFLUENCERS>0 output = world * influence; #else output =
+ * world; #endif`. A mesh with no skeleton — ActorPrototypes' own masters, which
+ * never render — therefore compiles to exactly the pre-P7 transform chain
+ * rather than to a zero matrix. The unbound-attribute trap does not apply to
+ * the two matrices kinds for the same reason: with the influencer count at 0
+ * nothing reads them.
  *
  * OPAQUE-ONLY DISCIPLINE (inherited, load-bearing): no discard, no alpha test,
  * no alpha blend anywhere in this graph. Actor silhouettes are real vertices
@@ -104,7 +135,7 @@ export function buildActorMaterial(scene, {
   const nm = new BABYLON.NodeMaterial(name, scene);
   if (shaderLanguage !== null) nm.shaderLanguage = shaderLanguage;
 
-  // ── Vertex stage: the plain transform chain ────────────────────────────────
+  // ── Vertex stage: world -> bone palette -> transform chain ────────────────
   // No InstancesBlock and no world0..3 attributes. Props need them because thin
   // instances carry their matrices in vertex buffers; an actor's matrix arrives
   // as the ordinary `world` uniform Babylon binds per draw, which is what makes
@@ -121,15 +152,66 @@ export function buildActorMaterial(scene, {
   const viewProjection = new BABYLON.InputBlock('viewProjection');
   viewProjection.setAsSystemValue(BABYLON.NodeMaterialSystemValues.ViewProjection);
 
+  // The two skinning attributes. ActorPrototypes.js writes both on every actor
+  // master (stride 4: `[boneOfMass[massIndex[v]], 0, 0, 0]` and `[1, 0, 0, 0]`)
+  // and asserts their presence at boot, so they are as guaranteed as position.
+  //
+  // THE TYPE IS DECLARED AT CONSTRUCTION, not left to AutoDetect. Babylon's own
+  // `BonesBlock.autoConfigure` gets away with the bare `new InputBlock(name)`
+  // form because `matricesIndices`/`matricesWeights` are RESERVED names in
+  // `InputBlock`'s attribute type table (measured: AutoDetect resolves both to
+  // Vector4 and connects). That table is the only thing making it work — the
+  // same bare form on a custom name resolves to AutoDetect (1024) and refuses
+  // the connection, which is why propNME.js declares `instTint` as Vector3 at
+  // construction. Declaring the type here costs one argument and removes the
+  // dependency on Babylon's reserved-name list entirely.
+  const T = BABYLON.NodeMaterialBlockConnectionPointTypes;
+  const matricesIndices = new BABYLON.InputBlock('matricesIndices', undefined, T.Vector4);
+  matricesIndices.setAsAttribute('matricesIndices');
+  const matricesWeights = new BABYLON.InputBlock('matricesWeights', undefined, T.Vector4);
+  matricesWeights.setAsAttribute('matricesWeights');
+
+  // `matricesIndicesExtra`/`matricesWeightsExtra` stay UNCONNECTED: they carry
+  // influences 5..8, and this phase's rig is rigid single-influence (weight 1.0
+  // in slot 0, ActorPrototypes.js). Their code is behind `#if
+  // NUM_BONE_INFLUENCERS>4`, which never fires at `numBoneInfluencers = 1`.
+  const bones = new BABYLON.BonesBlock('bones');
+  matricesIndices.output.connectTo(bones.matricesIndices);
+  matricesWeights.output.connectTo(bones.matricesWeights);
+  world.output.connectTo(bones.world);
+
   const worldPos = new BABYLON.TransformBlock('worldPos');
   position.connectTo(worldPos);
-  world.output.connectTo(worldPos.transform);
+  bones.output.connectTo(worldPos.transform);
 
   // w = 0: normals rotate with the world matrix but never translate.
+  //
+  // THE ORDER OF THESE TWO LINES IS LOAD-BEARING, and in the same reserved-name
+  // way `matricesIndices` was above. TransformBlock's `vector` input registers
+  // an onConnection observable that FORCES `complementW = 0` whenever the block
+  // connecting to it is an InputBlock named `normal` or `tangent` (read from
+  // the shipped constructor, not inferred). So the assignment below is restored
+  // by the connect that follows it, and changing the literal to 1 is an
+  // EQUIVALENT MUTANT — measured, and the reason a test suite staying green on
+  // that edit is not a coverage gap. Move the assignment AFTER the connect and
+  // it is no longer equivalent: complementW stays 1, TransformBlock emits the
+  // full affine `<bones> * vec4(normal, 1.0)`, and the bone TRANSLATION column
+  // enters the lighting normal — every actor's shading flattening toward the
+  // origin direction the further it walks from it. The line is written first so
+  // it states the intent explicitly rather than relying on Babylon's name
+  // table, and `actorNMEBones.test.js`'s source pin is what catches the move.
+  //
+  // THIS LINE IS THE ONE THE HEADER IS ABOUT. It must read `bones.output`, the
+  // same matrix worldPos reads, and NOT the raw `world` uniform. TransformBlock
+  // with complementW = 0 builds `mat3(<transform>)` (inverse-transposed under
+  // `#ifdef NONUNIFORMSCALING`), so feeding it `world` alone silently drops the
+  // bone rotation from the normal while keeping it in the position: geometry
+  // that bends under lighting that does not. Nothing downstream can detect it —
+  // the normal is still unit-length, still non-zero, still plausibly oriented.
   const worldNormal = new BABYLON.TransformBlock('worldNormal');
   worldNormal.complementW = 0;
   normal.connectTo(worldNormal);
-  world.output.connectTo(worldNormal.transform);
+  bones.output.connectTo(worldNormal.transform);
 
   const wvp = new BABYLON.TransformBlock('wvp');
   worldPos.output.connectTo(wvp.vector);
@@ -202,9 +284,13 @@ export function buildActorMaterial(scene, {
   // Non-uniform scale is fine too, and the "the rig must not scale
   // non-uniformly" contract this file used to hand Task 8 is stricter than it
   // needs to be: the TransformBlock above already emits
-  // `#ifdef NONUNIFORMSCALING u_world_NUS = transposeMat3(inverseMat3(...));`,
+  // `#ifdef NONUNIFORMSCALING <m>_NUS = transposeMat3(inverseMat3(<m>_NUS));`,
   // so the DIRECTION is correct under non-uniform scale and the rescale below
-  // supplies the unit LENGTH that inverse-transpose does not preserve.
+  // supplies the unit LENGTH that inverse-transpose does not preserve. `<m>` is
+  // the BonesBlock's output now rather than `u_world` — the mat3 is taken from
+  // whatever matrix drives the transform, so the bone rotation is inside it and
+  // the NONUNIFORMSCALING correction still applies to the mesh scale it is
+  // computed from.
   const normalLength = new BABYLON.LengthBlock('normalLength');
   worldNormal.output.connectTo(normalLength.value);
   const normalEps = new BABYLON.InputBlock('normalEps');
