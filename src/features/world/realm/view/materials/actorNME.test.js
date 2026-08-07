@@ -154,7 +154,7 @@ describe('buildActorMaterial — dual backend', () => {
     });
 
     // ── THE BLACK-ACTOR GUARD ────────────────────────────────────────────────
-    it(`${label}: demands NO vertex attribute beyond position/normal/color`, async () => {
+    it(`${label}: demands NO vertex attribute beyond an actor master's five kinds`, async () => {
       const scene = newScene();
       try {
         const { material } = await buildActorMaterial(scene, { name: `at${label}`, shaderLanguage: lang });
@@ -219,8 +219,9 @@ describe('buildActorMaterial — dual backend', () => {
             '(0,0,0,1) — a zero multiplied into albedo is a BLACK ACTOR.',
         ).toEqual([]);
 
-        // Guard against a vacuous pass: the fixture must really carry all three,
-        // and the effect must really be reading them rather than none of them.
+        // Guard against a vacuous pass: the fixture must really carry every one
+        // of the five kinds, and the effect must really be asking for them
+        // rather than for none of them.
         for (const kind of ACTOR_MESH_KINDS) {
           expect(mesh.isVerticesDataPresent(kind), `fixture is missing ${kind}`).toBe(true);
         }

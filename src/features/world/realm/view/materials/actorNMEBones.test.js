@@ -169,6 +169,31 @@ describe('actorNME — the BonesBlock splice', () => {
         expect(bones.world.connectedPoint.ownerBlock.name).toBe('world');
 
         // (3) the attributes it accumulates from, typed at construction.
+        //
+        // *** THESE ASSERTIONS ARE NOT REDUNDANT WITH THE SOURCE PINS, AND NO
+        // SOURCE PIN CAN EVER REPLACE THEM. NEVER RETIRE THEM. ***
+        //
+        // Babylon's `bonesDeclaration`/`bonesVertex` includes read
+        // `matricesIndices` and `matricesWeights` BY LITERAL NAME.
+        // `BonesBlock._buildBlock` substitutes only the `influence` variable —
+        // it never rewrites the include to match what is actually connected. So
+        // these connection points are DECLARATION HOOKS, not data paths: they
+        // exist to make Babylon declare and list the attributes, and the maths
+        // downstream reads the names regardless.
+        //
+        // Two consequences, both measured:
+        //   - SWAPPING the two wires changes the emitted shader by EXACTLY TWO
+        //     LINES, and they are the two `attribute vec4 …` DECLARATIONS. Zero
+        //     maths changes. Every source-level assertion in this file stays
+        //     green; only the name check below goes red.
+        //   - Connecting a DIFFERENTLY NAMED InputBlock declares the wrong
+        //     attribute while the include still reads the right one — a real
+        //     unbound-attribute bug that NullEngine cannot compile far enough
+        //     to notice, and that no text in the generated source reveals.
+        //
+        // The graph is therefore the ONLY layer where a mis-wired bone
+        // attribute is visible headless. The source pins below are structurally
+        // incapable of covering this, however thorough they look.
         const T = BABYLON.NodeMaterialBlockConnectionPointTypes;
         for (const [point, name] of [[bones.matricesIndices, 'matricesIndices'],
           [bones.matricesWeights, 'matricesWeights']]) {
@@ -208,8 +233,20 @@ describe('actorNME — the BonesBlock splice', () => {
         const palette = spliced[1];
         expect(vs, 'the POSITION transform does not read the bone matrix')
           .toMatch(new RegExp(`\\b${palette}\\s*\\*\\s*vec4`));
-        expect(vs, 'the NORMAL transform does not read the bone matrix')
-          .toMatch(new RegExp(`mat3(?:x3f)?\\(\\s*${palette}\\b`));
+        // TWO faults print this one, and the second is why the assertion is
+        // written against the mat3 form rather than against `<M> *` generally:
+        //   1. worldNormal.transform is on the raw world matrix (the mis-splice)
+        //   2. worldNormal.complementW is not 0, so TransformBlock emits the
+        //      full `<M> * vec4(normal, 1.0)` affine instead of `mat3(<M>)`.
+        //      The bone matrix IS read there — but its TRANSLATION column now
+        //      enters the lighting normal, flattening every actor's shading
+        //      toward the origin direction as it walks away from it.
+        expect(
+          vs,
+          'The NORMAL transform is not reading `mat3(<bone matrix>)`. Either it\n' +
+            'is on the raw world matrix (bind-pose lighting), or complementW is\n' +
+            'no longer 0 and bone TRANSLATION is leaking into the normal.',
+        ).toMatch(new RegExp(`mat3(?:x3f)?\\(\\s*${palette}\\b`));
 
         // ...and the raw world uniform is read NOWHERE ELSE: its declaration
         // plus BonesBlock's two branches. A fourth occurrence is a transform
@@ -219,7 +256,12 @@ describe('actorNME — the BonesBlock splice', () => {
           (vs.match(/\bu_world\b/g) || []).length,
           'u_world should appear exactly 3x: its declaration and BonesBlock`s\n' +
             '`#if NUM_BONE_INFLUENCERS>0 / #else` pair. A 4th reader is a\n' +
-            'transform bypassing the bone palette.',
+            'transform bypassing the bone palette. A count that moved for any\n' +
+            'OTHER reason — a babylonjs upgrade restructuring how BonesBlock or\n' +
+            'InputBlock emit, so the graph is unchanged and only the text moved —\n' +
+            'means re-deriving the expected number from the new emit, not\n' +
+            'loosening the assertion: the graph assertions above stay the primary\n' +
+            'gate and this one is their corroboration in the text the GPU gets.',
         ).toBe(3);
 
         // HONEST SCOPE — the texture path is DEAD TEXT, not absent text.
@@ -285,7 +327,15 @@ describe('actorNME — the BonesBlock splice', () => {
         // the flag is the ONLY thing holding the texture path off. The flag
         // assertion below is therefore the one with teeth headless; the define
         // is what that flag buys on the device.
-        expect(skeleton.useTextureToStoreBoneMatrices).toBe(false);
+        expect(
+          skeleton.useTextureToStoreBoneMatrices,
+          'Someone took the bones-uniform warning`s advice. THIS assertion is the\n' +
+            'headless teeth — the BONETEXTURE line below CANNOT catch it, because\n' +
+            'NullEngine reports textureFloat = false and the texture path stays\n' +
+            'unreachable here whatever the flag says. On a real GPU textureFloat is\n' +
+            'true and this flag is the only thing keeping the shipped path the\n' +
+            'tested one. See the header, and ActorSkeleton.js`s pin.',
+        ).toBe(false);
         expect(effect.defines).not.toMatch(/#define BONETEXTURE/);
         expect(engine.getCaps().textureFloat).toBe(false);
       } finally {

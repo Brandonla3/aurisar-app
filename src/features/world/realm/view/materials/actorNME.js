@@ -186,6 +186,21 @@ export function buildActorMaterial(scene, {
 
   // w = 0: normals rotate with the world matrix but never translate.
   //
+  // THE ORDER OF THESE TWO LINES IS LOAD-BEARING, and in the same reserved-name
+  // way `matricesIndices` was above. TransformBlock's `vector` input registers
+  // an onConnection observable that FORCES `complementW = 0` whenever the block
+  // connecting to it is an InputBlock named `normal` or `tangent` (read from
+  // the shipped constructor, not inferred). So the assignment below is restored
+  // by the connect that follows it, and changing the literal to 1 is an
+  // EQUIVALENT MUTANT — measured, and the reason a test suite staying green on
+  // that edit is not a coverage gap. Move the assignment AFTER the connect and
+  // it is no longer equivalent: complementW stays 1, TransformBlock emits the
+  // full affine `<bones> * vec4(normal, 1.0)`, and the bone TRANSLATION column
+  // enters the lighting normal — every actor's shading flattening toward the
+  // origin direction the further it walks from it. The line is written first so
+  // it states the intent explicitly rather than relying on Babylon's name
+  // table, and `actorNMEBones.test.js`'s source pin is what catches the move.
+  //
   // THIS LINE IS THE ONE THE HEADER IS ABOUT. It must read `bones.output`, the
   // same matrix worldPos reads, and NOT the raw `world` uniform. TransformBlock
   // with complementW = 0 builds `mat3(<transform>)` (inverse-transposed under
