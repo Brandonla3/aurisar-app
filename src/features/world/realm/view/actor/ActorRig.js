@@ -7,14 +7,34 @@
  * against whatever props leave of BUDGET_CEILINGS; slicing the payload's
  * per-mass vertex ranges into child nodes would multiply that by the mass
  * count (11 for orghon) and quietly invalidate a census that has already been
- * signed off. `massIndex` and `pivots` therefore ride along on
- * ActorPrototypes.metaFor() as inert DATA for P7's skinning, and nothing here
- * reads them.
+ * signed off. A SKELETON ADDS NO DRAW CALL — the bone palette rides the same
+ * draw as a block of vertex uniforms (THE PIN, ActorSkeleton.js) — so the
+ * census still stands with bones in it.
  *
- * NO ANIMATION, NO SKINNING, NO VERTEX DEFORMATION — not even an idle bob.
- * This phase ships static rigs; motion is P9's, bones are P7's, and putting
- * either here would bake a rig decision into the phase that measures
- * silhouettes.
+ * ── THE SKELETON IS PER RIG, AND IT OUTLIVES EVERY MESH THIS RIG OWNS ───────
+ *
+ * `Mesh.clone()` copies the `skeleton` REFERENCE (a live engine fact, asserted
+ * in ActorSkeleton.test.js), so a skeleton parked on ActorPrototypes' shared
+ * master would be shared by every actor of that archetype: one guard raises an
+ * arm and the whole faction raises one. `buildActorSkeleton` therefore runs
+ * ONCE per ActorRig, at construction, and `_applyTier` RE-ATTACHES it to each
+ * fresh clone. That re-attachment is not belt-and-braces: the master carries
+ * no skeleton to copy, so a clone arrives with `skeleton === null` and would
+ * render its bind pose forever — a character that walks around the world
+ * without bending a joint.
+ *
+ * THE POSE IS RETAINED ACROSS A TIER SWAP. Bone state lives on the Skeleton,
+ * and a swap rebuilds only the MESH, so an actor mid-stride that crosses the
+ * 96 m band edge keeps its stride: no re-application, no bookkeeping, nothing
+ * to forget. The rejected alternative — reset to rest and let the caller pose
+ * again — would make the LOD boundary visible as a one-frame T-pose, the exact
+ * class of artefact the hysteresis in `tierForDistance` exists to prevent.
+ * ActorRigSkin.test.js asserts the palette is BYTE-IDENTICAL either side of a
+ * forced swap, so "retained" is measured rather than reasoned.
+ *
+ * NO ANIMATION AND NO CLIPS — not even an idle bob. `setPose`/`rest` are the
+ * whole motion surface, and they are absolute (ActorSkeleton.js): what drives
+ * them over time is P9's.
  *
  * NEVER freezeWorldMatrix(). PropStreamer freezes its carriers and is right
  * to — a prop chunk's world matrix is identity forever and the instance
@@ -47,6 +67,7 @@
 /* global BABYLON */
 
 import { PROP_TIER, TIER_BANDS_M, TIER_HYST_M } from '../../model/propLod.js';
+import { buildActorSkeleton } from './ActorSkeleton.js';
 
 /**
  * Actors reuse props' NEAR/MID tier vocabulary and band edge deliberately: an
@@ -102,10 +123,22 @@ export class ActorRig {
     this._disposed = false;
 
     this.archetypeId = archetypeId;
-    this._root = new BABYLON.TransformNode(`actor_${name}`, scene);
     this._mesh = null;
     this._meta = null;
     this._tier = null;
+    // RESOLVED FIRST, before anything is put in the scene. `metaFor` is where
+    // an unknown archetype throws (via stageFor), and doing it here means the
+    // failing constructor leaves behind no TransformNode and no Skeleton — the
+    // latter would matter, because a Skeleton is scene-registered and is not
+    // swept up by disposing a node tree.
+    const { rig } = prototypes.metaFor(archetypeId, tier);
+    this._root = new BABYLON.TransformNode(`actor_${name}`, scene);
+    // ONE skeleton per actor, built before the first mesh so `_applyTier` —
+    // the single place a mesh and a skeleton are married — never runs without
+    // one. `rig` is the SAME object at every stage of an archetype
+    // (ActorPrototypes hoists it out of its stage loop), so bone k means the
+    // same joint whichever master this rig is currently cloning.
+    this._skin = buildActorSkeleton(scene, rig, `actorSkel_${name}`);
     this._applyTier(tier);
   }
 
@@ -119,13 +152,37 @@ export class ActorRig {
   get tier() { return this._tier; }
 
   /**
-   * The live stage's payload facts, including the untouched `massIndex` and
-   * `pivots` P7 will read. Never consumed here.
+   * The live stage's payload facts — `minY`, the counts, `massIndex`,
+   * `pivots`, and the `rig` this actor's skeleton was built from.
    */
   get meta() { return this._meta; }
 
+  /**
+   * This actor's own `BABYLON.Skeleton`, shared with no other rig, `null` once
+   * disposed. The mesh points at this exact object at every tier.
+   */
+  get skeleton() { return this._skin ? this._skin.skeleton : null; }
+
   /** Diagnostics: how many times this actor has rebuilt its mesh for LOD. */
   get swapCount() { return this._swaps; }
+
+  /**
+   * Pose the bones from a CANARY_POSE-shaped table
+   * (`{boneIndex: {axis, angleRad}}`, unit axis, missing entries the
+   * identity). ABSOLUTE, never incremental — see ActorSkeleton.js — and it
+   * SURVIVES a tier swap, so the caller poses when the pose changes and not
+   * once per rebuilt mesh. A no-op after dispose(), like update().
+   */
+  setPose(pose) {
+    if (!this._disposed) this._skin.setPose(pose);
+    return this;
+  }
+
+  /** Every bone back to rest; the palette returns to bit-exact identity. */
+  rest() {
+    if (!this._disposed) this._skin.rest();
+    return this;
+  }
 
   /**
    * Seat the actor with its SOLE on `groundY` — pass terrainField.surfaceY(x, z)
@@ -199,6 +256,20 @@ export class ActorRig {
     mesh.setEnabled(true);
     mesh.useVertexColors = true;
     mesh.receiveShadows = true;
+    // THE RE-ATTACHMENT, and it is load-bearing on EVERY pass through here,
+    // not just the first: the master carries no skeleton, so the clone arrives
+    // with `skeleton === null` and would render its bind pose for the rest of
+    // the actor's life — moving through the world without bending a joint.
+    // The skeleton object itself is untouched by the swap, which is what
+    // carries the POSE across it (see the header).
+    mesh.skeleton = this._skin.skeleton;
+    // Written again here, though `Mesh.clone()` copies it from the master
+    // (measured; the engine fact is pinned in ActorRigSkin.test.js). The
+    // skeleton and the influence count are ONE decision — a skinned mesh at
+    // Babylon's default 4 blends four bone matrices per vertex to reach the
+    // answer one gives — so they are set together, and this line stops a
+    // change in clone semantics from quietly quadrupling the vertex cost.
+    mesh.numBoneInfluencers = 1;
     // Nothing in the Realm picks yet. Explicit rather than inherited so the
     // day something does, this line is the one to flip.
     mesh.isPickable = false;
@@ -222,6 +293,12 @@ export class ActorRig {
     if (this._shadowRig && this._mesh) this._shadowRig.removeCaster(this._mesh);
     this._mesh?.dispose(false, false);
     this._mesh = null;
+    // A Skeleton is SCENE-REGISTERED (`scene.skeletons`) and is NOT a Node, so
+    // tearing down the mesh and the root leaves it behind entirely — one
+    // orphan per actor ever spawned, each holding its bones and its palette.
+    // Disposed AFTER the mesh, because the mesh is the thing pointing at it.
+    this._skin.skeleton.dispose();
+    this._skin = null;
     this._root.dispose();
   }
 }
