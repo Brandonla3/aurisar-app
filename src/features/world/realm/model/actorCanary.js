@@ -23,9 +23,11 @@
  * replacing `orthogonalAxis(limbDirection(b))` with `limbDirection(b)`, so
  * every canary becomes a pure twist, drops the worst endpoint travel to 0.174
  * (unbound), 0.156 (legion), 0.000 (magistari) and 0.117 m (orghon) — and
- * against a displacement floor alone, LEGION STILL PASSES at 0.156 against
- * 0.124. The floor is a second net, not the net; the orthogonality assertion
- * is what makes the mutation fail on all four.
+ * against a displacement floor alone, LEGION STILL PASSES at 0.156 against the
+ * shipped floor of 0.12 (`TRAVEL.legion.min`, actorCanary.test.js, which
+ * records why 0.124 is the wrong number to quote here). The floor is a second
+ * net, not the net; the orthogonality assertion is what makes the mutation
+ * fail on all four.
  *
  * ...AND IT IS ORTHOGONAL TO THE BONE'S *SUMMED* DIRECTION, NOT TO EACH MASS.
  * A bone owning several masses gets one axis, so an individual mass can still

@@ -32,8 +32,12 @@ const EXPECTED_NON_ROOT = { unbound: 7, legion: 5, magistari: 1, orghon: 4 };
  * (0.572 / 0.207 / 0.053 / 0.260) so it has real headroom rather than sitting
  * on the number. It is a SECOND net, not the primary one: the pure-twist
  * mutation measures 0.174 / 0.156 / 0.000 / 0.117, so the floor catches
- * unbound, magistari and orghon but LEGION SLIPS THROUGH at 0.156 against
- * 0.124. The orthogonality test below is what fails on all four.
+ * unbound, magistari and orghon but LEGION SLIPS THROUGH at 0.156 against the
+ * SHIPPED 0.12 below. (An earlier version of this comment quoted 0.124, which
+ * is 60% of legion's 0.207 exactly — the floor as DERIVED, before it was
+ * rounded down to the number actually on the line. Legion slips either way, so
+ * the disclosure stands; the figure just was not the one the test runs.) The
+ * orthogonality test below is what fails on all four.
  */
 const TRAVEL = {
   unbound: { min: 0.34, max: 0.60 },

@@ -73,9 +73,20 @@ const keyOf = (archetypeId, stage) => `${archetypeId}:${stage}`;
  * The two skinning kinds fail even more quietly. An absent vertex attribute
  * reads as `(0,0,0,1)` in the shader, so a missing `matricesIndices` welds
  * EVERY vertex to bone 0 — a character that tracks its root perfectly and
- * never bends a joint, which is precisely the "perfectly rigid, perfectly
- * plausible" failure Task 4 measured at 5.96e-8 of motion and could not see
- * without an oracle. Throwing at boot is the cheap version of noticing.
+ * never bends a joint, the "perfectly rigid, perfectly plausible" failure this
+ * phase kept finding.
+ *
+ * AND THAT ONE MOVES NOTHING AT ALL. Under `CANARY_POSE` the weld's worst
+ * vertex displacement is EXACTLY 0 m — not small, zero — on all four
+ * archetypes at both stages, because bone 0 is the one bone the canary never
+ * poses (its table starts at bone 1) and bone 0's palette entry is therefore
+ * bit-exact identity. So there is no small number here for a displacement gate
+ * to catch: the mesh is byte-identical to its rest pose and reads exactly like
+ * a correct actor standing still. (An earlier version of this comment quoted
+ * 5.96e-8 here. That number is real but belongs to a DIFFERENT failure —
+ * substituting `bone.updateMatrix` for the `_matrix` write, measured and
+ * documented in ActorSkeleton.js's header.) Throwing at boot is the cheap
+ * version of noticing.
  */
 const REQUIRED_KINDS = Object.freeze([
   'position', 'normal', 'color', 'matricesIndices', 'matricesWeights',

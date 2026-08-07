@@ -221,6 +221,18 @@ export function buildActorSkeleton(scene, rig, name = rig.archetypeId) {
    * mis-keyed table would deform nothing and look exactly like a correct rig
    * standing still, which is the failure mode this whole phase exists to make
    * impossible.
+   *
+   * P9 HANDOFF, AND IT IS LOAD-BEARING ON THE COMMENT ABOVE. This table has NO
+   * TRANSLATION CHANNEL — `{axis, angleRad}` is a rotation and nothing else —
+   * while ground (i) of the `_matrix` rationale in this file's header is
+   * exactly about translation channels: the `_matrix` write is preferred over
+   * `setRotationMatrix` BECAUSE the latter preserves whatever translation is
+   * currently decomposed on the bone, which is identical today only because
+   * nothing writes one. So P9's clips must add their translation by EXTENDING
+   * this function — same absolute rebuild from `bone.getRestMatrix()` on every
+   * call — and never by writing bone positions around it. Bypass the API and
+   * the two paths stop agreeing about what a pose is, and ground (i) becomes a
+   * paragraph describing code that no longer exists.
    */
   function setPose(pose) {
     if (pose) {

@@ -342,11 +342,40 @@ describe('evaluatePose — the palette', () => {
 
   it('canonicalises negative zero in a posed palette too', () => {
     // Anti-vacuity for the clause above: a pose that WOULD emit -0 without it.
+    //
+    // THE SIGN OF THE AXIS IS THE ENTIRE TEST. This case used to run
+    // `axis [0, 1, 0], angleRad: PI` and could not fail under the mutation its
+    // own name promises — delete evaluatePose's canonicalisation and that pose
+    // emits no -0 anywhere, so the assertion passed on both sides.
+    //
+    // The two paths mint -0 differently, which is why the rest-pose case above
+    // does not cover this one. At angle 0, `t = 1 - cos` is EXACTLY 0, so
+    // `t*ax*az` is a zero times whatever sign `az` carries and the -0 appears
+    // for any negative component at all (that case uses [0.6, 0, -0.8]). At a
+    // real angle `t` and `s` are both non-zero, so the only zero products left
+    // are the ones a ZERO axis component makes — and `(t*0)*c` is -0 only when
+    // `c` is itself negative. `[0, 1, 0]` has no negative component, so every
+    // zero product in it is `+0` and the canonicalisation had nothing to do.
+    // `[0, -1, 0]` at a real angle puts a genuine -0 in palette elements 4 and
+    // 9 (`t*ax*ay - s*az` and `t*ay*az - s*ax`), measured.
     const bones = [{ boneId: 'root', at: [0, 1, 0], parentIndex: -1, massIds: [] }];
-    const palette = evaluatePose({ bones }, { 0: { axis: [0, 1, 0], angleRad: Math.PI } });
+    const ANGLE = 0.7;
+    // The -0-minting arithmetic, asserted in the open rather than trusted to
+    // the axis literal: a future edit that "tidies" the axis back to something
+    // all-positive fails HERE, with this message, instead of going quietly
+    // toothless again.
+    const t = 1 - Math.cos(ANGLE);
+    expect(
+      Object.is(t * 0 * -1 - Math.sin(ANGLE) * 0, -0),
+      'this axis no longer mints a -0, so the assertion below cannot fail',
+    ).toBe(true);
+    const palette = evaluatePose({ bones }, { 0: { axis: [0, -1, 0], angleRad: ANGLE } });
     expect(Array.from(palette).some((v) => Object.is(v, -0))).toBe(false);
-    // ...and the rotation itself is still real: 180 degrees about +Y flips x.
-    expect(apply(palette, 0, [1, 1, 0])[0]).toBeCloseTo(-1, 6);
+    // ...and the rotation itself is real, not a dressed-up identity: 0.7 rad
+    // about -Y swings +x toward +z.
+    expect(matAt(palette, 0)).not.toEqual(IDENTITY_16);
+    expect(apply(palette, 0, [1, 0, 0])[2]).toBeCloseTo(Math.sin(ANGLE), 6);
+    expect(apply(palette, 0, [1, 0, 0])[0]).toBeCloseTo(Math.cos(ANGLE), 6);
   });
 
   it.each(IDS)('%s evaluatePose is deterministic and uncached', (id) => {

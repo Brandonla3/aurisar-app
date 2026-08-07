@@ -66,6 +66,7 @@
 
 /* global BABYLON */
 
+import { ACTOR_POSE_MARGIN_M } from '../../model/actorEnvelope.js';
 import { PROP_TIER, TIER_BANDS_M, TIER_HYST_M } from '../../model/propLod.js';
 import { buildActorSkeleton } from './ActorSkeleton.js';
 
@@ -91,6 +92,50 @@ export function tierForDistance(distanceM, prevTier = null) {
     return distanceM < edge - TIER_HYST_M ? PROP_TIER.NEAR : PROP_TIER.MID;
   }
   return distanceM <= edge ? PROP_TIER.NEAR : PROP_TIER.MID;
+}
+
+/**
+ * Grow a live actor mesh's LOCAL bounding box by `ACTOR_POSE_MARGIN_M` on
+ * every face, so the frustum culler tests a box a POSED actor still fits
+ * inside. model/actorEnvelope.js carries the measurement, the headroom
+ * argument and the P9 revisit trigger; this is only the application.
+ *
+ * ON THE CLONE, NOT ON THE MASTER, and that placement is a MEASURED ENGINE
+ * FACT rather than a preference. Expanding the master looks like the obvious
+ * one-write-serves-every-actor move — it is where the skinning buffers are
+ * written, for exactly that reason — but `Mesh.clone()` does NOT copy the
+ * source's `_boundingInfo`: it derives a fresh one from the shared geometry's
+ * vertex extents. Measured on unbound near stage with a 0.35 m probe margin:
+ * master reads min.x -0.7250 after `setBoundingInfo`, and its clone reads
+ * -0.3750 — the untouched rest value. So the master version of this fix is
+ * a silent no-op that reviews perfectly. Poking `geometry._extend` instead
+ * fails the same way (`refreshBoundingInfo` re-derives it from the buffer).
+ *
+ * It STICKS, which is the other half of the question: measured across
+ * parenting, `setEnabled`, the skeleton attach, `setPose`, two `scene.render`
+ * passes and a moved root, the local box stays expanded and the WORLD box
+ * tracks the world matrix (root at x=30 gives world min.x 29.275 = 30 - 0.725).
+ * Babylon never recomputes it on its own; only an explicit
+ * `refreshBoundingInfo()` would, and nothing here calls one.
+ *
+ * Called on every pass through `_applyTier`, not just the first, for the same
+ * reason the skeleton re-attach is: each tier swap builds a NEW clone, and a
+ * fresh clone arrives with the rest-pose box again.
+ */
+function expandForPose(mesh) {
+  const { minimum, maximum } = mesh.getBoundingInfo();
+  mesh.setBoundingInfo(new BABYLON.BoundingInfo(
+    new BABYLON.Vector3(
+      minimum.x - ACTOR_POSE_MARGIN_M,
+      minimum.y - ACTOR_POSE_MARGIN_M,
+      minimum.z - ACTOR_POSE_MARGIN_M,
+    ),
+    new BABYLON.Vector3(
+      maximum.x + ACTOR_POSE_MARGIN_M,
+      maximum.y + ACTOR_POSE_MARGIN_M,
+      maximum.z + ACTOR_POSE_MARGIN_M,
+    ),
+  ));
 }
 
 export class ActorRig {
@@ -172,6 +217,14 @@ export class ActorRig {
    * identity). ABSOLUTE, never incremental — see ActorSkeleton.js — and it
    * SURVIVES a tier swap, so the caller poses when the pose changes and not
    * once per rebuilt mesh. A no-op after dispose(), like update().
+   *
+   * P9 HANDOFF: this surface expresses ROTATIONS ONLY — there is no
+   * translation channel anywhere in `{axis, angleRad}`. Ground (i) of
+   * ActorSkeleton.js's `bone._matrix` rationale is precisely about translation
+   * channels, so when P9 adds one it must EXTEND setPose (and keep writing
+   * each local absolutely against `getRestMatrix()`) rather than reach past
+   * this API to the bones; posing a translation any other way collapses the
+   * argument that keeps the write correct. See ActorSkeleton.js's setPose.
    */
   setPose(pose) {
     if (!this._disposed) this._skin.setPose(pose);
@@ -283,6 +336,7 @@ export class ActorRig {
     // Nothing in the Realm picks yet. Explicit rather than inherited so the
     // day something does, this line is the one to flip.
     mesh.isPickable = false;
+    expandForPose(mesh);
 
     this._mesh = mesh;
     this._meta = meta;

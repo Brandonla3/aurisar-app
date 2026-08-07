@@ -62,17 +62,24 @@
  * TERMS WHOSE MATRIX COEFFICIENT IS EXACTLY ZERO ARE OMITTED FROM THE RUNNING
  * SUM, RATHER THAN ADDED AS A SIGNED ZERO — and this is not a stylistic
  * choice, it is what keeps the identity palette a genuine bit-exact no-op.
- * The roster's own generated payload carries 134 vertex normals (0 in
- * positions, ever — measured across all four archetypes, both stages) whose
- * `y` component is authored as `-0`. At the identity bone, the y-column reads
- * coefficients `(0, 1, 0)`: naively computing
- * `fround(nx*0) + fround(ny*1) + fround(nz*0)` adds a `-0` term (from `ny`,
+ * The roster's own generated payload carries 134 NORMAL COMPONENTS authored as
+ * `-0`, and the composition matters because it is not the one an earlier
+ * version of this comment claimed: 84 are `x` components and 50 are `y`, none
+ * is a `z`, and there is not a single `-0` anywhere in positions, ever
+ * (re-measured across all four archetypes at both stages — unbound 20x/12y,
+ * legion 30x/10y, magistari 14x/24y, orghon 20x/4y).
+ *
+ * Both columns fail the same way, which is why the count is worth stating
+ * whole. At the identity bone the column for axis `k` reads coefficient 1 at
+ * `k` and exactly 0 at the other two, so for a `-0` in `x`, naively computing
+ * `fround(nx*1) + fround(ny*0) + fround(nz*0)` adds the `-0` term (from `nx`,
  * whose true sign the input carries) to TWO `+0` terms (`0` is always
  * canonicalised to `+0` in a palette — `evaluatePose`'s own doc comment)
  * — and IEEE 754 defines the sum of two zeros with OPPOSITE signs, under
  * round-to-nearest, as `+0`. The `-0` is gone, silently, even though the
- * identity matrix's only real contribution to that component was `ny`
- * itself. Skipping a zero-coefficient term changes nothing mathematically —
+ * identity matrix's only real contribution to that component was `nx`
+ * itself; the 50 `y` cases are the same sentence with the `(0, 1, 0)` column.
+ * Skipping a zero-coefficient term changes nothing mathematically —
  * `0 * anything` contributes nothing to a sum regardless of its sign — and it
  * means the SOLE surviving term (the one whose coefficient is exactly 1 at
  * identity) is returned untouched, sign and all, because it is never added to

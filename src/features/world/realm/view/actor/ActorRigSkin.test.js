@@ -39,9 +39,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import BABYLON from 'babylonjs';
 import { ARCHETYPES } from '../../model/actorMasses.js';
-import { buildActorRig } from '../../model/actorRig.js';
+import { buildActorRig, evaluatePose } from '../../model/actorRig.js';
 import { CANARY_POSE } from '../../model/actorCanary.js';
+import { ACTOR_POSE_MARGIN_M } from '../../model/actorEnvelope.js';
 import { PROP_TIER } from '../../model/propLod.js';
+import { buildActorPayload } from '../../gen/actorGen.js';
+import { skinPayload } from '../../gen/actorSkin.js';
 
 let ActorPrototypes;
 let ActorRig;
@@ -373,6 +376,149 @@ describe('ActorRig — dispose releases the skeleton', () => {
       expect(() => new ActorRig(scene, protos, 'gelatinous-cube')).toThrow(/unknown archetype/);
       expect(scene.skeletons.length).toBe(0);
       expect(scene.transformNodes.filter((n) => n.name.startsWith('actor_')).length).toBe(0);
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+});
+
+/**
+ * ── THE CULLING ENVELOPE ───────────────────────────────────────────────────
+ *
+ * A GPU-skinned mesh's bounding box is its REST box forever: the deformation
+ * happens in the vertex shader and never reaches the vertex buffer. So a posed
+ * actor near the edge of frame gets frustum-culled with a limb still on
+ * screen — the whole character vanishing, not one bad triangle.
+ * model/actorEnvelope.js measures the reach and argues the margin; these are
+ * the assertions that the margin actually reaches a LIVE clone, which is the
+ * half no pure test can see (`Mesh.clone()` does not copy `_boundingInfo`, so
+ * the natural place to write it — the master — is a silent no-op).
+ */
+describe('ActorRig — the posed mesh fits inside the box the culler tests', () => {
+  /** The mesh-local rest box, straight off the payload the master was built from. */
+  function restBox(id, stage) {
+    const { positions } = buildActorPayload(id, stage);
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < positions.length; i += 3) {
+      for (let a = 0; a < 3; a++) {
+        if (positions[i + a] < min[a]) min[a] = positions[i + a];
+        if (positions[i + a] > max[a]) max[a] = positions[i + a];
+      }
+    }
+    return { min, max };
+  }
+
+  /** Canary-posed vertices, mesh-local — the CPU twin every P7 gate trusts. */
+  function posedVertices(id, stage) {
+    const payload = buildActorPayload(id, stage);
+    const rig = buildActorRig(id);
+    return skinPayload(payload, rig, evaluatePose(rig, CANARY_POSE[id])).positions;
+  }
+
+  const PAIRS = ARCHETYPES.flatMap((a) => (
+    Array.from({ length: a.stages }, (_, stage) => ({ id: a.id, stage }))
+  ));
+
+  it.each(PAIRS)('$id stage $stage: the live box is the rest box grown by the margin', ({ id, stage }) => {
+    const { scene, protos } = newWorld();
+    try {
+      const rig = new ActorRig(scene, protos, id, { name: `env_${id}_${stage}`, tier: stage });
+      expect(rig.meta.stage, 'tier did not resolve to the stage under test').toBe(stage);
+      const { min, max } = restBox(id, stage);
+      const box = rig.mesh.getBoundingInfo();
+      // Exact arithmetic, not a tolerance: the margin is added to numbers read
+      // out of the same Float32Array Babylon measured, so a mismatch here means
+      // the wrong constant or the wrong face, never rounding.
+      for (const [a, axis] of ['x', 'y', 'z'].entries()) {
+        expect(box.minimum[axis], `${id}[${stage}] min.${axis}`).toBeCloseTo(min[a] - ACTOR_POSE_MARGIN_M, 9);
+        expect(box.maximum[axis], `${id}[${stage}] max.${axis}`).toBeCloseTo(max[a] + ACTOR_POSE_MARGIN_M, 9);
+      }
+      rig.dispose();
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it.each(PAIRS)('$id stage $stage: EVERY canary-posed vertex is inside it', ({ id, stage }) => {
+    const { scene, protos } = newWorld();
+    try {
+      const rig = new ActorRig(scene, protos, id, { name: `fit_${id}_${stage}`, tier: stage });
+      rig.setPose(CANARY_POSE[id]);
+      const box = rig.mesh.getBoundingInfo();
+      const lo = [box.minimum.x, box.minimum.y, box.minimum.z];
+      const hi = [box.maximum.x, box.maximum.y, box.maximum.z];
+      const posed = posedVertices(id, stage);
+      // SLACK, not "is it inside": how far the OUTERMOST posed vertex still
+      // sits within the box, over all six faces. Reported rather than
+      // thresholded so a failure says how badly, and asserted strictly
+      // positive so a pose that merely grazes a face — exactly what the
+      // un-expanded box gives magistari, whose overhang is 0.0000 — counts as
+      // the miss it is rather than passing on a boundary.
+      let slack = Infinity;
+      let where = null;
+      for (let i = 0; i < posed.length; i += 3) {
+        for (let a = 0; a < 3; a++) {
+          const s = Math.min(posed[i + a] - lo[a], hi[a] - posed[i + a]);
+          if (s < slack) { slack = s; where = { v: i / 3, axis: 'xyz'[a] }; }
+        }
+      }
+      expect(
+        slack,
+        `${id}[${stage}] vertex ${where?.v} sits only ${slack.toFixed(4)} m inside the culling box `
+        + `on ${where?.axis}; at or below 0 the frustum test cannot see that posed limb.`,
+      ).toBeGreaterThan(0);
+      rig.dispose();
+      protos.dispose();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('has TEETH: without the expansion the roster leaves its rest box', () => {
+    // The mutation this file is proof against is deleting `expandForPose(mesh)`
+    // from `_applyTier`. That leaves the rest box, and these are the distances
+    // by which the canary pose already escapes it — so the test above would go
+    // red on three of four archetypes rather than passing vacuously.
+    const escapes = {};
+    for (const { id, stage } of PAIRS) {
+      const { min, max } = restBox(id, stage);
+      const posed = posedVertices(id, stage);
+      let worst = 0;
+      for (let i = 0; i < posed.length; i += 3) {
+        for (let a = 0; a < 3; a++) worst = Math.max(worst, min[a] - posed[i + a], posed[i + a] - max[a]);
+      }
+      escapes[`${id}:${stage}`] = Number(worst.toFixed(4));
+    }
+    expect(escapes).toEqual({
+      'unbound:0': 0.3068, 'unbound:1': 0.3265,
+      'legion:0': 0.1559, 'legion:1': 0.1657,
+      'magistari:0': 0, 'magistari:1': 0,
+      'orghon:0': 0.035, 'orghon:1': 0.0519,
+    });
+    // Named separately so the failure says WHICH claim broke: the margin has
+    // to beat the worst escape, or the containment test above is a coin toss.
+    expect(Math.max(...Object.values(escapes))).toBeLessThan(ACTOR_POSE_MARGIN_M);
+  });
+
+  it('a tier swap rebuilds the mesh AND re-expands it', () => {
+    // `_applyTier` clones a fresh mesh on every swap, and a fresh clone arrives
+    // with the rest-pose box again — the same shape of bug as the skeleton
+    // re-attach two describes up, and it has to be closed on the same line.
+    const { scene, protos } = newWorld();
+    try {
+      const rig = new ActorRig(scene, protos, DEEP, { tier: PROP_TIER.NEAR });
+      rig.setPose(CANARY_POSE[DEEP]);
+      rig.seatOn(0, 0, 0);
+      expect(rig.update({ x: 400, y: 0, z: 0 })).toBe(PROP_TIER.MID);
+      expect(rig.swapCount).toBe(1);
+      const { min, max } = restBox(DEEP, rig.meta.stage);
+      const box = rig.mesh.getBoundingInfo();
+      expect(box.minimum.x, 'the post-swap clone lost its margin').toBeCloseTo(min[0] - ACTOR_POSE_MARGIN_M, 9);
+      expect(box.maximum.x, 'the post-swap clone lost its margin').toBeCloseTo(max[0] + ACTOR_POSE_MARGIN_M, 9);
+      rig.dispose();
       protos.dispose();
     } finally {
       scene.dispose();

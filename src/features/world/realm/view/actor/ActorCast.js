@@ -24,11 +24,17 @@
  * at rest deliberately: nothing anywhere calls their skeleton's `setPose`,
  * so their palettes stay bit-identical to `rest()`, and it is the CONTRAST
  * — one archetype standing bent next to two standing straight — that is the
- * live demonstration a real GPU can skin a mesh at all. See
- * `view/actor/ActorRig.js`'s header for why legion is the only demo archetype
- * that COULD take an independent-leg pose in the first place (it can't —
- * its legs are one fused bone pair) and why a CANARY_POSE-derived stance is
- * the pose that sidesteps that entirely.
+ * live demonstration a real GPU can skin a mesh at all.
+ *
+ * AND IT IS NOT A WALK, because no rig in this roster can express one. The
+ * derivation is `model/actorRig.js`'s header, under "ONE BONE PER CAP PIVOT":
+ * a pivot joining N masses spawns exactly ONE bone owning every mass beyond
+ * it, "so legs move as a pair". Both unbound and legion put `{legL, legR}` on
+ * a single bone (bone 1 on each, re-derived from `buildActorRig` rather than
+ * taken on trust), which makes independent legs a GENOME change and a P9
+ * carry-forward, not a P7 omission. A CANARY_POSE-derived stance sidesteps it
+ * entirely: the canary poses every non-root bone by construction and asks
+ * nothing of leg independence.
  *
  * Legion, not orghon, is the one posed: `DEMO_POSITIONS[0]` (150, 0) is
  * closer to spawn than `DEMO_POSITIONS[1]` (-200, 150) — `hypot(150,0) = 150`
