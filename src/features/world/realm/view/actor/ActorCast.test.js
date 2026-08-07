@@ -44,6 +44,24 @@ function newWorld() {
   return { scene, sun, material, field, shadowRig };
 }
 
+/** One flattened 4x4 identity, repeated per bone slot by getTransformMatrices(). */
+const IDENTITY_16 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
+/**
+ * Is this skeleton's LIVE palette bit-exact identity? Runtime fact, not a
+ * flag check — a rig that was never posed, or one whose pose was silently
+ * dropped, reads identically to this either way, which is exactly the
+ * distinction ActorSkeleton.test.js's own `identityMismatches` exists to
+ * make (that helper is local to that file; this is the same check, inlined).
+ */
+function paletteIsIdentity(skeleton) {
+  const palette = skeleton.getTransformMatrices(null);
+  for (let i = 0; i < palette.length; i++) {
+    if (!Object.is(palette[i], IDENTITY_16[i % 16])) return false;
+  }
+  return true;
+}
+
 describe('ActorCast — construction', () => {
   it('builds the player plus two static demo actors', () => {
     const { scene, material, field, shadowRig } = newWorld();
@@ -91,6 +109,40 @@ describe('ActorCast — construction', () => {
     const { scene, material, field } = newWorld();
     try {
       expect(() => new ActorCast(scene, { material, field })).not.toThrow();
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('poses the legion demo actor at construction; the player and the orghon demo stay at rest', () => {
+    // TASK 7's whole contribution, as a runtime fact rather than a flag: a
+    // wiring mistake that drops the rig.setPose(CANARY_POSE.legion) call at
+    // construction looks perfectly correct to every other assertion in this
+    // file — the mesh still exists, the archetype is still 'legion', the
+    // shadow registration still happens — and only the LIVE PALETTE reveals
+    // whether the bones actually bent.
+    const { scene, material, field, shadowRig } = newWorld();
+    try {
+      const cast = new ActorCast(scene, { material, field, shadowRig });
+      const [legion, orghon] = cast.demoActors;
+      // Sanity on WHICH archetype is which, so a future reordering of
+      // DEMO_ARCHETYPES fails loudly here rather than silently posing the
+      // wrong actor and passing anyway.
+      expect(legion.archetypeId).toBe('legion');
+      expect(orghon.archetypeId).toBe('orghon');
+
+      expect(
+        paletteIsIdentity(legion.skeleton),
+        'the legion demo actor`s palette is bit-exact identity — is ActorCast still '
+        + 'calling rig.setPose(CANARY_POSE.legion) at construction?',
+      ).toBe(false);
+      expect(paletteIsIdentity(cast.player.skeleton), 'the player must stay at rest').toBe(true);
+      expect(paletteIsIdentity(orghon.skeleton), 'the orghon demo actor must stay at rest').toBe(true);
+
+      // The console-verification surface Task 8 reaches for.
+      expect(cast.posedDemo).toBe(legion);
+
+      cast.dispose();
     } finally {
       scene.dispose();
     }
@@ -232,6 +284,31 @@ describe('ActorCast — dispose', () => {
       expect(shadowRig._casters.size).toBe(0);
       expect(cast.demoActors).toHaveLength(0);
       expect(() => cast.dispose()).not.toThrow(); // idempotent
+    } finally {
+      scene.dispose();
+    }
+  });
+
+  it('releases every rig`s skeleton too — scene.skeletons returns to baseline, posed or not', () => {
+    // A Skeleton is scene-registered and is NOT a Node (ActorRig.js's header,
+    // ActorRigSkin.test.js's own version of this test) — disposing the mesh
+    // and the root leaves it behind. The posed legion demo actor is not a
+    // special case for this: setPose() only ever writes bone matrices on an
+    // existing Skeleton object, never adds a second one to the scene.
+    const { scene, material, field, shadowRig } = newWorld();
+    try {
+      const baseline = scene.skeletons.length;
+      const cast = new ActorCast(scene, { material, field, shadowRig });
+      // player + 2 demo actors, one skeleton each — ActorRig.js's "ONE
+      // skeleton per actor" commitment, read as a scene-level count.
+      expect(scene.skeletons.length).toBe(baseline + 3);
+
+      cast.dispose();
+
+      expect(
+        scene.skeletons.length,
+        'a posed skeleton outlived its actor — dispose() must release it exactly like an unposed one',
+      ).toBe(baseline);
     } finally {
       scene.dispose();
     }
