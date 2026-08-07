@@ -43,7 +43,8 @@
     "bake:heightmap": "node scripts/bake_ashwood_heightmap.mjs",
     "verify:worldgen": "node scripts/verify_worldgen.mjs",
     "emit:db-contract": "node scripts/check_db_contract.mjs",
-    "emit:db-contract:check": "node scripts/check_db_contract.mjs --check"
+    "emit:db-contract:check": "node scripts/check_db_contract.mjs --check",
+    "lint:undef": "node scripts/check_no_undef.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

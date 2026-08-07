@@ -89,6 +89,14 @@ jobs:
       - name: DB contract (code ↔ tracked schema, offline)
         run: npm run emit:db-contract:check
 
+      # `npm run lint` cannot gate yet (~590 pre-existing findings), but
+      # no-undef is never a matter of taste — every violation is a runtime
+      # ReferenceError. PR #321 shipped one that broke sign-in, sign-out,
+      # password change and password reset; the build passed and 1233 tests
+      # passed, because none of them execute the wiring.
+      - name: No undefined references (runtime ReferenceErrors)
+        run: npm run lint:undef
+
       - name: Tests
         run: npm test
 

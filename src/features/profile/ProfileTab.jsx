@@ -208,6 +208,7 @@ const ProfileTab = memo(function ProfileTab({
   // Password change
   pwPanelOpen, setPwPanelOpen,
   pwNew, setPwNew,
+  removePhone,
   pwCurrent, setPwCurrent,
   pwNonce, setPwNonce,
   pwReauthSent, pwRecoveryMode,

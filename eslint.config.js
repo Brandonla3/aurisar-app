@@ -20,7 +20,10 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      // BABYLON is loaded as a script global by the world bundle rather than
+      // imported, so no-undef would otherwise flag every legitimate use and
+      // drown out the real ones (see the `lint:undef` gate in package.json).
+      globals: { ...globals.browser, BABYLON: 'readonly' },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
