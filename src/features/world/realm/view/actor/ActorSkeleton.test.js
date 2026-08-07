@@ -25,6 +25,14 @@
  * numbers. Anything structural measures in centimetres to metres, four to
  * seven orders of magnitude away.
  *
+ * ITS SIBLING IS `ActorSkeletonLayout.test.js`, which holds the ASYMMETRIC
+ * FIXTURE: a synthetic two-bone strip carrying shear, non-uniform scale and an
+ * odd-angle rotation, proving Babylon's matrix LAYOUT contract (row-major,
+ * row-vector, translation in 12..14) rather than anything about this module.
+ * It never calls `buildActorSkeleton`, which is why it splits cleanly. The
+ * oracle here rests on that contract; if both files go red at once, read that
+ * one first — a broken layout explains a broken oracle, not the reverse.
+ *
  * ── THREE ENGINE TRAPS THIS FILE IS BUILT AROUND, EACH ASSERTED ────────────
  *
  * (1) `Mesh.applySkeleton` SILENTLY DOES NOTHING when called twice in the same
@@ -93,7 +101,17 @@ const NEAR = 0;
 
 const IDENTITY_16 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
-/** Next power of two above the worst measured 2.384e-7 (= 2^-22 exactly). */
+/**
+ * Next power of two above the worst measured 2.384e-7 (= 2^-22 exactly).
+ *
+ * COUPLED TO `AXIS_UNIT_EPS` IN ActorSkeleton.js, which says the same thing at
+ * its own end. A non-unit pose axis means something DIFFERENT to the engine
+ * (which normalises) than to `evaluatePose` (which does not), so an axis both
+ * guards accept but that is not really unit shows up here as an unexplained
+ * numerical failure. Measured: |axis|-1 of 5e-7 already produces 5.96e-7,
+ * above this tolerance. The module's eps is 1e-7 to keep the induced delta at
+ * the fp32 floor; loosening either constant without the other reopens the gap.
+ */
 const POSITION_TOL = 2 ** -21;
 
 /**
@@ -105,69 +123,12 @@ const POSITION_TOL = 2 ** -21;
 const NORMAL_TOL = 2 ** -22;
 
 /**
- * The asymmetric fixture below SCALES by up to 2.4x, so its palette entries
- * reach magnitude 5.6 and its skinned vertices 10.3 — where one fp32 ULP is
- * already 4.8e-7 and 9.5e-7, i.e. POSITION_TOL is one ULP there and would
- * flake on rounding alone. Worst measured on it: palette 5.00e-7, positions
- * 6.39e-7, normals 6.98e-8. Two ULP at its largest magnitude; the layout fault
- * it exists to catch separates by at least 1.36, some 700,000 times wider.
- */
-const ASYM_TOL = 2 ** -19;
-
-/**
  * Per-bone travel floor under the canary pose. Not decoration: the oracle
  * passes vacuously if the fixture welds everything to bone 0 or if some bone's
  * matrix is quietly the identity, because then BOTH sides compute the same
  * nothing. Sits just under model/actorCanary.js's measured 0.0288 m worst.
  */
 const MIN_BONE_TRAVEL = 0.02;
-
-// ── float64 references, COPIED not imported ────────────────────────────────
-// The oracle's independence rests on these being written here. `applyAffine`
-// is copied verbatim from model/actorRig.test.js and gen/actorSkin.test.js,
-// for the reason those files give: importing the helper of the thing under
-// test proves the test's arithmetic, not the module's.
-
-/** `p · M` where M is the 16-float row-major palette entry at bone `i`. */
-function applyAffine(palette, i, p) {
-  const o = i * 16;
-  return [
-    p[0] * palette[o] + p[1] * palette[o + 4] + p[2] * palette[o + 8] + palette[o + 12],
-    p[0] * palette[o + 1] + p[1] * palette[o + 5] + p[2] * palette[o + 9] + palette[o + 13],
-    p[0] * palette[o + 2] + p[1] * palette[o + 6] + p[2] * palette[o + 10] + palette[o + 14],
-  ];
-}
-
-/** `n · upper3x3(M)` — rotation part only, no translation. */
-function applyRotation(palette, i, n) {
-  const o = i * 16;
-  return [
-    n[0] * palette[o] + n[1] * palette[o + 4] + n[2] * palette[o + 8],
-    n[0] * palette[o + 1] + n[1] * palette[o + 5] + n[2] * palette[o + 9],
-    n[0] * palette[o + 2] + n[1] * palette[o + 6] + n[2] * palette[o + 10],
-  ];
-}
-
-/** Row-vector 4x4 multiply: the matrix that applies `a` first, then `b`. */
-function mul4(a, b) {
-  const o = new Array(16);
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      o[r * 4 + c] = a[r * 4] * b[c] + a[r * 4 + 1] * b[4 + c]
-        + a[r * 4 + 2] * b[8 + c] + a[r * 4 + 3] * b[12 + c];
-    }
-  }
-  return o;
-}
-
-const translation4 = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
-
-/** The transpose of a row-major 4x4 — what a column-major misread sees. */
-function transpose4(m) {
-  const o = new Array(16);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) o[r * 4 + c] = m[c * 4 + r];
-  return o;
-}
 
 // ── fixtures ───────────────────────────────────────────────────────────────
 
@@ -353,17 +314,43 @@ describe('buildActorSkeleton — THE CANARY ORACLE', () => {
     }));
   }
 
-  it('posing is visible in the palette immediately, without a render', () => withScene((scene) => {
-  // Trap (2). If setPose did not force the recompute, every posed assertion
-  // in this file would silently be measuring the construction-time identity.
+  it('a SECOND pose is visible in the palette too, without a render', () => withScene((scene) => {
+  // Trap (2), and the shape of this test is the whole point. An earlier version
+  // did pose-then-read ONCE and could not fail: `_currentRenderId` starts at -1,
+  // so the FIRST read always recomputes whether or not setPose forced it, and
+  // deleting `prepare(true)` left this green. It takes A -> read -> B -> read to
+  // bite, because only the second read meets a `_currentRenderId` that already
+  // equals the (never-advancing) headless render id.
     const { rig, skeleton, setPose } = actorCase(scene, DEEP_FIXTURE);
+    const poseA = CANARY_POSE[DEEP_FIXTURE];
+    // Same axes, opposite angles: a materially different pose that still passes
+    // the unit-axis guard.
+    const poseB = Object.fromEntries(Object.entries(poseA)
+      .map(([k, e]) => [k, { axis: e.axis, angleRad: -e.angleRad }]));
+
+    const worstAgainst = (palette, pose) => {
+      const twin = evaluatePose(rig, pose);
+      let worst = 0;
+      for (let i = 0; i < twin.length; i++) worst = Math.max(worst, Math.abs(palette[i] - twin[i]));
+      return worst;
+    };
+
     expect(scene.getRenderId()).toBe(0);
-    setPose(CANARY_POSE[DEEP_FIXTURE]);
-    const palette = skeleton.getTransformMatrices(null);
-    const twin = evaluatePose(rig, CANARY_POSE[DEEP_FIXTURE]);
-    let worst = 0;
-    for (let i = 0; i < twin.length; i++) worst = Math.max(worst, Math.abs(palette[i] - twin[i]));
-    expect(worst, 'engine palette vs evaluatePose, element for element').toBeLessThanOrEqual(POSITION_TOL);
+    setPose(poseA);
+    expect(worstAgainst(skeleton.getTransformMatrices(null), poseA)).toBeLessThanOrEqual(POSITION_TOL);
+
+    setPose(poseB);
+    const second = skeleton.getTransformMatrices(null);
+    expect(
+      worstAgainst(second, poseB),
+      'The second pose did not reach the palette. Skeleton.prepare() short-circuits\n' +
+        'on an unchanged render id, which never advances headless, so setPose must\n' +
+        'force the recompute — otherwise the skeleton serves pose A forever.',
+    ).toBeLessThanOrEqual(POSITION_TOL);
+
+    // Anti-vacuity: A and B must really differ, or serving a stale A would
+    // satisfy the assertion above by accident.
+    expect(worstAgainst(second, poseA)).toBeGreaterThan(0.01);
     expect(scene.getRenderId(), 'nothing here may need a render to be true').toBe(0);
   }));
 
@@ -388,174 +375,6 @@ describe('buildActorSkeleton — THE CANARY ORACLE', () => {
         'silently skins nothing.',
     ).toEqual(posed);
     expect(scene.getFrameId()).toBe(0);
-  }));
-});
-
-describe('buildActorSkeleton — THE ASYMMETRIC FIXTURE', () => {
-  /**
-   * Pure rotations masked three phases of render-criticals, because a rotation
-   * is orthogonal: its transpose IS its inverse, so a transposed or
-   * column-major-misread palette still produces a rigid, plausible body. This
-   * fixture is the antidote — shear 0.35, non-uniform scale and an odd-angle
-   * rotation, so M^T is nothing like M^-1 and any layout confusion lands the
-   * vertex somewhere numerically distinct. That separation is ASSERTED, not
-   * assumed obvious.
-   *
-   * The reference is hand-computed here in float64, never through
-   * gen/actorSkin.js: the twin's contract is RIGID palettes only (its normals
-   * take the rotation part verbatim, which is the inverse-transpose only for
-   * orthogonal matrices) and this fixture deliberately violates exactly that.
-   * Feeding it to the twin would compare against a function documented not to
-   * be correct here.
-   */
-  const SHEAR = 0.35;
-  const AT0 = [0.4, 1.1, -0.3];
-  const AT1 = [-0.7, 1.9, 0.5];
-
-  /** Rodrigues about a unit axis, row-vector convention. Copied, not imported. */
-  function rotAxis(ax, ay, az, angle) {
-    const s = Math.sin(angle);
-    const cs = Math.cos(angle);
-    const t = 1 - cs;
-    return [
-      t * ax * ax + cs, t * ax * ay + s * az, t * ax * az - s * ay, 0,
-      t * ax * ay - s * az, t * ay * ay + cs, t * ay * az + s * ax, 0,
-      t * ax * az + s * ay, t * ay * az - s * ax, t * az * az + cs, 0,
-      0, 0, 0, 1,
-    ];
-  }
-
-  const scale4 = (sx, sy, sz) => [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1];
-  /** x' = x + k·y — an off-diagonal term no rotation carries on its own. */
-  const shear4 = (k) => [1, 0, 0, 0, k, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-  const unit = (v) => {
-    const n = Math.hypot(v[0], v[1], v[2]);
-    return [v[0] / n, v[1] / n, v[2] / n];
-  };
-
-  // Odd angles, odd axes: nothing is a multiple of 90 degrees or aligned to a
-  // world axis, so no accidental symmetry can rescue a wrong layout.
-  const L0 = mul4(mul4(scale4(1.7, 0.43, 2.31), shear4(SHEAR)), rotAxis(...unit([0.31, -0.87, 0.42]), 0.6981317));
-  const L1 = mul4(mul4(shear4(-SHEAR), scale4(0.61, 2.4, 1.15)), rotAxis(...unit([-0.55, 0.24, 0.79]), 1.1519173));
-
-  /** Four vertices, two triangles: v0,v1 on bone 0; v2,v3 on bone 1. */
-  const STRIP = Object.freeze([
-    [0.83, -0.41, 1.27], [-0.62, 0.95, -0.18],
-    [1.44, 0.27, -0.91], [-0.35, -1.06, 0.53],
-  ]);
-  const STRIP_NORMALS = Object.freeze([
-    unit([0.2, 0.9, -0.3]), unit([-0.7, 0.1, 0.6]),
-    unit([0.5, -0.5, 0.7]), unit([0.15, 0.85, 0.5]),
-  ]);
-  const STRIP_BONES = Object.freeze([0, 0, 1, 1]);
-
-  function buildStrip(scene) {
-    const skeleton = new BABYLON.Skeleton('asym', 'asym', scene);
-    skeleton.useTextureToStoreBoneMatrices = false;
-    const b0 = new BABYLON.Bone('b0', skeleton, null, BABYLON.Matrix.Translation(...AT0));
-    const b1 = new BABYLON.Bone('b1', skeleton, b0, BABYLON.Matrix.Translation(
-      AT1[0] - AT0[0], AT1[1] - AT0[1], AT1[2] - AT0[2],
-    ));
-    // DRIVEN THROUGH BABYLON: the local matrices go in as Babylon Matrices and
-    // come back through getTransformMatrices, so the engine's own compose and
-    // invert are what is under test, not a re-derivation of them.
-    b0._matrix = BABYLON.Matrix.FromArray(L0);
-    b1._matrix = BABYLON.Matrix.FromArray(L1);
-    skeleton.prepare(true);
-
-    const mesh = new BABYLON.Mesh('strip', scene);
-    const vd = new BABYLON.VertexData();
-    vd.positions = new Float32Array(STRIP.flat());
-    vd.normals = new Float32Array(STRIP_NORMALS.flat());
-    vd.indices = [0, 1, 2, 1, 3, 2];
-    vd.matricesIndices = new Float32Array(STRIP_BONES.flatMap((b) => [b, 0, 0, 0]));
-    vd.matricesWeights = new Float32Array(STRIP_BONES.flatMap(() => [1, 0, 0, 0]));
-    vd.applyToMesh(mesh, true);
-
-    // The hand computation reads the matrices AS THE ENGINE STORED THEM (fp32),
-    // so the only thing left between the two sides is composition order and
-    // layout — which is exactly what this fixture exists to test.
-    const stored = [b0, b1].map((b) => [...b.getLocalMatrix().m]);
-    return {
-      skeleton,
-      mesh,
-      expected: [
-        mul4(translation4(-AT0[0], -AT0[1], -AT0[2]), stored[0]),
-        mul4(translation4(-AT1[0], -AT1[1], -AT1[2]), mul4(stored[1], stored[0])),
-      ],
-    };
-  }
-
-  it('the fixture is genuinely asymmetric: transpose is nothing like inverse', () => {
-    for (const [label, L] of [['L0', L0], ['L1', L1]]) {
-      const shouldNotBeIdentity = mul4(L, transpose4(L));
-      let worst = 0;
-      for (let i = 0; i < 16; i++) {
-        worst = Math.max(worst, Math.abs(shouldNotBeIdentity[i] - IDENTITY_16[i]));
-      }
-      expect(
-        worst,
-        `${label} · ${label}^T is near the identity, so this matrix is effectively a\n` +
-          'rotation and the whole fixture has lost its teeth.',
-      ).toBeGreaterThan(0.5);
-      // Non-uniform scale: a rigid matrix has |det| = 1.
-      const d = L[0] * (L[5] * L[10] - L[6] * L[9]) - L[1] * (L[4] * L[10] - L[6] * L[8])
-        + L[2] * (L[4] * L[9] - L[5] * L[8]);
-      expect(Math.abs(Math.abs(d) - 1)).toBeGreaterThan(0.1);
-    }
-  });
-
-  it('the engine palette matches a float64 hand computation', () => withScene((scene) => {
-    const { skeleton, expected } = buildStrip(scene);
-    const palette = skeleton.getTransformMatrices(null);
-    for (let b = 0; b < 2; b++) {
-      for (let k = 0; k < 16; k++) {
-        expect(
-          Math.abs(palette[b * 16 + k] - expected[b][k]),
-          `bone ${b} element ${k}: engine ${palette[b * 16 + k]} vs hand ${expected[b][k]}.\n` +
-            'The hand form is T(-at_b) · L_b · L_parent; Babylon composes\n' +
-            'final_i = local_i · final_parent then premultiplies the absolute inverse\n' +
-            'bind. A mismatch here is a composition-ORDER fault, not rounding.',
-        ).toBeLessThanOrEqual(ASYM_TOL);
-      }
-    }
-  }));
-
-  it('applySkeleton lands every vertex where the row-vector layout says', () => withScene((scene) => {
-    const { skeleton, mesh, expected } = buildStrip(scene);
-    mesh.applySkeleton(skeleton);
-    const got = mesh.getVerticesData('position');
-    const gotNormals = mesh.getVerticesData('normal');
-
-    for (let v = 0; v < STRIP.length; v++) {
-      const bone = STRIP_BONES[v];
-      const want = applyAffine(expected[bone], 0, STRIP[v]);
-      const wantNormal = applyRotation(expected[bone], 0, STRIP_NORMALS[v]);
-      // THE DISCRIMINATION, asserted: read the same palette entry transposed
-      // and the vertex lands somewhere else entirely. If this separation ever
-      // collapses, the fixture has stopped testing what it claims to.
-      const transposed = applyAffine(transpose4(expected[bone]), 0, STRIP[v]);
-      const separation = Math.hypot(
-        want[0] - transposed[0], want[1] - transposed[1], want[2] - transposed[2],
-      );
-      expect(
-        separation,
-        `vertex ${v}: a transposed palette read lands in the same place, so this\n` +
-          'fixture cannot detect the layout fault it exists for.',
-      ).toBeGreaterThan(1);
-
-      for (let c = 0; c < 3; c++) {
-        expect(
-          Math.abs(got[v * 3 + c] - want[c]),
-          `vertex ${v} position ${'xyz'[c]}: engine ${got[v * 3 + c]}, hand ${want[c]},\n` +
-            `transposed-layout would be ${transposed[c]} (${separation} away).`,
-        ).toBeLessThanOrEqual(ASYM_TOL);
-        expect(
-          Math.abs(gotNormals[v * 3 + c] - wantNormal[c]),
-          `vertex ${v} normal ${'xyz'[c]}: engine ${gotNormals[v * 3 + c]}, hand ${wantNormal[c]}`,
-        ).toBeLessThanOrEqual(ASYM_TOL);
-      }
-    }
   }));
 });
 
@@ -667,6 +486,27 @@ describe('buildActorSkeleton — guards', () => {
     const { setPose } = actorCase(scene, DEEP_FIXTURE);
     expect(() => setPose({ 1: { axis: [0, 2, 0], angleRad: 0.3 } }))
       .toThrow(/non-unit pose axis, \|axis\| = 2/);
+  }));
+
+  it('rejects a BARELY non-unit axis that evaluatePose still accepts', () => withScene((scene) => {
+    // The coupling documented at POSITION_TOL, with teeth. |axis|-1 = 5e-7 sits
+    // inside evaluatePose's own 1e-6 eps, so the twin takes it happily — and
+    // rotates about the RAW vector while the engine rotates about the
+    // normalised one. Measured oracle delta at this magnitude: 5.96e-7, above
+    // POSITION_TOL. A Task-7 hand-built pose landing here would fail the oracle
+    // with a numerical message and no structural cause; this makes it fail at
+    // the call site instead, naming the axis.
+    const { rig, setPose } = actorCase(scene, DEEP_FIXTURE);
+    const off = 5e-7;
+    const axis = [0, 1 + off, 0];
+    const pose = { 1: { axis, angleRad: 0.3 } };
+
+    expect(() => setPose(pose)).toThrow(/non-unit pose axis/);
+    expect(
+      () => evaluatePose(rig, pose),
+      'If evaluatePose starts rejecting this too, the two eps values have\n' +
+        'converged and this test is no longer pinning a gap — re-derive both.',
+    ).not.toThrow();
   }));
 
   it('rejects a pose key outside the bone range instead of posing nothing', () => withScene((scene) => {

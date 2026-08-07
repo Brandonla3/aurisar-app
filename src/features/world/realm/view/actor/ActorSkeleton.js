@@ -73,18 +73,45 @@
  * count crosses ~60, this pin must be re-argued — and the argument must
  * include a way to test the texture path, not merely a decision to enable it.
  *
- * ── WHY `bone._matrix = m` AND NOT `bone.updateMatrix(m)` ───────────────────
+ * ── HOW THE LOCAL MATRIX IS WRITTEN, AND WHY ───────────────────────────────
  *
- * `updateMatrix` is the un-underscored API and it is WRONG here: its first act
- * is `this._bindMatrix.copyFrom(matrix)`. Posing through it would move the
- * bind pose to wherever the actor currently is, so the palette would read
- * identity at the POSED pose and the mesh would never deform at all — a bug
- * that renders as a perfectly rigid, perfectly plausible character. The
- * `_matrix` setter (typed in Babylon's own `.d.ts`) writes the LOCAL matrix
- * only and runs the right bookkeeping: it marks the bone dirty and flags a
- * decompose, so `bone.position` / `bone.rotationQuaternion` stay consistent
- * for P9's animation clips. `ActorSkeleton.test.js` pins the bind matrix as
- * still-the-rest-matrix after a pose, so the wrong call cannot creep back in.
+ * `bone.updateMatrix(m)` — the obvious un-underscored API — is simply WRONG
+ * here: its first act is `this._bindMatrix.copyFrom(matrix)`. Posing through
+ * it moves the bind pose to wherever the actor currently is, so the palette
+ * reads identity at the POSED pose and the mesh never deforms at all: a
+ * perfectly rigid, perfectly plausible character. Measured, not theorised —
+ * substituting it turns 10 tests red, including an independence check
+ * reporting 5.96e-8 of total vertex motion.
+ *
+ * `bone.setRotationMatrix(R, Space.LOCAL)` is a genuine public alternative and
+ * it is NUMERICALLY FREE: measured bit-identical palettes and bit-identical
+ * skinned vertices on all four archetypes (max delta 0, 0 differing elements),
+ * because `_decompose()` of a pure-translation local yields scale (1,1,1) and
+ * `ComposeToRef` rebuilds `R · restLocal` exactly. An earlier version of this
+ * comment claimed it cost "a quaternion round-trip and a larger oracle delta";
+ * that was never measured and it is false.
+ *
+ * The `_matrix` write is kept on three true grounds and one safety net:
+ *
+ *   1. It is ABSOLUTE against the REST matrix, unconditionally. `setPose` is
+ *      not incremental and must not be: it rebuilds each local from
+ *      `bone.getRestMatrix()` every time, so no sequence of calls can drift.
+ *      `setRotationMatrix` preserves whatever translation is CURRENTLY
+ *      decomposed on the bone, which is identical today (nothing writes bone
+ *      translation) and stops being identical the moment P9's clips animate a
+ *      translation channel.
+ *   2. One `copyFrom` per bone against a decompose-plus-compose.
+ *   3. Babylon's own public `returnToRest()` writes `this._matrix =
+ *      this._restMatrix` — this is the engine's own idiom for exactly this
+ *      operation, not a private back door.
+ *   4. It is `@internal` in the JSDoc though fully typed in the shipped
+ *      `.d.ts`, so the risk is a semantic change on upgrade. That is covered:
+ *      the babylonjs version is pinned, and the bind-matrix pin plus the
+ *      oracle in `ActorSkeleton.test.js` fail loudly on any drift rather than
+ *      degrading quietly. If a future upgrade does break it,
+ *      `setRotationMatrix(R, Space.LOCAL)` is the drop-in replacement — at the
+ *      cost of ground 1, which must then be re-argued against whatever P9
+ *      writes to bone translations.
  *
  * ── WHY setPose FORCES prepare ─────────────────────────────────────────────
  *
@@ -103,17 +130,33 @@
 const ROOT_PARENT_AT = Object.freeze([0, 0, 0]);
 
 /**
- * How far |axis| may sit from 1 before a pose is rejected — the same constant
- * and the same reason as `model/actorRig.js`'s `evaluatePose`, and the reason
- * it is duplicated rather than shared is that this guard closes a DIFFERENT
- * hole. `evaluatePose` throws on a scaled axis because Rodrigues silently
- * returns a shearing non-rotation. `Matrix.RotationAxisToRef` normalises its
- * axis internally, so it would silently return a DIFFERENT, perfectly valid
- * rotation instead — the engine and the twin would disagree about what the
- * pose even means, and the oracle would report a mismatch whose real cause is
- * three files away. Both paths must reject the same inputs.
+ * How far |axis| may sit from 1 before a pose is rejected.
+ *
+ * TEN TIMES TIGHTER THAN `evaluatePose`'s 1e-6, and the gap is the whole
+ * point. The two paths disagree about what a non-unit axis MEANS:
+ * `Matrix.RotationAxisToRef` normalises internally and rotates about the
+ * direction, while `evaluatePose`'s Rodrigues uses the raw vector and produces
+ * a shearing non-rotation. So an axis that both guards accept is an axis on
+ * which the engine and the twin compute genuinely different bodies — and
+ * `evaluatePose`'s own eps is loose enough to leave a live band where that
+ * happens. Measured (unbound, canary, both sides given the same non-unit
+ * axis), worst oracle position delta against POSITION_TOL = 4.77e-7:
+ *
+ *     |axis|-1   1e-7 -> 2.38e-7 ok     2e-7 -> 3.58e-7 ok
+ *                5e-7 -> 5.96e-7 FAIL   9.9e-7 -> 9.54e-7 FAIL
+ *
+ * i.e. anything from roughly 3e-7 up to `evaluatePose`'s 1e-6 passes both
+ * guards and then fails the oracle with a numerical message and no structural
+ * cause — a Task-7 hand-built pose could burn a day on it. At 1e-7 the worst
+ * induced delta is 2.38e-7, indistinguishable from the fp32 floor and well
+ * inside the tolerance. A legitimately normalised axis is within ~2 ULP of 1
+ * (~4e-16), some nine orders inside this, so nothing real is refused.
+ *
+ * THE COUPLING IS LOAD-BEARING: this constant must stay comfortably below
+ * `POSITION_TOL` in `ActorSkeleton.test.js`, which says the same thing at its
+ * end. Loosening either without the other reopens the band.
  */
-const AXIS_UNIT_EPS = 1e-6;
+const AXIS_UNIT_EPS = 1e-7;
 
 /**
  * Build one live skeleton for one rig.
@@ -159,10 +202,8 @@ export function buildActorSkeleton(scene, rig, name = rig.archetypeId) {
     bones.push(new BABYLON.Bone(b.boneId, skeleton, parent, local));
   }
 
-  // Scratch, reused across bones and across calls. `_matrix`'s setter copies
-  // by value and guards on `updateFlag`, which every `multiplyToRef` bumps
-  // from a monotonic global seed — so a reused destination can never be
-  // mistaken for an unchanged one.
+  // Scratch, reused across bones and across calls — `_matrix`'s setter copies
+  // by value, so nothing downstream retains these.
   const rotation = new BABYLON.Matrix();
   const local = new BABYLON.Matrix();
   const axis = new BABYLON.Vector3();
@@ -170,9 +211,10 @@ export function buildActorSkeleton(scene, rig, name = rig.archetypeId) {
   /**
    * Pose the skeleton from a CANARY_POSE-shaped table:
    * `{boneIndex: {axis: [x,y,z], angleRad}}`, unit axis, missing entries are
-   * the identity. Absolute, not incremental — every bone is rewritten from its
-   * rest matrix on every call, so there is no accumulated-drift state and no
-   * order in which two calls give a different answer than one.
+   * the identity. ABSOLUTE, not incremental — every bone's local matrix is
+   * recomputed from its REST matrix on every call, never from its current
+   * value, so there is no accumulated-drift state and no sequence of calls
+   * that gives a different answer than the last one alone.
    *
    * `pose` may be an array, a plain object, or `null` (the rest pose). A key
    * outside the bone range is a thrown error rather than a silent no-op: a
@@ -202,12 +244,23 @@ export function buildActorSkeleton(scene, rig, name = rig.archetypeId) {
       } else {
         BABYLON.Matrix.IdentityToRef(rotation);
       }
-      // local = R · restLocal. Against a pure-translation rest matrix this is
-      // exact in both parts (each 3x3 term is `r*1 + 0 + 0 + 0`, each
-      // translation term `0 + 0 + 0 + 1*d`), so an unposed bone is returned to
-      // its rest matrix bit-for-bit and the rest palette stays exactly the
-      // identity it is at construction.
+      // local = R · restLocal, and an UNPOSED bone lands on its rest matrix
+      // bit-for-bit — which is what keeps the rest palette exactly the identity
+      // it is at construction. Not by lucky rounding: `Matrix.multiplyToRef`
+      // short-circuits an identity operand to `result.copyFrom(other)`, so the
+      // unposed case is a byte copy of the rest matrix and never a multiply at
+      // all. (Where the multiply DOES run, against a pure-translation rest
+      // matrix, it is exact anyway — every 3x3 term is `r*1 + 0 + 0 + 0`.)
       rotation.multiplyToRef(bone.getRestMatrix(), local);
+      // `_matrix`'s setter skips the write when `local.updateFlag` already
+      // equals the bone's own, and `copyFrom` PROPAGATES the source's flag
+      // rather than minting a new one — so an unposed bone is genuinely
+      // skipped, not merely rewritten with the same bytes. Measured on
+      // unbound: 0 of 8 bones written by rest() at construction, 7 of 8 by the
+      // canary pose (bone 0 is unposed), 7 of 8 by the rest() after it. That is
+      // a no-op elision of an already-correct value, so `setPose` stays
+      // ABSOLUTE: the local matrix equals `R · restLocal` on exit either way,
+      // whatever sequence of calls preceded it.
       bone._matrix = local;
     }
     // See the header: the unforced prepare short-circuits on an unchanged
