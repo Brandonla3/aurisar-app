@@ -151,15 +151,11 @@ describe('actorNME — the BonesBlock splice', () => {
         expect(classesOf(material)).toContain('BonesBlock');
         const bones = blockNamed(material, 'bones');
 
-        // (1) world -> bones, and nowhere else.
-        expect(endpointNames(blockNamed(material, 'world').output)).toEqual(['bones']);
-        expect(bones.world.connectedPoint.ownerBlock.name).toBe('world');
-
-        // (2) bones -> BOTH transforms, and nothing else. THE assertion this
-        // file exists for: dropping `worldNormal` from this set is the
-        // bind-pose-lighting bug, and it is invisible to every other gate in
-        // the phase. Compared as a SET, so a transform that quietly stops
-        // reading the palette fails here even though everything still builds.
+        // (1) bones -> BOTH transforms, and nothing else. THE assertion this
+        // file exists for, and FIRST deliberately: the mis-splice trips (2) as
+        // well, and this is the message that should be the one a reader sees.
+        // Compared as a SET, so a transform that quietly stops reading the
+        // palette fails here even though everything still builds.
         expect(
           endpointNames(bones.output).sort(),
           'BonesBlock.output must reach worldPos AND worldNormal. Feeding\n' +
@@ -167,6 +163,10 @@ describe('actorNME — the BonesBlock splice', () => {
             'BIND-POSE normals: geometry that bends under shading that does not.\n' +
             'No palette test, no vertex oracle and no attribute list can see it.',
         ).toEqual(['worldNormal', 'worldPos']);
+
+        // (2) ...and world reaches them ONLY through the BonesBlock.
+        expect(endpointNames(blockNamed(material, 'world').output)).toEqual(['bones']);
+        expect(bones.world.connectedPoint.ownerBlock.name).toBe('world');
 
         // (3) the attributes it accumulates from, typed at construction.
         const T = BABYLON.NodeMaterialBlockConnectionPointTypes;
