@@ -125,10 +125,13 @@ describe('ActorRig — the skeleton it owns', () => {
     try {
       const a = new ActorRig(scene, protos, DEEP, { name: 'a' });
       const b = new ActorRig(scene, protos, DEEP, { name: 'b' });
-      expect(a.skeleton).not.toBe(b.skeleton);
-      expect(a.mesh.skeleton).not.toBe(b.mesh.skeleton);
-      expect(a.skeleton.bones[1]).not.toBe(b.skeleton.bones[1]);
 
+      // BEHAVIOUR FIRST, deliberately. `a.skeleton !== b.skeleton` is the
+      // cheaper question and it goes red under the same fault — but it reports
+      // "expected Skeleton not to be Skeleton", which names neither the actors
+      // nor the consequence. Posing one and reading the OTHER'S palette is the
+      // claim; the identity checks below are corroboration, in ActorRig.test.js's
+      // frozen-matrix idiom.
       a.setPose(CANARY_POSE[DEEP]);
 
       expect(
@@ -145,6 +148,10 @@ describe('ActorRig — the skeleton it owns', () => {
       // ...and A comes back on its own, without touching B.
       a.rest();
       expect(identityMismatches(a.skeleton.getTransformMatrices(null))).toEqual([]);
+
+      expect(a.skeleton).not.toBe(b.skeleton);
+      expect(a.mesh.skeleton).not.toBe(b.mesh.skeleton);
+      expect(a.skeleton.bones[1]).not.toBe(b.skeleton.bones[1]);
       a.dispose();
       b.dispose();
       protos.dispose();
