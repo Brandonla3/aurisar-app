@@ -208,6 +208,10 @@ const ProfileTab = memo(function ProfileTab({
   // Password change
   pwPanelOpen, setPwPanelOpen,
   pwNew, setPwNew,
+  pwCurrent, setPwCurrent,
+  pwNonce, setPwNonce,
+  pwReauthSent, pwRecoveryMode,
+  sendPasswordReauthCode,
   pwConfirm, setPwConfirm,
   pwMsg, setPwMsg,
   // Phone change
@@ -1599,7 +1603,7 @@ return (
     /* ═══ Set / Change Password — collapsible ═══ */
   }<div className={"log-group-card"} style={{ "--mg-color": cls.color }}>
       <div className={`log-group-hdr${pwPanelOpen ? "" : " collapsed"}`}
-        onClick={() => { setPwPanelOpen(s => !s); if (pwPanelOpen) { setPwNew(""); setPwConfirm(""); setPwMsg(null); } }}>
+        onClick={() => { setPwPanelOpen(s => !s); if (pwPanelOpen) { setPwNew(""); setPwConfirm(""); setPwCurrent(""); setPwNonce(""); setPwMsg(null); } }}>
         <div className={"log-group-icon"}>{"🔑"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "'Cinzel',serif", fontSize: ".74rem", color: "#d4cec4", fontWeight: 600, letterSpacing: ".03em" }}>{"Set / Change Password"}</div>
@@ -1608,6 +1612,17 @@ return (
       </div>
       {pwPanelOpen && (
         <div style={{ padding: "8px 11px 10px" }}>
+          {/* Current password proves it's really you. Hidden during a reset,
+              where the user is here precisely because they don't know it. */}
+          {!pwRecoveryMode && (
+            <div className={"field"} style={{ marginTop: S.s10 }}>
+              <label>{"Current Password"}</label>
+              <input className={"inp"} type={"password"} value={pwCurrent}
+                autoComplete={"current-password"}
+                onChange={e => setPwCurrent(e.target.value)}
+                placeholder={"••••••••"} />
+            </div>
+          )}
           <div className={"field"} style={{
         marginTop: S.s10
       }}><div style={{
@@ -1632,9 +1647,28 @@ return (
         background: pwMsg.ok === null ? "rgba(45,42,36,.16)" : "transparent",
         borderRadius: R.md,
         border: pwMsg.ok === null ? "1px solid rgba(180,172,158,.06)" : "none"
-      }}>{pwMsg.text}</div>}<button className={"btn btn-ghost btn-sm"} style={{
+      }}>{pwMsg.text}</div>}
+          {/* Reauthentication code. Shown once Supabase has asked for one, and
+              reachable on demand regardless — if the error classification ever
+              misses, this is still a way through rather than a dead end. */}
+          {pwReauthSent && (
+            <div className={"field"}>
+              <label>{"Confirmation Code"}</label>
+              <input className={"inp"} inputMode={"numeric"} autoComplete={"one-time-code"}
+                value={pwNonce} onChange={e => setPwNonce(e.target.value)}
+                placeholder={"6-digit code from your email"}
+                onKeyDown={e => { if (e.key === "Enter") changePassword(); }} />
+            </div>
+          )}
+          <button className={"btn btn-ghost btn-sm"} style={{
         width: "100%"
       }} onClick={changePassword} disabled={!pwNew || !pwConfirm}>{"🔑 Save Password"}</button>
+          <div style={{ textAlign: "center", marginTop: S.s6 }}>
+            <span style={{ fontSize: FS.fs58, color: "#8a8478", cursor: "pointer", userSelect: "none", textDecoration: "underline", textUnderlineOffset: 2 }}
+              onClick={() => sendPasswordReauthCode()}>
+              {pwReauthSent ? "Send a new code" : "Email me a code"}
+            </span>
+          </div>
         </div>
       )}
     </div><div className={"div"} />

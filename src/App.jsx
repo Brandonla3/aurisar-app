@@ -96,6 +96,8 @@ import LiveWorkoutBanner from './components/LiveWorkoutBanner';
 // Password policy + HIBP breach check. Extracted so the breach logic is
 // testable; see src/utils/passwordPolicy.js.
 import { validatePasswordPolicy } from './utils/passwordPolicy';
+// Proof-of-identity for credential changes — see src/utils/credentialChange.js.
+import { needsCurrentPassword, buildPasswordUpdate, classifyPasswordUpdateError } from './utils/credentialChange';
 // Local mirror of TrendsTab's DEFAULT_CHART_ORDER so we don't have to eagerly
 // import the TrendsTab module (which would drag recharts into the main chunk)
 // just to read this constant. Keep in sync with TrendsTab.js.
@@ -738,6 +740,11 @@ function App() {
           setSecurityMode(true);
           setEditMode(false);
           setPwPanelOpen(true);
+          // Suppresses the current-password requirement: this user is here
+          // BECAUSE they don't know it. The recovery session is also freshly
+          // minted, so Supabase's reauthentication window is satisfied too.
+          setPwRecoveryMode(true);
+          setPwCurrent("");
           setPwMsg({
             ok: null,
             text: "🔑 You followed a password reset link — please set your new password below."
@@ -767,6 +774,15 @@ function App() {
         setMfaChallengeFactorId(null);
         setMfaChallengeType(null);
         setMfaRecoveryMode(false);
+        // The recovery exemption is scoped to the session that arrived via the
+        // reset link. Left set, a normal login later in the same SPA session
+        // would still hide the current-password field and omit
+        // current_password — silently downgrading the proof on a change that
+        // is not a recovery at all.
+        setPwRecoveryMode(false);
+        setPwCurrent("");
+        setPwNonce("");
+        setPwReauthSent(false);
         setScreen("login");
         return;
       }
@@ -1176,6 +1192,9 @@ function App() {
         setAuthIsNew(false);
       }
     } else {
+      // An ordinary sign-in is unambiguously not a recovery, whatever order
+      // auth events arrive in. Belt to the SIGNED_OUT braces.
+      setPwRecoveryMode(false);
       const {
         error
       } = await sb.auth.signInWithPassword({
@@ -1336,24 +1355,81 @@ function App() {
       });
       return;
     }
+    // A reset link is precisely the case where the user cannot know their
+    // current password, so it is only required for an ordinary change.
+    if (needsCurrentPassword({ isRecovery: pwRecoveryMode }) && !pwCurrent.trim()) {
+      setPwMsg({
+        ok: false,
+        text: "Enter your current password to confirm this change."
+      });
+      return;
+    }
     setPwMsg(null);
     const {
       error
-    } = await sb.auth.updateUser({
-      password: pwNew
-    });
-    if (error) setPwMsg({
-      ok: false,
-      text: "Could not update password. Please try again."
-    });else {
+    } = await sb.auth.updateUser(buildPasswordUpdate({
+      password: pwNew,
+      currentPassword: pwRecoveryMode ? "" : pwCurrent,
+      nonce: pwNonce
+    }));
+    if (error) {
+      const verdict = classifyPasswordUpdateError(error);
+      // Supabase asks for a nonce only when the session is no longer "recent".
+      // Send one immediately rather than telling the user to go find it — the
+      // old code returned a generic failure here that never resolved.
+      if (verdict.kind === "reauth_required" && !pwReauthSent) {
+        const sent = await sendPasswordReauthCode({ silent: true });
+        if (!sent) {
+          // sendPasswordReauthCode already set the real reason. Overwriting it
+          // with "we've emailed you a code" would promise an email that was
+          // never sent, and the code field stays hidden, so the message would
+          // point at a field the user cannot see.
+          return;
+        }
+      }
+      if (verdict.kind === "bad_nonce") setPwNonce("");
       setPwMsg({
-        ok: true,
-        text: "✓ Password updated!"
+        ok: false,
+        text: verdict.msg
       });
-      setPwNew("");
-      setPwConfirm("");
-      setShowPwProfile(false);
+      return;
     }
+    setPwMsg({
+      ok: true,
+      text: "✓ Password updated!"
+    });
+    setPwNew("");
+    setPwConfirm("");
+    setPwCurrent("");
+    setPwNonce("");
+    setPwReauthSent(false);
+    setPwRecoveryMode(false);
+    setShowPwProfile(false);
+  }
+
+  // Sends the reauthentication OTP Supabase requires when "Secure password
+  // change" is on and the session is older than its recency window. Exposed
+  // in the UI unconditionally, not just after a failure: if the error
+  // classification ever misses, the user still has a way through.
+  async function sendPasswordReauthCode({ silent = false } = {}) {
+    const {
+      error
+    } = await sb.auth.reauthenticate();
+    if (error) {
+      setPwMsg({
+        ok: false,
+        text: "Couldn't send the confirmation code. Try again in a moment."
+      });
+      return false;
+    }
+    setPwReauthSent(true);
+    if (!silent) {
+      setPwMsg({
+        ok: null,
+        text: "📧 Code sent — check your email, then enter it below."
+      });
+    }
+    return true;
   }
 
   // ── CHANGE EMAIL ──────────────────────────────────────────────
@@ -5527,6 +5603,13 @@ function App() {
             saveEdit={saveEdit}
             openEdit={openEdit}
             changePassword={changePassword}
+            pwCurrent={pwCurrent}
+            setPwCurrent={setPwCurrent}
+            pwNonce={pwNonce}
+            setPwNonce={setPwNonce}
+            pwReauthSent={pwReauthSent}
+            pwRecoveryMode={pwRecoveryMode}
+            sendPasswordReauthCode={sendPasswordReauthCode}
             changeEmailAddress={changeEmailAddress}
             resetChar={resetChar}
             verifyMfaEnroll={verifyMfaEnroll}
