@@ -1,11 +1,10 @@
 /**
  * actorRig — the SKELETON, derived from the mass genome, as pure data.
  *
- * PURE. No engine, no meshes, no weights. `buildActorRig(id)` reads
- * `pivotsOf`/`archetypeById` (model/actorMasses.js, the locked public entry —
- * never model/actorArchetypes.js) and returns a flat bone array plus a
- * mass-ordinal to bone-index map; `evaluatePose` turns a pose into the
- * 16-floats-per-bone palette the view layer hands to the engine.
+ * PURE. No engine, no meshes, no weights. `buildActorRig(id)` reads `pivotsOf`
+ * and `archetypeById` (model/actorMasses.js, the locked public entry — never
+ * model/actorArchetypes.js) and returns a flat bone array plus a mass-ordinal
+ * to bone-index map; `evaluatePose` turns a pose into the skinning palette.
  *
  * BIND POSE = REST POSE, SO THERE IS NO INVERSE-BIND MATRIX. A skinning
  * palette is normally `world_i · inverseBind_i`, and the inverse-bind is the
@@ -18,88 +17,84 @@
  *
  * The invariant that keeps that honest is BIT-EXACT IDENTITY: at the identity
  * pose every palette matrix must be exactly 1s and 0s in fp32, not 0.9999997.
- * Not cosmetic — Task 2's fp32 CPU twin and Task 4's oracle compare a
- * GPU-skinned vertex against a hand-computed one, and if the unposed palette
- * carried epsilon-scale drift every comparison downstream would need a
- * tolerance wide enough to swallow a genuinely wrong bone too. The exactness
- * falls out of the algebra, not out of rounding: the pivot conjugation's
- * translation is computed as `at - at·R`, which for R = I is a float minus
- * itself and therefore exactly 0, and I·I is exactly I. Verified in
- * actorRig.test.js element-by-element with `toBe`, never `toBeCloseTo`.
+ * Not cosmetic — Task 2's fp32 twin and Task 4's oracle compare a GPU-skinned
+ * vertex against a hand-computed one, and epsilon-scale drift in the unposed
+ * palette would force a tolerance wide enough to swallow a genuinely wrong
+ * bone too. The exactness falls out of the algebra, not out of rounding: the
+ * pivot conjugation's translation is computed as `at - at·R`, which for R = I
+ * is a float minus itself and therefore exactly 0, and I·I is exactly I.
+ * Verified element-by-element with `toBe`, never `toBeCloseTo`.
  *
  * RING PIVOTS ARE FUSED INTO THE PARENT BONE AND NEVER BECOME BONES. The
  * roster's 22 joints split 17 'cap' / 5 'ring' (model/actorMasses.js's
- * `closureAt` decides which). A 'cap' joint is a sphere centred exactly on
- * the pivot, and a sphere is rotation-invariant about its own centre, so the
- * joint stays sealed at any angle. A 'ring' joint is two equal-radius
- * coaxial end rings welded vertex-for-vertex, and that weld is a property of
- * the AUTHORED POSE: rotate either side by anything at all and the two rings
- * separate. gen/actorPrimitives.js's header calls this POSE-LOCKED and names
- * the five — legion's face-plate, magistari's robeLower/robeUpper,
- * robeUpper/cowlStem and cowl bar, and orghon's throat — and the failure is
- * measured, not theorised: orghon's throat before it was welded leaked 4760
- * rays out of 1652 interior directions, and giving that joint a bone would
- * put the leak back on the first animated frame.
+ * `closureAt` decides which). A 'cap' joint is a sphere centred exactly on the
+ * pivot, and a sphere is rotation-invariant about its own centre, so it stays
+ * sealed at any angle. A 'ring' joint is two equal-radius coaxial end rings
+ * welded vertex-for-vertex, and that weld is a property of the AUTHORED POSE:
+ * rotate either side by anything at all and the two rings separate.
+ * gen/actorPrimitives.js's header calls this POSE-LOCKED and names the five —
+ * legion's face-plate, magistari's robeLower/robeUpper, robeUpper/cowlStem and
+ * cowl bar, and orghon's throat — and the failure is measured, not theorised:
+ * orghon's throat before it was welded leaked 4760 rays out of 1652 interior
+ * directions, and a bone there puts the leak back on the first animated frame.
  *
- * So fusion is not an optimisation. It is the reason the bone counts are
- * 8/6/2/5 rather than 8/7/5/6 — measured both ways: letting rings through as
- * bones adds one to legion, three to magistari and one to orghon, and each
- * added bone is a joint that tears.
+ * Fusion is therefore not an optimisation. THE SHIPPED COUNTS ARE 8/6/2/5
+ * (unbound/legion/magistari/orghon); 8/7/5/6 is the COUNTERFACTUAL — what they
+ * would be if fusion broke and rings became bones, measured by running it that
+ * way (+1 legion, +3 magistari, +1 orghon), each extra bone a joint that tears.
  *
- * ONE BONE PER CAP PIVOT, which is what makes those counts come out. A pivot
- * joining N masses does NOT spawn N-1 bones: it spawns exactly one, owning
- * every mass on the far side of it, so legs move as a pair and yokes move
- * with the neck they share a pivot with. The alternative — a bone per
- * far-side BRANCH — was derived and rejected by counting: it hands every mass
- * its own bone, so unbound comes out at 11 (its mass count) instead of 8, and
- * it invents articulation the genome never authored a joint for.
+ * ONE BONE PER CAP PIVOT, which is what makes the shipped counts come out. A
+ * pivot joining N masses does NOT spawn N-1 bones: it spawns exactly one,
+ * owning every mass on the far side of it, so legs move as a pair and yokes
+ * move with the neck they share a pivot with. The rejected alternative — a
+ * bone per far-side BRANCH — hands every mass its own bone, so unbound comes
+ * out at 11 (its mass count), and invents joints the genome never authored.
  *
- * THE ROOT IS THE HEAVIEST MASS, by capsule volume, ties broken by table
- * order. One uniform derived rule, no per-archetype table, and it reproduces
- * all three roots the plan names: torso (unbound 0.118 m3, next 0.080), torso
- * (legion 0.043, next 0.032), robeLower (magistari 0.359, next 0.028) and —
- * for orghon, whose root the plan specifies as the hip cluster's heaviest mass
- * rather than its torso — hipL (0.162, next 0.110). Note the shape that gives
- * orghon: bone 0 owns hipL alone and bone 1 the hip cluster's other four, so
- * the body swings relative to the left hip slab rather than the other way
- * round. That is what "root = hip cluster" means once fusion has run. Volume
- * counts the CAPS, which is why hipL beats thighL (0.162 vs 0.110) where cone
- * volume alone would rank thighL first (0.100 vs 0.059) — hipL and hipR differ
- * only in `capA`, so this rule is sensitive to a cap flag, and that is exactly
- * why all four roots are pinned in actorRig.test.js.
+ * THE ROOT IS THE HEAVIEST MASS THAT IS NOT HALF OF A MIRRORED PAIR. Capsule
+ * volume decides "heaviest", ties break by table order, and any mass with a
+ * left/right twin is skipped outright, because a root must not be one of two
+ * mirrored siblings. One uniform derived rule, no per-archetype exception, and
+ * it gives torso / torso / robeLower / torso. Volume ALONE does not: it picks
+ * orghon's hipL (0.162 m3 against thighL 0.110 and torso 0.085), and a hipL
+ * root means bone 0 owns the LEFT HIP SLAB alone while its four hip-cluster
+ * siblings — the torso among them — hang off bone 1. Same bone count, but the
+ * whole body then swings relative to one hip: a left-hip root wearing a
+ * pelvis's name, which P9's clips would be stuck with forever. Skipping the
+ * hipL/hipR and thighL/thighR mirrors lands on torso, the heaviest centreline
+ * mass. The other three are unaffected — their heaviest mass is already on the
+ * centreline. All four roots are pinned in actorRig.test.js.
  *
- * TREE-NESS IS ASSERTED, NOT ASSUMED, and the graph that has to be a tree is
- * the BIPARTITE mass/pivot incidence graph — not the "masses joined where they
- * share a pivot" graph, which is not a tree even when everything is healthy: a
- * pivot joining N masses is an N-clique there, and the roster measures
- * 14/23/14/19 such edges against 10/13/8/10 masses-minus-one. The bipartite
- * graph measures exactly nodes-1 (17/19/12/15) and BFS reaches every node.
- * `pivotsOfMasses` guarantees none of this for a derived roster, and a cycle
- * would silently give one mass two parents.
+ * TREE-NESS IS ASSERTED, NOT ASSUMED, on the BIPARTITE mass/pivot incidence
+ * graph — not the "masses joined where they share a pivot" graph, which is not
+ * a tree even when healthy: a pivot joining N masses is an N-clique there, and
+ * the roster measures 14/23/14/19 such edges against 10/13/8/10 masses-minus-
+ * one. The bipartite graph measures exactly nodes-1 (17/19/12/15) and BFS
+ * reaches every node. `pivotsOfMasses` guarantees none of this for a derived
+ * roster; a cycle would silently give one mass two parents.
  *
  * CANARY_POSE EXISTS BECAUSE A SKINNING TEST IS TRIVIAL TO WRITE VACUOUSLY.
  * Skin a mesh, pose nothing, compare against the unskinned mesh: it passes,
- * it passes forever, and it passes just as well when every vertex is welded
- * to bone 0. This project has shipped eight tests that could not fail. So
- * every non-root bone gets a rotation, no bone shares an angle with another,
- * and no angle is an integer multiple of another (the prime-degree ladder
+ * it passes forever, and it passes just as well when every vertex is welded to
+ * bone 0. This project has shipped eight tests that could not fail. So every
+ * non-root bone gets a rotation, no bone shares an angle with another, and no
+ * angle is an integer multiple of another (the prime-degree ladder
  * 7/11/13/17/19/23/29). Strictly these are commensurate — all rational
- * multiples of a degree — but the property that matters is that swapping two
- * bones, doubling one, or dropping one to zero all change the palette, and a
- * prime ladder guarantees all three. The per-joint axis is ORTHOGONAL to the
- * bone's own limb direction, because rotating about the limb's own axis spins
- * a capsule on its centreline and moves almost nothing — the most expensive
- * vacuous canary there is, articulated in the table and inert in the mesh.
+ * multiples of a degree — but what matters is that swapping two bones,
+ * doubling one, or dropping one to zero all change the palette, and a prime
+ * ladder guarantees all three. The per-joint axis is ORTHOGONAL to the bone's
+ * own limb direction: rotating about a limb's own axis spins a capsule on its
+ * centreline and moves almost nothing — the most expensive vacuous canary
+ * there is, articulated in the table and inert in the mesh.
  *
- * The ladder is assigned in ASCENDING order of bone index — BFS order, so
- * roughly depth order — because angles COMPOUND down a chain and the shallow
- * bones carry the long lever arms. Measured max endpoint displacement under
- * the canary: 0.572 / 0.207 / 0.053 / 0.284 m ascending against 0.666 / 0.403
- * / 0.216 / 0.590 m with the ladder reversed. Unbound's 0.572 m is the fist,
- * four joints down the graft chain (11+17+23+29 degrees of compounding), and
- * it is the number Task 3's posed seal gate will bind on first. If that gate
- * fails, SHRINK THE ANGLE — never skip the joint, because a skipped joint is
- * exactly the vacuity this table exists to stop.
+ * The ladder runs ASCENDING by bone index — BFS order, so roughly depth order
+ * — because angles COMPOUND down a chain and the shallow bones carry the long
+ * lever arms. Measured max endpoint displacement: 0.572 / 0.207 / 0.053 /
+ * 0.260 m ascending against 0.666 / 0.403 / 0.216 / 0.435 m reversed —
+ * ascending wins on all four. Unbound's 0.572 m is the fist, four joints down
+ * the graft chain (11+17+23+29 degrees of compounding), and it is the number
+ * Task 3's posed seal gate will bind on first. If that gate fails, SHRINK THE
+ * ANGLE — never skip the joint, because a skipped joint is exactly the vacuity
+ * this table exists to stop.
  *
  * EVALUATION IS ONE NON-RECURSIVE FORWARD LOOP. `parent[i] < i` holds by
  * construction (a bone's parent exists before the bone does) and is asserted
@@ -108,22 +103,19 @@
  * palette: a stale or half-updated palette is not a state this code can be in.
  */
 
-import { ARCHETYPES, archetypeById, pivotsOf } from './actorMasses.js';
+import { ARCHETYPES, archetypeById, PIVOT_EPS, pivotsOf } from './actorMasses.js';
 
 /**
  * Object.freeze is shallow — the same trap model/actorArchetypes.js documents
- * for the roster. Freezing a rig leaves `bones`, every bone object and every
- * `at`/`massIds` array inside it writable, so one stray push retunes a
- * skeleton that several prototypes share. `boneOfMass` is deliberately NOT
- * frozen: Object.freeze throws on a typed array with elements. It is instead
- * a fresh allocation per call (buildActorRig is not memoised), so a caller
- * that scribbles on it damages only its own copy.
+ * for the roster. Freezing a rig leaves `bones`, every bone and every
+ * `at`/`massIds` array inside it writable, so one stray push retunes a skeleton
+ * several prototypes share. `boneOfMass` is deliberately NOT frozen (freeze
+ * throws on a typed array with elements); it is a fresh allocation per call —
+ * buildActorRig is not memoised — so a scribble damages only the caller's copy.
  */
 function freezeRig(rig) {
   for (const b of rig.bones) {
-    Object.freeze(b.at);
-    Object.freeze(b.massIds);
-    Object.freeze(b);
+    Object.freeze(b.at); Object.freeze(b.massIds); Object.freeze(b);
   }
   Object.freeze(rig.bones);
   return Object.freeze(rig);
@@ -139,15 +131,38 @@ function massVolume(m) {
 }
 
 /**
+ * Is some OTHER mass this one's reflection across x = 0? Compares a, b, r0, r1
+ * and deliberately NOT the cap flags: hipL and hipR are a mirrored pair that
+ * differ only in `capA` (at a shared pivot only one of the two carries the
+ * cap), so a mirror test reading cap flags would miss exactly the pair this
+ * rule exists to catch. Tolerance is PIVOT_EPS — the same one that groups the
+ * pivots, so a derived roster's float drift cannot hide a twin here either.
+ */
+function hasMirrorTwin(m, masses) {
+  const flipped = (u, v) => Math.abs(-u[0] - v[0]) <= PIVOT_EPS
+    && Math.abs(u[1] - v[1]) <= PIVOT_EPS && Math.abs(u[2] - v[2]) <= PIVOT_EPS;
+  return masses.some((o) => o.id !== m.id && flipped(m.a, o.a) && flipped(m.b, o.b)
+    && Math.abs(m.r0 - o.r0) <= PIVOT_EPS && Math.abs(m.r1 - o.r1) <= PIVOT_EPS);
+}
+
+/** Heaviest mass with no mirror twin — heaviest overall if every mass has one. */
+function pickRoot(masses) {
+  const vol = masses.map(massVolume);
+  const heaviest = (pool) => pool.reduce((a, b) => (vol[b] > vol[a] ? b : a));
+  const centreline = masses.map((_, i) => i).filter((i) => !hasMirrorTwin(masses[i], masses));
+  return heaviest(centreline.length ? centreline : masses.map((_, i) => i));
+}
+
+/**
  * `{bones, boneOfMass}` for one archetype.
  *
  * `bones[i]` is `{boneId, at:[x,y,z], parentIndex, massIds}`. `boneId` is the
  * PIVOT ID the bone hangs from (`unbound.p3`), or `<id>.root` for bone 0, so
- * every bone traces straight back to the `pivotsOf` row that created it and a
- * ring pivot appearing here is visible by name. `at` is the pivot coordinate
- * the bone rotates about; bone 0 uses the root mass's `a`, which is the
- * inboard end by the roster's authoring convention (a limb's `a` is its
- * parent's joint coordinate — model/actorArchetypes.js).
+ * every bone traces back to the `pivotsOf` row that created it and a ring pivot
+ * appearing here is visible by name. `at` is the pivot coordinate the bone
+ * rotates about; bone 0 uses the root mass's `a`, the inboard end by the
+ * roster's authoring convention (a limb's `a` is its parent's joint coordinate
+ * — model/actorArchetypes.js).
  *
  * `boneOfMass` is a Uint16Array indexed by MASS ORDINAL (position in
  * `archetype.masses`), not by mass id, because that is the index the vertex
@@ -172,23 +187,14 @@ export function buildActorRig(archetypeId) {
     }
   });
 
-  // Tree-ness, half one: edge count. A connected graph with nodes-1 edges is
-  // a tree; BFS below proves the connected half by reaching every node.
+  // Tree-ness, half one: edge count. A connected graph with nodes-1 edges is a
+  // tree; the BFS below proves the connected half by reaching every node.
   const nodes = masses.length + pivots.length;
   if (edges !== nodes - 1) {
-    throw new Error(
-      `[actorRig] "${archetypeId}" mass/pivot graph is not a tree: ${edges} incidences ` +
-      `across ${nodes} nodes, a tree needs ${nodes - 1}. More means a cycle (a mass ` +
-      `reachable two ways, so its bone parent depends on visit order); fewer means it ` +
-      `is a forest (a limb joined to nothing).`,
-    );
+    throw new Error(`[actorRig] "${archetypeId}" mass/pivot graph is not a tree: ${edges} incidences across ${nodes} nodes, a tree needs ${nodes - 1}. More means a cycle (a mass reachable two ways, so its bone parent depends on visit order); fewer means a forest (a limb joined to nothing).`);
   }
 
-  let root = 0;
-  for (let i = 1; i < masses.length; i++) {
-    if (massVolume(masses[i]) > massVolume(masses[root])) root = i;
-  }
-
+  const root = pickRoot(masses);
   const bones = [{ boneId: `${archetypeId}.root`, at: [...masses[root].a], parentIndex: -1, massIds: [] }];
   const boneOfMass = new Uint16Array(masses.length);
   const seenMass = masses.map(() => false);
@@ -231,9 +237,7 @@ export function buildActorRig(archetypeId) {
     throw new Error(`[actorRig] "${archetypeId}" mass/pivot graph is disconnected: masses [${orphanMass}] and pivots [${orphanPivot}] are unreachable from root "${masses[root].id}".`);
   }
   for (let i = 0; i < bones.length; i++) {
-    if (bones[i].parentIndex >= i) {
-      throw new Error(`[actorRig] "${archetypeId}" bone ${i} (${bones[i].boneId}) has parent ${bones[i].parentIndex} >= ${i}. evaluatePose is a single forward pass and reads the parent's palette entry before writing its own; a forward reference would compose against whatever was left in the buffer.`);
-    }
+    if (bones[i].parentIndex >= i) throw new Error(`[actorRig] "${archetypeId}" bone ${i} (${bones[i].boneId}) has parent ${bones[i].parentIndex} >= ${i}. evaluatePose is a single forward pass and reads the parent's palette entry before writing its own; a forward reference would compose against whatever was left in the buffer.`);
   }
 
   return freezeRig({ archetypeId, bones, boneOfMass });
@@ -242,19 +246,18 @@ export function buildActorRig(archetypeId) {
 /**
  * Distinct, non-multiple canary angles in DEGREES. Seven entries because the
  * roster's deepest rig (unbound) has seven non-root bones; a fifth archetype
- * with more would run off the end, which `canaryPoseFor` refuses loudly
- * rather than by wrapping the ladder and quietly duplicating an angle.
+ * with more runs off the end, which `canaryPoseFor` refuses loudly rather than
+ * wrapping the ladder and quietly duplicating an angle.
  */
 export const CANARY_LADDER_DEG = Object.freeze([7, 11, 13, 17, 19, 23, 29]);
 
 const DEG = Math.PI / 180;
 
 /**
- * A unit axis orthogonal to `dir`, chosen as the world axis LEAST parallel to
- * it and then Gram-Schmidt'd. The least-parallel world axis always has
- * |dot| <= 1/sqrt(3), so the rejected vector is never shorter than
- * sqrt(1 - 1/3) = 0.816 and the normalise is safe; across the shipped roster
- * the shortest is 0.988.
+ * A unit axis orthogonal to `dir`: the world axis LEAST parallel to it,
+ * Gram-Schmidt'd. That axis always has |dot| <= 1/sqrt(3), so the rejected
+ * vector is never shorter than sqrt(1 - 1/3) = 0.816 and the normalise is
+ * safe; across the shipped roster the shortest is 0.988.
  */
 function orthogonalAxis(dir) {
   let k = 0;
@@ -268,9 +271,9 @@ function orthogonalAxis(dir) {
 
 /**
  * The bone's limb direction: the sum of (outboard endpoint - pivot) over the
- * masses it owns, length-weighted so a long limb outvotes a stub. A
- * left/right pair cancels exactly if the bone owns nothing else, so the
- * degenerate case falls back to the first owned mass's own axis.
+ * masses it owns, length-weighted so a long limb outvotes a stub. A left/right
+ * pair cancels exactly if the bone owns nothing else, so that degenerate case
+ * falls back to the first owned mass's own axis.
  */
 function limbDirection(bone, massById) {
   let d = [0, 0, 0];
@@ -295,9 +298,7 @@ function canaryPoseFor(archetypeId) {
   const rig = buildActorRig(archetypeId);
   const massById = new Map(archetypeById(archetypeId).masses.map((m) => [m.id, m]));
   const nonRoot = rig.bones.length - 1;
-  if (nonRoot > CANARY_LADDER_DEG.length) {
-    throw new Error(`[actorRig] "${archetypeId}" has ${nonRoot} non-root bones but the canary ladder holds ${CANARY_LADDER_DEG.length} distinct angles. Extend the ladder with further primes; do not wrap it.`);
-  }
+  if (nonRoot > CANARY_LADDER_DEG.length) throw new Error(`[actorRig] "${archetypeId}" has ${nonRoot} non-root bones but the canary ladder holds ${CANARY_LADDER_DEG.length} distinct angles. Extend the ladder with further primes; do not wrap it.`);
   const table = {};
   for (let i = 1; i < rig.bones.length; i++) {
     table[i] = Object.freeze({
@@ -309,9 +310,9 @@ function canaryPoseFor(archetypeId) {
 }
 
 /**
- * `CANARY_POSE[archetypeId]` — the pose every downstream gate poses with.
- * Plain frozen data, built once at module load and never regenerated, so the
- * table Task 3 measures against is byte-identical to the one Task 4 replays.
+ * `CANARY_POSE[archetypeId]` — the pose every downstream gate poses with. Plain
+ * frozen data, built once at module load and never regenerated, so the table
+ * Task 3 measures against is byte-identical to the one Task 4 replays.
  */
 export const CANARY_POSE = Object.freeze(
   Object.fromEntries(ARCHETYPES.map((a) => [a.id, canaryPoseFor(a.id)])),
@@ -319,7 +320,7 @@ export const CANARY_POSE = Object.freeze(
 
 /**
  * Rodrigues rotation about a unit axis, row-major 3x3 in the ROW-VECTOR
- * convention (v' = v·M) — the same convention and the same expansion as
+ * convention (v' = v·M) — the same convention and expansion as
  * model/instanceMatrix.js's `rotAxis`, which is the layout the engine's
  * `Matrix` uses. At angle 0 this is exactly the identity: sin 0 is exactly 0
  * and cos 0 exactly 1, so every entry is an exact 0 or 1 with no rounding.
@@ -351,11 +352,10 @@ const IDENTITY_3X3 = Object.freeze([1, 0, 0, 0, 1, 0, 0, 0, 1]);
  * two-bone fixture in actorRig.test.js is there to catch the mirror.
  *
  * @param rig from `buildActorRig` — only `rig.bones` is read.
- * @param pose anything indexable by bone index yielding `{axis, angleRad}`
- *   (a plain object, an array, CANARY_POSE's table). Missing entries are the
+ * @param pose anything indexable by bone index yielding `{axis, angleRad}` (a
+ *   plain object, an array, CANARY_POSE's table). Missing entries are the
  *   identity, so `{}` is the rest pose.
- * @returns Float32Array(16 * boneCount). Fresh every call: there is no cached
- *   palette to go stale.
+ * @returns Float32Array(16 * boneCount), fresh every call — no cached palette.
  */
 export function evaluatePose(rig, pose) {
   const bones = rig.bones;

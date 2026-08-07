@@ -25,9 +25,22 @@ const IDS = ['unbound', 'legion', 'magistari', 'orghon'];
 /** The plan's locked counts. A different number here is a design change. */
 const EXPECTED_BONES = { unbound: 8, legion: 6, magistari: 2, orghon: 5 };
 
-/** The plan's named roots: torso, torso, robeLower, and orghon's hip cluster. */
+/**
+ * The named roots. All four are "heaviest mass that is not half of a mirrored
+ * pair" — orghon is the one where the mirror clause decides anything: volume
+ * alone picks `hipL` (0.162 m³ against torso's 0.085), which roots the whole
+ * body on the LEFT HIP SLAB. Same bone count, wrong pelvis.
+ */
 const EXPECTED_ROOT_MASS = {
-  unbound: 'torso', legion: 'torso', magistari: 'robeLower', orghon: 'hipL',
+  unbound: 'torso', legion: 'torso', magistari: 'robeLower', orghon: 'torso',
+};
+
+/** Left/right pairs the root rule must refuse, by archetype. */
+const MIRRORED_PAIRS = {
+  unbound: [['legL', 'legR']],
+  legion: [['legL', 'legR'], ['yokeL', 'yokeR'], ['armL', 'armR'], ['faceL', 'faceR'], ['crestL', 'crestR']],
+  magistari: [['sleeveL', 'sleeveR'], ['cowlL', 'cowlR']],
+  orghon: [['hipL', 'hipR'], ['thighL', 'thighR'], ['armLUpper', 'armRUpper'], ['armLFore', 'armRFore']],
 };
 
 const IDENTITY_16 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -67,6 +80,48 @@ describe('buildActorRig — topology', () => {
     expect(rig.bones[0].boneId).toBe(`${id}.root`);
     // ...and bone 0's pivot is that mass's inboard end.
     expect([...rig.bones[0].at]).toEqual([...archetypeById(id).masses.find((m) => m.id === rootMass).a]);
+  });
+
+  it.each(IDS)('%s never roots on half of a mirrored pair', (id) => {
+    // The reflection arithmetic is redone here rather than imported, so the
+    // module's own mirror test is not the only thing that believes these are
+    // pairs. Anti-vacuity: the list must be non-empty for the check to mean
+    // anything, and every listed pair must really mirror.
+    const byId = new Map(archetypeById(id).masses.map((m) => [m.id, m]));
+    const pairs = MIRRORED_PAIRS[id];
+    expect(pairs.length, `${id} has no mirrored pairs to refuse`).toBeGreaterThan(0);
+    // `-0` and `+0` are the same point but not `toEqual`-equal, and every one
+    // of these pairs has a centreline endpoint at x = 0.
+    const reflect = (p) => [p[0] === 0 ? 0 : -p[0], p[1], p[2]];
+    const mirrored = new Set();
+    for (const [l, r] of pairs) {
+      const a = byId.get(l);
+      const b = byId.get(r);
+      expect(reflect(a.a), `${l} vs ${r} start`).toEqual([...b.a]);
+      expect(reflect(a.b), `${l} vs ${r} end`).toEqual([...b.b]);
+      expect([a.r0, a.r1], `${l} vs ${r} radii`).toEqual([b.r0, b.r1]);
+      mirrored.add(l).add(r);
+    }
+    expect(mirrored.has(EXPECTED_ROOT_MASS[id])).toBe(false);
+    expect(mirrored.has(buildActorRig(id).bones[0].massIds[0])).toBe(false);
+  });
+
+  it('orghon would root on the wrong mass without the mirror clause', () => {
+    // The clause is load-bearing on exactly one archetype, and this records
+    // why: hipL is the heaviest mass orghon has, and rooting there puts the
+    // torso — and everything above it — underneath one hip slab.
+    const masses = archetypeById('orghon').masses;
+    const vol = (m) => {
+      const len = Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1], m.b[2] - m.a[2]);
+      const cone = ((Math.PI * len) / 3) * (m.r0 * m.r0 + m.r0 * m.r1 + m.r1 * m.r1);
+      return cone + (m.capA ? (2 / 3) * Math.PI * m.r0 ** 3 : 0) + (m.capB ? (2 / 3) * Math.PI * m.r1 ** 3 : 0);
+    };
+    const heaviest = masses.reduce((a, b) => (vol(b) > vol(a) ? b : a));
+    expect(heaviest.id).toBe('hipL');
+    expect(buildActorRig('orghon').bones[0].massIds[0]).toBe('torso');
+    // ...and the shipped root really is the heaviest CENTRELINE mass.
+    const centreline = masses.filter((m) => m.a[0] === 0 && m.b[0] === 0);
+    expect(centreline.reduce((a, b) => (vol(b) > vol(a) ? b : a)).id).toBe('torso');
   });
 
   it.each(IDS)('%s has parent[i] < i, with exactly one root', (id) => {
