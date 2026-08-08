@@ -12,3 +12,6 @@ config/terrain-assets.lock.json text eol=lf
 # The generated textures are hashed too; mark them binary explicitly so no
 # client config (e.g. a global `* text=auto`) can ever rewrite their bytes.
 public/assets/terrain/generated/** binary
+
+# README screenshots — binary so no line-ending config touches them.
+docs/readme/** binary
